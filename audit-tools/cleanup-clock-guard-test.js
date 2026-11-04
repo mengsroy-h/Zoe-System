@@ -178,6 +178,7 @@ function buildWorld(opts) {
         'function retryFailedDbListenersNow() {}',
         'function flushPendingHistoryPatches() {}',
         'function flushPendingRegistryReleases() {}',
+        'function resumePriceOperations() {}',
         'let pendingRegistryReleases = new Map();',
         'let registryReleaseFlushInFlight = false;',
         'function scheduleReconnectWatchdog() {}',

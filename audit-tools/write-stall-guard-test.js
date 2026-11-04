@@ -175,8 +175,8 @@ globalThis.__notifyIfSlow = notifyIfSlow;
     const modules = [
         ['src/domain/barcode-key.ts', ['canonicalBarcodeRegistryKey']],
         ['src/services/row-operation-lock.ts', ['rowOperationActive']],
-        ['src/domain/trash-generation.ts', ['TRASH_CONSUMPTIONS_ROOT', 'trashConsumptionSame', 'trashConsumptionOf', 'trashGenerationOf', 'trashSourceUnconsumed']],
-        ['src/domain/registry-purge-proof.ts', ['REGISTRY_RELEASES_ROOT', 'REGISTRY_PURGE_MAX_WRITES', 'boundedRegistryPurgeIntent', 'registryPurgeIntent', 'registryPurgeReceiptMatches']],
+        ['src/domain/trash-generation.ts', ['TRASH_CONSUMPTIONS_ROOT', 'trashConsumptionSame', 'trashConsumptionOf', 'trashGenerationOf', 'trashSourceUnconsumed', 'purgeCertificateOf']],
+        ['src/domain/registry-purge-proof.ts', ['REGISTRY_RELEASES_ROOT', 'REGISTRY_PURGE_MAX_WRITES', 'boundedRegistryPurgeIntent', 'slotRegistryPurgeIntent', 'registryPurgeIntent', 'registryPurgeReceiptMatches']],
         ['src/domain/scan-protocol.ts', ['SCAN_OPERATIONS_ROOT', 'scanOperationValid', 'scanRegistryOwned']],
         ['src/services/registry-purge.ts', ['purgeTrashWithRegistry']]
     ].map(([name, exported]) => {
@@ -198,6 +198,12 @@ globalThis.__notifyIfSlow = notifyIfSlow;
         let parent = tree;
         for (const part of parts) parent = parent[part] ||= {};
         if (value === null) delete parent[leaf]; else parent[leaf] = clone(value);
+        // RTDB ៖ node ដែលគ្មានកូនលែងមាន ➜ purge តាម slot/វាល (F03) លុបជួរទាំងមូលដូច server ពិត
+        if (value === null) for (let depth = parts.length; depth > 0; depth--) {
+            const node = parts.slice(0, depth).reduce((at, part) => at && at[part], tree);
+            if (!node || typeof node !== 'object' || Object.keys(node).length) break;
+            delete parts.slice(0, depth - 1).reduce((at, part) => at[part], tree)[parts[depth - 1]];
+        }
     };
     const seed = ctx.__seed;
     ctx.__seed = values => {

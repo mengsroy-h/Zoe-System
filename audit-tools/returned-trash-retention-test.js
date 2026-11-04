@@ -60,7 +60,18 @@ function build(items, ledgerDays, ledgerMonths, exitState = 'failed') {
         zoew_barcode_registry: Object.fromEntries(items.flatMap(item => item.barcodes.map(barcode => [barcode.code, true]))),
         zoew_daily_revenue_cod_dod: clone(ledgerDays || {}), zoew_monthly_revenue_cod_dod: clone(ledgerMonths || {}) };
     const get = raw => { let value = store; for (const key of String(raw || '').split('/').filter(Boolean)) value = value?.[key]; return value ?? null; };
-    const set = (raw, value) => { const parts = raw.split('/'); let target = store; for (const key of parts.slice(0, -1)) target = target[key] ||= {}; if (value === null) delete target[parts.at(-1)]; else target[parts.at(-1)] = clone(value); };
+    const set = (raw, value) => {
+        const parts = raw.split('/'); let target = store;
+        for (const key of parts.slice(0, -1)) target = target[key] ||= {};
+        if (value !== null) { target[parts.at(-1)] = clone(value); return; }
+        delete target[parts.at(-1)];
+        // RTDB ៖ node ដែលគ្មានកូនលែងមាន ➜ purge តាម slot/វាល (F03) លុបជួរទាំងមូលដូច server ពិត
+        for (let depth = parts.length - 1; depth > 0; depth--) {
+            const parent = parts.slice(0, depth).reduce((node, part) => node && node[part], store);
+            if (!parent || typeof parent !== 'object' || Object.keys(parent).length) break;
+            delete parts.slice(0, depth - 1).reduce((node, part) => node[part], store)[parts[depth - 1]];
+        }
+    };
     const fb = {
         ref: (_db, path = '') => ({ path }),
         get: async ref => ({ val: () => clone(get(ref.path)) }),
@@ -75,7 +86,9 @@ function build(items, ledgerDays, ledgerMonths, exitState = 'failed') {
         update: async (ref, updates) => {
             for (const [key, value] of Object.entries(updates)) {
                 const full = [ref.path, key].filter(Boolean).join('/'); set(full, value);
-                if (value === null && full.startsWith('zoew_recently_deleted_cod_dod/')) log.batches.push([full.split('/').at(-1)]);
+                if (value === null && /^zoew_recently_deleted_cod_dod\/[^/]+$/.test(full)) log.batches.push([full.split('/').at(-1)]);
+                // purge តាម slot (F03) ៖ consumption ដែលសរសេរជាមួយការលុបវាល = ធាតុនោះត្រូវ purge
+                if (value && /^zoew_trash_consumptions\/[^/]+$/.test(full) && value.kind === 'purge') log.batches.push([full.split('/').at(-1)]);
                 if (value === null && full.startsWith('zoew_barcode_registry/')) log.releasedBarcodes.push(full.split('/').at(-1));
             }
         }
@@ -119,7 +132,7 @@ function build(items, ledgerDays, ledgerMonths, exitState = 'failed') {
     });
     const runtime = require('./react-view').moduleRuntime(ROOT, source, [
         'src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/core/shop-scope.ts',
-        { path: 'src/domain/registry-purge-proof.ts', expose: ['REGISTRY_RELEASES_ROOT', 'REGISTRY_PURGE_MAX_WRITES', 'boundedRegistryPurgeIntent', 'registryPurgeReceiptValid', 'registryPurgeReceiptMatches', 'registryPurgeIntent'] },
+        { path: 'src/domain/registry-purge-proof.ts', expose: ['REGISTRY_RELEASES_ROOT', 'REGISTRY_PURGE_MAX_WRITES', 'boundedRegistryPurgeIntent', 'slotRegistryPurgeIntent', 'registryPurgeReceiptValid', 'registryPurgeReceiptMatches', 'registryPurgeIntent'] },
         { path: 'src/services/registry-purge.ts', expose: ['purgeTrashWithRegistry'] }
     ]);
     const code = [

@@ -98,7 +98,7 @@ function extractConst(src, name) {
 }
 
 const src = fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, '\n');
-const protocolRuntime = moduleRuntime(ROOT, src, ['src/domain/scan-protocol.ts', { path: 'src/domain/registry-purge-proof.ts', expose: ['REGISTRY_RELEASES_ROOT', 'REGISTRY_PURGE_MAX_WRITES', 'boundedRegistryPurgeIntent', 'registryPurgeReceiptValid', 'registryPurgeReceiptMatches', 'registryPurgeIntent'] }, { path: 'src/services/registry-purge.ts', expose: ['purgeTrashWithRegistry'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
+const protocolRuntime = moduleRuntime(ROOT, src, ['src/domain/scan-protocol.ts', { path: 'src/domain/registry-purge-proof.ts', expose: ['REGISTRY_RELEASES_ROOT', 'REGISTRY_PURGE_MAX_WRITES', 'boundedRegistryPurgeIntent', 'slotRegistryPurgeIntent', 'registryPurgeReceiptValid', 'registryPurgeReceiptMatches', 'registryPurgeIntent'] }, { path: 'src/services/registry-purge.ts', expose: ['purgeTrashWithRegistry'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
 
 const FNS = ['safeStoreGet', 'safeStoreSet', 'safeStoreRemove', 'barcodeEntriesOf', 'normalizeBarcodesOf', 'stripHistoryOnlyMarkers', 'trashClaimPolicy', 'newTrashClaimToken', 'trashClaimAge', 'trashClaimHeldByOther', 'ownLeftoverTrashClaim', 'trashClaimOwned', 'stripTrashClaim', 'itemHasLiveTrashClaim', 'trashClaimRecords', 'writeTrashClaimRecords', 'noteTrashClaim', 'forgetTrashClaim', 'pendingTrashClaims', 'trashClaimOwner', 'trashClaimOwnerIsCurrent', 'claimTrashBarcodes', 'releaseTrashClaims', 'beginTrashClaim', 'releaseLeftoverTrashClaims', 'itemHasRestoreMarkers', 'dropStaleRestoreMarkers',
     'applyBarcodeCloseState', 'barcodeCloseIsRipe', 'barcodeAbandonIsRipe', 'barcodeAbandonBasis', 'itemAbandonRipeAt', 'parseTimestampFromId',
@@ -135,7 +135,16 @@ function buildWorld(store, now) {
             cur = cur[parts[i]];
         }
         const key = parts[parts.length - 1];
-        if (value === null) { delete cur[key]; return; }
+        if (value === null) {
+            delete cur[key];
+            // RTDB ៖ node ដែលគ្មានកូនលែងមាន ➜ purge តាម slot/វាល (F03) លុបជួរទាំងមូលដូច server ពិត
+            for (let depth = parts.length - 1; depth > 0; depth--) {
+                const parent = parts.slice(0, depth).reduce((node, part) => node && node[part], store);
+                if (!parent || typeof parent !== 'object' || Object.keys(parent).length) break;
+                delete parts.slice(0, depth - 1).reduce((node, part) => node[part], store)[parts[depth - 1]];
+            }
+            return;
+        }
         cur[key] = clone(value);
     };
     const fb = {

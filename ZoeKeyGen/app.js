@@ -2960,68 +2960,77 @@ async function setKeySeatLimit(id) {
 }
 
 async function releaseKeySeat(id) {
-    const operation = captureSensitiveSession(true);
-    const operationDb = db;
-    if (!operation || !operationDb) return;
-    const row = keyListCache.find((r) => r.id === id);
-    if (!row) return;
-    if (seatReadFailed) {
-        alert('អាន license_seats មិនបានទេ! សូម Publish Firebase Rules ថ្មីជាមុនសិន (មើល README) រួចសាកល្បងម្តងទៀត។');
+    if (releaseKeySeat.busy) {
+        showToast('⏳ កំពុងដោះឧបករណ៍មួយ — សូមរង់ចាំលទ្ធផលសិន រួចសាកល្បងម្តងទៀត។');
         return;
     }
-    if (row.seatDevices.length === 0) {
-        if (row.paths.every((p) => typeof (row.perApp[p] || {}).releasedAt === 'number')) {
-            alert('Key នេះមិនទាន់ចងនឹងឧបករណ៍ណាទេ — គ្មានអ្វីត្រូវដោះឡើយ។');
+    releaseKeySeat.busy = true;
+    try {
+        const operation = captureSensitiveSession(true);
+        const operationDb = db;
+        if (!operation || !operationDb) return;
+        const row = keyListCache.find((r) => r.id === id);
+        if (!row) return;
+        if (seatReadFailed) {
+            alert('អាន license_seats មិនបានទេ! សូម Publish Firebase Rules ថ្មីជាមុនសិន (មើល README) រួចសាកល្បងម្តងទៀត។');
             return;
         }
-        if (!confirm('Key នេះគ្មានឧបករណ៍ចងនៅលើ Server ទេ។ ចុះត្រាដោះ ដើម្បីឲ្យឧបករណ៍ដែល Activate មុនពេលនេះលែងប្រើ Key នេះ?')) return;
-    } else if (!confirm('ដោះឧបករណ៍ទាំង ' + row.seatDevices.length + ' ចេញពី Key នេះ?\n\nក្រោយដោះ ឧបករណ៍ចាស់នឹងលែងប្រើ Key នេះបាន ហើយឧបករណ៍ថ្មីរហូតដល់ ' + row.maxDevices + ' អាច Activate បាន។')) return;
-    const isCurrent = () => adminOperationIsCurrent(operation) && db === operationDb;
-    const unstampedText = '⚠️ បានដោះកៅអីរួច តែ Rules License មិនទាន់ទទួល `releasedAt` ➜ ឧបករណ៍ចាស់ដែលនៅដំណើរការអាចកក់កៅអីវិញ។ សូម Publish Firebase Rules ថ្មី (មើល README) រួចដោះម្តងទៀត។';
-    const release = {};
-    const seatsOnly = {};
-    row.paths.forEach((p) => {
-        release[`license_seats/${p}/${id}`] = null;
-        release[`license_keys/${p}/${id}/releasedAt`] = { '.sv': 'timestamp' };
-        seatsOnly[`license_seats/${p}/${id}`] = null;
-    });
-    let sent;
-    let stampRefused = false;
-    try {
-        const sentAt = serverTimeSynced ? getServerNow() : NaN;
-        sent = await patchLicenseViaRest(operation, operationDb, release, isCurrent);
-        if (sent.outcome === 'refused') {
-            stampRefused = true;
-            sent = await patchLicenseViaRest(operation, operationDb, seatsOnly, isCurrent);
-        }
-        if (!isCurrent() || sent.outcome === 'stale') return;
-        if (sent.outcome === 'unknown') {
-            const nodes = await readKeyReleaseViaRest(row.paths, id, operationDb).catch(() => null);
+        if (row.seatDevices.length === 0) {
+            if (row.paths.every((p) => typeof (row.perApp[p] || {}).releasedAt === 'number')) {
+                alert('Key នេះមិនទាន់ចងនឹងឧបករណ៍ណាទេ — គ្មានអ្វីត្រូវដោះឡើយ។');
+                return;
+            }
+            if (!confirm('Key នេះគ្មានឧបករណ៍ចងនៅលើ Server ទេ។ ចុះត្រាដោះ ដើម្បីឲ្យឧបករណ៍ដែល Activate មុនពេលនេះលែងប្រើ Key នេះ?')) return;
+        } else if (!confirm('ដោះឧបករណ៍ទាំង ' + row.seatDevices.length + ' ចេញពី Key នេះ?\n\nក្រោយដោះ ឧបករណ៍ចាស់នឹងលែងប្រើ Key នេះបាន ហើយឧបករណ៍ថ្មីរហូតដល់ ' + row.maxDevices + ' អាច Activate បាន។')) return;
+        const isCurrent = () => adminOperationIsCurrent(operation) && db === operationDb;
+        const unstampedText = '⚠️ បានដោះកៅអីរួច តែ Rules License មិនទាន់ទទួល `releasedAt` ➜ ឧបករណ៍ចាស់ដែលនៅដំណើរការអាចកក់កៅអីវិញ។ សូម Publish Firebase Rules ថ្មី (មើល README) រួចដោះម្តងទៀត។';
+        const release = {};
+        const seatsOnly = {};
+        row.paths.forEach((p) => {
+            release[`license_seats/${p}/${id}`] = null;
+            release[`license_keys/${p}/${id}/releasedAt`] = { '.sv': 'timestamp' };
+            seatsOnly[`license_seats/${p}/${id}`] = null;
+        });
+        let sent;
+        let stampRefused = false;
+        try {
+            const sentAt = serverTimeSynced ? getServerNow() : NaN;
+            sent = await patchLicenseViaRest(operation, operationDb, release, isCurrent);
+            if (sent.outcome === 'refused') {
+                stampRefused = true;
+                sent = await patchLicenseViaRest(operation, operationDb, seatsOnly, isCurrent);
+            }
+            if (!isCurrent() || sent.outcome === 'stale') return;
+            if (sent.outcome === 'unknown') {
+                const nodes = await readKeyReleaseViaRest(row.paths, id, operationDb).catch(() => null);
+                if (!isCurrent()) return;
+                const shownAt = (p) => (row.perApp && row.perApp[p] ? row.perApp[p].releasedAt : undefined);
+                if (nodes && nodes.every((n) => n.seats === null && (stampRefused
+                    || (typeof n.releasedAt === 'number' && n.releasedAt >= sentAt && n.releasedAt !== shownAt(n.path))))) sent = { outcome: 'applied' };
+            }
+        } catch (e) {
             if (!isCurrent()) return;
-            const shownAt = (p) => (row.perApp && row.perApp[p] ? row.perApp[p].releasedAt : undefined);
-            if (nodes && nodes.every((n) => n.seats === null && (stampRefused
-                || (typeof n.releasedAt === 'number' && n.releasedAt >= sentAt && n.releasedAt !== shownAt(n.path))))) sent = { outcome: 'applied' };
+            sent = { outcome: 'unknown', error: e };
         }
-    } catch (e) {
-        if (!isCurrent()) return;
-        sent = { outcome: 'unknown', error: e };
+        if (sent.outcome !== 'applied') {
+            console.error(sent.error || new Error('Release ' + sent.outcome));
+            if (window.ZoeErrors) ZoeErrors.capture(sent.error || new Error('Release ' + sent.outcome), { context: 'releaseKeySeat', status: sent.status });
+        }
+        if (sent.outcome === 'applied') {
+            if (stampRefused) alert(unstampedText);
+            else showToast('✅ បានដោះឧបករណ៍! ឧបករណ៍ចាស់ឈប់ប្រើ Key ពេលពិនិត្យលើកក្រោយ ហើយឧបករណ៍ថ្មីអាច Activate បានឥឡូវ។');
+        } else if (sent.outcome === 'unknown') {
+            alert(RELEASE_PENDING_TEXT);
+        } else {
+            alert(sent.outcome === 'refused' ? 'ដោះឧបករណ៍មិនបានទេ! សូមប្រាកដថា Firebase Rules ថ្មីត្រូវបាន Publish រួច រួចសាកល្បងម្តងទៀត។'
+                : sent.outcome === 'unsent' ? 'ដោះឧបករណ៍មិនបានទេ! មិនទាន់ផ្ញើអ្វីទៅ Server ទេ (អ៊ីនធឺណិត ឬ Session Login) ➜ សូមពិនិត្យអ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត។'
+                    : 'ដោះឧបករណ៍មិនបានទេ! Server បដិសេធ (HTTP ' + (sent.status || '?') + ') ➜ សូម Refresh ឬ Login ម្តងទៀត ហើយសាកល្បងម្តងទៀត។');
+            return;
+        }
+        refreshKeyList();
+    } finally {
+        releaseKeySeat.busy = false;
     }
-    if (sent.outcome !== 'applied') {
-        console.error(sent.error || new Error('Release ' + sent.outcome));
-        if (window.ZoeErrors) ZoeErrors.capture(sent.error || new Error('Release ' + sent.outcome), { context: 'releaseKeySeat', status: sent.status });
-    }
-    if (sent.outcome === 'applied') {
-        if (stampRefused) alert(unstampedText);
-        else showToast('✅ បានដោះឧបករណ៍! ឧបករណ៍ចាស់ឈប់ប្រើ Key ពេលពិនិត្យលើកក្រោយ ហើយឧបករណ៍ថ្មីអាច Activate បានឥឡូវ។');
-    } else if (sent.outcome === 'unknown') {
-        alert(RELEASE_PENDING_TEXT);
-    } else {
-        alert(sent.outcome === 'refused' ? 'ដោះឧបករណ៍មិនបានទេ! សូមប្រាកដថា Firebase Rules ថ្មីត្រូវបាន Publish រួច រួចសាកល្បងម្តងទៀត។'
-            : sent.outcome === 'unsent' ? 'ដោះឧបករណ៍មិនបានទេ! មិនទាន់ផ្ញើអ្វីទៅ Server ទេ (អ៊ីនធឺណិត ឬ Session Login) ➜ សូមពិនិត្យអ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត។'
-                : 'ដោះឧបករណ៍មិនបានទេ! Server បដិសេធ (HTTP ' + (sent.status || '?') + ') ➜ សូម Refresh ឬ Login ម្តងទៀត ហើយសាកល្បងម្តងទៀត។');
-        return;
-    }
-    refreshKeyList();
 }
 
 async function patchLicenseViaRest(operation, database, body, isCurrent) {

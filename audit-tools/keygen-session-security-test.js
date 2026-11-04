@@ -667,6 +667,27 @@ async function verifyReleaseOverRest() {
         await drain();
         ok('R13 ៖ បិទប្រអប់ PIN កណ្តាល PATCH (មិនមែនការចាកចេញ) ➜ ✅ នៅបង្ហាញ + Refresh', patches(f).length === 1 && released(f), detail(f));
     }
+
+    {
+        const gate = deferred();
+        f = releaseRestFixture({ patch: ['pending'], pending: gate });
+        let confirms = 0;
+        f.ctx.confirm = () => { confirms++; return true; };
+        const task = f.ctx.releaseKeySeat('key-a');
+        await drain();
+        const second = f.ctx.releaseKeySeat('key-a');
+        await drain();
+        const whileBusy = { patches: patches(f).length, confirms, toasts: f.log.toasts.slice() };
+        gate.resolve({ ok: true, status: 200, text: () => Promise.resolve('{}') });
+        await task; await second;
+        await drain();
+        ok('⛔ R14 ៖ ចុចដោះម្តងទៀតពេល PATCH មិនទាន់ឆ្លើយ ➜ មិនសួរ · មិនផ្ញើ PATCH ទី ២ · ⏳ ប្រាប់ឲ្យរង់ចាំ',
+            whileBusy.patches === 1 && whileBusy.confirms === 1 && whileBusy.toasts.some((t) => t.startsWith('⏳')), { whileBusy, ...detail(f) });
+        ok('R14 ៖ ក្រោយ PATCH ទី ១ ចប់ ➜ ✅ តែម្តង ហើយការដោះលើកក្រោយផ្ញើបាន', patches(f).length === 1 && released(f), detail(f));
+        await f.ctx.releaseKeySeat('key-a');
+        await drain();
+        ok('R14 ៖ busy ត្រូវដោះក្រោយចប់ (ការដោះបន្ទាប់សួរ និងផ្ញើ PATCH)', confirms === 2 && patches(f).length === 2, { confirms, ...detail(f) });
+    }
 }
 
 async function run() {

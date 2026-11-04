@@ -1,7 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 import { compileRules, rulesSql } from './rtdb-rules.mjs';
+
+const { minifyRulesText, rulesArtifactProblems } = createRequire(import.meta.url)('./rtdb-rules-artifact.cjs');
 
 const MIGRATION_RE = /^\d{14}_[a-z0-9_]+\.sql$/;
 const RULES_RE = /_zoe_rules\.sql$/;
@@ -9,7 +12,17 @@ const RULES_RE = /_zoe_rules\.sql$/;
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '..', '..');
 const dir = path.join(repo, 'supabase', 'migrations');
-const rules = JSON.parse(fs.readFileSync(path.join(repo, 'firebase-database.rules.json'), 'utf8'));
+const rulesText = fs.readFileSync(path.join(repo, 'firebase-database.rules.json'), 'utf8');
+const rules = JSON.parse(rulesText);
+const artifactPath = path.join(repo, 'firebase-database.rules.min.json');
+const artifact = minifyRulesText(rulesText);
+const artifactProblems = rulesArtifactProblems(rulesText, artifact);
+if (artifactProblems.length) throw new Error('rules publish artifact ៖ ' + artifactProblems.join(' · '));
+if (rulesSql(compileRules(JSON.parse(artifact))) !== rulesSql(compileRules(rules))) throw new Error('rules publish artifact compiles to other SQL');
+if (!fs.existsSync(artifactPath) || fs.readFileSync(artifactPath, 'utf8') !== artifact) {
+    fs.writeFileSync(artifactPath, artifact);
+    console.log('wrote ' + path.relative(repo, artifactPath) + ' (' + Buffer.byteLength(artifact, 'utf8') + ' bytes)');
+}
 const sql = rulesSql(compileRules(rules));
 const files = fs.readdirSync(dir).filter((f) => MIGRATION_RE.test(f)).sort();
 const latestRules = files.filter((f) => RULES_RE.test(f)).pop();

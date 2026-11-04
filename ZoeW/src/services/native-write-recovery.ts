@@ -279,8 +279,8 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
         state.external = 0;
         externalRows.length = 0;
         recovery = (async () => {
-        if (!journaled) return;
         try {
+            if (!journaled) return;
             const rows = journal.list(scope, topic);
             const companion = (row) => !!(row.intent && row.intent.companion);
             const copyRoots = copyRootsReader();
@@ -302,7 +302,7 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
             state.recovering = false;
             changed();
             if (rerun && current()) { rerun = false; runRecovery(); }
-            else if (!state.deferred && !state.blocked && current()) purgeReceipts().catch(() => {});
+            else if (journaled && !state.deferred && !state.blocked && current()) purgeReceipts().catch(() => {});
         }
         })();
         return recovery;

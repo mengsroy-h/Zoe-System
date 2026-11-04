@@ -435,7 +435,9 @@ async function main() {
             const compiledRules = compileRules(JSON.parse(fs.readFileSync(path.join(ROOT, 'firebase-database.rules.json'), 'utf8')));
             const canonicalTree = value => Array.isArray(value) ? value.map(canonicalTree) : value && typeof value === 'object'
                 ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonicalTree(value[key])])) : value;
-            const policyHash = value => sha(JSON.stringify(canonicalTree(value)));
+            const withoutFoldHints = value => Array.isArray(value) ? value.map(withoutFoldHints) : value && typeof value === 'object'
+                ? Object.fromEntries(Object.keys(value).filter(key => key !== 'f').map(key => [key, withoutFoldHints(value[key])])) : value;
+            const policyHash = value => sha(JSON.stringify(canonicalTree(withoutFoldHints(value))));
             const installedRules = (await c.query('select private.zoe_rules() as value')).rows[0].value;
             const composition = { migrationCount: files.length, nativeRules,
                 nativeRulesHash: sha(fs.readFileSync(path.join(ROOT, 'supabase/migrations', nativeRules))),
@@ -450,7 +452,7 @@ async function main() {
                 && files.length >= 47
                 && files.length >= 50 && nativeRules > '20261101222215_zoe_rules.sql'
                 && composition.canonicalGeneratedFresh && composition.installedCanonicalEqual
-                && composition.f03LegacyPolicyHash === '240c2cac550e3f20988b1e06b3c83339c8be27416e63685ff41448f4a0f98740'
+                && composition.f03LegacyPolicyHash === '024b8de7d13968240170810b573cdf47b7b8328f95eee6966bdffa6b213ed772'
                 && composition.f09DailyPolicyHash === 'c3280874e9c28bb0b01a97b7c82d892c88ce434428fcc4b9142607e1087d2049', composition);
             const composedFixture = async (basis, label) => {
                 const name = 'compose_' + (++serial), actor = await H.makeAuthUser(c, name + '@u.zoe.test');

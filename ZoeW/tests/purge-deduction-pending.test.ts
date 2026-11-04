@@ -8,6 +8,7 @@ import { resetZtoFinalMarks } from '../src/features/zto-final-marks';
 import { ztoPickupStatus } from '../src/features/zto-status';
 import { purgeTrashWithRegistry } from '../src/services/registry-purge';
 import { cleanupServerRead } from './helpers/cleanup-server-read';
+import { prunedPut, purgesSource, slotPurgeAdmitted } from './helpers/purge-slot-model';
 
 /**
  * ធាតុធុងសំរាម «ត្រឡប់» · «ដក» ត្រូវកាត់ COD/DOD/ចំនួនកញ្ចប់ពី ledger (keyed event · `ded/<trashId>` ក្នុងថ្ងៃ និងខែ) ហើយ flag `isDeducted`
@@ -30,11 +31,7 @@ let purgeWrites = 0;
 let refuseLedger = false;
 let ledgerTx = 0;
 function at(path: string): any { return clone(path.split('/').filter(Boolean).reduce((value, key) => value?.[key], store) ?? null); }
-function put(path: string, value: any) {
-    const keys = path.split('/').filter(Boolean); let target = store;
-    for (const key of keys.slice(0, -1)) target = target[key] ||= {};
-    if (value == null) delete target[keys.at(-1)!]; else target[keys.at(-1)!] = clone(value);
-}
+function put(path: string, value: any) { prunedPut(store, path, value); }
 const ref = (_db: any, path = '') => ({ path, key: path.split('/').at(-1), toString: () => HOST + '/' + path });
 const snap = (value: any) => ({ val: () => clone(value), exists: () => value != null });
 const totals = (record: any) => [record?.codDollar ?? 0, record?.dodDollar ?? 0, record?.totalCount ?? 0];
@@ -82,7 +79,10 @@ beforeEach(() => {
             return { committed: true, snapshot: snap(at(target.path)) };
         },
         update: async (target: any, patch: Record<string, any>) => {
-            if (patch[T + '/source'] === null) purgeWrites++;
+            if (purgesSource(patch, 'source')) {
+                purgeWrites++;
+                if (!slotPurgeAdmitted(patch, 'source', at(T + '/source'))) throw Object.assign(new Error('PERMISSION_DENIED'), { code: 'PERMISSION_DENIED' });
+            }
             for (const [key, value] of Object.entries(patch)) put([target.path, key].filter(Boolean).join('/'), value);
         }, onValue: () => () => {}, off: () => {}
     } as any;

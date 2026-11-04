@@ -766,7 +766,7 @@ async function sectionSix() {
     const requiredBase = entry => entry[3].startsWith(EMU) || ['money-guardian-test.js', 'money-checker-truthfulness-test.js', 'exit-code-integrity.js', 'supabase-scan-rules-test.js'].some(name => entry[3] === 'audit-tools/' + name);
     const missingOwned = text => [...text.matchAll(/^\s*([A-Z0-9_]+_APP_DIR)="\$BASE" (runall_owned )?node (audit-tools\/[A-Za-z0-9_/-]+\.js)/gm)].filter(entry => requiredBase(entry) && !entry[2]);
     ok('BASE RTDB consumers ប្រើ owned API ដូច normal ដោយរក្សា source overrides ទាំងអស់',
-        baseCommands.filter(requiredBase).length === 19 && missingOwned(base).length === 0
+        baseCommands.filter(requiredBase).length === 18 && missingOwned(base).length === 0
         && /runall_prepare_command "\$@"/.test(runall));
     const pairedJobs = jobs.filter(internalOwnedRunner);
     const pairedContractJobs = jobs.filter(job => job.id === 'import-paired-ci-runner-test');

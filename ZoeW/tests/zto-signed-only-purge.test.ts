@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanupServerRead } from './helpers/cleanup-server-read';
+import { prunedPut } from './helpers/purge-slot-model';
 import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
 import { viewState } from '../src/core/view-state';
 import { appLocalStore } from '../src/core/storage';
@@ -39,7 +40,7 @@ function setPath(path: string, value: any) {
             if (!cur[parts[i]] || typeof cur[parts[i]] !== 'object') return;
             cur = cur[parts[i]];
         }
-        delete cur[parts[parts.length - 1]];
+        prunedPut(lab.store, path, null);
         return;
     }
     for (let i = 0; i < parts.length - 1; i++) {

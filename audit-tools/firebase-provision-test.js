@@ -196,9 +196,41 @@ function staticContract() {
         && fs.existsSync(tool.DEFAULT_RULES_FILE), tool.DEFAULT_RULES_FILE);
     let rules = null;
     try { rules = tool.readRulesFile(tool.DEFAULT_RULES_FILE); } catch (e) { rules = null; }
+    const artifactText = read('firebase-database.rules.min.json');
+    ok('Rules លំនាំដើម ៖ ឧបករណ៍ផ្ញើ firebase-database.rules.min.json (ឯកសារ Publish) មិនមែនប្រភពអានបានទេ',
+        !!rules && !!artifactText && rules.text === artifactText && path.resolve(rules.file) === path.resolve(ROOT, 'firebase-database.rules.min.json')
+        && rules.canonical === tool.canonicalJson(JSON.parse(artifactText)), rules && rules.file);
+    const staleDir = tempDir('zoe-provision-stale-');
+    try {
+        const staleTool = path.join(staleDir, 'tools', 'firebase-provision'), scripts = path.join(staleDir, 'supabase', 'scripts');
+        fs.mkdirSync(staleTool, { recursive: true }); fs.mkdirSync(scripts, { recursive: true });
+        ['provision.js', 'firebase-api.js'].forEach((f) => fs.copyFileSync(path.join(TOOL, f), path.join(staleTool, f)));
+        ['rtdb-rules-artifact.cjs', 'rtdb-canonical-key.cjs'].forEach((f) => fs.copyFileSync(path.join(ROOT, 'supabase', 'scripts', f), path.join(scripts, f)));
+        const source = read('firebase-database.rules.json');
+        fs.writeFileSync(path.join(staleDir, 'firebase-database.rules.json'), source.replace('auth != null', 'auth !== null'));
+        fs.writeFileSync(path.join(staleDir, 'firebase-database.rules.min.json'), artifactText || '');
+        const copyTool = require(path.join(staleTool, 'provision.js'));
+        let staleError = null;
+        try { copyTool.readRulesFile(copyTool.DEFAULT_RULES_FILE); } catch (e) { staleError = e; }
+        ok('artifact ចាស់ (ប្រភពប្តូរ) ➜ ឧបករណ៍បដិសេធមុនផ្ញើ (UsageError)', !!staleError && /stale or invalid/.test(staleError.message), staleError && staleError.message);
+        fs.writeFileSync(path.join(staleDir, 'firebase-database.rules.json'), source);
+        fs.unlinkSync(path.join(staleDir, 'firebase-database.rules.min.json'));
+        let missingError = null;
+        try { copyTool.readRulesFile(copyTool.DEFAULT_RULES_FILE); } catch (e) { missingError = e; }
+        ok('គ្មាន artifact ➜ ឧបករណ៍បដិសេធ (មិនផ្ញើប្រភពធំ)', !!missingError && /publish file/.test(missingError.message), missingError && missingError.message);
+        const big = path.join(staleDir, 'big.rules.json');
+        fs.writeFileSync(big, JSON.stringify({ rules: { '.read': false, '.write': false, x: { '.validate': "'" + 'a'.repeat(252000) + "' !== ''" } } }));
+        let bigError = null;
+        try { copyTool.readRulesFile(big); } catch (e) { bigError = e; }
+        ok('--rules ផ្ទាល់ខ្លួនធំលើសដែន Publish ➜ បដិសេធ', !!bigError && /larger than/.test(bigError.message), bigError && bigError.message);
+    } catch (e) {
+        ok('ការវាស់ artifact ចាស់/ធំ រត់បាន', false, e.message);
+    } finally {
+        fs.rmSync(staleDir, { recursive: true, force: true });
+    }
     const node = rules ? tool.signedInReadNode(rules) : '';
     ok('node សម្រាប់វាស់ «អានក្រោយ Login» ដេរីវេពី rules ពិត (.read មាន auth != null)',
-        !!node && /auth != null/.test(String(rules.parsed.rules[node]['.read'])), node);
+        !!node && /\bauth\s*!=\s*null\b/.test(String(rules.parsed.rules[node]['.read'])), node);
 
     const zoewSrc = read('ZoeW/app.js') || read('ZoeW/src/features/config.ts');
     const keysLine = (zoewSrc.match(/const FIREBASE_CONFIG_KEYS = (\[[^\]]+\]);/) || [])[1];
@@ -353,7 +385,7 @@ function createFake(tls) {
         if (rule === true) return true;
         if (typeof rule !== 'string') return false;
         if (rule.trim() === 'true') return true;
-        return rule.indexOf('auth != null') !== -1 ? authedUser : false;
+        return /\bauth\s*!=\s*null\b/.test(rule) ? authedUser : false;
     }
 
     function startDb(p, name) {
@@ -692,7 +724,7 @@ async function scenarioCore(t, ctx, toolDir) {
         t('ហ.១ Web App «ZoeW» តែមួយ', !!proj && proj.apps.length === 1 && proj.apps[0].displayName === 'ZoeW');
         const db = proj && proj.defaultDb ? proj.instances[proj.defaultDb] : null;
         t('ហ.១ Database លំនាំដើមនៅ asia-southeast1', !!db && db.location === 'asia-southeast1' && db.name === 'zoew-881859-default-rtdb');
-        t('ហ.១ Rules លើ Database = firebase-database.rules.json របស់ repo', !!db && sameRules(db.rules, ctx.rulesText));
+        t('ហ.១ Rules លើ Database = firebase-database.rules.min.json (Publish) របស់ repo', !!db && sameRules(db.rules, ctx.rulesText));
         const cfg = proj ? proj.auth.config : {};
         t('ហ.១ Authentication ៖ Email/Password បើក · sign-up បិទ · delete បិទ · enumeration protection បើក',
             cfg.signIn && cfg.signIn.email.enabled === true && cfg.client.permissions.disabledUserSignup === true
@@ -1059,6 +1091,9 @@ async function mutationRound(ctx) {
             fs.mkdirSync(toolDir, { recursive: true });
             ['provision.js', 'firebase-api.js'].forEach((f) => fs.copyFileSync(path.join(TOOL, f), path.join(toolDir, f)));
             fs.copyFileSync(path.join(ROOT, 'firebase-database.rules.json'), path.join(dir, 'firebase-database.rules.json'));
+            fs.copyFileSync(path.join(ROOT, 'firebase-database.rules.min.json'), path.join(dir, 'firebase-database.rules.min.json'));
+            fs.mkdirSync(path.join(dir, 'supabase', 'scripts'), { recursive: true });
+            ['rtdb-rules-artifact.cjs', 'rtdb-canonical-key.cjs'].forEach((f) => fs.copyFileSync(path.join(ROOT, 'supabase', 'scripts', f), path.join(dir, 'supabase', 'scripts', f)));
             const file = path.join(toolDir, mut.file);
             const src = fs.readFileSync(file, 'utf8');
             if (src.indexOf(mut.from) === -1) return { applied: false, red: 0 };
@@ -1258,7 +1293,7 @@ async function redirectGuards() {
                 const decodeFn = sliceFn(zoewSrc, 'decodeSetupPayload');
                 const dctx = vm.createContext({ atob: (s) => Buffer.from(s, 'base64').toString('binary'), escape });
                 if (decodeFn) vm.runInContext(decodeFn + '\nthis.decode = decodeSetupPayload;', dctx);
-                const ctx = { tls: tls, deps: deps, rulesText: read('firebase-database.rules.json'), decode: decodeFn ? dctx.decode : null,
+                const ctx = { tls: tls, deps: deps, rulesText: read('firebase-database.rules.min.json'), decode: decodeFn ? dctx.decode : null,
                     readProjectEntries: projectEntriesParser() };
                 console.log('\n── ខ. ឥរិយាបថ ៖ CLI ពិត + firebase-tools ' + pin['firebase-tools'] + ' ពិត ទល់ Google ក្លែង (HTTPS) ──');
                 const fns = [scenarioCore, scenarioDrift, scenarioUsers, scenarioUnmeasured, scenarioNotLoggedIn, scenarioResume,

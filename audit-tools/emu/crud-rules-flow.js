@@ -154,7 +154,12 @@ function sandboxUnresolvedNames(ast, globals) {
 function makeSandbox(store, now) {
     const w = { store, now, writes: [], toasts: [], revenueCalls: [] };
     const get = (raw) => { let c = store; for (const p of String(raw || '').split('/').filter(Boolean)) { if (!c || typeof c !== 'object') return null; c = c[p]; } return c === undefined ? null : c; };
-    const set = (raw, v) => { const parts = String(raw || '').split('/').filter(Boolean); let c = store; for (let i = 0; i < parts.length - 1; i++) { if (!c[parts[i]] || typeof c[parts[i]] !== 'object') c[parts[i]] = {}; c = c[parts[i]]; } const k = parts[parts.length - 1]; if (v === null) delete c[k]; else c[k] = clone(v); };
+    const set = (raw, v) => { const parts = String(raw || '').split('/').filter(Boolean); let c = store; for (let i = 0; i < parts.length - 1; i++) { if (!c[parts[i]] || typeof c[parts[i]] !== 'object') c[parts[i]] = {}; c = c[parts[i]]; } const k = parts[parts.length - 1]; if (v === null) delete c[k]; else c[k] = clone(v);
+        if (v === null) for (let depth = parts.length - 1; depth > 0; depth--) {
+            const container = get(parts.slice(0, depth).join('/'));
+            if (!container || typeof container !== 'object' || Object.values(container).some(value => value !== undefined && value !== null)) break;
+            delete get(parts.slice(0, depth - 1).join('/'))[parts[depth - 1]];
+        } };
     const fb = {
         ref: (db, raw) => ({ path: raw === undefined ? '' : String(raw) }),
         increment: (n) => ({ '.sv': { increment: Number(n) } }),
@@ -321,7 +326,7 @@ function makeSandbox(store, now) {
         ...['pickupCopyMarks', 'trashReasonDeducted', 'restorePendingCode'].map((n) => optionalFn(src, n, '')),
         'globalThis.api = { ' + FNS.join(', ') + ' };'
     ].join('\n\n');
-    const runtime = moduleRuntime(ROOT, src, [{ path: 'src/services/scan-import-proof.ts', expose: ['createScanImportProofCache'] }, 'src/domain/scan-protocol.ts', { path: 'src/domain/registry-purge-proof.ts', expose: ['REGISTRY_RELEASES_ROOT', 'REGISTRY_PURGE_MAX_WRITES', 'boundedRegistryPurgeIntent', 'registryPurgeReceiptValid', 'registryPurgeReceiptMatches', 'registryPurgeIntent'] }, { path: 'src/services/registry-purge.ts', expose: ['purgeTrashWithRegistry'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
+    const runtime = moduleRuntime(ROOT, src, [{ path: 'src/services/scan-import-proof.ts', expose: ['createScanImportProofCache'] }, 'src/domain/scan-protocol.ts', { path: 'src/domain/registry-purge-proof.ts', expose: ['REGISTRY_RELEASES_ROOT', 'REGISTRY_PURGE_MAX_WRITES', 'boundedRegistryPurgeIntent', 'slotRegistryPurgeIntent', 'registryPurgeReceiptValid', 'registryPurgeReceiptMatches', 'registryPurgeIntent'] }, { path: 'src/services/registry-purge.ts', expose: ['purgeTrashWithRegistry'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
     SANDBOX_SOURCE = runtime.code + '\n' + runtime.withoutBindings(assembled);
     new vm.Script(SANDBOX_SOURCE).runInContext(ctx);
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
@@ -453,15 +458,17 @@ async function clearOrphanBeforeRetry(w, label) {
             zoew_monthly_revenue_cod_dod: { '2026-08': clone(purgeMoney) } }, Date.now());
         const purged = await purgeWorld.ctx.purgeTrashWithRegistry(clone(purgeRow));
         const atomic = purgeWorld.writes.find(write => write.method === 'PATCH' && write.path === '');
-        check(purged === true && purgeWorld.writes.length === 1 && atomic && Object.keys(atomic.value).length === 4
-            && !purgeWorld.store.zoew_recently_deleted_cod_dod.preflight_purge && !purgeWorld.store.zoew_barcode_registry.PREFLIGHT_PURGE
+        check(purged === true && purgeWorld.writes.length === 1 && atomic && Object.keys(atomic.value).length === 1 + 3 + Object.keys(purgeRow).filter(key => key !== 'barcodes').length
+            && !Object.keys(atomic.value).includes('zoew_recently_deleted_cod_dod/preflight_purge')
+            && atomic.value['zoew_recently_deleted_cod_dod/preflight_purge/barcodes/0'] === null
+            && !purgeWorld.store.zoew_recently_deleted_cod_dod?.preflight_purge && !purgeWorld.store.zoew_barcode_registry?.PREFLIGHT_PURGE
             && Object.keys(purgeWorld.store.zoew_registry_releases || {}).length === 1
             && purgeWorld.store.zoew_trash_consumptions?.preflight_purge?.kind === 'purge'
             && isDeepStrictEqual(purgeWorld.store.zoew_daily_revenue_cod_dod['2026-08-26'], purgeMoney)
             && isDeepStrictEqual(purgeWorld.store.zoew_monthly_revenue_cod_dod['2026-08'], purgeMoney),
             'sandbox៖ actual bounded N1 purge ចុះ source/registry/receipt/consumption ក្នុង update តែមួយ មិនប៉ះប្រាក់');
         const purgeOps = Object.entries(atomic?.value || {}).map(([key, value]) => ({ k: 'set', p: key.split('/'), v: value }));
-        check(!!purgeWorld.ctx.boundedRegistryPurgeIntent(purgeOps)
+        check(!!purgeWorld.ctx.boundedRegistryPurgeIntent(purgeOps) && !!purgeWorld.ctx.slotRegistryPurgeIntent(purgeOps)
             && purgeWorld.ctx.boundedRegistryPurgeIntent(purgeOps.filter(op => op.p[0] !== 'zoew_barcode_registry')) === null,
             'sandbox៖ actual bounded parser ទទួល full effects និងបដិសេធ missing registry pair');
         const malformedRow = { ...clone(purgeRow), count: 2 };

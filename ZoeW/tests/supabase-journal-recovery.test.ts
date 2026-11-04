@@ -260,7 +260,7 @@ describe('session changes ៖ a write the caller was told failed is never sent l
 it('an admitted purge whose status read fails on the network defers the recovery pass and completes on the next pass (never blocked until reload)', async () => {
   const journal = makeJournal();
   const receipt = { id: 'rel1', releasedBy: 'user', scope: 'project#A', generation: 1, deletedAt: 5, rowBirth: 1, rowCount: 1 };
-  const registryPurge = { intent: (ops: any[]) => ops.some(o => o.p[0] === 'zoew_registry_releases') ? { sourceId: 'src1', receipts: [receipt] } : null, hash: async () => 'a'.repeat(64) };
+  const registryPurge = { intent: (ops: any[]) => ops.some(o => o.p[0] === 'zoew_registry_releases') ? { sourceId: 'src1', receipts: [receipt] } : null, hash: async () => 'a'.repeat(64), rowOps: (ops: any[]) => ops };
   journal.put({ v: 1, writeProtocol: 3, scope: 'project|user', topic: 'zoe:A', opId: 'purge_row_000000000001', stage: 'purge-queued', awaitingRecovery: false, sentAfter: 0, queuedAt: Date.now(), purgeHash: 'a'.repeat(64), ops: [{ k: 'set', p: ['zoew_registry_releases', 'rel1'], v: { x: 1 } }] });
   let statusFails = 1; const calls: string[] = [];
   const db = createSupabaseDatabase({ subscribe: () => () => {}, ping: async () => true, rpc: async (fn: string, args: any) => {

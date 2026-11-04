@@ -1,4 +1,4 @@
-import { REGISTRY_RELEASES_ROOT, registryPurgeIntent, registryPurgeReceiptMatches } from '../domain/registry-purge-proof';
+import { REGISTRY_RELEASES_ROOT, registryPurgeIntent, registryPurgeReceiptMatches, registryPurgeRowOps } from '../domain/registry-purge-proof';
 import { txDisconnectResolving } from './tx-disconnect';
 import { elapsedSince } from '../core/elapsed';
 import { SB_DOCS_CACHE_VERSION, docsCacheRecordIsValid } from './supabase-docs-cache';
@@ -782,9 +782,11 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         }
         let data;
         const t0 = Date.now();
+        const rowOps = (typeof purgeRules?.rowOps === 'function' ? purgeRules.rowOps : registryPurgeRowOps)(row.ops);
         try {
+            if (!rowOps) throw new SbRpcError('purge context unverified', 'purge_context', 0, '');
             data = await rpc(readOnly ? 'zoe_purge_status_v1' : 'zoe_purge_execute_v1', {
-                p_expected_tenant: context.tenant, p_op_id: row.opId, p_ops: cloneCanonical(row.ops)
+                p_expected_tenant: context.tenant, p_op_id: row.opId, p_ops: cloneCanonical(rowOps)
             });
             const proof = data?.purge;
             if (!data || data.ok !== true || !Number.isSafeInteger(data.seq) || data.seq < 0 || !Number.isFinite(data.now) || !(data.now > 0)
@@ -794,7 +796,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     || proof.outcome === 'unknown' && proof.proof === 'none')
                 || (readOnly || proof.proof !== 'operation') && data.docs.length) throw new SbRpcError('purge reply unreadable', 'bad_response', 0, '');
             if (data.docs.length) {
-                const expected = new Map(row.ops.map(op => [op.p.join('/'), op.v]));
+                const expected = new Map(rowOps.map(op => [op.p.join('/'), op.v]));
                 const seen = new Set();
                 if (data.docs.length !== expected.size || data.docs.some(doc => {
                     const key = doc?.r + '/' + doc?.k;

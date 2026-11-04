@@ -115,6 +115,7 @@ const EXPECT_PRIVATE_EXEC = {
     zoe_purge_packet_v1: [],
     zoe_purge_binding_v1: [],
     zoe_purge_source_v1: [],
+    zoe_purge_expand_v1: [],
     zoe_pickup_reset_text_v1: [],
     zoe_pickup_reset_receipt_v1: [],
     zoe_pickup_reset_intent_v1: [],

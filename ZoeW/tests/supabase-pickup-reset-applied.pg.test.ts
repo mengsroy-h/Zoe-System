@@ -80,12 +80,12 @@ it('Supabase ៖ Reset រក្សា original CAS និង proof ដោយ at
             expect(entry.activity.query).toMatch(/^\s*select public\.zoe_pickup_reset_execute_v1\(/);
         }
         expect(summary.codecEvidence.composition).toMatchObject({
-            nativeRules: '20261101231537_zoe_rules.sql', nativeEngine: 'UNRUN', canonicalGeneratedFresh: true, installedCanonicalEqual: true,
-            f03LegacyPolicyHash: '240c2cac550e3f20988b1e06b3c83339c8be27416e63685ff41448f4a0f98740',
+            nativeRules: '20261104095910_zoe_rules.sql', nativeEngine: 'UNRUN', canonicalGeneratedFresh: true, installedCanonicalEqual: true,
+            f03LegacyPolicyHash: '024b8de7d13968240170810b573cdf47b7b8328f95eee6966bdffa6b213ed772',
             f09DailyPolicyHash: 'c3280874e9c28bb0b01a97b7c82d892c88ce434428fcc4b9142607e1087d2049'
         });
-        expect(summary.codecEvidence.composition.migrationCount).toBe(51);
-        expect(summary.codecEvidence.composition.nativeRulesHash).toBe(hash(path.join(root, 'supabase/migrations', '20261101231537_zoe_rules.sql')));
+        expect(summary.codecEvidence.composition.migrationCount).toBe(54);
+        expect(summary.codecEvidence.composition.nativeRulesHash).toBe(hash(path.join(root, 'supabase/migrations', '20261104095910_zoe_rules.sql')));
         expect(summary.codecEvidence.sourceHash).toBe(hash(codec));
         expect(summary.codecEvidence.vectors).toHaveLength(3);
         expect(summary.codecEvidence.vectors.map((entry: { name: string; goldenId: string; goldenSQLHash: string; casTextHash: string }) => ({

@@ -264,3 +264,18 @@ it('config មិនអាចបកស្រាយបាន មិនត្រ�
     .rejects.toThrow('Database recovery scope unavailable');
   expect(writes).not.toHaveBeenCalled(); expect(records()).toEqual([]);
 });
+it('storage ដែលមិនអាចប្រើពេលបង្កើតការសង្គ្រោះ ៖ ស្ថានភាព recovering ត្រូវបញ្ចប់ មិនជាប់ «កំពុងផ្ទៀងផ្ទាត់» រហូត', async () => {
+  const original = Object.getOwnPropertyDescriptor(window, 'localStorage');
+  Object.defineProperty(window, 'localStorage', { configurable: true, get: () => { throw new Error('storage blocked'); } });
+  try {
+    const dispatched = vi.fn(async () => {}); const native = lab(dispatched);
+    const verdict = await native.sdk.set(native.sdk.ref(native.db, 'zoew_settings/exchange_rate'), 4300).then(() => 'sent', (error: any) => error?.code || 'refused');
+    await turn();
+    const state = await recoveryState(native.db);
+    expect(verdict).toBeTypeOf('string');
+    expect(state.recovering).toBe(false);
+    expect(state.blocked).toBe(0);
+  } finally {
+    if (original) Object.defineProperty(window, 'localStorage', original); else delete (window as any).localStorage;
+  }
+});

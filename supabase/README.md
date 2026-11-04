@@ -134,8 +134,8 @@ npx supabase@latest db push
 ឬ SQL Editor ➜ paste [`migrations/`](migrations) **តាមលំដាប់ឈ្មោះ** ➜ Run ម្តងមួយឯកសារ (ផ្លូវនេះមិនកត់ `schema_migrations` ➜ `migration repair` មុនប្រើ Deploy ពី GitHub)។
 
 **rules** ៖ `migrations/*_zoe_rules.sql` **ដេរីវេពី `firebase-database.rules.json`** ៖ កែ rules ➜ `node supabase/scripts/generate-rules-sql.mjs` ➜ វាបង្កើត
-`<ម៉ោង UTC>_zoe_rules.sql` **ថ្មី** (rules មិនប្រែ ➜ «unchanged» គ្មានឯកសារថ្មី) ➜ commit ➜ merge ➜ deploy ស្វ័យប្រវត្តិ (ឬ paste ឯកសារថ្មីនោះក្នុង SQL Editor) ហើយ
-Publish rules ដដែលលើ Firebase។ ឯកសារ rules **ចុងក្រោយ** ជាអ្វីដែលមានប្រសិទ្ធភាព (`create or replace`) · អ្នកយាមធ្លាក់បើវាចាស់។
+`<ម៉ោង UTC>_zoe_rules.sql` **ថ្មី** (rules មិនប្រែ ➜ «unchanged» គ្មានឯកសារថ្មី) និង `firebase-database.rules.min.json` (ឯកសារ Publish របស់ Firebase) ➜ commit ➜ merge ➜ deploy ស្វ័យប្រវត្តិ (ឬ paste ឯកសារថ្មីនោះក្នុង SQL Editor) ហើយ
+Publish `firebase-database.rules.min.json` លើ Firebase។ migration ដែលមិនមែន rules ត្រូវអនុវត្តមុន migration rules ដែលក្រោយវា (លំដាប់ឈ្មោះ)។ ឯកសារ rules **ចុងក្រោយ** ជាអ្វីដែលមានប្រសិទ្ធភាព (`create or replace`) · អ្នកយាមធ្លាក់បើវាចាស់។
 
 **admin ដំបូង** ៖ Authentication ➜ Users ➜ **Add user** (អ៊ីមែលដូច `boss@admin.zoew.invalid` · ពាក្យសម្ងាត់ខ្លាំង · Auto Confirm) រួច SQL Editor ៖
 

@@ -12,6 +12,8 @@ const api = require('./firebase-api');
 const TOOL_DIR = __dirname;
 const REPO_ROOT = path.resolve(TOOL_DIR, '..', '..');
 const DEFAULT_RULES_FILE = path.join(REPO_ROOT, 'firebase-database.rules.json');
+const DEFAULT_RULES_ARTIFACT = path.join(REPO_ROOT, 'firebase-database.rules.min.json');
+const { RULES_PUBLISH_MAX_BYTES, rulesArtifactProblems } = require(path.join(REPO_ROOT, 'supabase', 'scripts', 'rtdb-rules-artifact.cjs'));
 const STATE_DIR = process.env.ZOE_PROVISION_STATE_DIR
     ? path.resolve(process.env.ZOE_PROVISION_STATE_DIR)
     : path.join(TOOL_DIR, 'state');
@@ -237,6 +239,23 @@ function readRulesFile(file) {
     if (!parsed || typeof parsed.rules !== 'object' || parsed.rules === null) {
         throw new UsageError('Rules file has no "rules" object: ' + file);
     }
+    if (path.resolve(file) === path.resolve(DEFAULT_RULES_FILE)) {
+        let artifact;
+        try {
+            artifact = fs.readFileSync(DEFAULT_RULES_ARTIFACT, 'utf8');
+        } catch (e) {
+            throw new UsageError('Cannot read the rules publish file: ' + DEFAULT_RULES_ARTIFACT + ' (run node supabase/scripts/generate-rules-sql.mjs)');
+        }
+        const problems = rulesArtifactProblems(text, artifact);
+        if (problems.length) {
+            throw new UsageError('Rules publish file is stale or invalid: ' + DEFAULT_RULES_ARTIFACT + ' (' + problems[0] + '; run node supabase/scripts/generate-rules-sql.mjs)');
+        }
+        const published = JSON.parse(artifact);
+        return { file: DEFAULT_RULES_ARTIFACT, text: artifact, parsed: published, canonical: canonicalJson(published) };
+    }
+    if (Buffer.byteLength(text, 'utf8') > RULES_PUBLISH_MAX_BYTES) {
+        throw new UsageError('Rules file is larger than ' + RULES_PUBLISH_MAX_BYTES + ' bytes: ' + file);
+    }
     return { file: file, text: text, parsed: parsed, canonical: canonicalJson(parsed) };
 }
 
@@ -251,7 +270,7 @@ function rulesMatch(remoteText, rules) {
 function signedInReadNode(rules) {
     const top = rules.parsed.rules;
     return Object.keys(top).find((key) => !key.startsWith('.') && !key.startsWith('$')
-        && top[key] && typeof top[key]['.read'] === 'string' && top[key]['.read'].indexOf('auth != null') !== -1) || '';
+        && top[key] && typeof top[key]['.read'] === 'string' && /\bauth\s*!=\s*null\b/.test(top[key]['.read'])) || '';
 }
 
 async function ask(question) {

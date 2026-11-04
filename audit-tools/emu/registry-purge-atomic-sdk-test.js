@@ -91,26 +91,80 @@ function expectedKey(code) {
 }
 function source(count, id, scenario = {}) {
     const createdAt = 1700000000000, deletedAt = 1790000000000;
-    return { id, phone: '012345678', cod: count, dod: 0, price: count, count, isClosed: false, createdAt,
+    const row = { id, phone: '012345678', cod: count, dod: 0, price: count, count, isClosed: false, createdAt,
         scanDate: DAY, time: '09:00:00 (' + DAY + ')', barcodes: Object.fromEntries(Array.from({ length: count }, (_, index) =>
             [String(index), { code: scenario.collision ? ['ß', 'SS'][index] : scenario.unicodeOracle ? UNICODE_CODES[index] : 'F03_' + id.toUpperCase() + '_' + index, cod: 1, dod: 0, isClosed: false, createdAt: createdAt + index }])),
         deletedAt, trashGeneration: 1 };
+    if (scenario.legacyFallbacks) {
+        delete row.createdAt; delete row.trashGeneration;
+        for (const barcode of Object.values(row.barcodes)) delete barcode.createdAt;
+    }
+    if (scenario.arrayContainer) row.barcodes = Object.values(row.barcodes);
+    if (scenario.originsBlocked) { row.origins = { [expectedKey(Object.values(row.barcodes)[0].code)]: 'VN' }; row.restoreBlocked = true; }
+    return row;
 }
 function image(row) {
     return { [T]: { [row.id]: clone(row) }, [R]: Object.fromEntries(Object.values(row.barcodes).map(barcode => [expectedKey(barcode.code), true])),
         [D]: { [DAY]: { codDollar: 37, dodDollar: 5, totalCount: 11 } },
         [M]: { [MONTH]: { codDollar: 37, dodDollar: 5, totalCount: 11 } } };
 }
+function receiptsOf(row, context) {
+    const barcodes = Array.isArray(row.barcodes) ? Object.fromEntries(row.barcodes.map((barcode, index) => [String(index), barcode])) : row.barcodes;
+    return Object.entries(barcodes).filter(([, barcode]) => barcode !== null && barcode !== undefined).map(([slot, barcode]) => ({ v: 2,
+        generation: row.trashGeneration ?? 0, id: 'release_' + digest(row.id + ':' + slot).slice(0, 32), kind: 'legacy', actorUid: context.uid,
+        releasedBy: context.uid, scope: context.scope, code: barcode.code, registryKey: expectedKey(barcode.code), birth: barcode.createdAt ?? 0,
+        trashId: row.id, slot, deletedAt: row.deletedAt, rowBirth: row.createdAt ?? 0, rowCount: row.count }));
+}
+function certificateOf(receipts) {
+    const ordered = receipts.slice().sort((left, right) => Number(left.slot) - Number(right.slot)), members = {}, keys = {};
+    ordered.forEach((receipt, index) => {
+        members[receipt.slot] = { o: index, id: receipt.id, ...(index ? { p: ordered[index - 1].slot } : {}), ...(index < ordered.length - 1 ? { n: ordered[index + 1].slot } : {}) };
+        keys[receipt.registryKey] = receipt.id;
+    });
+    return { first: ordered[0].slot, members, keys };
+}
+function consumptionOf(row, context) {
+    return { v: 1, sourceId: row.id, generation: row.trashGeneration ?? 0, kind: 'purge', actorUid: context.uid,
+        scope: context.scope, deletedAt: row.deletedAt, rowBirth: row.createdAt ?? 0 };
+}
 function packet(row, context) {
-    const receipts = Object.entries(row.barcodes).map(([slot, barcode]) => ({ v: 2, generation: row.trashGeneration,
-        id: 'release_' + digest(row.id + ':' + slot).slice(0, 32), kind: 'legacy', actorUid: context.uid, releasedBy: context.uid,
-        scope: context.scope, code: barcode.code, registryKey: expectedKey(barcode.code), birth: barcode.createdAt, trashId: row.id, slot,
-        deletedAt: row.deletedAt, rowBirth: row.createdAt, rowCount: row.count }));
-    const consumption = { v: 1, sourceId: row.id, generation: row.trashGeneration, kind: 'purge', actorUid: context.uid,
-        scope: context.scope, deletedAt: row.deletedAt, rowBirth: row.createdAt };
-    return [{ k: 'set', p: [T, row.id], v: null }, { k: 'set', p: [G, row.id], v: consumption },
+    const receipts = receiptsOf(row, context), ops = [];
+    for (const receipt of receipts) ops.push({ k: 'set', p: [T, row.id, 'barcodes', receipt.slot], v: null },
+        { k: 'set', p: [R, receipt.registryKey], v: null }, { k: 'set', p: [P, receipt.id], v: receipt });
+    for (const field of Object.keys(row)) if (field !== 'barcodes') ops.push({ k: 'set', p: [T, row.id, field], v: null });
+    ops.push({ k: 'set', p: [G, row.id], v: { ...consumptionOf(row, context), ...certificateOf(receipts) } });
+    return ops;
+}
+function legacyPacket(row, context) {
+    const receipts = receiptsOf(row, context);
+    return [{ k: 'set', p: [T, row.id], v: null }, { k: 'set', p: [G, row.id], v: consumptionOf(row, context) },
         ...receipts.flatMap(receipt => [{ k: 'set', p: [R, receipt.registryKey], v: null }, { k: 'set', p: [P, receipt.id], v: receipt }])];
 }
+function rowShapeOf(ops) {
+    const sources = [...new Set(ops.filter(op => op.p[0] === T).map(op => op.p[1]))];
+    const consumptions = ops.filter(op => op.p[0] === G).map(op => {
+        const value = clone(op.v);
+        if (value && typeof value === 'object') { delete value.first; delete value.members; delete value.keys; }
+        return { k: 'set', p: clone(op.p), v: value };
+    });
+    return [...sources.map(id => ({ k: 'set', p: [T, id], v: null })), ...consumptions, ...clone(ops.filter(op => op.p[0] !== T && op.p[0] !== G))];
+}
+const opIndex = (ops, root, key) => ops.findIndex(op => op.p.length === 2 && op.p[0] === root && op.p[1] === key);
+const receiptOp = (ops, slot, sourceId) => ops.find(op => op.p[0] === P && op.v?.slot === slot && (sourceId === undefined || op.v.trashId === sourceId));
+const consumptionOp = (ops, sourceId) => ops.find(op => op.p[0] === G && (sourceId === undefined || op.p[1] === sourceId));
+function rekey(ops, slot, key) {
+    const receipt = receiptOp(ops, slot), registry = ops[opIndex(ops, R, receipt.v.registryKey)], certificate = consumptionOp(ops, receipt.v.trashId).v;
+    delete certificate.keys[receipt.v.registryKey];
+    registry.p[1] = key; receipt.v.registryKey = key; certificate.keys[key] = receipt.v.id;
+}
+const FIELD_COUNT = Object.keys(source(1, 'field_count')).length - 1;
+const packetSize = count => 1 + 3 * count + FIELD_COUNT;
+function rtdbShape(value) {
+    if (Array.isArray(value)) return Object.fromEntries(value.map((item, index) => [String(index), rtdbShape(item)]).filter(([, item]) => item !== null && item !== undefined));
+    if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, rtdbShape(item)]).filter(([, item]) => item !== null && item !== undefined));
+    return value;
+}
+const rtdbEqual = (left, right) => equal(rtdbShape(left ?? null), rtdbShape(right ?? null));
 const updateOf = ops => Object.fromEntries(ops.map(op => [op.p.join('/'), clone(op.v)]));
 const moneyOf = value => ({ [D]: value?.[D] || null, [M]: value?.[M] || null });
 const rowsOf = value => Object.fromEntries(Object.entries(value || {}).filter(([, child]) => child !== null && child !== undefined));
@@ -123,8 +177,13 @@ const FAMILY = {
     unknown: ['commit-before-loss', 'proof-fault-reached', 'full-journal-hold', 'no-reexecute', 'proof-completed', 'money-unchanged'],
     storage: ['storage-fault-reached', 'zero-dispatch', 'zero-effects', 'money-unchanged'],
     postgc: ['real-lost-ack-journal', 'original-op-gone', 'proof-result', 'same-original-intent', 'zero-replay', 'new-incarnation-preserved', 'money-unchanged'],
-    bytes: ['otherwise-complete-packet', 'over-byte-envelope', 'zero-dispatch', 'zero-effects', 'money-unchanged']
+    bytes: ['otherwise-complete-packet', 'over-byte-envelope', 'zero-dispatch', 'zero-effects', 'money-unchanged'],
+    control: ['backend-attempt-reached', 'backend-accepted', 'all-original-effects', 'money-unchanged'],
+    replay: ['first-applied', 'backend-attempt-reached', 'backend-refused', 'zero-effects', 'money-unchanged'],
+    legacy: { native: ['backend-attempt-reached', 'backend-refused', 'zero-effects', 'money-unchanged'],
+        supabase: ['backend-attempt-reached', 'backend-accepted', 'expanded-effects', 'money-unchanged'] }
 };
+const assertionsFor = (scenario, provider) => Array.isArray(FAMILY[scenario.family]) ? FAMILY[scenario.family] : FAMILY[scenario.family][provider];
 const CASES = [
     ...[1, 2, 249, 250, 251].map(count => ({ id: 'positive-' + count, count, family: 'positive', unicodeOracle: count === 2 })),
     ...['wrong-key', 'missing-pair', 'count-mirror'].map(fault => ({ id: 'backend-' + fault, count: 2, family: 'backend', fault, unicodeOracle: fault === 'wrong-key' })),
@@ -134,10 +193,26 @@ const CASES = [
     { id: 'read-unknown', count: 250, family: 'unknown' },
     ...['unavailable', 'quota'].map(fault => ({ id: 'storage-' + fault, count: 250, family: 'storage', fault })),
     ...['full', 'partial', 'absent'].map(fault => ({ id: 'postgc-' + fault, count: 250, family: 'postgc', fault })),
-    { id: 'byte-oversize', count: 230, family: 'bytes' }
+    { id: 'byte-oversize', count: 230, family: 'bytes' },
+    { id: 'backend-count-mirror-receipted', count: 2, family: 'backend', fault: 'count-mirror-receipted' },
+    ...['cert-missing-link', 'cert-wrong-ordinal', 'cert-first-wrong', 'cert-members-missing', 'cert-keys-wrong', 'cert-keys-missing']
+        .map(fault => ({ id: 'backend-' + fault, count: 2, family: 'backend', fault, route: 'write' })),
+    { id: 'backend-cert-duplicate-ordinal', count: 3, family: 'backend', fault: 'cert-duplicate-ordinal', route: 'write' },
+    { id: 'backend-cert-count-larger', count: 2, family: 'backend', fault: 'cert-count-larger' },
+    ...['borrowed-receipt', 'shared-receipt', 'extra-receipt', 'slot-delete-without-receipt']
+        .map(fault => ({ id: 'backend-' + fault, count: 2, family: 'backend', fault })),
+    ...['swapped-pointers', 'container-delete', 'row-delete-with-certificate']
+        .map(fault => ({ id: 'backend-' + fault, count: 2, family: 'backend', fault, route: 'write' })),
+    ...['cross-row-receipt', 'group-one-malformed'].map(fault => ({ id: 'backend-' + fault, count: 2, family: 'backend', fault, route: 'write', group: true })),
+    { id: 'replay-after-apply', count: 2, family: 'replay' },
+    ...[['control-slot', {}], ['control-prior-restore', { priorRestore: true }], ['control-legacy-fallbacks', { legacyFallbacks: true }],
+        ['control-array-container', { arrayContainer: true }], ['control-two-rows', { group: true }], ['control-origins-blocked', { originsBlocked: true }]]
+        .map(([id, extra]) => ({ id, count: 2, family: 'control', ...extra })),
+    { id: 'legacy-old-shape', count: 2, family: 'legacy', providersDiffer: true }
 ];
 const EXPECTED = CASES.flatMap(scenario => ['native', 'supabase'].map(provider =>
-    ({ id: scenario.id, provider, assertions: FAMILY[scenario.family] })));
+    ({ id: scenario.id, provider, assertions: assertionsFor(scenario, provider) })));
+const EXPECTED_ASSERTIONS = EXPECTED.reduce((sum, entry) => sum + entry.assertions.length, 0);
 const manifestHash = digest(JSON.stringify(EXPECTED));
 const GUARD_WHITESPACE = [0x0009, 0x000A, 0x000B, 0x000C, 0x000D, 0x0020, 0x00A0, 0x1680,
     0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2006, 0x2007, 0x2008, 0x2009, 0x200A,
@@ -210,28 +285,38 @@ function verifyGuardConstruction() {
     guardCheck('guard-manifest-separate-and-complete', GUARD_ENGINE_IDS.length === 12 && GUARD_CASES.length === 24 && GUARD_EXPECTED.length === 48
         && new Set(GUARD_EXPECTED.map(entry => entry.provider + ':' + entry.id)).size === 48
         && GUARD_EXPECTED.reduce((sum, entry) => sum + entry.assertions.length, 0) === 312
-        && CASES.length === 20 && EXPECTED.length === 40 && EXPECTED.reduce((sum, entry) => sum + entry.assertions.length, 0) === 212, undefined, true);
-    guardCheck('full-pure-vector-matrix-has-six-ops-and-legal-seeded-wrong-key', GUARD_VECTORS.every(vector => {
+        && CASES.length >= 40 && EXPECTED.length === 2 * CASES.length && EXPECTED_ASSERTIONS === CASES.reduce((sum, scenario) =>
+            sum + assertionsFor(scenario, 'native').length + assertionsFor(scenario, 'supabase').length, 0), undefined, true);
+    guardCheck('full-pure-vector-matrix-has-slot-shape-and-legal-seeded-wrong-key', GUARD_VECTORS.every(vector => {
         const { row, seed } = guardFixture({ vector, mode: 'mismatch' }), ops = packet(row, { uid: 'pure-fixture-owner', scope: 'pure-fixture-scope' });
-        const original = clone(ops); ops[2].p[1] = vector.badKey; ops[3].v.registryKey = vector.badKey;
-        return ops.length === 6 && seed[R][vector.key] === true && seed[R][vector.badKey] === true
-            && ops[3].v.code === vector.code && original[3].v.code === vector.code
-            && ops.every((op, index) => equal(op, index === 2 ? { ...original[index], p: [R, vector.badKey] }
-                : index === 3 ? { ...original[index], v: { ...original[index].v, registryKey: vector.badKey } } : original[index]));
+        const original = clone(ops); rekey(ops, '0', vector.badKey);
+        const receipt = receiptOp(ops, '0'), certificate = consumptionOp(ops).v;
+        return ops.length === packetSize(2) && seed[R][vector.key] === true && seed[R][vector.badKey] === true
+            && receipt.v.code === vector.code && receiptOp(original, '0').v.code === vector.code && receipt.v.registryKey === vector.badKey
+            && opIndex(ops, R, vector.badKey) !== -1 && opIndex(ops, R, vector.key) === -1 && certificate.keys[vector.badKey] === receipt.v.id
+            && !(vector.key in certificate.keys) && ops.filter((op, index) => !equal(op, original[index])).length === 3;
     }), undefined, true);
 }
 function verifyConstruction() {
-    requireCheck('case manifest nonempty, unique, both providers and exact assertion IDs', CASES.length === 20 && EXPECTED.length === 40
-        && new Set(EXPECTED.map(entry => entry.provider + ':' + entry.id)).size === 40
+    requireCheck('case manifest nonempty, unique, both providers and exact assertion IDs', CASES.length >= 40 && EXPECTED.length === 2 * CASES.length
+        && new Set(EXPECTED.map(entry => entry.provider + ':' + entry.id)).size === EXPECTED.length
         && EXPECTED.every(entry => entry.assertions.length > 0 && new Set(entry.assertions).size === entry.assertions.length));
     for (const count of [1, 2, 249, 250, 251]) {
         const row = source(count, 'matched_' + count, CASES.find(item => item.id === 'positive-' + count)), seed = image(row), ops = packet(row, { uid: 'fixture-user', scope: 'fixture-scope' });
-        requireCheck('fixture N=' + count + ' complete 2+2N and nonempty matching money', ops.length === 2 + 2 * count
+        const certificate = consumptionOp(ops, row.id).v;
+        requireCheck('fixture N=' + count + ' complete 1+3N+F slot packet and nonempty matching money', ops.length === packetSize(count)
+            && ops.filter(op => op.p[0] === T && op.p.length === 4).length === count && ops.filter(op => op.p[0] === T && op.p.length === 3).length === FIELD_COUNT
+            && !ops.some(op => op.p[0] === T && op.p.length < 3) && Object.keys(certificate.members).length === count && Object.keys(certificate.keys).length === count
+            && certificate.members[certificate.first].o === 0 && Object.values(certificate.members).every(member => receiptOp(ops, Object.keys(certificate.members)
+                .find(slot => certificate.members[slot] === member)).v.id === member.id)
             && Object.keys(row.barcodes).length === count && seed[D][DAY].codDollar === 37 && seed[M][MONTH].totalCount === 11);
+        const legacy = legacyPacket(row, { uid: 'fixture-user', scope: 'fixture-scope' });
+        requireCheck('fixture N=' + count + ' legacy row packet stays 2+2N and equals row conversion', legacy.length === 2 + 2 * count
+            && equal(rowShapeOf(ops), legacy));
     }
     requireCheck('fixed independent Unicode trim/reserved-key oracles', expectedKey(UNICODE_CODES[0]) === 'STRASSE😀%2FÉ'
         && expectedKey(UNICODE_CODES[1]) === 'IIİSS%2E%25%24%5B%5D%2F' && expectedKey('ß') === expectedKey('SS'));
-    requireCheck('case assertion manifest exact and nonempty', EXPECTED.reduce((sum, entry) => sum + entry.assertions.length, 0) === 212);
+    requireCheck('case assertion manifest exact and nonempty', EXPECTED_ASSERTIONS > 212 && EXPECTED.every(entry => entry.assertions.length >= 4));
     const objectSeed = image(source(2, 'matched_2', { unicodeOracle: true })), arraySeed = clone(objectSeed);
     arraySeed[T].matched_2.barcodes = Object.values(arraySeed[T].matched_2.barcodes);
     requireCheck('comparison maps only known numeric barcode container, preserving original Unicode values',
@@ -346,7 +431,7 @@ function physicalWriteEvidence(updates, physical, binding) {
         let value = physical;
         for (const part of parts) value = value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, part) ? value[part] : null;
         observed[key] = value ?? null;
-        if (equal(updates[key], observed[key])) { matchedPaths++; if (key !== receiptPath) originalMatchedPaths++; }
+        if (rtdbEqual(updates[key], observed[key])) { matchedPaths++; if (key !== receiptPath) originalMatchedPaths++; }
     }
     const receipt = observed[receiptPath], receiptShape = exactKeys(receipt), uidHashBound = receipt?.uid === binding.uid && receipt?.hash === binding.hash;
     const timestampResolved = Number.isSafeInteger(receipt?.at) && receipt.at > 0;
@@ -809,6 +894,7 @@ class NativeProvider {
                 const settled = () => { this.tasks.delete(task); this.taskLabels.delete(task); this.settledTasks++; };
                 task.then(settled, settled);
             }
+            await this.quiesce();
             await client.sdk.deleteApp(client.app); this.client = null;
         }
         if (this.pendingApp) { await this.pendingApp.close(); this.pendingApp = null; }
@@ -1041,7 +1127,7 @@ class SupabaseProvider {
         if (this.ordinaryAdmissionObserver && event.fn === 'zoe_write_v2') this.ordinaryAdmissionObserver.sql.push({ phase: event.phase, body: clone(event.body), ...(event.phase === 'after' ? { result: clone(event.result) } : {}) });
         if (event.fn !== 'zoe_purge_execute_v1') return;
         if (event.phase === 'before') {
-            if (this.rawMode) { this.stats.backendAttempts++; return; }
+            if (this.rawMode) return;
             this.stats.executeRequests++; capture(this.stats, this.row.id, event.body);
             if (this.beforePurge) { const action = this.beforePurge; this.beforePurge = null; await action(); }
         } else if (event.phase === 'after' && !this.rawMode) {
@@ -1099,11 +1185,21 @@ class SupabaseProvider {
         } else await this.harness.c.query('insert into public.zoe_docs(tenant_id,root,key,value,seq) values($1,$2,$3,$4,1) on conflict(tenant_id,root,key) do update set value=excluded.value',
             [this.tenant, root, key, value]);
     }
-    async rawBackend(ops) {
-        this.rawMode = true;
-        try { return await this.client.app._transport.rpc('zoe_purge_execute_v1', { p_expected_tenant: this.tenant,
-            p_op_id: 'f03_raw_' + randomBytes(12).toString('hex'), p_ops: ops }, WAIT_MS); }
-        finally { this.rawMode = false; }
+    async rawBackend(ops, route = 'rpc') {
+        this.rawMode = true; this.stats.backendAttempts++; this.lastRoutes = [];
+        const call = async (fn, payload) => {
+            try { const value = await this.client.app._transport.rpc(fn, { p_expected_tenant: this.tenant, p_op_id: 'f03_raw_' + randomBytes(12).toString('hex'), p_ops: payload }, WAIT_MS);
+                this.lastRoutes.push({ fn, fulfilled: true }); return { value }; }
+            catch (error) { this.lastRoutes.push({ fn, fulfilled: false, code: String(error?.code || '') }); return { error }; }
+        };
+        try {
+            const outcomes = [];
+            if (route !== 'rpc' && ops.length <= 500) outcomes.push(await call('zoe_write_v2', clone(ops)));
+            if (route !== 'write') outcomes.push(await call('zoe_purge_execute_v1', rowShapeOf(ops)));
+            const applied = outcomes.find(outcome => !outcome.error);
+            if (applied) return applied.value;
+            throw outcomes[0]?.error || new Error('No SQL route attempted');
+        } finally { this.rawMode = false; }
     }
     async removeOperationReceipt(entry) { await this.harness.c.query('delete from public.zoe_ops where tenant_id=$1 and op_id=$2', [this.tenant, entry.row.opId]); }
     async operationGone(entry) { return (await this.harness.c.query('select 1 from public.zoe_ops where tenant_id=$1 and op_id=$2', [this.tenant, entry.row.opId])).rows.length === 0; }
@@ -1126,7 +1222,7 @@ async function fullJournalValid(api, provider, entry) {
 }
 function originalEffectsMatch(provider, entry, actual) {
     if (!entry) return false;
-    return entry.row.ops.every(op => equal(actual[op.p[0]]?.[op.p[1]] ?? null, op.v));
+    return entry.row.ops.every(op => op.p.length > 2 && op.p[0] === T ? (actual[T]?.[op.p[1]] ?? null) === null : rtdbEqual(actual[op.p[0]]?.[op.p[1]], op.v));
 }
 function fullMembersMatch(api, provider, entry, actual) {
     const members = Object.entries(provider.row.barcodes);
@@ -1172,8 +1268,8 @@ function backendSnapshotEvidence(provider, ops, controlled, after, rejection, in
             return { index, root: roots.includes(op.p[0]) ? op.p[0] : 'other', pathHash: digest(op.p.join('/')),
                 beforePresent: prior !== null && prior !== undefined, afterPresent: actual !== null && actual !== undefined,
                 beforeValueHash: digest(JSON.stringify(prior ?? null)), afterValueHash: digest(JSON.stringify(actual ?? null)),
-                requestedValueHash: digest(JSON.stringify(op.v)), beforeRequestedEffectMatched: equal(prior ?? null, op.v),
-                afterRequestedEffectMatched: equal(actual ?? null, op.v) };
+                requestedValueHash: digest(JSON.stringify(op.v)), beforeRequestedEffectMatched: rtdbEqual(prior, op.v),
+                afterRequestedEffectMatched: rtdbEqual(actual, op.v) };
         });
         const backendCode = typeof rejection?.code === 'string' ? rejection.code : '';
         return { version: 1, status: 'OBSERVED', operationCount: ops.length, patchHash: digest(JSON.stringify(updateOf(ops))),
@@ -1195,7 +1291,14 @@ function logicalForComparison(logical) {
     const receipts = Object.values(logical[P] || {}).map(receipt => {
         const value = clone(receipt); delete value.id; value.actorUid = '<owner>'; value.releasedBy = '<owner>'; value.scope = '<scope>'; return value;
     }).sort((a, b) => Number(a.slot) - Number(b.slot));
-    const consumptions = Object.fromEntries(Object.entries(logical[G] || {}).map(([id, value]) => [id, { ...value, actorUid: '<owner>', scope: '<scope>' }]));
+    const slotOf = new Map(Object.values(logical[P] || {}).map(receipt => [receipt.id, receipt.trashId + ':' + receipt.slot]));
+    const masked = id => slotOf.has(id) ? '<release ' + slotOf.get(id) + '>' : id;
+    const consumptions = Object.fromEntries(Object.entries(logical[G] || {}).map(([id, value]) => {
+        const shaped = { ...rtdbShape(value), actorUid: '<owner>', scope: '<scope>' };
+        if (shaped.members) shaped.members = Object.fromEntries(Object.entries(shaped.members).map(([slot, member]) => [slot, { ...member, id: masked(member.id) }]));
+        if (shaped.keys) shaped.keys = Object.fromEntries(Object.entries(shaped.keys).map(([key, value]) => [key, masked(value)]));
+        return [id, shaped];
+    }));
     const sources = Object.fromEntries(Object.entries(logical[T] || {}).map(([id, row]) => [id, { ...row,
         barcodes: Object.fromEntries(Object.entries(row.barcodes || {}).filter(([, barcode]) => barcode !== null && barcode !== undefined)) }]));
     return { ...logical, [T]: sources, [P]: receipts, [G]: consumptions };
@@ -1716,17 +1819,17 @@ async function runGuardCase(provider, scenario) {
         if (!GUARD_FAMILY[scenario.mode].includes(label)) throw new Error('Unknown guard assertion ID ' + label);
         guardCheck(label, condition, detail);
     };
-    check('seed-proven', ops.length === 6 && provider.row.barcodes['0'].code === scenario.vector.code
-        && ops[2].p[1] === scenario.vector.key && ops[3].v.registryKey === scenario.vector.key
+    check('seed-proven', ops.length === packetSize(2) && provider.row.barcodes['0'].code === scenario.vector.code
+        && opIndex(ops, R, scenario.vector.key) !== -1 && receiptOp(ops, '0').v.registryKey === scenario.vector.key
         && guardOracle(provider.row.barcodes['0'].code) === scenario.vector.key
         && before.logical[R][scenario.vector.key] === true && before.logical[R].F03_GUARD_NEIGHBOR === true
         && (scenario.mode === 'matching' || before.logical[R][scenario.vector.badKey] === true)
         && Object.keys(before.logical[T]).length === 1 && Object.keys(before.logical[P]).length === 0 && Object.keys(before.logical[G]).length === 0
         && moneyOf(before.logical)[D][DAY].codDollar === 37 && moneyOf(before.logical)[M][MONTH].totalCount === 11
         && (provider.kind === 'native' ? !!protectedBefore[GUARD_HISTORY]?.f03_guard_history : protectedBefore.some(doc => doc.root === GUARD_HISTORY)));
-    if (scenario.mode === 'mismatch') { ops[2].p[1] = scenario.vector.badKey; ops[3].v.registryKey = scenario.vector.badKey; }
+    if (scenario.mode === 'mismatch') rekey(ops, '0', scenario.vector.badKey);
     const originalOps = clone(ops), patchHash = digest(JSON.stringify(updateOf(originalOps)));
-    const response = await bounded(provider.rawBackend(ops), 'guard raw authenticated backend').then(value => ({ fulfilled: true, value, rejection: null }), rejection => ({ fulfilled: false, value: null, rejection }));
+    const response = await bounded(provider.rawBackend(ops, 'rpc'), 'guard raw authenticated backend').then(value => ({ fulfilled: true, value, rejection: null }), rejection => ({ fulfilled: false, value: null, rejection }));
     if (provider.kind === 'native' && !response.fulfilled && !/permission[_-]denied/i.test(String(response.rejection?.code || ''))) provider.namespace.uncertain = true;
     const after = await provider.snapshot(), backendCode = String(response.rejection?.code || '');
     const evidence = backendSnapshotEvidence(provider, originalOps, before, after, response.rejection, moneyOf(before.logical));
@@ -1745,7 +1848,8 @@ async function runGuardCase(provider, scenario) {
             && Object.keys(after.logical[T]).length === 0 && Object.keys(after.logical[R]).length === 0
             && Object.keys(after.logical[P]).length === 2 && Object.keys(after.logical[G]).length === 1);
         check('all-receipt-members', originalOps.filter(op => op.p[0] === P).every(op => equal(after.logical[P][op.p[1]], op.v)
-            && guardOracle(op.v.code) === op.v.registryKey) && after.logical[P][originalOps[3].p[1]].code === scenario.vector.code);
+            && guardOracle(op.v.code) === op.v.registryKey) && after.logical[P][receiptOp(originalOps, '0').p[1]].code === scenario.vector.code
+            && rtdbEqual(after.logical[G][provider.row.id], consumptionOp(originalOps).v));
     } else {
         check('backend-typed-denial', response.fulfilled === false && (provider.kind === 'native' ? /permission[_-]denied/i.test(backendCode)
             : ['22023', '42501', 'PT409'].includes(backendCode)), { backendCode });
@@ -1798,14 +1902,90 @@ async function runGuardVectors(runtime, sql, origin) {
         && guardNativeResources.beforeEmpty === GUARD_CASES.length && guardNativeResources.afterEmpty === GUARD_CASES.length
         && guardNativeResources.closed === true && guardNativeResources.active === false && guardNativeResources.uncertain === false && guardNativeResources.pendingRequests === 0, undefined, true);
 }
+function secondRow(row) { return source(2, row.id + '_b'); }
+function seedOf(scenario, row) {
+    const seed = image(row);
+    if (scenario.group) {
+        const other = image(secondRow(row));
+        for (const root of [T, R]) Object.assign(seed[root], other[root]);
+    }
+    if (scenario.fault === 'cert-count-larger') seed[T][row.id].count = 3;
+    return seed;
+}
+async function faultedPacket(provider, scenario, context) {
+    const row = clone(provider.row);
+    if (scenario.fault === 'cert-count-larger') row.count = 3;
+    if (scenario.priorRestore) await provider.patch(G + '/' + row.id, { v: 1, sourceId: row.id, generation: 0, kind: 'restore', actorUid: provider.uid,
+        scope: provider.scope, deletedAt: row.deletedAt - 5, rowBirth: row.createdAt, token: 'f03_prior_restore_token', targetId: 'f03_prior_target' });
+    if (scenario.family === 'legacy') return legacyPacket(row, context);
+    if (scenario.fault === 'count-mirror' || scenario.fault === 'count-mirror-receipted') {
+        const ops = packet(row, context), changed = clone(provider.row);
+        changed.barcodes['2'] = { code: 'F03_EXTRA_ACTUAL_MEMBER', cod: 1, dod: 0, isClosed: false, createdAt: changed.createdAt + 2 };
+        await runOrdinaryCountAdmission(provider, changed);
+        return scenario.fault === 'count-mirror' ? ops : packet(changed, context);
+    }
+    const ops = packet(row, context), certificate = consumptionOp(ops, row.id).v;
+    const first = receiptOp(ops, '0', row.id), next = receiptOp(ops, '1', row.id);
+    const without = (list, item) => list.splice(list.indexOf(item), 1);
+    switch (scenario.fault) {
+    case undefined: case 'collision': break;
+    case 'wrong-key': rekey(ops, '0', 'F03_UNRELATED_KEY'); await provider.patch(R + '/F03_UNRELATED_KEY', true); break;
+    case 'missing-pair': ops.splice(opIndex(ops, R, first.v.registryKey), 1); break;
+    case 'cert-missing-link': delete certificate.members['1'].p; break;
+    case 'cert-wrong-ordinal': certificate.members['1'].o = 5; break;
+    case 'cert-first-wrong': certificate.first = '1'; break;
+    case 'cert-members-missing': delete certificate.members; break;
+    case 'cert-keys-wrong': certificate.keys[first.v.registryKey] = next.v.id; break;
+    case 'cert-keys-missing': delete certificate.keys; break;
+    case 'cert-duplicate-ordinal': certificate.members['2'] = { o: 1, id: certificate.members['2'].id, p: '0' }; break;
+    case 'cert-count-larger': break;
+    case 'borrowed-receipt': {
+        const borrowed = { ...clone(first.v), id: 'release_' + digest('borrowed:' + row.id).slice(0, 32), deletedAt: row.deletedAt - 1000 };
+        await provider.patch(P + '/' + borrowed.id, borrowed);
+        without(ops, first); certificate.members['0'].id = borrowed.id; certificate.keys[first.v.registryKey] = borrowed.id;
+        break;
+    }
+    case 'shared-receipt': without(ops, next); certificate.members['1'].id = first.v.id; delete certificate.keys[next.v.registryKey]; break;
+    case 'extra-receipt': {
+        const ghost = { ...clone(first.v), id: 'release_' + digest('ghost:' + row.id).slice(0, 32), slot: '7', code: 'F03_GHOST_MEMBER', registryKey: 'F03_GHOST_MEMBER' };
+        ops.splice(ops.length - 1, 0, { k: 'set', p: [R, ghost.registryKey], v: null }, { k: 'set', p: [P, ghost.id], v: ghost });
+        certificate.keys[ghost.registryKey] = ghost.id;
+        break;
+    }
+    case 'swapped-pointers': certificate.members['0'].id = next.v.id; certificate.members['1'].id = first.v.id; break;
+    case 'slot-delete-without-receipt': without(ops, next); break;
+    case 'container-delete': {
+        const slots = ops.filter(op => op.p[0] === T && op.p.length === 4);
+        for (const op of slots) without(ops, op);
+        ops.unshift({ k: 'set', p: [T, row.id, 'barcodes'], v: null });
+        break;
+    }
+    case 'row-delete-with-certificate': {
+        for (const op of ops.filter(item => item.p[0] === T)) without(ops, op);
+        ops.unshift({ k: 'set', p: [T, row.id], v: null });
+        break;
+    }
+    case 'cross-row-receipt': case 'group-one-malformed': break;
+    default: throw new Error('Unknown fault ' + scenario.fault);
+    }
+    if (!scenario.group) return ops;
+    const other = packet(secondRow(row), context), otherCertificate = consumptionOp(other).v;
+    if (scenario.fault === 'cross-row-receipt') {
+        const borrowed = receiptOp(other, '0');
+        without(other, borrowed); otherCertificate.members['0'].id = first.v.id; otherCertificate.keys[borrowed.v.registryKey] = first.v.id;
+    }
+    if (scenario.fault === 'group-one-malformed') without(other, consumptionOp(other));
+    return [...ops, ...other];
+}
 async function runCase(runtime, provider, scenario) {
     const before = await provider.snapshot();
     const initialMoney = moneyOf(before.logical);
     const context = { uid: provider.uid, scope: provider.scope };
     const check = (label, condition, detail) => {
-        if (!FAMILY[scenario.family].includes(label)) throw new Error('Unknown assertion ID ' + label);
+        if (!assertionsFor(scenario, provider.kind).includes(label)) throw new Error('Unknown assertion ID ' + label);
         requireCheck(label, condition, detail);
     };
+    const typedCode = code => provider.kind === 'native' ? /permission[_-]denied/i.test(code) : ['22023', '42501', 'PT409'].includes(code);
     if (scenario.family === 'positive') {
         const success = await observePurge(provider), after = await provider.snapshot();
         const entry = provider.stats.captures[0]?.journal;
@@ -1819,29 +1999,59 @@ async function runCase(runtime, provider, scenario) {
             wireBytes: provider.stats.lastWireBytes ?? null, submittedOpsUtf8: Buffer.byteLength(JSON.stringify(entry.row.ops), 'utf8') };
     }
     if (scenario.family === 'backend') {
-        const ops = packet(provider.row, context);
-        if (scenario.fault === 'wrong-key') {
-            ops[2].p[1] = 'F03_UNRELATED_KEY'; ops[3].v.registryKey = 'F03_UNRELATED_KEY';
-            await provider.patch(R + '/F03_UNRELATED_KEY', true);
-        }
-        if (scenario.fault === 'missing-pair') ops.splice(2, 1);
-        if (scenario.fault === 'count-mirror') {
-            const changed = clone(provider.row);
-            changed.barcodes['2'] = { code: 'F03_EXTRA_ACTUAL_MEMBER', cod: 1, dod: 0, isClosed: false, createdAt: changed.createdAt + 2 };
-            await runOrdinaryCountAdmission(provider, changed);
-        }
+        const ops = await faultedPacket(provider, scenario, context);
         const controlled = await provider.snapshot();
         const diagnosticOps = clone(ops);
-        const rejection = await bounded(provider.rawBackend(ops), 'raw authenticated backend negative').then(() => null, error => error);
+        const rejection = await bounded(provider.rawBackend(ops, scenario.route || 'both'), 'raw authenticated backend negative').then(() => null, error => error);
         const after = await provider.snapshot();
         const backendCode = String(rejection?.code || '');
+        const routeCodes = provider.kind === 'native' ? [backendCode] : (provider.lastRoutes || []).map(route => route.code);
         provider.rawBackendEvidence = backendSnapshotEvidence(provider, diagnosticOps, controlled, after, rejection, initialMoney);
-        check('backend-attempt-reached', provider.stats.backendAttempts === 1 && !!rejection
-            && (provider.kind === 'native' ? /permission[_-]denied/i.test(backendCode) : ['22023', '42501', 'PT409'].includes(backendCode)), { backendCode });
+        check('backend-attempt-reached', provider.stats.backendAttempts === 1 && !!rejection && routeCodes.length > 0 && routeCodes.every(typedCode),
+            { backendCode, routes: provider.lastRoutes });
         check('backend-refused', !!rejection);
         check('zero-effects', equal(after, controlled));
         check('money-unchanged', equal(moneyOf(after.logical), initialMoney));
-        return { logical: logicalForComparison(after.logical), backendCode, publicReachability: 'UNPROVEN; raw backend adversarial/schema-resilience fixture, not supported public admission proof', barrier: 'raw syntactically valid authenticated attempt; denial code required, not counter alone' };
+        return { logical: logicalForComparison(after.logical), backendCode, routes: provider.lastRoutes ?? null, publicReachability: 'UNPROVEN; raw backend adversarial/schema-resilience fixture, not supported public admission proof', barrier: 'raw syntactically valid authenticated attempt; denial code required, not counter alone' };
+    }
+    if (scenario.family === 'control' || scenario.family === 'legacy') {
+        const ops = await faultedPacket(provider, scenario, context);
+        const route = scenario.family === 'legacy' ? 'rpc' : 'write';
+        const response = await bounded(provider.rawBackend(ops, route), 'raw authenticated backend ' + scenario.family).then(value => ({ value, rejection: null }), rejection => ({ value: null, rejection }));
+        const after = await provider.snapshot();
+        const backendCode = String(response.rejection?.code || '');
+        provider.rawBackendEvidence = backendSnapshotEvidence(provider, clone(ops), before, after, response.rejection, initialMoney);
+        if (scenario.family === 'legacy' && provider.kind === 'native') {
+            check('backend-attempt-reached', provider.stats.backendAttempts === 1 && !!response.rejection && typedCode(backendCode), { backendCode });
+            check('backend-refused', !!response.rejection);
+            check('zero-effects', equal(after, before));
+        } else {
+            check('backend-attempt-reached', provider.stats.backendAttempts === 1, { backendCode });
+            check('backend-accepted', !response.rejection && (provider.kind === 'native' || response.value?.ok === true), { backendCode, value: response.value });
+            const sources = [...new Set(ops.filter(op => op.p[0] === T).map(op => op.p[1]))];
+            const expected = scenario.family === 'legacy' ? ops.map(op => op.p[0] === G ? { ...op, v: { ...op.v, ...certificateOf(ops.filter(item => item.p[0] === P).map(item => item.v)) } } : op) : ops;
+            const effects = sources.every(id => after.logical[T]?.[id] === undefined)
+                && expected.every(op => op.p[0] === T || rtdbEqual(after.logical[op.p[0]]?.[op.p[1]], op.v));
+            check(scenario.family === 'legacy' ? 'expanded-effects' : 'all-original-effects', effects, provider.rawBackendEvidence);
+        }
+        check('money-unchanged', equal(moneyOf(after.logical), initialMoney));
+        return { logical: logicalForComparison(after.logical), backendCode, routes: provider.lastRoutes ?? null };
+    }
+    if (scenario.family === 'replay') {
+        const ops = packet(provider.row, context);
+        const first = await bounded(provider.rawBackend(clone(ops), 'write'), 'raw authenticated first apply').then(() => true, () => false);
+        const controlled = await provider.snapshot();
+        check('first-applied', first && Object.keys(controlled.logical[T] || {}).length === 0 && Object.keys(controlled.logical[P] || {}).length === provider.row.count);
+        provider.stats.backendAttempts = 0;
+        const rejection = await bounded(provider.rawBackend(clone(ops), 'both'), 'raw authenticated replay').then(() => null, error => error);
+        const after = await provider.snapshot();
+        const backendCode = String(rejection?.code || '');
+        const routeCodes = provider.kind === 'native' ? [backendCode] : (provider.lastRoutes || []).map(route => route.code);
+        check('backend-attempt-reached', provider.stats.backendAttempts === 1 && !!rejection && routeCodes.length > 0 && routeCodes.every(typedCode), { backendCode, routes: provider.lastRoutes });
+        check('backend-refused', !!rejection);
+        check('zero-effects', equal(after, controlled));
+        check('money-unchanged', equal(moneyOf(after.logical), initialMoney));
+        return { logical: logicalForComparison(after.logical), backendCode, routes: provider.lastRoutes ?? null };
     }
     if (scenario.family === 'barrier') {
         let reached = false, controlled = null;
@@ -1938,13 +2148,13 @@ async function runCase(runtime, provider, scenario) {
     }
     if (scenario.family === 'bytes') {
         const ops = packet(provider.row, context), scope = '\u0002'.repeat(2048);
-        ops[1].v.scope = scope;
+        consumptionOp(ops).v.scope = scope;
         for (const op of ops) if (op.p[0] === P) {
             op.v.scope = scope; op.v.actorUid = '漢'.repeat(2048); op.v.kind = 'scan';
             op.v.id = 'scan_' + Number(op.v.slot).toString(16).padStart(32, '0'); op.p[1] = op.v.id;
         }
         const raw = JSON.stringify(ops), opsBytes = Buffer.byteLength(raw, 'utf8'), patchBytes = Buffer.byteLength(JSON.stringify(updateOf(ops)), 'utf8');
-        check('otherwise-complete-packet', !!runtime.api.registryPurgeIntent(ops) && ops.length <= 500 && raw.length + 2000 < LIMIT);
+        check('otherwise-complete-packet', !!runtime.api.boundedRegistryPurgeIntent(packet(provider.row, context)) && raw.length + 2000 < LIMIT);
         check('over-byte-envelope', opsBytes > LIMIT && patchBytes > LIMIT && runtime.api.boundedRegistryPurgeIntent(ops) === null);
         const failure = await bounded(Promise.resolve().then(() => provider.client.sdk.update(provider.client.sdk.ref(provider.client.db), updateOf(ops))), 'predispatch oversized update').then(() => null, error => error);
         const after = await provider.snapshot();
@@ -1979,7 +2189,7 @@ async function verifyBoundedDeadline() {
     requireCheck('bounded retains timer failure after original promise later settles', rejected);
 }
 function controlledTimingProofReady(row) {
-    const expected = 2 + 2 * row.count, proof = row.evidence;
+    const expected = packetSize(row.count), proof = row.evidence;
     return TIMING_COUNTS.includes(row.count) && row.workSettled === true && row.acknowledged === true
         && row.fullOriginalJournal === true && row.originalEffectsExact === true && row.releaseMembersExact === true
         && row.nonemptySentinels === true && row.moneyHistoryUnchanged === true && row.journalCompleted === true
@@ -2006,8 +2216,8 @@ function controlledTimingOverallFailed(rows, existingFailure) {
 function verifyControlledTimingGates() {
     const good = count => ({ count, workSettled: true, acknowledged: true, fullOriginalJournal: true, originalEffectsExact: true,
         releaseMembersExact: true, nonemptySentinels: true, moneyHistoryUnchanged: true, journalCompleted: true, latencyPass: true,
-        evidence: { status: 'OBSERVED', effects: 'ALL_ORIGINAL_EFFECTS_AND_BOUND_RECEIPT', totalPaths: 3 + 2 * count,
-            originalEffects: { totalPaths: 2 + 2 * count, matchedPaths: 2 + 2 * count, unmatchedPaths: 0 },
+        evidence: { status: 'OBSERVED', effects: 'ALL_ORIGINAL_EFFECTS_AND_BOUND_RECEIPT', totalPaths: packetSize(count) + 1,
+            originalEffects: { totalPaths: packetSize(count), matchedPaths: packetSize(count), unmatchedPaths: 0 },
             transportReceipt: { status: 'MATCHED_RESOLVED_TIMESTAMP', exactShape: true, uidHashBound: true, timestampResolved: true, originalOpIdBound: true } },
         phaseWithinBudget: true, cleanup: true, rootEmpty: true, connections: 1, closedSockets: 1,
         resources: { pending: 0, started: 10, settled: 10, activeApp: false, pendingApp: false, active: false, uncertain: false, pendingRequests: 0 } });
@@ -2044,7 +2254,7 @@ function verifyControlledTimingGates() {
     requireCheck('controlled timer failure never becomes PASS from later fast measurement', !controlledDeadlinePass(false, 1, 1)
         && !controlledDeadlinePass(undefined, 1, 1) && !controlledDeadlinePass(true, NaN, 1));
     requireCheck('controlled phase is separate from unchanged main manifest and bounded90s', TIMING_PHASE_MS === 90000 && WAIT_MS === 15000
-        && TIMING_COUNTS.length === 3 && [...TIMING_COUNTS].sort().join(',') === '249,250,251' && CASES.length === 20 && EXPECTED.length === 40);
+        && TIMING_COUNTS.length === 3 && [...TIMING_COUNTS].sort().join(',') === '249,250,251' && EXPECTED.length === 2 * CASES.length);
     requireCheck('owned diagnostic orders contain every original target exactly once', timingOrder(undefined).join(',') === '249,250,251'
         && timingOrder('251,249,250').join(',') === '251,249,250');
     for (const invalid of ['', '249,250', '249,250,250', '250,249,251', '251,249,250,1']) {
@@ -2201,9 +2411,9 @@ async function main() {
                 const provider = providerName === 'native' ? new NativeProvider(runtime, native, scenario, row) : new SupabaseProvider(runtime, sql, scenario, row);
                 activeCase = { id: scenario.id, provider: providerName };
                 const start = activeChecks.length;
-                const inputFingerprint = digest(JSON.stringify(image(row)));
+                const inputFingerprint = digest(JSON.stringify(seedOf(scenario, row)));
                 let value = null, error = null, cleaned = false, failureReadback = null;
-                try { await provider.setup(image(row)); value = await runCase(runtime, provider, scenario); }
+                try { await provider.setup(seedOf(scenario, row)); value = await runCase(runtime, provider, scenario); }
                 catch (failure) {
                     if (providerName === 'native') provider.trace.note('case-failed', { timedOut: String(failure?.message).startsWith('Timed out:') });
                     error = String(failure?.stack || failure); console.error(error);
@@ -2215,7 +2425,7 @@ async function main() {
                     catch (failure) { if (providerName === 'native') native.uncertain = true; error ||= String(failure?.stack || failure); }
                 }
                 const checks = activeChecks.slice(start).filter(check => check.caseId === scenario.id && check.provider === providerName);
-                const expected = FAMILY[scenario.family];
+                const expected = assertionsFor(scenario, providerName);
                 const coherent = checks.length === expected.length && expected.every(label => checks.filter(check => check.label === label && check.pass).length === 1)
                     && cleaned && !error;
                 if (!coherent) { fail++; console.error('  FAIL  case manifest ' + providerName + ':' + scenario.id); }
@@ -2229,7 +2439,8 @@ async function main() {
                 comparisons.push(value?.logical ?? null);
                 activeCase = null;
             }
-            requireCheck('matched logical state ' + scenario.id, comparisons.every(Boolean) && equal(comparisons[0], comparisons[1]));
+            if (scenario.providersDiffer) requireCheck('provider-specific logical state ' + scenario.id, comparisons.every(Boolean) && !equal(comparisons[0], comparisons[1]));
+            else requireCheck('matched logical state ' + scenario.id, comparisons.every(Boolean) && equal(comparisons[0], comparisons[1]));
         }
         requireCheck('all expected case/provider IDs executed exactly once', results.length === EXPECTED.length
             && EXPECTED.every(expected => results.filter(result => result.id === expected.id && result.provider === expected.provider && result.pass).length === 1));

@@ -47,7 +47,22 @@ function fixture(tenant, uid, name, count, overrides) {
     const consumption = { v: 1, sourceId: name, generation: 1, kind: 'purge', actorUid: uid, scope, deletedAt, rowBirth: createdAt };
     const ops = [{ k: 'set', p: [T, name], v: null }, { k: 'set', p: [G, name], v: consumption }];
     for (const receipt of receipts) ops.push({ k: 'set', p: [R, receipt.registryKey], v: null }, { k: 'set', p: [L, receipt.id], v: receipt });
-    return Object.assign({ name, source, receipts, ops, tenant, uid }, overrides || {});
+    return Object.assign({ name, source, receipts, ops, tenant, uid, expanded: { ...consumption, ...certificateOf(receipts) } }, overrides || {});
+}
+function certificateOf(receipts) {
+    const ordered = receipts.slice().sort((a, b) => Number(a.slot) - Number(b.slot)), members = {}, keys = {};
+    ordered.forEach((receipt, index) => {
+        members[receipt.slot] = { o: index, id: receipt.id, ...(index ? { p: ordered[index - 1].slot } : {}), ...(index < ordered.length - 1 ? { n: ordered[index + 1].slot } : {}) };
+        keys[receipt.registryKey] = receipt.id;
+    });
+    return { first: ordered[0].slot, members, keys };
+}
+function slotOps(f) {
+    const ops = [];
+    for (const receipt of f.receipts) ops.push({ k: 'set', p: [T, f.name, 'barcodes', receipt.slot], v: null }, { k: 'set', p: [R, receipt.registryKey], v: null }, { k: 'set', p: [L, receipt.id], v: receipt });
+    for (const field of Object.keys(f.source)) if (field !== 'barcodes') ops.push({ k: 'set', p: [T, f.name, field], v: null });
+    ops.push({ k: 'set', p: [G, f.name], v: f.expanded });
+    return ops;
 }
 async function main() {
     if (H.unavailableReason()) throw new Error(H.unavailableReason());
@@ -89,9 +104,10 @@ async function main() {
                 (coalesce((select sum(private.zoe_doc_bytes(d.root,d.key,d.value)) from public.zoe_docs d where d.tenant_id=s.tenant_id),0)
                 +coalesce((select sum(private.zoe_op_bytes(o.op_id,o.result)) from public.zoe_ops o where o.tenant_id=s.tenant_id),0))::text as real
                 from public.zoe_tenant_state s where s.tenant_id=$1`, [A])).rows[0];
-            ok('N=' + count + ' ៖ ALL source/registry/release/consumption values + one seq + typed receipt/quota exact', result.ok === true
+            ok('N=' + count + ' ៖ ALL source/registry/release/consumption values (consumption expanded with the locked-row certificate) + one seq + typed receipt/quota exact', result.ok === true
+                && result.docs?.length === 0 && persisted?.purge?.proof === 'operation'
                 && f.ops.every(op => { const row = actualRows.find(row => row.root === op.p[0] && row.key === op.p[1]);
-                    return row && isDeepStrictEqual(row.value, op.v) && Number(row.seq) === result.seq; })
+                    return row && isDeepStrictEqual(row.value, op.p[0] === G ? f.expanded : op.v) && Number(row.seq) === result.seq; })
                 && result.seq === beforeHead + 1 && persisted?.ok === true && isDeepStrictEqual(persisted.purge, result.purge)
                 && persisted.docs?.length === f.ops.length && Number(accounting.seq) === result.seq && accounting.bytes === accounting.real,
                 { result, accounting });
@@ -140,16 +156,40 @@ async function main() {
         }
         const nullRegistry = fixture(A, uid, 'already_null_registry', 1); await seed(nullRegistry);
         await c.query('update public.zoe_docs set value=null where tenant_id=$1 and root=$2 and key=$3', [A, R, nullRegistry.receipts[0].registryKey]);
-        const nullResult = await call('execute', nullRegistry, opId());
-        ok('valid legacy already-null registry retains existing per-doc s0 semantics', nullResult.ok === true
-            && nullResult.docs?.some(doc => doc.r === R && doc.k === nullRegistry.receipts[0].registryKey && doc.v === null && doc.s === 0), nullResult);
+        const nullRow = async () => (await c.query('select value, seq from public.zoe_docs where tenant_id=$1 and root=$2 and key=$3', [A, R, nullRegistry.receipts[0].registryKey])).rows[0];
+        const nullBefore = await nullRow(), nullId = opId(), nullResult = await call('execute', nullRegistry, nullId), nullAfter = await nullRow();
+        const nullPersisted = (await c.query('select result from public.zoe_ops where tenant_id=$1 and op_id=$2', [A, nullId])).rows[0]?.result;
+        ok('valid legacy already-null registry ៖ applied · registry row stays null at its own seq (no tombstone bump) · reply docs empty', nullResult.ok === true
+            && nullResult.docs?.length === 0 && nullBefore?.value === null && nullAfter?.value === null && nullAfter?.seq === nullBefore?.seq
+            && await sourceValue(nullRegistry) === null && !nullPersisted?.docs?.some(doc => doc.r === R && doc.k === nullRegistry.receipts[0].registryKey && doc.s !== 0),
+            { nullResult, nullBefore, nullAfter, nullPersisted });
+        const late = fixture(A, uid, 'late_field', 2); await seed(late);
+        const lateSource = copy(late.source); lateSource.locker = 'A1'; lateSource.origins = { [late.receipts[0].registryKey]: 'VN' };
+        await c.query('update public.zoe_docs set value=$1 where tenant_id=$2 and root=$3 and key=$4', [lateSource, A, T, late.name]);
+        const lateResult = await call('execute', late, opId());
+        ok('expansion deletes fields added after the client read (locked row keys) and applies', lateResult.ok === true && await sourceValue(late) === null, lateResult);
+        const array = fixture(A, uid, 'array_slots', 3); array.source.barcodes = Object.values(array.source.barcodes); await seed(array);
+        const arrayResult = await call('execute', array, opId());
+        const arrayConsumption = (await c.query('select value from public.zoe_docs where tenant_id=$1 and root=$2 and key=$3', [A, G, array.name])).rows[0]?.value;
+        ok('array container expands to numeric slots with the same certificate', arrayResult.ok === true && await sourceValue(array) === null
+            && isDeepStrictEqual(arrayConsumption, array.expanded), { arrayResult, arrayConsumption });
+        await c.query("set statement_timeout = '8s'");
+        for (const count of [500]) {
+            const big = fixture(A, uid, 'big_' + count, count); await seed(big);
+            const started = Date.now(), bigResult = await call('execute', big, opId()), ms = Date.now() - started;
+            ok('N=' + count + ' purge execute under the 8 s statement_timeout (' + ms + 'ms)', bigResult.ok === true && await sourceValue(big) === null, { ms, error: bigResult.error });
+        }
+        await c.query('reset statement_timeout');
         const generic = fixture(A, uid, 'generic_limit', 250); await seed(generic);
         const genericBefore = await snapshot(A);
         const capped = await H.as(c, who, 'select public.zoe_write_v2($1,$2,$3::jsonb) as r', [A, opId(), JSON.stringify(generic.ops)]);
         ok('generic >500 នៅតែបដិសេធ និងមិនមាន effects', capped.error?.code === '22023' && JSON.stringify(await snapshot(A)) === JSON.stringify(genericBefore), capped);
         const small = fixture(A, uid, 'generic_healthy', 1); await seed(small);
+        const oldBefore = await snapshot(A);
         const old = await H.as(c, who, 'select public.zoe_write_v2($1,$2,$3::jsonb) as r', [A, opId(), JSON.stringify(small.ops)]);
-        ok('generic <=500 neighboring valid purge នៅតែជោគជ័យ', old.rows?.[0]?.r?.ok === true, old);
+        ok('generic path refuses the row-shape purge (rules gate each slot) with zero effects', old.error?.code === '42501' && isDeepStrictEqual(await snapshot(A), oldBefore), old);
+        const slot = await H.as(c, who, 'select public.zoe_write_v2($1,$2,$3::jsonb) as r', [A, opId(), JSON.stringify(slotOps(small))]);
+        ok('generic <=500 neighboring valid slot purge នៅតែជោគជ័យ', slot.rows?.[0]?.r?.ok === true && await sourceValue(small) === null, slot);
         const collision = fixture(A, uid, 'collision', 2); await seed(collision);
         const collisionId = opId();
         await c.query("insert into public.zoe_ops(tenant_id,op_id,result) values($1,$2,'{\"ok\":true,\"seq\":1,\"docs\":[]}'::jsonb)", [A, collisionId]);

@@ -1310,6 +1310,68 @@ async function costGuard() {
     }
 }
 
+async function foldHintEquivalence() {
+    console.log('\n── ៤ខ. zoe_eval ៖ ផ្លូវ snapshot ដែលបត់រួច (hint `f` ពី compiler) = ការវាយតម្លៃខ្សែ child/parent ដើម ──');
+    const { c } = await H.freshDb('default-grants');
+    try {
+        await c.query(migrationSql);
+        const gen = await import(require('url').pathToFileURL(path.join(ROOT, 'supabase', 'scripts', 'rtdb-rules.mjs')).href);
+        const tree = gen.compileRules(JSON.parse(fs.readFileSync(path.join(ROOT, 'firebase-database.rules.json'), 'utf8')));
+        const seen = new Set(), samples = [];
+        const collect = (expr, loc, vars) => {
+            if (!expr || typeof expr !== 'object') return;
+            if (Array.isArray(expr)) { expr.forEach((item) => collect(item, loc, vars)); return; }
+            if (expr.f) {
+                const key = JSON.stringify([expr, loc]);
+                if (!seen.has(key)) { seen.add(key); samples.push({ expr, loc, vars }); }
+                return;
+            }
+            for (const value of Object.values(expr)) if (value && typeof value === 'object') collect(value, loc, vars);
+        };
+        const walk = (node, loc, vars) => {
+            for (const key of ['w', 'v']) if (node[key]) collect(node[key], loc, vars);
+            for (const [name, child] of Object.entries(node.c || {})) walk(child, loc.concat(name), vars);
+            if (node.x) walk(node.x.r, loc.concat({ v: node.x.n }), vars.concat(node.x.n));
+        };
+        walk(tree, [], []);
+        const strip = (expr) => { const copy = JSON.parse(JSON.stringify(expr)); delete copy.f; return copy; };
+        const variants = [['k', (name, i) => 'k' + i], ['slash', () => 'a/b'], ['empty', () => ''], ['reserved', () => 'bad.key'], ['number', () => 5], ['missing', () => undefined]];
+        const cases = [];
+        for (const sample of samples) {
+            for (const [label, value] of variants) {
+                const vars = {};
+                sample.vars.forEach((name, i) => { const v = value(name, i); if (v !== undefined) vars[name] = v; });
+                const loc = sample.loc.map((seg, i) => typeof seg === 'string' ? seg : (typeof vars[seg.v] === 'string' && vars[seg.v] ? vars[seg.v] : 'k' + i));
+                for (const scope of [{ vars, loc }, { vars, loc: [] }, { vars, loc: loc.slice(0, 1) }]) {
+                    cases.push({ e: sample.expr, r: strip(sample.expr), s: scope, label });
+                    cases.push({ e: { t: 'm', n: 'exists', o: sample.expr, a: [] }, r: { t: 'm', n: 'exists', o: strip(sample.expr), a: [] }, s: scope, label });
+                }
+            }
+        }
+        const ctx = { t: '00000000-0000-0000-0000-000000000000', pre: {}, post: {}, touched: {}, now: Date.now() };
+        const compare = async (list) => (await c.query(`select count(*)::int as n, count(*) filter (where private.zoe_eval(x->'e', $2::jsonb, x->'s') is distinct from private.zoe_eval(x->'r', $2::jsonb, x->'s'))::int as bad,
+            (array_agg(x->>'label') filter (where private.zoe_eval(x->'e', $2::jsonb, x->'s') is distinct from private.zoe_eval(x->'r', $2::jsonb, x->'s')))[1:3] as labels
+            from jsonb_array_elements($1::jsonb) x`, [JSON.stringify(list), JSON.stringify(ctx)])).rows[0];
+        let total = 0, bad = 0, labels = [];
+        for (let i = 0; i < cases.length; i += 4000) {
+            const r = await compare(cases.slice(i, i + 4000));
+            total += r.n; bad += r.bad; if (r.labels) labels = labels.concat(r.labels);
+        }
+        ok('hint `f` ៖ ' + samples.length + ' ខ្សែដែលបត់ពី rules ពិត × ' + variants.length + ' ប្រភេទ var × ៣ ទីតាំង (ខ្សែផ្ទាល់ + .exists()) ➜ លទ្ធផលដូចគ្មាន hint (' + total + ')',
+            samples.length >= 500 && total === cases.length && bad === 0, { bad, labels, samples: samples.length });
+        const withUp = samples.find((sample) => sample.expr.f.u), withVar = samples.find((sample) => sample.expr.f.s);
+        const wrong = [];
+        if (withUp) { const e = JSON.parse(JSON.stringify(withUp.expr)); e.f.u += 1; wrong.push({ e, r: strip(withUp.expr), s: { vars: Object.fromEntries(withUp.vars.map((n, i) => [n, 'k' + i])), loc: withUp.loc.map((seg, i) => typeof seg === 'string' ? seg : 'k' + i).concat('extra') }, label: 'up' }); }
+        if (withVar) { const e = JSON.parse(JSON.stringify(withVar.expr)); e.f.s = e.f.s.concat('extra'); wrong.push({ e, r: strip(withVar.expr), s: { vars: Object.fromEntries(withVar.vars.map((n, i) => [n, 'k' + i])), loc: withVar.loc.map((seg, i) => typeof seg === 'string' ? seg : 'k' + i) }, label: 'segment' }); }
+        const reverse = wrong.length === 2 ? await compare(wrong) : { bad: 0 };
+        ok('ទិសផ្ទុយ ៖ hint ខុស (parent លើស · segment លើស) ➜ ការប្រៀបធៀបរកឃើញ', reverse.bad === 2, reverse);
+    } catch (e) {
+        ok('zoe_eval hint equivalence រត់បាន', false, String(e && e.stack || e));
+    } finally {
+        try { await c.end(); } catch (e) {}
+    }
+}
+
 async function main() {
     await rulesCompilerGuardRegression();
     await rulesMigrationFreshness();
@@ -1363,6 +1425,7 @@ async function main() {
             r.applied && caught.length > 0);
     }
     await quotaUpgradeGuard();
+    await foldHintEquivalence();
     await costGuard();
     finish();
 }

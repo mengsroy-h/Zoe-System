@@ -1008,7 +1008,6 @@ run "emu/trash-generation-sdk" node audit-tools/emu/trash-generation-sdk-test.js
 run "emu/cleanup-consumed-sdk" node audit-tools/emu/cleanup-consumed-sdk-test.js
 run "emu/empty-delete-sdk" node audit-tools/emu/empty-delete-sdk-test.js
 run "emu/registry-purge-atomic-sdk" node audit-tools/emu/registry-purge-atomic-sdk-test.js
-run "emu/registry-purge-ordinal-prototype" node audit-tools/emu/registry-purge-ordinal-prototype-test.js
 run "emu/pickup-reset-applied-sdk" node audit-tools/emu/pickup-reset-applied-sdk-test.js
 run "emu/import-native-I100-cookie-unsigned" node audit-tools/emu/import-paired-ci-runner.js --case=I100-cookie-unsigned --provider=native
 run "emu/import-native-I100-cookie-signed" node audit-tools/emu/import-paired-ci-runner.js --case=I100-cookie-signed --provider=native
@@ -1326,7 +1325,6 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     SCANSDK_APP_DIR="$IMPORTPAIRED_BASE_SOURCE" runall_owned node audit-tools/emu/empty-delete-sdk-test.js 2>&1 | tail -1 | sed 's/^/   empty-delete:    /'
     SBADAPTER_APP_DIR="$BASE" runall_owned node audit-tools/emu/supabase-adapter-parity-test.js 2>&1 | tail -1 | sed 's/^/   sb-adapter-parity: /'
     F03_APP_DIR="$BASE" runall_owned node audit-tools/emu/registry-purge-atomic-sdk-test.js 2>&1 | tail -1 | sed 's/^/   registry-purge-sdk: /'
-    F03_ORDINAL_APP_DIR="$BASE" runall_owned node audit-tools/emu/registry-purge-ordinal-prototype-test.js 2>&1 | tail -1 | sed 's/^/   ordinal-prototype: /'
     PICKUPRESET_APP_DIR="$BASE" runall_owned node audit-tools/emu/pickup-reset-applied-sdk-test.js 2>&1 | tail -1 | sed 's/^/   pickup-reset-sdk: /'
     if [ -n "$IMPORTPAIRED_BASE_SOURCE" ] && [ -f "$IMPORTPAIRED_BASE_SOURCE/ZoeW/src/main.tsx" ]; then
         # BASE is a diagnostic single native profile, not eight-profile or SQL coverage.

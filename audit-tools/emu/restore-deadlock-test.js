@@ -77,12 +77,20 @@ const restoreFinalizeUpdate = (token) => ({
 });
 
 const releaseId = id => 'release_' + require('crypto').createHash('sha256').update(id).digest('hex').slice(0, 32);
-const purgeUpdate = (id, code = 'DEADLOCK_CODE') => ({
+const legacyPurgeUpdate = (id, code = 'DEADLOCK_CODE') => ({
     [`zoew_recently_deleted_cod_dod/${id}`]: null,
     [`zoew_barcode_registry/${code}`]: null,
     [`zoew_trash_consumptions/${id}`]: { v: 1, sourceId: id, generation: 0, kind: 'purge', actorUid: 'userA', scope: 'audit-scope', deletedAt: T0, rowBirth: T0 },
     ['zoew_registry_releases/' + releaseId(id)]: { v: 2, generation: 0, id: releaseId(id), kind: 'legacy', actorUid: 'userA', releasedBy: 'userA', scope: 'audit-scope', code, registryKey: code, birth: T0, trashId: id, slot: '0', deletedAt: T0, rowBirth: T0, rowCount: 1 }
 });
+const purgeUpdate = (item) => {
+    const legacy = legacyPurgeUpdate(item.id, item.barcodes[0].code), id = item.id, code = item.barcodes[0].code, rid = releaseId(id);
+    const update = { [`zoew_recently_deleted_cod_dod/${id}/barcodes/0`]: null, [`zoew_barcode_registry/${code}`]: null,
+        ['zoew_registry_releases/' + rid]: legacy['zoew_registry_releases/' + rid] };
+    for (const field of Object.keys(item)) if (field !== 'barcodes') update[`zoew_recently_deleted_cod_dod/${id}/${field}`] = null;
+    update[`zoew_trash_consumptions/${id}`] = { ...legacy[`zoew_trash_consumptions/${id}`], first: '0', members: { '0': { o: 0, id: rid } }, keys: { [code]: rid } };
+    return update;
+};
 
 // payload ដដែលបេះបិទនឹង `finalizeClaimedHistoryClear()`
 const clearFinalizeUpdate = (token) => ({
@@ -193,7 +201,10 @@ async function seedClearStuck(withStaleFinalization) {
     check(!denied(await asUser('PUT', `/zoew_recently_deleted_cod_dod/${PID}.json`, trashItem(PID))),
         'releaseStaleRestoreClaimForPurge ដោះ claim បាន');
     check(denied(await asUser('PATCH', '/.json', { [`zoew_recently_deleted_cod_dod/${PID}`]: null })), 'client ចាស់ purge គ្មាន receipt/consumption ត្រូវបដិសេធ');
-    check(!denied(await asUser('PATCH', '/.json', purgeUpdate(PID))),
+    check(denied(await asUser('PATCH', '/.json', legacyPurgeUpdate(PID))),
+        'client ចាស់ purge ទាំងជួរ (receipt + consumption គ្មាន slot) ត្រូវបដិសេធ ដោយគ្មាន effect');
+    check(!!JSON.parse((await asOwner('GET', `/zoew_recently_deleted_cod_dod/${PID}.json`)).body || 'null'), 'client ចាស់ ៖ ជួរធុងសំរាមនៅដដែល');
+    check(!denied(await asUser('PATCH', '/.json', purgeUpdate(trashItem(PID)))),
         'ក្រោយដោះ claim ➜ purge បាន');
 
     const SID = 'id_1750000000000_sig';
@@ -207,7 +218,7 @@ async function seedClearStuck(withStaleFinalization) {
         '⛔ ធុងសំរាមដែល Sign រួច (គ្មាន trashMode) ៖ សរសេរដោយគ្មាន restoreBlocked ត្រូវ rules បដិសេធ (Phase B ៖ គ្មាន compat មុន launch)');
     check(!denied(await asUser('PUT', `/zoew_recently_deleted_cod_dod/${SID}.json`, trashItem(SID, { barcodes: signedCodes, restoreBlocked: true }))),
         'ធុងសំរាមចាស់ដែល Sign រួច ៖ ដោះ claim ជាមួយ restoreBlocked (ដូច releaseStaleRestoreClaimForPurge) បាន');
-    check(!denied(await asUser('PATCH', '/.json', purgeUpdate(SID, 'SIG1'))),
+    check(!denied(await asUser('PATCH', '/.json', purgeUpdate(trashItem(SID, { barcodes: signedCodes, restoreBlocked: true })))),
         'ធុងសំរាមចាស់ដែល Sign រួច ៖ ក្រោយដោះ claim ➜ purge បាន');
 
     await asOwner('PUT', '/.json', null);
@@ -216,7 +227,7 @@ async function seedClearStuck(withStaleFinalization) {
     const heldItem = trashItem(claimedId, { barcodes: [{ code: 'HELD_CODE', createdAt: T0, cod: 5, dod: 0 }], restoreClaim: { token: 'dead', claimedAt: T0, targetId: claimedId } });
     await asOwner('PUT', `/zoew_recently_deleted_cod_dod/${cleanId}.json`, cleanItem);
     await asOwner('PUT', `/zoew_recently_deleted_cod_dod/${claimedId}.json`, heldItem);
-    const batchPurge = { ...purgeUpdate(cleanId, 'CLEAN_CODE'), ...purgeUpdate(claimedId, 'HELD_CODE') };
+    const batchPurge = { ...purgeUpdate(cleanItem), ...purgeUpdate(heldItem) };
     check(denied(await asUser('PATCH', '/.json', batchPurge)), 'batch មាន receipts/consumptions ត្រឹមត្រូវ តែ claim មួយជាប់ត្រូវបដិសេធ');
     const after = JSON.parse((await asOwner('GET', '/zoew_recently_deleted_cod_dod.json')).body || 'null') || {};
     check(!!after['id_1750000000000_ok'],

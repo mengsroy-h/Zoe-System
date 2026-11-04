@@ -98,7 +98,8 @@ App ទាំង ២ ជា **Netlify site ដាច់ដោយឡែក**។ `
 រាល់ពេល `firebase-database.rules.json` ប្រែ ត្រូវ paste ចូល Firebase Console ➜
 **Publish** ដោយដៃ។ មាន rules ២ ឯកសារ ៖
 
-- `firebase-database.rules.json` — Firebase Project របស់ **អាជីវកម្ម**
+- `firebase-database.rules.json` — Firebase Project របស់ **អាជីវកម្ម** (ប្រភព) ➜ paste ឯកសារ Publish `firebase-database.rules.min.json`
+  ដែល `node supabase/scripts/generate-rules-sql.mjs` សរសេរ (ប្រភពអានបានធំលើសដែន Console)
 - `ZoeKeyGen/firebase-database.rules.json` — Firebase Project របស់ **License**
 
 **Supabase** មានដំណើរការ migration និង Edge Function ដាច់ពី Netlify; របៀប GitHub integration ឬ CLI/SQL Editor

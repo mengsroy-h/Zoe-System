@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import * as purgeProof from '../src/domain/registry-purge-proof';
 import { createSupabaseDatabase, SbNetworkError, SbRpcError } from '../src/services/supabase-rtdb';
 import { createLocalWriteJournal, WRITE_JOURNAL_MAX_BYTES } from '../src/services/write-journal';
+import { purgeCertificateOf } from '../src/domain/trash-generation';
 
 const url = 'https://purge-large.supabase.co';
 const scope = url + '|user';
@@ -386,5 +387,27 @@ it('purge status ស្រប typed binding នៅតែអាចកែ clock �
         expect(values.at(-1)).toBeGreaterThan(1000); expect(values.at(-1)).toBeLessThan(3000);
         expect(db.recoveryState().blocked).toBe(1); expect(journal.list(scope, topic)).toHaveLength(1);
         expect(calls.filter(call => /zoe_(?:write|purge_execute)/.test(call.fn))).toEqual([]);
+    } finally { db.close('test'); }
+});
+
+it.each([1, 250])('F03 slot shape ៖ ក្រុម %i ផ្ញើ packet ជួរ v1 ទៅ RPC ខណៈ journal និង overlay រក្សា packet slot ដើម', async count => {
+    let seen: any;
+    const journal = createLocalWriteJournal();
+    const row = operations(count), receipts = row.filter(op => op.p[0] === 'zoew_registry_releases').map(op => op.v);
+    const slot: any[] = [...receipts.flatMap(receipt => [{ k: 'set', p: ['zoew_recently_deleted_cod_dod', 'trash1', 'barcodes', receipt.slot], v: null },
+        { k: 'set', p: ['zoew_barcode_registry', receipt.registryKey], v: null }, { k: 'set', p: ['zoew_registry_releases', receipt.id], v: receipt }]),
+    ...['count', 'deletedAt'].map(field => ({ k: 'set', p: ['zoew_recently_deleted_cod_dod', 'trash1', field], v: null })),
+    { k: 'set', p: ['zoew_trash_consumptions', 'trash1'], v: { ...row[1].v, ...purgeCertificateOf(receipts) } }];
+    expect((purgeProof as any).slotRegistryPurgeIntent(slot)).not.toBeNull();
+    const { db, calls } = await open({ journal, rpc: (fn: string) => { if (fn === 'zoe_purge_execute_v1') seen = journal.list(scope, topic)[0]; } });
+    try {
+        await db.update(db.ref(), patch(slot));
+        const writes = calls.filter(call => /zoe_(?:write|purge_execute)/.test(call.fn));
+        expect(writes.map(call => call.fn)).toEqual(['zoe_purge_execute_v1']);
+        expect(writes[0].args.p_ops).toEqual((purgeProof as any).registryPurgeRowOps(slot));
+        expect(writes[0].args.p_ops.length).toBe(2 + 2 * count);
+        expect(seen).toMatchObject({ writeProtocol: 3, stage: 'sent', purgeHash: await helpers.hash(row) });
+        expect(seen.ops.map((op: any) => op.p.join('/')).sort()).toEqual(Object.keys(patch(slot)).sort());
+        expect(journal.list(scope, topic)).toEqual([]);
     } finally { db.close('test'); }
 });

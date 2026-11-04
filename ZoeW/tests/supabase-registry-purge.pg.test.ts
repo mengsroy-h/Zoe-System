@@ -29,16 +29,19 @@ it('Supabase ៖ purge ពេញលេញចង original tenant និង source
         expect(run.status, output).toBe(0);
         expect(output).not.toMatch(/^\s*(?:FAIL|SKIP|SKIPPED)\b/m);
         const summary = JSON.parse(String(run.stdout).trim().split('\n').at(-1)!);
-        expect(summary).toMatchObject({ pass: 93, fail: 0, skipped: 0, infrastructureFailures: 0, migration, sourceHash, driverHash });
-        expect(summary.cases).toHaveLength(93);
-        expect(new Set(summary.cases.map((entry: { label: string }) => entry.label)).size).toBe(93);
+        expect(summary).toMatchObject({ pass: 97, fail: 0, skipped: 0, infrastructureFailures: 0, migration, sourceHash, driverHash });
+        expect(summary.cases).toHaveLength(97);
+        expect(new Set(summary.cases.map((entry: { label: string }) => entry.label)).size).toBe(97);
         expect(summary.cases.every((entry: { pass: boolean; kind: string }) => entry.pass === true && entry.kind === 'behavior')).toBe(true);
         for (const count of [1, 2, 249, 250, 251]) {
             expect(summary.cases.some((entry: { label: string }) => entry.label.startsWith('N=' + count + ' ៖ full packet execute applied'))).toBe(true);
         }
         for (const label of ['server source/member authority rejects wrong registry key pair',
             'full locked source membership cannot trust privileged source.count mirror',
-            'exact4MiB+1 SQL-expanded packet rejected with zero persistence']) {
+            'exact4MiB+1 SQL-expanded packet rejected with zero persistence',
+            'expansion deletes fields added after the client read (locked row keys) and applies',
+            'array container expands to numeric slots with the same certificate',
+            'generic path refuses the row-shape purge (rules gate each slot) with zero effects']) {
             expect(summary.cases.some((entry: { label: string }) => entry.label === label)).toBe(true);
         }
         expect(JSON.parse(fs.readFileSync(resultFile, 'utf8'))).toEqual(summary);

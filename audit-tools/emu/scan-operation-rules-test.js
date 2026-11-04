@@ -354,14 +354,26 @@ async function run() {
     const purgeTree = () => ({ [O]: { [id]: { ...prepared, phase: 'committed' } }, [R]: { [base.registryKey]: copy(owner) }, [T]: { [trashId]: copy(source) } });
     const consumption = value => ({ v: 1, sourceId: value.trashId, generation: value.generation, kind: 'purge', actorUid: value.releasedBy,
         scope: value.scope, deletedAt: value.deletedAt, rowBirth: value.rowBirth });
-    const purgePatch = value => ({ [T + '/' + value.trashId]: null, [R + '/' + value.registryKey]: null, [L + '/' + value.id]: copy(value), [G + '/' + value.trashId]: consumption(value) });
+    const certified = (...values) => ({ ...consumption(values[0]), first: values[0].slot,
+        members: Object.fromEntries(values.map((value, index) => [value.slot, { o: index, id: value.id,
+            ...(index ? { p: values[index - 1].slot } : {}), ...(index < values.length - 1 ? { n: values[index + 1].slot } : {}) }])),
+        keys: Object.fromEntries(values.map(value => [value.registryKey, value.id])) });
+    const purgePatch = (...values) => {
+        const patch = {};
+        for (const value of values) Object.assign(patch, { [T + '/' + value.trashId + '/barcodes/' + value.slot]: null, [R + '/' + value.registryKey]: null, [L + '/' + value.id]: copy(value) });
+        for (const field of Object.keys(source)) if (field !== 'barcodes') patch[T + '/' + values[0].trashId + '/' + field] = null;
+        patch[G + '/' + values[0].trashId] = certified(...values);
+        return patch;
+    };
+    const legacyPurgePatch = value => ({ [T + '/' + value.trashId]: null, [R + '/' + value.registryKey]: null, [L + '/' + value.id]: copy(value), [G + '/' + value.trashId]: consumption(value) });
+    await check('purge scan ចាស់ទាំងជួរ (client ចាស់) ត្រូវបដិសេធ', purgeTree(), '/.json', legacyPurgePatch(receipt), false);
     const purged = await check('purge scan៖ source + registry + receipt atomic', purgeTree(), '/.json', purgePatch(receipt), true);
     if (purged) {
         assert.equal(purged[T]?.[trashId], undefined); assert.equal(purged[R]?.[base.registryKey], undefined);
         for (const field of ['id', 'kind', 'scope', 'code', 'registryKey', 'birth', 'trashId', 'slot', 'deletedAt', 'rowBirth', 'rowCount']) assert.equal(purged[L][id][field], receipt[field]);
         assert.equal(purged[L][id].actorUid, purged[O][id].actorUid); assert.equal(purged[L][id].releasedBy, purged[O][id].actorUid);
     }
-    const purgeTerminal = { [O]: { [id]: { ...prepared, phase: 'committed' } }, [L]: { [id]: copy(receipt) }, [G]: { [trashId]: consumption(receipt) } };
+    const purgeTerminal = { [O]: { [id]: { ...prepared, phase: 'committed' } }, [L]: { [id]: copy(receipt) }, [G]: { [trashId]: certified(receipt) } };
     await check('purge lost ACK៖ receipt read បានតែ full replay ត្រូវបដិសេធ', purgeTerminal, '/.json', purgePatch(receipt), false);
     await check('release receipt មិនអាចសរសេរដដែល', purgeTerminal, at(L + '/' + id), receipt, false, 'PUT');
     await check('release receipt មិនអាចលុប', purgeTerminal, at(L + '/' + id), null, false, 'PUT');
@@ -373,7 +385,7 @@ async function run() {
     reclaimed[R] = { [base.registryKey]: { ...owner, intent: nextId } }; reclaimed[T] = { [trashId]: copy(source) };
     await check('receipt ចាស់មានរួចមិនអាចលុប scan owner ថ្មី', reclaimed, '/.json', purgePatch(receipt), false);
     await check('purge scan អនុញ្ញាតអ្នកប្រើផ្សេងដោយរក្សា original actor', purgeTree(), '/.json', purgePatch({ ...receipt, releasedBy: 'foreign' }), true, 'PATCH', 'foreign');
-    for (const missing of [T + '/' + trashId, R + '/' + base.registryKey, L + '/' + id, G + '/' + trashId]) {
+    for (const missing of [T + '/' + trashId + '/barcodes/0', T + '/' + trashId + '/deletedAt', R + '/' + base.registryKey, L + '/' + id, G + '/' + trashId]) {
         const patch = purgePatch(receipt); delete patch[missing];
         await check('purge scan ខ្វះ atomic leaf៖ ' + missing, purgeTree(), '/.json', patch, false);
     }
@@ -400,17 +412,21 @@ async function run() {
         assert.equal(snapshot[T][trashId].deletedAt, receipt.deletedAt);
         const changed = await req('PUT', at(T + '/' + trashId + '/deletedAt'), receipt.deletedAt + 1, uid); assert.equal(changed.status, 200);
     });
-    const legacyReceipt = { ...receipt, id: releaseId, kind: 'legacy', birth: 0, rowBirth: 0, rowCount: 0 };
+    const legacyReceipt = { ...receipt, id: releaseId, kind: 'legacy', birth: 0, rowBirth: 0, rowCount: 1 };
     const legacyTree = () => {
         const tree = purgeTree(); delete tree[O]; tree[R][base.registryKey] = true;
         delete tree[T][trashId].barcodes[0].scanIntent; tree[T][trashId].barcodes[0].createdAt = 0;
-        tree[T][trashId].createdAt = 0; tree[T][trashId].count = 0;
+        tree[T][trashId].createdAt = 0; tree[T][trashId].count = 1;
         return tree;
     };
     await check('purge legacy birth0 + true registry', legacyTree(), '/.json', purgePatch(legacyReceipt), true);
     const absentLegacy = legacyTree(); delete absentLegacy[R]; delete absentLegacy[T][trashId].createdAt;
-    delete absentLegacy[T][trashId].count; delete absentLegacy[T][trashId].barcodes[0].createdAt;
-    await check('purge legacy registry/birth/count មិនមានប្រើ0', absentLegacy, '/.json', purgePatch(legacyReceipt), true);
+    delete absentLegacy[T][trashId].barcodes[0].createdAt;
+    await check('purge legacy registry/birth មិនមានប្រើ0', absentLegacy, '/.json', purgePatch(legacyReceipt), true);
+    const zeroCount = legacyTree(); zeroCount[T][trashId].count = 0;
+    await check('certificate ចំនួន ៖ legacy count 0 មានសមាជិក 1 ត្រូវបដិសេធ (ដូច PT409)', zeroCount, '/.json', purgePatch({ ...legacyReceipt, rowCount: 0 }), false);
+    const absentCount = legacyTree(); delete absentCount[T][trashId].count;
+    await check('certificate ចំនួន ៖ legacy count អវត្តមានត្រូវបដិសេធ (ដូច PT409)', absentCount, '/.json', purgePatch({ ...legacyReceipt, rowCount: 0 }), false);
     const legacyPurged = { [L]: { [releaseId]: copy(legacyReceipt) }, [R]: { [base.registryKey]: true } };
     await check('legacy full replay មិនលុប claim true ថ្មីក្រោយ lost ACK', legacyPurged, '/.json', purgePatch(legacyReceipt), false);
     const ownedLegacy = legacyTree(); ownedLegacy[R][base.registryKey] = copy(owner); ownedLegacy[O] = { [id]: { ...prepared, phase: 'committed' } };
@@ -424,7 +440,7 @@ async function run() {
     const mixed = purgeTree(); mixed[T][trashId].barcodes[1] = { ...copy(source.barcodes[0]), code: 'LEGACY', createdAt: 0 };
     delete mixed[T][trashId].barcodes[1].scanIntent; mixed[T][trashId].count = 2; mixed[R].LEGACY = true;
     const scanMixed = { ...receipt, rowCount: 2 }, legacyMixed = { ...legacyReceipt, code: 'LEGACY', registryKey: 'LEGACY', slot: '1', rowBirth: base.birth, rowCount: 2 };
-    const mixedPatch = { ...purgePatch(scanMixed), ...purgePatch(legacyMixed) };
+    const mixedPatch = purgePatch(scanMixed, legacyMixed);
     await check('purge mixed scan/legacy មាន receipt តាម slot នីមួយៗ', mixed, '/.json', mixedPatch, true);
     const wrongMixed = copy(mixedPatch); wrongMixed[L + '/' + releaseId].slot = '0';
     await check('purge mixed មិនអាចដាក់ receipt legacy លើ scan slot', mixed, '/.json', wrongMixed, false);

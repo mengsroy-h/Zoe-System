@@ -27,7 +27,7 @@ Firebase config (បូក Setup Link បើអ្នកចង់)។
 |---|---|
 | `setup.cmd` | ដំឡើង `firebase-tools` ក្នុងថតនេះ រួចបើក browser ឲ្យ Login គណនី Google (ម្តងគត់) |
 | `new-customer.cmd` | អតិថិជនថ្មី ៖ បង្កើតគ្រប់យ៉ាង ➜ វាស់សុវត្ថិភាព ➜ បង្ហាញ config · ពាក្យសម្ងាត់ |
-| `deploy-rules.cmd` | ដំឡើង `firebase-database.rules.json` របស់ repo ទៅ **អតិថិជនទាំងអស់** ក្នុងពេលតែមួយ រួចវាស់ឡើងវិញ |
+| `deploy-rules.cmd` | ដំឡើង `firebase-database.rules.min.json` (ឯកសារ Publish ដែលដេរីវេពី `firebase-database.rules.json`) ទៅ **អតិថិជនទាំងអស់** ក្នុងពេលតែមួយ រួចវាស់ឡើងវិញ |
 | `node provision.js user …` | បន្ថែមបុគ្គលិក ឬកំណត់ពាក្យសម្ងាត់ថ្មី (`--reset`) |
 | `node provision.js verify …` | អាន settings/rules និងសាកសុវត្ថិភាព Project មួយ ឬទាំងអស់; sign-up probe អាចបង្កើតគណនីសាកល្បងបើ sign-up នៅបើក ហើយព្យាយាមលុបវាវិញ |
 | `node provision.js show …` | បង្ហាញ config និង Setup Link ម្តងទៀត · ម៉ាស៊ីនដែលគ្មាន state របស់ Project នោះ ដាក់ `--branch <លេខសាខា>` ដើម្បីបង្ហាញធាតុ `FIREBASE_PROJECT_IDS` (គ្មានវា ➜ ការព្រមាន ជំនួសធាតុ) |
@@ -41,7 +41,7 @@ Firebase config (បូក Setup Link បើអ្នកចង់)។
 3. បើក API ដែលត្រូវការ (Realtime Database · Authentication)
 4. **Web App** ឈ្មោះ `ZoeW`
 5. **Realtime Database** លំនាំដើម (តំបន់ `asia-southeast1` = សិង្ហបុរី)
-6. **Security Rules** ពី `firebase-database.rules.json` របស់ repo ➜ អានត្រឡប់មកវិញ ហើយប្រៀបធៀប
+6. **Security Rules** ពី `firebase-database.rules.min.json` របស់ repo ➜ អានត្រឡប់មកវិញ ហើយប្រៀបធៀប
 7. **Authentication** ៖ បើក Email/Password · **បិទ «Enable create (sign-up)»** · **បិទ «Enable delete»** ·
    បើក Email enumeration protection (ស្រេចចិត្ត ៖ បើ Google មិនទទួលវាលនេះ វារាយ `SKIP` ហើយការបិទ sign-up នៅតែអនុវត្ត)
 8. **គណនីបុគ្គលិក** `<ឈ្មោះ>@zoew<លេខសាខា>.com` ជាមួយពាក្យសម្ងាត់ចៃដន្យ ១៤ តួ
@@ -52,7 +52,7 @@ Firebase config (បូក Setup Link បើអ្នកចង់)។
 |---|---|
 | ការកំណត់ Authentication | sign-up និង delete បិទ · Email/Password បើក |
 | **ចុះឈ្មោះដោយ apiKey សាធារណៈ** | ត្រូវបដិសេធ (`ADMIN_ONLY_OPERATION`) — បើចុះឈ្មោះបាន វាលុបគណនីសាកល្បងនោះ ហើយរាយ **FAIL** |
-| Security Rules លើ Database | ដូច `firebase-database.rules.json` បេះបិទ |
+| Security Rules លើ Database | ដូច `firebase-database.rules.min.json` បេះបិទ |
 | អានទិន្នន័យដោយគ្មាន Login | ត្រូវបដិសេធ |
 | Login របស់បុគ្គលិកដែលទើបបង្កើត | ចូលបាន |
 | អានទិន្នន័យក្រោយ Login | អានបាន (App ដើរ) |
@@ -99,14 +99,16 @@ new-customer.cmd --branch 881859 --user sok,chan --app-url https://<ZoeW-site-�
 
 ### ដំឡើង Rules ថ្មីទៅអតិថិជនទាំងអស់
 
-ពេល `firebase-database.rules.json` ប្រែ (CLAUDE.md ច្បាប់ ១០) ជំនួសការ paste ក្នុង Console ម្តងមួយៗ ៖
+ពេល `firebase-database.rules.json` ប្រែ (CLAUDE.md ច្បាប់ ១០) រត់ `node supabase/scripts/generate-rules-sql.mjs` ជាមុន (វាសរសេរ `firebase-database.rules.min.json` ថ្មី) ហើយជំនួសការ paste ក្នុង Console ម្តងមួយៗ ៖
 
 ```bat
 deploy-rules.cmd
 ```
 
 វារាយ Project ទាំងអស់ដែលឧបករណ៍នេះស្គាល់ ➜ សួរ **YES** ➜ ដំឡើង ➜ អានត្រឡប់មកវិញ ➜ រត់ `verify`
-លើទាំងអស់។ សាកមុន ដោយមិនកែអ្វី ៖ `node provision.js rules --all --dry-run`។ Project មួយជាក់លាក់ ៖
+លើទាំងអស់។ សាកមុន ដោយមិនកែអ្វី ៖ `node provision.js rules --all --dry-run` (Firebase ពិនិត្យទំហំ និងអាន rules ពិត)។
+ឧបករណ៍បដិសេធ `firebase-database.rules.min.json` ដែលចាស់ជាងប្រភព ឬធំលើស ២៥១ ៩០៤ បៃ ➜ រត់ generator ម្តងទៀត។
+តាម Console ៖ paste ខ្លឹមសារ `firebase-database.rules.min.json` ទាំងមូល ➜ Publish (⛔ កុំ paste `firebase-database.rules.json` ៖ ធំលើសដែន Console)។ Project មួយជាក់លាក់ ៖
 `node provision.js rules --project zoew-881859`។
 
 ### អតិថិជនចាស់ (Project ដែលបង្កើតដោយដៃ)
@@ -145,8 +147,8 @@ node provision.js new --project-id <project-id-ចាស់> --branch 881859 --a
 - **sign-up ត្រូវបានវាស់ មិនមែនជឿ** ៖ ឧបករណ៍សាកចុះឈ្មោះគណនីថ្មីដោយ apiKey សាធារណៈ (ដូចអ្នកណាម្នាក់ដែលមាន
   Setup Link) ➜ ត្រូវបដិសេធ។ បើចុះឈ្មោះបាន វាព្យាយាមលុបគណនីនោះវិញ ហើយរាយ **FAIL**; បើលុបមិនបាន ត្រូវលុបតាមការណែនាំក្នុងលទ្ធផល។
   ⛔ Security Rules អនុញ្ញាតគ្រប់គណនីដែល Login ➜ sign-up ដែលបើក = អ្នកណាក៏អាន/សរសេរទិន្នន័យអតិថិជនបាន។
-- **Rules មានប្រភពតែមួយ** គឺ `firebase-database.rules.json` របស់ repo ➜ ក្រោយដំឡើង វាអានត្រឡប់មកវិញ ហើយ
-  ប្រៀបធៀប ➜ ការឃ្លាតលេចជា **FAIL**។
+- **Rules មានប្រភពតែមួយ** គឺ `firebase-database.rules.json` របស់ repo ➜ ឧបករណ៍ដំឡើងឯកសារ Publish `firebase-database.rules.min.json`
+  ដែល token ដូចប្រភពគ្រប់ rule ➜ ក្រោយដំឡើង វាអានត្រឡប់មកវិញ ហើយប្រៀបធៀប ➜ ការឃ្លាតលេចជា **FAIL**។
 - **ឧបករណ៍មិនយក Project ដែលមានស្រាប់ដោយស្ងាត់** (ត្រូវ `--adopt`) · **មិនប្តូរពាក្យសម្ងាត់គណនីដែលមានស្រាប់**
   (ត្រូវ `user --reset`) · `rules` សួរ **YES** មុនដំឡើង។
 - សារលើអេក្រង់ជា **ASCII អង់គ្លេស** ព្រោះ `cmd.exe` បំបែកអក្សរខ្មែរ។

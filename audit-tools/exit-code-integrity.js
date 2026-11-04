@@ -678,7 +678,7 @@ async function poisonOne(rel) {
     }
     if (verdict === 'failed') return;
     if (verdict === 'unverified') {
-        const tail = String(result.out || '').trim().split('\n').slice(-2).join(' | ').slice(-240);
+        const tail = String(result.out || '').trim().split('\n').slice(-14).join(' | ').slice(-1600);
         unverified.push(rel + ' (' + (result.timedOut ? 'ផុតថវិកា ' + budgetMs + 'ms (deadline របស់ job)' : 'signal=' + result.signal + ' code=' + result.code + ' (គ្មានភស្តុតាងពុលដែលបញ្ចប់ដោយគ្មាន uncaught crash)' ) + ') ចុង output ៖ ' + tail);
         return;
     }

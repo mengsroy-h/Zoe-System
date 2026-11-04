@@ -279,12 +279,18 @@ export function forgetAppLockPin() {
         appLockLogoutOwner = null;
         if (owner.late && (!signedOut || !securityState.appIsLocked || generation !== appLockUnlockGeneration)) return;
         if (firebaseState.auth !== logoutAuth || firebaseState.fb !== logoutSdk
-            || generation !== appLockUnlockGeneration && appLockPinIsSet()
-            || logoutAuth?.currentUser && (owner.authGeneration !== firebaseState.authGeneration || logoutAuth.currentUser.uid !== owner.uid)) return;
-        if (logoutAuth?.currentUser) {
-            if (owner.late) return;
+            || generation !== appLockUnlockGeneration && appLockPinIsSet()) return;
+        const unconfirmed = () => {
             setAppLockBusy(false);
             setAppLockMsg('⚠️ មិនទាន់អាចបញ្ជាក់ថាបានចាកចេញទេ។ សូមចុច «ភ្លេច PIN?» ម្តងទៀត ឬ Refresh។');
+        };
+        if (logoutAuth?.currentUser && (owner.authGeneration !== firebaseState.authGeneration || logoutAuth.currentUser.uid !== owner.uid)) {
+            if (!owner.late && securityState.appIsLocked && generation === appLockUnlockGeneration) unconfirmed();
+            return;
+        }
+        if (logoutAuth?.currentUser) {
+            if (owner.late) return;
+            unconfirmed();
             if (timedOut === true) {
                 owner.late = true;
                 appLockLogoutOwner = owner;

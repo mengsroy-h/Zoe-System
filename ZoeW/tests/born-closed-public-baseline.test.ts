@@ -235,6 +235,18 @@ it.each(['cookie', 'palm'].flatMap(provider => ['normal', 'late-save', 'handoff'
                 expect(get(D + '/' + DAY).codDollar).toBe(5); expect(get(M + '/2026-10').codDollar).toBe(5);
                 return;
             }
+            if (fault === 'ack-between-price') {
+                expect(journal()).toHaveLength(1); expect(journal()[0].phase).toBe('collected-pending');
+                expect(get(P + '/' + DAY), 'កែតម្លៃក្រោយ ack ៖ កញ្ចប់បិទពិត ➜ «យករួច» រាប់តាម holder ពិត (មិនអាស្រ័យលើតម្លៃ)').toMatchObject({ packagesPickedUp: 1, pickedUpBarcodes: { [CODE]: PHONE } });
+                firebaseState.authGeneration++; firebaseState.db = { app } as any;
+                dataState.scanHistory = Object.values(get(H) || {}); dataState.deletedItems = Object.values(get('zoew_recently_deleted_cod_dod') || {});
+                await resumePendingScanOperations();
+                expect(journal(), 'ការសង្គ្រោះបញ្ចប់ពី holder ពិតបច្ចុប្បន្ន (តម្លៃថ្មី)').toEqual([]);
+                expect(get(C + '/' + DAY + '/' + CODE)).toEqual({ c: 7, d: 0 });
+                expect(get(P + '/' + DAY)).toMatchObject({ packagesPickedUp: 1, pickedUpBarcodes: { [CODE]: PHONE } });
+                expect(get(D + '/' + DAY).codDollar).toBe(5); expect(get(D + '/' + DAY).totalCount).toBe(1);
+                return;
+            }
             expect(journal()).toHaveLength(1); expect(journal()[0].phase).toBe('collected-pending');
             const expectedCod = fault === 'ack-reused' ? 7 : 5;
             expect(get(D + '/' + DAY).codDollar).toBe(expectedCod); expect(get(M + '/2026-10').codDollar).toBe(expectedCod);

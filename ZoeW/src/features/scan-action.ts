@@ -18,7 +18,7 @@ import { updateRecentPhonesList } from '../services/db-listeners';
 import { mergeBarcodeIntoHistoryItem, playBeep, saveSingleHistoryItemToFirebase } from '../services/history-write';
 import { withTimeout } from '../services/network';
 import { probeDatabaseLiveness } from '../services/connection';
-import { finishPendingScan, notePendingScan, pendingScanIsCurrent, preparePendingScan, releasePendingScan, scanEvidenceRefusalText, settlePendingScanRelease } from '../services/scan-pending';
+import { finishPendingScan, notePendingScan, pendingScanIsCurrent, preparePendingScan, releasePendingScan, releasePendingScanAfter, scanEvidenceRefusalText, settlePendingScanRelease } from '../services/scan-pending';
 import { cancelScanOperation, claimScanOperation, saveScanOperation, scanImportCollectedOwned } from '../services/scan-operation';
 import { TX_OUTCOME_MAX_GAP_MS, TX_ROOT_READ_TIMEOUT_MS } from '../services/tx-outcome';
 import { refreshCurrentHistoryView } from '../ui/history-refresh';
@@ -173,6 +173,7 @@ export async function confirmPhone(isSkip = false) {
     lookupAnswersHeldWhileSaving.clear();
     let scanEvidence = null;
     let claimStarted = false;
+    let lateSave = null;
     try {
         scanEvidence = preparePendingScan(barcodeToSave, cod, dod, 0, 'interactive', 2);
         notePendingScan(scanEvidence, 'claim-pending');
@@ -213,8 +214,10 @@ export async function confirmPhone(isSkip = false) {
         };
 
         const savePromise = addOrUpdateEntry(barcodeToSave, phone, cod, dod, locker, scanEvidence.record.createdAt, 0, scanEvidence);
+        lateSave = savePromise;
         try {
             const saveStatus = await withTimeout(savePromise, 15000, 'Save timed out');
+            lateSave = null;
             if (!current()) return;
             if (saveStatus !== true) {
                 const heldAnswer = takeHeldLookupAnswer(barcodeToSave);
@@ -223,6 +226,7 @@ export async function confirmPhone(isSkip = false) {
                 return;
             }
         } catch (saveError) {
+            if (!saveError || saveError.message !== 'Save timed out') lateSave = null;
             if (!current()) return;
             if (saveError && saveError.message === 'Save timed out') {
                 probeDatabaseLiveness('save');
@@ -259,7 +263,7 @@ export async function confirmPhone(isSkip = false) {
             ? scanEvidenceRefusalText(e)
             : `⚠️ រក្សាទុកបរាជ័យ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងស្កេន (${barcodeToSave}) ម្ដងទៀត។`);
     } finally {
-        releasePendingScan(scanEvidence);
+        releasePendingScanAfter(scanEvidence, lateSave);
         if (current()) {
             viewState.phoneModalBusy = false;
             warmZtoLookupProxyNow();

@@ -72,6 +72,11 @@ export function releasePendingScan(handle) {
     if (unlock) unlock();
 }
 
+export function releasePendingScanAfter(handle, pending?) {
+    if (!pending) { releasePendingScan(handle); return; }
+    Promise.resolve(pending).catch(() => {}).finally(() => releasePendingScan(handle));
+}
+
 export function finishPendingScan(handle, proof) {
     if (!pendingScanIsCurrent(handle)) return false;
     try {

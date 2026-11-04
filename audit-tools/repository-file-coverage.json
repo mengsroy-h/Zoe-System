@@ -2895,6 +2895,15 @@
     "ZoeW/tests/scan-engine-recovery.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/scan-evidence-live-lock.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-evidence-owner-exit-budget.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-evidence-owner-exit-provable.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/scan-evidence-owner-exit.test.tsx": {
       "policy": "zoew-self-verification"
     },

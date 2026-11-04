@@ -2926,6 +2926,9 @@
     "ZoeW/tests/scan-late-claim-evidence.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/scan-background-save.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/scan-month-coordination.test.ts": {
       "policy": "zoew-self-verification"
     },

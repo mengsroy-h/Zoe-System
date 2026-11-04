@@ -1,8 +1,11 @@
 package com.zoesystem.zoew;
 
 import android.content.Context;
+import android.media.AudioAttributes;
+import android.media.AudioDeviceInfo;
 import android.media.AudioManager;
 import android.media.ToneGenerator;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import com.getcapacitor.JSObject;
@@ -10,6 +13,7 @@ import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import java.util.List;
 
 @CapacitorPlugin(name = "ZoeScanBeep")
 public class ScanBeepPlugin extends Plugin {
@@ -47,7 +51,8 @@ public class ScanBeepPlugin extends Plugin {
             try {
                 prepare();
                 audio = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
-                if (audio != null && !audio.isVolumeFixed() && audio.getMode() == AudioManager.MODE_NORMAL) {
+                if (audio != null && !audio.isVolumeFixed() && audio.getMode() == AudioManager.MODE_NORMAL
+                        && !audio.isStreamMute(AudioManager.STREAM_MUSIC) && speakerRoute(audio)) {
                     int before = audio.getStreamVolume(AudioManager.STREAM_MUSIC);
                     int maximum = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
                     if (before < maximum) {
@@ -72,6 +77,30 @@ public class ScanBeepPlugin extends Plugin {
             out.put("played", played);
             call.resolve(out);
         });
+    }
+
+    private static boolean speakerRoute(AudioManager audio) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                List<AudioDeviceInfo> route = audio.getAudioDevicesForAttributes(
+                    new AudioAttributes.Builder().setLegacyStreamType(AudioManager.STREAM_MUSIC).build());
+                if (route == null || route.isEmpty()) return false;
+                for (AudioDeviceInfo device : route) {
+                    if (device == null || device.getType() != AudioDeviceInfo.TYPE_BUILTIN_SPEAKER) return false;
+                }
+                return true;
+            }
+            for (AudioDeviceInfo device : audio.getDevices(AudioManager.GET_DEVICES_OUTPUTS)) {
+                if (device == null) return false;
+                int type = device.getType();
+                if (type != AudioDeviceInfo.TYPE_BUILTIN_SPEAKER && type != AudioDeviceInfo.TYPE_BUILTIN_EARPIECE
+                        && type != AudioDeviceInfo.TYPE_TELEPHONY && type != AudioDeviceInfo.TYPE_BUILTIN_SPEAKER_SAFE
+                        && type != AudioDeviceInfo.TYPE_REMOTE_SUBMIX) return false;
+            }
+            return true;
+        } catch (RuntimeException ignored) {
+            return false;
+        }
     }
 
     private void finish() {

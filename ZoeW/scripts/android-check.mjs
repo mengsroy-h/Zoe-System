@@ -169,6 +169,30 @@ ok('⛔ សិទ្ធិ ACCESS_FINE_LOCATION + ACCESS_COARSE_LOCATION ព្�
     geoUsers.length > 0 && manifestPermissions.has('android.permission.ACCESS_FINE_LOCATION') && manifestPermissions.has('android.permission.ACCESS_COARSE_LOCATION'),
     'ឯកសារ ' + geoUsers.length);
 ok('⛔ គ្មានសិទ្ធិទីតាំងពេលនៅខាងក្រោយ (ACCESS_BACKGROUND_LOCATION)', !manifestPermissions.has('android.permission.ACCESS_BACKGROUND_LOCATION'));
+/* ៣ក. 📷 ក្នុងផ្ទាំង Sign ៖ `<input accept="image/*" capture>` ➜ BridgeWebChromeClient របស់ Capacitor ដែលដំឡើង រក App កាមេរ៉ាតាម
+ *    `new Intent(ACTION_IMAGE_CAPTURE).resolveActivity()` ។ targetSdk ≥ 30 (Android 11+ package visibility) ៖ គ្មាន `<queries>` ➜ App កាមេរ៉ា
+ *    មើលមិនឃើញ ➜ null ➜ Capacitor បើកផ្ទាំងជ្រើសឯកសារជំនួសកាមេរ៉ា ។ `<queries>` ជាកូនផ្ទាល់របស់ `<manifest>` (មិនមែនក្នុង `<application>`) ·
+ *    វាមិនមែនសិទ្ធិ ៖ សំណុំ `<uses-permission>` ដដែល ។ */
+const chromeClientSrc = read('node_modules/@capacitor/android/capacitor/src/main/java/com/getcapacitor/BridgeWebChromeClient.java');
+const targetSdk = Number((read('android/variables.gradle').match(/targetSdkVersion\s*=\s*(\d+)/) || [])[1] || 0);
+const captureUsers = listFiles('src').filter((f) => /<input\b[^>]*\baccept="image\/[^"]*"[^>]*\bcapture=|<input\b[^>]*\bcapture=[^>]*\baccept="image\//.test(read(f)));
+const cameraByVisibility = /new Intent\(MediaStore\.ACTION_IMAGE_CAPTURE\);\s*if \(takePictureIntent\.resolveActivity\(/.test(chromeClientSrc);
+const imageCaptureQueried = (xml) => {
+    const outside = xml.replace(/<!--[\s\S]*?-->/g, '').replace(/<application\b[\s\S]*?<\/application>/g, '');
+    return [...outside.matchAll(/<queries>([\s\S]*?)<\/queries>/g)]
+        .some((m) => /<intent>\s*<action\s+android:name="android\.media\.action\.IMAGE_CAPTURE"\s*\/>\s*<\/intent>/.test(m[1]));
+};
+ok('ជាន់អប្បបរមា ៖ អាន BridgeWebChromeClient.java (Capacitor ដែលដំឡើង) · targetSdk · input capture រូបក្នុង src',
+    chromeClientSrc.length > 2000 && targetSdk > 0 && captureUsers.length > 0 && cameraByVisibility,
+    chromeClientSrc.length + ' · targetSdk ' + targetSdk + ' · ' + captureUsers.join(',') + ' · resolveActivity ' + cameraByVisibility);
+ok('⛔ <queries> IMAGE_CAPTURE ក្នុង AndroidManifest (Android 11+ ៖ 📷 បើកកាមេរ៉ា មិនមែនផ្ទាំងជ្រើសឯកសារ)',
+    targetSdk < 30 || imageCaptureQueried(manifest), 'targetSdk ' + targetSdk);
+ok('ទិសផ្ទុយ ៖ គ្មាន <queries> · <queries> ក្នុងមតិយោបល់ · <queries> ក្នុង <application> · action ផ្សេង ➜ មិនរាប់',
+    !imageCaptureQueried(manifest.replace(/<queries>[\s\S]*?<\/queries>/g, '')) &&
+    !imageCaptureQueried('<manifest><!-- <queries><intent><action android:name="android.media.action.IMAGE_CAPTURE" /></intent></queries> --><application></application></manifest>') &&
+    !imageCaptureQueried('<manifest><application><queries><intent><action android:name="android.media.action.IMAGE_CAPTURE" /></intent></queries></application></manifest>') &&
+    !imageCaptureQueried('<manifest><queries><intent><action android:name="android.media.action.VIDEO_CAPTURE" /></intent></queries><application></application></manifest>') &&
+    imageCaptureQueried('<manifest><queries><intent><action android:name="android.media.action.IMAGE_CAPTURE" /></intent></queries><application></application></manifest>'));
 ok('⛔ សិទ្ធិ REQUEST_INSTALL_PACKAGES (Android 8+ ៖ បើកផ្ទាំងដំឡើង APK ពី App)', manifestPermissions.has('android.permission.REQUEST_INSTALL_PACKAGES'));
 const probeBody = javaMethodBody(apkPluginSrc, 'void probe(');
 ok('probe ៖ HEAD · មិនតាម redirect · មាន = redirect ទៅ *.githubusercontent.com (https) · 404 = គ្មាន',

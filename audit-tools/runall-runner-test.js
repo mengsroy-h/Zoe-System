@@ -81,6 +81,7 @@ function fixture(dir, rel, opts) {
         else lines.push("log('end');");
     } else {
         lines.push('setTimeout(() => {');
+        if (o.bigLine) lines.push('    console.log(' + JSON.stringify(o.bigText || 'ក ') + '.repeat(' + Number(o.bigLine) + '));');
         for (const l of o.out) lines.push('    console.log(' + JSON.stringify(l) + ');');
         if (o.dependencyEnv) lines.push('    if (!process.env[' + JSON.stringify(o.dependencyEnv) + ']) console.log("SKIP dependency unavailable");' +
             (o.out.length === 0 ? ' else console.log("  ok    dependency available");' : ''));
@@ -129,11 +130,13 @@ function writeHarness(dir, body, timeoutSecs) {
     return h;
 }
 
-function runHarness(dir, body, extraEnv, timeoutSecs) {
+function runHarness(dir, body, extraEnv, timeoutSecs, limitMs) {
     try { fs.rmSync(path.join(dir, 'fx.log'), { force: true }); } catch (e) {}
     const h = writeHarness(dir, body, timeoutSecs);
     const t0 = Date.now();
-    const r = cp.spawnSync('bash', [h], { cwd: dir, env: harnessEnv(dir, extraEnv), encoding: 'utf8', timeout: 90000 });
+    // limitMs ➜ SIGKILL ៖ shell ដែលជាប់ក្នុង expansion មិនរត់ trap TERM ទេ ➜ ពិដានត្រូវបញ្ចប់វាពិតប្រាកដ
+    const r = cp.spawnSync('bash', [h], { cwd: dir, env: harnessEnv(dir, extraEnv), encoding: 'utf8', timeout: limitMs || 90000,
+        killSignal: limitMs ? 'SIGKILL' : 'SIGTERM', maxBuffer: 64 * 1024 * 1024 });
     return { rc: r.status, out: String(r.stdout || '') + String(r.stderr || ''), ms: Date.now() - t0, events: readLog(dir) };
 }
 
@@ -278,6 +281,28 @@ const indentedSkip = runHarness(falseGreen, 'run "fx-indented-skip" node audit-t
 ok('⛔ SKIP មានចន្លោះខាងមុខ មិនមែន PASS', /SKIPPED/.test(indentedSkip.out) && !/✅/.test(indentedSkip.out), indentedSkip.out);
 const strictSkip = runHarness(falseGreen, 'run "fx-indented-skip" node audit-tools/fx-indented-skip.js', { RUNALL_STRICT: '1' });
 ok('⛔ RUNALL_STRICT=1 ៖ dependency មិនបានវាស់ ត្រូវ exit មិនសូន្យ', strictSkip.rc !== 0, strictSkip.out);
+// ⛔ សាលក្រមអាន output ជាឯកសារក្នុងពេលលីនេអ៊ែរ ៖ checker ដែលបោះពុម្ពបន្ទាត់ធំ (របាយការណ៍ JSON ច្រើន MB) មិនអាចបង្កក
+//    shell មេបានទេ (`${out//[[:space:]]/}` ក្នុង locale UTF-8 ប្រើពេល quadratic ➜ shell មេរវល់ ១០០% CPU · មិន reap ·
+//    មិនចាប់ផ្តើម checker ថ្មី ហើយ `timeout` របស់ checker មិនការពារវា) ➜ ១ MB ក្នុង C.UTF-8 ត្រូវចប់ក្នុងពេលខ្លី និងរក្សាសាលក្រមដដែល។
+const UTF8 = { LC_ALL: 'C.UTF-8', LANG: 'C.UTF-8' };
+const bigOutput = newCase([
+    ['audit-tools/fx-big-pass.js', { bigLine: 500000, out: ['  ok    បន្ទាត់ធំ'] }],
+    ['audit-tools/fx-big-fail.js', { bigLine: 500000, out: ['  ok    មុន', '  FAIL  ក្រោយបន្ទាត់ធំ'] }],
+    ['audit-tools/fx-big-blank.js', { bigLine: 500000, bigText: ' \t', out: [] }],
+    ['audit-tools/fx-big-skip.js', { bigLine: 500000, out: ['  SKIP គ្មាន dependency'] }]
+]);
+const bigPass = runHarness(bigOutput, 'run "fx-big-pass" node audit-tools/fx-big-pass.js', UTF8, undefined, 45000);
+ok('⛔ output ១ MB (C.UTF-8) ៖ សាលក្រម PASS ក្នុងពេលខ្លី (មិនបង្កក shell មេ)', bigPass.rc === 0
+    && /fx-big-pass[^\n]*PASS {2}\(1\)/.test(bigPass.out) && bigPass.ms < 30000, { ms: bigPass.ms, rc: bigPass.rc, tail: bigPass.out.slice(-300) });
+const bigFail = runHarness(bigOutput, 'run "fx-big-fail" node audit-tools/fx-big-fail.js', UTF8, undefined, 45000);
+ok('⛔ output ធំ ៖ បន្ទាត់ FAIL ក្រោយបន្ទាត់ធំនៅតែជា FAIL', bigFail.rc !== 0 && /fx-big-fail[^\n]*\*\*\* FAIL/.test(bigFail.out)
+    && bigFail.ms < 30000, { ms: bigFail.ms, rc: bigFail.rc });
+const bigBlank = runHarness(bigOutput, 'run "fx-big-blank" node audit-tools/fx-big-blank.js', UTF8, undefined, 45000);
+ok('⛔ output ធំដែលមានតែចន្លោះ ៖ នៅតែជា output ទទេ (FAIL)', bigBlank.rc !== 0 && /fx-big-blank[^\n]*output ទទេ/.test(bigBlank.out)
+    && bigBlank.ms < 30000, { ms: bigBlank.ms, rc: bigBlank.rc });
+const bigSkip = runHarness(bigOutput, 'run "fx-big-skip" node audit-tools/fx-big-skip.js', UTF8, undefined, 45000);
+ok('⛔ output ធំ ៖ SKIP ក្រោយបន្ទាត់ធំនៅតែជា SKIPPED', /fx-big-skip[^\n]*SKIPPED/.test(bigSkip.out) && bigSkip.ms < 30000,
+    { ms: bigSkip.ms, tail: bigSkip.out.slice(-200) });
 // ⛔ exit 0 ដោយ event loop ហូរអស់ ≠ សេចក្តីសង្ខេប ៖ checker ដែល `await` promise ដែលមិនដែល settle បោះពុម្ព ok ខ្លះ ហើយ
 //    Node ចេញ 0 ដោយគ្មានការអះអាងនៅសល់ ➜ ម៉ាស៊ីនរត់ត្រូវទាមទារការសម្រេច exit code ពី checker (`process.exitCode = 0` ·
 //    `process.exit(0)`) មិនមែនទទួល exit 0 ធម្មជាតិ។ ទិសផ្ទុយ ៖ checker ដែលបន្ថយ exit code ខ្លួនឯង នៅ PASS។

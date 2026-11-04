@@ -313,8 +313,11 @@ runall_exec() {  # <i> — រត់ក្នុង subshell ៖ output ➜ <i>.
 
 runall_judge() {  # <i> — សាលក្រមដូច run() ជាជួរជំនាន់មុនបេះបិទ ៖ PASS · PARTIAL · SKIPPED · FAIL · ព្យួរ
     local i="$1" rc='' ms='' n skip_line out
+    out="$RUNALL_DIR/$i.out"
     [ -f "$RUNALL_DIR/$i.rc" ] && read -r rc ms < "$RUNALL_DIR/$i.rc"
-    out="$(cat "$RUNALL_DIR/$i.out" 2>/dev/null)"
+    # ⛔ អានជាឯកសារដោយ grep/sed/tr (ពេលលីនេអ៊ែរ) — កុំផ្ទុក output ចូលអថេរ bash ៖ `${out//[[:space:]]/}` លើ output ធំ
+    #    (របាយការណ៍ JSON ច្រើន MB) ក្នុង locale UTF-8 ប្រើពេល quadratic ➜ shell មេរវល់ ១០០% CPU · មិន reap · មិនចាប់ផ្តើម
+    #    checker ថ្មី · trap TERM រង់ចាំ expansion ចប់ (runall-runner-test «output ១ MB»)។
     J_MS[$i]="$ms"; J_SHOW[$i]=0; J_ST[$i]=done
     if [ -z "$rc" ]; then
         J_V[$i]=FAIL; J_TEXT[$i]="*** FAIL *** (ម៉ាស៊ីនរត់ ៖ checker ស្លាប់ដោយគ្មានលទ្ធផល)"; J_SHOW[$i]=1
@@ -323,9 +326,10 @@ runall_judge() {  # <i> — សាលក្រមដូច run() ជាជួរ
     elif [ "$rc" -eq 0 ] && [ "${J_ID[$i]}" = emu/import-paired-ci-runner ] && ! runall_native_summary "$RUNALL_DIR/$i.out" "${J_LABEL[$i]}" >/dev/null; then
         J_V[$i]=FAIL; J_TEXT[$i]="*** FAIL *** (native result missing or invalid)"; J_SHOW[$i]=0
     elif [ "$rc" -eq 0 ]; then
-        n=$(printf '%s\n' "$out" | grep -cE 'ok    ')
-        skip_line=$(printf '%s\n' "$out" | sed -n '/^[[:space:]]*\(SKIP\|PARTIAL PASS\)/ { s/^[[:space:]]*//; p; q; }')
-        if [ -z "${out//[[:space:]]/}" ] || printf '%s\n' "$out" | grep -qE '^[[:space:]]*(FAIL[[:space:]]|❌[[:space:]]|\*\*\* FAIL \*\*\*)'; then
+        n=$(grep -cE 'ok    ' "$out" 2>/dev/null); n="${n:-0}"
+        skip_line=$(sed -n '/^[[:space:]]*\(SKIP\|PARTIAL PASS\)/ { s/^[[:space:]]*//; p; q; }' "$out" 2>/dev/null)
+        if [ "$(LC_ALL=C tr -d '\000[:space:]' < "$out" 2>/dev/null | head -c 1 | wc -c)" -eq 0 ] \
+            || grep -qE '^[[:space:]]*(FAIL[[:space:]]|❌[[:space:]]|\*\*\* FAIL \*\*\*)' "$out" 2>/dev/null; then
             J_V[$i]=FAIL; J_TEXT[$i]="*** FAIL *** (exit 0 តែ output ទទេ ឬរាយ FAIL)"; J_SHOW[$i]=1
         elif [ -n "$skip_line" ]; then
             if [ "$n" -gt 0 ]; then J_V[$i]=PARTIAL; J_TEXT[$i]="PARTIAL PASS ($n; $skip_line)"

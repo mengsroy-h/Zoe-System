@@ -86,7 +86,7 @@ const NEEDED = [
     'ledgerTokenSeen', 'ledgerRecordTokens', 'ledgerTotalsOf', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged', 'ledgerDeltaIntent', 'ledgerDeltaCompanion', 'ledgerCompanionState',
     'normalizeBarcodesOf', 'ensureBarcodeArrayForItem', 'barcodeEntriesOf', 'sanitizeInput', 'formatScanStamp',
     'openViewListModal', 'closeModal', 'openModalHelper', 'viewListModalShowing',
-    'saveEditedBarcodePrice', 'itemHasRestoreMarkers',
+    'saveEditedBarcodePrice', 'itemHasRestoreMarkers', 'readRestoreServerNode', 'monthlyRootMutation',
     'statsMoney', 'statsPositive', 'barcodeRegistryKey', 'pickupBarcodeKey', 'collectedSetFromRecord',
     'collectedMarkValueOf', 'collectedDayHoldingKey', 'syncCollectedValueForBarcode',
     'reconcileCollectedHistory', 'reconcileCollectedPriceState', 'collectedMarksFor', 'collectedDayOfStamp',
@@ -122,7 +122,7 @@ function makeCtx(mode) {
 
     const ctx = {
         console, Math, JSON, parseFloat, parseInt, isNaN, isFinite, Date, Object, Array,
-        String, Number, Promise, Set, Map, Intl, queueMicrotask,
+        String, Number, Promise, Set, Map, WeakMap, Intl, queueMicrotask, performance: require('node:perf_hooks').performance,
         setTimeout: (fn, ms) => setTimeout(fn, ms >= 10000 ? 0 : ms),
         clearTimeout,
         document: {
@@ -182,7 +182,42 @@ function makeCtx(mode) {
             }
             return Promise.resolve(runUpdater());
         },
-        update: () => Promise.resolve(),
+        update: (r, patch) => {
+            const keys = Object.keys(patch || {});
+            const commit = keys.some((k) => k.endsWith('/pricePending/phase') && patch[k] === 'history');
+            const apply = () => {
+                for (const key of keys) {
+                    const full = [String(r.path || ''), key].filter(Boolean).join('/').split('/');
+                    const value = patch[key];
+                    const leaf = full.pop();
+                    let target;
+                    if (full[0] === HISTORY_ROOT) {
+                        target = serverHistory;
+                        for (const part of full.slice(1)) { if (!target[part]) target[part] = {}; target = target[part]; }
+                    } else if (full[0] === 'zoew_daily_revenue_cod_dod') {
+                        const day = 'zoew_daily_revenue_cod_dod/' + full[1];
+                        target = serverLedger[day] = serverLedger[day] || {};
+                    } else if (full[0] === 'zoew_monthly_revenue_cod_dod') {
+                        serverLedger.zoew_monthly_revenue_cod_dod = serverLedger.zoew_monthly_revenue_cod_dod || {};
+                        target = serverLedger.zoew_monthly_revenue_cod_dod[full[1]] = serverLedger.zoew_monthly_revenue_cod_dod[full[1]] || {};
+                    } else continue;
+                    target[leaf] = value && typeof value === 'object' && '__inc' in value
+                        ? Math.round(((parseFloat(target[leaf]) || 0) + value.__inc) * 100) / 100 : value;
+                }
+                for (const [day, record] of Object.entries(serverLedger)) {
+                    if (day.startsWith('zoew_daily_revenue_cod_dod/')) ctx.dailyRevenueData[day.split('/')[1]] = JSON.parse(JSON.stringify(record));
+                }
+                if (serverLedger.zoew_monthly_revenue_cod_dod) ctx.monthlyRevenueData = JSON.parse(JSON.stringify(serverLedger.zoew_monthly_revenue_cod_dod));
+            };
+            if (!commit) { apply(); return Promise.resolve(); }
+            const id = keys[0].split('/')[1];
+            if (serverHistory[id]?.pricePending?.phase !== 'admitted') return Promise.reject(Object.assign(new Error('permission_denied'), { code: 'PERMISSION_DENIED' }));
+            ctx.__writes.push('commit:' + id);
+            if (mode === 'abort' || mode === 'reject') return Promise.reject(Object.assign(new Error('permission_denied'), { code: 'PERMISSION_DENIED' }));
+            if (mode === 'stall') return new Promise((resolve) => { pending.push(() => { apply(); resolve(); }); });
+            apply();
+            return Promise.resolve();
+        },
         get: ref => {
             let value = ref.path.startsWith(HISTORY_ROOT + '/') ? serverHistory[ref.path.split('/')[1]] || null : serverLedger[ref.path] ?? null;
             if (ref.path.startsWith('zoew_monthly_revenue_cod_dod/')) value = serverLedger.zoew_monthly_revenue_cod_dod?.[ref.path.split('/')[1]] ?? null;
@@ -201,6 +236,8 @@ function makeCtx(mode) {
     vm.runInContext(reactRuntime(SRC, { exclude: NEEDED }), ctx);
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
     vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', ctx);
+    // ⛔ ការអាន server ក្នុង sandbox ឆ្លង `fb.get` (គ្មាន REST) · ជួររង់ចាំ monthly mutation ពិត (`monthlyRootMutation`)
+    vm.runInContext('var txRestUrl = function () { return null; }; var txReadServerValue = function () { return Promise.reject(new Error("rest unused")); }; var monthlyQueues = new WeakMap();', ctx);
     vm.runInContext('const DB_OP_TIMEOUT_MS = ' + (DB_OP_TIMEOUT ? DB_OP_TIMEOUT[1] : '15000') + ';\n'
         + 'const DAILY_COLLECTED_KEEP_DAYS = ' + (COLLECTED_DAYS ? COLLECTED_DAYS[1] : '7') + ';\n'
         + 'const PICKUP_DATE_KEY_PATTERN = /^\\d{4}-\\d{2}-\\d{2}$/;\n'
@@ -209,7 +246,7 @@ function makeCtx(mode) {
             return declaration ? declaration[0] : '';
         }).join('\n') + '\n'
         + NEEDED.filter((n) => sliceFn(n)).map(sliceFn).join('\n'), ctx);
-    const operation = moduleRuntime(ROOT, SRC, ['src/core/shop-scope.ts', 'src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts', 'src/services/row-operation-lock.ts']);
+    const operation = moduleRuntime(ROOT, SRC, ['src/core/shop-scope.ts', 'src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts', 'src/services/row-operation-lock.ts', 'src/services/price-operation.ts']);
     vm.runInContext(operation.code, ctx);
     ctx.__els = els;
     return ctx;
@@ -305,13 +342,13 @@ function toastText(ctx) { return ctx.toasts.join(' | '); }
     }
 
     // ═══ ៥. ⛔ ការព្យួរ ≠ ការបរាជ័យ ═══════════════════════════════════
-    console.log('\n=== ៥. បណ្តាញព្យួរ ➜ លុយមិនត្រូវបញ្ច្រាស · commit យឺតបញ្ចប់ការងារ ===');
+    console.log('\n=== ៥. បណ្តាញព្យួរ ➜ មិនប៉ាន់ស្មាន · commit យឺតបញ្ចប់ការងារ (A526 ៖ ប្រាក់ចូលជាមួយ commit) ===');
     {
         const ctx = setup('stall');
         ctx.saveEditedBarcodePrice();
         await settle(); await settle(); await settle();
-        ok('ខណៈព្យួរ ៖ លុយមិនត្រូវបញ្ច្រាស (សតិ $' + memoryCod(ctx) + ')',
-            memoryCod(ctx) === 15, { memory: memoryCod(ctx) });
+        ok('ខណៈព្យួរ ៖ លុយមិនទាន់ចូល ហើយមិនមានការបញ្ច្រាស (commit atomic មិនទាន់ចុះ · សតិ $' + memoryCod(ctx) + ')',
+            memoryCod(ctx) === 0 && serverCod(ctx) === 0, { memory: memoryCod(ctx), server: serverCod(ctx) });
         // ⛔ អះអាង **ការអះអាងថាការផ្លាស់ប្តូរត្រូវបានដកវិញ** មិនមែនវត្តមាន
         // ពាក្យ «ត្រឡប់មកវិញ» (សារព្យួរនិយាយអំពី *បណ្តាញ* ត្រឡប់មកវិញ)។
         ok('⛔ ខណៈព្យួរ ៖ មិនអះអាងថាទិន្នន័យត្រូវបានត្រឡប់មកវិញ',

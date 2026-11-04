@@ -5,6 +5,7 @@ import { useStoreFields, useStoreValue } from '../hooks/useStore';
 import { DeviceInfoLine } from './device/DeviceInfoLine';
 import { DrawerGroup } from './DrawerGroup';
 import { SCAN_EVIDENCE_EXIT_LABEL } from '../../services/scan-pending';
+import { PRICE_EXIT_LABEL } from '../../core/text';
 
 interface DrawerToggleProps {
     id: string;
@@ -38,7 +39,7 @@ export function SideDrawer() {
     const versionLabel = useStoreValue(viewState, (s) => s.appVersionLabel);
     const v = useStoreFields(viewState, ['ztoAutoCloseOn', 'ztoAutoCloseVisible', 'ztoAutoCloseText', 'ztoListSyncOn',
         'ztoListSyncDrawerVisible', 'ztoListSyncText', 'appLockToggleOn', 'appLockToggleText', 'biometricToggleOn',
-        'biometricUnsupported', 'biometricToggleText', 'connectionPhase', 'scanEvidenceRetained']);
+        'biometricUnsupported', 'biometricToggleText', 'connectionPhase', 'scanEvidenceRetained', 'priceOperationsStuck']);
     return (
         <aside className={open ? 'side-drawer open' : 'side-drawer'} id="sideDrawer" aria-hidden={open ? 'false' : 'true'}>
             <div className="drawer-head">
@@ -142,6 +143,16 @@ export function SideDrawer() {
                         <span className="ico">🧾</span>
                         <span>{SCAN_EVIDENCE_EXIT_LABEL}</span>
                         <span>{'(' + v.scanEvidenceRetained + ')'}</span>
+                    </button>
+                    <button
+                        type="button"
+                        className={v.priceOperationsStuck > 0 ? 'drawer-item' : 'drawer-item hidden'}
+                        id="resolvePriceOperationsBtn"
+                        onClick={onAct("drawerResolvePriceOperationsFlow")}
+                    >
+                        <span className="ico">🏷️</span>
+                        <span>{PRICE_EXIT_LABEL}</span>
+                        <span>{'(' + v.priceOperationsStuck + ')'}</span>
                     </button>
                 </DrawerGroup>
             </div>

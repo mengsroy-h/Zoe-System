@@ -1,4 +1,4 @@
-// pricePending រក្សាសោនៅពេល unknown; សងប្រាក់តែ history បដិសេធជាក់លាក់ និង cancelling ACK ប៉ុណ្ណោះ។
+// pricePending ៖ ប្រាក់ចូលតែតាម commit atomic (ជួរ admitted ➜ history + increment) · unknown ➜ អាន server ហើយរក្សាសោ · បដិសេធជាក់លាក់ ➜ បោះបង់ដោយមិនប៉ះប្រាក់ (A526)។
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { refTo } from '../src/app/refs';
@@ -10,7 +10,7 @@ import { ledgerCompanionState } from '../src/domain/ledger';
 const H = 'zoew_scan_history_cod_dod', D = 'zoew_daily_revenue_cod_dod', M = 'zoew_monthly_revenue_cod_dod';
 const HOST = 'https://m3-unknown.firebaseio.com';
 const NOW = Date.UTC(2026, 9, 24, 2);
-const lab = { store: {} as any, fault: '' as '' | 'landed' | 'lost' | 'gone' | 'rejected', readFails: false, intents: [] as any[] };
+const lab = { updates: 0, commits: 0, store: {} as any, fault: '' as '' | 'landed' | 'lost' | 'gone' | 'rejected', readFails: false, intents: [] as any[] };
 const clone = <V,>(v: V): V => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
 const parts = (p: string) => p.split('/').filter(Boolean);
 const getAt = (p: string) => clone(parts(p).reduce((n: any, k) => n?.[k], lab.store) ?? null);
@@ -36,7 +36,7 @@ beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(NOW);
     vi.stubGlobal('crypto', webcrypto);
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
-    lab.fault = ''; lab.readFails = false; lab.intents = [];
+    lab.fault = ''; lab.readFails = false; lab.intents = []; lab.updates = 0; lab.commits = 0;
     lab.store = {
         [H]: { itemI: { id: 'itemI', phone: '012000111', scanDate: DAY(), time: '08:00:00 (' + DAY() + ')', createdAt: NOW - 3600000, count: 1, cod: 10, dod: 0, price: 10,
             isClosed: false, isCalled: false, barcode: 'A100000001', barcodes: [{ code: 'A100000001', cod: 10, dod: 0, isClosed: false, isDeducted: false, isFromDeletion: false }] } },
@@ -55,20 +55,25 @@ beforeEach(() => {
         ref: (_db: any, p = '') => ref(p),
         increment: (n: number) => ({ __inc: n }),
         get: async (r: any) => snap(r, getAt(r.path)),
-        update: async (r: any, ups: any) => { for (const [k, v] of Object.entries(ups)) setAt([r.path, k].filter(Boolean).join('/'), v); },
+        update: async (r: any, ups: any) => {
+            lab.updates = (lab.updates || 0) + 1;
+            const commit = Object.keys(ups).some((k) => k.endsWith('/pricePending/phase') && ups[k] === 'history');
+            if (commit) lab.commits = (lab.commits || 0) + 1;
+            if (commit && lab.fault === 'lost') throw unknown();
+            if (commit && lab.fault === 'rejected') throw Object.assign(new Error('permission_denied'), { code: 'PERMISSION_DENIED' });
+            for (const [k, v] of Object.entries(ups) as any[]) {
+                const p = [r.path, k].filter(Boolean).join('/');
+                setAt(p, v && typeof v === 'object' && '__inc' in v ? Math.round(((getAt(p) || 0) + v.__inc) * 100) / 100 : v);
+            }
+            if (commit && lab.fault === 'gone') { setAt(H + '/itemI', null); throw unknown(); }
+            if (commit && lab.fault === 'landed') { const row = getAt(H + '/itemI'); row.isCalled = true; setAt(H + '/itemI', row); throw unknown(); }
+        },
         set: async (r: any, v: any) => setAt(r.path, v),
         runTransaction: async (r: any, fn: any) => {
             if (fn && fn.connectionIntent) lab.intents.push(clone(fn.connectionIntent));
             const prior = getAt(r.path); const next = fn(clone(prior));
             if (next === undefined) return { committed: false, snapshot: snap(r, prior) };
-            if (r.path === H + '/itemI' && next?.pricePending?.phase === 'history' && lab.fault === 'lost') throw unknown();
-            if (r.path === H + '/itemI' && next?.pricePending?.phase === 'history' && lab.fault === 'rejected') throw Object.assign(new Error('refused'), { txOutcome: 'not-applied' });
             setAt(r.path, next);
-            if (r.path === H + '/itemI' && next?.pricePending?.phase === 'history' && lab.fault) {
-                if (lab.fault === 'gone') setAt(r.path, null);
-                else { const row = getAt(r.path); row.isCalled = true; setAt(r.path, row); }
-                throw unknown();
-            }
             return { committed: true, snapshot: snap(r, getAt(r.path)) };
         },
         onValue: () => () => {}, off: () => {}
@@ -89,32 +94,35 @@ afterEach(() => {
 
 const moneyAlarm = () => ((window as any).ZoeErrors.capture as any).mock.calls.some(([, extra]: any) => extra && extra.zone === 'money');
 
-describe('M3 ៖ a price edit that landed but answered «unknown» keeps its revenue delta', () => {
-    it('the edit lands, another device marks the row, the reply is lost ➜ ledger 20 like the server price', async () => {
+describe('M3 ៖ a price commit that answered «unknown» is decided by the server row (A526)', () => {
+    it('the commit lands, the row changes, the reply is lost ➜ ledger 20 like the server price · the lock waits for resume', async () => {
         lab.fault = 'landed';
         saveEditedBarcodePrice();
         await settle();
         expect(getAt(H + '/itemI').barcodes[0].cod).toBe(20);
         expect(money()).toEqual([[20, 1], [20, 1]]);
-        expect(dataState.scanHistory.find((i: any) => i.id === 'itemI').barcodes[0].cod).toBe(20);
+        expect(getAt(H + '/itemI').pricePending.phase).toBe('history');
+        expect(moneyAlarm()).toBe(true);
     });
 
-    it('history unknown ហើយ server នៅតម្លៃមុន ➜ រក្សាប្រាក់ និងសោ មិនប៉ាន់ស្មានសង', async () => {
+    it('commit unknown ហើយ server នៅ admitted ➜ ប្រាក់មិនប្រែ · សោនៅ (resume បញ្ចប់)', async () => {
         lab.fault = 'lost';
         saveEditedBarcodePrice();
         await settle();
         expect(getAt(H + '/itemI').barcodes[0].cod).toBe(10);
         expect(getAt(H + '/itemI').pricePending.phase).toBe('admitted');
-        expect(money()).toEqual([[20, 1], [20, 1]]);
+        expect(money()).toEqual([[10, 1], [10, 1]]);
         expect(moneyAlarm()).toBe(true);
     });
 
-    it('control ៖ history បដិសេធជាក់លាក់ ហើយ fence ACK ➜ សងប្រាក់ត្រឡប់ទៅ 10', async () => {
+    it('control ៖ commit បដិសេធជាក់លាក់ ➜ បោះបង់ (compensated) · ប្រាក់ និងតម្លៃនៅ 10 គ្មានការសងប្រាក់', async () => {
         lab.fault = 'rejected';
         saveEditedBarcodePrice();
         await settle();
         expect(getAt(H + '/itemI').barcodes[0].cod).toBe(10);
+        expect(getAt(H + '/itemI').pricePending).toMatchObject({ phase: 'settled', outcome: 'compensated' });
         expect(money()).toEqual([[10, 1], [10, 1]]);
+        expect(lab.intents.filter((i: any) => i.kind === 'revenue-delta')).toEqual([]);
     });
 
     it('the row is gone after the lost reply ➜ undecidable: nothing reverted, a money alarm', async () => {
@@ -125,24 +133,25 @@ describe('M3 ៖ a price edit that landed but answered «unknown» keeps its rev
         expect(moneyAlarm()).toBe(true);
     });
 
-    it('the row cannot be read ➜ nothing reverted, a money alarm', async () => {
-        lab.fault = 'landed'; lab.readFails = true;
+    it('the row cannot be read before the commit ➜ nothing sent, nothing reverted, a money alarm', async () => {
+        lab.readFails = true;
         saveEditedBarcodePrice();
         await settle();
-        expect(money()).toEqual([[20, 1], [20, 1]]);
+        expect(money()).toEqual([[10, 1], [10, 1]]);
+        expect(getAt(H + '/itemI').pricePending.phase).toBe('admitted');
         expect(moneyAlarm()).toBe(true);
     });
 });
 
-describe('C6 · C5 ៖ ការកែតម្លៃពិតផ្ញើ companion ជាមួយតម្លៃថ្មី និងតម្លៃមុន · DOD សម្រេចដូច COD', () => {
-    it('DOD-only edit (0 ➜ 5) ➜ every ledger intent names the new and the prior price · the prior barcode reads «prior»', async () => {
+describe('C6 · C5 ៖ ការកែតម្លៃពិតគ្មាន ledger delta ដាច់ដោយឡែក ៖ commit តែមួយមាន COD និង DOD (A526)', () => {
+    it('DOD-only edit (0 ➜ 5) ➜ one update carries the row and both day/month DOD increments · no revenue-delta intent · companion still decides prior/holds', async () => {
         input('editBcCodInput', '10'); input('editBcDodInput', '5');
         saveEditedBarcodePrice();
         await settle();
-        const companions = lab.intents.map((i: any) => i.companion).filter(Boolean);
-        expect(companions.length).toBe(2);
-        for (const c of companions) expect(c).toEqual({ path: H + '/itemI', code: 'A100000001', wantCod: 10, wantDod: 5, priorCod: 10, priorDod: 0 });
-        expect(['holds', 'prior'].map((_, i) => ledgerCompanionState({ barcodes: [{ code: 'A100000001', cod: 10, dod: i ? 0 : 5 }] }, companions[0])))
+        expect(lab.intents.filter((i: any) => i.kind === 'revenue-delta' || i.companion)).toEqual([]);
+        expect([getAt(D + '/' + DAY()).dodDollar, getAt(M + '/' + DAY().slice(0, 7)).dodDollar, lab.commits]).toEqual([5, 5, 1]);
+        const companion = { path: H + '/itemI', code: 'A100000001', wantCod: 10, wantDod: 5, priorCod: 10, priorDod: 0 };
+        expect(['holds', 'prior'].map((_, i) => ledgerCompanionState({ barcodes: [{ code: 'A100000001', cod: 10, dod: i ? 0 : 5 }] }, companion)))
             .toEqual(['holds', 'prior']);
     });
 });

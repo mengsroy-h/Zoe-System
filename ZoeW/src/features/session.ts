@@ -139,6 +139,7 @@ export function clearSensitiveModalFields() {
     endScanFlow();
     viewState.manualAdjustBusy = false;
     viewState.scanEvidenceRetained = 0;
+    viewState.priceOperationsStuck = 0;
     viewState.configPendingLink = null;
     viewState.configManual = false;
     hidePhoneSuggestions();

@@ -34,35 +34,35 @@ const recoveryAttempts = new Map<string, { handle: PendingScanHandle; promise: P
 const attemptOutcomes = new Map<string, 'held' | 'retry'>();
 const SCAN_EVIDENCE_EXIT_ATTEMPTS = 2;
 
-type ScanMonthWaiter = { handle: PendingScanHandle; operation: ScanOperation; action: () => Promise<any>;
+type MonthlyWaiter = { current: () => boolean; action: () => Promise<any>;
     resolve: (value: any) => void; reject: (error: Error) => void; deadline: number; timer: ReturnType<typeof setTimeout> };
-type ScanMonthQueue = { active: ScanMonthWaiter | null; waiting: ScanMonthWaiter[] };
-const scanMonthQueues = new WeakMap<object, ScanMonthQueue>();
+type MonthlyQueue = { active: MonthlyWaiter | null; waiting: MonthlyWaiter[] };
+const monthlyQueues = new WeakMap<object, MonthlyQueue>();
 
-function scanMonthMutation<T>(handle: PendingScanHandle, operation: ScanOperation, action: () => Promise<T>): Promise<T> {
-    if (handle.sdk.__supabase) return Promise.resolve().then(() => {
-        if (!operationCurrent(handle, operation)) throw new Error('Scan operation owner changed');
+export function monthlyRootMutation<T>(db, sdk, current: () => boolean, action: () => Promise<T>): Promise<T> {
+    if (sdk.__supabase) return Promise.resolve().then(() => {
+        if (!current()) throw new Error('Monthly mutation owner changed');
         return action();
     });
-    let queue = scanMonthQueues.get(handle.db);
-    if (!queue) { queue = { active: null, waiting: [] }; scanMonthQueues.set(handle.db, queue); }
+    let queue = monthlyQueues.get(db);
+    if (!queue) { queue = { active: null, waiting: [] }; monthlyQueues.set(db, queue); }
     const owner = queue;
     const drain = () => {
         if (owner.active) return;
         const next = owner.waiting.shift();
         if (!next) {
-            if (scanMonthQueues.get(handle.db) === owner) scanMonthQueues.delete(handle.db);
+            if (monthlyQueues.get(db) === owner) monthlyQueues.delete(db);
             return;
         }
-        if (performance.now() >= next.deadline || !operationCurrent(next.handle, next.operation)) {
-            clearTimeout(next.timer); next.reject(new Error('Scan monthly mutation wait expired or owner changed')); drain(); return;
+        if (performance.now() >= next.deadline || !next.current()) {
+            clearTimeout(next.timer); next.reject(new Error('Monthly mutation wait expired or owner changed')); drain(); return;
         }
         owner.active = next;
         Promise.resolve().then(() => {
-            if (!operationCurrent(next.handle, next.operation)) throw new Error('Scan operation owner changed');
+            if (!next.current()) throw new Error('Monthly mutation owner changed');
             return next.action();
         }).then(value => {
-            if (!operationCurrent(next.handle, next.operation)) throw new Error('Scan operation owner changed');
+            if (!next.current()) throw new Error('Monthly mutation owner changed');
             next.resolve(value);
         }).catch(error => next.reject(error)).finally(() => {
             clearTimeout(next.timer);
@@ -71,15 +71,19 @@ function scanMonthMutation<T>(handle: PendingScanHandle, operation: ScanOperatio
         });
     };
     return new Promise<T>((resolve, reject) => {
-        const waiter: ScanMonthWaiter = { handle, operation, action, resolve, reject, deadline: performance.now() + DB_OP_TIMEOUT_MS, timer: undefined as any };
+        const waiter: MonthlyWaiter = { current, action, resolve, reject, deadline: performance.now() + DB_OP_TIMEOUT_MS, timer: undefined as any };
         waiter.timer = setTimeout(() => {
             const index = owner.waiting.indexOf(waiter);
             if (index >= 0) owner.waiting.splice(index, 1);
-            reject(new Error('Scan monthly mutation timed out'));
+            reject(new Error('Monthly mutation timed out'));
             if (!owner.active) drain();
         }, DB_OP_TIMEOUT_MS);
         owner.waiting.push(waiter); drain();
     });
+}
+
+function scanMonthMutation<T>(handle: PendingScanHandle, operation: ScanOperation, action: () => Promise<T>): Promise<T> {
+    return monthlyRootMutation(handle.db, handle.sdk, () => operationCurrent(handle, operation), action);
 }
 
 function operationOf(handle: PendingScanHandle): ScanOperation | null {

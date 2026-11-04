@@ -26,6 +26,7 @@ import { probeDatabaseLivenessIfIdle, setupConnectionRecovery } from '../../serv
 import { restoreLookupSecretKey } from '../../services/crypto';
 import { updateRecentPhonesList } from '../../services/db-listeners';
 import { resumePendingScanOperations } from '../../services/scan-operation';
+import { resumePriceOperations } from '../../services/price-operation';
 import { initFirebase } from '../../services/firebase-init';
 import { initNotifications, NOTIFY_FEED_INTERVAL_MS, notifyPeriodicTick } from '../../features/notifications';
 import { loadDeviceInfo } from '../../features/device-info';
@@ -181,6 +182,7 @@ function startPeriodicTasks(scope: LifecycleScope): void {
         runScheduledCleanup();
         resumeInterruptedCleanups();
         resumePendingScanOperations();
+        resumePriceOperations();
         scheduleZtoStatusSweep();
         scheduleZtoFinalMarks();
         refreshZtoPalmSession();
@@ -196,6 +198,7 @@ function startPeriodicTasks(scope: LifecycleScope): void {
         runScheduledCleanup();
         resumeInterruptedCleanups();
         resumePendingScanOperations();
+        resumePriceOperations();
         scheduleZtoStatusSweep();
         scheduleZtoFinalMarks();
         refreshZtoPalmSession();

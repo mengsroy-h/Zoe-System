@@ -7,6 +7,9 @@ import { DB_LIVENESS_PROBE_TIMEOUT_MS, renderConnectionStatus } from '../service
 import { connectionFlowSnapshot } from '../services/connection-flow';
 import { resolveRetainedScanEvidence } from '../services/scan-operation';
 import { pendingScanScope, retainedPendingScans, SCAN_EVIDENCE_EXIT_LABEL } from '../services/scan-pending';
+import { ownPriceOperations, settleStuckPriceOperations } from '../services/price-operation';
+import { PRICE_EXIT_LABEL } from '../core/text';
+import { viewState } from '../core/view-state';
 
 export const PENDING_WRITES_DISCARD_PATHS_MAX = 20;
 
@@ -49,6 +52,34 @@ export async function discardPendingWrites() {
 
 export function drawerResolveScanEvidenceFlow() {
     drawerAction(function () { requestPinBeforeConfig(resolveScanEvidence, 'resolveScanEvidence'); });
+}
+
+export function drawerResolvePriceOperationsFlow() {
+    drawerAction(function () { requestPinBeforeConfig(resolvePriceOperations, 'resolvePriceOperations'); });
+}
+
+export async function resolvePriceOperations() {
+    if (!firebaseState.db || !firebaseState.fb) {
+        showToast('⚠️ មិនទាន់ភ្ជាប់ហាង — មិនអាច' + PRICE_EXIT_LABEL + 'បានទេ');
+        return false;
+    }
+    const count = viewState.priceOperationsStuck;
+    if (!count || !ownPriceOperations().length) {
+        showToast('ℹ️ គ្មានការកែតម្លៃដែលជាប់ទេ');
+        return false;
+    }
+    if (!firebaseState.isDatabaseConnected || (navigator.onLine as boolean) === false) {
+        showToast('⚠️ ត្រូវភ្ជាប់ Server មុន ដើម្បីអានការកែតម្លៃដែលជាប់ — សូមភ្ជាប់បណ្តាញ រួចសាកម្ដងទៀត');
+        return false;
+    }
+    if (!confirm(PRICE_EXIT_LABEL + ' ' + count + '?\n\n· ការកែដែលមានភស្តុតាងលើ Server ៖ App បញ្ចប់ ឬបោះបង់វាតាមភស្តុតាងនោះ (ប្រាក់ត្រូវតែម្តង)\n· ការកែដែលគ្មានភស្តុតាងប្រាក់ ៖ មិនទាន់រក្សាទុកតម្លៃថ្មី ➜ រក្សាតម្លៃចាស់ · រក្សាទុករួច ➜ បញ្ចប់ — App មិនកែប្រាក់ទេ ព្រោះគ្មានភស្តុតាងថាប្រាក់ចូលស្ថិតិឬនៅ\n· សូមប្រាកដថាគ្មានទូរស័ព្ទណាកំពុងកែកញ្ចប់ទាំងនោះ ហើយពិនិត្យចំណូលថ្ងៃរបស់វាដោយដៃក្រោយបញ្ចប់')) return false;
+    const generationAtStart = firebaseState.authGeneration;
+    const result = await settleStuckPriceOperations();
+    if (firebaseState.authGeneration !== generationAtStart) return false;
+    showToast(result.kept
+        ? '⚠️ បានបញ្ចប់ ' + result.settled + ' · នៅសល់ ' + result.kept + ' (កំពុងដំណើរការ ឬអាន Server មិនបាន) — សូមសាកម្ដងទៀត'
+        : '✅ បានបញ្ចប់ការកែតម្លៃដែលជាប់ ' + result.settled + ' — សូមពិនិត្យចំណូលថ្ងៃរបស់កញ្ចប់ទាំងនោះដោយដៃ');
+    return result.settled > 0;
 }
 
 export async function resolveScanEvidence() {

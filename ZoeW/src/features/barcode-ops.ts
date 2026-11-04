@@ -8,8 +8,7 @@ import { getServerNow } from '../core/clock';
 import { formatScanStamp, getFormattedDate } from '../core/timezone';
 import { applyBarcodeCloseState, barcodeEntriesOf, barcodeSignIdentity, barcodeZtoSigned, ensureBarcodeArrayForItem, itemHasRestoreMarkers, stampTrashPolicy, stripHistoryOnlyMarkers } from '../domain/barcode';
 import { cleanupAdmissionMatches, cleanupPartialTrashId, prepareCleanupTrashGeneration, CLEANUP_STAGE_COLLECTED, CLEANUP_STAGE_FLIP, CLEANUP_STAGE_MOVED, cleanupInFlight, beginCleanupOperation, releaseCleanupOperation, clearCleanupJournalEntry, claimCleanupTrashSlot, deductCleanupRevenue, holdCleanupJournalLive, markCleanupJournalStage, patchCleanupJournalEntry, prepareCleanupClaim, remarkCleanupCollectedKept, restoreClaimedItemToScanHistory, settleCleanupDeduction } from '../domain/cleanup';
-import { collectedMarksFor, healPickupKeysLeftRow, holdCollectedSettle, markCollectedRevenue, reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks, syncCollectedValueForBarcode } from '../domain/collected';
-import { addRevenueToDailyAndMonthlyRecord, correctRevenueLedgerToActual, revertRevenueLedgerDelta, ledgerDeltaCompanion } from '../domain/ledger';
+import { collectedMarksFor, healPickupKeysLeftRow, holdCollectedSettle, markCollectedRevenue, reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks } from '../domain/collected';
 import { capturePickupContext, getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, pickupIntentTracker, preparePickupClose, failPickupClose } from '../domain/pickup';
 import { beginTrashClaim, claimTrashBarcodes, trashClaimOwned } from '../domain/trash-claim';
 import { clearScannedRemovalInFlight } from './scan-remove';
@@ -23,7 +22,9 @@ import { RESTORE_IN_PROGRESS_CLOSE_TEXT, ZTO_SIGNED_REOPEN_TEXT } from '../core/
 import { itemOriginOf, originLabel } from './barcode-origin';
 import { barcodeSignedInZto } from './zto-final-marks';
 import { getManualZtoTrashMode } from './lookup-config';
-import { admitPriceOperation, capturePriceOperation, movePriceOperation, priceOperationCurrent } from '../services/row-operation-lock';
+import { admitPriceOperation, capturePriceOperation, priceOperationCurrent } from '../services/row-operation-lock';
+import { finishPriceOperation, withPriceOperationLock } from '../services/price-operation';
+import { readRestoreServerNode } from './restore';
 
 export function openViewListModal(id?) {
     uiState.activeParentItemId = id;
@@ -653,7 +654,7 @@ export async function saveEditedBarcodePrice() {
         if (window.ZoeErrors) ZoeErrors.capture(error || new Error('Price operation remains unresolved'), {
             zone: 'money', context: 'saveEditedBarcodePrice pending', itemId: handle.itemId, phase
         });
-        showToast("⏳ ការកែទឹកប្រាក់មិនទាន់មានភស្តុតាងបញ្ចប់ — សោនៅរក្សាទុក។ សូមកុំកែម្ដងទៀត ហើយប្រាប់ Admin ពិនិត្យ។");
+        showToast("⏳ ការកែទឹកប្រាក់មិនទាន់មានភស្តុតាងបញ្ចប់ — កំពុងរង់ចាំ Server · App នឹងបញ្ចប់ដោយស្វ័យប្រវត្តិពេលភ្ជាប់វិញ។ សូមកុំកែម្ដងទៀត។");
     };
     const showRow = (row) => {
         if (!row || !current()) return;
@@ -662,68 +663,30 @@ export async function saveEditedBarcodePrice() {
         refreshCurrentHistoryView();
         if (modalIsOpen('viewListModal')) openViewListModal(handle.itemId);
     };
-    let applied = null;
-    const compensate = async () => {
-        if (!current()) return;
-        const cancelling = await movePriceOperation(handle, 'admitted', 'cancelling');
-        if (!cancelling || !current()) { hold(null, 'cancelling'); return; }
-        showRow(cancelling);
-        if (applied) {
-            const effects = await Promise.all([applied.dailyServer, applied.monthlyServer]);
-            if (!current() || effects.some((effect) => effect?.unknown)) { hold(null, 'compensation-unknown'); return; }
-            const reverted = revertRevenueLedgerDelta(applied);
-            if (!reverted || await reverted.compensation !== true || !current()) { hold(null, 'compensation'); return; }
-        }
-        const settled = await movePriceOperation(handle, 'cancelling', 'settled', 'compensated');
-        if (!settled || !current()) { hold(null, 'compensation-settle'); return; }
-        showRow(settled);
-        showToast("⚠️ ការកែទឹកប្រាក់មិនបានរក្សាទុកទេ។ កញ្ចប់ និងស្ថិតិប្រាក់បានផ្ទៀងត្រឡប់មកវិញ។");
+    const showServerRow = async () => {
+        try {
+            const row = await readRestoreServerNode(handle.sdk, handle.db, 'zoew_scan_history_cod_dod/' + handle.itemId);
+            if (row) showRow(row);
+        } catch (readError) {}
     };
     try {
-        const admitted = await notifyIfSlow(admitPriceOperation(handle), TRASH_WRITE_SLOW_NOTICE_MS,
-            "⏳ កំពុងផ្ទៀងសោមុនកែទឹកប្រាក់ — សូមកុំកែម្ដងទៀត។");
-        if (!admitted || !current()) { hold(null, 'admission'); return; }
-        showRow(admitted);
-        closeModal('editBarcodePriceModal');
-        openViewListModal(handle.itemId);
-        const { priorCod, priorDod, wantCod, wantDod, scanDate, birth, code } = handle.marker;
-        const codDiff = (Math.round(wantCod * 100) - Math.round(priorCod * 100)) / 100;
-        const dodDiff = (Math.round(wantDod * 100) - Math.round(priorDod * 100)) / 100;
-        if (codDiff || dodDiff) {
-            applied = addRevenueToDailyAndMonthlyRecord(scanDate, codDiff, dodDiff, 0,
-                ledgerDeltaCompanion(handle.itemId, code, wantCod, wantDod, priorCod, priorDod, birth), current);
-            applied.isCurrent = current;
-        }
-        const optimistic = dataState.scanHistory.find((entry) => entry.id === handle.itemId);
-        const optimisticBarcode = optimistic && ensureBarcodeArrayForItem(optimistic).find((entry) => entry.code === code);
-        if (optimisticBarcode && current()) {
-            optimisticBarcode.cod = wantCod;
-            optimisticBarcode.dod = wantDod;
-            recalcItemMoneyFromBarcodes(optimistic);
-            refreshCurrentHistoryView();
-        }
-        let history;
-        try {
-            history = await notifyIfSlow(movePriceOperation(handle, 'admitted', 'history'), TRASH_WRITE_SLOW_NOTICE_MS,
+        await withPriceOperationLock(handle.marker.token, async () => {
+            const admitted = await notifyIfSlow(admitPriceOperation(handle), TRASH_WRITE_SLOW_NOTICE_MS,
+                "⏳ កំពុងផ្ទៀងសោមុនកែទឹកប្រាក់ — សូមកុំកែម្ដងទៀត។");
+            if (!admitted || !current()) { hold(null, 'admission'); return; }
+            showRow(admitted);
+            closeModal('editBarcodePriceModal');
+            openViewListModal(handle.itemId);
+            const verdict = await notifyIfSlow(finishPriceOperation(handle, current, 'admitted'), TRASH_WRITE_SLOW_NOTICE_MS,
                 "⏳ កំពុងរក្សាទុកតម្លៃកញ្ចប់ — សោទឹកប្រាក់នៅរក្សាទុក។");
-        } catch (error) {
-            if (error?.txOutcome === 'not-applied' || /permission[_ ]denied/i.test(String(error?.code || error?.message || ''))) await compensate();
-            else hold(error, 'history');
-            return;
-        }
-        if (!current()) return;
-        if (!history) { await compensate(); return; }
-        showRow(history);
-        const status = await correctRevenueLedgerToActual(scanDate, applied, codDiff, dodDiff, 0);
-        if (!current()) return;
-        if (!status?.ok) { hold(null, 'ledger'); return; }
-        const mirrored = await syncCollectedValueForBarcode(handle.itemId, code, current);
-        if (!current()) return;
-        if (mirrored !== true) { hold(null, 'mirror'); return; }
-        const settled = await movePriceOperation(handle, 'history', 'settled', 'committed');
-        if (!settled || !current()) { hold(null, 'settlement'); return; }
-        showRow(settled);
-        showToast("✅ បានកែប្រែទឹកប្រាក់តាមកញ្ចប់ជោគជ័យ!");
+            if (!current()) return;
+            await showServerRow();
+            if (!current()) return;
+            if (verdict === 'committed') showToast("✅ បានកែប្រែទឹកប្រាក់តាមកញ្ចប់ជោគជ័យ!");
+            else if (verdict === 'underflow') showToast("⚠️ មិនបានរក្សាទុកការកែទឹកប្រាក់ទេ ៖ ចំណូលថ្ងៃ " + handle.marker.scanDate + " តិចជាងចំនួនដែលត្រូវដក — តម្លៃកញ្ចប់ និងស្ថិតិប្រាក់នៅដដែល។ សូមពិនិត្យ «កែទឹកប្រាក់/កញ្ចប់» ជាមុន។");
+            else if (verdict === 'cancelled') showToast("⚠️ ការកែទឹកប្រាក់មិនបានរក្សាទុកទេ — តម្លៃកញ្ចប់ និងស្ថិតិប្រាក់នៅដដែល។");
+            else hold(null, verdict);
+        });
     } catch (error) {
         hold(error);
     }

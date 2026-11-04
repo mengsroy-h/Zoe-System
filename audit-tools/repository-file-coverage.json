@@ -2008,6 +2008,9 @@
     "ZoeW/src/services/pickup-reset.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/services/price-operation.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/src/services/registry-purge.ts": {
       "policy": "zoew-self-verification"
     },
@@ -2783,6 +2786,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/price-operation-lock.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/price-operation-resume.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/print-relayout.test.tsx": {

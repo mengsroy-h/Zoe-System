@@ -4,6 +4,8 @@ import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
 import { getFormattedDate } from '../src/core/timezone';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
+import { PRICE_RESUME_GRACE_MS, priceOperationSeen, resumePriceOperations } from '../src/services/price-operation';
+import { PRICE_PROTOCOL_V2_TAG } from '../src/services/row-operation-lock';
 import { claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, clearCleanupJournalEntry, readCleanupJournal, noteCleanupJournalEntry, resumeCleanupJournalEntry, runAutomaticCleanupRules, runAutomaticDeletedCleanup } from '../src/domain/cleanup';
 import { claimBarcodeInRegistry, releaseBarcodesInRegistry } from '../src/domain/registry';
 import { resetPickupStats } from '../src/domain/collected';
@@ -322,6 +324,13 @@ const SCENARIOS: Scenario[] = [
         item.barcodes = item.barcodes.map((barcode: any) => ({ ...barcode, isDeducted: false }));
         dataState.deletedItems = [clone(item)];
     }, run: () => runAutomaticDeletedCleanup() },
+    { name: 'បញ្ចប់ការកែតម្លៃដែលនៅរង់ចាំ (resumePriceOperations · A526)', prepare: () => {
+        const row = lab.store[HISTORY][ID1];
+        row.pricePending = { token: 'price_' + PRICE_PROTOCOL_V2_TAG + '00aa11bb22cc33dd', actorUid: 'u1', code: 'C', slot: '0', birth: row.barcodes[0].createdAt,
+            rowBirth: row.createdAt, scanDate: row.scanDate, priorCod: 7, priorDod: 0, wantCod: 9, wantDod: 0, phase: 'admitted' };
+        dataState.scanHistory = Object.values(lab.store[HISTORY]).map((item: any) => clone(item));
+        priceOperationSeen.set(row.pricePending.token, Date.now() - PRICE_RESUME_GRACE_MS - 1);
+    }, run: () => resumePriceOperations() },
     { name: 'កែតម្លៃ barcode (saveEditedBarcodePrice)', prepare: () => { uiState.activeParentItemId = ID1; uiState.activeEditingBarcode = 'C'; inputValue('editBcCodInput', '9'); inputValue('editBcDodInput', '0'); }, run: () => saveEditedBarcodePrice() },
     { name: 'អត្រាប្រាក់ (saveExchangeRate)', prepare: () => { dataState.exchangeRateSaveInFlight = false; inputValue('exchangeRateInput', '4050'); }, run: () => saveExchangeRate() },
     { name: 'សម្អាតស្វ័យប្រវត្តិទាំងអស់ (runAutomaticCleanupRules)', run: () => runAutomaticCleanupRules() },

@@ -69,7 +69,7 @@ const MODULE_ASTS = require('./react-view').auditModuleSources(path.join(ROOT, '
 // ⛔ allowlist ៖ រាល់ធាតុមានហេតុផលសរសេរជាប់។ ធាតុគ្មានហេតុផលនឹងលាក់កំហុសបន្ទាប់។
 const WRITE_ALLOW = {
     recalcItemMoneyFromBarcodes: 'helper រួម — ជាប្រភពតែមួយនៃរូបមន្ត',
-    pricedRow: 'ភស្តុតាង price operation៖ គណនាផលបូក barcode array/object ដោយរូបមន្តដែល guard ខាងក្រោមផ្ទៀងឯករាជ្យ',
+    slotPricedRow: 'ភស្តុតាង price operation៖ គណនាផលបូក barcode array/object ដោយរូបមន្តដែល guard ខាងក្រោមផ្ទៀងឯករាជ្យ (pricedRow តម្លៃថ្មី · priceOperationFromRow ទិដ្ឋភាពមុន history សម្រាប់ resume · A526)',
     movePriceOperation: 'ចម្លងតម្លៃពី pricedRow ដែលបានផ្ទៀង ownership ក្នុង transaction; guard ខាងក្រោមរក្សាប្រភពនៃការចម្លង',
     initDatabaseListeners: 'normalize ពេលអាន ៖ item ចាស់គ្មាន barcodes ➜ ដេរីវេពី price',
     removeSingleBarcode: 'itemToTrash មាន barcode តែ ១ (`barcodes: [removedBc]`) ➜ ស្មើផលបូក',
@@ -80,7 +80,6 @@ const WRITE_ALLOW = {
     buildTrashSummaryModel: 'តួលេខសរុបបង្ហាញ (view model របស់ TrashSummaryBox) មិនមែន item',
     uncollectedItemValue: 'តម្លៃមិនទាន់យក (out) មិនមែន item',
     uncollectedValueByDate: 'bucket សរុប មិនមែន item',
-    saveEditedBarcodePrice: 'សរសេរលើ **barcode** (b/targetB/staleB) មិនមែន item',
     addOrUpdateEntry: 'តែ `count` (ចំនួន barcode) — លុយឆ្លងកាត់ helper',
     claimAndCleanupItem: 'តែ `count` — លុយឆ្លងកាត់ helper',
     dropOptimisticBarcode: 'តែ `count` — លុយឆ្លងកាត់ helper',
@@ -89,7 +88,7 @@ const WRITE_ALLOW = {
 };
 // These new exceptions belong to exact top-level declarations in one source module,
 // not any identically named function elsewhere (including nested declarations).
-const PRICE_WRITERS = new Set(['pricedRow', 'movePriceOperation']);
+const PRICE_WRITERS = new Set(['slotPricedRow', 'movePriceOperation']);
 function moneyWrites(modules) {
     const hits = [];
     for (const module of modules) (function walk(n, fnName, declaration) {
@@ -244,10 +243,12 @@ function moneyWriteAllowed(hit) {
         }
         return { ran, wrong };
     };
-    const clean = inspect(priced.text);
-    const changed = priced.text.replace(/row\.cod = [^\n]+;/, 'row.cod = 999;');
+    const slotted = named('slotPricedRow');
+    if (slotted.ast !== priced.ast) throw new Error('slotPricedRow provenance mismatch');
+    const clean = inspect(slotted.text + '\n' + priced.text);
+    const changedSlot = slotted.text.replace(/row\.cod = [^\n]+;/, 'row.cod = 999;');
     check(clean.ran === 108 && clean.wrong === 0, 'price proof៖ 108 array/object/sparse cases ផលបូកពិត ហើយមិនប្តូរ input', JSON.stringify(clean));
-    check(changed !== priced.text && inspect(changed).wrong === 108, '⛔ price proof ពុលផលបូក ➜ guard ចាប់បានគ្រប់ករណី');
+    check(changedSlot !== slotted.text && inspect(changedSlot + '\n' + priced.text).wrong === 108, '⛔ price proof ពុលផលបូក ➜ guard ចាប់បានគ្រប់ករណី');
     const copies = (code) => {
         const ast = acorn.parse(code, { ecmaVersion: 2022 });
         const writes = [];

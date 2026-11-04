@@ -86,3 +86,4 @@ export function ztoTextWithCodePoints(text: string): string {
     const points = Array.from(String(text)).map((ch) => (ch.codePointAt(0) || 0).toString(16).toUpperCase().padStart(4, '0'));
     return '«' + text + '» (U+' + points.join(' ') + ')';
 }
+export const PRICE_EXIT_LABEL = 'បញ្ចប់ការកែតម្លៃដែលជាប់';

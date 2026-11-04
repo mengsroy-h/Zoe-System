@@ -564,6 +564,30 @@ async function run() {
         const changed = copy(clearPatch); changed[T + '/' + target][field]++;
         await check('ClearHistory final tuple ខុស៖ ' + field, priceTree(clearRow), '/.json', changed, false);
     }
+    // A526 ៖ ការកែតម្លៃ ៖ commit atomic តែមួយ (ជួរ admitted ➜ history + increment ថ្ងៃ/ខែ) ទទួលតែពេលជួរនៅ admitted ➜ ប្រាក់ម្តងគត់
+    {
+        const price = { token: 'price_' + 'c0de5eed00000002' + 'd'.repeat(16), actorUid: uid, code: base.code, slot: '0', birth: base.birth,
+            rowBirth: base.birth, scanDate: day, priorCod: base.cod, priorDod: 0, wantCod: 9.29, wantDod: 0, phase: 'admitted' };
+        const ledger = () => ({ [D]: { [day]: { codDollar: 5.29, dodDollar: 0, totalCount: 1 } }, [M]: { [month]: { codDollar: 5.29, dodDollar: 0, totalCount: 1 } } });
+        const priced = (marker, extra = {}) => ({ [H]: { [target]: { ...copy(ordinary), pricePending: copy(marker) } }, ...ledger(), ...extra });
+        const commit = (delta = 4) => ({
+            [H + '/' + target + '/barcodes/0/cod']: base.cod + delta, [H + '/' + target + '/cod']: base.cod + delta, [H + '/' + target + '/price']: base.cod + delta,
+            [H + '/' + target + '/pricePending/phase']: 'history',
+            [D + '/' + day + '/codDollar']: { '.sv': { increment: delta } }, [M + '/' + month + '/codDollar']: { '.sv': { increment: delta } }
+        });
+        await check('ការកែតម្លៃ ៖ commit admitted ➜ history + increment ថ្ងៃ/ខែ ក្នុងការសរសេរតែមួយ', priced(price), '/.json', commit(), true);
+        const historyTree = priced({ ...price, phase: 'history' }); const historyRow = historyTree[H][target];
+        historyRow.barcodes[0].cod = 9.29; historyRow.cod = 9.29; historyRow.price = 9.29;
+        historyTree[D][day].codDollar = 9.29; historyTree[M][month].codDollar = 9.29;
+        await check('ការកែតម្លៃ ៖ commit ដដែលម្តងទៀតក្រោយ history ត្រូវបដិសេធ (ledger មិនប្រែ)', historyTree, '/.json', commit(), false);
+        await check('ការកែតម្លៃ ៖ commit ពី cancelling ត្រូវបដិសេធ', priced({ ...price, phase: 'cancelling' }), '/.json', commit(), false);
+        await check('ការកែតម្លៃ ៖ commit ក្រោយ settled compensated ត្រូវបដិសេធ', priced({ ...price, phase: 'settled', outcome: 'compensated' }), '/.json', commit(), false);
+        const low = priced({ ...price, wantCod: 0 }); low[D][day].codDollar = 3; low[M][month].codDollar = 3;
+        await check('ការកែតម្លៃ ៖ ការដកក្រោម 0 ត្រូវបដិសេធទាំងមូល (ជួរនៅ admitted)', low, '/.json', commit(-5.29), false);
+        await check('ការកែតម្លៃ ៖ គណនីផ្សេងមិនអាច commit', priced(price), '/.json', commit(), false, 'PATCH', 'foreign');
+        await check('ការកែតម្លៃ ៖ history ➜ settled committed តាម leaf update', historyTree, '/.json',
+            { [H + '/' + target + '/pricePending/phase']: 'settled', [H + '/' + target + '/pricePending/outcome']: 'committed' }, true);
+    }
     console.log('\n' + backend + ' scan rules: ' + pass + ' PASS, ' + fail + ' FAIL; វាស់តែ backend ដែលបង្ហាញនេះ។');
     process.exitCode = fail ? 1 : 0;
 }

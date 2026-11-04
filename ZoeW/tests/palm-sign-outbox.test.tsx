@@ -12,7 +12,7 @@ import { encryptLookupSecret } from '../src/services/crypto';
 import { openSignJob, sealSignJob, replaceSignJob, addSignJob, SIGN_OUTBOX_LEASE_MS } from '../src/services/palm-sign-outbox-store';
 import { palmOriginalFingerprint } from '../src/services/palm-sign-transport';
 import { openZtoPalmSign, submitZtoPalmSign, acceptPalmSignBarcode, setPalmSignName } from '../src/features/zto-palm-sign';
-import { actOnQueuedSign, palmSignOutboxState, runPalmSignOutbox, refreshPalmSignQueue } from '../src/features/palm-sign-outbox';
+import { actOnQueuedSign, discardUnreadablePalmSignJobs, palmSignOutboxState, runPalmSignOutbox, refreshPalmSignQueue } from '../src/features/palm-sign-outbox';
 import { applyBarcodeCloseChange } from '../src/features/barcode-ops';
 import { closeModal } from '../src/ui/modal';
 import { barcodeSignIdentity } from '../src/domain/barcode';
@@ -194,6 +194,52 @@ it('ការងារ Sign អានមិនបាន (key ចាស់) ៖ S
     expect(bodies('receipt')).toHaveLength(0);
     expect(closes()).toEqual([]);
     expect(disk.rows.get(row.id).cipher).toEqual(old.cipher);
+});
+// 📌 ភ្លេច PIN ៖ ការងារដែល PIN បច្ចុប្បន្នអានមិនបានមិនដែលចេញដោយស្វ័យប្រវត្តិ (អាចជាការងារតែមួយគត់ដែល PIN ដើមបើកវិញបាន) ➜ ច្រកចេញរបស់ម្ចាស់
+//    «🗑️ លុបការងារ Sign ដែលអានមិនបាន» ៖ confirm · លុបតែជួរអានមិនបាន ដែលគ្មាន lease (CAS តាម revision) · ការងារអានបានមិនប៉ះ។
+it('ការងារ Sign អានមិនបាន ៖ ច្រកចេញរបស់ម្ចាស់លុបតែជួរអានមិនបាន (confirm · គ្មាន lease) ហើយការងារអានបាននៅដដែល', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    await ready(); await submitZtoPalmSign(); await runPalmSignOutbox();
+    expect(disk.rows.size).toBe(3);
+    const oldKey = await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']) as CryptoKey;
+    const all = await jobs();
+    const ids = all.filter((value) => value.job.code !== codes[2]).map((value) => value.row.id);
+    const keepId = all.find((value) => value.job.code === codes[2])!.row.id;
+    for (const id of ids) {
+        const row = disk.rows.get(id);
+        const old = await sealSignJob(row.owner, oldKey, await openSignJob(row, key));
+        row.cipher = old.cipher; row.iv = old.iv;
+    }
+    disk.rows.get(ids[1]).leaseUntil = Date.now() + 60000;
+    await refreshPalmSignQueue();
+    expect(palmSignOutboxState.unreadable).toBe(2);
+    const confirmSpy = vi.fn(() => false);
+    vi.stubGlobal('confirm', confirmSpy);
+    await discardUnreadablePalmSignJobs();
+    expect(disk.rows.size).toBe(3);
+    confirmSpy.mockImplementation(() => true);
+    await discardUnreadablePalmSignJobs();
+    expect(confirmSpy).toHaveBeenCalledTimes(2);
+    expect([...disk.rows.keys()].sort()).toEqual([ids[1], keepId].sort());
+    expect((await openSignJob(disk.rows.get(keepId), key)).code).toBe(codes[2]);
+    expect(palmSignOutboxState.unreadable).toBe(1);
+});
+it('ការងារ Sign ទម្រង់មិនស្គាល់ (អានបានដោយ PIN បច្ចុប្បន្ន) ៖ បង្ហាញដាច់ដោយឡែក · ច្រកចេញលុបមិនប៉ះ · បញ្ជីដទៃនៅបង្ហាញ', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    await ready(); await submitZtoPalmSign(); await runPalmSignOutbox();
+    const all = await jobs();
+    const bad = disk.rows.get(all[0].row.id);
+    const sealed = await sealSignJob(bad.owner, key, { ...all[0].job, phase: 'unknown-phase' } as any);
+    bad.cipher = sealed.cipher; bad.iv = sealed.iv;
+    await refreshPalmSignQueue();
+    expect(palmSignOutboxState.unreadable).toBe(0);
+    expect(palmSignOutboxState.message).toContain('ទម្រង់មិនស្គាល់');
+    expect(palmSignOutboxState.rows.length + palmSignOutboxState.recoveryRows.length).toBe(2);
+    const confirmSpy = vi.fn(() => true);
+    vi.stubGlobal('confirm', confirmSpy);
+    await discardUnreadablePalmSignJobs();
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(disk.rows.size).toBe(3);
 });
 it('នាឡិកាថយក្រោយ៖ deadline ចាស់មិនបញ្ឈប់ការផ្ទៀង ACK ហើយមិនផ្ញើ05ម្ដងទៀត', async () => {
     const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);

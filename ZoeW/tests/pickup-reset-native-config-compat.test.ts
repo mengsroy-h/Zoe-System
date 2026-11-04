@@ -18,7 +18,11 @@ const AFTER = { pickupRevision: 5, pickupResetEpoch: 3, packagesPickedUp: 0 };
 const copy = value => structuredClone(value);
 let sdk: any, raw: any, app: any, db: any, auth: any, server: any, fetches: any, ref: any;
 const deferred = () => { let resolve: (value: any) => void; const promise = new Promise<any>(done => { resolve = done; }); return { promise, resolve: (value: any) => resolve(value) }; };
-const journals = () => Object.keys(appLocalStore).filter(key => key.startsWith('zoew_pickup_reset_pending_v2:')).map(key => JSON.parse(appLocalStore.getItem(key)!));
+// journal ដែល settled ចេញពី storage (pickup-reset-pending «settled journals leave storage») ➜ អានតម្លៃចុងក្រោយដែលបានសរសេរ
+const written = new Map<string, string>();
+const realSetItem = Storage.prototype.setItem;
+const journals = () => [...new Set([...written.keys(), ...Object.keys(appLocalStore)])].filter(key => key.startsWith('zoew_pickup_reset_pending_v2:'))
+    .map(key => JSON.parse(appLocalStore.getItem(key) ?? written.get(key)!));
 async function request() {
     const batchId = 'config-compat-batch';
     const context = { v: 1, scope: URL, batchId, batchHash: await pickupResetBatchHash(REALM, URL, UID, batchId, [DAY]),
@@ -27,6 +31,8 @@ async function request() {
     return { tenant: REALM, actorUid: UID, context, casText, attemptId: await pickupResetAttemptId(REALM, UID, context, casText) };
 }
 beforeEach(() => {
+    written.clear();
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key: string, value: string) { written.set(key, String(value)); return realSetItem.call(this, key, value); });
     vi.stubGlobal('crypto', webcrypto); appLocalStore.clear(); dbListenerPendingPaths.clear(); dbListenerFailedPaths.clear(); server = copy(BEFORE);
     const accepted = normalizeFirebaseConfig(JSON.stringify(CONFIG)); app = { options: accepted.config }; db = { app };
     auth = { app, currentUser: { uid: UID, getIdTokenResult: vi.fn(async () => ({ claims: { aud: REALM } })), getIdToken: vi.fn(async () => 'synthetic-read-token') } };

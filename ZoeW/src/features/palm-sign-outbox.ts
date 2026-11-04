@@ -15,10 +15,11 @@ import { endpoint, failureMessage, headersFor, palmSignConfigKey, palmSignConnec
 import { addSignJob, listSignJobs, openSignJob, PALM_RESERVATION_PROTOCOL, replaceSignJob, sealSignJob, SIGN_OUTBOX_LEASE_MS, type SignJob, type SignRecoveryCheck, type StoredSignJob } from '../services/palm-sign-outbox-store';
 import type { LifecycleScope } from '../app/lifecycle/scope';
 import { showToast } from '../ui/toast';
+import { requestPinBeforeConfig } from './pin';
 import { documentIsHidden } from '../platform/document-io';
 
 export type SignQueueView = { restartAllowed?: boolean; restartPending?: boolean; restartReady?: boolean; id: string; code: string; signMan?: string; message: string; phase: SignJob['phase']; warning?: string; continuationAllowed?: boolean; verificationRequired?: boolean; manualReviewReason?: string; recovery?: boolean; recoveryContinuation?: boolean; dismissed?: boolean; signed?: boolean; statusUnavailable?: boolean; photoVerified?: boolean; cleanupAt?: number; busy: boolean };
-export const palmSignOutboxState = createStore('palmSignOutbox', { owner: '', rows: [] as SignQueueView[], recoveryRows: [] as SignQueueView[], message: '' });
+export const palmSignOutboxState = createStore('palmSignOutbox', { owner: '', rows: [] as SignQueueView[], recoveryRows: [] as SignQueueView[], message: '', unreadable: 0 });
 registerStore(palmSignOutboxState);
 let running: Promise<void> | null = null;
 let rerun = false;
@@ -642,23 +643,40 @@ async function processJob(op: NonNullable<ReturnType<typeof context>>, value: St
     }
 }
 
+function signJobShapeError(error) {
+    return error instanceof SyntaxError || error?.message === 'outbox:shape';
+}
+
 async function readJobs(op: NonNullable<ReturnType<typeof localContext>>) {
     const rows = await listSignJobs(op.owner);
     const jobs: StoredSignJob[] = [];
-    let unreadable = 0;
+    let unreadable = 0, malformed = 0;
     for (const row of rows) {
         try { jobs.push({ row, job: await openSignJob(row, op.key) }); }
-        catch { unreadable++; }
+        catch (error) { if (signJobShapeError(error)) malformed++; else unreadable++; }
     }
-    return { jobs, unreadable };
+    return { jobs, unreadable, malformed };
 }
 
 async function publish(op: ConnectionView, loaded?: Awaited<ReturnType<typeof readJobs>>) {
-    const { jobs, unreadable } = loaded || await readJobs(op);
+    const read = loaded || await readJobs(op);
     if (!op.current()) return;
+    const views: SignQueueView[] = [];
+    const { unreadable } = read;
+    let malformed = read.malformed;
+    for (const entry of read.jobs) {
+        try { views.push(signQueueView(op, entry.row, entry.job)); }
+        catch { malformed++; }
+    }
     palmSignOutboxState.owner = op.owner;
-    palmSignOutboxState.message = unreadable ? '⚠️ ការងារ Sign ' + String(unreadable).replace(/\d/g, (digit) => '០១២៣៤៥៦៧៨៩'[Number(digit)]) + ' អានមិនបានដោយ PIN បច្ចុប្បន្ន (ឧ. ក្រោយប្តូរ PIN)។ ទិន្នន័យអ៊ិនគ្រីបនៅរក្សាទុក។ សូមប្រើ PIN ដើមដើម្បីអានរូប ហើយកុំលុបទិន្នន័យ App។' : '';
-    const views = jobs.map(({ row, job }) => ({ id: row.id, code: job.code, signMan: job.signMan, phase: job.phase, recovery: !!job.recovery,
+    palmSignOutboxState.unreadable = unreadable;
+    palmSignOutboxState.message = (malformed ? '⚠️ ការងារ Sign ' + String(malformed).replace(/\d/g, (digit) => '០១២៣៤៥៦៧៨៩'[Number(digit)]) + ' បង្ហាញមិនបាន (ទម្រង់មិនស្គាល់)។ ទិន្នន័យនៅរក្សាទុក។ ' : '') + (unreadable ? '⚠️ ការងារ Sign ' + String(unreadable).replace(/\d/g, (digit) => '០១២៣៤៥៦៧៨៩'[Number(digit)]) + ' អានមិនបានដោយ PIN បច្ចុប្បន្ន (ឧ. ក្រោយប្តូរ PIN)។ ទិន្នន័យអ៊ិនគ្រីបនៅរក្សាទុក។ សូមប្រើ PIN ដើមដើម្បីអានរូប ហើយកុំលុបទិន្នន័យ App។' : '');
+    palmSignOutboxState.rows = views.filter(row => !row.recovery);
+    palmSignOutboxState.recoveryRows = views.filter(row => row.recovery);
+}
+
+function signQueueView(op: ConnectionView, row: StoredSignJob['row'], job: SignJob): SignQueueView {
+    return ({ id: row.id, code: job.code, signMan: job.signMan, phase: job.phase, recovery: !!job.recovery,
         cleanupAt: job.signedCleanupAt, dismissed: job.recovery?.dismissed === true, signed: job.recoveryCheck?.signed ?? (signedEvidence(job) ? true : undefined),
         statusUnavailable: job.recoveryCheck?.statusUnavailable === true || job.recoveryCheck?.statusChecked === true && job.recoveryCheck.signed === undefined,
         photoVerified: job.recoveryCheck?.photoVerified ?? job.photoVerified === true,
@@ -669,15 +687,13 @@ async function publish(op: ConnectionView, loaded?: Awaited<ReturnType<typeof re
         continuationAllowed: job.continuationAllowed === true && !job.refreshStage,
         verificationRequired: job.verificationRequired, manualReviewReason: job.manualReviewReason,
         message: sameConnection(job, op) ? job.message : '⚠️ ការភ្ជាប់ ZTO ប្រែ។ សូមស្តារការភ្ជាប់ដើមដើម្បីបន្ត Sign។',
-        warning: !job.recovery && job.warningToken && job.manualReviewReason !== 'parent_in_trash' ? job.message : '', busy: pendingDeadline(row.leaseUntil, Date.now(), SIGN_OUTBOX_LEASE_MS) || busyActions.has(row.id) || activeJobs.has(row.id) }));
-    palmSignOutboxState.rows = views.filter(row => !row.recovery);
-    palmSignOutboxState.recoveryRows = views.filter(row => row.recovery);
+        warning: !job.recovery && job.warningToken && job.manualReviewReason !== 'parent_in_trash' ? job.message : '', busy: pendingDeadline(row.leaseUntil, Date.now(), SIGN_OUTBOX_LEASE_MS) || busyActions.has(row.id) || activeJobs.has(row.id) });
 }
 
 export async function refreshPalmSignQueue() {
     const local = localContext();
     const op = local && await connectionView(local);
-    if (!op) { palmSignOutboxState.owner = ''; palmSignOutboxState.rows = []; palmSignOutboxState.recoveryRows = []; return; }
+    if (!op) { palmSignOutboxState.owner = ''; palmSignOutboxState.rows = []; palmSignOutboxState.recoveryRows = []; palmSignOutboxState.unreadable = 0; return; }
     try { await publish(op); }
     catch { if (op.current()) palmSignOutboxState.message = '⚠️ បើកបញ្ជី Sign ដែលរក្សាទុកមិនបាន។ សូមកុំលុបទិន្នន័យ App។'; }
 }
@@ -1069,6 +1085,44 @@ export async function actOnQueuedSign(id: string, action: 'approve' | 'cancel' |
         if (op.current()) await publish(op).catch(() => {});
     }
     void runPalmSignOutbox();
+}
+
+let discardingUnreadable = false;
+
+export function requestDiscardUnreadablePalmSignJobs() {
+    requestPinBeforeConfig(discardUnreadablePalmSignJobs, 'discardUnreadableSign');
+}
+
+export async function discardUnreadablePalmSignJobs() {
+    const local = localContext();
+    if (!local || discardingUnreadable) return;
+    discardingUnreadable = true;
+    let op: ConnectionView | null = null;
+    try {
+        op = await connectionView(local);
+        if (!op?.current()) return;
+        const targets = [];
+        for (const row of await listSignJobs(op.owner)) {
+            if (activeJobs.has(row.id) || busyActions.has(row.id) || pendingDeadline(row.leaseUntil, Date.now(), SIGN_OUTBOX_LEASE_MS)) continue;
+            try { await openSignJob(row, op.key); } catch (error) { if (!signJobShapeError(error)) targets.push(row); }
+        }
+        if (!targets.length || !op.current()) return;
+        const count = String(targets.length).replace(/\d/g, (digit) => '០១២៣៤៥៦៧៨៩'[Number(digit)]);
+        if (!confirm('លុបការងារ Sign ' + count + ' ដែល PIN បច្ចុប្បន្នអានមិនបាន អចិន្ត្រៃយ៍?\n\nរូប និងការងារទាំងនេះនឹងអានមិនបានទៀតទេ ទោះប្រើ PIN ដើមវិញ។ ការងារដែលអានបាន និងស្ថានភាពកញ្ចប់មិនប៉ះពាល់។')) return;
+        let removed = 0;
+        for (const row of targets) {
+            if (!op.current()) break;
+            if (await replaceSignJob(row, null, () => !!op?.current() && !activeJobs.has(row.id) && !busyActions.has(row.id))) removed++;
+        }
+        if (op.current()) showToast(removed === targets.length
+            ? '✅ បានលុបការងារ Sign ' + count + ' ដែលអានមិនបាន។'
+            : '⚠️ លុបបានតែ ' + String(removed).replace(/\d/g, (digit) => '០១២៣៤៥៦៧៨៩'[Number(digit)]) + ' — ការងារខ្លះកំពុងប្រើ ឬបានប្រែ។ សូមសាកម្ដងទៀត។');
+    } catch (_) {
+        if (op?.current()) showToast('⚠️ លុបការងារ Sign ដែលអានមិនបាន មិនបានសម្រេច។ សូមសាកម្ដងទៀត។');
+    } finally {
+        discardingUnreadable = false;
+        if (op?.current()) await publish(op).catch(() => {});
+    }
 }
 
 export function setupPalmSignOutbox(scope: LifecycleScope) {

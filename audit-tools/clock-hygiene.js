@@ -49,7 +49,8 @@ const LOCAL_CLOCK_OK = {
         finishCommittedScan: 'Local import-proof TTL only, after committed financial receipt and exact journal identity proof. Future clock stamp holds; expiry retires proven journal without publishing Sign. Exact TTL and backward-clock regression coverage in scan-reboot-closure.',
         finishLocal: 'Sign outbox local retry deadline only; parcel close uses the server clock in applyBarcodeCloseChange. Never a retention or revenue timestamp.',
         processJob: 'Sign outbox local IndexedDB lease/retry deadlines shared by tabs on this device; server journal CAS independently guards photo/05 and uncertain sends are polled, never replayed.',
-        publish: 'Sign outbox busy indicator from the local IndexedDB lease; UI only, no receipt or money verdict.',
+        signQueueView: 'Sign outbox busy indicator from the local IndexedDB lease; UI only, no receipt or money verdict.',
+        discardUnreadablePalmSignJobs: 'Sign outbox local lease check before the explicit owner discard; revision CAS guards the IndexedDB delete, no receipt or money verdict.',
         runPalmSignOutbox: 'Sign outbox local lease/retry scheduling; authoritative receipt ACK and parcel identity checks remain required before local close.',
         actOnQueuedSign: 'Sign outbox local lease check before an explicit user action; revision CAS guards the IndexedDB write, server validates confirmation separately.',
 

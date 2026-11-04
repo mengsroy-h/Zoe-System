@@ -53,11 +53,13 @@ let diagnosticFrames = null;
 let fixtureLockChecks = [];
 let active = null, api, dom, database, firebaseApp, createMockUserToken, bundle, serial = 0, originalSocket, websocket;
 let namespace, origin, closing = false, denyStorage = false, storageDenials = 0, poisoned = false, acquired = false, released = false, engineStarted = false;
-const rows = new Map();
+const rows = new Map(), written = new Map();
 const store = { get length() { return rows.size; }, key: i => [...rows.keys()][i] ?? null, getItem: key => rows.get(key) ?? null,
-    setItem(key, value) { if (denyStorage && key.startsWith(PREFIX)) { storageDenials++; throw new Error('synthetic actual persistence denial'); } rows.set(key, String(value)); },
-    removeItem: key => rows.delete(key), clear: () => rows.clear() };
-const journal = () => [...rows].filter(([key]) => key.startsWith(PREFIX)).map(([key, text]) => ({ key, value: JSON.parse(text) }));
+    setItem(key, value) { if (denyStorage && key.startsWith(PREFIX)) { storageDenials++; throw new Error('synthetic actual persistence denial'); } rows.set(key, String(value)); written.set(key, String(value)); },
+    removeItem: key => rows.delete(key), clear: () => { rows.clear(); written.clear(); } };
+// journal ដែល settled ចេញពី storage ➜ អានតម្លៃចុងក្រោយដែលបានសរសេរ · `stored` = នៅក្នុង storage
+const journal = () => [...new Set([...written.keys(), ...rows.keys()])].filter(key => key.startsWith(PREFIX))
+    .map(key => ({ key, value: JSON.parse(rows.get(key) ?? written.get(key)), stored: rows.has(key) }));
 const failureValue = error => ({ kind: error === null ? 'null' : typeof error, name: error?.name ?? null,
     code: error?.code ?? null, txOutcome: error?.txOutcome ?? null, message: String(error?.message ?? error).slice(0, 1000) });
 async function observedTransaction(frame, ref, updater, options) {
@@ -410,13 +412,15 @@ async function behavior(row, frame) {
     await preserve(row);
 }
 function independentStore() {
-    const values = new Map();
-    return { values, get length() { return values.size; }, key: index => [...values.keys()][index] ?? null,
-        getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, String(value)),
-        removeItem: key => values.delete(key), clear: () => values.clear() };
+    const values = new Map(), written = new Map();
+    return { values, written, get length() { return values.size; }, key: index => [...values.keys()][index] ?? null,
+        getItem: key => values.get(key) ?? null, setItem: (key, value) => { values.set(key, String(value)); written.set(key, String(value)); },
+        removeItem: key => values.delete(key), clear: () => { values.clear(); written.clear(); } };
 }
+// journal ដែល settled ចេញពី storage ➜ អានតម្លៃចុងក្រោយដែលបានសរសេរ · `stored` = នៅក្នុង storage
 function independentJournal(frame) {
-    return [...frame.store.values].filter(([key]) => key.startsWith(PREFIX)).map(([key, text]) => ({ key, value: JSON.parse(text) }));
+    return [...new Set([...frame.store.written.keys(), ...frame.store.values.keys()])].filter(key => key.startsWith(PREFIX))
+        .map(key => ({ key, value: JSON.parse(frame.store.values.get(key) ?? frame.store.written.get(key)), stored: frame.store.values.has(key) }));
 }
 function independentTask(frame, promise) {
     if (frame.closing) throw new Error('Independent context task after close');

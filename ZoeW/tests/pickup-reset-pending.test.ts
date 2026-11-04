@@ -151,12 +151,33 @@ it.each([
     expect(calls).toBe(blocked ? 1 : 2); expect(server.packagesPickedUp).toBe(blocked ? 1 : 0); expect(markers()).toHaveLength(1);
 });
 it.each([false, true])('pending copy បែងចែក persisted evidence ពី unreadable storage (enumeration denied=%s)', async (denied) => {
-    if (denied) vi.spyOn(appLocalStore, 'key').mockImplementation(() => { throw new DOMException('enumeration denied', 'SecurityError'); });
+    const enumeration = denied ? vi.spyOn(appLocalStore, 'key').mockImplementation(() => { throw new DOMException('enumeration denied', 'SecurityError'); }) : null;
     mode = 'unknown'; await resetPickupStats(); const messages = uiState.toasts.map(toast => toast.msg).join(' ');
+    enumeration?.mockRestore();
     if (denied) {
         expect(calls).toBe(0); expect(markers()).toEqual([]);
         expect.soft(messages).not.toContain('ភស្តុតាងការងារត្រូវបានរក្សាទុក'); expect.soft(messages).toContain('មិនអាចពិនិត្យ');
     } else {
         expect(calls).toBe(1); expect(markers()).toHaveLength(1); expect(messages).toContain('ភស្តុតាងការងារត្រូវបានរក្សាទុក');
     }
+});
+// 📌 «Reset នៅបើក» ៖ journal ដែល settled (owner ended · គ្មានថ្ងៃ pending) មិនដែលត្រូវការម្តងទៀត តែផ្ទុក casText ពេញ (barcode ·
+//    លេខទូរស័ព្ទ) ➜ Reset ច្រើនដងបំពេញ localStorage ➜ ស្កេនត្រូវបដិសេធ ➜ journal settled ត្រូវចេញពី storage · pending នៅដដែល។
+it('settled journals leave storage (complete · definitive rejection); a pending journal stays', async () => {
+    const stored = () => Object.keys(appLocalStore).filter(key => key.startsWith(PREFIX));
+    firebaseState.auth = { currentUser: { uid: 'reset-retire-owner' } } as any;
+    for (let round = 0; round < 5; round++) {
+        server = { ...server, pickupRevision: server.pickupRevision + 1, packagesPickedUp: 1, pickedUpBarcodes: { ['R' + round]: '000000001' }, pickedUpPhones: { '000000001': 1 } };
+        dataState.dailyPickupData = { [DAY]: clone(server) };
+        await resetPickupStats();
+        expect(server.packagesPickedUp).toBe(0);
+        expect(stored()).toEqual([]);
+    }
+    expect(calls).toBe(5);
+    const refill = () => {
+        server = { ...server, pickupRevision: server.pickupRevision + 1, packagesPickedUp: 1, pickedUpBarcodes: { LATER: '000000001' }, pickedUpPhones: { '000000001': 1 } };
+        dataState.dailyPickupData = { [DAY]: clone(server) };
+    };
+    refill(); mode = 'reject'; await resetPickupStats(); expect(calls).toBe(6); expect(stored()).toEqual([]);
+    refill(); mode = 'unknown'; await resetPickupStats(); expect(calls).toBe(7); expect(stored()).toHaveLength(1); expect(markers()).toHaveLength(1);
 });

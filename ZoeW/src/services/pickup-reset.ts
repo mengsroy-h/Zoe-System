@@ -1,6 +1,6 @@
 import { firebaseState } from '../core/state';
 import { liveShopScope } from '../core/shop-scope';
-import { appLocalStore, safeStoreSet } from '../core/storage';
+import { appLocalStore, safeStoreRemove, safeStoreSet } from '../core/storage';
 import { generateUniqueId } from '../domain/barcode';
 import { pickupResetRecord } from '../domain/pickup';
 import { pickupResetAppliedReceipt, pickupResetAttemptId, pickupResetBatchHash, pickupResetBoundReceipt,
@@ -133,6 +133,13 @@ function persist(key, previous, value) {
     return encoded;
 }
 
+function retireSettledJournal(key, encoded) {
+    try {
+        const stored = storedJournal(key);
+        if (stored && stored.value.settled && stored.encoded === encoded) safeStoreRemove(appLocalStore, key);
+    } catch (error) {}
+}
+
 function settle(value) {
     value.complete = value.days.every(day => last(day)?.outcome === 'applied');
     value.settled = value.owner.ended && !value.days.some(day => last(day)?.outcome === 'pending');
@@ -162,7 +169,7 @@ async function annotateLate(owner, key, token, request, result) {
         } else if (owner.current() && result?.committed === false && result.pickupReset === undefined) attempt.outcome = 'not-applied';
         else return;
         settle(value);
-        persist(key, stored.encoded, value);
+        retireSettledJournal(key, persist(key, stored.encoded, value));
     });
 }
 
@@ -258,7 +265,10 @@ export async function runPickupResetBatch(dates, isCurrent = () => true, onAppli
                     value.owner.ended = true;
                     settle(value);
                     encoded = persist(key, encoded, value);
-                    if (value.settled) summary.status = value.complete ? 'complete' : 'partial';
+                    if (value.settled) {
+                        summary.status = value.complete ? 'complete' : 'partial';
+                        retireSettledJournal(key, encoded);
+                    }
                 }
             } catch (error) { summary.status = 'hold'; }
             if (active.get(ownerId) === token) active.delete(ownerId);
@@ -287,7 +297,7 @@ export async function resumePickupResetOutcomes() {
                 const stored = storedJournal(key);
                 if (!stored || stored.value.tenant !== owner.tenant || stored.value.backend !== owner.backend) { summary.held = true; continue; }
                 const value = stored.value;
-                if (value.settled) continue;
+                if (value.settled) { retireSettledJournal(key, stored.encoded); continue; }
                 if (!value.owner.ended && !value.owner.locked || active.has(suffix(owner.scope, owner.uid))) { summary.held = true; continue; }
                 let encoded = stored.encoded;
                 const batchHash = await pickupResetBatchHash(owner.tenant, owner.scope, owner.uid, value.id, value.dates);
@@ -317,6 +327,7 @@ export async function resumePickupResetOutcomes() {
                 if (!current()) return { ...summary, held: true };
                 settle(value); encoded = persist(key, encoded, value);
                 if (!value.settled) summary.held = true;
+                else retireSettledJournal(key, encoded);
             }
             if (pickupResetPendingState(owner.scope, owner.uid)) summary.held = true;
             return summary;

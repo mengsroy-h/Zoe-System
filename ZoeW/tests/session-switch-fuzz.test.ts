@@ -1,4 +1,5 @@
 import { createHash, webcrypto } from 'node:crypto';
+import { appLocalStore } from '../src/core/storage';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
@@ -546,10 +547,13 @@ it('Reset without modern receipt APIs fails closed before any write', async () =
 it('healthy Reset without projectId binds actual token audience and original durable CAS', async () => {
     const scenario = SCENARIOS.find(row => row.name === 'Reset ចំនួនយករួច (resetPickupStats)')!;
     resetBetweenRuns();
+    const written = new Map<string, string>(), store = appLocalStore!, realSetItem = store.setItem.bind(store);
+    const recorder = vi.spyOn(store, 'setItem').mockImplementation((name: string, value: string) => { written.set(name, String(value)); return realSetItem(name, value); });
     const result = await runScenario(scenario, Infinity);
-    const key = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
-        .find(value => value?.startsWith('zoew_pickup_reset_pending_v2:'));
-    const journal = key && JSON.parse(localStorage.getItem(key)!);
+    recorder.mockRestore();
+    const key = [...written.keys()].find(value => value.startsWith('zoew_pickup_reset_pending_v2:'));
+    const journal = key && JSON.parse(written.get(key)!);
+    expect(key && store.getItem(key)).toBeNull();
     const attempt = journal?.days[0]?.attempts[0], saved = getAt(PICKUP + '/' + lab.day);
     expect(result.writes).toBeGreaterThan(0);
     expect(result.late).toEqual([]);

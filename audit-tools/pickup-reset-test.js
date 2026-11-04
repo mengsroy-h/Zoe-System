@@ -173,9 +173,20 @@ function makeCtx(opts) {
     const writes = [];
     const serverPickup = JSON.parse(JSON.stringify(opts.ledger || {}));
     const config = { databaseURL: 'http://127.0.0.1:1', projectId: 'pickup-reset-fixture' };
-    const storage = opts.storage || memoryStorage({ zoew_firebase_config: JSON.stringify(config) });
+    const baseStorage = opts.storage || memoryStorage({ zoew_firebase_config: JSON.stringify(config) });
+    // journal ដែល settled ចេញពី storage ➜ កត់តម្លៃចុងក្រោយដែល App សរសេរ ដើម្បីនៅតែផ្ទៀងខ្លឹមសាររបស់វាបាន
+    const written = new Map();
+    const storage = {
+        get length() { return baseStorage.length; },
+        key: (index) => baseStorage.key(index),
+        getItem: (key) => baseStorage.getItem(key),
+        setItem: (key, value) => { written.set(String(key), String(value)); baseStorage.setItem(key, value); },
+        removeItem: (key) => baseStorage.removeItem(key),
+        clear: () => baseStorage.clear()
+    };
     const toasts = [];
     const sandbox = {
+        __written: written, __baseStorage: baseStorage,
         console, crypto: webcrypto, TextEncoder, URL,
         window: {},
         appLocalStore: storage, appSessionStore: storage,
@@ -271,11 +282,14 @@ async function runReset(opts) {
         toasts: sandbox.__toasts,
         ledger: vm.runInContext('dailyPickupData', ctx),
         inFlight: vm.runInContext('pickupResetInFlight', ctx),
-        storage: sandbox.appLocalStore,
+        storage: sandbox.__baseStorage,
         pendingKeys: Array.from({ length: sandbox.appLocalStore.length }, (_, index) => sandbox.appLocalStore.key(index))
             .filter((key) => key.startsWith('zoew_pickup_reset_pending_v2:') && !JSON.parse(sandbox.appLocalStore.getItem(key)).settled),
-        evidence: Array.from({ length: sandbox.appLocalStore.length }, (_, index) => sandbox.appLocalStore.key(index))
-            .filter(key => key.startsWith('zoew_pickup_reset_pending_v2:')).map(key => JSON.parse(sandbox.appLocalStore.getItem(key))),
+        evidence: [...new Set([...sandbox.__written.keys(), ...Array.from({ length: sandbox.appLocalStore.length }, (_, index) => sandbox.appLocalStore.key(index))])]
+            .filter(key => key.startsWith('zoew_pickup_reset_pending_v2:'))
+            .map(key => JSON.parse(sandbox.appLocalStore.getItem(key) ?? sandbox.__written.get(key))),
+        storedEvidence: Array.from({ length: sandbox.appLocalStore.length }, (_, index) => sandbox.appLocalStore.key(index))
+            .filter(key => key.startsWith('zoew_pickup_reset_pending_v2:')),
         serverPickup: sandbox.__serverPickup, rawTransactions: sandbox.__rawTransactions,
         toastKinds: sandbox.__toasts.map((message) => ctx.toastKindOf(message)),
         refreshed: sandbox.__refreshed || 0
@@ -319,9 +333,10 @@ async function runReset(opts) {
             r.rawTransactions === 1 && r.serverPickup['2026-08-26'].packagesPickedUp === 0
             && r.serverPickup['2026-08-26'].pickupResetApplied.attemptId === r.writes[0].request.attemptId,
             { rawTransactions: r.rawTransactions, server: r.serverPickup['2026-08-26'] });
-        ok('ACK ដែលបានបញ្ជាក់រក្សា settled journal និង receipt ពេញលេញ មិនលុប evidence',
+        ok('ACK ដែលបានបញ្ជាក់ ៖ journal ចុងក្រោយ settled · complete · receipt ត្រូវនឹង server ហើយចេញពី storage (មិនបំពេញ localStorage)',
             r.evidence.length === 1 && r.evidence[0].settled && r.evidence[0].complete
-            && JSON.stringify(r.evidence[0].days[0].attempts[0].receipt) === JSON.stringify(r.serverPickup['2026-08-26'].pickupResetApplied), r.evidence);
+            && JSON.stringify(r.evidence[0].days[0].attempts[0].receipt) === JSON.stringify(r.serverPickup['2026-08-26'].pickupResetApplied)
+            && r.storedEvidence.length === 0, { evidence: r.evidence, stored: r.storedEvidence });
     }
 
     {

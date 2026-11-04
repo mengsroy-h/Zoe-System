@@ -174,6 +174,16 @@ export async function confirmPhone(isSkip = false) {
     let scanEvidence = null;
     let claimStarted = false;
     let lateSave = null;
+    let released = false;
+    const releaseScanModal = () => {
+        if (released) return;
+        released = true;
+        if (!current()) return;
+        viewState.phoneModalBusy = false;
+        warmZtoLookupProxyNow();
+        const heldAnswer = takeHeldLookupAnswer(scanState.pendingBarcode);
+        if (heldAnswer) fillEmptyLookupFields(heldAnswer.phone, heldAnswer.cod, heldAnswer.dod);
+    };
     try {
         scanEvidence = preparePendingScan(barcodeToSave, cod, dod, 0, 'interactive', 2);
         notePendingScan(scanEvidence, 'claim-pending');
@@ -215,14 +225,16 @@ export async function confirmPhone(isSkip = false) {
 
         const savePromise = addOrUpdateEntry(barcodeToSave, phone, cod, dod, locker, scanEvidence.record.createdAt, 0, scanEvidence);
         lateSave = savePromise;
+        const heldAnswer = takeHeldLookupAnswer(barcodeToSave);
+        closeModal('phoneModal');
+        releaseScanModal();
         try {
             const saveStatus = await withTimeout(savePromise, 15000, 'Save timed out');
             lateSave = null;
             if (!current()) return;
             if (saveStatus !== true) {
-                const heldAnswer = takeHeldLookupAnswer(barcodeToSave);
-                closeModal('phoneModal');
                 if (saveStatus === false) warnHeldLookupMoney(heldAnswer, barcodeToSave, cod, dod);
+                refreshCurrentHistoryView();
                 return;
             }
         } catch (saveError) {
@@ -230,7 +242,6 @@ export async function confirmPhone(isSkip = false) {
             if (!current()) return;
             if (saveError && saveError.message === 'Save timed out') {
                 probeDatabaseLiveness('save');
-                const heldAnswer = takeHeldLookupAnswer(barcodeToSave);
                 savePromise.then((lateStatus) => {
                     if (!current()) return;
                     if (lateStatus === true) showToast(`✅ (${barcodeToSave}) រក្សាទុកបានជោគជ័យ!`);
@@ -242,18 +253,14 @@ export async function confirmPhone(isSkip = false) {
                     if (!lateErr?.scanSettlement) showToast(`⚠️ រក្សាទុក (${barcodeToSave}) បរាជ័យ! សូមស្កេនម្ដងទៀត។`);
                     if (window.ZoeErrors) ZoeErrors.capture(lateErr, { zone: 'data', context: 'savePhoneAndSave late write' });
                 });
-                closeModal('phoneModal');
                 showToast(`⏳ កំពុងរក្សាទុក (${barcodeToSave})… សូមកុំស្កេនម្ដងទៀត។`);
-                safeFocusScanner();
                 return;
             }
             rollbackFailedSave(saveError);
             throw saveError;
         }
 
-        const heldAnswer = takeHeldLookupAnswer(barcodeToSave);
-        closeModal('phoneModal');
-        showToast("✅ រក្សាទុកបានជោគជ័យ!");
+        showToast(`✅ (${barcodeToSave}) រក្សាទុកបានជោគជ័យ!`);
         warnHeldLookupMoney(heldAnswer, barcodeToSave, cod, dod);
     } catch (e) {
         if (scanEvidence && !claimStarted) finishPendingScan(scanEvidence, 'not-started');
@@ -264,13 +271,28 @@ export async function confirmPhone(isSkip = false) {
             : `⚠️ រក្សាទុកបរាជ័យ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងស្កេន (${barcodeToSave}) ម្ដងទៀត។`);
     } finally {
         releasePendingScanAfter(scanEvidence, lateSave);
-        if (current()) {
-            viewState.phoneModalBusy = false;
-            warmZtoLookupProxyNow();
-            const heldAnswer = takeHeldLookupAnswer(scanState.pendingBarcode);
-            if (heldAnswer) fillEmptyLookupFields(heldAnswer.phone, heldAnswer.cod, heldAnswer.dod);
-        }
+        releaseScanModal();
     }
+}
+
+export const SCAN_SAVE_LANE_WAIT_MS = 30000;
+
+const scanSaveLanes = new WeakMap<object, Map<string, Promise<void>>>();
+
+export function inScanSaveLane<T>(db, key: string, task: () => Promise<T>): Promise<T> {
+    if (!key || !db || typeof db !== 'object') return task();
+    let lanes = scanSaveLanes.get(db);
+    if (!lanes) { lanes = new Map(); scanSaveLanes.set(db, lanes); }
+    const prior = lanes.get(key);
+    const ready = prior ? new Promise<void>((resolve) => {
+        const ceiling = setTimeout(resolve, SCAN_SAVE_LANE_WAIT_MS);
+        prior.then(() => { clearTimeout(ceiling); resolve(); });
+    }) : Promise.resolve();
+    const result = ready.then(task);
+    const tail = result.then(() => {}, () => {});
+    lanes.set(key, tail);
+    tail.then(() => { if (lanes.get(key) === tail) lanes.delete(key); });
+    return result;
 }
 
 export const SCAN_SETTLE_READ_TRIES = 3;
@@ -295,7 +317,8 @@ export function addOrUpdateEntry(barcode, phone, cod, dod, locker = "N/A", stamp
             }
             return saveScanOperation(handle, phone, locker, closedAtMs);
         };
-        return run().finally(() => {
+        const lane = phone === "គ្មានលេខ" ? '' : [phone, handle.record.scanDate, Number(closedAtMs) > 0 ? 1 : 0].join('|');
+        return inScanSaveLane(handle.db, lane, run).finally(() => {
             if (!scanImportCollectedOwned(handle)) releasePendingScan(handle);
         });
     }

@@ -27,9 +27,9 @@ const ownedPgChildren = [], outboundViolations = [];
 function outside(reason, target) { outboundViolations.push({ reason, target: String(target) }); throw new Error(reason); }
 const hash = value => crypto.createHash('sha256').update(value).digest('hex'), clone = value => JSON.parse(JSON.stringify(value));
 const equal = (a, b) => a === undefined || b === undefined ? a === b : isDeepStrictEqual(clone(a), clone(b));
-function memory() { const data = new Map(); const store = { get length() { return data.size; }, key: i => [...data.keys()][i] ?? null,
-    getItem: k => data.get(k) ?? null, setItem: (k, v) => { if (store.deny && k.startsWith(PREFIX)) { store.denials++; throw new Error('synthetic actual journal persistence denial'); } data.set(k, String(v)); },
-    removeItem: k => data.delete(k), clear: () => data.clear(), deny: false, denials: 0 }; return store; }
+function memory() { const data = new Map(), written = new Map(); const store = { get length() { return data.size; }, key: i => [...data.keys()][i] ?? null,
+    getItem: k => data.get(k) ?? null, setItem: (k, v) => { if (store.deny && k.startsWith(PREFIX)) { store.denials++; throw new Error('synthetic actual journal persistence denial'); } data.set(k, String(v)); written.set(k, String(v)); },
+    removeItem: k => data.delete(k), clear: () => { data.clear(); written.clear(); }, deny: false, denials: 0, written }; return store; }
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
 async function bounded(promise, label, ms = 15000) { let timer; try { return await Promise.race([promise, new Promise((_, reject) => {
     timer = setTimeout(() => reject(new Error(label + ' timed out')), ms); })]); } finally { clearTimeout(timer); } }
@@ -120,7 +120,9 @@ function evaluate(label, coordinator, store = memory(), session = memory()) {
     frames.add(frame); return frame;
 }
 function task(frame, promise) { frame.tasks.add(promise); promise.finally(() => frame.tasks.delete(promise)).catch(() => {}); return promise; }
-function pending(frame) { const rows = []; for (let i = 0; i < frame.store.length; i++) { const key = frame.store.key(i); if (key.startsWith(PREFIX)) rows.push({ key, value: JSON.parse(frame.store.getItem(key)) }); } return rows; }
+// journal ដែល settled ចេញពី storage ➜ អានតម្លៃចុងក្រោយដែលបានសរសេរ · `stored` = នៅក្នុង storage
+function pending(frame) { const keys = new Set(frame.store.written ? frame.store.written.keys() : []); for (let i = 0; i < frame.store.length; i++) keys.add(frame.store.key(i));
+    return [...keys].filter(key => key.startsWith(PREFIX)).map(key => ({ key, value: JSON.parse(frame.store.getItem(key) ?? frame.store.written.get(key)), stored: frame.store.getItem(key) !== null })); }
 function activate(frame) {
     const { api, sdk, app, auth, db } = frame; frame.store.setItem('zoew_firebase_config', JSON.stringify(app.options));
     Object.assign(api.firebaseState, { db, fb: sdk, auth, authGeneration: (api.firebaseState.authGeneration || 0) + 1, firebaseConfig: app.options,
@@ -239,7 +241,7 @@ function migrationFiles() { return fs.readdirSync(path.join(ROOT, 'supabase/migr
 function loadNativeContract() {
     const file = path.join(ROOT, 'audit-tools/emu/pickup-reset-applied-sdk-test.js'), source = fs.readFileSync(file, 'utf8');
     const sourceHash = crypto.createHash('sha256').update(source).digest('hex');
-    if (sourceHash !== '9c6409c1da79b86bd5568c36f4820b10c46a4c91386bd3ee57b2840d7e3c1433') throw new Error('native counterpart changed; independently review matched contract before accepting it');
+    if (sourceHash !== 'c343877e15899c1d90f385dda37ca0df37275bb58043a8cdc84e2e29a01965eb') throw new Error('native counterpart changed; independently review matched contract before accepting it');
     const nodes = [], env = {}, parse = require(path.join(DEPS, 'acorn')).parse;
     function walk(node) { if (!node || typeof node !== 'object') return; if (node.type) nodes.push(node);
         for (const value of Object.values(node)) { if (Array.isArray(value)) value.forEach(walk); else if (value?.type) walk(value); } }

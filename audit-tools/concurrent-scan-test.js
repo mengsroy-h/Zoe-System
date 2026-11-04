@@ -205,12 +205,17 @@ function makeCtx(server, fbSet) {
     ctx.readRestoreServerNode = async (api, db, path) => (await api.get(api.ref(db, path))).val();
     vm.runInContext("var SCANNER_LOOKUP_BARCODE_INDEX_FIELD = '__zoeScannerLookupIndex';", ctx);
     vm.runInContext('var deletedItems = []; var activeRestoreClaims = new Map(); var dbListenerPendingPaths = new Set(); const DB_LISTENER_KEY_DELETED = "deleted";', ctx);
+    // ⛔ ផ្លូវរក្សាទុកស្កេន (A527) រត់ក្នុង lane តាមអតិថិជន ➜ ស្រង់អថេររបស់ lane ពីកូដពិត (មិនចម្លងដោយដៃ)
+    for (const name of ['SCAN_SAVE_LANE_WAIT_MS', 'scanSaveLanes']) {
+        const decl = (src.match(new RegExp('const ' + name + ' = [^;]+;')) || [])[0];
+        if (decl) vm.runInContext(decl, ctx);
+    }
     for (const fn of ['barcodeRegistryKey', 'barcodeEntriesOf', 'normalizeBarcodesOf', 'getPickupPhoneKey',
                       'recalcItemMoneyFromBarcodes', 'applyBarcodeCloseState',
                       'itemHasRestoreMarkers', 'isActiveRestoreClaim', 'dropStaleRestoreMarkers',
                       'saveSingleHistoryItemToFirebase',
                       'freshHistoryItemShell', 'freshHistoryItemFrom',
-                      'mergeBarcodeIntoHistoryItem', 'ledgerDeltaCompanion', 'addOrUpdateEntry']) {
+                      'mergeBarcodeIntoHistoryItem', 'ledgerDeltaCompanion', 'inScanSaveLane', 'addOrUpdateEntry']) {
         const code = extractFn(src, fn);
         if (code) vm.runInContext(code, ctx);
     }

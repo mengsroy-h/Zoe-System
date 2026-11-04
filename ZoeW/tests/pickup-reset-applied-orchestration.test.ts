@@ -16,11 +16,19 @@ const record = (count = 1, revision = 3, epoch = 1) => ({ pickupRevision: revisi
 let server: Record<string, any>, sends: any[], legacyCalls: number, mode: string;
 let faults: Record<string, string>;
 let beforeRead: null | ((day: string) => void), stopDay: string | null;
-const journals = () => Object.keys(appLocalStore).filter(key => key.startsWith(PREFIX)).map(key => ({ key, raw: appLocalStore.getItem(key)!, value: JSON.parse(appLocalStore.getItem(key)!) }));
+// journal ដែល settled ចេញពី storage (pickup-reset-pending «settled journals leave storage») ➜ អានតម្លៃចុងក្រោយដែលបានសរសេរ · `stored` = នៅក្នុង storage
+const written = new Map<string, string>();
+const realSetItem = Storage.prototype.setItem;
+const journals = () => [...new Set([...written.keys(), ...Object.keys(appLocalStore)])].filter(key => key.startsWith(PREFIX)).map(key => {
+    const raw = appLocalStore.getItem(key) ?? written.get(key)!;
+    return { key, raw, value: JSON.parse(raw), stored: appLocalStore.getItem(key) !== null };
+});
 const retained = () => clone({ daily: dataState.dailyRevenueData, monthly: dataState.monthlyRevenueData,
     collected: dataState.dailyCollectedData, history: dataState.scanHistory, trash: dataState.deletedItems });
 
 beforeEach(() => {
+    written.clear();
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key: string, value: string) { written.set(key, String(value)); return realSetItem.call(this, key, value); });
     appLocalStore.clear(); appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: SCOPE }));
     vi.stubGlobal('crypto', webcrypto);
     vi.stubGlobal('navigator', { locks: { request: async (_name: string, _options: any, run: (lock: object) => any) => run({}) } });
@@ -356,7 +364,8 @@ it.each(['session', 'journal'])('status await rechecks %s ownership before annot
     expect((await resumePickupResetOutcomes()).held).toBe(true); expect(journals()[0].value.days[0].attempts[0]).toEqual(pending); expect(sends).toHaveLength(1);
     if (kind === 'journal') expect(journals()[0].value.owner.token).toBe('new-status-owner');
 });
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers(); appLocalStore.clear(); dataState.pickupResetInFlight = false; });
+afterEach(() => {
+    expect(journals().filter(journal => journal.value.settled && journal.stored).map(journal => journal.key)).toEqual([]); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers(); appLocalStore.clear(); dataState.pickupResetInFlight = false; });
 
 it('F09 original batch and immutable physical CAS attempt are durable before public execute', async () => {
     const money = retained(); await resetPickupStats();

@@ -290,7 +290,17 @@ function runResetPickup(mode, opts) {
     const writes = [];
     const hang = mode === 'hang';
     const config = { databaseURL: 'http://127.0.0.1:1', projectId: 'db-stall-reset-fixture' };
-    const storage = memoryStorage({ zoew_firebase_config: JSON.stringify(config) });
+    const baseStorage = memoryStorage({ zoew_firebase_config: JSON.stringify(config) });
+    // journal ដែល settled ចេញពី storage ➜ កត់តម្លៃចុងក្រោយដែល App សរសេរ ដើម្បីនៅតែផ្ទៀងខ្លឹមសាររបស់វាបាន
+    const written = new Map();
+    const storage = {
+        get length() { return baseStorage.length; },
+        key: (index) => baseStorage.key(index),
+        getItem: (key) => baseStorage.getItem(key),
+        setItem: (key, value) => { written.set(String(key), String(value)); baseStorage.setItem(key, value); },
+        removeItem: (key) => baseStorage.removeItem(key),
+        clear: () => baseStorage.clear()
+    };
     let serverPickup = {};
     const box = baseSandbox({
         appLocalStore: storage, appSessionStore: storage,
@@ -374,9 +384,11 @@ function runResetPickup(mode, opts) {
             box.__timers.dispose();
             const pendingKeys = Array.from({ length: storage.length }, (_, index) => storage.key(index))
                 .filter((key) => key.startsWith('zoew_pickup_reset_pending_v2:') && !JSON.parse(storage.getItem(key)).settled);
-            const evidence = Array.from({ length: storage.length }, (_, index) => storage.key(index))
-                .filter((key) => key.startsWith('zoew_pickup_reset_pending_v2:')).map(key => JSON.parse(storage.getItem(key)));
-            resolve({ locked, toasts, writes, day, pendingKeys, evidence, serverPickup });
+            const storedEvidence = Array.from({ length: storage.length }, (_, index) => storage.key(index))
+                .filter((key) => key.startsWith('zoew_pickup_reset_pending_v2:'));
+            const evidence = [...new Set([...written.keys(), ...storedEvidence])].filter((key) => key.startsWith('zoew_pickup_reset_pending_v2:'))
+                .map(key => JSON.parse(storage.getItem(key) ?? written.get(key)));
+            resolve({ locked, toasts, writes, day, pendingKeys, evidence, storedEvidence, serverPickup });
         }, 1200);
     });
 }
@@ -609,11 +621,12 @@ function runAbandonCleanup(mode) {
             'បណ្តាញធម្មតា ➜ សរសេរ `{ packagesPickedUp: 0 }` ដដែល', fine.writes);
         check(/Reset/i.test(fine.toasts.join(' | ')) || fine.toasts.length >= 1,
             'បណ្តាញធម្មតា ➜ មានសាររបាយការណ៍', fine.toasts);
-        check(fine.pendingKeys.length === 0, 'បណ្តាញធម្មតា ➜ ACK ដែលបានបញ្ជាក់បិទ pending ហើយរក្សា settled evidence', fine.pendingKeys);
+        check(fine.pendingKeys.length === 0, 'បណ្តាញធម្មតា ➜ ACK ដែលបានបញ្ជាក់បិទ pending', fine.pendingKeys);
         check(fine.evidence.length === 1 && fine.evidence[0].settled && fine.evidence[0].complete
             && fine.evidence[0].days[0].attempts[0].receipt.attemptId === fine.writes[0].request.attemptId
             && JSON.stringify(fine.evidence[0].days[0].attempts[0].receipt) === JSON.stringify(fine.serverPickup[fine.day].pickupResetApplied),
-            'typed ACK រក្សា full original receipt ដូច actual raw server CAS', fine.evidence);
+            'typed ACK ៖ journal ចុងក្រោយមាន full original receipt ដូច actual raw server CAS', fine.evidence);
+        check(fine.storedEvidence.length === 0, 'typed ACK ៖ journal settled ចេញពី storage (មិនបំពេញ localStorage)', fine.storedEvidence);
     }
 
     console.log('\n== ៤ខ. រង្វិលជុំត្រូវបោះបង់ភ្លាមពេលតំណស្លាប់ ==');

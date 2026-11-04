@@ -183,6 +183,7 @@ function makeCtx(server, fbSet) {
         refreshCurrentHistoryView: () => {},
         showToast: () => {},
         window: { localStorage },
+        viewState: {},
         revenue,
         pickup,
         reconciliations

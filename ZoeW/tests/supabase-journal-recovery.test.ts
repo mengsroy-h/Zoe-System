@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createSupabaseDatabase, SB_OP_REPLAY_SAFE_MS, SbNetworkError, SbRpcError } from '../src/services/supabase-rtdb';
+import fs from 'node:fs';
+import path from 'node:path';
+import { createSupabaseDatabase, SB_OP_REPLAY_SAFE_MS, SB_REPLAY_REFUSAL_PROOFS, SbNetworkError, SbRpcError, sbReplayRefusalProvesUnsent } from '../src/services/supabase-rtdb';
 import { createLocalWriteJournal } from '../src/services/write-journal';
 import { firebaseState } from '../src/core/state';
 import { commitDailyRevenueDelta, commitLedgerEventStep, commitMonthlyRevenueDelta, ledgerJournalUpdate } from '../src/domain/ledger';
@@ -317,11 +319,25 @@ it('control ៖ a tenant forbidden answer during recovery still takes the accoun
   } finally { db.close('test'); }
 });
 
+const REPLAY_REFUSALS = [
+  { refusal: 'a rules refusal (permission_denied · raised only after the zoe_ops replay lookup)', error: () => new SbRpcError('permission_denied', '42501', 403, 'zoew_settings/exchange_rate'), proven: true },
+  { refusal: 'the shop quota (quota_exceeded/bytes · only after the lookup)', error: () => new SbRpcError('quota_exceeded', '22023', 400, 'bytes'), proven: true },
+  { refusal: 'an invalid path (invalid_path · only after the lookup)', error: () => new SbRpcError('invalid_path', '22023', 400, ''), proven: true },
+  { refusal: 'overlapping paths (invalid_op/overlap · only after the lookup)', error: () => new SbRpcError('invalid_op', '22023', 400, 'overlap'), proven: true },
+  { refusal: 'a root that is not an object (invalid_data/root · only after the lookup)', error: () => new SbRpcError('invalid_data', '22023', 400, 'root'), proven: true },
+  { refusal: 'a size limit (invalid_data/size · the payload cap is checked before the lookup)', error: () => new SbRpcError('invalid_data', '22023', 400, 'size'), proven: false },
+  { refusal: 'an op shape check (invalid_op · also raised before the lookup)', error: () => new SbRpcError('invalid_op', '22023', 400, ''), proven: false },
+  { refusal: 'the op id check of zoe_write_v2 (invalid-op-id · before the lookup)', error: () => new SbRpcError('invalid-op-id', '22023', 400, ''), proven: false },
+  { refusal: 'a tenant mismatch (PT409 · before the lookup)', error: () => new SbRpcError('tenant-mismatch', 'PT409', 409, ''), proven: false },
+  { refusal: 'a 42501 refusal under another text', error: () => new SbRpcError('new row violates rules', '42501', 403, ''), proven: false },
+  { refusal: 'a 22023 refusal under an unknown text', error: () => new SbRpcError('invalid_payload', '22023', 400, ''), proven: false }
+].map((c) => ({ ...c, live: c.proven ? 'not-applied · row dropped · not blocked' : 'unknown · row unresolved · blocked',
+  recovery: c.proven ? 'row dropped · not blocked · the next write sends' : 'row unresolved · blocked · the next write waits' }));
+
 it.each([
-  ['permission_denied', '42501', 'not-applied'],
-  ['quota_exceeded', '22023', 'not-applied'],
-  ['forbidden', '42501', 'unknown']
-])('a lost reply then a resend refused with %s ➜ %s (the engine checks zoe_ops replay before rules and data)', async (message, code, expected) => {
+  ...REPLAY_REFUSALS,
+  { refusal: 'the account forbidden answer', error: () => new SbRpcError('forbidden', '42501', 403, ''), proven: false, live: 'unknown · row unresolved · blocked' }
+])('live ៖ a lost reply, then a resend refused with $refusal ➜ $live', async ({ error, proven }) => {
   vi.useFakeTimers();
   const journal = makeJournal(); const h = hooks(); let writes = 0;
   const db = createSupabaseDatabase({ subscribe: () => () => {}, rpc: async (fn: string) => {
@@ -329,25 +345,95 @@ it.each([
     if (fn === 'zoe_write_v2') {
       writes++;
       if (writes === 1) throw new SbNetworkError('timeout');
-      if (writes === 2) throw new SbRpcError(message, code, code === '42501' ? 403 : 400, '');
+      if (writes === 2) throw error();
       return { ok: true, docs: [], now: Date.now() };
     }
     return { seq: 1, more: false, reset: true, tenant: 'A', now: Date.now(), rows: [] };
   } }, h, { writeJournal: journal, retryStepsMs: [5], pollFallbackMs: 600000 });
   try {
     db.setTenantTopic('zoe:A'); db.setAuthed(true, 'project|user'); await vi.advanceTimersByTimeAsync(10);
-    const outcome = db.set(db.ref('zoew_settings/exchange_rate'), 4200).then(() => 'sent', (error: any) => error.txOutcome || error.code);
+    const outcome = db.set(db.ref('zoew_settings/exchange_rate'), 4200).then(() => 'sent', (e: any) => e.txOutcome || e.code);
     await vi.advanceTimersByTimeAsync(200);
-    expect(writes, 'the same op_id was resent once').toBeGreaterThanOrEqual(2);
-    expect(await outcome).toBe(expected);
-    if (expected === 'not-applied') {
-      expect(journal.rows.size, 'a proven not-applied row is dropped').toBe(0);
-      expect(db.recoveryState().blocked, 'later writes are not blocked').toBe(0);
-      expect(h.onTxOutcomeUnknown).not.toHaveBeenCalled();
-    } else {
-      expect(db.recoveryState().blocked, 'a state-dependent refusal stays held (control)').toBeGreaterThan(0);
-    }
+    expect({ resent: writes >= 2, outcome: await outcome, rows: [...journal.rows.values()].map((r) => r.stage), blocked: db.recoveryState().blocked,
+      unknownReported: h.onTxOutcomeUnknown.mock.calls.length }).toEqual(proven
+      ? { resent: true, outcome: 'not-applied', rows: [], blocked: 0, unknownReported: 0 }
+      : { resent: true, outcome: 'unknown', rows: ['unresolved'], blocked: 1, unknownReported: 1 });
   } finally { db.close('test'); vi.useRealTimers(); }
+});
+
+it.each(REPLAY_REFUSALS)('recovery ៖ an uncertain journal row whose resend is refused with $refusal ➜ $recovery', async ({ error, proven }) => {
+  const journal = makeJournal(); const h = hooks(); let writes = 0;
+  journal.put({ v: 1, writeProtocol: 2, scope: 'project|user', topic: 'zoe:A', stage: 'cancelled', uncertain: true, opId: 'operation_replayproof01', sentAfter: Date.now() - 1000,
+    ops: [{ k: 'set', p: ['zoew_settings', 'exchange_rate'], v: 4100 }] });
+  const db = createSupabaseDatabase({ subscribe: () => () => {}, rpc: async (fn: string) => {
+    if (fn === 'zoe_now') return Date.now();
+    if (fn === 'zoe_write_v2') { if (++writes === 1) throw error(); return { ok: true, docs: [], now: Date.now() }; }
+    return { seq: 1, more: false, reset: true, tenant: 'A', now: Date.now(), rows: [] };
+  } }, h, { writeJournal: journal, retryStepsMs: [5], pollFallbackMs: 600000 });
+  try {
+    db.setTenantTopic('zoe:A'); db.setAuthed(true, 'project|user');
+    await vi.waitFor(() => expect(writes).toBe(1));
+    await vi.waitFor(() => expect(db.recoveryState().recovering).toBe(false));
+    const recovered = { rows: [...journal.rows.values()].map((r) => r.stage), blocked: db.recoveryState().blocked };
+    const later = await verdictOf(db.set(db.ref('zoew_settings/exchange_rate'), 4200));
+    expect({ ...recovered, later, forbidden: h.onForbidden.mock.calls.length }).toEqual(proven
+      ? { rows: [], blocked: 0, later: 'sent', forbidden: 0 }
+      : { rows: ['unresolved'], blocked: 1, later: 'WRITE_RECOVERY_PENDING', forbidden: 0 });
+  } finally { db.close('test'); }
+});
+
+describe('replay refusal proof ↔ the live write engine (A521) ៖ only an error the SQL raises after its zoe_ops replay lookup proves a lost-reply op never applied', () => {
+  const dir = path.resolve(__dirname, '../../supabase/migrations');
+  const sql = fs.readdirSync(dir).filter((n) => n.endsWith('.sql')).sort().map((n) => fs.readFileSync(path.join(dir, n), 'utf8')).join('\n');
+  const body = (name: string) => {
+    let start = -1;
+    for (const m of sql.matchAll(new RegExp('create (?:or replace )?function ' + name.replace(/\./g, '\\.') + '\\(', 'gi'))) start = m.index!;
+    if (start < 0) return null;
+    const tag = /\bas\s+(\$[A-Za-z_]*\$)/.exec(sql.slice(start))!;
+    const open = start + tag.index + tag[0].length;
+    return sql.slice(open, sql.indexOf(tag[1], open));
+  };
+  const CHAIN = ['private.zoe_write_v2', 'private.zoe_apply', 'private.zoe_apply_engine_v1'];
+  type Raise = { message: string, code: string, detail: string | null };
+  const raisesOf = (text: string, seen = new Set<string>()): Raise[] => {
+    const own = [...text.matchAll(/raise exception '([^']+)' using errcode = '([0-9A-Z]{5})'(?:\s*,\s*detail = ('([^']*)'|[^;]+))?/g)]
+      .map((m) => ({ message: m[1], code: m[2], detail: m[3] === undefined ? '' : m[4] !== undefined ? m[4] : null }));
+    const called = [...text.matchAll(/\bprivate\.(\w+)\(/g)].map((m) => 'private.' + m[1]).filter((n) => !CHAIN.includes(n) && !seen.has(n));
+    return own.concat(called.flatMap((n) => { seen.add(n); const b = body(n); return b ? raisesOf(b, seen) : []; }));
+  };
+  const engine = body('private.zoe_apply_engine_v1') || '';
+  const lookup = engine.search(/select o\.result into prior from public\.zoe_ops o where o\.tenant_id = tenant and o\.op_id = p_op_id;\s*if found then\s*return prior/);
+  const tenantInsertTriggers = [...sql.matchAll(/create (?:or replace )?trigger \w+\s+(?:before|after)\s+([\s\S]*?)\s+on public\.zoe_tenant_state\b[\s\S]*?execute (?:function|procedure) private\.(\w+)\(/gi)]
+    .filter((m) => /\binsert\b/i.test(m[1])).map((m) => body('private.' + m[2]) || '');
+  const before = [body('private.zoe_write_v2') || '', body('private.zoe_apply') || '', engine.slice(0, Math.max(lookup, 0)), ...tenantInsertTriggers].flatMap((t) => raisesOf(t));
+  const after = raisesOf(engine.slice(Math.max(lookup, 0)));
+  const sample = (r: Raise) => new SbRpcError(r.message, r.code, r.code === '42501' ? 403 : 400, r.detail === null ? 'zoew_settings/exchange_rate' : r.detail);
+  const covers = (proof: any, r: Raise) => proof.code === r.code && proof.message === r.message && (proof.detail === null || r.detail === null || proof.detail === r.detail);
+
+  it('the client path ends in the engine, whose replay lookup runs under the tenant lock', () => {
+    expect(body('private.zoe_write_v2')).toContain('private.zoe_apply(');
+    expect(body('private.zoe_apply')).toContain('private.zoe_apply_engine_v1(');
+    expect(lookup, 'the zoe_ops replay lookup that returns the prior result').toBeGreaterThan(0);
+    expect(engine.slice(0, lookup)).toMatch(/from public\.zoe_tenant_state s where s\.tenant_id = tenant for update;\s*$/);
+    expect(before.length, 'raises found before the lookup').toBeGreaterThanOrEqual(8);
+    expect(after.length, 'raises found after the lookup').toBeGreaterThanOrEqual(8);
+  });
+
+  it('no error the SQL can raise before the replay lookup is read as proof (the engine may have changed since the first send)', () => {
+    const misread = before.filter((r) => sbReplayRefusalProvesUnsent(sample(r)) || sbReplayRefusalProvesUnsent(new SbRpcError(r.message, r.code, 400, '')));
+    expect(misread).toEqual([]);
+  });
+
+  it('every proof the client accepts is raised after the lookup and never before it', () => {
+    expect(SB_REPLAY_REFUSAL_PROOFS.map((p: any) => p.message)).toEqual(expect.arrayContaining(['permission_denied', 'quota_exceeded']));
+    for (const proof of SB_REPLAY_REFUSAL_PROOFS) {
+      expect(after.some((r) => covers(proof, r)), proof.message + ' is raised after the lookup').toBe(true);
+      expect(before.filter((r) => covers(proof, r)), proof.message + ' is never raised before the lookup').toEqual([]);
+      expect(sbReplayRefusalProvesUnsent(new SbRpcError(proof.message, proof.code, 400, proof.detail ?? 'zoew_settings/exchange_rate'))).toBe(true);
+    }
+    const accepted = [...before, ...after].filter((r) => sbReplayRefusalProvesUnsent(sample(r)));
+    expect(accepted.every((r) => SB_REPLAY_REFUSAL_PROOFS.some((proof: any) => covers(proof, r)))).toBe(true);
+  });
 });
 
 describe('ledger rows (A497) ៖ a CAS of the whole monthly root decides exactly like the daily record ⛔ a ledger row is never dropped as plain CAS («Durable writes» · A375 · A483)', () => {

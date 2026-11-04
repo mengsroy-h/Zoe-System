@@ -30,8 +30,20 @@ export const SB_OP_REPLAY_SAFE_MS = 24 * 60 * 60 * 1000;
 export const SB_WRITE_LOCK_PREFIX = 'zoew-sb-write:';
 export const SB_SERVER_NOW_FRESH_MS = 10 * 60 * 1000;
 
+export const SB_REPLAY_REFUSAL_PROOFS = Object.freeze([
+    { code: '42501', message: 'permission_denied', detail: null },
+    { code: '22023', message: 'quota_exceeded', detail: 'bytes' },
+    { code: '22023', message: 'invalid_path', detail: '' },
+    { code: '22023', message: 'invalid_op', detail: 'overlap' },
+    { code: '22023', message: 'invalid_data', detail: 'root' },
+    { code: '22023', message: 'invalid_data', detail: 'depth' },
+    { code: '22023', message: 'invalid_data', detail: 'number' },
+    { code: '22023', message: 'invalid_data', detail: 'key' }
+].map((proof) => Object.freeze(proof)));
+
 export function sbReplayRefusalProvesUnsent(error) {
-    return error instanceof SbRpcError && (error.code === '22023' || error.code === '42501' && error.message === 'permission_denied');
+    return error instanceof SbRpcError && SB_REPLAY_REFUSAL_PROOFS.some((proof) => proof.code === error.code && proof.message === error.message
+        && (proof.detail === null || proof.detail === (error.detail || '')));
 }
 
 const sbLedgerTagged = (value) => !!value && typeof value === 'object' && !Array.isArray(value) && typeof value.op === 'string';

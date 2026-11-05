@@ -280,31 +280,50 @@ function acquireRunLock(backupRoot, staleMs) {
     throw new Error('Could not acquire the backup run lock.');
 }
 
-function validateBusinesses(config, backupRoot) {
+function checkBusiness(business, backupRoot) {
+    const dir = resolveBusinessDir(backupRoot, business && business.name);
+    if (business.type === 'supabase') {
+        if (typeof business.secretKeyPath !== 'string' || !business.secretKeyPath.trim()) {
+            throw new Error(`Business "${business.name}" is missing secretKeyPath.`);
+        }
+        supabase.normalizeSupabaseUrl(business.url);
+        return path.basename(dir).toLowerCase();
+    }
+    if (business.type !== undefined && business.type !== 'firebase') {
+        throw new Error(`Business "${business.name}" has an unknown type (use "firebase" or "supabase").`);
+    }
+    if (typeof business.serviceAccountPath !== 'string' || !business.serviceAccountPath.trim()) {
+        throw new Error(`Business "${business.name}" is missing serviceAccountPath.`);
+    }
+    normalizeDatabaseUrl(business.databaseURL);
+    return path.basename(dir).toLowerCase();
+}
+
+function checkBusinesses(config, backupRoot) {
     if (!Array.isArray(config.businesses) || config.businesses.length === 0) {
         throw new Error('config.json has no "businesses" entries.');
     }
     const names = new Set();
-    for (const business of config.businesses) {
-        const dir = resolveBusinessDir(backupRoot, business && business.name);
-        const key = path.basename(dir).toLowerCase();
-        if (names.has(key)) throw new Error(`Duplicate business name "${business.name}" in config.`);
-        names.add(key);
-        if (business.type === 'supabase') {
-            if (typeof business.secretKeyPath !== 'string' || !business.secretKeyPath.trim()) {
-                throw new Error(`Business "${business.name}" is missing secretKeyPath.`);
-            }
-            supabase.normalizeSupabaseUrl(business.url);
-            continue;
+    const valid = [];
+    const invalid = [];
+    config.businesses.forEach((business, index) => {
+        const label = business && typeof business.name === 'string' && /^[A-Za-z0-9._-]+$/.test(business.name)
+            ? business.name : `#${index + 1}`;
+        try {
+            const key = checkBusiness(business, backupRoot);
+            if (names.has(key)) throw new Error(`Duplicate business name "${business.name}" in config.`);
+            names.add(key);
+            valid.push(business);
+        } catch (e) {
+            invalid.push({ label, reason: e && e.message ? e.message : 'Unknown error' });
         }
-        if (business.type !== undefined && business.type !== 'firebase') {
-            throw new Error(`Business "${business.name}" has an unknown type (use "firebase" or "supabase").`);
-        }
-        if (typeof business.serviceAccountPath !== 'string' || !business.serviceAccountPath.trim()) {
-            throw new Error(`Business "${business.name}" is missing serviceAccountPath.`);
-        }
-        normalizeDatabaseUrl(business.databaseURL);
-    }
+    });
+    return { valid, invalid };
+}
+
+function validateBusinesses(config, backupRoot) {
+    const checked = checkBusinesses(config, backupRoot);
+    if (checked.invalid.length) throw new Error(checked.invalid[0].reason);
 }
 
 async function backupSupabase(business, context, dependencies) {
@@ -382,12 +401,16 @@ async function main(argv) {
     const keepCount = integerOption(config, 'keepCount', 30, 1, 10000);
     const network = networkOptions(config);
     const lockStaleMs = integerOption(config, 'lockStaleMs', DEFAULT_LOCK_STALE_MS, 60000, 604800000);
-    validateBusinesses(config, backupRoot);
+    const checked = checkBusinesses(config, backupRoot);
 
     const releaseLock = acquireRunLock(backupRoot, lockStaleMs);
     let failures = 0;
     try {
-        for (const business of config.businesses) {
+        for (const problem of checked.invalid) {
+            failures += 1;
+            console.error(`[FAIL] ${problem.label}: ${problem.reason}`);
+        }
+        for (const business of checked.valid) {
             try {
                 const outcome = await backupOne(business, {
                     backupRoot,
@@ -432,6 +455,7 @@ module.exports = {
     acquireRunLock,
     backupOne,
     backupSupabase,
+    checkBusinesses,
     createServiceAccountJwt,
     getAccessToken,
     main,

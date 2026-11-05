@@ -72,4 +72,17 @@ describe('ledgerOpWitness ៖ សាលក្រមក្រោយ `disconnect` 
         expect(ledgerOpWitness(null, prior, mine)).toBeNull();
         expect(ledgerOpWitness(write(prior, 'op_foreignforei'), prior, null)).toBeNull();
     });
+
+    it('⛔ token នៃ ring មុនដែលត្រូវរុញចេញ ហើយដាក់ឡើងវិញដោយលំដាប់ថ្មី (ស្កេនរៀបខែឡើងវិញ · A491) មិនមែនភស្តុតាង ➜ null មិនមែន not-applied', () => {
+        const scan = 'op_m' + 'a'.repeat(32);
+        const base = write(write(prior, scan), 'op_otherotherot');
+        let rec: any = write(base, mine);
+        for (let i = 0; i < LEDGER_OP_RING_MAX; i++) rec = write(rec, 'op_g' + String(i).padStart(11, '0'));
+        expect(ledgerOpRingOf(rec)[mine], 'token យើងចុះ ហើយត្រូវរុញចេញ').toBeUndefined();
+        expect(ledgerOpRingOf(rec)[scan]).toBeUndefined();
+        const readded = write(rec, scan);
+        expect(ledgerOpRingOf(readded)[scan]).toBeGreaterThan(ledgerOpRingOf(base)[scan]);
+        expect(ledgerOpWitness(readded, base, mine), 'យើងបានចុះពិត ➜ មិនអាចឆ្លើយ not-applied (ផ្ញើម្តងទៀត = ពីរដង)').toBeNull();
+        expect(ledgerOpWitness(write(base, 'op_foreignforei'), base, mine), 'control ៖ token មុននៅលំដាប់ដើម ➜ not-applied').toBe('not-applied');
+    });
 });

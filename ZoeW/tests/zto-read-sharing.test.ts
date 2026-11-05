@@ -58,7 +58,8 @@ describe('ការអាន ZTO ចែករំលែកតែសំណើក�
         const pending = deferred(); const rpc = vi.fn(() => pending.promise);
         useStore(vi.fn(async () => entry()));
         vi.stubGlobal('fetch', vi.fn((url: string) => url.startsWith('https://audit.invalid/') ? rpc() : Promise.resolve(list())));
-        const runs = [call(listQuery), call({ ...listQuery, withSigned: '0', returned: '1' }), call({ ...listQuery, withSigned: '0', sent: '1' })];
+        const sharedToken = token();
+        const runs = [call(listQuery, sharedToken), call({ ...listQuery, withSigned: '0', returned: '1' }, sharedToken), call({ ...listQuery, withSigned: '0', sent: '1' }, sharedToken)];
         await ticks(); expect.soft(rpc).toHaveBeenCalledTimes(1); pending.resolve(identity());
         expect((await Promise.all(runs)).every((r) => JSON.parse(r.body).success)).toBe(true);
     });

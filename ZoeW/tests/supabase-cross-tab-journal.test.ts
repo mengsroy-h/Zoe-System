@@ -70,7 +70,8 @@ function fakeServer() {
     rpc: async (fn: string, args: any) => {
       if (fn === 'zoe_now') return Date.now();
       if (fn === 'zoe_pull') return { seq, more: false, reset: true, head: seq, tenant: 't1', now: Date.now(), rows: rows() };
-      if (fn !== 'zoe_write') throw new Error('unexpected ' + fn);
+      if (fn !== 'zoe_write_v2') throw new Error('unexpected ' + fn);
+      expect.soft(args.p_expected_tenant).toBe('t1');
       if (down && name === 'A') throw new SbNetworkError('network');
       sent.push(name + ':' + args.p_op_id);
       const res = apply(args);
@@ -136,7 +137,7 @@ it('S4: a write the first tab still holds is never sent by the second tab\'s rec
   let verdict = 'pending';
   A.set(A.ref('zoew_scan_history_cod_dod/item1/phone'), '012000111').then(() => { verdict = 'sent'; }, (e: any) => { verdict = e.code || e.message; });
   for (let i = 0; i < 20; i++) await wait(1);
-  const queued = journalRows().find((r: any) => r.stage === 'queued');
+  const queued = journalRows().find((r: any) => r.stage === 'unresolved' && r.awaitingRecovery === true);
   expect(queued, 'tab A journals its write before it can send').toBeTruthy();
   const B = await openTab(server, 'B');
   for (let i = 0; i < 40; i++) await wait(5);
@@ -150,8 +151,8 @@ it('S4: a write the first tab still holds is never sent by the second tab\'s rec
 it('«លុបការសរសេររង់ចាំ» in a second tab keeps the first tab\'s live row and drops only rows nobody holds', async () => {
   const server = fakeServer();
   const journal = createLocalWriteJournal(lab.storage);
-  journal.put({ v: 1, scope: 'scope', topic: 'zoe:t1', stage: 'unresolved', uncertain: true, opId: 'operation_dead_tab_0001', sentAfter: Date.now() - 1000, queuedAt: Date.now() - 2000, ops: [{ k: 'set', p: ['zoew_settings', 'exchange_rate'], v: 4000 }] });
-  journal.put({ v: 1, scope: 'scope', topic: 'zoe:t1', stage: 'sent', uncertain: true, opId: 'operation_live_tab_0001', sentAfter: Date.now() - 1000, queuedAt: Date.now() - 2000, ops: [{ k: 'set', p: ['zoew_settings', 'exchange_rate'], v: 4100 }] });
+  journal.put({ v: 1, writeProtocol: 2, scope: 'scope', topic: 'zoe:t1', stage: 'unresolved', uncertain: true, opId: 'operation_dead_tab_0001', sentAfter: Date.now() - 1000, queuedAt: Date.now() - 2000, ops: [{ k: 'set', p: ['zoew_settings', 'exchange_rate'], v: 4000 }] });
+  journal.put({ v: 1, writeProtocol: 2, scope: 'scope', topic: 'zoe:t1', stage: 'sent', uncertain: true, opId: 'operation_live_tab_0001', sentAfter: Date.now() - 1000, queuedAt: Date.now() - 2000, ops: [{ k: 'set', p: ['zoew_settings', 'exchange_rate'], v: 4100 }] });
   let release: () => void = () => {};
   lab.locks.request('zoew-sb-write:operation_live_tab_0001', () => new Promise<void>((r) => { release = r; }));
   const B = await openTab(server, 'B');

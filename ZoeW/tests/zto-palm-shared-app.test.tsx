@@ -24,7 +24,7 @@ import { attemptAutoLookup } from '../src/features/auto-lookup';
 import { scanState } from '../src/core/state';
 import { cancelZtoPalmLogin, connectSharedZtoPalm, disconnectZtoPalm, refreshZtoPalmSession, resetZtoPalmRefresh, submitZtoPalmLogin, PALM_REFRESH_AGE_MS } from '../src/features/zto-palm-login';
 import { deriveLookupSecretKey, encryptLookupSecret, hashPin, restoreLookupSecretKey } from '../src/services/crypto';
-import { clearAppUnlockedForSession, completeAppUnlock } from '../src/features/app-lock';
+import { clearAppUnlockedForSession, completeAppUnlock, hideAppLockScreen, showAppLockScreen } from '../src/features/app-lock';
 import { securityState } from '../src/core/state';
 import { ARRIVED, KEY, NOW, OTHER_SITE, SITE, fn, identityToken, noteText, palmLoginBody, pulledRows, setupWorld, shopOf, signIn, storePalmConfig, teardownWorld, toastTexts, useSharedBlobs, world, type Backend } from './zto-palm-harness';
 
@@ -35,6 +35,7 @@ const sessionKeys = () => [...world.blobs!.keys()].filter((key) => key.startsWit
 
 afterEach(() => {
     act(() => cancelZtoPalmLogin());
+    act(() => hideAppLockScreen());
     unmount();
     uiState.modalDisplay = {};
     resetZtoPalmRefresh();
@@ -259,7 +260,9 @@ describe.each(BACKENDS)('App Lock ៖ បិទ App ជាប់សោ ២០ �
         vi.setSystemTime(new Date(NOW + minutes * 60000));
         signIn(backend, identityToken(backend));
         expect(await restoreLookupSecretKey()).toBe(false);
-        await act(async () => { await completeAppUnlock(PIN); });
+        act(() => showAppLockScreen());
+        expect(securityState.appIsLocked).toBe(true);
+        await act(async () => { expect(await completeAppUnlock(PIN)).toBe(true); });
 
         const rejected: number[] = [];
         const handler = fn.handler;

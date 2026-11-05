@@ -276,6 +276,9 @@ it('cleanup parity ៖ legacy release nonce តែប៉ុណ្ណោះស្
     const newId = 'release_' + 'b'.repeat(32);
     delete second.zoew_registry_releases[oldId];
     second.zoew_registry_releases[newId] = { ...original, id: newId };
+    const certificate = second.zoew_trash_consumptions.tRetOut;
+    expect(certificate.members[original.slot].id).toBe(oldId); expect(certificate.keys[original.registryKey]).toBe(oldId);
+    certificate.members[original.slot].id = newId; certificate.keys[original.registryKey] = newId;
     expect(context.checkRelease(first)).toEqual(context.checkRelease(second));
     for (const field of ['generation', 'trashId', 'slot', 'code', 'registryKey', 'birth', 'deletedAt', 'rowBirth', 'rowCount', 'actorUid', 'releasedBy', 'scope', 'kind', 'v']) {
         const wrong = structuredClone(second);
@@ -290,7 +293,10 @@ it('cleanup parity ៖ legacy release nonce តែប៉ុណ្ណោះស្
         (x: any) => { x.zoew_barcode_registry.TEO = true; },
         (x: any) => { delete x.zoew_trash_consumptions.tRetOut; },
         (x: any) => { x.zoew_trash_consumptions.tRetOut.kind = 'restore'; },
-        (x: any) => { x.zoew_trash_consumptions.tRetOut.generation++; }
+        (x: any) => { x.zoew_trash_consumptions.tRetOut.generation++; },
+        (x: any) => { x.zoew_trash_consumptions.tRetOut.members[original.slot].id = oldId; },
+        (x: any) => { x.zoew_trash_consumptions.tRetOut.keys[original.registryKey] = oldId; },
+        (x: any) => { delete x.zoew_trash_consumptions.tRetOut.keys; }
     ]) {
         const wrong = structuredClone(second); mutate(wrong);
         expect(() => context.checkRelease(wrong)).toThrow(/invalid (legacy release|restore consumption) parity proof/);

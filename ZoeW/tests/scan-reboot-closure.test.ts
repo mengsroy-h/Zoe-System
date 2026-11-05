@@ -41,6 +41,14 @@ const money = () => [get(D + '/' + day()), get(M + '/' + day().slice(0, 7))]
 const parcels = () => Object.values(get(H) || {}).flatMap((row: any) => Object.values(row.barcodes || {})) as any[];
 const evidence = () => ([1, 2] as const).flatMap(version => createScanEvidenceJournal(localStorage, version).list(pendingScanScope()));
 const flush = async () => { for (let n = 0; n < 25; n++) await new Promise(resolve => setTimeout(resolve, 0)); };
+const C = 'zoew_daily_collected_cod_dod', P = 'zoew_daily_pickup_cod_dod';
+const withoutSettlement = (tree: any) => { const rest = copy(tree); delete rest[C]; delete rest[P]; delete rest.zoew_write_receipts; return rest; };
+const expectRecoveredSettlement = (before: any) => {
+    expect(withoutSettlement(server), 'ការសង្គ្រោះមិនប៉ះប្រាក់ ប្រវត្តិ ឬ registry').toEqual(withoutSettlement(before));
+    expect(get(C + '/' + day() + '/' + CODE)).toEqual({ c: 5, d: 0 });
+    expect(get(P + '/' + day())).toMatchObject({ packagesPickedUp: 1, pickedUpBarcodes: { [CODE]: '012999888' }, pickedUpPhones: { '012999888': 1 } });
+    expect(evidence()).toEqual([]);
+};
 
 function put(path: string, value: any) {
     const keys = parts(path);
@@ -339,15 +347,15 @@ for (const reset of [false, true]) it('born-closed import៖ reboot រក្ស
     const recovered = projection();
     expect.soft(recovered.money).toEqual(normal.money);
     expect.soft(recovered.barcode).toEqual(normal.barcode);
-    expect(recovered.collected).toBeNull();
-    expect(evidence()).toHaveLength(1);
-    expect(evidence()[0].phase).toBe('collected-pending');
+    expect(recovered.collected?.[day()]?.[CODE], 'ការសង្គ្រោះផ្ទៀង mirror ពី server ពិត').toEqual({ c: 5, d: 0 });
+    expect(evidence()).toEqual([]);
     expect.soft(recovered.sign).toEqual(normal.sign);
-    expect(normal.pickup?.[day()]?.packagesPickedUp || 0).toBe(0);
-    expect.soft(recovered.pickup?.[day()]?.packagesPickedUp || 0).toBe(0);
-    expect.soft(recovered.pickup?.[day()]?.pickupResetEpoch || 0).toBe(reset ? 1 : 0);
+    expect(normal.pickup?.[day()]).toMatchObject({ packagesPickedUp: 1, pickedUpBarcodes: { [CODE]: '012999888' } });
+    expect(recovered.pickup?.[day()]?.packagesPickedUp || 0, 'Reset ក្រោយ epoch ដើម ➜ មិននាំ key ត្រឡប់').toBe(reset ? 0 : 1);
+    expect(recovered.pickup?.[day()]?.pickedUpBarcodes?.[CODE]).toBe(reset ? undefined : '012999888');
+    expect(recovered.pickup?.[day()]?.pickupResetEpoch || 0).toBe(reset ? 1 : 0);
     const held = copy(server); await resumePendingScanOperations(); expect(server).toEqual(held);
-    expect(evidence()).toHaveLength(1);
+    expect(evidence()).toEqual([]);
 }, 15000);
 
 
@@ -375,9 +383,7 @@ it('import cache quota៖ ប្រាក់ចប់តែ evidence នៅ រ�
     firebaseState.authGeneration++; makeNative();
     vi.setSystemTime(NOW + 60000);
     await resumePendingScanOperations();
-    expect(server).toEqual(before);
-    expect(evidence()).toHaveLength(1);
-    expect(evidence()[0].phase).toBe('collected-pending');
+    expectRecoveredSettlement(before);
     const item: any = Object.values(get(H)).find((row: any) => row.barcodes.some((b: any) => b.code === CODE));
     const barcode = item.barcodes.find((b: any) => b.code === CODE);
     const candidate = ztoVerdictCandidate(item, barcode);
@@ -446,12 +452,11 @@ it('recovery owner replacement fences old reads and stale finally cannot unlock 
     expect(operationReads).toBe(2);
     held[1]();
     await newRecovery;
-    expect(evidence()).toHaveLength(1);
-    expect(evidence()[0].phase).toBe('collected-pending');
-    expect(server).toEqual(before);
+    expectRecoveredSettlement(before);
+    const settled = copy(server), readsSettled = operationReads;
     await resumePendingScanOperations();
-    expect(operationReads).toBe(3);
-    expect(server).toEqual(before);
+    expect(operationReads).toBe(readsSettled);
+    expect(server).toEqual(settled);
 });
 
 it.each([-1, 0, 1])('import proof recovery preserves TTL boundary at offset %i ms', async (offset) => {
@@ -461,11 +466,9 @@ it.each([-1, 0, 1])('import proof recovery preserves TTL boundary at offset %i m
     const before = copy(server);
     vi.setSystemTime(NOW + 3 * 86400000 + offset);
     await resumePendingScanOperations();
-    expect(server).toEqual(before);
-    expect(evidence()).toHaveLength(1);
-    expect(evidence()[0].phase).toBe('collected-pending');
+    expectRecoveredSettlement(before);
     expect(getZtoPickupVerdict(CODE, ztoVerdictCandidate(item, barcode))?.closed).toBe(offset <= 0 ? true : undefined);
-    expect(uiState.toasts.some((toast: any) => String(toast.msg).includes('ហួសរយៈរក្សា'))).toBe(offset > 0);
+    expect(uiState.toasts.filter((toast: any) => String(toast.msg).includes('ហួសរយៈរក្សា'))).toHaveLength(offset > 0 ? 1 : 0);
 });
 
 it('future import proof remains HOLD after device clock moves backward', async () => {
@@ -507,8 +510,7 @@ it('import proof recovery៖ tab ផ្សេងសរសេរ verdict ថ្�
 it('cache bound រួច៖ false ថ្មីពី tab ផ្សេងត្រូវឈ្នះ ទោះ memory មិនទាន់ reload', async () => {
     await importClosedWithCacheFault();
     await resumePendingScanOperations();
-    expect(evidence()).toHaveLength(1);
-    expect(evidence()[0].phase).toBe('collected-pending');
+    expect(evidence()).toEqual([]);
     const item: any = Object.values(get(H)).find((row: any) => row.barcodes.some((b: any) => b.code === CODE));
     const barcode = item.barcodes.find((b: any) => b.code === CODE);
     expect(getZtoPickupVerdict(CODE, ztoVerdictCandidate(item, barcode))?.closed).toBe(true);
@@ -524,8 +526,10 @@ for (const closed of [false, null, true]) it('import proof៖ unbound observatio
     await importClosedWithCacheFault();
     localStorage.setItem('zoew_zto_pickup_status_v1', JSON.stringify({ [CODE]: { closed, at: NOW,
         ...(closed ? { signedAt: NOW, signedAtExact: false } : {}) } }));
+    const before = copy(server);
     await resumePendingScanOperations();
-    expect(evidence()).toHaveLength(1);
+    if (closed === true) expectRecoveredSettlement(before);
+    else { expect(evidence()).toHaveLength(1); expect(server).toEqual(before); }
 });
 
 
@@ -546,9 +550,10 @@ for (const route of ['cancel', 'save', 'finalize']) it('committed ' + route + ' 
     expect(evidence()).toHaveLength(1);
     write.mockRestore();
     expect(await invoke()).toBe(true);
-    expect(evidence()).toHaveLength(1);
-    expect(evidence()[0].phase).toBe('collected-pending');
-    expect(server).toEqual(before);
+    expectRecoveredSettlement(before);
+    const settled = copy(server);
+    expect(await invoke()).toBe(route === 'save' ? 'unknown' : false);
+    expect(server).toEqual(settled);
 });
 
 it('cache settlement៖ auth ប្ដូរពេលអាន holder ➜ callback ចាស់មិនបោះ journal ឬបង្កើត Sign', async () => {
@@ -570,9 +575,9 @@ it('cache settlement៖ auth ប្ដូរពេលអាន holder ➜ callba
 for (const provider of ['palm', 'cookie']) for (const exact of [false, true]) it('cache proof ' + provider + ' exact=' + exact + ' រក្សាពេល Sign ដើម មិនប្ដូរជាពេល reboot', async () => {
     await importClosedWithCacheFault(provider, exact);
     vi.setSystemTime(NOW + 60000);
+    const before = copy(server);
     await resumePendingScanOperations();
-    expect(evidence()).toHaveLength(1);
-    expect(evidence()[0].phase).toBe('collected-pending');
+    expectRecoveredSettlement(before);
     const item: any = Object.values(get(H)).find((row: any) => row.barcodes.some((b: any) => b.code === CODE));
     const barcode = item.barcodes.find((b: any) => b.code === CODE);
     expect(getZtoPickupVerdict(CODE, ztoVerdictCandidate(item, barcode))).toMatchObject({

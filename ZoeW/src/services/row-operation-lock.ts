@@ -29,6 +29,7 @@ export type PriceOperationHandle = {
     scope: string;
 };
 
+export const PRICE_PROTOCOL_V2_TAG = 'c0de5eed00000002';
 const immutableKeys = ['token', 'actorUid', 'code', 'slot', 'birth', 'rowBirth', 'scanDate', 'priorCod', 'priorDod', 'wantCod', 'wantDod'];
 const textBound = (value, max) => typeof value === 'string' && value.length > 0 && value.length <= max;
 const birthValid = (value) => Number.isSafeInteger(value) && value >= 0 && value <= 9007199254740990;
@@ -85,10 +86,10 @@ export function capturePriceOperation(item, code, wantCod, wantDod): PriceOperat
     const entries = barcodeEntriesOf(item.barcodes).filter(({ barcode }) => barcode?.code === code);
     if (entries.length !== 1) return null;
     const { barcode, index } = entries[0];
-    const bytes = new Uint8Array(16);
+    const bytes = new Uint8Array(8);
     try { crypto.getRandomValues(bytes); } catch (e) { return null; }
     const marker: PriceOperationMarker = {
-        token: 'price_' + Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join(''),
+        token: 'price_' + PRICE_PROTOCOL_V2_TAG + Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join(''),
         actorUid, code, slot: String(index), birth: birthOf(barcode.createdAt), rowBirth: birthOf(item.createdAt),
         scanDate: item.scanDate, priorCod: moneyOf(barcode.cod), priorDod: moneyOf(barcode.dod), wantCod, wantDod, phase: 'admitted'
     };
@@ -96,20 +97,45 @@ export function capturePriceOperation(item, code, wantCod, wantDod): PriceOperat
     return { itemId: item.id, marker, expected: copy(item), db: operationDb, sdk, auth: firebaseState.authGeneration, scope };
 }
 
+export function priceOperationProtocol(marker) {
+    return priceOperationMarkerValid(marker) && marker.token.slice(6, 6 + PRICE_PROTOCOL_V2_TAG.length) === PRICE_PROTOCOL_V2_TAG ? 'v2' : 'legacy';
+}
+
+export function priceOperationFromRow(itemId: string, row): PriceOperationHandle | null {
+    const marker = row?.pricePending;
+    const sdk = firebaseState.fb;
+    const operationDb = firebaseState.db;
+    const scope = liveShopScope();
+    if (!sdk || !operationDb || !scope || !/^[a-zA-Z0-9_-]{1,128}$/.test(itemId || '') || !priceOperationMarkerValid(marker) || marker.phase === 'settled'
+        || marker.actorUid !== firebaseState.auth?.currentUser?.uid || row.id !== undefined && row.id !== itemId) return null;
+    const view = copy(row);
+    delete view.pricePending;
+    delete view.id;
+    if (view.barcodes?.[marker.slot]?.code !== marker.code) return null;
+    const expected = marker.phase === 'history' ? slotPricedRow(view, marker.slot, marker.priorCod, marker.priorDod) : view;
+    const immutable: any = {};
+    for (const key of immutableKeys) immutable[key] = marker[key];
+    return { itemId, marker: { ...immutable, phase: 'admitted' }, expected, db: operationDb, sdk, auth: firebaseState.authGeneration, scope };
+}
+
 export function priceOperationCurrent(handle: PriceOperationHandle) {
     return !!handle && handle.db === firebaseState.db && handle.sdk === firebaseState.fb && handle.auth === firebaseState.authGeneration
         && handle.marker.actorUid === firebaseState.auth?.currentUser?.uid && handle.scope === liveShopScope();
 }
 
-function pricedRow(handle: PriceOperationHandle) {
-    const row = copy(handle.expected);
-    row.barcodes[handle.marker.slot].cod = handle.marker.wantCod;
-    row.barcodes[handle.marker.slot].dod = handle.marker.wantDod;
+function slotPricedRow(source, slot: string, cod: number, dod: number) {
+    const row = copy(source);
+    row.barcodes[slot].cod = cod;
+    row.barcodes[slot].dod = dod;
     const entries = barcodeEntriesOf(row.barcodes);
     row.cod = Math.round(entries.reduce((total, { barcode }) => total + (parseFloat(barcode.cod) || 0), 0) * 100) / 100;
     row.dod = Math.round(entries.reduce((total, { barcode }) => total + (parseFloat(barcode.dod) || 0), 0) * 100) / 100;
     row.price = Math.round((row.cod + row.dod) * 100) / 100;
     return row;
+}
+
+export function pricedRow(handle: PriceOperationHandle) {
+    return slotPricedRow(handle.expected, handle.marker.slot, handle.marker.wantCod, handle.marker.wantDod);
 }
 
 export function priceOperationOwned(row, handle: PriceOperationHandle, phase: PriceOperationPhase, outcome?: PriceOperationOutcome) {

@@ -1,7 +1,8 @@
 // @vitest-environment node
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { addSignJob, listSignJobs, openSignJob, replaceSignJob, sealSignJob, SIGN_OUTBOX_MAX, type SignEnvelope, type SignJob } from '../src/services/palm-sign-outbox-store';
+import { addSignJob, listSignJobs, openSignJob, replaceSignJob, sealSignJob, SIGN_OUTBOX_MAX, SIGN_OUTBOX_SIGNED_MAX, type SignEnvelope, type SignJob } from '../src/services/palm-sign-outbox-store';
+import { deriveLookupSecretKey } from '../src/services/crypto';
 
 // គំរូ transaction នេះដំណើរការ API រក្សាទុកពិត ដោយមិនបើក browser។
 // វាមិនជំនួសតេស្ត IndexedDB ពិតក្នុង CI ទេ។
@@ -39,6 +40,7 @@ function database() {
                 };
                 tx.objectStore = () => ({ transaction: tx,
                     index: () => ({ count: (owner: string) => op(() => [...pending.values()].filter((row) => row.owner === owner).length),
+                        getAllKeys: (owner: string) => op(() => [...pending.values()].filter((row) => row.owner === owner).map((row) => row.id)),
                         getAll: (owner: string) => op(() => structuredClone([...pending.values()].filter((row) => row.owner === owner))) }),
                     get: (id: string) => op(() => structuredClone(pending.get(id))),
                     add: (row: SignEnvelope) => op(() => { if (pending.has(row.id)) throw new Error('ConstraintError'); write(row); }),
@@ -56,8 +58,8 @@ function database() {
 let db: ReturnType<typeof database>;
 let key: CryptoKey;
 const owner = 'synthetic-shop/synthetic-user';
-async function envelope(n: number) {
-    const job: SignJob = { code: '7713050000' + String(n).padStart(4, '0'), itemId: 'item', requestId: crypto.randomUUID(),
+async function envelope(n: number, signed = false) {
+    const job: SignJob = { ...(signed ? { signedCleanupConfirmed: true, signedVerifiedAt: 1700000000000, signedCleanupAt: 1700086400000 } : {}), code: '7713050000' + String(n).padStart(4, '0'), itemId: 'item', requestId: crypto.randomUUID(),
         signMan: 'សុខា', photo: '/9j/AAECAwQF/9k=', dispatchProof: 'proof', signature: 'config', parcelIdentity: 'original', reservationProtocol: 'original-reservation-v1', originalFingerprint: 'f'.repeat(64), originalSHA256: 'e'.repeat(64),
         phase: 'queued', attempts: 0, message: '' };
     return sealSignJob(owner, key, job);
@@ -124,4 +126,36 @@ it.each(['iv', 'cipher'] as const)('CAS ពិនិត្យ snapshot %s ទា
     db.committed.set(row.id, altered);
     expect(await replaceSignJob(row, null, () => true)).toBe(false);
     expect((await listSignJobs(owner))[0]).toEqual(altered);
+});
+it('ភ្លេច PIN ៖ ការងារ ៤០ ដែល PIN ថ្មីអានមិនបាន មិនស៊ីកន្លែងការងារថ្មី · Barcode ដដែលមិនជំនួស · ការផ្ទុកមានព្រំដែន · ciphertext ចាស់មិនប្រែ ហើយ PIN ដើមអានវិញបាន', async () => {
+    const oldKey = (await deriveLookupSecretKey('1111'))!; const newKey = (await deriveLookupSecretKey('2222'))!; const laterKey = (await deriveLookupSecretKey('3333'))!;
+    key = oldKey;
+    for (let n = 0; n < SIGN_OUTBOX_MAX; n++) expect(await addSignJob(await envelope(n), () => true, oldKey)).toBe(true);
+    const before = structuredClone([...db.committed]);
+    key = newKey;
+    const attempt = async (n: number, k: CryptoKey) => addSignJob(await envelope(n), () => true, k).catch((error) => error.message);
+    expect(await attempt(0, newKey)).toBe(false);
+    for (let n = 0; n < SIGN_OUTBOX_MAX; n++) expect(await attempt(100 + n, newKey)).toBe(true);
+    await expect(addSignJob(await envelope(200), () => true, newKey)).rejects.toThrow();
+    key = laterKey;
+    await expect(addSignJob(await envelope(300), () => true, laterKey)).rejects.toThrow();
+    expect(await listSignJobs(owner)).toHaveLength(SIGN_OUTBOX_MAX * 2);
+    for (const [id, row] of before) expect(db.committed.get(id)).toEqual(row);
+    const readable = async (k: CryptoKey) => (await Promise.all((await listSignJobs(owner)).map((row) => openSignJob(row, k).then(() => 1, () => 0)))).reduce((a: number, b: number) => a + b, 0);
+    expect(await readable(oldKey)).toBe(SIGN_OUTBOX_MAX);
+    expect(await readable(newKey)).toBe(SIGN_OUTBOX_MAX);
+});
+it('ការងារ Sign ដែល ZTO បញ្ជាក់រួច (រង់ចាំលុប ២៤ ម៉ោង) មិនស៊ីកន្លែងការងារថ្មី ៤០ · មានព្រំដែនផ្ទាល់ខ្លួន', async () => {
+    for (let n = 0; n < SIGN_OUTBOX_MAX; n++) expect(await addSignJob(await envelope(n, true), () => true, key)).toBe(true);
+    for (let n = 0; n < SIGN_OUTBOX_MAX; n++) expect(await addSignJob(await envelope(1000 + n), () => true, key)).toBe(true);
+    await expect(addSignJob(await envelope(2000), () => true, key)).rejects.toThrow();
+    expect(await listSignJobs(owner)).toHaveLength(SIGN_OUTBOX_MAX * 2);
+});
+it('ការងារ Sign ដែលបញ្ជាក់រួចពេញព្រំដែនផ្ទាល់ខ្លួន ➜ ការងារថ្មីរង់ចាំការលុប ២៤ ម៉ោង (ការផ្ទុកមានព្រំដែន)', async () => {
+    const seeded: string[] = [];
+    for (let n = 0; n < SIGN_OUTBOX_SIGNED_MAX; n++) { const row = await envelope(n, true); db.committed.set(row.id, row); seeded.push(row.id); }
+    await expect(addSignJob(await envelope(5000), () => true, key)).rejects.toThrow();
+    db.committed.delete(seeded[0]);
+    expect(await addSignJob(await envelope(5001), () => true, key)).toBe(true);
+    expect(await listSignJobs(owner)).toHaveLength(SIGN_OUTBOX_SIGNED_MAX);
 });

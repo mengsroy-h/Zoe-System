@@ -39,6 +39,8 @@ const { modulePrograms } = require('./audit-module-ast');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { webcrypto } = require('node:crypto');
+const { TextEncoder } = require('node:util');
 const { moduleRuntime, memoryStorage } = require('./react-view');
 
 let acorn;
@@ -287,39 +289,81 @@ function runResetPickup(mode, opts) {
     const toasts = [];
     const writes = [];
     const hang = mode === 'hang';
+    const config = { databaseURL: 'http://127.0.0.1:1', projectId: 'db-stall-reset-fixture' };
+    const baseStorage = memoryStorage({ zoew_firebase_config: JSON.stringify(config) });
+    // journal ដែល settled ចេញពី storage ➜ កត់តម្លៃចុងក្រោយដែល App សរសេរ ដើម្បីនៅតែផ្ទៀងខ្លឹមសាររបស់វាបាន
+    const written = new Map();
+    const storage = {
+        get length() { return baseStorage.length; },
+        key: (index) => baseStorage.key(index),
+        getItem: (key) => baseStorage.getItem(key),
+        setItem: (key, value) => { written.set(String(key), String(value)); baseStorage.setItem(key, value); },
+        removeItem: (key) => baseStorage.removeItem(key),
+        clear: () => baseStorage.clear()
+    };
+    let serverPickup = {};
     const box = baseSandbox({
+        appLocalStore: storage, appSessionStore: storage,
+        auth: { currentUser: { uid: 'db-stall-reset-owner', getIdToken: async () => 'synthetic-fixture-token' } }, isInitializingFirebase: false,
+        firebaseConfig: config, crypto: webcrypto, TextEncoder, URL, txRestUrl: () => '',
         confirm: () => true,
         showToast: (m) => toasts.push(String(m)),
         refreshCurrentHistoryView: () => {},
         getCurrentFilterLabel: () => 'ថ្ងៃនេះ',
         countPickedUpCustomers: (b) => (b && b.pickedUpPhones) ? Object.keys(b.pickedUpPhones).length : 0,
         getServerNow: () => Date.now(),
-        db: {}, dbRefDailyPickup: {},
+        db: { app: { options: config } }, dbRefDailyPickup: {},
         fb: {
-            ref: (_db, p) => ({ path: p }),
+            ref: (_db, p) => ({ path: p, toString: () => config.databaseURL + '/' + p }),
+            get: async ref => ({ val: () => JSON.parse(JSON.stringify(serverPickup[ref.path.split('/').pop()] || null)) }),
             runTransaction: (ref, fn) => {
-                const value = fn(null);
-                writes.push({ path: ref.path, value });
+                const day = ref.path.split('/').pop();
+                const value = fn(JSON.parse(JSON.stringify(serverPickup[day] || null)));
                 if (hang) return new Promise(() => {});
+                if (value !== undefined) serverPickup[day] = JSON.parse(JSON.stringify(value));
                 return Promise.resolve({ committed: value !== undefined, snapshot: { val: () => value } });
             }
         }
     });
     const ctx = vm.createContext(box);
-    vm.runInContext(moduleRuntime(ROOT, zoewSrc, ['src/services/row-operation-lock.ts']).code, ctx);
+    const resetRuntime = moduleRuntime(ROOT, zoewSrc, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts',
+        { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied', 'pickupResetAppliedReceipt', 'pickupResetAttemptId', 'pickupResetBatchHash', 'pickupResetBoundReceipt', 'pickupResetCasOf', 'pickupResetCasText', 'pickupResetContextOf', 'pickupResetReceiptMatches'] },
+        'src/domain/pickup.ts',
+        { path: 'src/services/tx-outcome.ts', expose: ['executeNativePickupReset', 'nativePickupResetStatus'] },
+        { path: 'src/services/pickup-reset.ts', expose: ['PICKUP_RESET_PENDING_TEXT', 'PICKUP_RESET_UNAVAILABLE_TEXT', 'pickupResetPendingState', 'runPickupResetBatch'] },
+        'src/domain/collected.ts']);
+    const rawSdk = box.fb;
+    const owner = current => ({ tenant: config.projectId, actorUid: box.auth.currentUser.uid,
+        tokenRealm: async () => config.projectId, sessionCurrent: current });
+    box.fetchWithTimeout = async url => {
+        const target = new URL(url);
+        if (target.origin !== config.databaseURL || !/^\/zoew_daily_pickup_cod_dod\/\d{4}-\d{2}-\d{2}\.json$/.test(target.pathname)) throw new Error('Unexpected fixture read');
+        return { body: (await rawSdk.get(rawSdk.ref(box.db, target.pathname.slice(1, -5)))).val() };
+    };
+    rawSdk.executePickupReset = (ref, request, current) => {
+        writes.push({ path: ref.path, value: JSON.parse(request.casText).v, request: JSON.parse(JSON.stringify(request)) });
+        return ctx.executeNativePickupReset(rawSdk, ref, request, current, owner(current));
+    };
+    rawSdk.pickupResetStatus = (ref, request, current) => ctx.nativePickupResetStatus(ref, request, current, owner(current));
+    for (const name of ['safeStoreGet', 'safeStoreSet', 'safeStoreRemove', 'generateUniqueId', 'armLateCommit']) {
+        const helper = sliceFrom(zoewSrc, name);
+        if (!helper) return { missing: name };
+        vm.runInContext(helper, ctx);
+    }
+    vm.runInContext(resetRuntime.code, ctx);
     loadCommon(ctx, zoewSrc);
     vm.runInContext(sliceConst(zoewSrc, 'PICKUP_DATE_KEY_PATTERN')
         || 'const PICKUP_DATE_KEY_PATTERN=/^\\d{4}-\\d{2}-\\d{2}$/;', ctx);
-    vm.runInContext('let pickupResetInFlight = false; let pickupResetOwner = null; let authGeneration = 0;', ctx);
+    vm.runInContext(resetRuntime.withoutBindings('let pickupResetInFlight = false; let pickupResetOwner = null; let authGeneration = 0;'), ctx);
     vm.runInContext('let currentFilterMode = ' + JSON.stringify(opts.filterMode || 'today') + ';', ctx);
     vm.runInContext("let customFilterDate = '';", ctx);
     vm.runInContext((sliceConst(zoewSrc, 'DB_LISTENER_KEY_DAILY_PICKUP') || "const DB_LISTENER_KEY_DAILY_PICKUP = 'dailyPickup';")
         + ' const dbListenerPendingPaths = new Set(); const dbListenerFailedPaths = new Set();', ctx);
-    vm.runInContext(sliceConst(zoewSrc, 'PICKUP_PROTOCOL_MAX'), ctx);
+    vm.runInContext(resetRuntime.withoutBindings(sliceConst(zoewSrc, 'PICKUP_PROTOCOL_MAX')), ctx);
     for (const fn of ['pickupMetadata', 'pickupResetRecord', 'buildPickupRecordFromSet', 'pickupSetSize', 'tallyPickupPhones', 'getFilterTargetDateKey', 'getPickupResetTargetDates', 'dbListenerViewIsStale', 'pickupStatsAreMeasurable', 'resetPickupStats']) {
         const s = sliceFrom(zoewSrc, fn);
         if (!s) return { missing: fn };
-        vm.runInContext(s, ctx);
+        if (!resetRuntime.names.has(fn)) vm.runInContext(s, ctx);
     }
     const day = vm.runInContext('getFilterTargetDateKey()', ctx);
     let ledger = { [day]: { packagesPickedUp: 3, pickedUpPhones: { '0970008508': 3 } } };
@@ -331,13 +375,20 @@ function runResetPickup(mode, opts) {
         }
     }
     vm.runInContext('let dailyPickupData = ' + JSON.stringify(ledger) + ';', ctx);
+    serverPickup = JSON.parse(JSON.stringify(ledger));
     vm.runInContext('resetPickupStats();', ctx);
 
     return new Promise((resolve) => {
         setTimeout(() => {
             const locked = vm.runInContext('pickupResetInFlight', ctx);
             box.__timers.dispose();
-            resolve({ locked, toasts, writes, day });
+            const pendingKeys = Array.from({ length: storage.length }, (_, index) => storage.key(index))
+                .filter((key) => key.startsWith('zoew_pickup_reset_pending_v2:') && !JSON.parse(storage.getItem(key)).settled);
+            const storedEvidence = Array.from({ length: storage.length }, (_, index) => storage.key(index))
+                .filter((key) => key.startsWith('zoew_pickup_reset_pending_v2:'));
+            const evidence = [...new Set([...written.keys(), ...storedEvidence])].filter((key) => key.startsWith('zoew_pickup_reset_pending_v2:'))
+                .map(key => JSON.parse(storage.getItem(key) ?? written.get(key)));
+            resolve({ locked, toasts, writes, day, pendingKeys, evidence, storedEvidence, serverPickup });
         }, 1200);
     });
 }
@@ -408,7 +459,7 @@ const CLEANUP_FNS = ['barcodeEntriesOf', 'normalizeBarcodesOf', 'applyBarcodeClo
     'recalcItemMoneyFromBarcodes', 'armLateCommit', 'notifyIfSlow', 'settleLockWithin',
     'ledgerNumber', 'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'alignMonthlyLedgerToDaily',
     'ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'applyLedgerBucketDelta', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged', 'runLedgerTransaction',
-    'correctRevenueLedgerToActual', 'cleanupTrashCodes', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'readRestoreServerNode', 'txRestUrl', 'txReadServerValue', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'cleanupJournalClaimMatches', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'ensureBarcodeArrayForItem', 'collectedSettleHolds', 'collectedSettleHeld', 'claimAndCleanupItem'];
+    'correctRevenueLedgerToActual', 'cleanupTrashCodes', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMonthTrimmed', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'readRestoreServerNode', 'txRestUrl', 'txReadServerValue', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'cleanupJournalClaimMatches', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'ensureBarcodeArrayForItem', 'collectedSettleHolds', 'collectedSettleHeld', 'claimAndCleanupItem'];
 
 function runAbandonCleanup(mode) {
     const revenueLog = [];
@@ -514,7 +565,7 @@ function runAbandonCleanup(mode) {
         parts.push(body);
     }
     parts.push('globalThis.__inflight = () => cleanupInFlight.size;');
-    const protocol = moduleRuntime(ROOT, zoewSrc, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
+    const protocol = moduleRuntime(ROOT, zoewSrc, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
     ctx.__storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://fixture-db-stall-guard-test.invalid' }) });
     ctx.auth = { currentUser: { uid: 'fixture-user' } };
     ctx.dataState = { pickupPendingVersion: 0 };
@@ -558,6 +609,7 @@ function runAbandonCleanup(mode) {
         check(hung.toasts.length >= 1, '⛔ ការព្យួរ ➜ ត្រូវប្រាប់អ្នកប្រើ',
             'គ្មានសារសោះ ➜ អ្នកប្រើមិនដឹងថាមានអ្វីកើតឡើង');
         check(!/បានលុប|ជោគជ័យ|✅/.test(said) , '⛔ ការព្យួរ ➜ មិនត្រូវអះអាងជោគជ័យ', said);
+        check(hung.pendingKeys.length === 1, '⛔ ការព្យួរ ➜ durable Reset marker នៅ HOLD មិនលុបជាភស្តុតាង success', hung.pendingKeys);
     }
 
     console.log('\n== ៤. ទិសផ្ទុយ ៖ បណ្តាញធម្មតាមិនត្រូវប្រែ ==');
@@ -569,6 +621,12 @@ function runAbandonCleanup(mode) {
             'បណ្តាញធម្មតា ➜ សរសេរ `{ packagesPickedUp: 0 }` ដដែល', fine.writes);
         check(/Reset/i.test(fine.toasts.join(' | ')) || fine.toasts.length >= 1,
             'បណ្តាញធម្មតា ➜ មានសាររបាយការណ៍', fine.toasts);
+        check(fine.pendingKeys.length === 0, 'បណ្តាញធម្មតា ➜ ACK ដែលបានបញ្ជាក់បិទ pending', fine.pendingKeys);
+        check(fine.evidence.length === 1 && fine.evidence[0].settled && fine.evidence[0].complete
+            && fine.evidence[0].days[0].attempts[0].receipt.attemptId === fine.writes[0].request.attemptId
+            && JSON.stringify(fine.evidence[0].days[0].attempts[0].receipt) === JSON.stringify(fine.serverPickup[fine.day].pickupResetApplied),
+            'typed ACK ៖ journal ចុងក្រោយមាន full original receipt ដូច actual raw server CAS', fine.evidence);
+        check(fine.storedEvidence.length === 0, 'typed ACK ៖ journal settled ចេញពី storage (មិនបំពេញ localStorage)', fine.storedEvidence);
     }
 
     console.log('\n== ៤ខ. រង្វិលជុំត្រូវបោះបង់ភ្លាមពេលតំណស្លាប់ ==');
@@ -581,8 +639,8 @@ function runAbandonCleanup(mode) {
             '⛔ តំណស្លាប់ ➜ បោះបង់ក្រោយការព្យួរ **ដំបូង** (មិនមែន N × ពិដាន)',
             `ព្យាយាមសរសេរ ${many.writes.length} ដង ➜ សោជាប់ ${many.writes.length} × ១៥ វិ.`);
         check(many.locked === false, 'តំណស្លាប់ ➜ សោដោះវិញ (ពហុថ្ងៃ)');
-        check(/បណ្តាញ|ឆ្លើយមិនចេញ/.test(many.toasts.join(' | ')),
-            'តំណស្លាប់ ➜ សារប្រាប់មូលហេតុពិត (បណ្តាញ)', many.toasts);
+        check(many.toasts.some((message) => message.startsWith('⏳') && message.includes('Reset') && message.includes('មិនទាន់ផ្ទៀងផ្ទាត់')),
+            'តំណស្លាប់ ➜ សារប្រាប់ Reset មិនទាន់ផ្ទៀងផ្ទាត់ ដោយមិនសន្និដ្ឋានថាមិនបានអនុវត្ត', many.toasts);
     }
     const manyFine = await runResetPickup('fast', { filterMode: 'all', days: 5 });
     if (!manyFine.missing) {

@@ -48,6 +48,7 @@ let warnings: Record<string, string | null> = {};
 let changingWarning = false;
 let journalEdgeLagMs = 0;
 let interruption: 'none' | 'before-reservation' | 'reservation-ack' | 'scan-ack' = 'none';
+let palmToken = 'palm-token';
 const tracks = () => {
     const rows: any[] = [{ action: '3', siteCode: SITE, mailNo: CODE, time: '2026-10-18 13:25:26' }];
     if (zto.some((c) => c.path.endsWith('saveScanInfo') && c.body[0].scanTypeCode === '04')) rows.unshift({ action: '4', siteCode: SITE, mailNo: CODE, time: '2026-10-18 13:33:04', preOrNextID: '04' });
@@ -58,7 +59,7 @@ function fakeZto(url: string, init?: RequestInit) {
     const path = new URL(url).pathname;
     const body = init?.body ? JSON.parse(String(init.body)) : null;
     zto.push({ path, body });
-    if (path.endsWith('doLogin')) return reply({ token: 'palm-token', countryCode: 'KH', siteCode: SITE });
+    if (path.endsWith('doLogin')) return reply({ token: palmToken, countryCode: 'KH', siteCode: SITE });
     if (path.endsWith('queryTrackInfo')) return reply(tracks());
     if (path.endsWith('newBusinessCheck')) {
         const message = warnings[String(body.scanType)];
@@ -150,7 +151,7 @@ beforeEach(async () => {
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
     zto = [];
     warnings = {};
-    changingWarning = false; interruption = 'none';
+    changingWarning = false; interruption = 'none'; palmToken = 'palm-token';
     vi.stubGlobal('fetch', vi.fn(route));
     const login = await fn.handler({ httpMethod: 'POST', headers: { 'x-zoe-proxy-key': KEY }, queryStringParameters: { palm: 'login' }, body: JSON.stringify({ username: 'test-operator', password: 'test', deviceSn: 'zoew-sign-e2e' }) });
     const session = JSON.parse(login.body).sessionToken;
@@ -295,15 +296,40 @@ it.each(['before-reservation', 'reservation-ack', 'scan-ack'] as const)('UI → 
 });
 
 
-it.each(['during-grace', 'after-manual'] as const)('UI → handler៖ signed មុន receipt រូបមក %s មិនផ្ញើរូបឬ05ស្ទួន', async visibility => {
+it.each([['during-grace', false], ['after-manual', false], ['fresh-status', true]] as const)('UI → handler៖ signed មុន receipt រូបមក %s · status ថ្មីអាចអាន %s មិនផ្ញើរូបឬ05ស្ទួន', async (visibility, statusAvailable) => {
     const original = READBACK.toString('base64');
     await openAndScan(original);
     await vi.waitFor(() => expect(palmSignProof(CODE)).toMatch(/^.{8,}$/));
+    const fixtureFetch = fetch;
+    vi.stubGlobal('fetch', vi.fn(async (url: unknown, init?: RequestInit) => {
+        const body = String(url).includes('/.netlify/functions/zto-order-detail') && init?.body ? JSON.parse(String(init.body)) : null;
+        if (!statusAvailable && body?.stage === 'status') return new Response(JSON.stringify({ code: 'ZTO_PALM_STATUS_UNCONFIRMED' }), { status: 503 });
+        return fixtureFetch(url as any, init);
+    }));
     let now = Date.now();
     vi.spyOn(Date, 'now').mockImplementation(() => now);
     remoteSigned = true; readback = 'none';
     setPalmSignName('សុខា');
     await submitZtoPalmSign();
+    if (statusAvailable) {
+        await vi.waitFor(async () => {
+            expect(disk.rows.size).toBe(1);
+            const retained = [...disk.rows.values()][0];
+            expect(retained.leaseUntil).toBe(0);
+            expect(await openSignJob(retained, securityState.lookupSecretKey!)).toMatchObject({ photo: original, signedCleanupConfirmed: true,
+                phase: 'action', readOnlyProbe: true, recovery: { dismissed: true }, recoveryCheck: { signed: true, signedStatusVerified: true, photoVerified: false } });
+        });
+        expect(applyBarcodeCloseChange).not.toHaveBeenCalled();
+        expect(scans('04')).toHaveLength(1);
+        expect(scans('05')).toHaveLength(0);
+        expect(zto.filter(call => call.path.endsWith('saveBillPic'))).toHaveLength(0);
+        const before = zto.length;
+        now += 60000;
+        await runPalmSignOutbox();
+        expect(zto).toHaveLength(before);
+        expect(disk.rows.size).toBe(1);
+        return;
+    }
     const settled = async () => {
         await vi.waitFor(async () => {
             expect(disk.rows.size).toBe(1);
@@ -390,4 +416,27 @@ it.each([false, true])('UI → handler៖ edge cache យឺត60វិនាទ�
     expect(zto.filter(call => call.path.endsWith('saveBillPic'))).toHaveLength(1);
     expect(zto.filter(call => call.path.endsWith('newBusinessCheck') && call.body.scanType === 5)).toHaveLength(warning ? 2 : 1);
     expect(palmSignState.confirmation).toBeNull();
+});
+
+it('token Palm ប្តូរក្រោយចែកចាយ (Login ZTO ឡើងវិញ) ➜ DISPATCH_REQUIRED ➜ អាន status យកភស្តុតាងចែកចាយថ្មីដោយស្វ័យប្រវត្តិ ➜ រូប និង 05 តែម្តង · គ្មាន 04 ស្ទួន · គ្មានការចុចពីមនុស្ស', async () => {
+    readback = 'exact';
+    await openAndScan(READBACK.toString('base64'));
+    await vi.waitFor(() => expect(palmSignProof(CODE)).toMatch(/^.{8,}$/));
+    palmToken = 'palm-token-rotated';
+    const login = await fn.handler({ httpMethod: 'POST', headers: { 'x-zoe-proxy-key': KEY }, queryStringParameters: { palm: 'login' }, body: JSON.stringify({ username: 'test-operator', password: 'test', deviceSn: 'zoew-sign-e2e' }) });
+    const rotated = JSON.parse(login.body).sessionToken;
+    expect(rotated).toEqual(expect.any(String));
+    const cfg = JSON.parse(appLocalStore.getItem('zoew_lookup_api_config')!);
+    appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ ...cfg, palmTokenEnc: await encryptLookupSecret(rotated) }));
+    setPalmSignName('សុខា');
+    await submitZtoPalmSign();
+    await vi.waitFor(async () => {
+        for (const row of disk.rows.values()) row.due = 0;
+        await runPalmSignOutbox();
+        expect(scans('05')).toHaveLength(1);
+    }, { timeout: 3000, interval: 100 });
+    await expectQueueCompleted();
+    expect(scans('04')).toHaveLength(1);
+    expect(zto.filter((c) => c.path.endsWith('saveBillPic'))).toHaveLength(1);
+    expect(applyBarcodeCloseChange).toHaveBeenCalledOnce();
 });

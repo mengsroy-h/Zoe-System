@@ -28,7 +28,7 @@ import { saveNewSecurityPin, submitSecurityPinForm, verifySecurityPin } from '..
 import { cancelPermanentDelete, executePermanentDelete, executeRestoreItem, promptPermanentDelete } from '../features/restore';
 import { confirmPhone } from '../features/scan-action';
 import { cancelScannedRemoval, confirmScannedRemoval, setEntryScanMode } from '../features/scan-remove';
-import { drawerDiscardPendingWritesFlow } from '../features/pending-writes';
+import { drawerDiscardPendingWritesFlow, drawerResolvePriceOperationsFlow, drawerResolveScanEvidenceFlow } from '../features/pending-writes';
 import { applySheetImportHeaderRow, closeSheetImportModal, drawerSheetImportFlow, editSheetImportConfig, handleSheetImportFileInput, loadSheetImportSelectedSheet, pickSheetImportFile, renderSheetImportPreview, resetSheetImportFileSelection, runSheetImport, runSheetImportClear, saveSheetImportConfig } from '../features/sheet-import';
 import { openCollectedStatsModal, openDailyStatsModal, submitManualAdjustment } from '../features/stats-modals';
 import { cancelRestoreItem, closeRecentlyDeletedModal, filterRecentlyDeleted, promptRestoreDeletedItem, showMoreTrashRows, toggleTrashGroup, toggleTrashReasonFilter } from '../features/trash';
@@ -89,6 +89,8 @@ export const ACTION_REGISTRY: Record<string, (...args: any[]) => any> = Object.f
     drawerDiscardPendingWritesFlow,
     drawerLockerSettingsFlow,
     drawerLookupApiFlow,
+    drawerResolveScanEvidenceFlow,
+    drawerResolvePriceOperationsFlow,
     drawerSheetImportFlow,
     drawerZtoAutoCloseFlow,
     drawerZtoListSyncFlow,

@@ -37,6 +37,15 @@ Firebase និង Supabase ជាជម្រើសរបស់អតិថិ�
 | `[WARN]` | វាលដែល rules មិនអនុញ្ញាតក្នុង record ដែលល្អ (ZoeW អានបាន តែរក្សាទុក record នោះវិញទាំងមូលមិនបាន) |
 
 មាន `[ERROR]` ➜ `--apply` **បដិសេធ** (គ្មានការសរសេរ) រហូតដល់កែប្រភព ឬដាក់ `--skip-invalid` (ទុក record ទាំងនោះចោល ហើយរាយវា)។
+record ដែលទុកចោល (ឬ root ទាំងមូលដែលខូច) នៅតែជា record **ក្នុង input** ៖ ច្បាប់ចម្លងដែលហាងមានរួចនៅដដែល (មិនសរសេរ · មិនលុប សូម្បីតែ `--replace`)
+➜ `Kept` រាយវា ហើយ `VERIFIED … equals the input except the left-out records`។
+ពេល record ដែលហាងរក្សាជាប្រវត្តិ (`zoew_scan_history_cod_dod`) ឬធុងសំរាម (`zoew_recently_deleted_cod_dod`) កូនសោ `zoew_barcode_registry` របស់ហាងដែល input មិនមាន
+ក៏នៅដដែលដែរ (`Registry` រាយចំនួន) ៖ record ទាំងនោះអាចជាម្ចាស់វា ហើយឧបករណ៍មិនអាចបញ្ជាក់ពី input ដែលខូចបានទេ។ កូនសោដែលគ្មានម្ចាស់ធ្វើឲ្យ ZoeW
+បដិសេធតែការស្កេន barcode នោះម្តងទៀត ➜ ពិនិត្យដោយភ្នែកក្រោយនាំចូល។ record ដែលរក្សាផ្សេងទៀត (ledger · registry …) មិនជាម្ចាស់កូនសោទេ ➜ `--replace` នៅលុបកូនសោដែល input មិនមាន។
+ពេលមាន record ដែលរក្សា `--replace` ក៏បោះពុម្ព `Note` ៖ record ផ្សេង (ledger · ស្ថិតិយករួច · ធុងសំរាម) មកពី input ហើយមិនបានផ្ទៀងជាមួយ record ដែលរក្សា
+➜ ពិនិត្យចំណូល និងចំនួនយករួចក្នុង ZoeW ក្រោយនាំចូល។
+input ដែល **គ្មាន record ណាឆ្លងការពិនិត្យ** (Firebase ទទេ export ជា `null` · array · root មិនស្គាល់ទាំងអស់ · record ខូចទាំងអស់) ➜ **បដិសេធ** ទោះមាន `--skip-invalid`
+(`--skip-invalid` ទុកចោលតែ record ខូច មិនមែន input ទាំងមូល ➜ គ្មានអ្វីត្រូវនាំចូល ហើយ `--replace` នឹងគ្រាន់តែលុប) — ពិនិត្យថាជាឯកសារត្រឹមត្រូវ។
 
 ### ការសរសេរ និងការផ្ទៀងផ្ទាត់
 
@@ -116,7 +125,7 @@ node tools/supabase-migrate/migrate.js backups/<target>/<tenant-id>/ --branch <�
 |---|---|
 | `--tenant <uuid>` | ជ្រើសហាងតាម id (ដាក់ជាមួយ `--branch` ➜ ត្រូវជាហាងដដែល) |
 | `--url` · `--secret-key` | ជំនួស env (⛔ សោលើបន្ទាត់បញ្ជា កម្មវិធីផ្សេងអាចមើលឃើញ ➜ ប្រើ env) |
-| `--skip-invalid` | ទុក record `[ERROR]` ចោល (រាយ) ហើយនាំចូលអ្វីដែលនៅសល់ |
+| `--skip-invalid` | ទុក record `[ERROR]` ចោល (រាយ) ហើយនាំចូលអ្វីដែលនៅសល់ · ច្បាប់ចម្លងរបស់ហាងនៃ record ទាំងនោះនៅដដែល (`Kept`) និងកូនសោ registry របស់ហាងពេល record នោះជាប្រវត្តិ ឬធុងសំរាម (`Registry`) · input ដែលគ្មាន record ល្អសោះ នៅតែបដិសេធ |
 | `--rules <file>` | ឯកសារ rules ផ្សេង |
 | `--batch-ops` · `--batch-bytes` | ទំហំបាច់ (ពិដាន ៤០០ record · 2 MiB) |
 | `--timeout-ms` · `--retries` · `--retry-delay-ms` | ពិដានក្នុងមួយសំណើ · ចំនួន retry (timeout · 408/425/429/5xx) · ពេលរង់ចាំដំបូង |

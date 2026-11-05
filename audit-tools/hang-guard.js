@@ -40,6 +40,13 @@ let files = [];
 try {
     files = fs.readdirSync(TOOLS).filter((f) => f.endsWith('.js') && !NOT_CHECKERS.has(f)).sort();
 } catch (e) { files = []; }
+// ⛔ checker `emu/*` (ផ្នែក emulator របស់ run-all · browser + server ពិត) ក៏ត្រូវស្កេនរកការរង់ចាំគ្មានពិដានដែរ ៖ ជំនាន់មុនអានតែ
+// `readdirSync(TOOLS)` ➜ checker emu មិនដែលត្រូវបានវាស់ (ឈ្មោះក្នុងរបាយការណ៍ ៖ `emu/<x>.js`)។
+let emuFiles = [];
+try {
+    emuFiles = fs.readdirSync(path.join(TOOLS, 'emu')).filter((f) => f.endsWith('.js') && !f.startsWith('.tmp-poison-')).sort().map((f) => 'emu/' + f);
+} catch (e) { emuFiles = []; }
+files = files.concat(emuFiles);
 const srcOf = new Map();
 for (const f of files) {
     try { srcOf.set(f, fs.readFileSync(path.join(TOOLS, f), 'utf8')); } catch (e) {}
@@ -61,6 +68,13 @@ ok('`run-all.sh` រុំរាល់ checker ក្នុង `timeout`',
 ok('`run-all.sh` រាយការណ៍ការផុតកំណត់ជា FAIL ដែលមានឈ្មោះ (exit 124/137)',
     /rc" -eq 124/.test(runall) && /ព្យួរ/.test(runall),
     'ការផុតកំណត់ត្រូវបែកចេញពី FAIL ធម្មតា ដើម្បីឲ្យអ្នកអានដឹងថាវាព្យួរ');
+// ⛔ បញ្ជី checker emu ដេរីវេពី `run-all.sh` ៖ ឈ្មោះនីមួយៗដែលវារត់ ត្រូវមានប្រភពដែលឯកសារនេះបានស្កេន (ប្តូរឈ្មោះ · ផ្លាស់ទី ➜ ធ្លាក់)។
+const runallEmu = new Set();
+for (const m of runall.replace(/^\s*#.*$/gm, '').matchAll(/node\s+audit-tools\/(emu\/[A-Za-z0-9._-]+\.js)(?=\s|$)/g)) runallEmu.add(m[1]);
+const unscannedEmu = [...runallEmu].filter((f) => !srcOf.has(f));
+ok('ជាន់អប្បបរមា ៖ checker emu/ ដែល run-all រត់ >= 1 (ឃើញ ' + runallEmu.size + ' · ស្កេន emu/ ' + emuFiles.length + ')',
+    runallEmu.size >= 1 && emuFiles.length >= 1);
+ok('រាល់ checker emu/ ដែល run-all រត់ ត្រូវបានស្កេនរកការរង់ចាំគ្មានពិដាន', unscannedEmu.length === 0, unscannedEmu.join(', '));
 
 // checker-coverage ត្រូវ probe checker ជាង ១០០។ បើរត់ `execFileSync` ជាជួរ
 // checker browser នីមួយៗអាចចំណាយរាប់វិនាទី ➜ meta-checker ខ្លួនឯងលើសពិដាន
@@ -123,7 +137,7 @@ if (body) {
     const greenJs = path.join(tmp, 'green.js');
     const harness = path.join(tmp, 'harness.sh');
     fs.writeFileSync(hangJs, "console.log('   ok    ចាប់ផ្តើម');\nsetInterval(() => {}, 1 << 30);\n");
-    fs.writeFileSync(greenJs, "console.log('   ok    បៃតង');\n");
+    fs.writeFileSync(greenJs, "console.log('   ok    បៃតង');\nprocess.exitCode = 0;\n");
     fs.writeFileSync(harness,
         'pass=0; fail=0; skip=0; partial=0\n' +
         // ⛔ បង្ខំពិដានតូចត្រង់នេះ — កុំទទួលតម្លៃពីបរិស្ថាន បើមិនដូច្នេះ
@@ -134,6 +148,7 @@ if (body) {
         '\nrun "សាកល្បង" node ' + JSON.stringify(hangJs) +
         '\nrun "បៃតង" node ' + JSON.stringify(greenJs) +
         '\nif declare -F runall_drain >/dev/null; then runall_drain; fi' +
+        '\nif declare -F runall_cleanup_owned >/dev/null; then runall_cleanup_owned; fi' +
         '\necho "FAILCOUNT=$fail PASSCOUNT=$pass"\n');
     const env = Object.assign({}, process.env, { RUNALL_JOBS: '2', RUNALL_STATE: '' });
     delete env.RUNALL_ONLY; delete env.RUNALL_RESUME; delete env.RUNALL_SHARD; delete env.RUNALL_TREE_HASH;
@@ -205,6 +220,53 @@ if (process.env.EXITCODE_CHILD) {
     ok('⛔ ឥរិយាបថ ៖ កូនដែលព្យួរពេលពុល ➜ FAIL ដែលមានឈ្មោះ (timeout ≠ ការធ្លាក់ត្រឹមត្រូវ)',
         hangNamed, lines.filter((l) => /FAIL|c01/.test(l)).join(' | ').slice(0, 300));
     ok('⛔ ឥរិយាបថ ៖ ការពុលរត់ស្របគ្នា (ចប់ < ១៤ វិ. ; ជាជួរ ≥ ២០ វិ.)', ran && ms < 14000, 'ms=' + ms);
+
+    // ⛔ ថវិកាកូនពុល = deadline ពិតរបស់ job (`RUNALL_JOB_TIMEOUT` + `RUNALL_JOB_STARTED_MS` ពី `runall_exec`) មិនមែនលេខថេរ ៖
+    //    🔴 CI1156 ៖ ថវិកាថេរ ៦០ វិ. សម្លាប់កូនដែលយឺតតែកំពុងដើរ (ក្រហមក្លែង) ហើយមិនទាក់ទងនឹងពិដាន job ដែលវារត់ក្នុងនោះទេ។
+    //    fixture ៖ job ៣០ វិ. (deadline = ៣០ − ២០ វិ. រឹម) គ្មាន `EXITCODE_TIMEOUT_MS` ➜ កូនព្យួរត្រូវឈ្មោះមុនពិដាន job ·
+    //    កូនយឺត ៧ វិ. ទទួលសាលក្រមពិត (មិនមែន unverified)។ tree មុនកែ ៖ ថវិកា ៦០ វិ. ➜ meta-checker លើសពិដាន job (៣០ វិ.)។
+    const fx2 = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-eci-deadline-'));
+    const fx2Tools = path.join(fx2, 'audit-tools');
+    fs.mkdirSync(fx2Tools);
+    const names2 = [];
+    for (let i = 1; i <= 40; i++) {
+        const name = 'd' + String(i).padStart(2, '0');
+        names2.push(name);
+        const onFail = name === 'd01' ? 'setInterval(() => {}, 1 << 30);'
+            : name === 'd02' ? 'setTimeout(() => process.exit(1), 7000);'
+            : 'process.exit(1);';
+        fs.writeFileSync(path.join(fx2Tools, name + '.js'),
+            'let pass = 0, fail = 0;\n'
+            + 'function ok(label, cond, detail) { if (cond) pass++; else fail++; }\n'
+            + "ok('fixture', true);\n"
+            + 'if (fail) { ' + onFail + ' } else { process.exit(0); }\n');
+    }
+    fs.writeFileSync(path.join(fx2Tools, 'run-all.sh'),
+        'for t in ' + names2.join(' ') + '; do\n    run "$t" node "audit-tools/$t.js"\ndone\n');
+    const env2 = Object.assign({}, process.env, {
+        EXITCODE_APP_DIR: fx2, EXITCODE_CONCURRENCY: '4', RUNALL_JOB_TIMEOUT: '30', RUNALL_JOB_STARTED_MS: String(Date.now())
+    });
+    delete env2.EXITCODE_CHILD; delete env2.EXITCODE_TIMEOUT_MS;
+    let out2 = '', ran2 = false;
+    const t2 = Date.now();
+    try {
+        out2 = execFileSync(process.execPath, [eciPath], { env: env2, encoding: 'utf8', timeout: 90000, stdio: ['ignore', 'pipe', 'pipe'] });
+        ran2 = true;
+    } catch (e) {
+        out2 = String((e && e.stdout) || '') + String((e && e.stderr) || '');
+        ran2 = e && typeof e.status === 'number';
+    }
+    const ms2 = Date.now() - t2;
+    try { fs.rmSync(fx2, { recursive: true, force: true }); } catch (e) {}
+    const unverifiedLine = (() => {
+        const lines2 = out2.split('\n');
+        const at = lines2.findIndex((l) => /^\s*FAIL\b/.test(l) && /signal|ផុតថវិកា|unverified|ស្លាប់ដោយ signal/.test(l));
+        return at === -1 ? '' : lines2[at + 1] || '';
+    })();
+    ok('⛔ ថវិកាពុល ៖ deadline របស់ job (៣០ វិ.) ➜ meta-checker ចប់មុនពិដាន job ហើយកូនព្យួរមានឈ្មោះ (មិនមែនថវិកាថេរ ៦០ វិ.)',
+        ran2 && ms2 < 25000 && /d01\.js/.test(unverifiedLine), { ms: ms2, unverifiedLine: unverifiedLine.slice(0, 300) });
+    ok('⛔ ថវិកាពុល ៖ កូនយឺត (៧ វិ.) ដែលចប់មុន deadline ទទួលសាលក្រមពិត មិនត្រូវសម្លាប់ជា unverified',
+        ran2 && !/d02\.js/.test(unverifiedLine), unverifiedLine.slice(0, 300));
 }
 
 console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')' : '✅ ជោគជ័យ ' + pass));

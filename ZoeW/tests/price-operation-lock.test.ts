@@ -7,12 +7,11 @@ import { dataState, firebaseState, uiState } from '../src/core/state';
 import { getFormattedDate } from '../src/core/timezone';
 import { saveEditedBarcodePrice } from '../src/features/barcode-ops';
 import * as collected from '../src/domain/collected';
-import * as ledger from '../src/domain/ledger';
 
 const H = 'zoew_scan_history_cod_dod', D = 'zoew_daily_revenue_cod_dod', M = 'zoew_monthly_revenue_cod_dod';
 const HOST = 'https://m3-unknown.firebaseio.com';
 const NOW = Date.UTC(2026, 9, 24, 2);
-const lab = { store: {} as any, fault: '' as '' | 'landed' | 'lost' | 'gone', readFails: false, intents: [] as any[] };
+const lab = { updates: 0, store: {} as any, fault: '' as '' | 'landed' | 'lost' | 'gone', readFails: false, intents: [] as any[] };
 const clone = <V,>(v: V): V => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
 const parts = (p: string) => p.split('/').filter(Boolean);
 const getAt = (p: string) => clone(parts(p).reduce((n: any, k) => n?.[k], lab.store) ?? null);
@@ -57,7 +56,13 @@ beforeEach(() => {
         ref: (_db: any, p = '') => ref(p),
         increment: (n: number) => ({ __inc: n }),
         get: async (r: any) => snap(r, getAt(r.path)),
-        update: async (r: any, ups: any) => { for (const [k, v] of Object.entries(ups)) setAt([r.path, k].filter(Boolean).join('/'), v); },
+        update: async (r: any, ups: any) => {
+            lab.updates = (lab.updates || 0) + 1;
+            for (const [k, v] of Object.entries(ups) as any[]) {
+                const p = [r.path, k].filter(Boolean).join('/');
+                setAt(p, v && typeof v === 'object' && '__inc' in v ? Math.round(((getAt(p) || 0) + v.__inc) * 100) / 100 : v);
+            }
+        },
         set: async (r: any, v: any) => setAt(r.path, v),
         runTransaction: async (r: any, fn: any) => {
             if (fn && fn.connectionIntent) lab.intents.push(clone(fn.connectionIntent));
@@ -132,55 +137,6 @@ describe('pricePending ៖ ទ្វារកែតម្លៃពិត និ�
         expect(row().pricePending).toBeUndefined();
     });
 
-    it('history បរាជ័យជាក់លាក់ ➜ fence មុនសងប្រាក់ ហើយ callback ចាស់មិនអាចកែម្ដងទៀត', async () => {
-        let late: any;
-        intercept(async (r, update, original) => {
-            if (r.path === H + '/itemI') {
-                const proposal = update(row());
-                if (proposal?.pricePending?.phase === 'history' || !proposal?.pricePending) {
-                    late = update;
-                    throw Object.assign(new Error('refused'), { txOutcome: 'not-applied' });
-                }
-            }
-            return original(r, update);
-        });
-        await saveEditedBarcodePrice(); await settle();
-        expect(row().pricePending).toMatchObject({ phase: 'settled', outcome: 'compensated' });
-        expect(money()).toEqual([[10, 1], [10, 1]]);
-        expect(late(row())).toBeUndefined();
-        const newer = row(); newer.pricePending.token = 'price_' + 'f'.repeat(32); newer.pricePending.phase = 'admitted';
-        delete newer.pricePending.outcome;
-        expect(late(newer)).toBeUndefined();
-    });
-
-    it.each(['token', 'actorUid', 'code', 'slot', 'birth', 'rowBirth', 'scanDate', 'priorCod', 'priorDod', 'wantCod', 'wantDod'])('history callback មិនទទួល tuple %s ខុស', async (key) => {
-        let updater: any;
-        intercept(async (r, update, original) => {
-            if (r.path === H + '/itemI' && row().pricePending?.phase === 'admitted') {
-                const next = update(row());
-                if (next?.pricePending?.phase === 'history') updater = update;
-            }
-            return original(r, update);
-        });
-        await saveEditedBarcodePrice(); await settle();
-        expect(updater).toBeTypeOf('function');
-        const value = row(); value.pricePending.phase = 'admitted'; delete value.pricePending.outcome;
-        value.barcodes[0].cod = 10; value.cod = 10; value.price = 10;
-        value.pricePending[key] = key === 'token' ? 'price_' + 'f'.repeat(32) : value.pricePending[key] + 1;
-        expect(updater(value)).toBeUndefined();
-    });
-
-    it('history unknown មិនសងប្រាក់តាមតម្លៃចាស់ និងរក្សាសោ durable', async () => {
-        intercept(async (r, update, original) => {
-            if (r.path === H + '/itemI' && row().pricePending?.phase === 'admitted' && update(row())?.pricePending?.phase === 'history') throw unknown();
-            return original(r, update);
-        });
-        await saveEditedBarcodePrice(); await settle();
-        expect(row().pricePending?.phase).toBe('admitted');
-        expect(money()).toEqual([[20, 1], [20, 1]]);
-        expect(alarm()).toBe(true);
-    });
-
     it.each([null, false, 'pending'])('mirror ACK %s មិនបញ្ចេញសោ', async (saved) => {
         vi.spyOn(collected, 'syncCollectedValueForBarcode').mockReturnValue(Promise.resolve(saved) as any);
         await saveEditedBarcodePrice(); await settle();
@@ -213,27 +169,6 @@ describe('pricePending ៖ ទ្វារកែតម្លៃពិត និ�
         expect(money()).toEqual([[10, 1], [10, 1]]);
         expect(row().barcodes[0].cod).toBe(10);
     });
-    it.each(['scope', 'uid', 'sdk'])('alignment ផ្ទៃក្នុងមិនផ្ញើទៅ session ថ្មីពេល %s ប្ដូរកណ្ដាល money', async (kind) => {
-        const gate = deferred(); const entered = deferred(); let switched = false; let afterSwitch = 0;
-        intercept(async (r, update, original) => {
-            if (r.path === M) {
-                if (switched) afterSwitch++;
-                else throw Object.assign(new Error('permission_denied'), { code: 'permission_denied' });
-            }
-            if (r.path === D + '/' + DAY()) { entered.resolve(); await gate.promise; }
-            return original(r, update);
-        });
-        const operation = saveEditedBarcodePrice();
-        await entered.promise;
-        if (kind === 'scope') localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: HOST + '/other' }));
-        if (kind === 'uid') (firebaseState.auth.currentUser as any).uid = 'other';
-        if (kind === 'sdk') firebaseState.fb = { ...firebaseState.fb } as any;
-        switched = true; gate.resolve();
-        await operation; await settle();
-        expect(afterSwitch).toBe(0);
-        expect(row().pricePending.phase).not.toBe('settled');
-    });
-
     it.each(['scope', 'uid', 'sdk'])('mirror មិនផ្ញើសំណើថ្មីក្រោយ %s ប្ដូរពេលកំពុងអាន', async (kind) => {
         const gate = deferred(); const entered = deferred(); const sdk = firebaseState.fb; const get = sdk.get;
         let switched = false; let afterSwitch = 0;
@@ -252,84 +187,6 @@ describe('pricePending ៖ ទ្វារកែតម្លៃពិត និ�
         switched = true; gate.resolve(); await operation; await settle();
         expect(afterSwitch).toBe(0);
         expect(row().pricePending.phase).toBe('history');
-    });
-
-    it('សងប្រាក់រង់ចាំ daily និង monthly ដើម ហើយ cancelling រារាំង callback ចាស់', async () => {
-        const gate = deferred(); const entered = deferred(); let late: any; let monthly = 0; let inverses = 0;
-        const sync = vi.spyOn(collected, 'syncCollectedValueForBarcode');
-        intercept(async (r, update, original) => {
-            if (r.path === H + '/itemI' && update(row())?.pricePending?.phase === 'history') {
-                late = update; throw Object.assign(new Error('refused'), { txOutcome: 'not-applied' });
-            }
-            if (r.path === M && monthly++ === 0) { entered.resolve(); await gate.promise; }
-            if (update.connectionIntent?.cod < 0) inverses++;
-            return original(r, update);
-        });
-        const operation = saveEditedBarcodePrice(); await entered.promise; await settle();
-        try {
-            expect(row().pricePending.phase).toBe('cancelling');
-            expect(late(row())).toBeUndefined();
-            expect(inverses).toBe(0);
-        } finally { gate.resolve(); await operation; await settle(); }
-        expect(row().pricePending).toMatchObject({ phase: 'settled', outcome: 'compensated' });
-        expect(money()).toEqual([[10, 1], [10, 1]]);
-        expect(sync).not.toHaveBeenCalled();
-    });
-
-    it('daily ដើម unknown ➜ មិនប៉ាន់ស្មាន inverse ហើយរក្សា cancelling', async () => {
-        let inverses = 0;
-        intercept(async (r, update, original) => {
-            if (r.path === H + '/itemI' && update(row())?.pricePending?.phase === 'history') throw Object.assign(new Error('refused'), { txOutcome: 'not-applied' });
-            if (update.connectionIntent?.cod < 0) inverses++;
-            const result = await original(r, update);
-            if (r.path === D + '/' + DAY()) throw unknown();
-            return result;
-        });
-        await saveEditedBarcodePrice(); await settle();
-        expect(row().pricePending.phase).toBe('cancelling');
-        expect(inverses).toBe(0);
-        expect(money()).toEqual([[20, 1], [20, 1]]);
-    });
-
-    it.each(['known', 'unknown'])('inverse %s បរាជ័យ ➜ មិនដោះសោ cancelling', async (mode) => {
-        intercept(async (r, update, original) => {
-            if (r.path === H + '/itemI' && update(row())?.pricePending?.phase === 'history') throw Object.assign(new Error('refused'), { txOutcome: 'not-applied' });
-            if (r.path === D + '/' + DAY() && update.connectionIntent?.cod < 0) {
-                if (mode === 'unknown') { await original(r, update); throw unknown(); }
-                throw Object.assign(new Error('permission_denied'), { code: 'permission_denied' });
-            }
-            return original(r, update);
-        });
-        await saveEditedBarcodePrice(); await settle();
-        expect(row().pricePending.phase).toBe('cancelling');
-        expect(row().pricePending.outcome).toBeUndefined();
-    });
-
-    it.each(['admitted', 'history', 'cancelling', 'settled-committed', 'settled-compensated'].flatMap(phase => [true, false].map(landed => ({ phase, landed }))))('ACK បាត់នៅ $phase / landed=$landed មិនបង្កើតលទ្ធផលប៉ាន់ស្មាន', async ({ phase, landed }) => {
-        const cancel = phase === 'cancelling' || phase === 'settled-compensated';
-        let faulted = false; let later = 0;
-        intercept(async (r, update, original) => {
-            if (faulted) later++;
-            if (r.path === H + '/itemI') {
-                const proposal = update(row());
-                if (cancel && proposal?.pricePending?.phase === 'history') throw Object.assign(new Error('refused'), { txOutcome: 'not-applied' });
-                if (proposal?.pricePending?.phase === phase.split('-')[0]) {
-                    if (landed) await original(r, update);
-                    faulted = true; throw unknown();
-                }
-            }
-            return original(r, update);
-        });
-        await saveEditedBarcodePrice(); await settle();
-        const expected = phase === 'admitted' ? (landed ? 'admitted' : undefined)
-            : phase === 'history' ? (landed ? 'history' : 'admitted')
-            : phase === 'cancelling' ? (landed ? 'cancelling' : 'admitted')
-            : landed ? 'settled' : cancel ? 'cancelling' : 'history';
-        expect(row().pricePending?.phase).toBe(expected);
-        expect(faulted).toBe(true);
-        expect(later).toBe(0);
-        const amount = phase === 'admitted' || phase === 'settled-compensated' ? 10 : 20;
-        expect(money()).toEqual([[amount, 1], [amount, 1]]);
     });
 
     it('mirror reject ➜ history នៅជាប់សោ', async () => {
@@ -383,30 +240,6 @@ describe('pricePending ៖ ទ្វារកែតម្លៃពិត និ�
         await saveEditedBarcodePrice(); await settle();
         expect(ledgerWrites).toBe(0);
         expect(row().pricePending).toMatchObject({ phase: 'settled', outcome: 'committed' });
-    });
-
-    it.each(['scope', 'uid', 'sdk'])('inverse ចុង microtask មិនផ្ញើសំណើថ្មីក្រោយ %s ប្ដូរ', async (kind) => {
-        let switched = false; let afterSwitch = 0;
-        const revert = ledger.revertRevenueLedgerDelta;
-        vi.spyOn(ledger, 'revertRevenueLedgerDelta').mockImplementation((applied) => {
-            const result = revert(applied);
-            queueMicrotask(() => queueMicrotask(() => {
-                if (kind === 'scope') localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: HOST + '/other' }));
-                if (kind === 'uid') (firebaseState.auth.currentUser as any).uid = 'other';
-                if (kind === 'sdk') firebaseState.fb = { ...firebaseState.fb } as any;
-                switched = true;
-            }));
-            return result;
-        });
-        intercept(async (r, update, original) => {
-            if (r.path === H + '/itemI' && update(row())?.pricePending?.phase === 'history') throw Object.assign(new Error('refused'), { txOutcome: 'not-applied' });
-            if (switched && update.connectionIntent?.cod < 0) afterSwitch++;
-            return original(r, update);
-        });
-        await saveEditedBarcodePrice(); await settle();
-        expect(switched).toBe(true);
-        expect(afterSwitch).toBe(0);
-        expect(row().pricePending.phase).toBe('cancelling');
     });
 
     it('positive birth ៖ កែតម្លៃរក្សា sibling close និង target locker ថ្មីពី authoritative admission', async () => {
@@ -526,5 +359,95 @@ describe('trash projection after a completed price operation', () => {
         expect(projected.pricePending).toBe(value); expect(projected.scanPending).toEqual({ intent: 'unknown' });
         expect(rowOperationActive(projected)).toBe(true);
         expect(rowOperationActive({ pricePending: value })).toBe(true);
+    });
+});
+
+describe('pricePending ៖ commit atomic (A526) ជំនួស history callback · inverse · alignment របស់ protocol មុន', () => {
+    const commits = () => lab.updates;
+    const patchFault = (fault: (ups: any) => void) => {
+        const original = firebaseState.fb.update;
+        firebaseState.fb.update = async (r: any, ups: any) => {
+            if (Object.keys(ups).some((k) => k.endsWith('/pricePending/phase') && ups[k] === 'history')) fault(ups);
+            return original(r, ups);
+        };
+    };
+
+    it('commit បដិសេធជាក់លាក់ ➜ cancelling ➜ compensated · ប្រាក់មិនប្រែ · គ្មាន inverse ledger', async () => {
+        let inverses = 0;
+        patchFault(() => { throw Object.assign(new Error('permission_denied'), { code: 'PERMISSION_DENIED' }); });
+        intercept(async (r, update, original) => { if (r.path === D + '/' + DAY() || r.path === M) inverses++; return original(r, update); });
+        await saveEditedBarcodePrice(); await settle();
+        expect(row().pricePending).toMatchObject({ phase: 'settled', outcome: 'compensated' });
+        expect({ money: money(), cod: row().barcodes[0].cod, inverses }).toEqual({ money: [[10, 1], [10, 1]], cod: 10, inverses: 0 });
+    });
+
+    it.each(['token', 'actorUid', 'code', 'slot', 'birth', 'rowBirth', 'scanDate', 'priorCod', 'priorDod', 'wantCod', 'wantDod'])('marker server ខុស tuple %s ក្រោយ admission ➜ commit មិនផ្ញើ · ប្រាក់មិនប្រែ', async (key) => {
+        intercept(async (r, update, original) => {
+            const result = await original(r, update);
+            if (r.path === H + '/itemI' && row().pricePending?.phase === 'admitted') {
+                const value = row();
+                value.pricePending[key] = key === 'token' ? 'price_' + 'f'.repeat(32) : key === 'actorUid' || key === 'code' || key === 'scanDate' ? value.pricePending[key] + 'x' : value.pricePending[key] + 1;
+                setAt(H + '/itemI', value);
+            }
+            return result;
+        });
+        const before = commits();
+        await saveEditedBarcodePrice(); await settle();
+        expect({ sent: commits() - before, money: money(), cod: row().barcodes[0].cod }).toEqual({ sent: 0, money: [[10, 1], [10, 1]], cod: 10 });
+        expect(alarm()).toBe(true);
+    });
+
+    it('commit unknown មិនចុះ ➜ admitted · ប្រាក់មិនប្រែ · សោ durable · Sentry money', async () => {
+        patchFault(() => { throw unknown(); });
+        await saveEditedBarcodePrice(); await settle();
+        expect({ phase: row().pricePending?.phase, money: money() }).toEqual({ phase: 'admitted', money: [[10, 1], [10, 1]] });
+        expect(alarm()).toBe(true);
+    });
+
+    it.each(['scope', 'uid', 'sdk'])('ប្ដូរ %s ពេលកំពុងអាន server មុន commit ➜ មិនផ្ញើ commit ទៅ session ថ្មី', async (kind) => {
+        const gate = deferred(); const entered = deferred(); const fetcher = globalThis.fetch as any; let switched = false;
+        vi.stubGlobal('fetch', vi.fn(async (input: any, init: any) => {
+            if (!switched && String(input).includes(D + '/')) { entered.resolve(); await gate.promise; }
+            return fetcher(input, init);
+        }));
+        const before = commits();
+        const operation = saveEditedBarcodePrice(); await entered.promise;
+        if (kind === 'scope') localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: HOST + '/other' }));
+        if (kind === 'uid') (firebaseState.auth.currentUser as any).uid = 'other';
+        if (kind === 'sdk') firebaseState.fb = { ...firebaseState.fb } as any;
+        switched = true; gate.resolve(); await operation; await settle();
+        expect({ sent: commits() - before, money: money(), phase: row().pricePending.phase }).toEqual({ sent: 0, money: [[10, 1], [10, 1]], phase: 'admitted' });
+    });
+
+    it.each(['commit', 'cancelling', 'settled-committed', 'settled-compensated'].flatMap(step => [true, false].map(landed => ({ step, landed }))))('ACK បាត់នៅ $step / landed=$landed ➜ សម្រេចពី server · មិនផ្ញើបន្ថែម', async ({ step, landed }) => {
+        const cancel = step === 'cancelling' || step === 'settled-compensated';
+        let faulted = false; let later = 0;
+        if (step === 'commit') patchFault(() => { if (!landed) { faulted = true; throw unknown(); } });
+        else if (cancel) patchFault(() => { throw Object.assign(new Error('permission_denied'), { code: 'PERMISSION_DENIED' }); });
+        if (step === 'commit' && landed) {
+            const original = firebaseState.fb.update;
+            firebaseState.fb.update = async (r: any, ups: any) => { await original(r, ups); if (Object.keys(ups).some((k) => k.endsWith('/pricePending/phase'))) { faulted = true; throw unknown(); } };
+        }
+        intercept(async (r, update, original) => {
+            if (faulted && step !== 'commit') later++;
+            if (r.path === H + '/itemI' && step !== 'commit') {
+                const proposal = update(row());
+                const phase = proposal?.pricePending?.phase === 'settled' ? 'settled-' + proposal.pricePending.outcome : proposal?.pricePending?.phase;
+                if (phase === step) {
+                    if (landed) await original(r, update);
+                    faulted = true; throw unknown();
+                }
+            }
+            return original(r, update);
+        });
+        await saveEditedBarcodePrice(); await settle();
+        const expected = step === 'commit' ? (landed ? 'settled' : 'admitted')
+            : step === 'cancelling' ? (landed ? 'cancelling' : 'admitted')
+            : landed ? 'settled' : step === 'settled-compensated' ? 'cancelling' : 'history';
+        expect(faulted).toBe(true);
+        expect(row().pricePending?.phase).toBe(expected);
+        expect(later).toBe(0);
+        const amount = cancel || step === 'commit' && !landed ? 10 : 20;
+        expect(money()).toEqual([[amount, 1], [amount, 1]]);
     });
 });

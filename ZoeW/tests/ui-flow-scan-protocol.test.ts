@@ -223,15 +223,19 @@ it.each(['settled', 'delayed', 'rules-reject-marker', 'old-marker', 'rules-rejec
     if (mode === 'rules-reject-old-marker') vi.useFakeTimers();
     const context: any = vm.createContext({ window: fixture, document, openEditBarcodePriceModal, saveEditedBarcodePrice, removeSingleBarcode, setTimeout });
     const priorTrash = clone(store.zoew_recently_deleted_cod_dod || {});
+    const priorDay = clone(store[D] || {}), priorMonth = clone(store[M] || {});
+    const cents = (record: any) => ({ codDollar: Math.round(record.codDollar * 100) / 100, dodDollar: Math.round(record.dodDollar * 100) / 100, totalCount: record.totalCount });
     const pending = vm.runInContext('(' + body + ')()', context);
     if (mode === 'rules-reject-old-marker') await vi.advanceTimersByTimeAsync(12000);
     const result = await pending;
     if (mode === 'empty-month' || mode === 'full-sequence-empty') {
         expect(result).toEqual({ reached: true, priceSettled: false });
-        expect(Object.values(store[H]).some((row: any) => row.pricePending?.phase === 'history')).toBe(true);
-        expect(delayed).toBe(false);
+        const edited: any = Object.values(store[H]).find((row: any) => row.pricePending);
+        expect(edited.pricePending).toMatchObject({ phase: 'settled', outcome: 'compensated' });
+        expect(edited.barcodes.find((b: any) => b.code === edited.pricePending.code)).toMatchObject({ cod: edited.pricePending.priorCod, dod: edited.pricePending.priorDod });
         expect(store.zoew_recently_deleted_cod_dod || {}).toEqual(priorTrash);
-        expect(store[M]['2026-10'].codDollar).toBe(0);
+        expect(store[D] || {}).toEqual(priorDay);
+        expect(store[M] || {}).toEqual(priorMonth);
         return;
     }
     expect(delayed).toBe(true);
@@ -243,12 +247,12 @@ it.each(['settled', 'delayed', 'rules-reject-marker', 'old-marker', 'rules-rejec
     if (mode === 'rules-reject-old-marker') {
         expect(deniedTrash).toBeGreaterThan(0);
         expect(result.trash).toBe(false);
-        expect(result.removed).toMatchObject({ codDollar: 0.01, dodDollar: 0.01, totalCount: 1 });
+        expect(cents(result.removed)).toEqual({ codDollar: 0.01, dodDollar: 0.01, totalCount: 1 });
         return;
     }
     if (mode === 'old-order') {
         expect(result.trash).toBe(false);
-        expect(result.removed).toMatchObject({ codDollar: 0.01, dodDollar: 0.01, totalCount: 1 });
+        expect(cents(result.removed)).toEqual({ codDollar: 0.01, dodDollar: 0.01, totalCount: 1 });
         await new Promise(resolve => setTimeout(resolve, 200));
         return;
     }

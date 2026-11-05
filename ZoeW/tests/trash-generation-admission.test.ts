@@ -62,13 +62,15 @@ it.each(['delete', 'remove', 'auto', 'clear'])('generation ៖ %s ថ្មី�
     else expect(admissions[0][0].trashItem).toMatchObject({ trashGeneration: 1, deletedAt: NOW });
 });
 
-it.each(['slot', 'moved', 'ledger', 'flip', 'collected', 'undo'])('generation ៖ replay stage %s ដែល consumed មិនបង្កើត source ឬប៉ះ money/mirror', async stage => {
+const purgeRetires = (stage: string) => stage !== 'collected' && stage !== 'undo';
+
+it.each(['slot', 'moved', 'ledger', 'flip', 'collected', 'undo'])('generation ៖ replay stage %s ដែល consumed មិនបង្កើត source ឬប៉ះ money/mirror (copy purge រួច ➜ journal បញ្ចប់ · collected/undo នៅកាន់)', async stage => {
     const trash = { ...at(H + '/' + ID), deletedAt: NOW - 1000, trashReason: 'remove', trashMode: 'local', isFromDeletion: false };
     delete store[H][ID]; dataState.scanHistory = [];
     store[TRASH_CONSUMPTIONS_ROOT] = { [ID]: consumption() };
     noteCleanupJournalEntry({ id: ID, reason: 'remove', stage, trashItem: trash, revenue: null });
     const before = copy(store); await resumeCleanupJournalEntry(ID);
-    expect(store).toEqual(before); expect(effects).toEqual([]); expect(readCleanupJournal()).toHaveLength(1);
+    expect(store).toEqual(before); expect(effects).toEqual([]); expect(readCleanupJournal()).toHaveLength(purgeRetires(stage) ? 0 : 1);
 });
 
 
@@ -122,12 +124,12 @@ it('generation ៖ deletedAt ដូចគ្នា generation ថ្មីមិ
     expect(at(T + '/' + ID)).toEqual(newer);
 });
 
-it.each(['moved', 'ledger', 'flip', 'collected', 'undo'])('generation ៖ consumed កើតក្រោយ preflight read មិនឱ្យ stage %s បន្ត', async stage => {
+it.each(['moved', 'ledger', 'flip', 'collected', 'undo'])('generation ៖ consumed កើតក្រោយ preflight read មិនឱ្យ stage %s បន្ត (copy purge រួច ➜ journal បញ្ចប់ · collected/undo នៅកាន់)', async stage => {
     const trash = { ...at(H + '/' + ID), deletedAt: NOW - 1000, trashReason: 'remove', trashMode: 'local', trashGeneration: 1 };
     delete store[H][ID]; store[T][ID] = copy(trash); dataState.scanHistory = []; noteCleanupJournalEntry({ id: ID, reason: 'remove', stage, trashItem: trash, revenue: null });
     readHook = path => { if (path === T + '/' + ID) { readHook = null; delete store[T][ID]; store[TRASH_CONSUMPTIONS_ROOT] = { [ID]: consumption(ID, 1) }; } };
     await resumeCleanupJournalEntry(ID);
-    expect(at(T + '/' + ID)).toBeNull(); expect(effects).toEqual([]); expect(readCleanupJournal()).toHaveLength(1);
+    expect(at(T + '/' + ID)).toBeNull(); expect(effects).toEqual([]); expect(readCleanupJournal()).toHaveLength(purgeRetires(stage) ? 0 : 1);
 });
 
 it.each(['delete', 'remove', 'auto', 'clear'])('generation ៖ %s ប្រែ metadata ក្រោយ admission មិនលុប source ហើយ fresh retry រួច', async route => {

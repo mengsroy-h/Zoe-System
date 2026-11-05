@@ -12,6 +12,8 @@ const api = require('./firebase-api');
 const TOOL_DIR = __dirname;
 const REPO_ROOT = path.resolve(TOOL_DIR, '..', '..');
 const DEFAULT_RULES_FILE = path.join(REPO_ROOT, 'firebase-database.rules.json');
+const DEFAULT_RULES_ARTIFACT = path.join(REPO_ROOT, 'firebase-database.rules.min.json');
+const { RULES_PUBLISH_MAX_BYTES, rulesArtifactProblems } = require(path.join(REPO_ROOT, 'supabase', 'scripts', 'rtdb-rules-artifact.cjs'));
 const STATE_DIR = process.env.ZOE_PROVISION_STATE_DIR
     ? path.resolve(process.env.ZOE_PROVISION_STATE_DIR)
     : path.join(TOOL_DIR, 'state');
@@ -237,6 +239,23 @@ function readRulesFile(file) {
     if (!parsed || typeof parsed.rules !== 'object' || parsed.rules === null) {
         throw new UsageError('Rules file has no "rules" object: ' + file);
     }
+    if (path.resolve(file) === path.resolve(DEFAULT_RULES_FILE)) {
+        let artifact;
+        try {
+            artifact = fs.readFileSync(DEFAULT_RULES_ARTIFACT, 'utf8');
+        } catch (e) {
+            throw new UsageError('Cannot read the rules publish file: ' + DEFAULT_RULES_ARTIFACT + ' (run node supabase/scripts/generate-rules-sql.mjs)');
+        }
+        const problems = rulesArtifactProblems(text, artifact);
+        if (problems.length) {
+            throw new UsageError('Rules publish file is stale or invalid: ' + DEFAULT_RULES_ARTIFACT + ' (' + problems[0] + '; run node supabase/scripts/generate-rules-sql.mjs)');
+        }
+        const published = JSON.parse(artifact);
+        return { file: DEFAULT_RULES_ARTIFACT, text: artifact, parsed: published, canonical: canonicalJson(published) };
+    }
+    if (Buffer.byteLength(text, 'utf8') > RULES_PUBLISH_MAX_BYTES) {
+        throw new UsageError('Rules file is larger than ' + RULES_PUBLISH_MAX_BYTES + ' bytes: ' + file);
+    }
     return { file: file, text: text, parsed: parsed, canonical: canonicalJson(parsed) };
 }
 
@@ -251,7 +270,7 @@ function rulesMatch(remoteText, rules) {
 function signedInReadNode(rules) {
     const top = rules.parsed.rules;
     return Object.keys(top).find((key) => !key.startsWith('.') && !key.startsWith('$')
-        && top[key] && typeof top[key]['.read'] === 'string' && top[key]['.read'].indexOf('auth != null') !== -1) || '';
+        && top[key] && typeof top[key]['.read'] === 'string' && /\bauth\s*!=\s*null\b/.test(top[key]['.read'])) || '';
 }
 
 async function ask(question) {
@@ -553,7 +572,22 @@ function printCard(state, config, settings, passwords, notes) {
     say('');
     say('Still manual:');
     say('  1. ZoeKeyGen: create an Activation Key for this customer.');
-    say('  2. Only for "ZTO list": add ' + state.projectId + ' to Netlify env FIREBASE_PROJECT_IDS (site zoew), then Trigger deploy.');
+    say('  2. ZTO list pull and ZTO /detail account checks (ZTO_DETAIL_IDENTITY, ZTO_DETAIL_BRANCH_PATHS) need this project');
+    const entry = projectIdsEntry(state);
+    if (entry) {
+        say('     bound to its branch: add ' + entry + ' to Netlify env FIREBASE_PROJECT_IDS (site zoew,');
+        say('     entries separated by commas; a project serving several branches separates them with |), then Trigger deploy.');
+    } else {
+        say('     bound to its branch in Netlify env FIREBASE_PROJECT_IDS (site zoew), but the branch of this project is not known here.');
+        say('     WARNING: do not type a guessed entry. One malformed entry makes the ZTO function ignore the whole list,');
+        say('     which turns the ZTO list and /detail branch checks off for every customer. Print the exact entry with:');
+        say('       node provision.js show --project ' + state.projectId + ' --branch (the ZTO branch digits)');
+    }
+}
+
+function projectIdsEntry(state) {
+    const branch = String(state.branch || '');
+    return BRANCH_RE.test(branch) ? state.projectId + ':' + branch : '';
 }
 
 async function cmdNew(opts) {
@@ -739,7 +773,13 @@ async function cmdVerify(opts) {
 async function cmdShow(opts) {
     const id = flagText(opts, 'project').toLowerCase();
     if (!PROJECT_ID_RE.test(id)) throw new UsageError('Pass --project <id>');
-    const state = loadState(id) || { projectId: id, steps: {}, users: [] };
+    const branchFlag = flagText(opts, 'branch');
+    if (branchFlag && !BRANCH_RE.test(branchFlag)) throw new UsageError('--branch must be digits (the ZTO branch code)');
+    const state = Object.assign({}, loadState(id) || { projectId: id, steps: {}, users: [] });
+    if (branchFlag && state.branch && state.branch !== branchFlag) {
+        throw new UsageError('Project ' + id + ' belongs to branch ' + state.branch + ', not ' + branchFlag);
+    }
+    if (branchFlag) state.branch = branchFlag;
     rememberSettings(opts, loadSettings());
     await api.login();
     const raw = await api.withDeadline(api.webConfigOf(id, state.appId), STEP_TIMEOUT_MS, 'read web app');
@@ -789,7 +829,7 @@ function help() {
         '  node provision.js rules --all | --project id[,id] [--yes] [--dry-run]',
         '  node provision.js user --project id --user name [--reset]',
         '  node provision.js verify --all | --project id[,id]',
-        '  node provision.js show --project id',
+        '  node provision.js show --project id [--branch 881859]',
         '',
         'Exit codes: 0 ok, 1 failure, 2 usage/cancelled, 3 some checks could not be measured'
     ].forEach((l) => say(l));

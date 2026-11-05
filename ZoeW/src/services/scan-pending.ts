@@ -7,11 +7,14 @@ import { type ScanImportProof } from './scan-import-proof';
 import { createScanEvidenceJournal, type ScanEvidenceRecord } from './scan-evidence';
 
 import { showToast } from '../ui/toast';
+import { viewState } from '../core/view-state';
 
 export type PendingScanHandle = { record: ScanEvidenceRecord; db: typeof firebaseState.db; auth: number; sdk?: typeof firebaseState.fb; claimed?: boolean; settlement?: Promise<boolean> };
 
 const scanEvidenceLive = new Map<string, PendingScanHandle>();
+const scanEvidenceLocks = new Map<string, () => void>();
 let scanEvidenceNotice = '';
+export const SCAN_EVIDENCE_LOCK_PREFIX = 'zoew-scan-live:';
 
 export function pendingScanScope() {
     const uid = firebaseState.auth && firebaseState.auth.currentUser && firebaseState.auth.currentUser.uid;
@@ -19,15 +22,29 @@ export function pendingScanScope() {
     return uid && target ? JSON.stringify([String(target), String(uid)]) : '';
 }
 
-export function preparePendingScan(barcode, cod, dod, stampMs = 0, mode = 'direct', version: 1 | 2 = 1, importProof?: ScanImportProof): PendingScanHandle {
+function holdScanEvidenceLock(handle: PendingScanHandle) {
+    const id = handle.record.id;
+    const locks = typeof navigator !== 'undefined' && navigator.locks;
+    if (!locks || typeof locks.request !== 'function') return;
+    try {
+        Promise.resolve(locks.request(SCAN_EVIDENCE_LOCK_PREFIX + id, () => new Promise<void>((resolve) => {
+            if (scanEvidenceLive.get(id) !== handle) resolve();
+            else scanEvidenceLocks.set(id, resolve);
+        }))).catch(() => {});
+    } catch (e) {}
+}
+
+export function preparePendingScan(barcode, cod, dod, stampMs = 0, mode = 'direct', version: 1 | 2 = 1, importProof?: ScanImportProof, pickupEpoch?: number): PendingScanHandle {
     const scope = pendingScanScope();
     if (!scope || !firebaseState.db || !firebaseState.fb) throw Object.assign(new Error('Scan evidence scope unavailable'), { code: 'scan_evidence_unavailable' });
     const createdAt = Number(stampMs) > 0 ? Number(stampMs) : getServerNow();
     const record = createScanEvidenceJournal(appLocalStore, version).prepare(scope, {
-        barcode, createdAt, cod, dod, scanDate: getFormattedDate(createdAt as any), mode, ...(importProof === undefined ? {} : { importProof })
+        barcode, createdAt, cod, dod, scanDate: getFormattedDate(createdAt as any), mode, ...(importProof === undefined ? {} : { importProof }),
+        ...(pickupEpoch === undefined ? {} : { pickupEpoch })
     });
     const handle = { record, db: firebaseState.db, auth: firebaseState.authGeneration, sdk: firebaseState.fb };
     scanEvidenceLive.set(record.id, handle);
+    holdScanEvidenceLock(handle);
     return handle;
 }
 
@@ -48,7 +65,16 @@ export function notePendingScan(handle, phase, itemId?) {
 }
 
 export function releasePendingScan(handle) {
-    if (handle && handle.record) scanEvidenceLive.delete(handle.record.id);
+    if (!handle || !handle.record) return;
+    scanEvidenceLive.delete(handle.record.id);
+    const unlock = scanEvidenceLocks.get(handle.record.id);
+    scanEvidenceLocks.delete(handle.record.id);
+    if (unlock) unlock();
+}
+
+export function releasePendingScanAfter(handle, pending?) {
+    if (!pending) { releasePendingScan(handle); return; }
+    Promise.resolve(pending).catch(() => {}).finally(() => releasePendingScan(handle));
 }
 
 export function finishPendingScan(handle, proof) {
@@ -99,12 +125,31 @@ export function settlePendingScanClaim(handle, claim, releaseRegistry) {
     });
 }
 
+export function retainedPendingScans(scope = pendingScanScope()) {
+    if (!scope) return [];
+    const seen = new Set<string>();
+    return ([1, 2] as const).flatMap((version) => createScanEvidenceJournal(appLocalStore, version).list(scope).map((entry) => ({ ...entry, v: version })))
+        .filter((entry) => !pendingScanIsLive(entry.id) && !seen.has(entry.id) && !!seen.add(entry.id));
+}
+
+export const SCAN_EVIDENCE_EXIT_LABEL = 'បញ្ចប់ភស្តុតាងស្កេនរង់ចាំ';
+export const SCAN_EVIDENCE_EXIT_HINT = 'បើនៅជាប់ សូមឲ្យម្ចាស់ហាងប្រើ ☰ ឧបករណ៍ ➜ «បញ្ចប់ភស្តុតាងស្កេនរង់ចាំ» (PIN)។';
+
+export function scanEvidenceRefusalText(error, importing = false) {
+    const after = importing ? ' ការបញ្ចូលត្រូវបានផ្អាក មុនប៉ះប្រាក់។' : '';
+    if (error?.code === 'pickup_epoch_unavailable') return '⏳ មិនអាចផ្ទៀងផ្ទាត់ស្ថិតិយកពី server បាន —' + (after || ' មិនទាន់រក្សាទុក។') + ' សូមភ្ជាប់បណ្តាញ រួចសាកម្តងទៀត។';
+    if (error?.reason === 'unresolved') return '⚠️ ឧបករណ៍នេះមានការស្កេនមិនទាន់បញ្ចប់ច្រើនពេកសម្រាប់ហាង និងគណនីនេះ — មិនទាន់ទទួលការស្កេនថ្មី។' + after
+        + ' App ផ្ទៀងវាម្ដងទៀតពេលភ្ជាប់ Server; ' + SCAN_EVIDENCE_EXIT_HINT;
+    return '⚠️ មិនអាចរក្សាទុកភស្តុតាងស្កេនក្នុងឧបករណ៍បាន។' + (after || ' សូមពិនិត្យទំហំផ្ទុក មុនសាកម្ដងទៀត។');
+}
+
 export function warnPendingScans() {
     const scope = pendingScanScope();
-    if (!scope) return;
+    if (!scope) { viewState.scanEvidenceRetained = 0; return; }
     let pending;
-    try { pending = ([1, 2] as const).flatMap((version) => createScanEvidenceJournal(appLocalStore, version).list(scope)).filter((entry) => !pendingScanIsLive(entry.id)); }
+    try { pending = retainedPendingScans(scope); }
     catch (e) { pending = [{ id: 'unreadable' }]; }
+    viewState.scanEvidenceRetained = pending.length;
     if (!pending.length) { scanEvidenceNotice = ''; return; }
     const signature = firebaseState.authGeneration + '|' + scope + '|' + pending.map((entry) => entry.id + ':' + entry.phase).sort().join('|');
     if (scanEvidenceNotice === signature) return;
@@ -112,7 +157,7 @@ export function warnPendingScans() {
     const unconfirmed = pending.filter(entry => entry.phase !== 'collected-pending');
     const codes = unconfirmed.slice(0, 3).map((entry) => entry.barcode || entry.id).join(', ');
     const collected = pending.filter(entry => entry.phase === 'collected-pending');
-    if (collected.length) showToast(`⏳ កញ្ចប់ ${collected.length} បានរក្សាទុក និងផ្ទៀងប្រាក់រួច ប៉ុន្តែចំណូលយករួចនៅរង់ចាំផ្ទៀង៖ ${collected.slice(0, 3).map(entry => entry.barcode).join(', ')}។ ភស្តុតាងនៅរក្សាទុក — សូមឱ្យ Admin ពិនិត្យ។`);
-    if (unconfirmed.length) showToast(`⏳ ការស្កេន ${unconfirmed.length} មិនទាន់មានភស្តុតាងបញ្ចប់៖ ${codes}។ វាអាចកំពុងរក្សាទុកក្នុងផ្ទាំងផ្សេង។ កុំស្កេនម្ដងទៀត រហូតដល់ផ្ទៀងប្រាក់ និងបញ្ជីបាន។ បើបិទ App រួច សូមឱ្យ Admin ពិនិត្យ។`);
+    if (collected.length) showToast(`⏳ កញ្ចប់ ${collected.length} បានរក្សាទុក និងផ្ទៀងប្រាក់រួច ប៉ុន្តែចំណូលយករួចនៅរង់ចាំផ្ទៀង៖ ${collected.slice(0, 3).map(entry => entry.barcode).join(', ')}។ App ផ្ទៀងម្ដងទៀតពេលភ្ជាប់ Server — ${SCAN_EVIDENCE_EXIT_HINT}`);
+    if (unconfirmed.length) showToast(`⏳ ការស្កេន ${unconfirmed.length} មិនទាន់មានភស្តុតាងបញ្ចប់៖ ${codes}។ វាអាចកំពុងរក្សាទុកក្នុងផ្ទាំងផ្សេង។ កុំស្កេនម្ដងទៀត រហូតដល់ផ្ទៀងប្រាក់ និងបញ្ជីបាន។ ${SCAN_EVIDENCE_EXIT_HINT}`);
     if (window.ZoeErrors) ZoeErrors.capture(new Error('Unresolved scan evidence retained'), { zone: 'money', context: 'scan evidence pending', count: pending.length });
 }

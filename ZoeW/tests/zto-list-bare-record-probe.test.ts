@@ -192,7 +192,7 @@ describe('ទាញបញ្ជី ZTO (Cookie) ៖ ការសួរស្ថ�
 
     it.each([
         ['record កាន់ barcode តែគ្មានវាល Sign', () => bare({}), 'ZTO_NO_CUSTOMER_DATA'],
-        ['record របស់ barcode ផ្សេង (ទោះ Sign)', () => bare({ billCode: OTHER, signed: '1' }), 'ZTO_NOT_FOUND']
+        ['record របស់ barcode ផ្សេង (ទោះ Sign)', () => bare({ billCode: OTHER, signed: '1' }), 'ZTO_INVALID_RESPONSE']
     ])('គ. ទិសផ្ទុយ ៖ %s ➜ ចម្លើយគ្មាន verdict ➜ `too-old-unknown` ➜ មិនបញ្ចូល', async (_label, upstream, code) => {
         const { probes, groups } = await pull(upstream);
         expect(probes, 'the probe asked in status mode, the Function had no verdict to give').toEqual([

@@ -33,7 +33,7 @@ describe('pull sync owns tenant and authenticated scope across awaits', () => {
     let tenant = 'A';
     const writes: any[] = [];
     const db = createSupabaseDatabase({ rpc: async (fn: string, args: any) => {
-      if (fn === 'zoe_write') { writes.push({ tenant, ops: args.p_ops }); return { ok: true, docs: [] }; }
+      if (fn === 'zoe_write_v2') { expect.soft(args.p_expected_tenant).toBe(tenant); writes.push({ tenant, ops: args.p_ops }); return { ok: true, docs: [] }; }
       return { seq: 1, more: false, reset: true, tenant, now: Date.now(), rows: [] };
     }, subscribe: () => () => {} }, { onListenerError: vi.fn(), onSynced: vi.fn(), onForbidden: vi.fn(), onTxOutcomeUnknown: vi.fn() });
     db.setTenantTopic('zoe:A'); db.setAuthed(true, 'same-user'); await turn(); db.goOffline();
@@ -44,8 +44,8 @@ describe('pull sync owns tenant and authenticated scope across awaits', () => {
   });
   it('a CAS conflict from A cannot trigger a retry write in tenant B', async () => {
     let tenant = 'A'; const first = deferred<any>(); const writes: string[] = [];
-    const db = createSupabaseDatabase({ rpc: async (fn: string) => {
-      if (fn === 'zoe_write') { writes.push(tenant); return writes.length === 1 ? first.promise : { ok: true, docs: [] }; }
+    const db = createSupabaseDatabase({ rpc: async (fn: string, args: any) => {
+      if (fn === 'zoe_write_v2') { expect.soft(args.p_expected_tenant).toBe(tenant); writes.push(tenant); return writes.length === 1 ? first.promise : { ok: true, docs: [] }; }
       return { seq: 1, more: false, reset: true, tenant, now: Date.now(), rows: [] };
     }, subscribe: () => () => {} }, { onListenerError: vi.fn(), onSynced: vi.fn(), onForbidden: vi.fn(), onTxOutcomeUnknown: vi.fn() });
     db.setTenantTopic('zoe:A'); db.setAuthed(true, 'same-user'); await turn();
@@ -58,8 +58,8 @@ describe('pull sync owns tenant and authenticated scope across awaits', () => {
   for (const transaction of [false, true]) {
     it('acknowledged A ' + (transaction ? 'CAS' : 'write') + ' stays successful without publishing A into B', async () => {
       let tenant = 'A'; const sent = deferred<any>(); let writes = 0;
-      const db = createSupabaseDatabase({ rpc: async (fn: string) => {
-        if (fn === 'zoe_write') { writes++; return sent.promise; }
+      const db = createSupabaseDatabase({ rpc: async (fn: string, args: any) => {
+        if (fn === 'zoe_write_v2') { expect.soft(args.p_expected_tenant).toBe(tenant); writes++; return sent.promise; }
         return { seq: 1, more: false, reset: true, tenant, now: Date.now(), rows: [] };
       }, subscribe: () => () => {} }, { onListenerError: vi.fn(), onSynced: vi.fn(), onForbidden: vi.fn(), onTxOutcomeUnknown: vi.fn() });
       db.setTenantTopic('zoe:A'); db.setAuthed(true, 'same-user'); await turn();

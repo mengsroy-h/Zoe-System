@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { createScanEvidenceJournal, SCAN_EVIDENCE_MAX_BYTES, SCAN_EVIDENCE_MAX_PENDING, SCAN_EVIDENCE_PREFIX } from '../src/services/scan-evidence';
+import { createScanEvidenceJournal, SCAN_EVIDENCE_MAX_BYTES, SCAN_EVIDENCE_MAX_PENDING, SCAN_EVIDENCE_PREFIX, SCAN_EVIDENCE_V2_PREFIX } from '../src/services/scan-evidence';
 
 function memory() {
     const rows = new Map<string, string>();
@@ -152,10 +152,57 @@ it('the pending count bound rejects new work without evicting any unresolved evi
 
 it('the byte bound preserves existing evidence and rejects the next preparation', () => {
     const { storage, rows } = memory(); const journal = createScanEvidenceJournal(storage);
-    rows.set(SCAN_EVIDENCE_PREFIX + 'opaque', 'x'.repeat(SCAN_EVIDENCE_MAX_BYTES / 2));
+    rows.set(SCAN_EVIDENCE_PREFIX + encodeURIComponent(scope) + ':opaque', 'x'.repeat(SCAN_EVIDENCE_MAX_BYTES / 2));
     const before = [...rows];
     expect(() => journal.prepare(scope, payload)).toThrow(/storage full/);
     expect([...rows]).toEqual(before);
+});
+
+it('unfinished evidence caps count only its own shop/account scope and name the real cause', () => {
+    const { storage, rows } = memory(); const journal = createScanEvidenceJournal(storage, 2);
+    const other = 'firebase|https://other.firebaseio.com|userB';
+    for (let n = 0; n < SCAN_EVIDENCE_MAX_PENDING; n++) journal.prepare(scope, { ...payload, barcode: 'B' + n });
+    let refused: any = null;
+    try { journal.prepare(scope, payload); } catch (e) { refused = e; }
+    expect(refused).toMatchObject({ code: 'scan_evidence_unavailable', reason: 'unresolved' });
+    expect(journal.prepare(other, payload).scope).toBe(other);
+    rows.set(SCAN_EVIDENCE_V2_PREFIX + encodeURIComponent(scope) + ':bulk', 'x'.repeat(SCAN_EVIDENCE_MAX_BYTES / 2));
+    expect(journal.prepare(other, { ...payload, barcode: 'C1' }).scope).toBe(other);
+    let full: any = null;
+    try { createScanEvidenceJournal(storage, 1).prepare(scope, { ...payload, barcode: 'C2' }); } catch (e) { full = e; }
+    expect(full).toMatchObject({ code: 'scan_evidence_unavailable', reason: 'unresolved' });
+    vi.spyOn(storage, 'setItem').mockImplementation(() => { throw new DOMException('quota', 'QuotaExceededError'); });
+    let quota: any = null;
+    try { journal.prepare('third-scope', payload); } catch (e) { quota = e; }
+    expect(quota?.code).toBe('scan_evidence_unavailable');
+    expect(quota?.reason).toBeUndefined();
+});
+
+it('a born-closed import keeps its pre-effect pickup epoch in the immutable prepared row', () => {
+    const { storage } = memory(); const journal = createScanEvidenceJournal(storage, 2);
+    const identity = JSON.stringify([payload.scanDate, payload.createdAt, '09:00:00 (' + payload.scanDate + ')', null]);
+    const importProof = { v: 1 as const, provider: 'cookie' as const, observedAt: payload.createdAt, signedAt: payload.createdAt, signedAtExact: false, identity };
+    const imported = { ...payload, mode: 'zto-import', importProof };
+    const handle = journal.prepare(scope, { ...imported, pickupEpoch: 3 } as any);
+    expect(createScanEvidenceJournal(storage, 2).list(scope)).toEqual([expect.objectContaining({ id: handle.id, pickupEpoch: 3, importProof })]);
+    expect(() => journal.prepare(scope, { ...payload, pickupEpoch: 0 } as any)).toThrow();
+    expect(() => journal.prepare(scope, { ...imported, pickupEpoch: -1 } as any)).toThrow();
+    expect(() => journal.prepare(scope, { ...imported, pickupEpoch: 1.5 } as any)).toThrow();
+    expect(createScanEvidenceJournal(storage, 2).list(scope)).toHaveLength(1);
+});
+
+it('the owner exit discards one unresolved record of its own scope and nothing else', () => {
+    const { storage, rows } = memory(); const journal = createScanEvidenceJournal(storage, 2);
+    const other = 'firebase|https://other.firebaseio.com|userB';
+    const dropped = journal.prepare(scope, payload); journal.appendPhase(dropped, { phase: 'collected-pending', itemId: 'item1' });
+    const kept = journal.prepare(scope, { ...payload, barcode: 'ZTO100002' });
+    const foreign = journal.prepare(other, payload);
+    expect(journal.discard(dropped)).toBe(true);
+    expect([...rows.keys()].some((key) => key.includes(dropped.id))).toBe(false);
+    expect(journal.list(scope).map((row) => row.id)).toEqual([kept.id]);
+    expect(journal.list(other).map((row) => row.id)).toEqual([foreign.id]);
+    expect(() => journal.discard({ ...foreign, scope })).not.toThrow();
+    expect(journal.list(other).map((row) => row.id)).toEqual([foreign.id]);
 });
 
 it('stored payload includes only business evidence, never extra phone/cookie/config fields', () => {

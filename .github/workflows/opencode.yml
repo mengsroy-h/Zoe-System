@@ -31,15 +31,35 @@ jobs:
           head=$(gh api "repos/$REPO/pulls/$PR" --jq .head.repo.full_name)
           if [ "$head" = "$REPO" ]; then echo "same=true" >> "$GITHUB_OUTPUT"; else echo "same=false" >> "$GITHUB_OUTPUT"; fi
 
-      - name: Checkout repository
+      - name: Refuse threads holding text from outside the repository team
+        id: thread
         if: steps.trust.outputs.same == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
+          AUTHOR: ${{ github.event.issue.author_association || github.event.pull_request.author_association }}
+          IS_PR: ${{ (github.event.pull_request.number || github.event.issue.pull_request) && 'true' || 'false' }}
+        run: |
+          list="$RUNNER_TEMP/thread-authors.tsv"
+          printf '%s\tUser\n' "$AUTHOR" > "$list"
+          gh api --paginate "repos/$REPO/issues/$NUMBER/comments" --jq '.[] | [.author_association, .user.type] | @tsv' >> "$list"
+          if [ "$IS_PR" = "true" ]; then
+            gh api --paginate "repos/$REPO/pulls/$NUMBER/comments" --jq '.[] | [.author_association, .user.type] | @tsv' >> "$list"
+            gh api --paginate "repos/$REPO/pulls/$NUMBER/reviews" --jq '.[] | [.author_association, .user.type] | @tsv' >> "$list"
+          fi
+          outside=$(awk -F '\t' '!($1 ~ /^(OWNER|MEMBER|COLLABORATOR)$/ || $2 == "Bot") { n++ } END { print n + 0 }' "$list")
+          if [ "$outside" = "0" ]; then echo "trusted=true" >> "$GITHUB_OUTPUT"; else echo "trusted=false" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Checkout repository
+        if: steps.trust.outputs.same == 'true' && steps.thread.outputs.trusted == 'true'
         uses: actions/checkout@v6
         with:
           fetch-depth: 1
           persist-credentials: false
 
       - name: Run OpenCode
-        if: steps.trust.outputs.same == 'true'
+        if: steps.trust.outputs.same == 'true' && steps.thread.outputs.trusted == 'true'
         uses: anomalyco/opencode/github@1873fbe304ebeda5051bfd3a54fd091cb277e545
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

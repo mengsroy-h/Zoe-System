@@ -1,7 +1,8 @@
 import { webcrypto } from 'node:crypto';
 import { DB_OP_TIMEOUT_MS } from '../src/services/network';
 import { withTransactionOutcomeResolution } from '../src/services/tx-outcome';
-import { TRASH_CONSUMPTIONS_ROOT, trashConsumptionOf } from '../src/domain/trash-generation';
+import { TRASH_CONSUMPTIONS_ROOT, purgeCertificateOf, trashConsumptionOf } from '../src/domain/trash-generation';
+import { prunedPut, purgesSource, slotPurgeAdmitted } from './helpers/purge-slot-model';
 import { purgeTrashWithRegistry } from '../src/services/registry-purge';
 import { runAutomaticDeletedCleanup } from '../src/domain/cleanup';
 import { liveShopScope } from '../src/core/shop-scope';
@@ -24,11 +25,7 @@ let readHook: null | ((path: string) => void), beforeWrite: null | ((target: any
 let batches: any[];
 let purgeGate: null | { entered: () => void; wait: Promise<void> };
 function at(path: string): any { return clone(path.split('/').filter(Boolean).reduce((value, key) => value?.[key], store) ?? null); }
-function put(path: string, value: any) {
-    const keys = path.split('/').filter(Boolean); let target = store;
-    for (const key of keys.slice(0, -1)) target = target[key] ||= {};
-    if (value == null) delete target[keys.at(-1)!]; else target[keys.at(-1)!] = clone(value);
-}
+function put(path: string, value: any) { prunedPut(store, path, value); }
 const ref = (_db: any, path = '') => ({ path, key: path.split('/').at(-1), toString: () => HOST + '/' + path });
 const snap = (value: any) => ({ val: () => clone(value), exists: () => value != null });
 const money = () => ({ daily: at(D), monthly: at(M) });
@@ -64,7 +61,7 @@ beforeEach(() => {
         update: async (target: any, patch: Record<string, any>) => {
             if (Object.keys(patch).some(path => path.startsWith('zoew_registry_releases/'))) batches.push(clone(patch));
             await beforeWrite?.(target, patch);
-            if (purgeGate && (target.path === T && patch.source === null || target.path === '' && patch[T + '/source'] === null && Object.keys(patch).some(path => path.startsWith('zoew_registry_releases/')))) {
+            if (purgeGate && (target.path === T && patch.source === null || target.path === '' && purgesSource(patch, 'source'))) {
                 events.push({ kind: 'purge-issued', path: T + '/source', value: at(T + '/source') });
                 purgeGate.entered(); await purgeGate.wait;
                 events.push({ kind: 'purge-before-commit', path: T + '/source', value: at(T + '/source') });
@@ -74,7 +71,7 @@ beforeEach(() => {
                 const source = at(T + '/' + receipt.trashId), barcode = source?.barcodes?.[receipt.slot];
                 if (target.path !== '' || at(path) !== null || !source || source.restoreClaim || source.deletedAt !== receipt.deletedAt
                     || (source.createdAt || 0) !== receipt.rowBirth || source.count !== receipt.rowCount || !barcode || barcode.code !== receipt.code
-                    || (barcode.createdAt || 0) !== receipt.birth || patch[T + '/' + receipt.trashId] !== null || patch[R + '/' + receipt.registryKey] !== null)
+                    || (barcode.createdAt || 0) !== receipt.birth || !slotPurgeAdmitted(patch, receipt.trashId, source) || patch[R + '/' + receipt.registryKey] !== null)
                     throw Object.assign(new Error('PERMISSION_DENIED'), { code: 'PERMISSION_DENIED' });
                 const registry = at(R + '/' + receipt.registryKey);
                 if (receipt.kind === 'legacy' ? Object.prototype.hasOwnProperty.call(barcode, 'scanIntent') || registry !== true && registry !== null
@@ -156,9 +153,11 @@ function expectedScanReceipt(index = 0) {
 
 it('atomic purge ៖ sparse server slot ត្រូវបានដោះតាមអត្តសញ្ញាណ មិនយក local index', async () => {
     const captured = source(); store[T].source.barcodes = { 7: clone(captured.barcodes[0]) };
+    const fields = Object.keys(store[T].source).filter(key => key !== 'barcodes');
     expect(await purgeTrashWithRegistry(captured)).toBe(true);
     expect(receipts()).toEqual([expect.objectContaining({ slot: '7', code: CODE, birth: BIRTH })]);
-    expect(Object.keys(batches[0])).toHaveLength(4);
+    expect(Object.keys(batches[0])).toHaveLength(1 + 3 + fields.length);
+    expect(batches[0][T + '/source/barcodes/7']).toBeNull();
     expect(at(TRASH_CONSUMPTIONS_ROOT + '/source')).toMatchObject({ kind: 'purge', generation: 0, sourceId: 'source' });
 });
 
@@ -177,8 +176,9 @@ it.each(['missing', 'zero'])('atomic purge ៖ legacy birth %s ជាមួយ c
 
 it('atomic purge ៖ legacy និង v2 ចម្រុះក្នុង batch តែមួយ រក្សា original actor និង releasedBy', async () => {
     addCode('SCAN000002'); makeScan(1);
+    const fields = Object.keys(store[T].source).filter(key => key !== 'barcodes');
     const before = money(); expect(await purgeTrashWithRegistry(source())).toBe(true);
-    expect(batches).toHaveLength(1); expect(Object.keys(batches[0])).toHaveLength(6); expect(at(T + '/source')).toBeNull();
+    expect(batches).toHaveLength(1); expect(Object.keys(batches[0])).toHaveLength(1 + 3 * 2 + fields.length); expect(at(T + '/source')).toBeNull();
     expect(receipts().find(receipt => receipt.kind === 'scan')).toMatchObject({ actorUid: 'original-member', releasedBy: 'purge-user', code: 'SCAN000002' });
     expect(money()).toEqual(before); expect(at(R + '/' + CODE)).toBeNull(); expect(at(R + '/SCAN000002')).toBeNull();
 });
@@ -242,13 +242,38 @@ it.each(['db', 'sdk', 'uid', 'scope', 'generation'])('atomic purge ៖ owner %s 
     expect(await purgeTrashWithRegistry(captured)).toBe(false); expect(store).toEqual(before); expect(batches).toEqual([]);
 });
 
-it.each([249, 250])('atomic purge ៖ %s barcodes មិនបំបែក row ជា batch កន្លះ', async count => {
-    store[T].source.barcodes = Array.from({ length: count }, (_, index) => ({ ...source().barcodes[0], code: 'CAP' + index }));
-    store[T].source.count = count; store[R] = Object.fromEntries(store[T].source.barcodes.map((barcode: any) => [barcode.code, true]));
-    expect(await purgeTrashWithRegistry(source())).toBe(count === 249);
-    expect(batches).toHaveLength(count === 249 ? 1 : 0);
-    if (count === 249) expect(Object.keys(batches[0])).toHaveLength(500);
-    else expect(at(T + '/source').barcodes).toHaveLength(250);
+it.each([249, 250, 251])('atomic purge ៖ full bounded group %s ចប់ដោយ update តែមួយ និងភស្តុតាងពេញលេញ', async count => {
+    const barcode = source().barcodes[0];
+    store[T].source.barcodes = Array.from({ length: count }, (_, index) => ({ ...barcode, code: 'CAP' + index }));
+    Object.assign(store[T].source, { count, cod: 7 * count, dod: 0, price: 7 * count, trashGeneration: 1 });
+    store[R] = Object.fromEntries(store[T].source.barcodes.map((entry: any) => [entry.code, true]));
+    store[D][DAY] = { codDollar: 7 * count, dodDollar: 0, totalCount: count };
+    store[M]['2026-10'] = { codDollar: 7 * count, dodDollar: 0, totalCount: count };
+    dataState.dailyRevenueData = clone(store[D]); dataState.monthlyRevenueData = clone(store[M]);
+    const captured = source(), beforeMoney = money();
+    const expectedConsumption = trashConsumptionOf(captured, 'purge', { uid: 'purge-user', scope: HOST });
+    const update = vi.spyOn(firebaseState.fb, 'update');
+    expect(await purgeTrashWithRegistry(captured)).toBe(true);
+    expect(update).toHaveBeenCalledTimes(1); expect(update.mock.calls[0][0]).toMatchObject({ path: '' });
+    expect(batches).toHaveLength(1); expect(at(T + '/source')).toBeNull();
+    const released = receipts(), byCode = new Map(released.map(receipt => [receipt.code, receipt]));
+    expect(at(TRASH_CONSUMPTIONS_ROOT + '/source')).toEqual({ ...expectedConsumption, ...purgeCertificateOf(released) });
+    expect(released).toHaveLength(count); expect(byCode.size).toBe(count);
+    expect(new Set(released.map(receipt => receipt.id)).size).toBe(count);
+    for (const [index, entry] of captured.barcodes.entries()) {
+        const receipt = byCode.get(entry.code);
+        expect(at(R + '/' + entry.code)).toBeNull();
+        expect(receipt?.id).toMatch(/^release_[a-f0-9]{32}$/);
+        expect(receipt).toEqual({ v: 2, generation: 1, id: receipt.id, kind: 'legacy', actorUid: 'purge-user', releasedBy: 'purge-user',
+            scope: HOST, code: entry.code, registryKey: entry.code, birth: entry.createdAt, trashId: captured.id, slot: String(index),
+            deletedAt: captured.deletedAt, rowBirth: captured.createdAt, rowCount: count });
+    }
+    const fields = Object.keys(captured).filter(key => key !== 'barcodes');
+    expect(Object.keys(batches[0]).sort()).toEqual([...fields.map(key => T + '/source/' + key), TRASH_CONSUMPTIONS_ROOT + '/source', ...captured.barcodes.flatMap((entry: any, index: number) =>
+        [T + '/source/barcodes/' + index, R + '/' + entry.code, 'zoew_registry_releases/' + byCode.get(entry.code).id])].sort());
+    expect(Object.keys(batches[0])).toHaveLength(1 + 3 * count + fields.length);
+    expect(events.filter(event => event.kind === 'update')).toHaveLength(1 + 3 * count + fields.length);
+    expect(money()).toEqual(beforeMoney);
 });
 
 it('atomic purge ៖ automatic cleanup ដាច់តាម row រក្សា held row ហើយមិន release ប្រាក់មុន receipts', async () => {
@@ -312,8 +337,8 @@ it('atomic purge ៖ auto completion ចាស់មិនដោះ inFlight រ
     const enteredA = deferred(), enteredB = deferred(), releaseA = deferred(), releaseB = deferred();
     beforeWrite = async (_target, patch) => {
         if (!Object.keys(patch).some(path => path.startsWith('zoew_registry_releases/'))) return;
-        if (patch[T + '/source'] === null) { enteredA.resolve(); await releaseA.promise; }
-        if (patch[T + '/second'] === null) { enteredB.resolve(); await releaseB.promise; }
+        if (purgesSource(patch, 'source')) { enteredA.resolve(); await releaseA.promise; }
+        if (purgesSource(patch, 'second')) { enteredB.resolve(); await releaseB.promise; }
     };
     dataState.deletedItems = [source()]; const first = runAutomaticDeletedCleanup(); await enteredA.promise;
     firebaseState.authGeneration++; dataState.deletedItems = [clone(store[T].second)];
@@ -487,7 +512,7 @@ it('auto purge៖ ពិដានទាំងជុំដោះសោ ហើយ�
     store[T].second = { ...source(), id: 'second', barcodes: [{ ...source().barcodes[0], code: 'SECOND0001' }] }; store[R].SECOND0001 = true;
     dataState.deletedItems = [source(), clone(store[T].second)];
     const entered = deferred(), release = deferred();
-    beforeWrite = async (_target, patch) => { if (patch[T + '/source'] === null) { entered.resolve(); await release.promise; } };
+    beforeWrite = async (_target, patch) => { if (purgesSource(patch, 'source')) { entered.resolve(); await release.promise; } };
     let finished = false; const operation = runAutomaticDeletedCleanup().then(() => { finished = true; });
     await entered.promise; await vi.advanceTimersByTimeAsync(DB_OP_TIMEOUT_MS + 1);
     const bounded = finished && !dataState.deletedCleanupInFlight;
@@ -503,8 +528,8 @@ it('auto purge៖ ម្ចាស់ចាស់ផុតពិដាន ហើ�
     store[T].second = { ...source(), id: 'second', barcodes: [{ ...source().barcodes[0], code: 'SECOND0001' }] }; store[R].SECOND0001 = true;
     const enteredA = deferred(), enteredB = deferred(), releaseA = deferred(), releaseB = deferred();
     beforeWrite = async (_target, patch) => {
-        if (patch[T + '/source'] === null) { enteredA.resolve(); await releaseA.promise; }
-        if (patch[T + '/second'] === null) { enteredB.resolve(); await releaseB.promise; }
+        if (purgesSource(patch, 'source')) { enteredA.resolve(); await releaseA.promise; }
+        if (purgesSource(patch, 'second')) { enteredB.resolve(); await releaseB.promise; }
     };
     dataState.deletedItems = [source()]; let ended = false;
     const first = runAutomaticDeletedCleanup().then(() => { ended = true; }); await enteredA.promise;
@@ -552,7 +577,7 @@ it('auto purge៖ ប្រភពដំបូងព្យួររាល់ជ�
     store[T].source.deletedAt = NOW - 31 * 86400000;
     store[T].second = { ...source(), id: 'second', barcodes: [{ ...source().barcodes[0], code: 'SECOND0001' }] }; store[R].SECOND0001 = true;
     dataState.deletedItems = [source(), clone(store[T].second)];
-    beforeWrite = async (_target, patch) => { if (patch[T + '/source'] === null) await new Promise(() => {}); };
+    beforeWrite = async (_target, patch) => { if (purgesSource(patch, 'source')) await new Promise(() => {}); };
     const beforeMoney = money();
     for (let round = 0; round < 2; round++) {
         const sweep = runAutomaticDeletedCleanup();
@@ -568,7 +593,7 @@ it.each(['generation', 'db', 'sdk', 'uid', 'scope'])('auto purge៖ cursor ម�
     store[T].source.deletedAt = NOW - 31 * 86400000;
     store[T].second = { ...source(), id: 'second', barcodes: [{ ...source().barcodes[0], code: 'SECOND0001' }] }; store[R].SECOND0001 = true;
     dataState.deletedItems = [source(), clone(store[T].second)];
-    beforeWrite = async (_target, patch) => { if (patch[T + '/source'] === null) await new Promise(() => {}); };
+    beforeWrite = async (_target, patch) => { if (purgesSource(patch, 'source')) await new Promise(() => {}); };
     let sweep = runAutomaticDeletedCleanup(); await vi.advanceTimersByTimeAsync(DB_OP_TIMEOUT_MS + 1); await sweep;
     if (change === 'generation') firebaseState.authGeneration++;
     if (change === 'db') firebaseState.db = {} as any;
@@ -580,7 +605,7 @@ it.each(['generation', 'db', 'sdk', 'uid', 'scope'])('auto purge៖ cursor ម�
         localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: other }));
     }
     sweep = runAutomaticDeletedCleanup(); await vi.advanceTimersByTimeAsync(DB_OP_TIMEOUT_MS + 1); await sweep;
-    expect(batches).toHaveLength(2); expect(batches.every(patch => patch[T + '/source'] === null)).toBe(true);
+    expect(batches).toHaveLength(2); expect(batches.every(patch => purgesSource(patch, 'source'))).toBe(true);
     expect(at(T + '/second')).not.toBeNull(); expect(receipts()).toHaveLength(0);
 });
 
@@ -588,7 +613,7 @@ it('auto purge៖ cursor ដែល source បាត់ អាចចាប់ can
     vi.useFakeTimers(); vi.setSystemTime(NOW);
     store[T].source.deletedAt = NOW - 31 * 86400000;
     dataState.deletedItems = [source()];
-    beforeWrite = async (_target, patch) => { if (patch[T + '/source'] === null) await new Promise(() => {}); };
+    beforeWrite = async (_target, patch) => { if (purgesSource(patch, 'source')) await new Promise(() => {}); };
     const first = runAutomaticDeletedCleanup(); await vi.advanceTimersByTimeAsync(DB_OP_TIMEOUT_MS + 1); await first;
     store[T].second = { ...source(), id: 'second', barcodes: [{ ...source().barcodes[0], code: 'SECOND0001' }] }; store[R].SECOND0001 = true;
     dataState.deletedItems = [clone(store[T].second)];
@@ -607,8 +632,8 @@ it('auto purge៖ callback ចាស់មិនបង្វិល cursor រប
     dataState.deletedItems = [source(), clone(store[T].second), clone(store[T].third)];
     const releaseA = deferred(), enteredB = deferred();
     beforeWrite = async (_target, patch) => {
-        if (patch[T + '/source'] === null) await releaseA.promise;
-        if (patch[T + '/second'] === null) { enteredB.resolve(); await new Promise(() => {}); }
+        if (purgesSource(patch, 'source')) await releaseA.promise;
+        if (purgesSource(patch, 'second')) { enteredB.resolve(); await new Promise(() => {}); }
     };
     const first = runAutomaticDeletedCleanup(); await vi.advanceTimersByTimeAsync(DB_OP_TIMEOUT_MS + 1); await first;
     const second = runAutomaticDeletedCleanup(); await enteredB.promise;
@@ -617,5 +642,5 @@ it('auto purge៖ callback ចាស់មិនបង្វិល cursor រប
     await vi.advanceTimersByTimeAsync(DB_OP_TIMEOUT_MS); await second;
     const third = runAutomaticDeletedCleanup(); await vi.advanceTimersByTimeAsync(DB_OP_TIMEOUT_MS + 1); await third;
     expect(at(T + '/third')).toBeNull(); expect(at(T + '/second')).not.toBeNull();
-    expect(batches[2][T + '/third']).toBeNull();
+    expect(purgesSource(batches[2], 'third')).toBe(true);
 });

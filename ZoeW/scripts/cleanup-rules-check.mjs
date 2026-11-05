@@ -352,6 +352,8 @@ function normalizeLegacyRegistryReleases(db) {
     const consumptionFields = ['v', 'sourceId', 'generation', 'kind', 'actorUid', 'scope', 'deletedAt', 'rowBirth'];
     const normalized = {}, groups = new Map();
     const fail = () => { throw new Error('invalid legacy release parity proof'); };
+    const certificate = ['first', 'members', 'keys'];
+    const consumptionFieldsOf = consumption => certificate.some(k => Object.hasOwn(consumption, k)) ? [...consumptionFields, ...certificate] : consumptionFields;
     for (const [id, receipt] of Object.entries(receipts)) {
         if (receipt?.kind !== 'legacy' && !id.startsWith('release_')) { normalized[id] = receipt; continue; }
         const source = sources[receipt?.trashId];
@@ -366,8 +368,9 @@ function normalizeLegacyRegistryReleases(db) {
             || db.zoew_barcode_registry?.[receipt.registryKey] != null
             || typeof receipt.actorUid !== 'string' || !receipt.actorUid || receipt.actorUid !== receipt.releasedBy
             || typeof receipt.scope !== 'string' || !receipt.scope
-            || !consumption || Array.isArray(consumption) || Object.keys(consumption).length !== consumptionFields.length
-            || !consumptionFields.every(k => Object.hasOwn(consumption, k)) || consumption.v !== 1 || consumption.kind !== 'purge'
+            || !consumption || Array.isArray(consumption) || Object.keys(consumption).length !== consumptionFieldsOf(consumption).length
+            || !consumptionFieldsOf(consumption).every(k => Object.hasOwn(consumption, k)) || consumption.v !== 1 || consumption.kind !== 'purge'
+            || Object.hasOwn(consumption, 'members') && (consumption.members[receipt.slot]?.id !== id || consumption.keys?.[receipt.registryKey] !== id)
             || consumption.sourceId !== receipt.trashId || consumption.actorUid !== receipt.releasedBy
             || !['generation', 'scope', 'deletedAt', 'rowBirth'].every(k => consumption[k] === receipt[k])) fail();
         const label = JSON.stringify([receipt.trashId, receipt.generation, receipt.slot, receipt.registryKey]);
@@ -376,7 +379,14 @@ function normalizeLegacyRegistryReleases(db) {
         groups.set(receipt.trashId, (groups.get(receipt.trashId) || 0) + 1);
     }
     for (const [sourceId, count] of groups) if (count !== sources[sourceId].barcodes.length) fail();
-    return { ...db, zoew_registry_releases: normalized };
+    const nonce = value => typeof value === 'string' && value.startsWith('release_') ? '<legacy release nonce>' : value;
+    const consumptions = Object.fromEntries(Object.entries(db.zoew_trash_consumptions || {}).map(([sourceId, consumption]) => {
+        if (!consumption || !Object.hasOwn(consumption, 'members')) return [sourceId, consumption];
+        if (groups.has(sourceId) && Object.keys(consumption.members).length !== groups.get(sourceId)) fail();
+        return [sourceId, { ...consumption, members: Object.fromEntries(Object.entries(consumption.members).map(([slot, member]) => [slot, { ...member, id: nonce(member.id) }])),
+            keys: Object.fromEntries(Object.entries(consumption.keys).map(([key, value]) => [key, nonce(value)])) }];
+    }));
+    return { ...db, zoew_registry_releases: normalized, ...(db.zoew_trash_consumptions ? { zoew_trash_consumptions: consumptions } : {}) };
 }
 
 function normalize(db) {

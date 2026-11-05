@@ -11,7 +11,7 @@ import { getFormattedDate } from '../core/timezone';
 import { barcodeEntriesOf, barcodeZtoSigned, generateUniqueId, itemHasRestoreMarkers, normalizeBarcodesOf } from '../domain/barcode';
 import { reconcileCollectedHistory } from '../domain/collected';
 import { getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, pickupIntentTracker } from '../domain/pickup';
-import { ledgerDedOf } from '../domain/ledger';
+import { ledgerDedOf, ledgerMonthTrimmed } from '../domain/ledger';
 import { TRASH_WRITE_SLOW_NOTICE_MS } from './session';
 import { openRecentlyDeletedModal, renderRecentlyDeleted, trashReasonDeducted } from './trash';
 import { dbListenerViewIsStale, updateRecentPhonesList } from '../services/db-listeners';
@@ -425,10 +425,13 @@ export async function restoreLedgerKeyFor(item, trashId, revenueDeltas) {
     const paths = [`zoew_daily_revenue_cod_dod/${scanDate}`, `zoew_monthly_revenue_cod_dod/${scanDate.substring(0, 7)}`];
     const records = await Promise.all(paths.map(path => readRestoreServerNode(api, readDb, path)));
     if (firebaseState.db !== readDb || firebaseState.authGeneration !== generation) throw new Error('RESTORE_SESSION_SWITCHED');
-    const entries = records.map(record => {
+    const monthTrimmed = records[1] === null && ledgerMonthTrimmed(await readRestoreServerNode(api, readDb, 'zoew_monthly_revenue_cod_dod'), scanDate.substring(0, 7));
+    if (firebaseState.db !== readDb || firebaseState.authGeneration !== generation) throw new Error('RESTORE_SESSION_SWITCHED');
+    const entries: any[] = records.map(record => {
         const entry = ledgerDedOf(record, trashId);
         return entry && entry.at === at ? entry : null;
     });
+    if (monthTrimmed && entries[0]) entries[1] = { ...entries[0], trimmed: true };
     if (needsProof && entries.some(entry => !entry)) {
         const listed = barcodeEntriesOf(item.barcodes);
         const pending = listed.length > 0 && !listed.some(({ barcode }) => barcode?.isDeducted) && entries.every(entry => !entry);
@@ -442,6 +445,7 @@ export async function restoreLedgerKeyFor(item, trashId, revenueDeltas) {
     const keys = [];
     ['daily', 'monthly'].forEach((bucket, i) => {
         const entry = entries[i];
+        if (entry?.trimmed || bucket === 'monthly' && monthTrimmed) return;
         if (!entry) {
             fallback.forEach(delta => revenueDeltas.push({ ...delta, bucket }));
             return;
@@ -852,11 +856,13 @@ export async function executePermanentDelete() {
         const done = await notifyIfSlow(purgeTrashWithRegistry(source), TRASH_WRITE_SLOW_NOTICE_MS,
             '⏳ កំពុងផ្ទៀងការលុប និងសិទ្ធិ Barcode… ទិន្នន័យនៅរង់ចាំរហូតដល់មានភស្តុតាង។');
         if (!current()) return;
-        if (!done) throw new Error('REGISTRY_PURGE_HOLD');
+        if (!done) throw new Error(done === null ? 'REGISTRY_PURGE_DEDUCTION_PENDING' : 'REGISTRY_PURGE_HOLD');
         await refresh();
     } catch (error) {
         if (!current()) return;
         try { await refresh(); } catch (readError) {}
-        if (current()) showToast('⏳ ការលុបមិនទាន់បានផ្ទៀងបញ្ចប់។ សូមរង់ចាំ Sync ហើយពិនិត្យធុងសំរាមម្ដងទៀត។');
+        if (current()) showToast(error?.message === 'REGISTRY_PURGE_DEDUCTION_PENDING'
+            ? '⏳ ការដកប្រាក់នៃកញ្ចប់នេះមិនទាន់បញ្ចប់នៅឧបករណ៍ដែលដក ឬសម្អាត — បើកឧបករណ៍នោះពេលមានបណ្តាញ ឬរង់ចាំ ៖ ពេលផុតរយៈរក្សាទុកក្នុងធុងសំរាម App ដកប្រាក់ និងលុបដោយខ្លួនឯង'
+            : '⏳ ការលុបមិនទាន់បានផ្ទៀងបញ្ចប់។ សូមរង់ចាំ Sync ហើយពិនិត្យធុងសំរាមម្ដងទៀត។');
     }
 }

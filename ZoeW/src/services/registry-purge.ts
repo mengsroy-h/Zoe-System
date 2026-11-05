@@ -1,9 +1,11 @@
 import { firebaseState } from '../core/state';
 import { liveShopScope } from '../core/shop-scope';
+import { getFormattedDate } from '../core/timezone';
 import { canonicalBarcodeRegistryKey } from '../domain/barcode-key';
 import { barcodeEntriesOf } from '../domain/barcode';
-import { REGISTRY_PURGE_MAX_WRITES, REGISTRY_RELEASES_ROOT, registryPurgeIntent, registryPurgeReceiptMatches, type RegistryPurgeReceipt } from '../domain/registry-purge-proof';
-import { TRASH_CONSUMPTIONS_ROOT, trashConsumptionOf, trashGenerationOf, trashSourceUnconsumed } from '../domain/trash-generation';
+import { ledgerDedOf, ledgerMonthTrimmed } from '../domain/ledger';
+import { REGISTRY_RELEASES_ROOT, registryPurgeReceiptMatches, slotRegistryPurgeIntent, type RegistryPurgeReceipt } from '../domain/registry-purge-proof';
+import { TRASH_CONSUMPTIONS_ROOT, purgeCertificateOf, trashConsumptionOf, trashGenerationOf, trashSourceUnconsumed } from '../domain/trash-generation';
 import { SCAN_OPERATIONS_ROOT, scanOperationValid, scanRegistryOwned } from '../domain/scan-protocol';
 import { dbOp } from './network';
 import { rowOperationActive } from './row-operation-lock';
@@ -34,7 +36,7 @@ function sourceBasis(source) {
         if (scan) intents.add(barcode.scanIntent);
         entries.push({ slot, code: barcode.code, registryKey, birth, scanIntent: scan ? barcode.scanIntent : null });
     }
-    if (!entries.length || source.count !== entries.length || 2 + 2 * entries.length > REGISTRY_PURGE_MAX_WRITES) return null;
+    if (!entries.length || source.count !== entries.length) return null;
     return { generation, deletedAt: source.deletedAt, rowBirth: legacyNumber(source.createdAt), rowCount: legacyNumber(source.count), scanDate: source.scanDate ?? null, entries };
 }
 
@@ -47,7 +49,19 @@ function sourceHeld(source) {
         || barcodeEntriesOf(source?.barcodes).some(({ barcode }) => ['trashClaim', 'trashClaimAt'].some(key => barcode?.[key] !== undefined && barcode[key] !== null));
 }
 
-export async function purgeTrashWithRegistry(source, isCurrent = () => true): Promise<boolean> {
+async function deductionSettled(source, sourceId: string, read: (path: string) => Promise<any>) {
+    if (source.trashReason !== 'returned' && source.trashReason !== 'remove'
+        || barcodeEntriesOf(source.barcodes).every(({ barcode }) => barcode?.isDeducted === true)) return true;
+    const day = source.scanDate || getFormattedDate(source.deletedAt);
+    if (typeof day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return false;
+    const month = day.slice(0, 7);
+    const [dayRecord, monthRecord] = await Promise.all([read('zoew_daily_revenue_cod_dod/' + day), read('zoew_monthly_revenue_cod_dod/' + month)]);
+    const landed = record => { const entry = ledgerDedOf(record, sourceId); return !!entry && entry.at === source.deletedAt && !entry.back; };
+    if (!landed(dayRecord)) return false;
+    return landed(monthRecord) || monthRecord === null && ledgerMonthTrimmed(await read('zoew_monthly_revenue_cod_dod'), month);
+}
+
+export async function purgeTrashWithRegistry(source, isCurrent = () => true): Promise<boolean | null> {
     const owner = { db: firebaseState.db, sdk: firebaseState.fb, generation: firebaseState.authGeneration,
         uid: firebaseState.auth?.currentUser?.uid, scope: liveShopScope() };
     const current = () => isCurrent() && owner.db === firebaseState.db && owner.sdk === firebaseState.fb && owner.generation === firebaseState.authGeneration
@@ -72,6 +86,7 @@ export async function purgeTrashWithRegistry(source, isCurrent = () => true): Pr
         const consumed = await read(TRASH_CONSUMPTIONS_ROOT + '/' + sourceId);
         const currentSource = { ...authoritative, id: sourceId };
         if (!current() || consumed !== null && consumed?.scope !== owner.scope || !trashSourceUnconsumed(currentSource, consumed)) return false;
+        if (!await deductionSettled(currentSource, sourceId, read)) return current() ? null : false;
         const consumption = trashConsumptionOf(currentSource, 'purge', { uid: owner.uid, scope: owner.scope });
         if (!consumption) return false;
         const receipts: RegistryPurgeReceipt[] = [];
@@ -88,12 +103,18 @@ export async function purgeTrashWithRegistry(source, isCurrent = () => true): Pr
                 actorUid, releasedBy: owner.uid, scope: owner.scope, code: entry.code, registryKey: entry.registryKey, birth: entry.birth,
                 trashId: sourceId, slot: entry.slot, deletedAt: basis.deletedAt, rowBirth: basis.rowBirth, rowCount: basis.rowCount });
         }
-        const updates: Record<string, any> = { ['zoew_recently_deleted_cod_dod/' + sourceId]: null, [TRASH_CONSUMPTIONS_ROOT + '/' + sourceId]: consumption };
+        const certificate = purgeCertificateOf(receipts);
+        const fields = Object.keys(authoritative).filter(key => key !== 'barcodes');
+        if (!certificate || !fields.length || fields.some(key => !text(key, 768) || /[.#$\[\]\/]/.test(key))) return false;
+        const updates: Record<string, any> = {};
         for (const receipt of receipts) {
+            updates['zoew_recently_deleted_cod_dod/' + sourceId + '/barcodes/' + receipt.slot] = null;
             updates['zoew_barcode_registry/' + receipt.registryKey] = null;
             updates[REGISTRY_RELEASES_ROOT + '/' + receipt.id] = receipt;
         }
-        if (!registryPurgeIntent(Object.entries(updates).map(([path, value]) => ({ k: 'set', p: path.split('/'), v: value })))) return false;
+        for (const field of fields) updates['zoew_recently_deleted_cod_dod/' + sourceId + '/' + field] = null;
+        updates[TRASH_CONSUMPTIONS_ROOT + '/' + sourceId] = { ...consumption, ...certificate };
+        if (!slotRegistryPurgeIntent(Object.entries(updates).map(([path, value]) => ({ k: 'set', p: path.split('/'), v: value })))) return false;
         const receiptState = async () => {
             const actual = await Promise.all(receipts.map(receipt => read(REGISTRY_RELEASES_ROOT + '/' + receipt.id)));
             return actual.every((value, index) => registryPurgeReceiptMatches(receipts[index], value)) ? 'done'
@@ -111,8 +132,10 @@ export async function purgeTrashWithRegistry(source, isCurrent = () => true): Pr
             return Object.entries(rows || {}).some(([id, item]: [string, any]) => !(inTrash && id === sourceId)
                 && barcodeEntriesOf(item?.barcodes).some(({ barcode }) => wanted.has(canonicalBarcodeRegistryKey(barcode?.code))));
         };
-        if (otherHolder(history, false) || otherHolder(trash, true) || !current() || sourceHeld(trash?.[sourceId])
-            || JSON.stringify(sourceBasis(trash?.[sourceId])) !== JSON.stringify(basis)) return false;
+        const latest = trash?.[sourceId];
+        if (otherHolder(history, false) || otherHolder(trash, true) || !current() || sourceHeld(latest)
+            || JSON.stringify(sourceBasis(latest)) !== JSON.stringify(basis)
+            || Object.keys(latest).filter(key => key !== 'barcodes').sort().join('/') !== fields.slice().sort().join('/')) return false;
         try { await dbOp(owner.sdk.update(owner.sdk.ref(owner.db), updates)); } catch (error) {}
         if (!current()) return false;
         const settled = await receiptState();

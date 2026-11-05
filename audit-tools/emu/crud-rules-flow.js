@@ -54,7 +54,7 @@ const src = fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, '\n');
 let SANDBOX_SOURCE = '';
 let acorn = null;
 try { acorn = require('acorn'); } catch (e) {}
-const FNS = ['getZtoPickupVerdict', 'ztoVerdictCandidate', 'ztoImportLegacyValid', 'readDurableZtoImportLegacy', 'clearHistoryClaimValid', 'rawSnapshotToItemList', 'txCanonical', 'txSameValue', 'dbListenerViewIsStale', 'barcodeEntriesOf', 'recalcItemMoneyFromBarcodes', 'normalizeBarcodesOf', 'ensureBarcodeArrayForItem', 'stripHistoryOnlyMarkers', 'trashClaimPolicy', 'newTrashClaimToken', 'trashClaimAge', 'trashClaimHeldByOther', 'ownLeftoverTrashClaim', 'trashClaimOwned', 'stripTrashClaim', 'itemHasLiveTrashClaim', 'trashClaimRecords', 'writeTrashClaimRecords', 'noteTrashClaim', 'forgetTrashClaim', 'pendingTrashClaims', 'trashClaimOwner', 'trashClaimOwnerIsCurrent', 'claimTrashBarcodes', 'releaseTrashClaims', 'beginTrashClaim', 'releaseLeftoverTrashClaims', 'itemHasRestoreMarkers', 'dropStaleRestoreMarkers',
+const FNS = ['getZtoPickupVerdict', 'ztoVerdictCandidate', 'ztoImportLegacyValid', 'readDurableZtoImportLegacy', 'clearHistoryClaimValid', 'rawSnapshotToItemList', 'txCanonical', 'txSameValue', 'txDelay', 'dbListenerViewIsStale', 'barcodeEntriesOf', 'recalcItemMoneyFromBarcodes', 'normalizeBarcodesOf', 'ensureBarcodeArrayForItem', 'stripHistoryOnlyMarkers', 'trashClaimPolicy', 'newTrashClaimToken', 'trashClaimAge', 'trashClaimHeldByOther', 'ownLeftoverTrashClaim', 'trashClaimOwned', 'stripTrashClaim', 'itemHasLiveTrashClaim', 'trashClaimRecords', 'writeTrashClaimRecords', 'noteTrashClaim', 'forgetTrashClaim', 'pendingTrashClaims', 'trashClaimOwner', 'trashClaimOwnerIsCurrent', 'claimTrashBarcodes', 'releaseTrashClaims', 'beginTrashClaim', 'releaseLeftoverTrashClaims', 'itemHasRestoreMarkers', 'dropStaleRestoreMarkers',
     'barcodeSignBasis', 'ztoAutoCloseEnabled', 'ztoFastModeIsOn', 'flushPendingRegistryReleases', 'ownedRegistryKeys', 'registryKeyIsOwned', 'registryReleaseVerdict', 'releaseRegistryKeys', 'queueRegistryReleaseRetry',
     'runAutomaticCollectedCleanup', 'staleCollectedDays', 'reapplyPickupMarks', 'revertPickupMarks', 'healPickupKeysLeftRow',
     'getZtoTrashMode', 'ztoTrashModeOf', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'sameShop', 'lookupApiIsZto', 'lookupApiIsPalm', 'stampTrashPolicy',
@@ -76,7 +76,7 @@ const FNS = ['getZtoPickupVerdict', 'ztoVerdictCandidate', 'ztoImportLegacyValid
 //    ដើម្បីឲ្យ payload `ded` ពិតទៅដល់ rules ពិត (ផ្នែក ៥)។ tree មុនកែ ➜ stub (ផ្លូវចាស់មិនហៅវា)។
 const KEYED_FNS = ['ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'applyLedgerBucketDelta', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness',
     'ledgerTagged', 'runLedgerTransaction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf',
-    'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep',
+    'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMonthTrimmed', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep',
     'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue',
     'cleanupJournalClaimMatches', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'cleanupPartialTrashId', 'trashSlotSharesClaim'];
 
@@ -154,7 +154,12 @@ function sandboxUnresolvedNames(ast, globals) {
 function makeSandbox(store, now) {
     const w = { store, now, writes: [], toasts: [], revenueCalls: [] };
     const get = (raw) => { let c = store; for (const p of String(raw || '').split('/').filter(Boolean)) { if (!c || typeof c !== 'object') return null; c = c[p]; } return c === undefined ? null : c; };
-    const set = (raw, v) => { const parts = String(raw || '').split('/').filter(Boolean); let c = store; for (let i = 0; i < parts.length - 1; i++) { if (!c[parts[i]] || typeof c[parts[i]] !== 'object') c[parts[i]] = {}; c = c[parts[i]]; } const k = parts[parts.length - 1]; if (v === null) delete c[k]; else c[k] = clone(v); };
+    const set = (raw, v) => { const parts = String(raw || '').split('/').filter(Boolean); let c = store; for (let i = 0; i < parts.length - 1; i++) { if (!c[parts[i]] || typeof c[parts[i]] !== 'object') c[parts[i]] = {}; c = c[parts[i]]; } const k = parts[parts.length - 1]; if (v === null) delete c[k]; else c[k] = clone(v);
+        if (v === null) for (let depth = parts.length - 1; depth > 0; depth--) {
+            const container = get(parts.slice(0, depth).join('/'));
+            if (!container || typeof container !== 'object' || Object.values(container).some(value => value !== undefined && value !== null)) break;
+            delete get(parts.slice(0, depth - 1).join('/'))[parts[depth - 1]];
+        } };
     const fb = {
         ref: (db, raw) => ({ path: raw === undefined ? '' : String(raw) }),
         increment: (n) => ({ '.sv': { increment: Number(n) } }),
@@ -180,8 +185,8 @@ function makeSandbox(store, now) {
         }),
         remove: (ref) => Promise.resolve().then(() => { w.writes.push({ method: 'PUT', path: ref.path, value: null }); set(ref.path, null); })
     };
-    const ctx = vm.createContext({ ztoState: { ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 }, ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 } }, ZTO_TRASH_MODE_ACTIVE_MS: 7 * 24 * 60 * 60 * 1000, ztoTrashModeSeen: null, serverTimeOffsetMs: 0, hasEverConnectedToDatabase: true, 
-        console, queueMicrotask, setTimeout, clearTimeout, Promise, Math, Date, JSON, Set, Map, URL, window: { location: { href: 'https://example.invalid/' } }, ZoeErrors: null,
+    const ctx = vm.createContext({ runEvidenceRetentionSweep: async () => 0, ztoState: { ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 }, ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 } }, ZTO_TRASH_MODE_ACTIVE_MS: 7 * 24 * 60 * 60 * 1000, ztoTrashModeSeen: null, serverTimeOffsetMs: 0, hasEverConnectedToDatabase: true, 
+        console, queueMicrotask, setTimeout, clearTimeout, Promise, Math, Date, JSON, Set, Map, URL, TextEncoder, window: { location: { href: 'https://example.invalid/' } }, ZoeErrors: null,
         navigator: { onLine: true },
         db: { app: { options: { databaseURL: 'https://crud-fixture.invalid' } } }, authGeneration: 0, isInitializingFirebase: false, fb,
         isDatabaseInitialized: true, dbListenersFailed: false, registryReleaseFlushInFlight: false,
@@ -321,7 +326,7 @@ function makeSandbox(store, now) {
         ...['pickupCopyMarks', 'trashReasonDeducted', 'restorePendingCode'].map((n) => optionalFn(src, n, '')),
         'globalThis.api = { ' + FNS.join(', ') + ' };'
     ].join('\n\n');
-    const runtime = moduleRuntime(ROOT, src, [{ path: 'src/services/scan-import-proof.ts', expose: ['createScanImportProofCache'] }, 'src/domain/scan-protocol.ts', { path: 'src/domain/registry-purge-proof.ts', expose: ['REGISTRY_RELEASES_ROOT', 'REGISTRY_PURGE_MAX_WRITES', 'registryPurgeReceiptValid', 'registryPurgeReceiptMatches', 'registryPurgeIntent'] }, { path: 'src/services/registry-purge.ts', expose: ['purgeTrashWithRegistry'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
+    const runtime = moduleRuntime(ROOT, src, [{ path: 'src/services/scan-import-proof.ts', expose: ['createScanImportProofCache'] }, 'src/domain/scan-protocol.ts', { path: 'src/domain/registry-purge-proof.ts', expose: ['REGISTRY_RELEASES_ROOT', 'REGISTRY_PURGE_MAX_WRITES', 'boundedRegistryPurgeIntent', 'slotRegistryPurgeIntent', 'registryPurgeReceiptValid', 'registryPurgeReceiptMatches', 'registryPurgeIntent'] }, { path: 'src/services/registry-purge.ts', expose: ['purgeTrashWithRegistry'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
     SANDBOX_SOURCE = runtime.code + '\n' + runtime.withoutBindings(assembled);
     new vm.Script(SANDBOX_SOURCE).runInContext(ctx);
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
@@ -446,6 +451,33 @@ async function clearOrphanBeforeRetry(w, label) {
             console.log('   បន្ថែមវាក្នុង `FNS` ឬក្នុង context របស់ `makeSandbox()`។');
             process.exit(1);
         }
+        const purgeRow = parcel('preflight_purge', [bc('PREFLIGHT_PURGE', 1, false)], { deletedAt: Date.now() - 1000, trashGeneration: 1 });
+        const purgeMoney = { codDollar: 7, dodDollar: 2, totalCount: 1 };
+        const purgeWorld = makeSandbox({ zoew_scan_history_cod_dod: {}, zoew_recently_deleted_cod_dod: { [purgeRow.id]: clone(purgeRow) },
+            zoew_barcode_registry: { PREFLIGHT_PURGE: true }, zoew_daily_revenue_cod_dod: { '2026-08-26': clone(purgeMoney) },
+            zoew_monthly_revenue_cod_dod: { '2026-08': clone(purgeMoney) } }, Date.now());
+        const purged = await purgeWorld.ctx.purgeTrashWithRegistry(clone(purgeRow));
+        const atomic = purgeWorld.writes.find(write => write.method === 'PATCH' && write.path === '');
+        check(purged === true && purgeWorld.writes.length === 1 && atomic && Object.keys(atomic.value).length === 1 + 3 + Object.keys(purgeRow).filter(key => key !== 'barcodes').length
+            && !Object.keys(atomic.value).includes('zoew_recently_deleted_cod_dod/preflight_purge')
+            && atomic.value['zoew_recently_deleted_cod_dod/preflight_purge/barcodes/0'] === null
+            && !purgeWorld.store.zoew_recently_deleted_cod_dod?.preflight_purge && !purgeWorld.store.zoew_barcode_registry?.PREFLIGHT_PURGE
+            && Object.keys(purgeWorld.store.zoew_registry_releases || {}).length === 1
+            && purgeWorld.store.zoew_trash_consumptions?.preflight_purge?.kind === 'purge'
+            && isDeepStrictEqual(purgeWorld.store.zoew_daily_revenue_cod_dod['2026-08-26'], purgeMoney)
+            && isDeepStrictEqual(purgeWorld.store.zoew_monthly_revenue_cod_dod['2026-08'], purgeMoney),
+            'sandbox៖ actual bounded N1 purge ចុះ source/registry/receipt/consumption ក្នុង update តែមួយ មិនប៉ះប្រាក់');
+        const purgeOps = Object.entries(atomic?.value || {}).map(([key, value]) => ({ k: 'set', p: key.split('/'), v: value }));
+        check(!!purgeWorld.ctx.boundedRegistryPurgeIntent(purgeOps) && !!purgeWorld.ctx.slotRegistryPurgeIntent(purgeOps)
+            && purgeWorld.ctx.boundedRegistryPurgeIntent(purgeOps.filter(op => op.p[0] !== 'zoew_barcode_registry')) === null,
+            'sandbox៖ actual bounded parser ទទួល full effects និងបដិសេធ missing registry pair');
+        const malformedRow = { ...clone(purgeRow), count: 2 };
+        const malformedWorld = makeSandbox({ zoew_scan_history_cod_dod: {}, zoew_recently_deleted_cod_dod: { [malformedRow.id]: clone(malformedRow) },
+            zoew_barcode_registry: { PREFLIGHT_PURGE: true } }, Date.now());
+        check(await malformedWorld.ctx.purgeTrashWithRegistry(clone(malformedRow)) === false && malformedWorld.writes.length === 0
+            && isDeepStrictEqual(malformedWorld.store.zoew_recently_deleted_cod_dod.preflight_purge, malformedRow)
+            && malformedWorld.store.zoew_barcode_registry.PREFLIGHT_PURGE === true,
+            'sandbox៖ malformed purge basis នៅ HOLD មិនលុប source/registry');
     } catch (sandboxError) {
         check(false, 'sandbox៖ ស្រង់ និងរត់ function ពិតបាន (គ្មាន ReferenceError) — មិនត្រូវការ emulator',
             String(sandboxError && sandboxError.message || sandboxError));
@@ -463,12 +495,12 @@ async function clearOrphanBeforeRetry(w, label) {
         load = await asOwner('PUT', '/.settings/rules.json', JSON.parse(fs.readFileSync(path.join(ROOT, 'firebase-database.rules.json'), 'utf8')));
     } catch (connectError) {
         console.log((strictMode ? 'FAIL' : 'SKIP') + ' — តភ្ជាប់ទៅ emulator មិនបាន (127.0.0.1:9000): ' + connectError.message);
-        if (strictMode) console.log('        CRUD_FLOW_STRICT=1 ➜ ការ SKIP ត្រូវរាប់ជាការធ្លាក់ (កុំឲ្យ CI បៃតងក្លែងក្លាយ)');
+        if (strictMode) console.log('        CRUD_FLOW_STRICT=1 ➜ ការរំលងត្រូវរាប់ជាការធ្លាក់ (កុំឲ្យ CI បៃតងក្លែងក្លាយ)');
         process.exit(strictMode ? 1 : 0);
     }
     if (!/"status"\s*:\s*"ok"/.test(load.body)) {
         console.log((strictMode ? 'FAIL' : 'SKIP') + ' — rules load មិនបាន: ' + load.body.slice(0, 160));
-        if (strictMode) console.log('        CRUD_FLOW_STRICT=1 ➜ ការ SKIP ត្រូវរាប់ជាការធ្លាក់ (កុំឲ្យ CI បៃតងក្លែងក្លាយ)');
+        if (strictMode) console.log('        CRUD_FLOW_STRICT=1 ➜ ការរំលងត្រូវរាប់ជាការធ្លាក់ (កុំឲ្យ CI បៃតងក្លែងក្លាយ)');
         process.exit(strictMode ? 1 : 0);
     }
     const invalidCollected = await asUser('PUT', '/zoew_daily_collected_cod_dod/2026-08-26/invalid_probe.json', { c: -1, d: 0 });

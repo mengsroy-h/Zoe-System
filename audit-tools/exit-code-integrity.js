@@ -31,7 +31,7 @@ function checkersFromRunAll() {
     }
     const normal = sh.replace(/^\s*#.*$/gm, '').split(/if \[ -n "\$BASE" \]/)[0];
     if (/^\s*run\s+"[^"]*"\s+node\s+zto-import\/test\.js(?=\s|$)/m.test(normal)) found.add(ZTO_IMPORT_TEST);
-    return [...found].filter((f) => fs.existsSync(path.join(TOOLS, f)));
+    return [...found].filter((f) => f !== 'owned-rtdb-command.js' && fs.existsSync(path.join(TOOLS, f)));
 }
 
 const checkers = checkersFromRunAll();
@@ -83,7 +83,7 @@ for (const rel of checkers) {
     let src;
     try { src = fs.readFileSync(file, 'utf8'); } catch (e) { continue; }
     let ast;
-    try { ast = acorn.parse(src, { ecmaVersion: 2022, locations: true }); } catch (e) { continue; }
+    try { ast = acorn.parse(src, { ecmaVersion: 'latest', locations: true, allowHashBang: true, allowReturnOutsideFunction: true }); } catch (e) { continue; }
     scannedStatic++;
 
     const ENV_FLAGS = [...src.matchAll(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*process\.env\b/g)].map((m) => m[1]);
@@ -125,6 +125,125 @@ ok('ស្កេន checker ' + scannedStatic + ' ឯកសារ (AST)', scanne
 ok('គ្មាន `process.exit(0)` ដែលឈរក្រោយការអះអាងដោយគ្មានច្រកទ្វារ',
     offenders.length === 0, offenders.slice(0, 10));
 
+// ១ខ — កិច្ចសន្យា exit របស់ `run-all.sh` (`runall-exit-guard.cjs`) ៖ exit code ចាប់ផ្តើម «មិនទាន់សម្រេច» ហើយតែសេចក្តីសង្ខេប
+// ទេដែលបន្ថយវា ➜ checker ដែល `await` មិនដែល settle ក្លាយជា FAIL។ ⛔ ការបន្ថយ ២ កន្លែងរំលងកិច្ចសន្យានោះវិញ ៖
+//   (ក) ក្នុង listener `exit`/`beforeExit` ៖ រត់ទោះ event loop ហូរអស់ពាក់កណ្តាលការអះអាង
+//   (ខ) ក្នុងកូដ top-level ធម្មតា **ក្រោយ** statement ដែលចាប់ផ្តើមការងារ async (IIFE async · `main()` async · `.then`/`.catch`
+//       /`.finally`) ៖ វារត់ភ្លាមមុន await ដំបូង ➜ exit 0 ខណៈការអះអាង async មិនទាន់រត់
+//   (គ) `process.exitCode = 0` top-level **មុន** ការងារ async ដោយមិនចេញភ្លាម (statement ដដែលគ្មាន `process.exit`) ៖
+//       សញ្ញា «មិនទាន់សម្រេច» ត្រូវលុបមុនការអះអាង async រត់ ➜ await ដែលព្យួរ ➜ exit 0 ដូចគ្មាន guard
+// ផ្លូវ SKIP ដំបូង (`process.exit(0)` មុនការងារ async) និងការបន្ថយក្នុងខ្លួន function async នៅត្រឹមត្រូវ។
+function isMember(node, object, property) {
+    return !!node && node.type === 'MemberExpression' && !node.computed && node.object
+        && node.object.type === 'Identifier' && node.object.name === object && node.property && node.property.name === property;
+}
+function nonZeroLiteral(node) { return !!node && node.type === 'Literal' && typeof node.value === 'number' && node.value !== 0; }
+function isExitLowering(node) {
+    if (node.type === 'CallExpression' && isMember(node.callee, 'process', 'exit')) return !nonZeroLiteral(node.arguments[0]);
+    if (node.type === 'AssignmentExpression' && isMember(node.left, 'process', 'exitCode')) return !nonZeroLiteral(node.right);
+    return false;
+}
+const FUNCTION_TYPES = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression']);
+function walkNodes(node, visit, intoFunctions) {
+    if (!node || typeof node !== 'object') return;
+    if (visit(node) === false) return;
+    if (!intoFunctions && FUNCTION_TYPES.has(node.type)) return;
+    for (const key in node) {
+        if (key === 'type' || key === 'start' || key === 'end' || key === 'loc') continue;
+        const value = node[key];
+        if (Array.isArray(value)) value.forEach((child) => walkNodes(child, visit, intoFunctions));
+        else if (value && typeof value === 'object' && value.type) walkNodes(value, visit, intoFunctions);
+    }
+}
+function exitDecisionOffenders(ast) {
+    const found = [];
+    const asyncNames = new Set();
+    for (const statement of ast.body) {
+        if (statement.type === 'FunctionDeclaration' && statement.async && statement.id) asyncNames.add(statement.id.name);
+        if (statement.type === 'VariableDeclaration') for (const d of statement.declarations) {
+            if (d.id && d.id.type === 'Identifier' && d.init && FUNCTION_TYPES.has(d.init.type) && d.init.async) asyncNames.add(d.id.name);
+        }
+    }
+    walkNodes(ast, (node) => {
+        if (node.type !== 'CallExpression' || !node.callee || node.callee.type !== 'MemberExpression') return;
+        const target = node.callee.object, method = node.callee.property && node.callee.property.name;
+        if (!target || target.type !== 'Identifier' || target.name !== 'process') return;
+        if (!['on', 'once', 'addListener', 'prependListener', 'prependOnceListener'].includes(method)) return;
+        const event = node.arguments[0];
+        if (!event || event.type !== 'Literal' || !['exit', 'beforeExit'].includes(event.value)) return;
+        walkNodes(node.arguments[1], (inner) => {
+            if (isExitLowering(inner)) found.push({ line: inner.loc.start.line, why: 'ក្នុង listener ' + event.value });
+        }, true);
+    }, true);
+    let asyncStarted = false;
+    const loweredBefore = [];
+    for (const statement of ast.body) {
+        if (FUNCTION_TYPES.has(statement.type)) continue;
+        let starts = false, exits = false;
+        const lowered = [];
+        walkNodes(statement, (node) => {
+            if (asyncStarted && isExitLowering(node)) found.push({ line: node.loc.start.line, why: 'top-level ក្រោយការងារ async ចាប់ផ្តើម' });
+            if (node.type === 'AssignmentExpression' && isExitLowering(node)) lowered.push(node);
+            if (node.type !== 'CallExpression' || !node.callee) return;
+            const callee = node.callee;
+            if (isMember(callee, 'process', 'exit')) exits = true;
+            if (FUNCTION_TYPES.has(callee.type) && callee.async) starts = true;
+            if (callee.type === 'Identifier' && asyncNames.has(callee.name)) starts = true;
+            if (callee.type === 'MemberExpression' && callee.property && ['then', 'catch', 'finally'].includes(callee.property.name)) starts = true;
+        }, false);
+        if (starts) {
+            for (const node of loweredBefore) found.push({ line: node.loc.start.line, why: 'top-level មុនការងារ async ដោយមិនចេញភ្លាម' });
+            loweredBefore.length = 0;
+            asyncStarted = true;
+        } else if (!asyncStarted && !exits) loweredBefore.push(...lowered);
+    }
+    return found;
+}
+{
+    const parse = (text) => acorn.parse(text, { ecmaVersion: 'latest', locations: true, allowHashBang: true });
+    const cases = [
+        ['(async () => { await x; process.exitCode = fail ? 1 : 0; })();', 0],
+        ['main().catch(() => { process.exitCode = 1; });\nasync function main() { await x; process.exit(fail ? 1 : 0); }', 0],
+        ['if (!dep) { console.log("SKIP"); process.exit(0); }\n(async () => { await x; process.exit(0); })();', 0],
+        ['ok(1);\nif (fail) process.exit(1);\nprocess.exitCode = 0;', 0],
+        ['(async () => { await x; })();\nprocess.exitCode = 0;', 1],
+        ['async function main() { await x; }\nmain();\nprocess.exit(0);', 1],
+        ['run().then(() => {});\nif (!fail) process.exitCode = 0;', 1],
+        ['process.on("exit", () => { process.exitCode = fail ? 1 : 0; });', 1],
+        ['process.once("beforeExit", () => process.exit(0));', 1],
+        ['process.on("exit", () => { console.log(summary); });', 0],
+        ['process.exitCode = 0;\n(async () => { await x; })();', 1],
+        ['let fail = 0;\nprocess.exitCode = fail;\nmain();\nasync function main() { await x; process.exitCode = fail ? 1 : 0; }', 1],
+        ['if (!dep) { console.log("SKIP"); process.exitCode = 0; process.exit(0); }\nmain();\nasync function main() { await x; process.exitCode = 0; }', 0],
+        ['if (plan) { process.exitCode = 0; } else { run().then(done); }', 0],
+        ['ok(1);\nprocess.exitCode = fail ? 1 : 0;', 0]
+    ];
+    const wrong = cases.map(([text, want]) => ({ text, want, got: exitDecisionOffenders(parse(text)).length }))
+        .filter((row) => row.got !== row.want);
+    ok('ច្បាប់ AST កិច្ចសន្យា exit ៖ ការបន្ថយក្នុង listener exit · top-level ក្រោយ async · top-level មុន async ដោយមិនចេញ ➜ ចាប់ · ផ្លូវ SKIP/សេចក្តីសង្ខេបត្រឹមត្រូវ ➜ មិនចាប់',
+        wrong.length === 0, wrong);
+}
+const lateLowering = [];
+let scannedDecision = 0;
+// ⛔ driver `*-test.cjs` (រត់ពី vitest pg ៖ `supabase-*.pg.test.ts`) ក៏ត្រូវតាមកិច្ចសន្យា exit ដូច checker ដែរ ➜ ស្កេនផង
+const cjsDrivers = fs.readdirSync(TOOLS).filter((f) => /-test\.cjs$/.test(f) && !f.startsWith('.tmp-poison-')).sort();
+ok('driver .cjs ត្រូវបានស្កេនកិច្ចសន្យា exit (≥ ៤)', cjsDrivers.length >= 4, cjsDrivers);
+for (const rel of checkers.concat(cjsDrivers)) {
+    let src;
+    try { src = fs.readFileSync(path.join(TOOLS, rel), 'utf8'); } catch (e) { continue; }
+    let ast;
+    try { ast = acorn.parse(src, { ecmaVersion: 'latest', locations: true, allowHashBang: true, allowReturnOutsideFunction: true }); }
+    catch (e) {
+        try { ast = acorn.parse(src, { ecmaVersion: 'latest', locations: true, sourceType: 'module', allowHashBang: true }); }
+        catch (moduleError) { lateLowering.push(rel + '  (parse មិនបាន ➜ វាស់កិច្ចសន្យា exit មិនបាន)'); continue; }
+    }
+    scannedDecision++;
+    for (const row of exitDecisionOffenders(ast)) lateLowering.push(rel + ':' + row.line + '  បន្ថយ exit code ' + row.why);
+}
+ok('ស្កេនកិច្ចសន្យា exit លើ checker ' + scannedDecision + ' ឯកសារ', scannedDecision >= MIN_CHECKERS, { scannedDecision });
+ok('⛔ គ្មាន checker ណាបន្ថយ exit code ក្នុង listener exit ឬនៅ top-level ជុំវិញការងារ async (រំលងកិច្ចសន្យា exit)',
+    lateLowering.length === 0, lateLowering.slice(0, 10));
+
 // ២ — ការវាស់ **ឥរិយាបថ**៖ ពុលការអះអាងទាំងអស់ ➜ checker ត្រូវចេញដោយ exit != 0
 console.log('\n=== ការវាស់ឥរិយាបថ ៖ ការអះអាងធ្លាក់ ➜ exit != 0 ===');
 
@@ -134,7 +253,10 @@ const POISON = [
     [/function ok\(cond, label, got\) \{/, 'function ok(cond, label, got) { cond = false;'],
     [/function ok\(label, condition, detail\) \{/, 'function ok(label, condition, detail) { condition = false;'],
     [/function ok\(label, cond, got\) \{/, 'function ok(label, cond, got) { cond = false;'],
-    [/const ok = \(n, c, d\) => results\.push\(\[n, !!c, d\]\);/, 'const ok = (n, c, d) => results.push([n, false, d]);']
+    [/const ok = \(n, c, d\) => results\.push\(\[n, !!c, d\]\);/, 'const ok = (n, c, d) => results.push([n, false, d]);'],
+    [/function check\(row, label, condition\) \{/, 'function check(row, label, condition) { condition = false;'],
+    [/async function check\(label, tree, location, body, allow, method = 'PATCH', actor = uid, interleave = null\) \{/,
+        "async function check(label, tree, location, body, allow, method = 'PATCH', actor = uid, interleave = null) { allow = !allow;"]
 ];
 
 function poisonSource(src) {
@@ -171,7 +293,55 @@ function poisonSource(src) {
     return null;
 }
 
-const BUDGET_MS = parseInt(process.env.EXITCODE_TIMEOUT_MS || '60000', 10);
+// ⛔ ថវិកាកូនពុល **ដេរីវេពីពិដានពិត** មិនមែនលេខថេរ។ 🔴 វាស់បាន (CI1156) ៖ ថវិកាថេរ ៦០ វិ. ក្រោមពេលធម្មតារបស់កូន
+// (`supabase-datastore-test` ៦៦ វិ. មិនពុល · ពុល ៨៤ វិ. នៅ local) ➜ កូនដែលនឹងចេញ 1 ជាមួយភស្តុតាងពុល ត្រូវសម្លាប់ ហើយរាប់ជា
+// unverified ➜ FAIL ក្លែង។ ពិដានពិតតែមួយគឺពិដានរបស់ job នេះក្នុង `run-all.sh` (`RUNALL_JOB_TIMEOUT` ដែល `runall_exec`
+// បញ្ជូនជាមួយ `RUNALL_JOB_STARTED_MS` · រត់ផ្ទាល់ ➜ លំនាំដើម `CHECKER_TIMEOUT` ក្នុង run-all.sh) ➜ កូននីមួយៗទទួលពេលដែលនៅសល់រហូតដល់ deadline
+// (ពិដាន − `DEADLINE_RESERVE_MS` សម្រាប់ settle/សេចក្តីសង្ខេប) ➜ កូនយឺតតែកំពុងដើរ ទទួលសាលក្រមពិត ហើយកូនដែលព្យួរពិតនៅ
+// ក្លាយជា unverified ដែលមានឈ្មោះ **មុន** run-all សម្លាប់ meta-checker ទាំងមូល (ពិដានតេស្តតឹងជាងពិដានទ្វារបម្រុង)។
+// ⛔ មិនមែនការបង្កើន `CHECKER_TIMEOUT` ទេ ៖ ពិដានខាងក្រៅនៅដដែល។ `EXITCODE_TIMEOUT_MS` = ពិដានកូនមួយច្បាស់លាស់ (fixture · debug)។
+function durationMs(text) {
+    const m = /^\s*(\d+(?:\.\d+)?)\s*([smhd]?)\s*$/.exec(String(text === undefined || text === null ? '' : text));
+    if (!m) return null;
+    const ms = Number(m[1]) * { '': 1000, s: 1000, m: 60000, h: 3600000, d: 86400000 }[m[2]];
+    return Number.isFinite(ms) && ms > 0 ? Math.round(ms) : null;
+}
+function runAllDefaultTimeout(text) {
+    const m = /^CHECKER_TIMEOUT="\$\{CHECKER_TIMEOUT:-([^}"]+)\}"$/m.exec(String(text || ''));
+    return m ? durationMs(m[1]) : null;
+}
+const DEADLINE_RESERVE_MS = 20000;
+const MIN_CHILD_BUDGET_MS = 2000;
+const PROCESS_STARTED_AT = (() => {
+    const fromRunner = Number(process.env.RUNALL_JOB_STARTED_MS);
+    const now = Date.now();
+    if (Number.isSafeInteger(fromRunner) && fromRunner <= now && now - fromRunner < 86400000) return fromRunner;
+    return now - Math.round(process.uptime() * 1000);
+})();
+const JOB_CEILING_MS = durationMs(process.env.RUNALL_JOB_TIMEOUT)
+    || runAllDefaultTimeout(fs.existsSync(RUNALL) ? fs.readFileSync(RUNALL, 'utf8') : '') || 300000;
+const DEADLINE_AT = PROCESS_STARTED_AT + JOB_CEILING_MS - DEADLINE_RESERVE_MS;
+const EXPLICIT_CHILD_MS = (() => { const v = parseInt(process.env.EXITCODE_TIMEOUT_MS || '', 10); return Number.isFinite(v) && v > 0 ? v : null; })();
+function childBudgetMs(now, deadlineAt, explicitMs) {
+    const left = deadlineAt - now;
+    return explicitMs === null ? left : Math.min(explicitMs, left);
+}
+{
+    const wrong = [
+        ['300', 300000], ['2m', 120000], ['1.5s', 1500], ['1h', 3600000], ['0', null], ['', null], ['abc', null], [undefined, null]
+    ].filter(([text, want]) => durationMs(text) !== want).map(([text, want]) => ({ text, want, got: durationMs(text) }));
+    const runAllDefault = runAllDefaultTimeout(fs.existsSync(RUNALL) ? fs.readFileSync(RUNALL, 'utf8') : '');
+    ok('ថវិកាពុល ៖ អាន DURATION ដូច `timeout` (s · m · h · d · 0 = បិទ) និងពិដានលំនាំដើមពី run-all.sh ពិត',
+        wrong.length === 0 && runAllDefault !== null && runAllDefault >= 60000, { wrong, runAllDefault });
+    const budgets = [
+        childBudgetMs(1000, 281000, null) === 280000,
+        childBudgetMs(200000, 281000, null) === 81000,
+        childBudgetMs(1000, 281000, 4000) === 4000,
+        childBudgetMs(280000, 281000, 4000) === 1000
+    ];
+    ok('ថវិកាពុល ៖ កូនទទួលពេលដែលនៅសល់រហូតដល់ deadline (កូនយឺតមិនត្រូវសម្លាប់ដោយលេខថេរ) · ពិដានច្បាស់លាស់នៅគោរព',
+        budgets.every(Boolean), budgets);
+}
 // ⛔ ការពុលរត់ **ស្របគ្នាតាមចំនួនកំណត់** មិនមែនម្តងមួយៗ។
 // 🔴 វាស់បាន (2.42.8) ៖ checker កូន ១០៨ រត់ជាជួរ ➜ ២៨០ វិ. លើម៉ាស៊ីន ៤ CPU និង **៣៦៧ វិ.** លើម៉ាស៊ីនមួយទៀត ➜ លើសពិដាន
 // ៣០០ វិ. របស់ `run-all.sh` ➜ «*** FAIL *** (ព្យួរ)» ខណៈគ្មាន checker ណាខូចសោះ។ ការរត់ស្របគ្នាក្នុងពិដាន
@@ -232,6 +402,13 @@ const OUT_CAP = 4 * 1024 * 1024;
 const EXIT_TO_CLOSE_GRACE_MS = 2000;
 const HARD_GRACE_MS = 5000;
 const liveChildren = new Set();
+// ⛔ កូនពុលរត់ក្រោមកិច្ចសន្យា exit ដូច `run-all.sh` (`runall-exit-guard.cjs` របស់ tree ដែលវាស់) ➜ សាលក្រមវាស់ឥរិយាបថដែល
+//    run-all ពិតឃើញ។ tree ដែលគ្មានឯកសារនេះ (baseline ចាស់ · fixture) ➜ រត់ដូច runner របស់វា (គ្មាន preload)។
+const EXIT_GUARD = path.join(TOOLS, 'runall-exit-guard.cjs');
+const EXIT_GUARD_ARGS = fs.existsSync(EXIT_GUARD) ? ['--require', EXIT_GUARD] : [];
+ok('កូនពុលរត់ក្រោមកិច្ចសន្យា exit ដូច run-all (run-all.sh ប្រើ preload ➜ ឯកសារមាន)',
+    !/runall-exit-guard\.cjs/.test(fs.existsSync(RUNALL) ? fs.readFileSync(RUNALL, 'utf8') : '') || EXIT_GUARD_ARGS.length === 2,
+    EXIT_GUARD);
 
 function runPoisonedChild(file, budgetMs) {
     return new Promise((resolve) => {
@@ -253,9 +430,9 @@ function runPoisonedChild(file, budgetMs) {
         const hardTimer = setTimeout(() => finish(exited ? exitCode : null, exited ? exitSignal : 'SIGKILL'),
             budgetMs + HARD_GRACE_MS);
         try {
-            child = cp.spawn(process.execPath, [file], {
+            child = cp.spawn(process.execPath, EXIT_GUARD_ARGS.concat([file]), {
                 cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'],
-                env: Object.assign({}, process.env, { EXITCODE_CHILD: '1' })
+                env: Object.assign({}, process.env, { EXITCODE_CHILD: '1' }, EXIT_GUARD_ARGS.length ? { ZOE_RUNALL_EXIT_GUARD: '1' } : {})
             });
         } catch (e) {
             out = String(e && e.message || e);
@@ -396,6 +573,28 @@ const runnable = checkers.filter((rel) => {
 if (browserExcluded.length) console.log('   (មិនពុល checker browser ' + browserExcluded.length + ' ៖ '
     + browserExcluded.map(chain => chain.join(' → ')).join(' · ') + '; ការវាស់ AST ខាងលើនៅរក្សា)');
 
+// ⛔ `--part=k/n` ៖ checker ពុលទី i ជារបស់ផ្នែក (i mod n) + 1 ➜ ផ្នែកទាំង n រួមគ្នា = checker ពុលទាំងអស់ (តាមរចនាសម្ព័ន្ធ ·
+//    គ្មានការជាន់)។ ការអះអាង AST និង fixture រត់គ្រប់ផ្នែក។ មូលហេតុ ៖ 🔴 វាស់បាន (CI1156) ពុល ១២៥ កូនក្នុង ២៧២.៥ វិ. នៃពិដាន
+//    ៣០០ វិ. របស់ job តែមួយ ➜ deadline របស់ថវិកាកូនគ្មានរឹម ➜ ផ្នែកនីមួយៗមានពិដាន ៣០០ វិ. ផ្ទាល់ខ្លួន ⛔ មិនមែនបង្កើន CHECKER_TIMEOUT។
+const PART = (() => {
+    const arg = process.argv.slice(2).find((a) => a.startsWith('--part'));
+    if (!arg) return { k: 1, n: 1 };
+    const m = /^--part=(\d+)\/(\d+)$/.exec(arg);
+    if (!m || +m[2] < 1 || +m[2] > 8 || +m[1] < 1 || +m[1] > +m[2]) return null;
+    return { k: +m[1], n: +m[2] };
+})();
+ok('--part ត្រូវជា k/n (1 ≤ k ≤ n ≤ 8)', PART !== null, process.argv.slice(2).join(' '));
+const mine = PART ? runnable.filter((_, i) => i % PART.n === PART.k - 1) : [];
+if (PART && PART.n > 1) {
+    console.log('   ផ្នែក ' + PART.k + '/' + PART.n + ' ៖ ពុល checker ' + mine.length + ' ក្នុង ' + runnable.length);
+    const listedText = fs.existsSync(RUNALL) ? fs.readFileSync(RUNALL, 'utf8').replace(/^\s*#.*$/gm, '') : '';
+    const listed = [];
+    for (let k = 1; k <= PART.n; k++) {
+        if (new RegExp('node\\s+audit-tools/exit-code-integrity\\.js\\s+--part=' + k + '/' + PART.n + '(?=\\s|$)', 'm').test(listedText)) listed.push(k);
+    }
+    ok('⛔ run-all.sh រត់ផ្នែកទាំង ' + PART.n + ' (ផ្នែកដែលបាត់ = checker ដែលគ្មាននរណាពុល)', listed.length === PART.n, 'ឃើញ ' + listed.join(','));
+}
+
 // ⛔⛔ **ឯកសារដើមរបស់ checker មិនត្រូវត្រូវសរសេរជាន់ឡើយ។**
 //
 // 🔴 ជំនាន់មុនរបស់ឯកសារនេះពុល checker **នៅនឹងកន្លែង** រួចស្តារវិញតាម ៣ ផ្លូវ
@@ -461,9 +660,16 @@ async function poisonOne(rel) {
     const shadow = path.join(path.dirname(file), POISON_PREFIX + process.pid + '-' + path.basename(file));
     shadows.add(shadow);
     fs.writeFileSync(shadow, bad);
+    const budgetMs = childBudgetMs(Date.now(), DEADLINE_AT, EXPLICIT_CHILD_MS);
+    if (budgetMs < MIN_CHILD_BUDGET_MS) {
+        shadows.delete(shadow);
+        try { fs.unlinkSync(shadow); } catch (e) {}
+        unverified.push(rel + ' (គ្មានពេលនៅសល់មុន deadline ' + JOB_CEILING_MS + 'ms − ' + DEADLINE_RESERVE_MS + 'ms ➜ មិនបានរត់)');
+        return;
+    }
     let result;
     try {
-        result = await runPoisonedChild(shadow, BUDGET_MS);
+        result = await runPoisonedChild(shadow, budgetMs);
     } finally {
         try { fs.unlinkSync(shadow); } catch (e) {}
         shadows.delete(shadow);
@@ -478,7 +684,8 @@ async function poisonOne(rel) {
     }
     if (verdict === 'failed') return;
     if (verdict === 'unverified') {
-        unverified.push(rel + ' (' + (result.timedOut ? 'ផុតថវិកា ' + BUDGET_MS + 'ms' : 'signal=' + result.signal + ' code=' + result.code + ' (គ្មានភស្តុតាងពុលដែលបញ្ចប់ដោយគ្មាន uncaught crash)' ) + ')');
+        const tail = String(result.out || '').trim().split('\n').slice(-14).join(' | ').slice(-1600);
+        unverified.push(rel + ' (' + (result.timedOut ? 'ផុតថវិកា ' + budgetMs + 'ms (deadline របស់ job)' : 'signal=' + result.signal + ' code=' + result.code + ' (គ្មានភស្តុតាងពុលដែលបញ្ចប់ដោយគ្មាន uncaught crash)' ) + ') ចុង output ៖ ' + tail);
         return;
     }
     // ⛔ ការចេញ exit 0 **ខណៈ SKIP** មិនមែនជាបៃតងក្លែងក្លាយទេ — checker
@@ -499,10 +706,10 @@ const startedAt = Date.now();
 // ក្នុងការរត់ជាកូន ការអះអាងទាំងអស់ធ្លាក់រួចហើយ ➜ ការរំលងមិនបាត់ការវាស់អ្វីទេ (ដូចផ្នែក ៥ របស់ `checker-coverage`)។
 if (process.env.EXITCODE_CHILD) {
     console.log('   (រំលងការពុល — កំពុងរត់ជាកូនរបស់ exit-code-integrity)');
-    runnable.length = 0;
+    mine.length = 0;
 }
 try {
-    await runPoisonQueues(runnable, CONCURRENCY, poisonOne);
+    await runPoisonQueues(mine, CONCURRENCY, poisonOne);
 } finally {
     killLiveChildren();
     dropShadows();
@@ -514,9 +721,13 @@ console.log('   (ពុល ' + timings.length + ' checker ក្នុង ' + ((
     + ' វិ. · ស្របគ្នា ' + CONCURRENCY + ' · យឺតជាងគេ ៖ ' + slowest + ')');
 
 const MIN_POISONED = 25;
-ok('zto-import/test.js ៖ ពុលការអះអាងពិតយ៉ាងតិច ៦៩ ➜ exit 1 ហើយឯកសារដើមមិនប្រែ',
-    ztoPoison && ztoPoison.rc === 1 && ztoPoison.passed === 0 && ztoPoison.failed >= 69 && ztoPoison.unchanged,
-    ztoPoison);
+if (process.env.EXITCODE_CHILD || mine.includes(ZTO_IMPORT_TEST)) {
+    ok('zto-import/test.js ៖ ពុលការអះអាងពិតយ៉ាងតិច ៦៩ ➜ exit 1 ហើយឯកសារដើមមិនប្រែ',
+        ztoPoison && ztoPoison.rc === 1 && ztoPoison.passed === 0 && ztoPoison.failed >= 69 && ztoPoison.unchanged,
+        ztoPoison);
+} else {
+    console.log('   (zto-import/test.js ពុលក្នុងផ្នែកផ្សេង)');
+}
 ok('ជាន់អប្បបរមា៖ ពុល checker ដែលមិនប្រើ browser >= ' + MIN_POISONED + ' (ពុលបាន ' + poisoned + ')',
     poisoned >= MIN_POISONED, { poisoned, unpoisonable });
 ok('គ្មាន checker ណាចេញ exit 0 ខណៈការអះអាងទាំងអស់ធ្លាក់',

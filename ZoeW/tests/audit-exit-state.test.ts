@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
 const guard = readFileSync('../audit-tools/exit-code-integrity.js', 'utf8');
-const poison = runInNewContext(guard.slice(guard.indexOf('const POISON ='), guard.indexOf('const BUDGET_MS')) + '\npoisonSource;', {});
+const poison = runInNewContext(guard.slice(guard.indexOf('const POISON ='), guard.indexOf('function durationMs(')) + '\npoisonSource;', {});
 const files = ['scan-operation-sdk', 'trash-generation-sdk', 'cleanup-consumed-sdk', 'empty-delete-sdk'];
 
 describe('SDK checker៖ លទ្ធផលបរាជ័យពិតកំណត់ exit code', () => {
@@ -62,8 +62,34 @@ describe('poison queues៖ Postgres ធ្ងន់នៅដាច់ដោយ�
         expect(events).toEqual([]);
         await run(['only'], 1, async (job: string) => { events.push(job); });
         expect(events).toEqual(['only']);
-        expect(guard).toContain("process.env.EXITCODE_TIMEOUT_MS || '60000'");
         expect(guard).toContain("if (!r || r.timedOut || typeof r.code !== 'number') return 'unverified'");
+    });
+});
+
+describe('poison budget៖ ថវិកាកូនតាម deadline ពិតរបស់ job មិនមែនលេខថេរ', () => {
+    const helpers = guard.slice(guard.indexOf('function durationMs('), guard.indexOf('const DEADLINE_RESERVE_MS'))
+        + guard.slice(guard.indexOf('function childBudgetMs('), guard.indexOf('\n{\n', guard.indexOf('function childBudgetMs(')));
+    const budget = runInNewContext(helpers + '\n({ durationMs, runAllDefaultTimeout, childBudgetMs });', {});
+    const runall = readFileSync('../audit-tools/run-all.sh', 'utf8');
+    it('អាន DURATION ដូច timeout ហើយពិដានលំនាំដើមមកពី run-all.sh ពិត', () => {
+        expect(guard).not.toMatch(/EXITCODE_TIMEOUT_MS \|\| '\d+'/);
+        expect(budget.durationMs('300')).toBe(300000);
+        expect(budget.durationMs('2m')).toBe(120000);
+        expect(budget.durationMs('0')).toBeNull();
+        expect(budget.durationMs('')).toBeNull();
+        expect(budget.runAllDefaultTimeout(runall)).toBe(300000);
+    });
+    it('កូនយឺតទទួលពេលដែលនៅសល់រហូត deadline · ពិដានច្បាស់លាស់នៅគោរព', () => {
+        expect(budget.childBudgetMs(0, 280000, null)).toBe(280000);
+        expect(budget.childBudgetMs(66000, 280000, null)).toBeGreaterThan(84000);
+        expect(budget.childBudgetMs(0, 280000, 4000)).toBe(4000);
+        expect(budget.childBudgetMs(279000, 280000, 4000)).toBe(1000);
+    });
+    it('run-all ផ្តល់ deadline របស់ job ទៅ checker ហើយបំបែក meta-checker ជាផ្នែកដែលគ្រប់គ្នា', () => {
+        const exec = runall.slice(runall.indexOf('runall_exec() {'), runall.indexOf('runall_judge() {'));
+        expect(exec).toContain('export RUNALL_JOB_TIMEOUT="$CHECKER_TIMEOUT" RUNALL_JOB_STARTED_MS="$(runall_now_ms)"');
+        expect(runall).toMatch(/^run "exit-code-integrity 1\/2 \(meta\)" node audit-tools\/exit-code-integrity\.js --part=1\/2$/m);
+        expect(runall).toMatch(/^run "exit-code-integrity 2\/2 \(meta\)" node audit-tools\/exit-code-integrity\.js --part=2\/2$/m);
     });
 });
 

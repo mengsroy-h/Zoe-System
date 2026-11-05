@@ -120,3 +120,24 @@ it('សង្គ្រោះ IndexedDB ពិត៖ បិទ browser/បើក�
         } finally { await other.close(); }
     } finally { await ctx.close(); await rm(profile, { recursive: true, force: true }); }
 }, 30000);
+
+it('IndexedDB ពិត៖ ការងារ ៤០ ដែល PIN ថ្មីអានមិនបានមិនស៊ីកន្លែងការងារថ្មី · Barcode ដដែលមិនជំនួស · ព្រំដែនការផ្ទុកសរុបនៅ', async () => {
+    const ctx = await browser.newContext(); const page = await ctx.newPage();
+    try {
+        await load(page);
+        const out = await page.evaluate(async () => {
+            const api = (window as any).outbox; const owner = 'pin-shop/pin-user';
+            const keyOf = () => crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+            const job = (n: number) => ({ code: '7713050000' + String(n).padStart(4, '0'), itemId: 'item', requestId: crypto.randomUUID(), signMan: 'សុខា', photo: 'photo-' + n,
+                reservationProtocol: 'original-reservation-v1', originalFingerprint: 'f'.repeat(64), originalSHA256: 'e'.repeat(64), dispatchProof: '', signature: 'cfg', parcelIdentity: 'life', phase: 'queued', attempts: 0, message: '' });
+            const add = async (key: CryptoKey, n: number) => { try { return await api.addSignJob(await api.sealSignJob(owner, key, job(n)), () => true, key); } catch { return 'refused'; } };
+            const [oldKey, newKey, laterKey] = [await keyOf(), await keyOf(), await keyOf()];
+            const old = []; for (let n = 0; n < 40; n++) old.push(await add(oldKey, n));
+            const same = await add(newKey, 0);
+            const fresh = []; for (let n = 100; n < 140; n++) fresh.push(await add(newKey, n));
+            return { old: old.every(v => v === true), same, fresh: fresh.every(v => v === true), readableFull: await add(newKey, 200), storageFull: await add(laterKey, 300),
+                rows: (await api.listSignJobs(owner)).length };
+        });
+        expect(out).toEqual({ old: true, same: false, fresh: true, readableFull: 'refused', storageFull: 'refused', rows: 80 });
+    } finally { await ctx.close(); }
+}, 30000);

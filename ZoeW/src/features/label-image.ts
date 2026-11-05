@@ -40,6 +40,10 @@ export function drawLabelImage(text: LabelImageText, layout: string): HTMLCanvas
     const [wmm, hmm] = labelImageSizeMm(layout);
     const W = wmm * LABEL_IMAGE_DOTS_PER_MM;
     const H = hmm * LABEL_IMAGE_DOTS_PER_MM;
+    const pad = Math.round(LABEL_IMAGE_DOTS_PER_MM * 1.5);
+    const inner = W - 2 * pad;
+    const bars = text.barcode ? code128Bars(text.barcode) : null;
+    if (bars && bars.width > inner) return null;
     const canvas = createScratchCanvas();
     canvas.width = W;
     canvas.height = H;
@@ -47,12 +51,9 @@ export function drawLabelImage(text: LabelImageText, layout: string): HTMLCanvas
     if (!g) return null;
     g.fillStyle = '#fff';
     g.fillRect(0, 0, W, H);
-    const pad = Math.round(LABEL_IMAGE_DOTS_PER_MM * 1.5);
-    const inner = W - 2 * pad;
     const bold = (px: number) => '800 ' + px + 'px sans-serif';
     const mono = (px: number) => '600 ' + px + 'px ui-monospace, Menlo, Consolas, monospace';
     const meta = [text.date, text.locker].filter(Boolean).join('  ·  ');
-    const bars = text.barcode ? code128Bars(text.barcode) : null;
     const gap = Math.round(H * 0.025);
     const rows = [
         { kind: 'phone', size: fitFont(g, text.phone, bold, inner, Math.round(H * 0.2)) },

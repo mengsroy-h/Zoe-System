@@ -458,7 +458,10 @@ async function reservedReceipt(originalPhoto = PHOTO) {
 
 it('handler ពិត៖ sealed reservation capability ចាំបាច់មុនរូប និង05', async () => {
     const { body } = await reservedReceipt();
-    expect(JSON.parse((await call({ ...body, reservationToken: body.reservationToken.slice(0, -2) + '00' })).body).success).not.toBe(true);
+    const sealed = body.reservationToken;
+    const forged = sealed.slice(0, 20) + (sealed[20] === 'A' ? 'B' : 'A') + sealed.slice(21);
+    expect(Buffer.compare(Buffer.from(forged, 'base64url'), Buffer.from(sealed, 'base64url'))).not.toBe(0);
+    expect(JSON.parse((await call({ ...body, reservationToken: forged })).body).success).not.toBe(true);
     expect(vi.mocked(fetch)).not.toHaveBeenCalled();
     const signed = JSON.parse((await call(body)).body); expect(signed.scanCompleted).toBe(true);
     await call(body);
@@ -584,4 +587,62 @@ it.each(['reservation', 'receipt', 'warning', 'refresh'])('handler ពិត៖ 
         expect(vi.mocked(fetch).mock.calls.some(([url]) => /saveBillPic|saveScanInfo|\/add$/.test(String(url)))).toBe(false);
         expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).endsWith('queryTrackInfo'))).toBe(true);
     } finally { clock?.mockRestore(); }
+});
+
+it.each([
+    { stop: 'photo', latency: { queryTrackInfo: 2000, queryPreOrderByBillCode: 1700, newBusinessCheck: 1700, add: 1700, saveBillPic: 2500 } },
+    { stop: 'scan', latency: { queryTrackInfo: 1000, queryPreOrderByBillCode: 1000, newBusinessCheck: 1000, add: 1000, saveBillPic: 2500, saveScanInfo: 2500 } }
+])('ZTO យឺតរហូតថវិកា ៩ វិ. ជិតអស់មុនសរសេរ $stop ➜ មិនចាប់ផ្តើមសរសេរ · ចម្លើយមិនទាន់ផ្ញើ · lease ផុត ➜ ផ្ញើម្ដងទៀតដោយស្វ័យប្រវត្តិ ហើយរូប និង 05 តែម្តង', async ({ stop, latency }) => {
+    const body = { ...await receipt(), background: true };
+    const status = { ...body, stage: 'receipt-status', photo: undefined, signMan: undefined };
+    let slow = true;
+    const writes = (path: string) => vi.mocked(fetch).mock.calls.filter(([url, init]) => String(url).endsWith(path)
+        && (path !== 'saveScanInfo' || JSON.parse(String(init?.body))[0].scanTypeCode === '05')).length;
+    vi.stubGlobal('fetch', vi.fn(async (url, init) => {
+        const name = new URL(String(url)).pathname.split('/').pop()!;
+        const ms = slow ? (latency as Record<string, number>)[name] || 0 : 0;
+        if (ms) await new Promise<void>((resolve, reject) => {
+            const timer = setTimeout(resolve, ms);
+            init?.signal?.addEventListener('abort', () => { clearTimeout(timer); reject(Object.assign(new Error('aborted'), { name: 'AbortError' })); }, { once: true });
+        });
+        return name === 'querySignPic' ? reply([]) : upstream(url);
+    }));
+    vi.useFakeTimers();
+    const settle = async (work: Promise<any>) => { await vi.advanceTimersByTimeAsync(30000); return JSON.parse((await work).body); };
+    try {
+        const first = await settle(call(body));
+        expect(first).toMatchObject({ code: 'ZTO_PALM_SIGN_RETRY_LATER', barcode: CODE, stage: 'receipt', retryable: true });
+        expect(first.uncertain).not.toBe(true);
+        expect(writes('saveBillPic')).toBe(stop === 'photo' ? 0 : 1);
+        expect(writes('saveScanInfo')).toBe(0);
+        slow = false;
+        expect((await settle(call(status))).code).not.toBe('ZTO_PALM_SIGN_RESUME_READY');
+        vi.setSystemTime(Date.now() + 91000);
+        const ready = await settle(call(status));
+        expect(ready).toMatchObject({ code: 'ZTO_PALM_SIGN_RESUME_READY', reservationOwner: body.reservationOwner });
+        const done = await settle(call({ ...body, reservationToken: ready.reservationToken }));
+        expect(done).toMatchObject({ success: true, ztoClosed: true, scanCompleted: true, photoAccepted: true });
+        expect(writes('saveBillPic')).toBe(1);
+        expect(writes('saveScanInfo')).toBe(1);
+    } finally { vi.useRealTimers(); }
+});
+it('ថវិកា Function តូចដែលកំណត់ក្នុង env (៤ វិ.) តែ ZTO លឿន ➜ មិនបញ្ឈប់ជានិច្ច · រូប និង 05 ចប់ក្នុងសំណើតែមួយ', async () => {
+    vi.stubEnv('ZTO_UPSTREAM_TIMEOUT_MS', '2000'); vi.stubEnv('ZTO_REQUEST_BUDGET_MS', '4000');
+    const body = { ...await receipt(), background: true };
+    const latency: Record<string, number> = { queryTrackInfo: 300, queryPreOrderByBillCode: 300, newBusinessCheck: 300, add: 300, saveBillPic: 500, saveScanInfo: 300 };
+    vi.stubGlobal('fetch', vi.fn(async (url, init) => {
+        const name = new URL(String(url)).pathname.split('/').pop()!;
+        if (latency[name]) await new Promise<void>((resolve, reject) => {
+            const timer = setTimeout(resolve, latency[name]);
+            init?.signal?.addEventListener('abort', () => { clearTimeout(timer); reject(Object.assign(new Error('aborted'), { name: 'AbortError' })); }, { once: true });
+        });
+        return name === 'querySignPic' ? reply([]) : upstream(url);
+    }));
+    vi.useFakeTimers();
+    try {
+        const work = call(body);
+        await vi.advanceTimersByTimeAsync(30000);
+        expect(JSON.parse((await work).body)).toMatchObject({ success: true, ztoClosed: true, scanCompleted: true });
+        expect(vi.mocked(fetch).mock.calls.filter(([url]) => String(url).endsWith('saveScanInfo'))).toHaveLength(1);
+    } finally { vi.useRealTimers(); }
 });

@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.31';
+const APP_VERSION = '2.24.32';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -1641,6 +1641,7 @@ function showLoginModalWithPrefill() {
     if (keyListBody) keyListBody.innerHTML = '';
     noticeListCache = [];
     noticeReadFailed = false;
+    noticeRefreshOwner = null;
     noticeSendOwner = null;
     isSendingNotice = false;
     const noticeSendBtn = document.getElementById('noticeSendBtn');
@@ -1674,7 +1675,9 @@ function showLoginModalWithPrefill() {
     const setupLinkQrContainer = document.getElementById('setupLinkQrContainer');
     if (setupLinkQrContainer) setupLinkQrContainer.innerHTML = '';
 
+    const sbSession = sbAdminSession;
     sbAdminReset(false);
+    if (sbSession) sbAdminRevoke(sbSession);
     clearSigningKey(true);
     openModalHelper('loginModal');
     if (losingUncopiedKeypair) {
@@ -1998,7 +2001,8 @@ const SIGNING_KEY_IDLE_MS = 15 * 60 * 1000;
 let signingKeyLastUseAt = 0;
 
 function noteSigningKeyActivity() {
-    if (signingPrivateKeyJwk) signingKeyLastUseAt = Date.now();
+    if (!signingPrivateKeyJwk || expireIdleSigningKey()) return;
+    signingKeyLastUseAt = Date.now();
 }
 
 function expireIdleSigningKey() {
@@ -2263,6 +2267,7 @@ async function generateLicenseKey() {
         };
 
         let generateAlreadyTimedOut = false;
+        const myGenerate = generateLicenseKey.generation = (generateLicenseKey.generation || 0) + 1;
         const writePromise = Promise.allSettled(targetPaths.map((p) => retryAsync(generateWrite(() => fb.update(fb.ref(operationDb), {
             [`license_keys/${p}/${payload.id}`]: publicRecord,
             [`license_keys_meta/${p}/${payload.id}`]: metaRecord
@@ -2272,7 +2277,15 @@ async function generateLicenseKey() {
             if (myGeneration !== keyListSessionGeneration || !generateIsCurrent()) return;
             const bgSucceededPaths = targetPaths.filter((p, i) => bgResults[i].status !== 'rejected');
             if (bgSucceededPaths.length > 0) {
-                showToast(`⏱️ Key ${payload.id} ដែលអស់ពេលមុន ត្រូវបានបង្កើតជោគជ័យទីបំផុតសម្រាប់: ${bgSucceededPaths.join(', ')} — សូមកុំបង្កើត Key ត្រួតគ្នា, ពិនិត្យ Key List ជាមុនសិន!`);
+                const landed = `⏱️ Key ${payload.id} ដែលអស់ពេលមុន ត្រូវបានបង្កើតជោគជ័យទីបំផុតសម្រាប់: ${bgSucceededPaths.join(', ')} — `;
+                if (myGenerate === generateLicenseKey.generation) {
+                    lastGeneratedKey = keyString;
+                    document.getElementById('genResultKey').textContent = keyString;
+                    document.getElementById('genResultBox').classList.remove('hidden');
+                    showToast(landed + 'Key បង្ហាញក្នុងប្រអប់លទ្ធផលហើយ សូមចម្លងវាប្រគល់អតិថិជន (កុំបង្កើត Key ត្រួតគ្នា)!');
+                } else {
+                    showToast(landed + 'សូមកុំបង្កើត Key ត្រួតគ្នា, ពិនិត្យ Key List ជាមុនសិន!');
+                }
                 refreshKeyList();
             }
         });
@@ -2493,10 +2506,13 @@ function generateSetupLink() {
     if (resultBox) resultBox.classList.remove('hidden');
 
     const qrContainer = document.getElementById('setupLinkQrContainer');
+    const qrSave = document.getElementById('setupLinkQrSaveBtn');
     try {
-        renderQrInto(qrContainer, lastGeneratedSetupLink);
+        const drawn = renderQrInto(qrContainer, lastGeneratedSetupLink);
+        if (qrSave) qrSave.classList[drawn ? 'remove' : 'add']('hidden');
     } catch (e) {
         if (qrContainer) qrContainer.innerHTML = '';
+        if (qrSave) qrSave.classList.add('hidden');
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'generateSetupLink QR render' });
     }
 }
@@ -2586,7 +2602,14 @@ async function generateLookupSetupLink() {
         if (element('setupLookupCodeOutput')) element('setupLookupCodeOutput').textContent = '🔐 ' + code + ' — ប្រាប់អ្នកទទួលដាច់ដោយឡែកពី Link/QR ហើយកត់ទុកឥឡូវនេះ។';
         if (element('setupLinkResultBox')) element('setupLinkResultBox').classList.remove('hidden');
         safeStoreSet(appLocalStore, SETUP_LINK_URL_KEY, base.origin + base.pathname);
-        renderQrInto(element('setupLinkQrContainer'), lastGeneratedSetupLink);
+        try {
+            const drawn = renderQrInto(element('setupLinkQrContainer'), lastGeneratedSetupLink);
+            if (element('setupLinkQrSaveBtn')) element('setupLinkQrSaveBtn').classList[drawn ? 'remove' : 'add']('hidden');
+        } catch (e) {
+            if (element('setupLinkQrContainer')) element('setupLinkQrContainer').innerHTML = '';
+            if (element('setupLinkQrSaveBtn')) element('setupLinkQrSaveBtn').classList.add('hidden');
+            showToast('⚠️ Link នេះវែងពេក បង្កើត QR មិនបានទេ — សូមចម្លង Link ផ្ញើជំនួស QR (កូដ ១៦ តួ ប្រាប់ដាច់ដោយឡែកដដែល)។');
+        }
         if (lookup.secretParam) {
             const urlField = element('setupLookupUrlInput');
             if (urlField && urlField.value.trim() === rawLookupUrl) urlField.value = lookupSetupSplitKey(rawLookupUrl).url;
@@ -2937,59 +2960,122 @@ async function setKeySeatLimit(id) {
 }
 
 async function releaseKeySeat(id) {
-    const operation = captureSensitiveSession(true);
-    const operationDb = db;
-    if (!operation || !operationDb) return;
-    const row = keyListCache.find((r) => r.id === id);
-    if (!row) return;
-    if (seatReadFailed) {
-        alert('អាន license_seats មិនបានទេ! សូម Publish Firebase Rules ថ្មីជាមុនសិន (មើល README) រួចសាកល្បងម្តងទៀត។');
+    if (releaseKeySeat.busy) {
+        showToast('⏳ កំពុងដោះឧបករណ៍មួយ — សូមរង់ចាំលទ្ធផលសិន រួចសាកល្បងម្តងទៀត។');
         return;
     }
-    if (row.seatDevices.length === 0) {
-        if (row.paths.every((p) => typeof (row.perApp[p] || {}).releasedAt === 'number')) {
-            alert('Key នេះមិនទាន់ចងនឹងឧបករណ៍ណាទេ — គ្មានអ្វីត្រូវដោះឡើយ។');
+    releaseKeySeat.busy = true;
+    try {
+        const operation = captureSensitiveSession(true);
+        const operationDb = db;
+        if (!operation || !operationDb) return;
+        const row = keyListCache.find((r) => r.id === id);
+        if (!row) return;
+        if (seatReadFailed) {
+            alert('អាន license_seats មិនបានទេ! សូម Publish Firebase Rules ថ្មីជាមុនសិន (មើល README) រួចសាកល្បងម្តងទៀត។');
             return;
         }
-        if (!confirm('Key នេះគ្មានឧបករណ៍ចងនៅលើ Server ទេ។ ចុះត្រាដោះ ដើម្បីឲ្យឧបករណ៍ដែល Activate មុនពេលនេះលែងប្រើ Key នេះ?')) return;
-    } else if (!confirm('ដោះឧបករណ៍ទាំង ' + row.seatDevices.length + ' ចេញពី Key នេះ?\n\nក្រោយដោះ ឧបករណ៍ចាស់នឹងលែងប្រើ Key នេះបាន ហើយឧបករណ៍ថ្មីរហូតដល់ ' + row.maxDevices + ' អាច Activate បាន។')) return;
-    const isCurrent = () => adminOperationIsCurrent(operation) && db === operationDb;
-    let write = null;
-    try {
+        if (row.seatDevices.length === 0) {
+            if (row.paths.every((p) => typeof (row.perApp[p] || {}).releasedAt === 'number')) {
+                alert('Key នេះមិនទាន់ចងនឹងឧបករណ៍ណាទេ — គ្មានអ្វីត្រូវដោះឡើយ។');
+                return;
+            }
+            if (!confirm('Key នេះគ្មានឧបករណ៍ចងនៅលើ Server ទេ។ ចុះត្រាដោះ ដើម្បីឲ្យឧបករណ៍ដែល Activate មុនពេលនេះលែងប្រើ Key នេះ?')) return;
+        } else if (!confirm('ដោះឧបករណ៍ទាំង ' + row.seatDevices.length + ' ចេញពី Key នេះ?\n\nក្រោយដោះ ឧបករណ៍ចាស់នឹងលែងប្រើ Key នេះបាន ហើយឧបករណ៍ថ្មីរហូតដល់ ' + row.maxDevices + ' អាច Activate បាន។')) return;
+        const isCurrent = () => adminOperationIsCurrent(operation) && db === operationDb;
+        const unstampedText = '⚠️ បានដោះកៅអីរួច តែ Rules License មិនទាន់ទទួល `releasedAt` ➜ ឧបករណ៍ចាស់ដែលនៅដំណើរការអាចកក់កៅអីវិញ។ សូម Publish Firebase Rules ថ្មី (មើល README) រួចដោះម្តងទៀត។';
         const release = {};
+        const seatsOnly = {};
         row.paths.forEach((p) => {
             release[`license_seats/${p}/${id}`] = null;
             release[`license_keys/${p}/${id}/releasedAt`] = { '.sv': 'timestamp' };
+            seatsOnly[`license_seats/${p}/${id}`] = null;
         });
+        let sent;
         let stampRefused = false;
-        write = retryAsync(() => isCurrent()
-            ? fb.update(fb.ref(operationDb), release).catch((e) => {
-                if ((e && e.noRetry) || !isCurrent() || !/permission[_ ]denied/i.test(String((e && (e.code || e.message)) || ''))) throw e;
+        try {
+            const sentAt = serverTimeSynced ? getServerNow() : NaN;
+            sent = await patchLicenseViaRest(operation, operationDb, release, isCurrent);
+            if (sent.outcome === 'refused') {
                 stampRefused = true;
-                return Promise.all(row.paths.map((p) => fb.set(fb.ref(operationDb, `license_seats/${p}/${id}`), null)));
-            })
-            : Promise.reject(Object.assign(new Error('Release session changed'), { noRetry: true })), 3, 1000);
-        await withTimeout(write, 15000, 'Release timed out');
-        if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
-        if (stampRefused) alert('⚠️ បានដោះកៅអីរួច តែ Rules License មិនទាន់ទទួល `releasedAt` ➜ ឧបករណ៍ចាស់ដែលនៅដំណើរការអាចកក់កៅអីវិញ។ សូម Publish Firebase Rules ថ្មី (មើល README) រួចដោះម្តងទៀត។');
-        else showToast('✅ បានដោះឧបករណ៍! ឧបករណ៍ចាស់ឈប់ប្រើ Key ពេលពិនិត្យលើកក្រោយ ហើយឧបករណ៍ថ្មីអាច Activate បានឥឡូវ។');
-        refreshKeyList();
-    } catch (e) {
-        if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
-        console.error(e);
-        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'releaseKeySeat' });
-        if (write && e && e.message === 'Release timed out') {
-            armAdminLateWrite(write, isCurrent, () => showToast('✅ បានដោះឧបករណ៍ (ចុះយឺត)! ឧបករណ៍ថ្មីអាច Activate បានឥឡូវ។'));
-            alert(ADMIN_WRITE_PENDING_TEXT);
+                sent = await patchLicenseViaRest(operation, operationDb, seatsOnly, isCurrent);
+            }
+            if (!isCurrent() || sent.outcome === 'stale') return;
+            if (sent.outcome === 'unknown') {
+                const nodes = await readKeyReleaseViaRest(row.paths, id, operationDb).catch(() => null);
+                if (!isCurrent()) return;
+                const shownAt = (p) => (row.perApp && row.perApp[p] ? row.perApp[p].releasedAt : undefined);
+                if (nodes && nodes.every((n) => n.seats === null && (stampRefused
+                    || (typeof n.releasedAt === 'number' && n.releasedAt >= sentAt && n.releasedAt !== shownAt(n.path))))) sent = { outcome: 'applied' };
+            }
+        } catch (e) {
+            if (!isCurrent()) return;
+            sent = { outcome: 'unknown', error: e };
+        }
+        if (sent.outcome !== 'applied') {
+            console.error(sent.error || new Error('Release ' + sent.outcome));
+            if (window.ZoeErrors) ZoeErrors.capture(sent.error || new Error('Release ' + sent.outcome), { context: 'releaseKeySeat', status: sent.status });
+        }
+        if (sent.outcome === 'applied') {
+            if (stampRefused) alert(unstampedText);
+            else showToast('✅ បានដោះឧបករណ៍! ឧបករណ៍ចាស់ឈប់ប្រើ Key ពេលពិនិត្យលើកក្រោយ ហើយឧបករណ៍ថ្មីអាច Activate បានឥឡូវ។');
+        } else if (sent.outcome === 'unknown') {
+            alert(RELEASE_PENDING_TEXT);
+        } else {
+            alert(sent.outcome === 'refused' ? 'ដោះឧបករណ៍មិនបានទេ! សូមប្រាកដថា Firebase Rules ថ្មីត្រូវបាន Publish រួច រួចសាកល្បងម្តងទៀត។'
+                : sent.outcome === 'unsent' ? 'ដោះឧបករណ៍មិនបានទេ! មិនទាន់ផ្ញើអ្វីទៅ Server ទេ (អ៊ីនធឺណិត ឬ Session Login) ➜ សូមពិនិត្យអ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត។'
+                    : 'ដោះឧបករណ៍មិនបានទេ! Server បដិសេធ (HTTP ' + (sent.status || '?') + ') ➜ សូម Refresh ឬ Login ម្តងទៀត ហើយសាកល្បងម្តងទៀត។');
             return;
         }
-        alert('ដោះឧបករណ៍មិនបានទេ! សូមប្រាកដថា Firebase Rules ថ្មីត្រូវបាន Publish រួច រួចសាកល្បងម្តងទៀត។');
+        refreshKeyList();
+    } finally {
+        releaseKeySeat.busy = false;
     }
+}
+
+async function patchLicenseViaRest(operation, database, body, isCurrent) {
+    const base = databaseUrlOf(database);
+    const user = operation && operation.user;
+    if (!base || !isFirebaseDatabaseHost(base) || !user || typeof user.getIdToken !== 'function' || typeof fetch !== 'function') {
+        return { outcome: 'unsent', error: new Error('REST write unavailable') };
+    }
+    let token;
+    try {
+        token = await withTimeout(Promise.resolve().then(() => user.getIdToken()), 15000, 'Release token timed out');
+    } catch (e) {
+        return { outcome: 'unsent', error: e };
+    }
+    if (!isCurrent()) return { outcome: 'stale' };
+    let out;
+    try {
+        out = await fetchWithTimeout(base + '/.json?auth=' + encodeURIComponent(token),
+            { method: 'PATCH', cache: 'no-store', body: JSON.stringify(body) }, 15000, 'Release timed out',
+            (r) => Promise.resolve().then(() => r.text()).catch(() => ''));
+    } catch (e) {
+        return { outcome: 'unknown', error: e };
+    }
+    const status = out.res.status;
+    if (out.res.ok) return { outcome: 'applied', status };
+    if (status >= 500) return { outcome: 'unknown', status };
+    return { outcome: /permission[_ ]denied/i.test(String(out.body || '')) ? 'refused' : 'failed', status };
+}
+
+function readKeyReleaseViaRest(appPaths, keyId, database) {
+    const base = databaseUrlOf(database);
+    if (!base || !isFirebaseDatabaseHost(base) || typeof fetch !== 'function') return Promise.reject(new Error('REST read unavailable'));
+    const read = (path) => fetchWithTimeout(base + path + '.json', { cache: 'no-store' }, 10000, 'Release read-back timed out',
+        (r) => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))).then((out) => (out.body === undefined ? null : out.body));
+    return Promise.all(appPaths.map((p) => {
+        const node = '/' + encodeURIComponent(p) + '/' + encodeURIComponent(keyId);
+        return Promise.all([read('/license_seats' + node), read('/license_keys' + node + '/releasedAt')])
+            .then((values) => ({ path: p, seats: values[0], releasedAt: values[1] }));
+    }));
 }
 
 let extendTargetId = null;
 
 const ADMIN_WRITE_PENDING_TEXT = '⏳ ការកែមិនទាន់បញ្ជាក់ទេ (អ៊ីនធឺណិតយឺត ឬដាច់)។ វាអាចនឹងចុះដោយស្វ័យប្រវត្តិពេលភ្ជាប់វិញ — សូមចុច 🔄 Refresh មើលបញ្ជី Key មុនធ្វើម្តងទៀត។';
+const RELEASE_PENDING_TEXT = '⏳ មិនទាន់បញ្ជាក់ថាការដោះឧបករណ៍បានចុះឬនៅទេ (អ៊ីនធឺណិតយឺត ឬដាច់)។ សំណើនេះមិនផ្ញើម្តងទៀតដោយស្វ័យប្រវត្តិទេ — សូមចុច 🔄 Refresh មើលបញ្ជី Key មុនដោះម្តងទៀត។';
 
 function armAdminLateWrite(write, isCurrent, onLanded) {
     Promise.resolve(write).then((value) => {
@@ -3118,6 +3204,7 @@ const ZOEW_PUSH_ORIGIN = 'https://zoew.netlify.app';
 const NOTICE_PUSH_KICK_TIMEOUT_MS = 8000;
 let noticeListCache = [];
 let noticeReadFailed = false;
+let noticeRefreshOwner = null;
 let isSendingNotice = false;
 let noticeSendOwner = null;
 
@@ -3200,14 +3287,16 @@ async function refreshNoticeList() {
     const operationDb = db;
     if (!list || !operationDb) return;
     const myGeneration = keyListSessionGeneration;
+    const refreshOwner = {};
+    noticeRefreshOwner = refreshOwner;
     list.innerHTML = '<li class="notice-empty">កំពុងផ្ទុក...</li>';
     try {
         const snap = await withTimeout(fb.get(fb.ref(operationDb, noticeBucketPath())), 15000, 'Notice list timed out');
-        if (myGeneration !== keyListSessionGeneration || db !== operationDb) return;
+        if (myGeneration !== keyListSessionGeneration || db !== operationDb || noticeRefreshOwner !== refreshOwner) return;
         noticeReadFailed = false;
         noticeListCache = noticeRowsOf(snap.exists() ? snap.val() : null);
     } catch (e) {
-        if (myGeneration !== keyListSessionGeneration || db !== operationDb) return;
+        if (myGeneration !== keyListSessionGeneration || db !== operationDb || noticeRefreshOwner !== refreshOwner) return;
         console.error(e);
         noticeReadFailed = true;
         noticeListCache = [];
@@ -3569,12 +3658,16 @@ function sbAdminReset(expired) {
     if (expired === true) alert('Session Supabase ផុតកំណត់ — សូមចូល Supabase ម្តងទៀត!');
 }
 
+function sbAdminRevoke(session) {
+    sbAdminRequest(session, '/auth/v1/logout?scope=local', 'POST', {}).catch(() => {});
+}
+
 function expireIdleSbAdmin() {
     const session = sbAdminSession;
     if (!session || sbAdminBusy) return false;
     if (elapsedSince(sbAdminLastUseAt) < SB_ADMIN_IDLE_MS) return false;
     sbAdminReset(false);
-    sbAdminRequest(session, '/auth/v1/logout', 'POST', {}).catch(() => {});
+    sbAdminRevoke(session);
     showToast('🔒 ចាកចេញពី Supabase Admin ក្រោយមិនប្រើ ១៥ នាទី — សូមចូលម្តងទៀត');
     return true;
 }
@@ -3587,7 +3680,7 @@ function sbAdminActivity() {
 function sbAdminLogout() {
     const session = sbAdminSession;
     sbAdminReset(false);
-    if (session) sbAdminRequest(session, '/auth/v1/logout', 'POST', {}).catch(() => {});
+    if (session) sbAdminRevoke(session);
 }
 
 async function sbAdminRefresh() {
@@ -3985,7 +4078,8 @@ let keygenLastActivityAt = 0;
 let kgNextTarget = null;
 
 function noteKeygenActivity() {
-    if (authButtonIsLoggedIn) keygenLastActivityAt = Date.now();
+    if (!authButtonIsLoggedIn || expireIdleKeygenSession()) return;
+    keygenLastActivityAt = Date.now();
 }
 
 function expireIdleKeygenSession() {
@@ -4004,7 +4098,7 @@ function khmerMinutes(ms) {
 
 function lockKeygenSession(silent) {
     clearSigningKey(true);
-    if (sbAdminSession) sbAdminLogout();
+    sbAdminLogout();
     invalidateSensitiveSession();
     refreshKgStatus();
     if (!silent) showToast('🔒 វគ្គត្រូវបានចាក់សោ ៖ Signing Key និង Supabase Admin ដកចេញពីសតិរួច។');

@@ -22,6 +22,7 @@ const { execFileSync } = require('child_process');
 const ROOT = process.env.SUPABASE_DS_APP_DIR ? path.resolve(process.env.SUPABASE_DS_APP_DIR) : path.join(__dirname, '..');
 const REPO = process.env.ZOE_REPO_ROOT ? path.resolve(process.env.ZOE_REPO_ROOT) : path.join(__dirname, '..');
 const STRICT = process.env.SUPABASE_STRICT === '1';
+const RULES_GENERATOR_ONLY = process.argv.includes('--rules-generator-only');
 const MIGRATIONS_DIR = path.join(ROOT, 'supabase', 'migrations');
 const DEPS_DIRS = [process.env.SUPABASE_DEPS_DIR, path.join(ROOT, 'supabase', 'node_modules'), path.join(REPO, 'supabase', 'node_modules')].filter(Boolean);
 
@@ -49,8 +50,8 @@ const configText = fs.existsSync(path.join(ROOT, 'supabase', 'config.toml')) ? f
 const wantMajor = parseInt((configText.match(/^major_version\s*=\s*(\d+)\s*$/m) || [])[1] || '0', 10);
 
 const { createPgHarness } = require('./supabase-pg.js');
-const H = createPgHarness({ depsDirs: DEPS_DIRS, shimDir: path.join(__dirname, 'supabase-shim'), wantMajor });
-const { as, makeAuthUser, denied, raised } = H;
+const H = RULES_GENERATOR_ONLY ? null : createPgHarness({ depsDirs: DEPS_DIRS, shimDir: path.join(__dirname, 'supabase-shim'), wantMajor });
+const { as, makeAuthUser, denied, raised } = H || {};
 
 const STOP = Symbol('stop');
 let opCounter = 0;
@@ -60,12 +61,15 @@ const future = () => new Date(Date.now() + 30 * 86400000).toISOString();
 async function setupTenants(c) {
     const adminId = await makeAuthUser(c, 'boss@u.zoe.test');
     await c.query('insert into public.platform_admins (user_id) values ($1)', [adminId]);
-    const ADMIN = { role: 'authenticated', sub: adminId };
+    const adminSession = (await c.query('insert into auth.sessions (id, user_id, created_at) values (gen_random_uuid(), $1, now()) returning id', [adminId])).rows[0].id;
+    const ADMIN = { role: 'authenticated', sub: adminId, extra: { session_id: adminSession } };
     const SERVICE = { role: 'service_role' };
     const tenants = {};
     for (const [name, branch, user] of [['A', '881859', 'sokha'], ['B', '770001', 'dara']]) {
         const t = await as(c, ADMIN, 'select * from public.admin_create_tenant($1, $2, $3)', ['ហាង ' + name, branch, future()]);
+        if (!t.rows) throw new Error('setup tenant failed ' + JSON.stringify(t.error));
         const inv = await as(c, ADMIN, "select * from public.admin_issue_invite($1, 'owner', 1, 24)", [t.rows[0].id]);
+        if (!inv.rows) throw new Error('setup invite failed ' + JSON.stringify(inv.error));
         const hash = (await c.query('select private.invite_code_hash($1) as h', [inv.rows[0].code])).rows[0].h;
         const uid = await makeAuthUser(c, user + '@u.zoe.test');
         const reg = await as(c, SERVICE, 'select * from public.finish_registration($1, $2, $3)', [uid, hash, user]);
@@ -272,6 +276,50 @@ async function body(c, rec, extra) {
     rec('housekeeping (seq % 64) ៖ tombstone ចាស់ជាង ៧ ថ្ងៃលុប · purged_seq កើន', hk.seq === 64 && tomb === 0 && Number(st.purged_seq) > 0, { st, tomb, seq: hk.seq });
     const stale = await pull(A.who, 1);
     rec('cursor ចាស់ជាង purged_seq ➜ reset (client មិនបាត់ការលុប)', stale.reset === true, { reset: stale.reset, seq: stale.seq });
+    // ⛔ ការជួសជុល tombstone ចាស់ (migration retro resync) ៖ ជួរដែលលុបក្រៅ App មុន migration tombstone គ្មាន tombstone ➜
+    //    ឧបករណ៍ដែល cursor = head មិនដែលឃើញការលុប ➜ migration បង្កើន seq និង purged_seq ➜ ទាញពេញម្តង ហើយជួរនោះចេញ · ក្រោយមកមិនវិលទាញពេញ
+    const retroBase = await pull(A.who, 0);
+    const retroVictim = retroBase.rows.find((r) => r.r === REG && r.v !== null);
+    const retroVictimBytes = (await c.query('select private.zoe_doc_bytes($1, $2, value) as b from public.zoe_docs where tenant_id = $3 and root = $1 and key = $2', [retroVictim.r, retroVictim.k, A.id])).rows[0].b;
+    await c.query("select set_config('zoe.raw_docs', 'on', false)");
+    try { await c.query('delete from public.zoe_docs where tenant_id = $1 and root = $2 and key = $3', [A.id, retroVictim.r, retroVictim.k]); }
+    finally { await c.query("select set_config('zoe.raw_docs', 'off', false)"); }
+    await c.query('update public.zoe_tenant_state set bytes = bytes - $2 where tenant_id = $1', [A.id, retroVictimBytes]);
+    const unseen = await pull(A.who, retroBase.seq);
+    rec('មុន retro ៖ ការលុបក្រៅ App ដែលគ្មាន tombstone មើលមិនឃើញក្នុង delta (ឧបករណ៍រក្សាជួរចាស់)', unseen.reset === false && !unseen.rows.some((r) => r.k === retroVictim.k), unseen);
+    await c.query(fs.readFileSync(path.join(ROOT, 'supabase', 'migrations', '20261105000000_zoe_tombstone_retro_resync.sql'), 'utf8'));
+    const repaired = await pull(A.who, retroBase.seq);
+    rec('retro resync ៖ cursor ចាស់ ➜ ទាញពេញម្តង · ជួរដែលលុបក្រៅ App មិននៅក្នុងទិដ្ឋភាព', repaired.reset === true && repaired.rows.length > 0
+        && !repaired.rows.some((r) => r.r === retroVictim.r && r.k === retroVictim.k), { reset: repaired.reset, rows: repaired.rows.length });
+    const settledPull = await pull(A.who, repaired.seq);
+    rec('retro resync ៖ ក្រោយទាញពេញ cursor = head ➜ delta ធម្មតា (មិនវិលទាញពេញ)', settledPull.reset === false, settledPull);
+
+    // ⛔ zoe_evidence_candidates ៖ បញ្ជីកំណត់ត្រាភស្តុតាងចាស់ (អានតែប៉ុណ្ណោះ · ហាងខ្លួនឯង · តម្រៀបតាមអាយុ · មានព្រំដែន) ➜ ការលុបនៅតាម rules ពិត
+    const EV = 'zoew_scan_operations';
+    const evId = (ch) => 'scan_' + ch.repeat(32);
+    const evOp = (id, birth) => ({ v: 2, id, actorUid: A.who.sub, phase: 'committed', birth, registryKey: 'ZEV' + id.slice(5, 8), code: 'ZEV' + id.slice(5, 8) });
+    const evNow = Date.now();
+    await admin(A.id, [{ k: 'set', p: [EV, evId('1')], v: evOp(evId('1'), 1000) }, { k: 'set', p: [EV, evId('2')], v: evOp(evId('2'), 500) },
+        { k: 'set', p: [EV, evId('3')], v: evOp(evId('3'), evNow) }]);
+    await admin(B.id, [{ k: 'set', p: [EV, evId('4')], v: evOp(evId('4'), 100) }]);
+    const candidates = async (who, root, before, limit) => {
+        const r = await as(c, who, 'select public.zoe_evidence_candidates($1, $2, $3) as r', [root, before, limit]);
+        return r.rows ? r.rows[0].r : r;
+    };
+    const evOne = await candidates(A.who, EV, evNow - 1000, 1);
+    const evAll = await candidates(A.who, EV, evNow - 1000, 50);
+    rec('zoe_evidence_candidates ៖ តែកំណត់ត្រាចាស់ជាង before · តម្រៀបតាមអាយុ · limit', Array.isArray(evOne.docs) && evOne.docs.map((d) => d.k).join() === evId('2')
+        && evAll.docs.map((d) => d.k).join() === [evId('2'), evId('1')].join(), { one: evOne.docs, all: evAll.docs && evAll.docs.map((d) => d.k) });
+    const evB = await candidates(B.who, EV, evNow - 1000, 50);
+    rec('zoe_evidence_candidates ៖ ហាងនីមួយៗឃើញតែកំណត់ត្រារបស់ខ្លួន', evB.docs.map((d) => d.k).join() === evId('4'), evB.docs);
+    rec('zoe_evidence_candidates ៖ root ក្រៅបញ្ជី · limit លើស ២០០ ➜ បដិសេធ', !!(await candidates(A.who, REG, evNow, 10)).error && !!(await candidates(A.who, EV, evNow, 201)).error);
+    rec('zoe_evidence_candidates ៖ anon ➜ បដិសេធ', denied(await as(c, ANON, 'select public.zoe_evidence_candidates($1, $2, $3)', [EV, evNow, 10])));
+    const evDel = await write(A.who, [{ k: 'set', p: [EV, evId('2')], v: null }]);
+    const evYoung = await write(A.who, [{ k: 'set', p: [EV, evId('3')], v: null }]);
+    rec('rules ៖ លុបកំណត់ត្រាចាស់ (committed · គ្មាន registry/scan_pending) បាន · កំណត់ត្រាថ្មីបដិសេធ', !!evDel && evDel.ok === true && !!evYoung && !evYoung.ok
+        && (docOf(await read(A.who, EV, evId('2')), EV, evId('2')) || {}).v === null && !!(docOf(await read(A.who, EV, evId('3')), EV, evId('3')) || {}).v, { evDel, evYoung });
+    await admin(A.id, [{ k: 'set', p: [EV, evId('1')], v: null }, { k: 'set', p: [EV, evId('3')], v: null }]);
+    await admin(B.id, [{ k: 'set', p: [EV, evId('4')], v: null }]);
 
     const pullFull = async (who, since, limit, fullHead) => {
         const r = await as(c, who, 'select public.zoe_pull($1, $2, $3) as r', [since, limit, fullHead]);
@@ -771,6 +819,50 @@ async function externalEditCases(c, rec) {
         await insertB.end();
     }
 
+    await write([{ k: 'set', p: [REG, 'AGED'], v: true }]);
+    await write([{ k: 'set', p: [REG, 'AGED'], v: null }]);
+    await c.query("update public.zoe_docs set updated_at = now() - interval '8 days' where tenant_id = $1 and root = $2 and key = $3", [tid, REG, 'AGED']);
+    const agedTomb = await row('AGED');
+    await write([{ k: 'set', p: [REG, 'HKLIVE'], v: true }]);
+    const h0 = await state();
+    let markerAfterHk = null, liveDelete = null;
+    await c.query('begin');
+    try {
+        await c.query("select set_config('zoe.raw_docs', 'off', true)");
+        await c.query('select private.zoe_housekeeping($1)', [tid]);
+        markerAfterHk = (await c.query("select current_setting('zoe.raw_docs', true) as v")).rows[0].v;
+        await c.query('delete from public.zoe_docs where tenant_id = $1 and root = $2 and key = $3', [tid, REG, 'HKLIVE']);
+        liveDelete = await row('HKLIVE');
+        await c.query('commit');
+    } catch (e) {
+        await c.query('rollback').catch(() => {});
+        throw e;
+    }
+    const h1 = await state();
+    rec('housekeeping ពិតលុប tombstone ចាស់ ➜ purged_seq · bytes ដកម្តង (trigger មិនដកស្ទួន) · zoe.raw_docs ត្រឡប់តម្លៃមុនហៅ ➜ Table Editor លុបក្នុង transaction ដដែលនៅបាន tombstone',
+        h0.bytes === h0.real && !!agedTomb && agedTomb.value === null && agedTomb.aged === true && !(await row('AGED')) && h1.purged === Number(agedTomb.seq)
+        && markerAfterHk === 'off' && !!liveDelete && liveDelete.value === null && Number(liveDelete.seq) === h0.seq + 1
+        && h1.seq === h0.seq + 1 && h1.bytes === h1.real, { agedTomb, h0, h1, markerAfterHk, liveDelete });
+
+    const lone = await write([{ k: 'set', p: [REG, 'TOMB'], v: true }]);
+    const t0 = await state();
+    await c.query('delete from public.zoe_docs where tenant_id = $1 and root = $2 and key = $3', [tid, REG, 'TOMB']);
+    const tomb = await row('TOMB');
+    const later = await write([{ k: 'set', p: [REG, 'LATER'], v: true }]);
+    await c.query('delete from public.zoe_docs where tenant_id = $1 and root = $2 and key = $3', [tid, REG, 'TOMB']);
+    const t1 = await state();
+    const behind = await pull(t0.seq);
+    const caught = await pull(tomb ? Number(tomb.seq) : 0);
+    rec('មុនលក្ខខណ្ឌ ៖ Table Editor លុបជួររស់ ➜ tombstone · ការសរសេរបន្ទាប់ · លុបជួរ tombstone នោះ ➜ ជួរបាត់ពិត · seq ហាងមិនឡើង',
+        !!lone && lone.ok === true && !!tomb && tomb.value === null && Number(tomb.seq) === t0.seq + 1 && !!later && later.ok === true
+        && t1.seq === Number(tomb.seq) + 1 && !(await row('TOMB')), { lone, tomb, later, t0, t1 });
+    rec('⛔ Table Editor លុបជួរ tombstone ➜ purged_seq = seq របស់វា · bytes ពិត · ឧបករណ៍ដែលមិនទាន់ទាញការលុប reset (មិនរក្សាឯកសារដែលលុបរហូត logout)',
+        !!tomb && t1.purged === Number(tomb.seq) && t1.bytes === t1.real && !!behind && behind.reset === true
+        && !pulled(behind, 'TOMB') && !!pulled(behind, 'LATER'),
+        { tomb, t1, behind: behind && { reset: behind.reset, seq: behind.seq, rows: Array.isArray(behind.rows) ? behind.rows.length : behind } });
+    rec('ទិសផ្ទុយ ៖ ឧបករណ៍ដែលទាញ tombstone រួច ➜ មិន reset (ទាញតែ delta ក្រោយវា)',
+        !!caught && caught.reset === false && Array.isArray(caught.rows) && caught.rows.length === 1 && !!pulled(caught, 'LATER'), caught);
+
     await c.query('delete from auth.users where id = $1', [uid]);
     const cascade = await c.query('delete from public.tenants where id = $1', [tid]).then(() => null, (e) => e);
     const left = (await c.query('select count(*)::int as n from public.zoe_docs where tenant_id = $1', [tid])).rows[0].n;
@@ -843,6 +935,14 @@ async function suite(sql, stopOnFail) {
 
 const MUTATIONS = [
     ['Table Editor លុបជួរ ➜ មិនបង្កើត tombstone', '    insert into public.zoe_docs (tenant_id, root, key, value, seq, updated_at)\n    values (old.tenant_id, old.root, old.key, null, next_seq, now());', '    perform 1;'],
+    ['Table Editor លុប tombstone ➜ trigger រំលង (លុបស្ងាត់ ដូចមុនកែ)',
+        "    if pg_trigger_depth() > 1 or current_setting('zoe.raw_docs', true) = 'on'\n        or not exists (select 1 from public.tenants t where t.id = old.tenant_id) then",
+        "    if pg_trigger_depth() > 1 or current_setting('zoe.raw_docs', true) = 'on' or old.value is null\n        or not exists (select 1 from public.tenants t where t.id = old.tenant_id) then"],
+    ['Table Editor លុប tombstone ➜ purged_seq មិនឡើង (ឧបករណ៍ដែលនៅក្រោយរក្សាឯកសារ)', 'set purged_seq = greatest(s.purged_seq, old.seq),', 'set purged_seq = s.purged_seq,'],
+    ['Table Editor លុប tombstone ➜ purged_seq = head (ឧបករណ៍ដែលទាញការលុបរួចក៏ត្រូវទាញពេញ)', 'greatest(s.purged_seq, old.seq)', 'greatest(s.purged_seq, s.seq)'],
+    ['Table Editor លុប tombstone ➜ bytes មិនដក', 'bytes = greatest(s.bytes - private.zoe_doc_bytes(old.root, old.key, null), 0)', 'bytes = s.bytes'],
+    ['housekeeping មិនសម្គាល់ការលុបខ្លួនឯង (trigger ដក bytes ស្ទួន)', "    perform set_config('zoe.raw_docs', 'on', true);\n", ''],
+    ['housekeeping មិនត្រឡប់ zoe.raw_docs (ការលុបបន្ទាប់ក្នុង transaction ក្លាយជាការលុបស្ងាត់)', "    perform set_config('zoe.raw_docs', coalesce(prior_raw, ''), true);\n", ''],
     ['Table Editor កែ ➜ seq ឯកសារមិនឡើង', '    new.seq := next_seq;\n    new.updated_at := now();', '    new.updated_at := now();'],
     ['Table Editor ➜ bytes មិនតាម', 'bytes = greatest(s.bytes + delta, 0)', 'bytes = s.bytes'],
     ['trigger restamp ការសរសេរខាងក្នុង', "        or current_setting('zoe.internal_write', true) = 'on' then", '        then'],
@@ -1013,6 +1113,151 @@ async function rulesMigrationFreshness() {
     ok('ទិសផ្ទុយ ៖ rules ប្រែ ➜ SQL ដែលបង្កើតប្រែ (generator មិនមែនថេរ)', gen.rulesSql(gen.compileRules(probe)) !== want);
 }
 
+async function rulesCompilerGuardRegression() {
+    console.log('\n── F03. compiler guard ៖ AST ពិត · token/regex/arity poison · គ្មាន backend engine ──');
+    const assert = require('assert/strict'), { createHash } = require('crypto');
+    const checks = [], hashes = {}, hash = value => createHash('sha256').update(value).digest('hex');
+    const check = (id, run) => {
+        let error = null;
+        try { run(); } catch (failure) { error = String(failure?.message || failure).slice(0, 500); }
+        checks.push({ id, pass: error === null, ...(error ? { error } : {}) });
+        ok('F03 compiler ៖ ' + id, error === null, error);
+    };
+    let parseExpression, guard, rules, generator;
+    const parserPath = path.join(ROOT, 'supabase/scripts/rtdb-expression.cjs');
+    const guardPath = path.join(ROOT, 'supabase/scripts/rtdb-canonical-key.cjs');
+    const rulesPath = path.join(ROOT, 'firebase-database.rules.json');
+    try {
+        for (const file of [parserPath, guardPath, rulesPath]) hashes[path.relative(ROOT, file)] = hash(fs.readFileSync(file));
+        ({ parseExpression } = require(parserPath));
+        ({ NATIVE_F03_CANONICAL_GUARD: guard } = require(guardPath));
+        rules = JSON.parse(fs.readFileSync(rulesPath, 'utf8'));
+        generator = await import(require('url').pathToFileURL(path.join(ROOT, 'supabase/scripts/rtdb-rules.mjs')).href);
+    } catch (failure) {
+        check('C00-source-inputs', () => { throw failure; });
+    }
+    if (!checks.length) check('C00-source-inputs', () => {
+        assert.equal(typeof parseExpression, 'function'); assert.equal(typeof guard, 'string'); assert.ok(guard.length > 0);
+        assert.equal(typeof generator?.compileRules, 'function'); assert.ok(rules?.rules?.zoew_registry_releases?.$releaseId);
+    });
+    if (parseExpression && typeof guard === 'string' && rules && generator) {
+        const scope = ['$releaseId'], node = rules.rules.zoew_registry_releases.$releaseId;
+        const hasIntrinsic = tree => tree && typeof tree === 'object'
+            && (tree.t === 'f03_registry_key' || Object.values(tree).some(value => Array.isArray(value) ? value.some(hasIntrinsic) : hasIntrinsic(value)));
+        check('C01-fixed-guard-exact-AST', () => assert.deepEqual(parseExpression(guard, scope), { t: 'f03_registry_key' }));
+        check('C02-actual-release-and-compiled-tree-have-one-guard', () => {
+            assert.equal(node['.validate'].split(guard).length - 1, 1);
+            let count = 0;
+            const strip = value => {
+                if (!value || typeof value !== 'object') return value;
+                if (value.t === '&&' && value.r?.t === 'f03_registry_key') { count++; return strip(value.l); }
+                return Array.isArray(value) ? value.map(strip) : Object.fromEntries(Object.entries(value).map(([key, child]) => [key, strip(child)]));
+            };
+            const current = generator.compileRules(rules), unguarded = JSON.parse(JSON.stringify(rules));
+            unguarded.rules.zoew_registry_releases.$releaseId['.validate'] = node['.validate'].replace(' && ' + guard, '');
+            assert.notEqual(unguarded.rules.zoew_registry_releases.$releaseId['.validate'], node['.validate']);
+            assert.deepEqual(strip(current), generator.compileRules(unguarded));
+            assert.equal(count, 1);
+            assert.equal(hasIntrinsic(current.c.zoew_registry_releases.x.r.v), true);
+        });
+        check('C03-guard-scope-is-exact-release-scope', () => {
+            for (const other of [[], ['$itemId'], ['$releaseId', '$other']]) assert.throws(() => parseExpression(guard, other));
+        });
+        check('C04-quoted-template-is-only-a-literal', () => {
+            for (const value of [guard, 'prefix\\\"' + guard + 'suffix', "prefix'/*" + guard + '//suffix']) {
+                const quoted = '"' + value.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+                assert.deepEqual(parseExpression(quoted, []), { t: 'l', v: value });
+                assert.equal(hasIntrinsic(parseExpression(JSON.stringify(value), [])), false);
+            }
+        });
+        check('C05-comment-and-partial-identifier-poisons-refused', () => {
+            for (const text of ['/*' + guard + '*/', '//' + guard, 'prefix' + guard, guard + 'suffix']) assert.throws(() => parseExpression(text, scope));
+        });
+        const poison = (text, from, to) => { assert.equal(text.includes(from), true, 'poison anchor missing'); const changed = text.replace(from, () => to); assert.notEqual(changed, text); return changed; };
+        check('C06-field-source-and-operator-poisons-refused', () => {
+            for (const [from, to] of [["child('code')", "child('barcode')"], ['newData', 'data'], ["child('registryKey')", "child('other')"], [' && ', ' || ']]) {
+                const changed = poison(guard, from, to);
+                assert.throws(() => parseExpression(changed, scope));
+            }
+        });
+        check('C07-regex-anchor-wildcard-flag-poisons-refused', () => {
+            for (const [from, to] of [['[.]', '.'], ['^', ''], ['$/)', '$/m)'], ['\u00A0', '\u0020']]) {
+                const changed = poison(guard, from, to);
+                assert.throws(() => parseExpression(changed, scope));
+            }
+        });
+        check('C08-arity-and-encoding-order-poisons-refused', () => {
+            for (const [from, to] of [['.toUpperCase()', '.toUpperCase("tr")'], ['%25', '%2525'], ['.replace("%09", "\\t")', '.replace("%09")'],
+                ['.replace("%09", "\\t")', '.replace("%09", "x")'], ["child('code').isString()", "child('code').isString(true)"]]) {
+                const changed = poison(guard, from, to);
+                assert.throws(() => parseExpression(changed, scope));
+            }
+        });
+        check('C09-general-string-methods-remain-unsupported', () => {
+            for (const text of ["newData.val().trim()", "newData.val().toUpperCase()", "newData.val().replace('x','y')", "newData.val().contains('x')", "newData.val().matches(/^x$/)"]) {
+                assert.throws(() => parseExpression(text, scope));
+            }
+        });
+        check('C10-dynamic-regex-eval-functions-tokens-refused', () => {
+            for (const text of ["newData.val().matches(data.val())", "eval('true')", 'foo()', 'newData.foo', 'true; true', 'true @ false', '__f03_registry_key']) {
+                assert.throws(() => parseExpression(text, scope));
+            }
+        });
+        check('C11-compound-old-operators-retain-exact-AST', () => {
+            assert.deepEqual(parseExpression('true && ' + guard, scope), { t: '&&', l: { t: 'l', v: true }, r: { t: 'f03_registry_key' } });
+            assert.deepEqual(parseExpression('auth != null && newData.isString()', []), { t: '&&', l: { t: 'b', o: '!=', l: { t: 'auth' }, r: { t: 'l', v: null } },
+                r: { t: 'm', n: 'isString', o: { t: 'newData' }, a: [] } });
+        });
+        check('C12-poisoned-guard-cannot-compile-through-rule-generator', () => {
+            const bad = JSON.parse(JSON.stringify(rules));
+            bad.rules.zoew_registry_releases.$releaseId['.validate'] = node['.validate'].replace(guard, () => poison(guard, '[.]', '.'));
+            assert.throws(() => generator.compileRules(bad));
+        });
+        check('C13-native-any-character-uses-supported-partition', () => {
+            const patterns = [...guard.matchAll(/\.matches\((\/(?:\\.|[^/\\])*\/)\)/g)].map(match => match[1]);
+            const group = '([^A]|A)';
+            assert.equal(patterns.length, 4);
+            assert.ok(patterns.every(pattern => pattern.startsWith('/^') && pattern.endsWith('$/')));
+            assert.equal(guard.includes('[\\s\\S]'), false);
+            assert.equal(guard.split(group).length - 1, 4);
+            assert.ok(patterns[0].startsWith('/^' + group + '*'));
+            const any = new RegExp('^' + group + '*$');
+            const points = [0, 9, 10, 11, 12, 13, 32, 127, 160, 5760, ...Array.from({ length: 11 }, (_, index) => 8192 + index),
+                8232, 8233, 8239, 8287, 12288, 65279];
+            for (const value of ['', 'A', 'a', 'AA', 'A\\B', 'ß', 'ᲊ', '😀', '\ud800', '\udc00', ...points.map(point => String.fromCharCode(point))]) {
+                assert.equal(any.test(value), true);
+            }
+            assert.equal(JSON.parse(JSON.stringify({ guard })).guard, guard);
+        });
+        check('C14-native-regex-uses-literal-code-points', () => {
+            const patterns = [...guard.matchAll(/\.matches\((\/(?:\\.|[^/\\])*\/)\)/g)].map(match => match[1]);
+            assert.equal(patterns.length, 4);
+            assert.ok(patterns.every(pattern => !/\\u[0-9a-f]{4}/i.test(pattern) && !/[\r\n\u2028\u2029]/.test(pattern)));
+            assert.ok(patterns[0].includes(String.fromCharCode(0) + '-' + String.fromCharCode(31)) && patterns[0].includes(String.fromCharCode(127)));
+            const unsafe = new RegExp(patterns[0].slice(1, -1));
+            for (let point = 0; point < 128; point++) assert.equal(unsafe.test(String.fromCharCode(point)), point < 32 || point === 127 || [35, 36, 46, 47, 91, 93].includes(point));
+        });
+        check('C15-known-casefold-gap-is-mapped-before-uppercase', () => {
+            assert.ok(guard.includes("newData.child('code').val().replace(\"ᲊ\", \"Ᲊ\").toUpperCase()"));
+            for (const code of ['ᲊ', 'Ᲊ', 'ᲊᲊ', 'F03ᲊa', 'literal\\u1C8A']) assert.equal(code.replaceAll('ᲊ', 'Ᲊ').toUpperCase(), code.toUpperCase());
+        });
+        check('C16-line-whitespace-is-normalized-only-for-regex-input', () => {
+            const patterns = [...guard.matchAll(/\.matches\((\/(?:\\.|[^/\\])*\/)\)/g)].map(match => match[1]);
+            const set = patterns[1].slice(3, patterns[1].indexOf(']'));
+            assert.deepEqual([...set].map(value => value.charCodeAt(0)), [32, 160, 5760, ...Array.from({ length: 11 }, (_, index) => 8192 + index), 8239, 8287, 12288, 65279]);
+            for (const point of [9, 10, 11, 12, 13, 8232, 8233]) {
+                const literal = JSON.stringify(String.fromCharCode(point)).replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+                assert.equal(guard.split('.replace(' + literal + ', " ")').length - 1, 3);
+            }
+        });
+    }
+    const report = { status: checks.length === 17 && checks.every(row => row.pass) ? 'PURE_COMPILER_CHECKS_COMPLETE' : 'FAIL',
+        checks, pass: checks.filter(row => row.pass).length, fail: checks.filter(row => !row.pass).length,
+        sourceHashes: hashes, driverHash: hash(fs.readFileSync(__filename)), guardHash: typeof guard === 'string' ? hash(guard) : null, nativeRuntime: 'UNRUN', supabaseRuntime: 'UNRUN' };
+    if (process.env.SUPABASE_RULES_COMPILER_RESULT) fs.writeFileSync(path.resolve(process.env.SUPABASE_RULES_COMPILER_RESULT), JSON.stringify(report, null, 2) + '\n');
+    return report;
+}
+
 // ⛔ ចំណាយនៃការសរសេរ/អានត្រូវលីនេអ៊ែរតាមទំហំ (A154 ៖ ឯកសារ ៩៨ KB ចំណាយ ៨ វិ. · ហាងធំ ~៤០០០ barcode/ថ្ងៃ ធ្លាក់ពិដាន) ៖ រូបរាងពិតរបស់ App
 //    (reconcile `update()` ចូល root ចំណូលយករួច · `runTransaction` លើ root ទាំងមូល · ទាញ/អានឯកសារធំ) ក្រោម `statement_timeout` ៨ វិ.
 //    (លំនាំដើមរបស់ role `authenticated` លើ Supabase) ➜ ត្រូវឆ្លង · ទំហំឯកសារដែលការសរសេរមួយប៉ះមានពិដាន · ទំព័រ `zoe_pull` មានពិដានបៃ
@@ -1109,8 +1354,77 @@ async function costGuard() {
     }
 }
 
+async function foldHintEquivalence() {
+    console.log('\n── ៤ខ. zoe_eval ៖ ផ្លូវ snapshot ដែលបត់រួច (hint `f` ពី compiler) = ការវាយតម្លៃខ្សែ child/parent ដើម ──');
+    const { c } = await H.freshDb('default-grants');
+    try {
+        await c.query(migrationSql);
+        const gen = await import(require('url').pathToFileURL(path.join(ROOT, 'supabase', 'scripts', 'rtdb-rules.mjs')).href);
+        const tree = gen.compileRules(JSON.parse(fs.readFileSync(path.join(ROOT, 'firebase-database.rules.json'), 'utf8')));
+        const seen = new Set(), samples = [];
+        const collect = (expr, loc, vars) => {
+            if (!expr || typeof expr !== 'object') return;
+            if (Array.isArray(expr)) { expr.forEach((item) => collect(item, loc, vars)); return; }
+            if (expr.f) {
+                const key = JSON.stringify([expr, loc]);
+                if (!seen.has(key)) { seen.add(key); samples.push({ expr, loc, vars }); }
+                return;
+            }
+            for (const value of Object.values(expr)) if (value && typeof value === 'object') collect(value, loc, vars);
+        };
+        const walk = (node, loc, vars) => {
+            for (const key of ['w', 'v']) if (node[key]) collect(node[key], loc, vars);
+            for (const [name, child] of Object.entries(node.c || {})) walk(child, loc.concat(name), vars);
+            if (node.x) walk(node.x.r, loc.concat({ v: node.x.n }), vars.concat(node.x.n));
+        };
+        walk(tree, [], []);
+        const strip = (expr) => { const copy = JSON.parse(JSON.stringify(expr)); delete copy.f; return copy; };
+        const variants = [['k', (name, i) => 'k' + i], ['slash', () => 'a/b'], ['empty', () => ''], ['reserved', () => 'bad.key'], ['number', () => 5], ['missing', () => undefined]];
+        const cases = [];
+        for (const sample of samples) {
+            for (const [label, value] of variants) {
+                const vars = {};
+                sample.vars.forEach((name, i) => { const v = value(name, i); if (v !== undefined) vars[name] = v; });
+                const loc = sample.loc.map((seg, i) => typeof seg === 'string' ? seg : (typeof vars[seg.v] === 'string' && vars[seg.v] ? vars[seg.v] : 'k' + i));
+                for (const scope of [{ vars, loc }, { vars, loc: [] }, { vars, loc: loc.slice(0, 1) }]) {
+                    cases.push({ e: sample.expr, r: strip(sample.expr), s: scope, label });
+                    cases.push({ e: { t: 'm', n: 'exists', o: sample.expr, a: [] }, r: { t: 'm', n: 'exists', o: strip(sample.expr), a: [] }, s: scope, label });
+                }
+            }
+        }
+        const ctx = { t: '00000000-0000-0000-0000-000000000000', pre: {}, post: {}, touched: {}, now: Date.now() };
+        const compare = async (list) => (await c.query(`select count(*)::int as n, count(*) filter (where private.zoe_eval(x->'e', $2::jsonb, x->'s') is distinct from private.zoe_eval(x->'r', $2::jsonb, x->'s'))::int as bad,
+            (array_agg(x->>'label') filter (where private.zoe_eval(x->'e', $2::jsonb, x->'s') is distinct from private.zoe_eval(x->'r', $2::jsonb, x->'s')))[1:3] as labels
+            from jsonb_array_elements($1::jsonb) x`, [JSON.stringify(list), JSON.stringify(ctx)])).rows[0];
+        let total = 0, bad = 0, labels = [];
+        for (let i = 0; i < cases.length; i += 4000) {
+            const r = await compare(cases.slice(i, i + 4000));
+            total += r.n; bad += r.bad; if (r.labels) labels = labels.concat(r.labels);
+        }
+        ok('hint `f` ៖ ' + samples.length + ' ខ្សែដែលបត់ពី rules ពិត × ' + variants.length + ' ប្រភេទ var × ៣ ទីតាំង (ខ្សែផ្ទាល់ + .exists()) ➜ លទ្ធផលដូចគ្មាន hint (' + total + ')',
+            samples.length >= 500 && total === cases.length && bad === 0, { bad, labels, samples: samples.length });
+        const withUp = samples.find((sample) => sample.expr.f.u), withVar = samples.find((sample) => sample.expr.f.s);
+        const wrong = [];
+        if (withUp) { const e = JSON.parse(JSON.stringify(withUp.expr)); e.f.u += 1; wrong.push({ e, r: strip(withUp.expr), s: { vars: Object.fromEntries(withUp.vars.map((n, i) => [n, 'k' + i])), loc: withUp.loc.map((seg, i) => typeof seg === 'string' ? seg : 'k' + i).concat('extra') }, label: 'up' }); }
+        if (withVar) { const e = JSON.parse(JSON.stringify(withVar.expr)); e.f.s = e.f.s.concat('extra'); wrong.push({ e, r: strip(withVar.expr), s: { vars: Object.fromEntries(withVar.vars.map((n, i) => [n, 'k' + i])), loc: withVar.loc.map((seg, i) => typeof seg === 'string' ? seg : 'k' + i) }, label: 'segment' }); }
+        const reverse = wrong.length === 2 ? await compare(wrong) : { bad: 0 };
+        ok('ទិសផ្ទុយ ៖ hint ខុស (parent លើស · segment លើស) ➜ ការប្រៀបធៀបរកឃើញ', reverse.bad === 2, reverse);
+    } catch (e) {
+        ok('zoe_eval hint equivalence រត់បាន', false, String(e && e.stack || e));
+    } finally {
+        try { await c.end(); } catch (e) {}
+    }
+}
+
 async function main() {
+    await rulesCompilerGuardRegression();
     await rulesMigrationFreshness();
+    if (RULES_GENERATOR_ONLY) {
+        if (STRICT) ok('SUPABASE_STRICT=1 ៖ rules-generator-only មិនអាចជំនួស backend engine', false);
+        skipped.push('rules-generator-only ៖ native និង PostgreSQL engine UNRUN');
+        finish();
+        return;
+    }
     migrationAppendOnly();
     const reason = H.unavailableReason();
     if (reason) {
@@ -1155,6 +1469,7 @@ async function main() {
             r.applied && caught.length > 0);
     }
     await quotaUpgradeGuard();
+    await foldHintEquivalence();
     await costGuard();
     finish();
 }
@@ -1162,4 +1477,4 @@ async function main() {
 main().catch((e) => {
     ok('ការវាស់មិនគាំង', false, String(e && e.stack || e));
     finish();
-}).finally(() => H.stop());
+}).finally(() => H?.stop());

@@ -457,9 +457,231 @@ async function trashModeCases(realRules, compileRules, rulesSql) {
     await sc.drop();
 }
 
+// ⛔ អាយុ root ភស្តុតាង ៖ ការលុបកំណត់ត្រាចាស់ជាង ៦០ ថ្ងៃ មានតែពេលគ្មានទិន្នន័យរស់ណាយោងវា (registry · scan_pending · ធុងសំរាម · history ·
+//    restore finalization) ➜ verdict ដូចគ្នាទាំង RTDB/Postgres ហើយការបដិសេធទុកកំណត់ត្រាដដែល
+async function evidenceRetentionCases(realRules, compileRules, rulesSql) {
+    console.log('\n── អាយុ root ភស្តុតាង (scan operation · registry release · trash consumption) ៖ លុបតែកំណត់ត្រាចាស់ដែលគ្មានអ្វីយោង ──');
+    await pgSetRules(realRules, compileRules, rulesSql);
+    const sc = makeScenario('evidence-retention');
+    await sc.loadRules(realRules);
+    const now = Date.now(), old = now - 61 * 86400000, young = now - 59 * 86400000;
+    const op = (id, phase, birth, key = 'ZTREG1') => ({ v: 2, id, actorUid: 'uid-old', phase, birth, registryKey: key, code: key });
+    const release = (id, deletedAt, trashId = 'trash_old', key = 'ZTREG1') => ({ v: 1, id, kind: 'scan', deletedAt, trashId, registryKey: key, releasedBy: 'uid-old' });
+    const consumption = (sourceId, deletedAt) => ({ v: 1, sourceId, generation: 1, kind: 'purge', actorUid: 'uid-old', scope: 's', deletedAt, rowBirth: 1 });
+    const write = policyWriter(sc, 'evidence-retention', 'អាយុភស្តុតាង', 'កំណត់ត្រា និងទិន្នន័យទាំងអស់នៅដដែលទាំង backend ២');
+    const scanId = 'scan_' + 'a'.repeat(32);
+    const trial = async (label, seed, location, deny) => {
+        await both(sc, 'owner', 'SNAP', '', seed);
+        await write('PUT', location, null, deny, label);
+    };
+    await trial('scan operation committed ចាស់ · registry មិនជារបស់វា ➜ លុបបាន', { zoew_scan_operations: { [scanId]: op(scanId, 'committed', old) } }, 'zoew_scan_operations/' + scanId, false);
+    await trial('scan operation cancelled ចាស់ ➜ លុបបាន', { zoew_scan_operations: { [scanId]: op(scanId, 'cancelled', old) } }, 'zoew_scan_operations/' + scanId, false);
+    await trial('scan operation committed ថ្មីជាង ៦០ ថ្ងៃ ➜ បដិសេធ', { zoew_scan_operations: { [scanId]: op(scanId, 'committed', young) } }, 'zoew_scan_operations/' + scanId, true);
+    await trial('scan operation prepared ចាស់ ➜ បដិសេធ', { zoew_scan_operations: { [scanId]: op(scanId, 'prepared', old) } }, 'zoew_scan_operations/' + scanId, true);
+    await trial('scan operation admitted ចាស់ ➜ បដិសេធ', { zoew_scan_operations: { [scanId]: op(scanId, 'admitted', old) } }, 'zoew_scan_operations/' + scanId, true);
+    await trial('scan operation ចាស់ ដែល registry នៅជារបស់វា ➜ បដិសេធ', { zoew_scan_operations: { [scanId]: op(scanId, 'committed', old) },
+        zoew_barcode_registry: { ZTREG1: { v: 2, intent: scanId, actorUid: 'uid-old', birth: old } } }, 'zoew_scan_operations/' + scanId, true);
+    await trial('scan operation ចាស់ ដែលមាន scan_pending ➜ បដិសេធ', { zoew_scan_operations: { [scanId]: op(scanId, 'cancelled', old) },
+        zoew_scan_pending: { [scanId]: 'uid-old' } }, 'zoew_scan_operations/' + scanId, true);
+    await trial('scan operation ចាស់ ដែល registry ជារបស់ការស្កេនផ្សេង ➜ លុបបាន', { zoew_scan_operations: { [scanId]: op(scanId, 'committed', old) },
+        zoew_barcode_registry: { ZTREG1: { v: 2, intent: 'scan_' + 'b'.repeat(32), actorUid: 'uid-new', birth: now } } }, 'zoew_scan_operations/' + scanId, false);
+    await trial('registry release ចាស់ · ធុងសំរាមលែងមាន ➜ លុបបាន', { zoew_registry_releases: { [scanId]: release(scanId, old) } }, 'zoew_registry_releases/' + scanId, false);
+    await trial('registry release ថ្មីជាង ៦០ ថ្ងៃ ➜ បដិសេធ', { zoew_registry_releases: { [scanId]: release(scanId, young) } }, 'zoew_registry_releases/' + scanId, true);
+    await trial('registry release ចាស់ ដែលធុងសំរាមនៅ ➜ បដិសេធ', { zoew_registry_releases: { [scanId]: release(scanId, old) },
+        zoew_recently_deleted_cod_dod: { trash_old: { id: 'trash_old', deletedAt: old } } }, 'zoew_registry_releases/' + scanId, true);
+    await trial('registry release ចាស់ ដែល registry នៅជារបស់ intent នោះ ➜ បដិសេធ', { zoew_registry_releases: { [scanId]: release(scanId, old) },
+        zoew_barcode_registry: { ZTREG1: { v: 2, intent: scanId, actorUid: 'uid-old', birth: old } } }, 'zoew_registry_releases/' + scanId, true);
+    await trial('trash consumption ចាស់ · ធុងសំរាម និង history លែងមាន ➜ លុបបាន', { zoew_trash_consumptions: { trash_old: consumption('trash_old', old) } }, 'zoew_trash_consumptions/trash_old', false);
+    await trial('trash consumption ថ្មីជាង ៦០ ថ្ងៃ ➜ បដិសេធ', { zoew_trash_consumptions: { trash_old: consumption('trash_old', young) } }, 'zoew_trash_consumptions/trash_old', true);
+    await trial('trash consumption ចាស់ ដែល history នៅ (restore) ➜ បដិសេធ', { zoew_trash_consumptions: { trash_old: consumption('trash_old', old) },
+        zoew_scan_history_cod_dod: { trash_old: { id: 'trash_old', phone: '012', barcodes: [{ code: 'ZT1' }] } } }, 'zoew_trash_consumptions/trash_old', true);
+    await trial('trash consumption ចាស់ ដែលធុងសំរាមនៅ ➜ បដិសេធ', { zoew_trash_consumptions: { trash_old: consumption('trash_old', old) },
+        zoew_recently_deleted_cod_dod: { trash_old: { id: 'trash_old', deletedAt: old } } }, 'zoew_trash_consumptions/trash_old', true);
+    await trial('trash consumption ចាស់ ដែលមាន restore finalization ➜ បដិសេធ', { zoew_trash_consumptions: { trash_old: consumption('trash_old', old) },
+        zoew_restore_finalizations: { trash_old: { targetId: 'trash_old' } } }, 'zoew_trash_consumptions/trash_old', true);
+    await both(sc, 'owner', 'SNAP', '', { zoew_scan_operations: { [scanId]: op(scanId, 'committed', old) }, zoew_registry_releases: { [scanId]: release(scanId, old) },
+        zoew_trash_consumptions: { trash_old: consumption('trash_old', old) } });
+    await write('PATCH', '', { ['zoew_scan_operations/' + scanId]: null, ['zoew_registry_releases/' + scanId]: null, ['zoew_trash_consumptions/trash_old']: null }, false,
+        'PATCH ច្រើនផ្លូវលុប root ភស្តុតាងទាំង ៣ ដែលចាស់ ➜ ទទួល');
+    await sc.drop();
+}
+
 function generationConsumption(source, kind, token, targetId) {
     return { v: 1, sourceId: source.id, generation: source.trashGeneration ?? 0, kind, actorUid: member.sub, scope: 'audit-scope', deletedAt: source.deletedAt, rowBirth: source.createdAt ?? 0,
         ...(kind === 'restore' ? { token, targetId } : {}) };
+}
+function slotPurgeVectors(uid) {
+    const T = 'zoew_recently_deleted_cod_dod', G = 'zoew_trash_consumptions', P = 'zoew_registry_releases', R = 'zoew_barcode_registry', O = 'zoew_scan_operations';
+    const SCOPE = 'https://f03-parity.example', copy = value => JSON.parse(JSON.stringify(value));
+    const hex = text => require('crypto').createHash('sha256').update(text).digest('hex').slice(0, 32);
+    const keyOf = code => code === 'ß' ? 'SS' : code.toUpperCase();
+    const row = (id, generation, slots, extra = {}) => {
+        const value = { id, count: slots.length, cod: slots.length, dod: 0, price: slots.length, phone: '0120000000', createdAt: 1700000000000,
+            deletedAt: 1790000000000, scanDate: '2026-10-01', trashReason: 'delete', isFromDeletion: true, time: '10:00:00 (2026-10-01)', barcodes: {}, ...extra };
+        if (generation !== null) value.trashGeneration = generation;
+        if (extra.noCreatedAt) { delete value.createdAt; delete value.noCreatedAt; }
+        slots.forEach((slot, index) => { value.barcodes[slot.slot] = { code: slot.code, cod: 1, dod: 0, isClosed: false,
+            ...(extra.noBirth ? {} : { createdAt: 1700000000000 + index }), ...(slot.scan ? { scanIntent: slot.scan } : {}) }; });
+        delete value.noBirth;
+        return value;
+    };
+    const packet = (source, options = {}) => {
+        const updates = {}, members = {}, keys = {};
+        const generation = Object.prototype.hasOwnProperty.call(source, 'trashGeneration') ? source.trashGeneration : 0;
+        const rowBirth = Object.prototype.hasOwnProperty.call(source, 'createdAt') ? source.createdAt : 0;
+        for (const [slot, barcode] of Object.entries(source.barcodes).filter(([slot]) => !(options.skipSlots || []).includes(slot))) {
+            const id = barcode.scanIntent || 'release_' + hex(source.id + ':' + generation + ':' + slot);
+            const receipt = { v: 2, generation, id, kind: barcode.scanIntent ? 'scan' : 'legacy', actorUid: barcode.scanIntent ? (options.scanActor || uid) : uid, releasedBy: uid,
+                scope: SCOPE, code: barcode.code, registryKey: keyOf(barcode.code), birth: Object.prototype.hasOwnProperty.call(barcode, 'createdAt') ? barcode.createdAt : 0,
+                trashId: source.id, slot, deletedAt: source.deletedAt, rowBirth, rowCount: options.rowCount ?? source.count };
+            members[slot] = { id }; keys[receipt.registryKey] = id;
+            if (!options.oldShape) updates[T + '/' + source.id + '/barcodes/' + slot] = null;
+            updates[R + '/' + receipt.registryKey] = null;
+            updates[P + '/' + id] = receipt;
+        }
+        if (options.oldShape) updates[T + '/' + source.id] = null;
+        else for (const key of Object.keys(source)) if (key !== 'barcodes' && !(options.keepFields || []).includes(key)) updates[T + '/' + source.id + '/' + key] = null;
+        const consumption = { v: 1, sourceId: source.id, generation, kind: 'purge', actorUid: uid, scope: SCOPE, deletedAt: source.deletedAt, rowBirth };
+        const order = Object.keys(members).sort((a, b) => Number(a) - Number(b));
+        order.forEach((slot, index) => { members[slot].o = index; if (index) members[slot].p = order[index - 1]; if (index < order.length - 1) members[slot].n = order[index + 1]; });
+        if (!options.oldShape || options.withMaps) Object.assign(consumption, { first: order[0], members, keys });
+        updates[G + '/' + source.id] = consumption;
+        return updates;
+    };
+    const seedOf = source => ({ [T]: { [source.id]: source }, [R]: Object.fromEntries(Object.values(source.barcodes).map(barcode => [keyOf(barcode.code), true])) });
+    const two = [{ slot: '0', code: 'F03CODE0' }, { slot: '1', code: 'F03CODE1' }];
+    const three = [{ slot: '0', code: 'C0' }, { slot: '1', code: 'C1' }, { slot: '2', code: 'C2' }];
+    const extra = (source, slot = '2') => { source.barcodes[slot] = { code: 'F03EXTRA', cod: 1, dod: 0, isClosed: false, createdAt: 1700000000002 }; return source; };
+    const vectors = [];
+    const add = (id, allowed, build) => vectors.push({ id, allowed, build });
+    const simple = (id, allowed, make) => add(id, allowed, () => { const { seed, updates } = make(); return { seed, steps: [{ updates, allowed }] }; });
+    simple('pos-1', true, () => { const r = row('p1', 1, [two[0]]); return { seed: seedOf(r), updates: packet(r) }; });
+    simple('pos-2', true, () => { const r = row('p2', 1, two); return { seed: seedOf(r), updates: packet(r) }; });
+    simple('pos-noncontiguous', true, () => { const r = row('pnc', 1, [{ slot: '0', code: 'A0' }, { slot: '7', code: 'A7' }, { slot: '15', code: 'A15' }]); return { seed: seedOf(r), updates: packet(r) }; });
+    simple('pos-legacy-zero-fallbacks', true, () => { const r = row('plz', null, two, { noCreatedAt: true, noBirth: true }); return { seed: seedOf(r), updates: packet(r) }; });
+    simple('pos-origins-and-flags', true, () => { const r = row('pof', 1, two, { origins: { F03CODE0: 'VN' }, restoreBlocked: true, trashMode: 'cookie', locker: 'A1' }); return { seed: seedOf(r), updates: packet(r) }; });
+    simple('pos-prior-restore-G', true, () => { const r = row('ppr', 2, two), seed = seedOf(r);
+        seed[G] = { ppr: { v: 1, sourceId: 'ppr', generation: 1, kind: 'restore', actorUid: uid, scope: SCOPE, deletedAt: 1, rowBirth: 1, token: 't', targetId: 'x1' } }; return { seed, updates: packet(r) }; });
+    simple('pos-prior-purge-G-with-certificate', true, () => { const r = row('ppm', 2, two), seed = seedOf(r), old = 'release_' + hex('old0');
+        seed[G] = { ppm: { v: 1, sourceId: 'ppm', generation: 1, kind: 'purge', actorUid: uid, scope: SCOPE, deletedAt: 1, rowBirth: 1, first: '0', members: { 0: { o: 0, id: old } }, keys: { OLD0: old } } };
+        return { seed, updates: packet(r) }; });
+    simple('pos-scan-kind-member', true, () => { const intent = 'scan_' + hex('scan-member');
+        const r = row('psk', 1, [{ slot: '0', code: 'SCANCODE', scan: intent }, { slot: '1', code: 'F03CODE1' }]), seed = seedOf(r);
+        seed[R].SCANCODE = { v: 2, intent, actorUid: 'other-actor', birth: 1700000000000 };
+        seed[O] = { [intent]: { v: 2, id: intent, actorUid: 'other-actor', scope: SCOPE, code: 'SCANCODE', registryKey: 'SCANCODE', birth: 1700000000000, phase: 'committed' } };
+        return { seed, updates: packet(r, { scanActor: 'other-actor' }) }; });
+    simple('pos-group-two-rows', true, () => { const a = row('ga', 1, two), b = row('gb', 1, [{ slot: '0', code: 'GB0' }]), seed = seedOf(a); seed[T].gb = b; seed[R].GB0 = true;
+        return { seed, updates: { ...packet(a), ...packet(b) } }; });
+    simple('pos-3-chain', true, () => { const r = row('c3', 1, three); return { seed: seedOf(r), updates: packet(r) }; });
+    simple('pos-24-members', true, () => { const r = row('p24', 1, Array.from({ length: 24 }, (_, i) => ({ slot: String(i), code: 'F03M' + String(i).padStart(4, '0') }))); return { seed: seedOf(r), updates: packet(r) }; });
+    simple('neg-old-shape', false, () => { const r = row('no', 1, two); return { seed: seedOf(r), updates: packet(r, { oldShape: true }) }; });
+    simple('neg-old-shape-with-certificate', false, () => { const r = row('nom', 1, two); return { seed: seedOf(r), updates: packet(r, { oldShape: true, withMaps: true }) }; });
+    simple('neg-count-mirror-old-shape', false, () => { const r = row('cmo', 1, two), updates = packet(r, { oldShape: true }); return { seed: seedOf(extra(r)), updates }; });
+    simple('neg-count-mirror-slot-shape', false, () => { const r = row('cmn', 1, two), updates = packet(r); return { seed: seedOf(extra(r)), updates }; });
+    simple('neg-count-mirror-extra-slot-deleted-no-receipt', false, () => { const r = row('cmd', 1, two), updates = packet(r); updates[T + '/cmd/barcodes/2'] = null; return { seed: seedOf(extra(r)), updates }; });
+    simple('neg-count-mirror-every-member-receipted', false, () => { const r = row('cme', 1, three); r.count = 2; return { seed: seedOf(r), updates: packet(r, { rowCount: 2 }) }; });
+    simple('neg-count-larger-than-members', false, () => { const r = row('clm', 1, two); r.count = 3; return { seed: seedOf(r), updates: packet(r, { rowCount: 3 }) }; });
+    simple('neg-collision-slot-shape', false, () => { const r = row('col', 1, [{ slot: '0', code: 'ß' }, { slot: '1', code: 'SS' }]); return { seed: seedOf(r), updates: packet(r) }; });
+    simple('neg-collision-old-shape', false, () => { const r = row('colo', 1, [{ slot: '0', code: 'ß' }, { slot: '1', code: 'SS' }]); return { seed: seedOf(r), updates: packet(r, { oldShape: true }) }; });
+    simple('neg-partial-member-omitted', false, () => { const r = row('pm', 1, two); return { seed: seedOf(r), updates: packet(r, { skipSlots: ['1'] }) }; });
+    simple('neg-container-delete', false, () => { const r = row('bc', 1, two), updates = packet(r);
+        for (const key of Object.keys(updates)) if (key.startsWith(T + '/bc/barcodes/')) delete updates[key]; updates[T + '/bc/barcodes'] = null; return { seed: seedOf(r), updates }; });
+    simple('neg-field-missed', false, () => { const r = row('mf', 1, two); return { seed: seedOf(r), updates: packet(r, { keepFields: ['phone'] }) }; });
+    simple('neg-no-consumption', false, () => { const r = row('ng', 1, two), updates = packet(r); delete updates[G + '/ng']; return { seed: seedOf(r), updates }; });
+    simple('neg-restore-kind-with-receipts', false, () => { const r = row('gk', 1, two), updates = packet(r), g = updates[G + '/gk'];
+        delete g.members; delete g.keys; delete g.first; Object.assign(g, { kind: 'restore', token: 't', targetId: 'x1' }); return { seed: seedOf(r), updates }; });
+    simple('neg-borrowed-old-receipt', false, () => { const r = row('br', 2, two), updates = packet(r), g = updates[G + '/br'];
+        const oldId = 'release_' + hex('old-incarnation'), old = copy(updates[P + '/' + g.members['1'].id]); old.generation = 1; old.id = oldId;
+        const seed = seedOf(r); seed[P] = { [oldId]: old }; seed[G] = { br: { v: 1, sourceId: 'br', generation: 1, kind: 'purge', actorUid: uid, scope: SCOPE, deletedAt: 1, rowBirth: 1 } };
+        delete updates[P + '/' + g.members['1'].id]; g.members['1'].id = oldId; g.keys[old.registryKey] = oldId; return { seed, updates }; });
+    simple('neg-swapped-pointers', false, () => { const r = row('sw', 1, two), updates = packet(r), m = updates[G + '/sw'].members; [m['0'].id, m['1'].id] = [m['1'].id, m['0'].id]; return { seed: seedOf(r), updates }; });
+    simple('neg-keys-map-wrong', false, () => { const r = row('kw', 1, two), updates = packet(r), k = updates[G + '/kw'].keys; [k.F03CODE0, k.F03CODE1] = [k.F03CODE1, k.F03CODE0]; return { seed: seedOf(r), updates }; });
+    simple('neg-keys-map-missing', false, () => { const r = row('km', 1, two), updates = packet(r); delete updates[G + '/km'].keys; return { seed: seedOf(r), updates }; });
+    simple('neg-members-map-missing', false, () => { const r = row('mm', 1, two), updates = packet(r); delete updates[G + '/mm'].members; return { seed: seedOf(r), updates }; });
+    simple('neg-extra-receipt', false, () => { const r = row('xr', 1, two), updates = packet(r), more = copy(updates[P + '/' + updates[G + '/xr'].members['1'].id]);
+        more.id = 'release_' + hex('extra'); updates[P + '/' + more.id] = more; return { seed: seedOf(r), updates }; });
+    simple('neg-shared-receipt-two-slots', false, () => { const r = row('ss2', 1, two), updates = packet(r), g = updates[G + '/ss2'], shared = g.members['1'].id;
+        delete updates[P + '/' + g.members['0'].id]; g.members['0'].id = shared; delete g.keys.F03CODE0; return { seed: seedOf(r), updates }; });
+    simple('neg-cross-row-shared-receipt', false, () => { const a = row('xa', 1, [{ slot: '0', code: 'XA0' }]), b = row('xb', 1, [{ slot: '0', code: 'XA0' }]), seed = seedOf(a); seed[T].xb = b;
+        const pa = packet(a), pb = packet(b), rb = pb[G + '/xb'].members['0'].id; delete pa[P + '/' + pa[G + '/xa'].members['0'].id]; delete pa[R + '/XA0'];
+        pa[G + '/xa'].members['0'].id = rb; pa[G + '/xa'].keys = { XA0: rb }; return { seed, updates: { ...pa, ...pb } }; });
+    simple('neg-restoreClaim-present', false, () => { const r = row('rc', 1, two, { restoreClaim: { token: 't', targetId: 'x', claimedAt: 1 } }); return { seed: seedOf(r), updates: packet(r) }; });
+    simple('neg-other-actor', false, () => { const r = row('ou', 1, two), updates = packet(r); updates[G + '/ou'].actorUid = 'someone-else'; return { seed: seedOf(r), updates }; });
+    simple('neg-wrong-generation', false, () => { const r = row('wg', 2, two), updates = packet(r); updates[G + '/wg'].generation = 1;
+        for (const key of Object.keys(updates)) if (key.startsWith(P + '/')) updates[key].generation = 1; return { seed: seedOf(r), updates }; });
+    simple('neg-group-one-malformed', false, () => { const a = row('gc', 1, two), b = row('gd', 1, [{ slot: '0', code: 'GD0' }]), pb = packet(b);
+        b.barcodes['1'] = { code: 'GDX', cod: 1, dod: 0, isClosed: false, createdAt: 1 }; const seed = seedOf(a); seed[T].gd = b; seed[R].GD0 = true; seed[R].GDX = true;
+        return { seed, updates: { ...packet(a), ...pb } }; });
+    simple('neg-scan-pending', false, () => { const r = row('sp', 1, two), seed = seedOf(r); seed[T].sp.scanPending = { x: 1 }; return { seed, updates: packet(r) }; });
+    simple('neg-cert-missing-link-n', false, () => { const r = row('cml', 1, three), updates = packet(r); delete updates[G + '/cml'].members['0'].n; return { seed: seedOf(r), updates }; });
+    simple('neg-cert-missing-link-p', false, () => { const r = row('cmp', 1, three), updates = packet(r); delete updates[G + '/cmp'].members['2'].p; return { seed: seedOf(r), updates }; });
+    simple('neg-cert-wrong-ordinal', false, () => { const r = row('cwo', 1, three), updates = packet(r); updates[G + '/cwo'].members['2'].o = 3; return { seed: seedOf(r), updates }; });
+    simple('neg-cert-duplicate-ordinal', false, () => { const r = row('cdo', 1, three), updates = packet(r), m = updates[G + '/cdo'].members; m['2'].o = 1; m['2'].p = '0'; delete m['1'].n; return { seed: seedOf(r), updates }; });
+    simple('neg-cert-two-anchors', false, () => { const r = row('cta', 1, two), updates = packet(r), m = updates[G + '/cta'].members; m['1'] = { o: 0, id: m['1'].id }; delete m['0'].n; return { seed: seedOf(r), updates }; });
+    simple('neg-cert-first-wrong', false, () => { const r = row('cfw', 1, three), updates = packet(r); updates[G + '/cfw'].first = '1'; return { seed: seedOf(r), updates }; });
+    simple('neg-cert-first-missing', false, () => { const r = row('cfm', 1, three), updates = packet(r); delete updates[G + '/cfm'].first; return { seed: seedOf(r), updates }; });
+    simple('neg-cert-string-ordinal', false, () => { const r = row('cso', 1, two), updates = packet(r); updates[G + '/cso'].members['1'].o = '1'; return { seed: seedOf(r), updates }; });
+    simple('neg-cert-link-outside-source', false, () => { const r = row('clo', 1, two), updates = packet(r), m = updates[G + '/clo'].members;
+        m['0'].n = '9'; m['9'] = { o: 1, id: m['1'].id, p: '0' }; m['1'].p = '9'; m['1'].o = 2; return { seed: seedOf(r), updates }; });
+    simple('neg-stale-equal-consumption', false, () => { const r = row('sec', 1, two), seed = seedOf(r), updates = packet(r), g = updates[G + '/sec'];
+        seed[G] = { sec: { v: 1, sourceId: 'sec', generation: 1, kind: 'purge', actorUid: g.actorUid, scope: g.scope, deletedAt: g.deletedAt, rowBirth: g.rowBirth } }; return { seed, updates }; });
+    simple('neg-legacy-count-zero', false, () => { const r = row('lc0', null, two, { noCreatedAt: true, noBirth: true }); r.count = 0; return { seed: seedOf(r), updates: packet(r, { rowCount: 0 }) }; });
+    simple('neg-legacy-count-absent', false, () => { const r = row('lca', null, two, { noCreatedAt: true, noBirth: true }); delete r.count; return { seed: seedOf(r), updates: packet(r, { rowCount: 0 }) }; });
+    simple('ord-edit-isDeducted', true, () => { const r = row('ed', 1, two); return { seed: seedOf(r), updates: { [T + '/ed/barcodes/0/isDeducted']: true } }; });
+    simple('ord-edit-restoreBlocked', true, () => { const r = row('eb', 1, two); return { seed: seedOf(r), updates: { [T + '/eb/restoreBlocked']: true } }; });
+    simple('ord-create-row', true, () => ({ seed: {}, updates: { [T + '/cr']: row('cr', 1, two) } }));
+    simple('ord-drop-member-row-stays', true, () => { const r = row('dm', 1, two); return { seed: seedOf(r), updates: { [T + '/dm/barcodes/1']: null } }; });
+    simple('ord-field-delete-row-stays', true, () => { const r = row('md', 1, two); return { seed: seedOf(r), updates: { [T + '/md/locker']: null } }; });
+    simple('ord-trashGeneration-change-refused', false, () => { const r = row('tg', 1, two); return { seed: seedOf(r), updates: { [T + '/tg/trashGeneration']: 5 } }; });
+    simple('neg-barcodeless-row-fields-no-consumption', false, () => { const r = row('bl', 1, []); delete r.barcodes; const updates = {};
+        for (const key of Object.keys(r)) updates[T + '/bl/' + key] = null; return { seed: { [T]: { bl: r } }, updates }; });
+    add('neg-replay-after-apply', false, () => { const r = row('rr', 1, two), updates = packet(r); return { seed: seedOf(r), steps: [{ updates, allowed: true }, { updates, allowed: false }] }; });
+    add('pos-second-incarnation', true, () => { const r = row('rs', 1, two), first = packet(r), next = row('rs', 2, [{ slot: '0', code: 'G2CODE0' }, { slot: '1', code: 'G2CODE1' }]);
+        return { seed: seedOf(r), steps: [{ updates: first, allowed: true }, { owner: { [T + '/rs']: next, [R + '/G2CODE0']: true, [R + '/G2CODE1']: true } }, { updates: packet(next), allowed: true }] }; });
+    add('neg-identical-consumption-rewrite-new-incarnation', false, () => { const r = row('ri', 1, two), first = packet(r), next = row('ri', 2, [{ slot: '0', code: 'G2CODE0' }, { slot: '1', code: 'G2CODE1' }]);
+        const second = packet(next); for (const key of Object.keys(second)) if (key.startsWith(P + '/')) second[key].generation = 1;
+        second[G + '/ri'] = { ...first[G + '/ri'], first: second[G + '/ri'].first, members: second[G + '/ri'].members, keys: second[G + '/ri'].keys };
+        return { seed: seedOf(r), steps: [{ updates: first, allowed: true }, { owner: { [T + '/ri']: next, [R + '/G2CODE0']: true, [R + '/G2CODE1']: true } }, { updates: second, allowed: false }] }; });
+    return vectors;
+}
+
+async function slotPurgeCases(rulesJson, compileRules, rulesSql, label) {
+    console.log('\n── F03 purge តាម slot (' + label + ') ៖ receipt គ្រប់ slot · certificate ចំនួន · verdict ដូចគ្នា RTDB/Postgres ──');
+    await pgSetRules(rulesJson, compileRules, rulesSql);
+    const vectors = slotPurgeVectors(member.sub);
+    check(vectors.length >= 60 && new Set(vectors.map(vector => vector.id)).size === vectors.length
+        && vectors.some(vector => vector.allowed) && vectors.some(vector => !vector.allowed), 'F03 slot matrix ' + label + ' ៖ vector ' + vectors.length + ' មិនស្ទួន មានទាំងទទួល/បដិសេធ');
+    // ⛔ namespace តែមួយ (rules ផ្ទុកម្តង) ៖ namespace ថ្មីក្នុងមួយ vector ផ្ទុក rules ~270 KB ច្រើនជាង ៦០ ដង ➜ emulator ព្យួរត្រង់ `PUT /.settings/rules.json`
+    //    (វាស់ ៖ 600 s គ្មានចម្លើយ) · ទិន្នន័យត្រូវ `drop()` រវាង vector ហើយ SNAP ជំនួស root ទាំងមូល ➜ vector មិនឃើញគ្នា
+    const sc = makeScenario('slot-matrix-' + label);
+    await sc.loadRules(rulesJson);
+    for (const vector of vectors) {
+        const { seed, steps } = vector.build();
+        await both(sc, 'owner', 'SNAP', '', seed);
+        const write = policyWriter(sc, 'slot-purge-' + label, 'F03 slot purge ' + label, 'ការបដិសេធគ្មាន effect ទាំង RTDB/Postgres');
+        for (const step of steps) {
+            if (step.owner) { for (const [location, value] of Object.entries(step.owner)) await both(sc, 'owner', 'PUT', location, value); continue; }
+            await write('PATCH', '', step.updates, !step.allowed, vector.id);
+        }
+        await sc.drop();
+    }
+}
+
+function slotPurgePacket(source) {
+    const updates = {}, members = {}, keys = {}, receipts = [];
+    source.barcodes.forEach((barcode, slot) => {
+        const id = 'release_' + require('crypto').randomBytes(16).toString('hex');
+        receipts.push(id);
+        updates['zoew_recently_deleted_cod_dod/' + source.id + '/barcodes/' + slot] = null;
+        updates['zoew_barcode_registry/' + barcode.code] = null;
+        updates['zoew_registry_releases/' + id] = { v: 2, generation: source.trashGeneration ?? 0, id, kind: 'legacy', actorUid: member.sub, releasedBy: member.sub, scope: 'audit-scope', code: barcode.code, registryKey: barcode.code,
+            birth: barcode.createdAt ?? 0, trashId: source.id, slot: String(slot), deletedAt: source.deletedAt, rowBirth: source.createdAt ?? 0, rowCount: source.count };
+        members[String(slot)] = { o: slot, id, ...(slot ? { p: String(slot - 1) } : {}), ...(slot < source.barcodes.length - 1 ? { n: String(slot + 1) } : {}) };
+        keys[barcode.code] = id;
+    });
+    for (const field of Object.keys(source)) if (field !== 'barcodes') updates['zoew_recently_deleted_cod_dod/' + source.id + '/' + field] = null;
+    updates['zoew_trash_consumptions/' + source.id] = { ...generationConsumption(source, 'purge'), first: '0', members, keys };
+    return updates;
 }
 function legacyPurgePacket(source) {
     const updates = { ['zoew_recently_deleted_cod_dod/' + source.id]: null,
@@ -503,7 +725,8 @@ async function trashPolicyCases(realRules, compileRules, rulesSql) {
     await write('PUT', trash + '/policy_source/trashMode', null, true, 'មិនអាចលុប mode Palm');
     await write('PUT', trash + '/policy_source/trashMode', 'cookie', true, 'មិនអាចប្ដូរ Palm ទៅ Cookie');
     await write('PUT', trash + '/policy_source', null, true, 'client ចាស់ purge គ្មាន consumption ត្រូវបដិសេធ');
-    await write('PATCH', '', legacyPurgePacket(item({ trashMode: 'palm', restoreBlocked: true })), false, 'Palm purge ជាមួយ release receipts និង consumption');
+    await write('PATCH', '', legacyPurgePacket(item({ trashMode: 'palm', restoreBlocked: true })), true, 'client ចាស់ purge ទាំងជួរ ទោះមាន receipts/consumption ត្រូវបដិសេធ');
+    await write('PATCH', '', slotPurgePacket(item({ trashMode: 'palm', restoreBlocked: true })), false, 'Palm purge តាម slot ជាមួយ release receipts និង consumption');
     await seed(null);
     await write('PUT', trash + '/policy_source', item({ trashMode: 'palm' }), true, 'Palm ត្រូវមាន restoreBlocked');
     await write('PUT', trash + '/policy_source', item({ trashMode: 'unknown' }), true, 'mode មិនស្គាល់ត្រូវបដិសេធ');
@@ -563,7 +786,7 @@ async function trashPolicyCases(realRules, compileRules, rulesSql) {
     await write('PUT', trash + '/policy_source/restoreClaim', null, true, 'blocked មិនអាច release claim ខណៈ history នៅ prepare');
     await seed(item({ trashMode: 'cookie', restoreBlocked: true, restoreClaim: claim }));
     await write('PUT', trash + '/policy_source/restoreClaim', null, false, 'blocked អនុញ្ញាត release claim បន្ទាប់ពីគ្មាន prepared history');
-    await write('PATCH', '', legacyPurgePacket(item({ trashMode: 'cookie', restoreBlocked: true })), false, 'blocked ដែល release រួចអាច purge ជាមួយ receipts/consumption');
+    await write('PATCH', '', slotPurgePacket(item({ trashMode: 'cookie', restoreBlocked: true })), false, 'blocked ដែល release រួចអាច purge តាម slot ជាមួយ receipts/consumption');
     await seed(item({ restoreClaim: claim }), prepared);
     await write('PATCH', '', { [trash + '/policy_source']: null, [history + '/policy_target']: restored,
         [finals + '/policy_source']: { token: claim.token, targetId: claim.targetId, finalizedAt: at },
@@ -1043,7 +1266,13 @@ function capture() {
         await oldAppTrashCases(realRules, compileRules, rulesSql);
         await monthlyDeductionCases(realRules, compileRules, rulesSql);
         await trashModeCases(realRules, compileRules, rulesSql);
+        await evidenceRetentionCases(realRules, compileRules, rulesSql);
         await pickupProtocolCases(realRules, compileRules, rulesSql);
+        await slotPurgeCases(realRules, compileRules, rulesSql, 'source');
+        const artifactText = fs.readFileSync(path.join(ROOT, 'firebase-database.rules.min.json'), 'utf8');
+        check(rulesSql(compileRules(JSON.parse(artifactText))) === rulesSql(compileRules(realRules)), 'artifact publish compile ទៅ SQL ដូចប្រភព');
+        await slotPurgeCases(JSON.parse(artifactText), compileRules, rulesSql, 'artifact');
+        await pgSetRules(realRules, compileRules, rulesSql);
         const cap = await capture();
         check(cap.ok && Array.isArray(cap.data) && cap.data.length === RUNS, 'revenue-fuzz (App ពិត) capture ' + RUNS + ' លំដាប់', cap.tail);
         if (!cap.ok || !Array.isArray(cap.data)) throw new Error('capture failed');

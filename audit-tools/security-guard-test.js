@@ -315,9 +315,7 @@ const SCRIPT_SRC_ALLOW = {
     "'self'": 'កូដរបស់ App ខ្លួនឯង',
     "'wasm-unsafe-eval'": 'ZoeW តែប៉ុណ្ណោះ ៖ ម៉ាស៊ីនស្កេន ZXing-WASM (មិនអនុញ្ញាត eval របស់ JS)',
     'https://www.gstatic.com/firebasejs/': 'Firebase JS SDK (`firebase-loader.js`) ➜ កំណត់ត្រឹមថត firebasejs (www.gstatic.com ទាំងមូលមានឧបករណ៍រំលង CSP)',
-    'https://browser.sentry-cdn.com': 'bundle SDK Sentry ដែល error-reporting.js ផ្ទុកជាមួយ SRI (កំណែជាក់លាក់ · sha384)',
-    'https://*.firebaseio.com': 'RTDB long-polling (JSONP) ពេល WebSocket ត្រូវបិទ',
-    'https://*.firebasedatabase.app': 'RTDB long-polling (JSONP) តំបន់ក្រៅ US'
+    'https://browser.sentry-cdn.com': 'bundle SDK Sentry ដែល error-reporting.js ផ្ទុកជាមួយ SRI (កំណែជាក់លាក់ · sha384)'
 };
 const CONNECT_SRC_ALLOW = {
     "'self'": 'Netlify Functions និង feed របស់ App',
@@ -346,6 +344,7 @@ function cspProblems(app, toml, usedHosts) {
     const script = csp['script-src'] || [];
     if (!script.length) p.push('គ្មាន script-src');
     script.filter((s) => /^'unsafe-(inline|eval|hashes)'$|^\*$|^https?:$|^data:$|^blob:$|^http:\/\//.test(s)).forEach((s) => p.push('script-src ហាម ៖ ' + s));
+    script.filter((s) => /firebaseio\.com|firebasedatabase\.app|supabase\.co/.test(s)).forEach((s) => p.push('script-src ហាម host database (អ្នកណាក៏បង្កើត project បាន ➜ JSONP រំលង CSP) ៖ ' + s));
     script.filter((s) => !Object.prototype.hasOwnProperty.call(SCRIPT_SRC_ALLOW, s) || (s === "'wasm-unsafe-eval'" && app !== 'ZoeW'))
         .forEach((s) => p.push('script-src ក្រៅបញ្ជី ៖ ' + s));
     const connect = csp['connect-src'] || [];
@@ -374,6 +373,17 @@ function cspProblems(app, toml, usedHosts) {
         ok(problems.length === 0, '⛔ ' + app + ' ៖ CSP តឹងរ៉ឹង (គ្មាន unsafe-inline/eval · ប្រភព script/connect តែក្នុងបញ្ជីដែលមានហេតុផល) · header security គ្រប់ (XFO · nosniff · Referrer · HSTS ≥ ១ ឆ្នាំ · COOP · Permissions · X-XSS-Protection 0) · CORS * តែ feed សាធារណៈ',
             problems.join('\n        '));
     }
+    const zwLoader = TEXT.get('ZoeW/public/firebase-loader.js') || '';
+    const kgLoader = TEXT.get('ZoeKeyGen/firebase-loader.js') || '';
+    const zwForced = /if \(typeof dbMod\.forceWebSockets === 'function'\) dbMod\.forceWebSockets\(\);/.test(zwLoader)
+        && zwLoader.indexOf('dbMod.forceWebSockets()') < zwLoader.indexOf('window.firebaseSDK =');
+    const kgCall = kgLoader.search(/^\s*forceWebSockets\(\);\s*$/m);
+    const kgForced = /\bforceWebSockets\s*\}\s*from\s*"https:\/\/www\.gstatic\.com\/firebasejs\/[0-9.]+\/firebase-database\.js"/.test(kgLoader)
+        && kgCall !== -1 && kgCall < kgLoader.indexOf('window.firebaseSDK =');
+    ok(zwForced && kgForced, '⛔ RTDB ប្រើតែ WebSocket (`forceWebSockets()` មុន SDK បើក · App ទាំង ២) ➜ គ្មាន JSONP long-polling ➜ script-src គ្មាន host database',
+        { ZoeW: zwForced, ZoeKeyGen: kgForced });
+    const dbHostProbe = cspProblems('probe', TEXT.get('ZoeW/netlify.toml').replace("https://browser.sentry-cdn.com;", "https://browser.sentry-cdn.com https://*.firebaseio.com;"), null);
+    ok(dbHostProbe.some((x) => /JSONP/.test(x) && x.indexOf('https://*.firebaseio.com') !== -1), 'ទិសផ្ទុយ ៖ CSP ពិតដែលបន្ថែម `https://*.firebaseio.com` ក្នុង script-src ត្រូវរកឃើញ', dbHostProbe.join(' · '));
     const deadAllow = Object.keys(SCRIPT_SRC_ALLOW).concat(Object.keys(CONNECT_SRC_ALLOW)).filter((s) => !used.has(s));
     ok(deadAllow.length === 0, 'បញ្ជីអនុញ្ញាត CSP ៖ គ្មានធាតុងាប់', deadAllow.join(' · '));
     const weak = '[[headers]]\n  for = "/*"\n  [headers.values]\n    Content-Security-Policy = "default-src *; script-src \'self\' \'unsafe-inline\' https://evil.example; connect-src * https://exfil.example; object-src \'self\'"\n'
@@ -454,6 +464,10 @@ function workflowProblems(name, text) {
             if (!/author_association/.test(gate)) p.push('job ' + job.name + ' ៖ comment trigger គ្មានការពិនិត្យ author_association');
             const secretSteps = job.text.split(/\n(?= {6}- )/).filter((s) => /\$\{\{\s*secrets\./.test(s));
             if (!/head\.repo\.full_name/.test(job.text) || secretSteps.some((s) => !/^ {8}if:/m.test(s))) p.push('job ' + job.name + ' ៖ comment trigger ត្រូវបដិសេធ PR ពី fork មុនជំហានដែលប្រើ secret');
+            const threadStep = job.text.split(/\n(?= {6}- )/).find((s) => /^ {8}id:\s*thread\s*$/m.test(s)) || '';
+            const threadReads = ['issues/$NUMBER/comments', 'pulls/$NUMBER/comments', 'pulls/$NUMBER/reviews'].every((x) => threadStep.indexOf(x) !== -1)
+                && /author_association/.test(threadStep) && /OWNER\|MEMBER\|COLLABORATOR/.test(threadStep) && !/\$\{\{\s*secrets\./.test(threadStep);
+            if (!threadReads || secretSteps.some((s) => !/^ {8}if:.*steps\.thread\.outputs\.trusted == 'true'/m.test(s))) p.push('job ' + job.name + ' ៖ comment trigger ត្រូវបដិសេធ thread ដែលមានអត្ថបទពីអ្នកក្រៅក្រុម (ម្ចាស់ issue/PR · comment · review) មុនជំហានដែលប្រើ secret');
         }
         if (/self-hosted/.test(runsOn)) {
             if (prTrigger && iff.indexOf('github.event.pull_request.head.repo.full_name == github.repository') === -1) p.push('job ' + job.name + ' ៖ runner self-hosted គ្មានការការពារ PR ពី fork');
@@ -481,7 +495,11 @@ function workflowProblems(name, text) {
     ok(found.length >= 5, 'ទិសផ្ទុយ ៖ workflow គ្រោះថ្នាក់ (pull_request_target · គ្មាន permissions · self-hosted · action មិន pin · បោះពុម្ព secret) ត្រូវរកឃើញ', found.join(' · '));
     const evilComment = 'on:\n  issue_comment:\n    types: [created]\npermissions:\n  contents: read\njobs:\n  x:\n    if: contains(github.event.comment.body, \'/oc\')\n    runs-on: ubuntu-latest\n    steps:\n      - name: agent\n        uses: actions/checkout@v6\n        env:\n          KEY: ${{ secrets.KEY }}\n';
     const foundComment = workflowProblems('.github/workflows/evil-comment.yml', evilComment).filter((x) => /comment trigger/.test(x));
-    ok(foundComment.length === 3, 'ទិសផ្ទុយ ៖ comment trigger ដែលមាន secret (contains · គ្មាន author_association · គ្មានការបដិសេធ fork) ត្រូវរកឃើញទាំង ៣', foundComment.join(' · '));
+    ok(foundComment.length === 4, 'ទិសផ្ទុយ ៖ comment trigger ដែលមាន secret (contains · គ្មាន author_association · គ្មានការបដិសេធ fork · គ្មានការបដិសេធអត្ថបទអ្នកក្រៅ) ត្រូវរកឃើញទាំង ៤', foundComment.join(' · '));
+    const realOc = TEXT.get('.github/workflows/opencode.yml') || '';
+    const openThread = realOc.replace(/ && steps\.thread\.outputs\.trusted == 'true'/g, '');
+    ok(realOc !== openThread && workflowProblems('.github/workflows/opencode.yml', openThread).some((x) => /អ្នកក្រៅក្រុម/.test(x)),
+        'ទិសផ្ទុយ ៖ opencode.yml ពិតដែលដកលក្ខខណ្ឌ thread ចេញពីជំហាន secret ត្រូវរកឃើញ');
 }
 
 // ── ច. Firebase rules ─────────────────────────────────────────────────────────────

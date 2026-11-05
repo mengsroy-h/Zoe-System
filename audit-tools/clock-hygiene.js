@@ -49,7 +49,8 @@ const LOCAL_CLOCK_OK = {
         finishCommittedScan: 'Local import-proof TTL only, after committed financial receipt and exact journal identity proof. Future clock stamp holds; expiry retires proven journal without publishing Sign. Exact TTL and backward-clock regression coverage in scan-reboot-closure.',
         finishLocal: 'Sign outbox local retry deadline only; parcel close uses the server clock in applyBarcodeCloseChange. Never a retention or revenue timestamp.',
         processJob: 'Sign outbox local IndexedDB lease/retry deadlines shared by tabs on this device; server journal CAS independently guards photo/05 and uncertain sends are polled, never replayed.',
-        publish: 'Sign outbox busy indicator from the local IndexedDB lease; UI only, no receipt or money verdict.',
+        signQueueView: 'Sign outbox busy indicator from the local IndexedDB lease; UI only, no receipt or money verdict.',
+        discardUnreadablePalmSignJobs: 'Sign outbox local lease check before the explicit owner discard; revision CAS guards the IndexedDB delete, no receipt or money verdict.',
         runPalmSignOutbox: 'Sign outbox local lease/retry scheduling; authoritative receipt ACK and parcel identity checks remain required before local close.',
         actOnQueuedSign: 'Sign outbox local lease check before an explicit user action; revision CAS guards the IndexedDB write, server validates confirmation separately.',
 
@@ -69,10 +70,12 @@ const LOCAL_CLOCK_OK = {
         sampleScrollHz: 'ចន្លោះ ៥ វិ. រវាងការវាស់ Hz ពេលរមូរ (រៀន Hz ខ្ពស់បំផុតរបស់ឧបករណ៍) — local ហើយវាស់តាម `elapsedSince()` · មិនប៉ះទិន្នន័យ ឬលុយ',
         subscribeWeb: 'ត្រាពេលចុះឈ្មោះ Push/ផ្ញើកាលវិភាគចុងក្រោយ — ពិដានល្បឿន local (២៤ ម៉ោង · ១០ នាទី · ៦ ម៉ោង) វាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ ចុះឈ្មោះ/ផ្ញើម្តងទៀត) · មិនប៉ះ retention ឬលុយ · ម៉ោងផុតកំណត់ដែលផ្ញើទៅ server មកពី `getServerNow()`',
         onNativeToken: 'ត្រាពេលចុះឈ្មោះ Push/ផ្ញើកាលវិភាគចុងក្រោយ — ពិដានល្បឿន local (២៤ ម៉ោង · ១០ នាទី · ៦ ម៉ោង) វាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ ចុះឈ្មោះ/ផ្ញើម្តងទៀត) · មិនប៉ះ retention ឬលុយ · ម៉ោងផុតកំណត់ដែលផ្ញើទៅ server មកពី `getServerNow()`',
+        releaseCameraCaptures: 'ព្រំដែន `before` នៃការបោសឯកសារកាមេរ៉ាបណ្ដោះអាសន្ន JPEG_*.jpg របស់ APK — Java ប្រៀបនឹង `File.lastModified()` ដែលជានាឡិកាឧបករណ៍ដដែល (System.currentTimeMillis) ➜ ⛔ វា **ត្រូវតែ** ជា Date.now() មិនមែន getServerNow() (offset server ធ្វើឲ្យព្រំដែនរំកិល ហើយអាចលុបរូបដែលទើបថត) · ឯកសារដែលការអានកាមេរ៉ាកំពុងហោះ ➜ before = 0 · មិនសរសេរទៅ server · មិនប៉ះ retention ឬលុយ',
         notePalmSignPosition: 'ត្រាពេលទីតាំង GPS ចុងក្រោយក្នុងផ្ទាំង Sign — local សុទ្ធសាធ វាស់តាម `elapsedSince()` (`palmSignCurrentFix()` ៖ ចាស់ជាង ២ នាទី ឬថយក្រោយ ➜ Infinity ➜ មិនប្រើកូអរដោនេ ➜ រូបមានតែម៉ោង) · ម៉ោងលើរូបមកពី `getServerNow()` · មិនប៉ះ retention ឬលុយ',
         noteShopDevice: 'ត្រាពេលការផ្ញើឧបករណ៍ហាង Supabase ធ្លាក់ (`note_my_device`) — គម្លាតសាកម្តងទៀត local ៥ នាទី (`SHOP_DEVICE_RETRY_MS`) វាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ សាកម្តងទៀត) · មិនសរសេរត្រាពេលទៅ server (ថ្ងៃ `last_seen` មកពី now() របស់ Postgres) · មិនប៉ះ retention ឬលុយ',
         resyncPush: 'ត្រាពេលចុះឈ្មោះ Push/ផ្ញើកាលវិភាគចុងក្រោយ — ពិដានល្បឿន local (២៤ ម៉ោង · ១០ នាទី · ៦ ម៉ោង) វាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ ចុះឈ្មោះ/ផ្ញើម្តងទៀត) · មិនប៉ះ retention ឬលុយ · ម៉ោងផុតកំណត់ដែលផ្ញើទៅ server មកពី `getServerNow()`',
         syncExpirySchedule: 'ត្រាពេលចុះឈ្មោះ Push/ផ្ញើកាលវិភាគចុងក្រោយ — ពិដានល្បឿន local (២៤ ម៉ោង · ១០ នាទី · ៦ ម៉ោង) វាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ ចុះឈ្មោះ/ផ្ញើម្តងទៀត) · មិនប៉ះ retention ឬលុយ · ម៉ោងផុតកំណត់ដែលផ្ញើទៅ server មកពី `getServerNow()`',
+        settlePushUnsubscribe: 'ត្រាពេល Server ឆ្លើយបដិសេធការបិទ Push (`offFailedAt`) — ពិដានសាកម្តងទៀត local (១៥ នាទី) វាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ សាកម្តងទៀត) · មិនប៉ះ retention ឬលុយ',
         seedCustomerTableFromImport: 'ត្រាថា cache តារាងអតិថិជនស្រស់ពេលណា — TTL local ដដែល គ្មានទំនាក់ទំនងនឹង retention ឬលុយ',
         setFastLookupRow: 'ត្រាពេល cache Lookup ក្នុងសតិ — TTL local សុទ្ធសាធ គ្មានទំនាក់ទំនងនឹង retention ឬលុយ',
         scheduleCustomerTableSoonRefresh: 'ត្រាពេលតាំងម៉ោងទាញឡើងវិញ — វាស់តាម elapsedSince() ដែល fail-open ពេលនាឡិកាថយក្រោយ',
@@ -105,6 +108,8 @@ const LOCAL_CLOCK_OK = {
         noteZtoTrashModeRefused: 'ត្រាពេលដែល rules បដិសេធការសរសេររបៀបធុងសំរាម (`ztoTrashModeRefusal.at`) — ការផ្អាកការសរសេរតាមឧបករណ៍ `ZTO_TRASH_MODE_REFUSED_RETRY_MS` ក្នុង memory សុទ្ធសាធ វាស់តាម elapsedSince() ➜ ⛔ វា **ត្រូវតែ** ជា Date.now(); មិនសរសេរទៅ server ឡើយ',
         pruneZtoTrashMode: 'ត្រាពេលនៃជុំសម្អាតត្រារបៀបធុងសំរាមហាងដែលចាស់ជាង `ZTO_TRASH_MODE_ACTIVE_MS` (`ztoTrashModePrunedAt`) — ពិដានល្បឿន local សុទ្ធសាធ (≤ `ZTO_TRASH_MODE_PRUNE_MAX` សោ / `ZTO_TRASH_MODE_RETRY_MS`) វាស់តាម elapsedSince() · ការសម្រេចថាត្រាចាស់ប្រើ getServerNow() ដែលទុកចិត្តបាន (`cleanupClockIsTrustworthy()`) ➜ មិនប៉ះ retention ឬលុយ',
         runZtoStatusSweep: 'ត្រាពេលនៃជុំបោស ZTO ចុងក្រោយ — ពិដានល្បឿន local សុទ្ធសាធ (មិនប៉ះ retention ឬលុយ) ហើយវាស់តាម elapsedSince() ➜ ⛔ វា **ត្រូវតែ** ជា Date.now() មិនមែន getServerNow(): មូលដ្ឋានលាយគ្នាធ្វើឲ្យ elapsedSince() ត្រឡប់ Infinity ➜ ពិដានរលាយ (`clock-basis-test.js`)',
+        notePurgeDeductionWait: 'ត្រាពេលនៃការដកដែល purge ធ្វើជំនួស (A522 · `purgeDeductionWaits`) មិនចុះ — ពិដានល្បឿនព្យាយាមម្តងទៀត local សុទ្ធសាធ (`PURGE_DEDUCTION_RETRY_MS` កើនទ្វេ) វាស់តាម elapsedSince() ➜ ថយក្រោយ = Infinity = ព្យាយាមភ្លាម · មិនប៉ះ retention ឬប្រាក់ (rules + keyed event សម្រេច)',
+        notePriceOperationsStuck: 'ត្រាពេលដែលឧបករណ៍នេះឃើញ marker ការកែតម្លៃនីមួយៗលើកដំបូង (`priceOperationSeen`) — grace មុន resume (`PRICE_RESUME_GRACE_MS`) និងមុនបង្ហាញផ្លូវចេញម្ចាស់ (`PRICE_EXIT_GRACE_MS`) local សុទ្ធសាធ វាស់តាម elapsedSince() ➜ ថយក្រោយ = Infinity = មិនរង់ចាំ · មិនប៉ះប្រាក់ (rules + commit atomic សម្រេចម្តងគត់ · A526)',
         attemptDbListenerRecovery: 'ពិដានល្បឿននៃការស្តារ listener — local',
         noteDbListenerAlive: 'ត្រាពេលនៃវឌ្ឍនភាព resync — វាស់ចន្លោះពេលក្នុងវគ្គដដែល មិនមែនការសម្រេច retention/revenue',
         scheduleFirebaseSdkRetry: 'កត់ត្រាពេលព្យាយាមផ្ទុក SDK — ចូលរួមក្នុងពិដានល្បឿន local',
@@ -153,6 +158,8 @@ const LOCAL_CLOCK_OK = {
 
 // អនុញ្ញាតតែចំណុចកំណត់ពេល local ជាក់លាក់ មិនមែន function ទាំងមូល; server fields/retention នៅផ្ទៀងដដែល។
 const LOCAL_CLOCK_SITES = [
+    { fn: 'runEvidenceRetentionSweep', expression: 'evidenceSweep.at=Date.now()', reason: 'ចន្លោះពេលរវាងការបោសភស្តុតាងក្នុង page (វាស់តាម elapsedSince() ៖ នាឡិកាថយក្រោយ ➜ បោសម្តងទៀត fail-open) · ព្រំអាយុលុបប្រើ getServerNow() និង rules ពិនិត្យ now របស់ server។' },
+    { fn: 'runPickupResetBatch', binding: 'value', property: 'at', expression: 'Date.now()', reason: 'ត្រាពេល diagnostic ក្នុង local Reset intent ប៉ុណ្ណោះ; pending reader ផ្ទៀង key/scope/UID មិនអានអាយុ ឬផ្តល់សិទ្ធិ replay ពីត្រានេះ។' },
     { fn: 'completeResetCancelledPickup', property: 'completedAt', expression: 'Date.now()', reason: 'ត្រាតម្រៀបបង្កាន់ដៃ Reset ក្នុងឧបករណ៍; មិនសម្រេចលុយ ឬអនុញ្ញាត replay ហើយមិនលុប journal រង់ចាំតាមអាយុ។' },
     { fn: 'restartQueuedSign', expression: 'pendingDeadline(value.row.leaseUntil,Date.now(),SIGN_OUTBOX_LEASE_MS)', reason: 'ផ្ទៀង lease local មុនស្នើចាប់ផ្ដើមថ្មី; Server នៅផ្ទៀង lease/អាយុរបស់ខ្លួន។' },
     { fn: 'restartQueuedSign', call: 'updateJob', argument: 4, expression: 'Date.now()+SIGN_OUTBOX_LEASE_MS', reason: 'កក់សិទ្ធិ IndexedDB ក្នុងឧបករណ៍សម្រាប់ការស្នើដោយដៃ; មិនអនុញ្ញាត Sign ឬកំណត់អាយុកញ្ចប់។' },
@@ -177,7 +184,11 @@ const LOCAL_CLOCK_SITES = [
     { fn: 'cancelJob', call: 'updateJob', argument: 3, expression: 'Date.now()+15000', reason: 'រង់ចាំសាក cancellation មិនច្បាស់ម្ដងទៀត មិនបញ្ជាក់ cancel/discard។' },
     { fn: 'refreshBeforeWrite', expression: 'pendingDeadline(value.job.warningRefreshRetryAfter||0,Date.now(),300000)', reason: 'ចង្វាក់ local warning/prewrite refresh; server ផ្ទៀង one-shot intent។' },
     { fn: 'refreshBeforeWrite', call: 'updateJob', argument: 3, expression: 'Date.now()+15000', reason: 'ពេលសាក local queue ខណៈរង់ចាំ authoritative refresh។' },
-    { fn: 'refreshBeforeWrite', property: 'warningRefreshRetryAfter', expression: 'Date.now()+300000', reason: 'រក្សាតែ local refresh throttle មិនមែន server token expiry។' }
+    { fn: 'refreshBeforeWrite', property: 'warningRefreshRetryAfter', expression: 'Date.now()+300000', reason: 'រក្សាតែ local refresh throttle មិនមែន server token expiry។' },
+    { fn: 'refreshDispatchProof', expression: 'pendingDeadline(retryAfter,Date.now(),DISPATCH_REFRESH_GAP_MS)', reason: 'ចង្វាក់ local ការផ្ញើឡើងវិញក្រោយភស្តុតាងចែកចាយថ្មី (ផ្ញើភ្លាមលើកដំបូង ក្នុង ៥ នាទីបន្ទាប់រង់ចាំ ១៥ វិ.); Server ផ្ទៀងភស្តុតាង និង reservation ដដែល។' },
+    { fn: 'refreshDispatchProof', property: 'dispatchRefreshRetryAfter', expression: 'Date.now()+DISPATCH_REFRESH_GAP_MS', reason: 'រក្សាតែ local throttle នៃការផ្ញើឡើងវិញ មិនមែនអាយុភស្តុតាងលើ Server។' },
+    { fn: 'refreshDispatchProof', expression: 'Date.now()+15000', reason: 'ពេលសាក local queue (ផ្ញើឡើងវិញ ឬអាន status មិនច្បាស់); ក្រោមពិដាន ១៥ វិ. របស់ waiting(); មិនផ្ញើចែកចាយ ឬ Sign ស្ទួន។' },
+    { fn: 'createNativeWriteRecovery', call: 'safeStoreSet', argument: 2, expression: 'Date.now()', reason: 'ត្រាពិដានការអាន root `zoew_write_receipts` ក្នុងឧបករណ៍ (≤ ១ ដងក្នុង `NATIVE_RECEIPT_PURGE_GAP_MS`) វាស់ដោយ `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ សម្អាតភ្លាម); receipt ដែលលុបនៅធៀប `at` នឹង `getServerNow()` ហើយ rules ផ្ទៀង `now` របស់ server — មិនមែន retention ឬលុយ។' }
 ];
 
 // ឯកសារដែលមាននាឡិកា server ផ្ទាល់ខ្លួន ➜ ត្រូវមាន getServerNow() និងផ្លូវធ្វើឲ្យ offset ស្រស់
@@ -273,6 +284,9 @@ for (const rel of FILES) {
                     expression = ancestor.arguments[entry.argument];
                 } else if (entry.property) {
                     if (ancestor.type !== 'Property' || fieldNameOf(ancestor) !== entry.property) return false;
+                    if (entry.binding && !ancestors.some((owner) => owner.type === 'VariableDeclarator'
+                        && owner.id.type === 'Identifier' && owner.id.name === entry.binding
+                        && owner.init?.type === 'ObjectExpression' && owner.init.properties.includes(ancestor))) return false;
                     expression = ancestor.value;
                 }
                 return expression && expression.start <= node.start && expression.end >= node.end

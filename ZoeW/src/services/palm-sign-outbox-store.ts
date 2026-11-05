@@ -12,7 +12,7 @@ export type SignJob = {
     continuationAllowed?: boolean; continueRequested?: boolean; warningRefreshRetryAfter?: number;
     readOnlyProbe?: boolean; cancelRequested?: boolean; cancelConfirmationToken?: string;
     photoGraceStartedAt?: number; photoGraceLastObservedAt?: number; photoGraceChecks?: number;
-    photoPollStep?: number; photoPollDelay?: number; manualReviewReason?: string;
+    photoPollStep?: number; photoPollDelay?: number; manualReviewReason?: string; dispatchRefreshRetryAfter?: number;
     recovery?: RecoveryMark; recoveryHistory?: (RecoveryMark & { resumedAt: number })[]; recoveryCheck?: SignRecoveryCheck;
     originalSHA256?: string; photoVerified?: boolean; scanCompleted?: boolean; photoBindRetryAfter?: number; signature: string; parcelIdentity: string; confirmationToken?: string; warningToken?: string; autoConfirm?: boolean; verificationRequired?: boolean; message: string;
     phase: 'queued' | 'checking' | 'confirmed' | 'action'; attempts: number;
@@ -22,6 +22,8 @@ export type StoredSignJob = { row: SignEnvelope; job: SignJob };
 export const PALM_RESERVATION_PROTOCOL = 'original-reservation-v1';
 const STORE = 'jobs';
 export const SIGN_OUTBOX_MAX = 40;
+export const SIGN_OUTBOX_UNREADABLE_MAX = 40;
+export const SIGN_OUTBOX_SIGNED_MAX = 400;
 export const SIGN_OUTBOX_LEASE_MS = 90000;
 const DEADLINE_MS = 5000;
 
@@ -99,11 +101,33 @@ export function listSignJobs(owner: string): Promise<SignEnvelope[]> {
     });
 }
 
-export function addSignJob(row: SignEnvelope, current: () => boolean): Promise<boolean> {
+function countSignJobs(owner: string): Promise<number> {
+    return transact('readonly', (store, result) => {
+        const request = store.index('owner').count(owner);
+        request.onsuccess = () => result(request.result);
+    });
+}
+
+async function classifySignJobs(owner: string, key: CryptoKey) {
+    const held = new Set<string>();
+    const signed = new Set<string>();
+    for (const row of await listSignJobs(owner)) {
+        try {
+            if ((await openSignJob(row, key)).signedCleanupConfirmed === true) signed.add(row.id);
+        } catch { held.add(row.id); }
+    }
+    return { held, signed };
+}
+
+export async function addSignJob(row: SignEnvelope, current: () => boolean, key?: CryptoKey): Promise<boolean> {
+    const known = key && await countSignJobs(row.owner) >= SIGN_OUTBOX_MAX ? await classifySignJobs(row.owner, key) : { held: new Set<string>(), signed: new Set<string>() };
     return transact('readwrite', (store, result) => {
-        const count = store.index('owner').count(row.owner);
-        count.onsuccess = () => {
-            if (!current() || count.result >= SIGN_OUTBOX_MAX) { store.transaction.abort(); return; }
+        const stored = store.index('owner').getAllKeys(row.owner);
+        stored.onsuccess = () => {
+            const ids = stored.result.map(String);
+            const signed = ids.filter((id) => known.signed.has(id)).length;
+            if (!current() || ids.filter((id) => !known.held.has(id) && !known.signed.has(id)).length >= SIGN_OUTBOX_MAX
+                || signed >= SIGN_OUTBOX_SIGNED_MAX || ids.length - signed >= SIGN_OUTBOX_MAX + SIGN_OUTBOX_UNREADABLE_MAX) { store.transaction.abort(); return; }
             const request = store.get(row.id);
             request.onsuccess = () => {
                 if (!current()) { store.transaction.abort(); return; }

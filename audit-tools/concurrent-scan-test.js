@@ -183,6 +183,7 @@ function makeCtx(server, fbSet) {
         refreshCurrentHistoryView: () => {},
         showToast: () => {},
         window: { localStorage },
+        viewState: {},
         revenue,
         pickup,
         reconciliations
@@ -197,19 +198,24 @@ function makeCtx(server, fbSet) {
         { path: 'src/services/scan-import-proof.ts', expose: ['scanImportProofValid', 'SCAN_IMPORT_CACHE_TTL_MS'] },
         { path: 'src/domain/ledger.ts', expose: ['ledgerOpRing', 'ledgerTokenSeen', 'ledgerLatestMonths'] },
         { path: 'src/services/network.ts', expose: ['dbOp', 'withTimeout', 'DB_OP_TIMEOUT_MS'] },
-        { path: 'src/services/scan-operation.ts', expose: ['claimScanOperation', 'saveScanOperation', 'cancelScanOperation', 'finalizeScanOperation'] }
+        { path: 'src/services/scan-operation.ts', expose: ['claimScanOperation', 'saveScanOperation', 'cancelScanOperation', 'finalizeScanOperation', 'scanImportCollectedOwned'] }
     ]).code, ctx);
     ctx.fixture = fbSet;
     // ព្រំដែនអាន SDK ប៉ុណ្ណោះ៖ ការសម្រេច operation/ម្ចាស់រត់ក្នុង coordinator ពិត។
     ctx.readRestoreServerNode = async (api, db, path) => (await api.get(api.ref(db, path))).val();
     vm.runInContext("var SCANNER_LOOKUP_BARCODE_INDEX_FIELD = '__zoeScannerLookupIndex';", ctx);
     vm.runInContext('var deletedItems = []; var activeRestoreClaims = new Map(); var dbListenerPendingPaths = new Set(); const DB_LISTENER_KEY_DELETED = "deleted";', ctx);
+    // ⛔ ផ្លូវរក្សាទុកស្កេន (A527) រត់ក្នុង lane តាមអតិថិជន ➜ ស្រង់អថេររបស់ lane ពីកូដពិត (មិនចម្លងដោយដៃ)
+    for (const name of ['SCAN_SAVE_LANE_WAIT_MS', 'scanSaveLanes']) {
+        const decl = (src.match(new RegExp('const ' + name + ' = [^;]+;')) || [])[0];
+        if (decl) vm.runInContext(decl, ctx);
+    }
     for (const fn of ['barcodeRegistryKey', 'barcodeEntriesOf', 'normalizeBarcodesOf', 'getPickupPhoneKey',
                       'recalcItemMoneyFromBarcodes', 'applyBarcodeCloseState',
                       'itemHasRestoreMarkers', 'isActiveRestoreClaim', 'dropStaleRestoreMarkers',
                       'saveSingleHistoryItemToFirebase',
                       'freshHistoryItemShell', 'freshHistoryItemFrom',
-                      'mergeBarcodeIntoHistoryItem', 'ledgerDeltaCompanion', 'addOrUpdateEntry']) {
+                      'mergeBarcodeIntoHistoryItem', 'ledgerDeltaCompanion', 'inScanSaveLane', 'addOrUpdateEntry']) {
         const code = extractFn(src, fn);
         if (code) vm.runInContext(code, ctx);
     }

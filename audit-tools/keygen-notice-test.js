@@ -134,6 +134,7 @@ function build(options) {
         var keyListSessionGeneration = 0;
         var noticeListCache = [];
         var noticeReadFailed = false;
+        var noticeRefreshOwner = null;
         var isSendingNotice = false;
         var noticeSendOwner = null;
         var pinTargetAction = null;
@@ -428,6 +429,27 @@ async function run() {
         stale.resolve(snapOf(raw));
         await t;
         ok('⛔ ចម្លើយយឺតក្រោយ logout ➜ មិនគូរបញ្ជីឡើងវិញ', hs.el('noticeListBody').innerHTML === '' && hs.ctx.noticeListCache.length === 0);
+        // ⛔ A504 ៖ refresh ស្របគ្នា (ផ្ញើ ➜ refresh A យឺត · លុបដំណឹង ➜ refresh B) ➜ refresh ចុងក្រោយជាម្ចាស់បញ្ជី ៖ ចម្លើយ A ចាស់
+        //    (មានដំណឹងដែលលុបរួច ឬ «អានមិនបាន» ពិដាន) មិនជាន់បញ្ជីដែល B បង្ហាញ (ដូច refreshKeyList · sbAdminRefresh)
+        for (const staleFails of [false, true]) {
+            const reads = [];
+            const hr = build({ get: () => { const pending = deferred(); reads.push(pending); return pending.promise; } });
+            const older = hr.ctx.refreshNoticeList();
+            const newer = hr.ctx.refreshNoticeList();
+            ok('លក្ខខណ្ឌចាំបាច់ ៖ refresh ២ កំពុងអានស្របគ្នា', reads.length === 2, reads.length);
+            const fresh = {};
+            fresh[idB] = raw[idB];
+            reads[1].resolve(snapOf(fresh));
+            await newer;
+            const shown = hr.el('noticeListBody').innerHTML;
+            ok('លក្ខខណ្ឌចាំបាច់ ៖ refresh ថ្មីបង្ហាញបញ្ជីក្រោយលុប', hr.ctx.noticeListCache.map((r) => r.id).join() === idB && shown.includes(idB) && !shown.includes(idA));
+            if (staleFails) reads[0].reject(new Error('Notice list timed out'));
+            else reads[0].resolve(snapOf(raw));
+            await older;
+            ok('⛔ refresh ស្របគ្នា/' + (staleFails ? 'ចម្លើយចាស់បរាជ័យ' : 'ចម្លើយចាស់មានដំណឹងដែលលុបរួច') + ' ➜ មិនជាន់ cache/DOM របស់ refresh ថ្មី',
+                hr.ctx.noticeListCache.map((r) => r.id).join() === idB && hr.el('noticeListBody').innerHTML === shown && hr.ctx.noticeReadFailed === false,
+                { ids: hr.ctx.noticeListCache.map((r) => r.id), failed: hr.ctx.noticeReadFailed, deletedShown: hr.el('noticeListBody').innerHTML.includes(idA) });
+        }
 
         await h.ctx.deleteNotice(idA);
         await drain();

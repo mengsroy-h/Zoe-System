@@ -6,7 +6,7 @@ import { CLEANUP_JOURNAL_KEY } from '../src/core/storage-keys';
 import { appLocalStore } from '../src/core/storage';
 import { trashClaimPolicy } from '../src/domain/trash-claim';
 import { dbListenerFailedPaths, dbListenerPendingPaths, DB_LISTENER_KEY_HISTORY } from '../src/core/text';
-import { beginCleanupOperation, releaseCleanupOperation, prepareCleanupClaim, cleanupJournalStorageKeys, claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, noteCleanupJournalEntry, readCleanupJournal, resumeCleanupJournalEntry } from '../src/domain/cleanup';
+import { beginCleanupOperation, releaseCleanupOperation, prepareCleanupClaim, cleanupJournalStorageKeys, claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, cleanupResumeBarrier, noteCleanupJournalEntry, readCleanupJournal, resumeCleanupJournalEntry } from '../src/domain/cleanup';
 import { activeRestoreClaims, executeRestoreItem } from '../src/features/restore';
 import { ABANDON_AGE_MS } from '../src/features/session';
 
@@ -421,7 +421,7 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
 });
 
 
-it.each([false, true])('cleanup v2 keeps one final admission across retried updater payloads (partial=%s)', (partial) => {
+it.each([false, true])('cleanup v2 keeps one final admission across retried updater payloads (partial=%s)', async (partial) => {
     seed([returnedItem()]);
     const owner = beginCleanupOperation(ID);
     const firstItem = getAt(HISTORY + '/' + ID);
@@ -438,5 +438,15 @@ it.each([false, true])('cleanup v2 keeps one final admission across retried upda
         expect(readCleanupJournal().map(entry => entry.trashItem.barcodes.map((barcode: any) => barcode.code))).toEqual([['B']]);
         expect(ledger().codDollar).toBe(100);
         expect(getAt(HISTORY + '/' + ID).barcodes.map((barcode: any) => barcode.code)).toEqual(['A']);
-    } finally { now.mockRestore(); releaseCleanupOperation(ID, owner); }
+    } finally {
+        now.mockRestore();
+        releaseCleanupOperation(ID, owner);
+        await flush();
+        await cleanupResumeBarrier.settled;
+    }
+    expect(dataState.cleanupResumeInFlight).toBe(false);
+    expect(cleanupInFlight.size).toBe(0);
+    expect(ledger().codDollar).toBe(100);
+    expect(month().codDollar).toBe(100);
+    expect(getAt(HISTORY + '/' + ID).barcodes.map((barcode: any) => barcode.code)).toEqual(['A']);
 });

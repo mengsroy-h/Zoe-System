@@ -237,20 +237,32 @@ const meta = { [APP]: { K1: { issuedAt: 5, scope: 'ALL', note: 'ហាង A' }, 
                 alert: () => { box.alerted++; },
                 showToast: () => { box.toasts++; },
                 refreshKeyList: () => { box.refreshed++; },
-                captureSensitiveSession: () => ({ user: { email: 'a@x.com' } }),
+                captureSensitiveSession: () => ({ user: { email: 'a@x.com', getIdToken: () => Promise.resolve('admin-id-token') } }),
                 isSensitiveSessionCurrent: () => true,
                 adminOperationIsCurrent: () => true,
                 withTimeout: (pr) => pr,
                 retryAsync: (fn) => fn(),
+                serverTimeSynced: true,
+                getServerNow: () => 1700000000000,
+                URL,
                 fb: {
                     ref: (d, path) => ({ path: path }),
                     update: (ref, payload) => { calls.push(['update', ref.path, payload]); return Promise.resolve(); },
                     set: (ref, value) => { calls.push(['set', ref.path, value]); return Promise.resolve(); }
+                },
+                // ⛔ A505 ៖ «🔓 ដោះឧបករណ៍» ផ្ញើតាម REST PATCH ទៅ root របស់ Database ប្រតិបត្តិការ ➜ កត់ត្រាជា ['patch', '', body] (root)
+                fetch: (url, init) => {
+                    if (init && init.method === 'PATCH') calls.push(['patch', new URL(String(url)).pathname === '/.json' ? '' : String(url), JSON.parse(init.body)]);
+                    else calls.push(['get', String(url)]);
+                    return Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve(init && init.body ? init.body : 'null'), json: () => Promise.resolve(null) });
                 }
             };
+            sb.db = { app: { options: { databaseURL: 'https://keylist-probe.firebaseio.com' } } };
             const c = vm.createContext(sb);
-            vm.runInContext([realDecl(src2, 'LICENSE_SEAT_SLOT_NAMES'), realDecl(src2, 'LICENSE_SEAT_MAX')].join('\n'), c);
-            vm.runInContext(sliceFns(src2, ['seatLimitOf', 'setKeySeatLimit', 'releaseKeySeat']), c);
+            vm.runInContext([realDecl(src2, 'LICENSE_SEAT_SLOT_NAMES'), realDecl(src2, 'LICENSE_SEAT_MAX'), realDecl(src2, 'ADMIN_WRITE_PENDING_TEXT'), realDecl(src2, 'RELEASE_PENDING_TEXT')].join('\n'), c);
+            const restHelpers = ['databaseUrlOf', 'isFirebaseDatabaseHost', 'fetchWithTimeout', 'patchLicenseViaRest', 'readKeyReleaseViaRest']
+                .filter((name) => src2.indexOf('function ' + name + '(') !== -1);
+            vm.runInContext(sliceFns(src2, ['seatLimitOf', 'setKeySeatLimit', 'releaseKeySeat'].concat(restHelpers)), c);
             return vm.runInContext(fnName + "('" + row.id + "')", c).then(() => ({ calls, box }));
         }
         const baseRow = (over) => Object.assign({
@@ -290,11 +302,12 @@ const meta = { [APP]: { K1: { issuedAt: 5, scope: 'ALL', note: 'ហាង A' }, 
     ok('⛔ បន្ថយក្រោមចំនួនឧបករណ៍ដែលចងរួច ➜ សួរជាមុន; បដិសេធ ➜ មិនសរសេរ',
         wLower.calls.length === 0, wLower.calls);
     // ⛔ ដោះ = update root តែមួយ ៖ លុបកៅអី + ត្រា `releasedAt` (ម៉ោង server) ➜ ឧបករណ៍ដែលដោះមិន claim កៅអីទទេវិញ (CLAUDE.md «Key ➜ device ceiling»)
-    const writtenPaths = (c) => (c[0] === 'update'
+    //    ⛔ A505 (សេចក្តីសម្រេចម្ចាស់) ៖ update នោះផ្ញើតាម REST PATCH (មិនមែន SDK ដែលផ្ញើម្តងទៀតក្រោយចម្លើយបាត់)
+    const writtenPaths = (c) => (c[0] === 'update' || c[0] === 'patch'
         ? Object.keys(c[2] || {}).map((k) => (c[1] ? c[1] + '/' : '') + k)
         : [String(c[1] || '')]);
-    const relPayload = wRel.calls.length === 1 && wRel.calls[0][0] === 'update' && !wRel.calls[0][1] ? wRel.calls[0][2] : null;
-    ok('ដោះឧបករណ៍ ➜ update root តែមួយ ៖ លុប node `license_seats` ទាំងមូល + `releasedAt` ម៉ោង server',
+    const relPayload = wRel.calls.length === 1 && wRel.calls[0][0] === 'patch' && !wRel.calls[0][1] ? wRel.calls[0][2] : null;
+    ok('ដោះឧបករណ៍ ➜ update root តែមួយ (REST PATCH · ⛔ គ្មាន SDK) ៖ លុប node `license_seats` ទាំងមូល + `releasedAt` ម៉ោង server',
         !!relPayload && relPayload['license_seats/' + APP + '/K1'] === null
         && JSON.stringify(relPayload['license_keys/' + APP + '/K1/releasedAt']) === JSON.stringify({ '.sv': 'timestamp' }), wRel.calls);
     ok('⛔ ទិសផ្ទុយ ៖ ការដោះ **មិនប៉ះ** ពិដាន ឬវាលផ្សេងរបស់ `license_keys` (តែ `releasedAt`)',
@@ -302,7 +315,7 @@ const meta = { [APP]: { K1: { issuedAt: 5, scope: 'ALL', note: 'ហាង A' }, 
             || p === 'license_keys/' + APP + '/K1/releasedAt')), wRel.calls);
     // ⛔ re-audit (K2) ៖ Key គ្មានឧបករណ៍ក្នុងបញ្ជី តែគ្មាន `releasedAt` (ការដោះតាម rules ចាស់លុបកៅអី) ➜ សួរ ហើយចុះត្រាដោះ ·
     //    មានត្រារួចគ្រប់ App ➜ មិនសរសេរ ហើយប្រាប់អ្នកប្រើ · បដិសេធប្រអប់ ➜ មិនសរសេរ
-    const emptyPayload = wRelEmpty.calls.length === 1 && wRelEmpty.calls[0][0] === 'update' && !wRelEmpty.calls[0][1] ? wRelEmpty.calls[0][2] : null;
+    const emptyPayload = wRelEmpty.calls.length === 1 && wRelEmpty.calls[0][0] === 'patch' && !wRelEmpty.calls[0][1] ? wRelEmpty.calls[0][2] : null;
     ok('⛔ គ្មានឧបករណ៍ · គ្មាន `releasedAt` ➜ ចុះត្រាដោះ (update root តែមួយ · ម៉ោង server) មិនមែន «គ្មានអ្វីត្រូវដោះ»',
         !!emptyPayload && JSON.stringify(emptyPayload['license_keys/' + APP + '/K1/releasedAt']) === JSON.stringify({ '.sv': 'timestamp' })
         && wRelEmpty.box.alerted === 0, wRelEmpty.calls);

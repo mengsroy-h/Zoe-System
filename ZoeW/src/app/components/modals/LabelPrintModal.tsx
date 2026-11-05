@@ -1,14 +1,21 @@
+import { useEffect } from 'react';
+import { dataState, uiState } from '../../../core/state';
 import { viewState } from '../../../core/view-state';
-import type { LabelPrintPreview } from '../../../features/label-print';
+import { updateLabelPrintPreview, type LabelPrintPreview } from '../../../features/label-print';
 import { onAct } from '../../actions';
-import { useStoreFields } from '../../hooks/useStore';
+import { useStore, useStoreFields } from '../../hooks/useStore';
 import { refTo } from '../../refs';
 import { LabelSheet } from '../PdfPrintArea';
 import { Modal } from './Modal';
 
 export function LabelPrintModal() {
+    const revision = useStore(dataState);
+    const selection = useStoreFields(uiState, ['modalDisplay', 'currentFilterMode', 'customFilterDate', 'historyRenderSeq']);
     const v = useStoreFields(viewState, ['labelPrintTitle', 'labelPrintSummary', 'labelPrintPreview']);
     const preview = v.labelPrintPreview as LabelPrintPreview | null;
+    useEffect(() => {
+        if (selection.modalDisplay.labelPrintModal === 'flex') updateLabelPrintPreview();
+    }, [revision, selection]);
     return (
         <Modal id="labelPrintModal">
             <div className="modal-content label-print-modal-content">

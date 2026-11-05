@@ -5,7 +5,9 @@ import { getFormattedClockTime } from '../core/timezone';
 import { applyBarcodeCloseState, barcodeEntriesOf, barcodeSignIdentity, generateUniqueId, itemHasRestoreMarkers, normalizeBarcodesOf } from '../domain/barcode';
 import { ledgerLatestMonths, ledgerOpRing, ledgerTokenSeen } from '../domain/ledger';
 import { trashSourceUnconsumed, TRASH_CONSUMPTIONS_ROOT } from '../domain/trash-generation';
-import { collectedDayOfStamp } from '../domain/collected';
+import { collectedDayOfStamp, collectedRetentionCutoffKey, reconcileCollectedHistory } from '../domain/collected';
+import { capturePickupContext, commitPickupMarks, getPickupPhoneKey, pickupBarcodeKey } from '../domain/pickup';
+import { cleanupClockIsTrustworthy, getServerNow } from '../core/clock';
 import { barcodeRegistryKey } from '../domain/registry';
 import { SCAN_LEDGER_MAX_MONEY, SCAN_OPERATIONS_ROOT, SCAN_PENDING_ROOT, scanLedgerIncrementSafe, scanOperationSame, scanOperationValid, scanPendingMatches, scanStoredMoney,
     scanRegistryOwned, scanRegistryOwner, type ScanOperation } from '../domain/scan-protocol';
@@ -14,7 +16,8 @@ import { recalcItemMoneyFromBarcodes } from '../ui/modal-stack';
 import { refreshCurrentHistoryView } from '../ui/history-refresh';
 import { showToast } from '../ui/toast';
 import { createScanEvidenceJournal } from './scan-evidence';
-import { finishPendingScan, notePendingScan, pendingScanIsCurrent, pendingScanIsLive, pendingScanScope, releasePendingScan, warnPendingScans, type PendingScanHandle } from './scan-pending';
+import { finishPendingScan, notePendingScan, pendingScanIsCurrent, pendingScanIsLive, pendingScanScope, releasePendingScan, retainedPendingScans,
+    SCAN_EVIDENCE_LOCK_PREFIX, warnPendingScans, type PendingScanHandle } from './scan-pending';
 import { persistZtoImportVerdict } from '../features/zto-status';
 import { scanImportProofValid, SCAN_IMPORT_CACHE_TTL_MS } from './scan-import-proof';
 import { rowOperationActive } from './row-operation-lock';
@@ -24,38 +27,42 @@ const activeScans = new Map<string, PendingScanHandle>();
 const liveImportCollected = new WeakMap<PendingScanHandle, ScanOperation>();
 const originalScanHandles = new WeakSet<PendingScanHandle>();
 let recoveryOwner: any = null;
+export const SCAN_IMPORT_PICKUP_TRIES_MAX = 8;
+export const SCAN_EVIDENCE_DROP_CODES_MAX = 20;
 let recoveryCursor: any = null;
 const recoveryAttempts = new Map<string, { handle: PendingScanHandle; promise: Promise<void> }>();
+const attemptOutcomes = new Map<string, 'held' | 'retry'>();
+const SCAN_EVIDENCE_EXIT_ATTEMPTS = 2;
 
-type ScanMonthWaiter = { handle: PendingScanHandle; operation: ScanOperation; action: () => Promise<any>;
+type MonthlyWaiter = { current: () => boolean; action: () => Promise<any>;
     resolve: (value: any) => void; reject: (error: Error) => void; deadline: number; timer: ReturnType<typeof setTimeout> };
-type ScanMonthQueue = { active: ScanMonthWaiter | null; waiting: ScanMonthWaiter[] };
-const scanMonthQueues = new WeakMap<object, ScanMonthQueue>();
+type MonthlyQueue = { active: MonthlyWaiter | null; waiting: MonthlyWaiter[] };
+const monthlyQueues = new WeakMap<object, MonthlyQueue>();
 
-function scanMonthMutation<T>(handle: PendingScanHandle, operation: ScanOperation, action: () => Promise<T>): Promise<T> {
-    if (handle.sdk.__supabase) return Promise.resolve().then(() => {
-        if (!operationCurrent(handle, operation)) throw new Error('Scan operation owner changed');
+export function monthlyRootMutation<T>(db, sdk, current: () => boolean, action: () => Promise<T>): Promise<T> {
+    if (sdk.__supabase) return Promise.resolve().then(() => {
+        if (!current()) throw new Error('Monthly mutation owner changed');
         return action();
     });
-    let queue = scanMonthQueues.get(handle.db);
-    if (!queue) { queue = { active: null, waiting: [] }; scanMonthQueues.set(handle.db, queue); }
+    let queue = monthlyQueues.get(db);
+    if (!queue) { queue = { active: null, waiting: [] }; monthlyQueues.set(db, queue); }
     const owner = queue;
     const drain = () => {
         if (owner.active) return;
         const next = owner.waiting.shift();
         if (!next) {
-            if (scanMonthQueues.get(handle.db) === owner) scanMonthQueues.delete(handle.db);
+            if (monthlyQueues.get(db) === owner) monthlyQueues.delete(db);
             return;
         }
-        if (performance.now() >= next.deadline || !operationCurrent(next.handle, next.operation)) {
-            clearTimeout(next.timer); next.reject(new Error('Scan monthly mutation wait expired or owner changed')); drain(); return;
+        if (performance.now() >= next.deadline || !next.current()) {
+            clearTimeout(next.timer); next.reject(new Error('Monthly mutation wait expired or owner changed')); drain(); return;
         }
         owner.active = next;
         Promise.resolve().then(() => {
-            if (!operationCurrent(next.handle, next.operation)) throw new Error('Scan operation owner changed');
+            if (!next.current()) throw new Error('Monthly mutation owner changed');
             return next.action();
         }).then(value => {
-            if (!operationCurrent(next.handle, next.operation)) throw new Error('Scan operation owner changed');
+            if (!next.current()) throw new Error('Monthly mutation owner changed');
             next.resolve(value);
         }).catch(error => next.reject(error)).finally(() => {
             clearTimeout(next.timer);
@@ -64,15 +71,19 @@ function scanMonthMutation<T>(handle: PendingScanHandle, operation: ScanOperatio
         });
     };
     return new Promise<T>((resolve, reject) => {
-        const waiter: ScanMonthWaiter = { handle, operation, action, resolve, reject, deadline: performance.now() + DB_OP_TIMEOUT_MS, timer: undefined as any };
+        const waiter: MonthlyWaiter = { current, action, resolve, reject, deadline: performance.now() + DB_OP_TIMEOUT_MS, timer: undefined as any };
         waiter.timer = setTimeout(() => {
             const index = owner.waiting.indexOf(waiter);
             if (index >= 0) owner.waiting.splice(index, 1);
-            reject(new Error('Scan monthly mutation timed out'));
+            reject(new Error('Monthly mutation timed out'));
             if (!owner.active) drain();
         }, DB_OP_TIMEOUT_MS);
         owner.waiting.push(waiter); drain();
     });
+}
+
+function scanMonthMutation<T>(handle: PendingScanHandle, operation: ScanOperation, action: () => Promise<T>): Promise<T> {
+    return monthlyRootMutation(handle.db, handle.sdk, () => operationCurrent(handle, operation), action);
 }
 
 function operationOf(handle: PendingScanHandle): ScanOperation | null {
@@ -98,7 +109,8 @@ async function readOperationNode(handle: PendingScanHandle, operation: ScanOpera
     return value;
 }
 
-function scanHeld(handle: PendingScanHandle) {
+function scanHeld(handle: PendingScanHandle, definitive = true) {
+    attemptOutcomes.set(handle.record.id, definitive ? 'held' : 'retry');
     try { notePendingScan(handle, 'hold'); } catch (e) {}
     return false;
 }
@@ -110,18 +122,40 @@ function retainCommittedImportCollected(handle: PendingScanHandle, operation: Sc
     return true;
 }
 
-export async function finishScanImportCollected(handle: PendingScanHandle, report) {
+export async function importPickupEpoch(date: string) {
+    try { return (await capturePickupContext(date)).epoch; }
+    catch (e) { throw Object.assign(new Error('Pickup epoch unavailable'), { code: 'pickup_epoch_unavailable', noRetry: true }); }
+}
+
+async function settleImportPickup(handle: PendingScanHandle, operation: ScanOperation, readHolder: () => Promise<any>) {
+    const recorded = handle.record.pickupEpoch;
+    const epoch = recorded === undefined ? 0 : recorded;
+    const key = pickupBarcodeKey(operation.code);
+    for (let attempt = 0; attempt < SCAN_IMPORT_PICKUP_TRIES_MAX; attempt++) {
+        const context = await capturePickupContext(operation.scanDate);
+        if (!operationCurrent(handle, operation)) return false;
+        if (context.epoch !== epoch) return recorded !== undefined;
+        const holder = await readHolder();
+        if (!holder) return false;
+        if (context.presentKeys.includes(key)) return true;
+        await dbOp(commitPickupMarks(operation.scanDate, [{ key, phoneKey: getPickupPhoneKey(holder.item), closed: true }], false, true, undefined, context, true));
+        if (!operationCurrent(handle, operation)) return false;
+    }
+    return false;
+}
+
+async function completeImportCollected(handle: PendingScanHandle, operation: ScanOperation, live: boolean, report?) {
     try {
-        const operation = liveImportCollected.get(handle);
-        if (!operation || !pendingScanIsCurrent(handle) || report?.collectedSaved !== true || report?.pickupSaved !== true) return false;
+        if (!pendingScanIsCurrent(handle) || live && (report?.collectedSaved !== true || report?.pickupSaved !== true)) return false;
         const matches = (item, barcode) => item?.scanDate === operation.scanDate
             && barcode?.code === operation.code && barcode.scanIntent === operation.id && barcode.createdAt === operation.birth
             && barcode.isClosed === true && barcode.isDeducted !== true && barcode.closedAt === operation.closedAt
-            && barcode.cod === operation.cod && barcode.dod === operation.dod
             && barcodeSignIdentity(item, barcode) === handle.record.importProof?.identity;
-        if (report.itemId !== operation.targetId || !matches({ scanDate: report.scanDate }, report.barcode)) return false;
+        if (live && (report.itemId !== operation.targetId || !matches({ scanDate: report.scanDate }, report.barcode)
+            || report.barcode.cod !== operation.cod || report.barcode.dod !== operation.dod)) return false;
         const saved = createScanEvidenceJournal(appLocalStore, 2).list(handle.record.scope).find(entry => entry.id === operation.id);
-        if (!saved || saved.corrupt || saved.phase !== 'collected-pending' || JSON.stringify(saved.importProof) !== JSON.stringify(handle.record.importProof)) return false;
+        if (!saved || saved.corrupt || saved.phase !== 'collected-pending' || JSON.stringify(saved.importProof) !== JSON.stringify(handle.record.importProof)
+            || saved.pickupEpoch !== handle.record.pickupEpoch) return false;
         const readHolder = async () => {
             const roots = ['zoew_scan_history_cod_dod', 'zoew_recently_deleted_cod_dod'];
             const [target, receipt, registry] = await Promise.all([
@@ -149,11 +183,19 @@ export async function finishScanImportCollected(handle: PendingScanHandle, repor
             return trashSourceUnconsumed(item, consumed) ? { ...holder, consumed } : null;
         };
         const holder = await readHolder() || await readHolder();
-        if (!holder) return false;
+        if (!holder) { attemptOutcomes.set(handle.record.id, 'held'); return false; }
         const day = collectedDayOfStamp(operation.closedAt);
-        if (!day) return false;
-        const leaf = await readOperationNode(handle, operation, 'zoew_daily_collected_cod_dod/' + day + '/' + operation.registryKey);
-        if (!leaf || typeof leaf !== 'object' || Array.isArray(leaf) || Object.keys(leaf).length !== 2 || leaf.c !== operation.cod || leaf.d !== operation.dod) return false;
+        if (!day) { attemptOutcomes.set(handle.record.id, 'held'); return false; }
+        const leafPath = 'zoew_daily_collected_cod_dod/' + day + '/' + operation.registryKey;
+        const leafHolds = leaf => !!leaf && typeof leaf === 'object' && !Array.isArray(leaf) && Object.keys(leaf).length === 2
+            && leaf.c === holder.barcode.cod && leaf.d === holder.barcode.dod;
+        const leaf = await readOperationNode(handle, operation, leafPath);
+        if (!leafHolds(leaf) && !(leaf === null && cleanupClockIsTrustworthy() && day < collectedRetentionCutoffKey(getServerNow()))) {
+            if (live) return false;
+            const healed = await reconcileCollectedHistory(holder.id, [operation.registryKey], undefined, undefined, true, undefined, () => operationCurrent(handle, operation));
+            if (healed !== true || !leafHolds(await readOperationNode(handle, operation, leafPath))) return false;
+        }
+        if (!await settleImportPickup(handle, operation, readHolder)) return false;
         const after = await readHolder();
         const stableBarcode = barcode => {
             const value = { ...barcode };
@@ -166,7 +208,20 @@ export async function finishScanImportCollected(handle: PendingScanHandle, repor
         const done = finishPendingScan(handle, 'saved-and-ledger-confirmed');
         if (done) liveImportCollected.delete(handle);
         return done;
-    } catch (e) { return false; }
+    } catch (e) {
+        attemptOutcomes.set(handle.record.id, 'retry');
+        return false;
+    }
+}
+
+export async function finishScanImportCollected(handle: PendingScanHandle, report) {
+    const operation = liveImportCollected.get(handle);
+    return !!operation && completeImportCollected(handle, operation, true, report);
+}
+
+async function retainOrCompleteImport(handle: PendingScanHandle, operation: ScanOperation) {
+    if (!retainCommittedImportCollected(handle, operation)) return false;
+    return liveImportCollected.has(handle) || await completeImportCollected(handle, operation, false);
 }
 
 async function finishCommittedScan(handle: PendingScanHandle, operation: ScanOperation) {
@@ -178,9 +233,10 @@ async function finishCommittedScan(handle: PendingScanHandle, operation: ScanOpe
     const now = Date.now();
     if (proof.observedAt > now) return scanHeld(handle);
     if (now > proof.observedAt + SCAN_IMPORT_CACHE_TTL_MS) {
-        const done = retainCommittedImportCollected(handle, operation);
-        if (done) showToast(`⚠️ (${operation.code}) បានផ្ទៀងការរក្សាទុក និងប្រាក់រួច។ ភស្តុតាង ZTO ចាស់ហួសរយៈរក្សា — ត្រូវពិនិត្យស្ថានភាព ZTO ថ្មី។`);
-        return done;
+        const first = durable.phase !== 'collected-pending';
+        if (!retainCommittedImportCollected(handle, operation)) return false;
+        if (first) showToast(`⚠️ (${operation.code}) បានផ្ទៀងការរក្សាទុក និងប្រាក់រួច។ ភស្តុតាង ZTO ចាស់ហួសរយៈរក្សា — ត្រូវពិនិត្យស្ថានភាព ZTO ថ្មី។`);
+        return liveImportCollected.has(handle) || await completeImportCollected(handle, operation, false);
     }
     const roots = await Promise.all(['zoew_scan_history_cod_dod', 'zoew_recently_deleted_cod_dod'].map(path => readOperationNode(handle, operation, path)));
     const holders = roots.flatMap(root => Object.values(root || {}).flatMap((item: any) => barcodeEntriesOf(item?.barcodes)
@@ -194,7 +250,7 @@ async function finishCommittedScan(handle: PendingScanHandle, operation: ScanOpe
     const binding = { v: 1, provider: proof.provider, scope: operation.scope, actorUid: operation.actorUid,
         intent: operation.id, code: operation.code, birth: operation.birth, identity: proof.identity };
     if (persistZtoImportVerdict(binding, proof) !== 'stored') return scanHeld(handle);
-    return retainCommittedImportCollected(handle, operation);
+    return retainOrCompleteImport(handle, operation);
 }
 
 function finishCancelledScan(handle: PendingScanHandle) {
@@ -325,14 +381,19 @@ export async function finalizeScanOperation(handle: PendingScanHandle, operation
         if (!scanOperationSame(saved, operation)) return scanHeld(handle);
         if (saved.phase === 'committed') return await finishCommittedScan(handle, saved);
         if (saved.phase !== 'prepared') return scanHeld(handle);
-        const [row, registry, month, daily] = await Promise.all([
+        const [row, registry, seen, daily] = await Promise.all([
             readOperationNode(handle, operation, 'zoew_scan_history_cod_dod/' + operation.targetId),
             readOperationNode(handle, operation, 'zoew_barcode_registry/' + operation.registryKey),
             readOperationNode(handle, operation, 'zoew_monthly_revenue_cod_dod/' + operation.month),
             readOperationNode(handle, operation, 'zoew_daily_revenue_cod_dod/' + operation.scanDate)
         ]);
-        if (!scanPendingMatches(row, operation) || !scanRegistryOwned(registry, operation) || !validLedgerBucket(month)
-            || !ledgerTokenSeen(month, operation.monthToken) || daily !== null && !validLedgerBucket(daily)) return scanHeld(handle);
+        if (!scanPendingMatches(row, operation) || !scanRegistryOwned(registry, operation) || daily !== null && !validLedgerBucket(daily)) return scanHeld(handle);
+        let month = seen;
+        if (!validLedgerBucket(month) || !ledgerTokenSeen(month, operation.monthToken)) {
+            if (!await prepareScanMonth(handle, operation)) return scanHeld(handle, false);
+            month = await readOperationNode(handle, operation, 'zoew_monthly_revenue_cod_dod/' + operation.month);
+        }
+        if (!validLedgerBucket(month) || !ledgerTokenSeen(month, operation.monthToken)) return scanHeld(handle);
         if (![daily, month].every(bucket => scanLedgerIncrementSafe(bucket?.codDollar || 0, operation.cod)
             && scanLedgerIncrementSafe(bucket?.dodDollar || 0, operation.dod))) return scanHeld(handle);
         const updates: any = {
@@ -387,7 +448,7 @@ export async function saveScanOperation(handle: PendingScanHandle, phone, locker
         notePendingScan(handle, 'save-pending', operation.targetId);
         const monthReady = preparedHere ? await prepareScanMonth(handle, operation)
             : ledgerTokenSeen(await readOperationNode(handle, operation, 'zoew_monthly_revenue_cod_dod/' + operation.month), operation.monthToken);
-        if (!monthReady) { scanHeld(handle); return 'unknown'; }
+        if (!monthReady) { scanHeld(handle, false); return 'unknown'; }
         const stage: any = value => {
             if (!operationCurrent(handle, operation)) return;
             if (scanPendingMatches(value, operation)) return value;
@@ -418,9 +479,30 @@ export async function saveScanOperation(handle: PendingScanHandle, phone, locker
         return 'unknown';
     } finally {
         if (activeScans.get(original.id) === handle) activeScans.delete(original.id);
-        releasePendingScan(handle);
-        if (!liveImportCollected.has(handle)) warnPendingScans();
+        if (!liveImportCollected.has(handle)) {
+            releasePendingScan(handle);
+            warnPendingScans();
+        }
     }
+}
+
+export function scanImportCollectedOwned(handle: PendingScanHandle) {
+    return liveImportCollected.has(handle);
+}
+
+async function recoverScanRecord(handle: PendingScanHandle, base: ScanOperation) {
+    try {
+        const operation = await readOperationNode(handle, base, SCAN_OPERATIONS_ROOT + '/' + base.id);
+        if (!scanOperationSame(operation, base, false)) { scanHeld(handle); return; }
+        if (operation.phase === 'committed') await finishCommittedScan(handle, operation);
+        else if (operation.phase === 'cancelled') finishCancelledScan(handle);
+        else if (operation.phase === 'prepared') {
+            const row = await readOperationNode(handle, operation, 'zoew_scan_history_cod_dod/' + operation.targetId);
+            if (scanPendingMatches(row, operation)) await finalizeScanOperation(handle, operation);
+            else if (!row?.scanPending) await cancelScanOperation(handle);
+            else scanHeld(handle);
+        } else await cancelScanOperation(handle);
+    } catch (e) { scanHeld(handle, false); }
 }
 
 export async function resumePendingScanOperations() {
@@ -453,18 +535,7 @@ export async function resumePendingScanOperations() {
             const attempt = { handle, promise: null as Promise<void> };
             recoveryAttempts.set(record.id, attempt);
             attempt.promise = (async () => {
-                try {
-                    const operation = await readOperationNode(handle, base, SCAN_OPERATIONS_ROOT + '/' + base.id);
-                    if (!scanOperationSame(operation, base, false)) { scanHeld(handle); return; }
-                    if (operation.phase === 'committed') await finishCommittedScan(handle, operation);
-                    else if (operation.phase === 'cancelled') finishCancelledScan(handle);
-                    else if (operation.phase === 'prepared') {
-                        const row = await readOperationNode(handle, operation, 'zoew_scan_history_cod_dod/' + operation.targetId);
-                        if (scanPendingMatches(row, operation)) await finalizeScanOperation(handle, operation);
-                        else if (!row?.scanPending) await cancelScanOperation(handle);
-                        else scanHeld(handle);
-                    } else await cancelScanOperation(handle);
-                } catch (e) { scanHeld(handle); }
+                try { await recoverScanRecord(handle, base); }
                 finally {
                     if (recoveryAttempts.get(record.id) === attempt) recoveryAttempts.delete(record.id);
                 }
@@ -478,4 +549,70 @@ export async function resumePendingScanOperations() {
         if (recoveryOwner === owner) recoveryOwner = null;
         if (sameContext(owner)) warnPendingScans();
     }
+}
+
+export async function resolveRetainedScanEvidence() {
+    const scope = pendingScanScope(), db = firebaseState.db, sdk = firebaseState.fb, auth = firebaseState.authGeneration;
+    const result = { status: 'unavailable', finished: 0, dropped: 0, kept: 0 };
+    if (!scope || !db || !sdk || shopScopePending() || !firebaseState.isDatabaseConnected) return result;
+    if (recoveryOwner) return { ...result, status: 'busy' };
+    const same = () => firebaseState.db === db && firebaseState.fb === sdk && firebaseState.authGeneration === auth
+        && pendingScanScope() === scope && !shopScopePending();
+    const busy = (id: string) => pendingScanIsCurrent(activeScans.get(id)) || pendingScanIsLive(id) || pendingScanIsCurrent(recoveryAttempts.get(id)?.handle);
+    const owner = { db, sdk, auth, scope, active: true };
+    recoveryOwner = owner;
+    const dropped: any[] = [], kept: any[] = [];
+    let finished = 0;
+    try {
+        let entries: any[];
+        try { entries = retainedPendingScans(scope); } catch (e) { return { ...result, status: 'unreadable' }; }
+        const locks = typeof navigator !== 'undefined' && navigator.locks;
+        for (const entry of entries) {
+            if (!same()) { kept.push(entry); continue; }
+            if (busy(entry.id)) { kept.push(entry); continue; }
+            const record = createScanEvidenceJournal(appLocalStore, entry.v === 2 ? 2 : 1).list(scope).find(row => row.id === entry.id);
+            if (!record) { finished++; continue; }
+            const handle: PendingScanHandle = { record, db, sdk, auth };
+            const base = record.corrupt ? null : operationOf(handle);
+            let completed = false;
+            for (let round = 0; base && round < SCAN_EVIDENCE_EXIT_ATTEMPTS; round++) {
+                if (round && (!same() || !completed || attemptOutcomes.get(entry.id) !== 'retry'
+                    || !retainedPendingScans(scope).some(row => row.id === entry.id))) break;
+                attemptOutcomes.delete(entry.id);
+                completed = false;
+                const attempt = { handle, promise: null as Promise<void> };
+                recoveryAttempts.set(entry.id, attempt);
+                attempt.promise = recoverScanRecord(handle, base).finally(() => {
+                    if (recoveryAttempts.get(entry.id) === attempt) recoveryAttempts.delete(entry.id);
+                });
+                try { await dbOp(attempt.promise); completed = true; }
+                catch (e) { completed = false; }
+            }
+            if (!same()) { kept.push(entry); continue; }
+            if (!retainedPendingScans(scope).some(row => row.id === entry.id)) { finished++; continue; }
+            if (base && (!completed || attemptOutcomes.get(entry.id) !== 'held')) { kept.push(entry); continue; }
+            let receipt;
+            try {
+                receipt = await readRestoreServerNode(sdk, db, SCAN_OPERATIONS_ROOT + '/' + (/^scan_[a-f0-9]{32}$/.test(entry.id) ? entry.id : 'scan_' + '0'.repeat(32)));
+            } catch (e) { kept.push(entry); continue; }
+            if (!same() || busy(entry.id)) { kept.push(entry); continue; }
+            const drop = () => { try { return createScanEvidenceJournal(appLocalStore, entry.v === 2 ? 2 : 1).discard(entry); } catch (e) { return false; } };
+            let gone = false;
+            if (locks && typeof locks.request === 'function') {
+                try { gone = await locks.request(SCAN_EVIDENCE_LOCK_PREFIX + entry.id, { ifAvailable: true }, (lock) => !!lock && drop()) === true; } catch (e) { gone = false; }
+            } else gone = drop();
+            if (gone) dropped.push({ ...entry, server: scanOperationValid(receipt) ? receipt.phase : receipt === null ? 'none' : 'invalid' });
+            else kept.push(entry);
+        }
+    } finally {
+        owner.active = false;
+        if (recoveryOwner === owner) recoveryOwner = null;
+    }
+    if (dropped.length && window.ZoeErrors) {
+        ZoeErrors.capture(new Error('Unresolved scan evidence discarded by the owner'), { zone: 'money', context: 'resolveRetainedScanEvidence',
+            count: dropped.length, kept: kept.length, codes: dropped.slice(0, SCAN_EVIDENCE_DROP_CODES_MAX).map(entry => entry.barcode || entry.id).join(' · '),
+            phases: dropped.slice(0, SCAN_EVIDENCE_DROP_CODES_MAX).map(entry => entry.phase + '/' + entry.server).join(' · ') });
+    }
+    if (same()) warnPendingScans();
+    return { status: 'done', finished, dropped: dropped.length, kept: kept.length };
 }

@@ -186,3 +186,4 @@ if (problems) {
     process.exit(1);
 }
 console.log('\n✅ គ្មានច្បាប់ @media និងគ្មាន class variant ណាត្រូវស្លាប់ដោយច្បាប់ក្រោយវាទេ');
+process.exitCode = 0;

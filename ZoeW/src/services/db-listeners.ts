@@ -15,6 +15,7 @@ import { liveSuccessCount, refreshLiveToasts, showToast } from '../ui/toast';
 import { attachZtoShopSweepListener, resetZtoShopSweep } from './zto-shop-sweep';
 import { attachZtoTrashModeListener, resetZtoTrashMode } from './zto-trash-mode';
 import { attachZtoSweepLaneListener, resetZtoSweepLane } from './zto-sweep-lane';
+import { resumePickupResetOutcomes } from './pickup-reset';
 
 export const dbListenerReportedFailures = new Set();
 
@@ -308,6 +309,7 @@ export function initDatabaseListeners() {
 
     firebaseState.isDatabaseInitialized = true;
     listenersAuthGeneration = firebaseState.authGeneration;
+    if (firebaseState.auth?.currentUser?.uid) void resumePickupResetOutcomes().catch(() => undefined);
     return true;
 }
 

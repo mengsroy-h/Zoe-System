@@ -8,6 +8,7 @@ const os = require('os');
 const path = require('path');
 const zlib = require('zlib');
 const http = require('http');
+const { spawnSync } = require('child_process');
 const ROOT = process.env.FBACKUP_APP_DIR
     ? path.resolve(process.env.FBACKUP_APP_DIR)
     : path.resolve(__dirname, '..');
@@ -525,6 +526,116 @@ async function credentialRedirectScenario(kind, status) {
                 () => ciConfig.parseTargets('[]'), /at least one entry/);
             expectThrow('⛔ secret ដែលមិនទាន់កំណត់ត្រូវប្រាប់ឈ្មោះ env',
                 () => ciConfig.parseTargets(''), /ZOE_BACKUP_TARGETS is empty/);
+
+            // target ខូចមួយ (សោកាត់ខ្លី · publishable key · URL ក្លែង · ឈ្មោះស្ទួន) មិនត្រូវបញ្ឈប់ backup របស់អាជីវកម្មផ្សេង
+            // តែជំហានត្រៀមនៅធ្លាក់ (exit ≠ 0) ដើម្បីឲ្យ job ក្រហមក្រោយ upload ➜ រត់ CLI ពិតជា child process
+            const otherKeys = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+            const otherServiceAccount = {
+                client_email: 'backup-other@example.iam.gserviceaccount.com',
+                private_key: otherKeys.privateKey.export({ type: 'pkcs8', format: 'pem' }),
+                token_uri: 'https://oauth2.googleapis.com/token'
+            };
+            const goodSecret = 'sb_secret_' + 'q'.repeat(32);
+            const publishable = 'sb_publishable_' + 'p'.repeat(32);
+            const mixedTargets = [
+                { name: 'biz-good', databaseURL: 'https://good-default-rtdb.firebaseio.com', serviceAccount: rawServiceAccount },
+                { name: 'biz-cut', databaseURL: 'https://cut-default-rtdb.firebaseio.com', serviceAccount: JSON.stringify(rawServiceAccount).slice(0, 90) },
+                { name: 'biz-nokey', databaseURL: 'https://nokey-default-rtdb.firebaseio.com',
+                    serviceAccount: { client_email: 'nokey@example.iam.gserviceaccount.com', private_key: 'synthetic-not-a-key' } },
+                { type: 'supabase', name: 'sb-pub', url: 'https://demo.supabase.co', secretKey: publishable },
+                { name: 'biz-host', databaseURL: 'https://good-default-rtdb.firebaseio.com.attacker.example', serviceAccount: rawServiceAccount },
+                'not-an-object',
+                { name: 'BIZ-GOOD', databaseURL: 'https://dup-default-rtdb.firebaseio.com', serviceAccount: otherServiceAccount },
+                { type: 'supabase', name: 'sb-good', url: 'https://demo.supabase.co', secretKey: goodSecret }
+            ];
+            const runCiConfig = (dir, list) => {
+                const run = spawnSync(process.execPath, [ciConfigPath, dir], {
+                    env: Object.assign({}, process.env, { ZOE_BACKUP_TARGETS: JSON.stringify(list) }), encoding: 'utf8', timeout: 30000
+                });
+                const all = String(run.stdout || '') + String(run.stderr || '');
+                return { status: run.status, all, failLines: all.split('\n').filter((line) => line.startsWith('[FAIL] ')) };
+            };
+            const mixedRoot = path.join(tempRoot, 'ci-mixed');
+            const mixed = runCiConfig(mixedRoot, mixedTargets);
+            const mixedConfigPath = path.join(mixedRoot, 'config.json');
+            const mixedConfig = fs.existsSync(mixedConfigPath) ? JSON.parse(fs.readFileSync(mixedConfigPath, 'utf8')) : null;
+            const mixedNames = mixedConfig ? mixedConfig.businesses.map((business) => business.name) : [];
+            ok('⛔ target ខូច ១ មិនបញ្ឈប់ target ផ្សេង ៖ config.json សម្រាប់ target ដែលល្អ (Firebase · Supabase)',
+                JSON.stringify(mixedNames) === JSON.stringify(['biz-good', 'sb-good']), { names: mixedNames, out: mixed.all.slice(-700) });
+            ok('⛔ target ខូច ➜ ជំហានត្រៀម exit ≠ 0 (job ក្រហមក្រោយ upload)', mixed.status !== 0 && mixed.status !== null, mixed.status);
+            ok('target ខូចនីមួយៗ ➜ បន្ទាត់ [FAIL] មួយ ប្រាប់ឈ្មោះ (ឬលំដាប់) និងមូលហេតុ',
+                mixed.failLines.length === 6 && ['biz-cut', 'biz-nokey', 'sb-pub', 'biz-host', '#6', 'BIZ-GOOD']
+                    .every((label) => mixed.failLines.some((line) => line.startsWith('[FAIL] ' + label + ': '))), mixed.failLines);
+            const mixedSecretsDir = path.join(mixedRoot, 'secrets');
+            const mixedSecrets = fs.existsSync(mixedSecretsDir) ? fs.readdirSync(mixedSecretsDir).sort() : [];
+            const goodKeyFile = path.join(mixedSecretsDir, 'biz-good.json');
+            ok('⛔ គ្មានឯកសារសោរបស់ target ខូច · ឈ្មោះស្ទួនមិនសរសេរជាន់សោរបស់ target ដើម',
+                JSON.stringify(mixedSecrets) === JSON.stringify(['biz-good.json', 'sb-good.key']) && fs.existsSync(goodKeyFile)
+                && JSON.parse(fs.readFileSync(goodKeyFile, 'utf8')).client_email === rawServiceAccount.client_email, mixedSecrets);
+            ok('config ដែលនៅសល់ឆ្លងការផ្ទៀងផ្ទាត់ពេញរបស់ backup.js', !!mixedConfig && (() => {
+                try {
+                    backup.validateBusinesses(mixedConfig, path.join(mixedRoot, 'backups'));
+                    return true;
+                } catch (e) { return false; }
+            })());
+            ok('⛔ សារ [FAIL] មិនបញ្ចេញសម្ភារៈសោ', ['PRIVATE KEY', publishable, goodSecret, 'synthetic-not-a-key',
+                rawServiceAccount.client_email, otherServiceAccount.client_email].every((secret) => mixed.all.indexOf(secret) === -1));
+            const deadRoot = path.join(tempRoot, 'ci-dead');
+            const dead = runCiConfig(deadRoot, [mixedTargets[1], mixedTargets[3]]);
+            ok('target ខូចទាំងអស់ ➜ exit ≠ 0 · គ្មាន config.json · [FAIL] គ្រប់ target',
+                dead.status !== 0 && dead.status !== null && !fs.existsSync(path.join(deadRoot, 'config.json'))
+                && ['biz-cut', 'sb-pub'].every((label) => dead.failLines.some((line) => line.startsWith('[FAIL] ' + label + ': '))), dead.all.slice(-500));
+        }
+
+        {
+            // config.json ក្នុងស្រុក ៖ business ខូច (type មិនស្គាល់ · URL ក្លែង · ឈ្មោះស្ទួន · គ្មានឈ្មោះ) មិនបញ្ឈប់ business ដែលល្អ
+            const localRoot = path.join(tempRoot, 'local-mixed');
+            fs.mkdirSync(path.join(localRoot, 'secrets'), { recursive: true });
+            fs.writeFileSync(path.join(localRoot, 'secrets', 'a.json'), JSON.stringify(rawServiceAccount));
+            const localConfigPath = path.join(localRoot, 'config.json');
+            fs.writeFileSync(localConfigPath, JSON.stringify({
+                backupDir: './backups',
+                retryCount: 0,
+                requestTimeoutMs: 5000,
+                businesses: [
+                    { name: 'biz-mystery', type: 'mystery', serviceAccountPath: './secrets/a.json', databaseURL: 'https://mystery-default-rtdb.firebaseio.com' },
+                    { name: 'biz-local', serviceAccountPath: './secrets/a.json', databaseURL: 'https://local-default-rtdb.firebaseio.com' },
+                    { name: 'biz-badurl', serviceAccountPath: './secrets/a.json', databaseURL: 'https://local.example' },
+                    { name: 'BIZ-LOCAL', serviceAccountPath: './secrets/a.json', databaseURL: 'https://dup-default-rtdb.firebaseio.com' },
+                    { serviceAccountPath: './secrets/a.json', databaseURL: 'https://noname-default-rtdb.firebaseio.com' }
+                ]
+            }));
+            const reads = [];
+            const logged = [];
+            const savedFetch = globalThis.fetch;
+            const savedLog = console.log;
+            const savedError = console.error;
+            globalThis.fetch = async (url) => {
+                if (String(url).indexOf('https://oauth2.googleapis.com/') === 0) return response(200, { access_token: 'local-token' });
+                reads.push(String(url));
+                return response(200, { zoew_settings: { exchange_rate: 4100 } });
+            };
+            console.log = (...parts) => { logged.push(parts.join(' ')); };
+            console.error = (...parts) => { logged.push(parts.join(' ')); };
+            let localError = null;
+            try {
+                await backup.main(['node', 'backup.js', localConfigPath]);
+            } catch (e) {
+                localError = e;
+            } finally {
+                globalThis.fetch = savedFetch;
+                console.log = savedLog;
+                console.error = savedError;
+            }
+            const localDir = path.join(localRoot, 'backups', 'biz-local');
+            const localFiles = fs.existsSync(localDir) ? fs.readdirSync(localDir).filter((file) => file.endsWith('.json.gz')) : [];
+            ok('⛔ business ខូចក្នុង config.json មិនបញ្ឈប់ business ផ្សេង (backup ក្នុងស្រុក)',
+                localFiles.length === 1 && reads.length === 1 && reads[0] === 'https://local-default-rtdb.firebaseio.com/.json',
+                { localFiles, reads, logged });
+            ok('business ខូចនីមួយៗ ➜ [FAIL] · run ចប់ដោយកំហុស (exit ≠ 0 សម្រាប់ Task Scheduler)',
+                !!localError && /4 of 5 backup\(s\) failed/.test(localError.message)
+                && ['biz-mystery', 'biz-badurl', 'BIZ-LOCAL', '#5'].every((label) => logged.some((line) => line.startsWith('[FAIL] ' + label + ': '))),
+                { error: localError && localError.message, logged });
         }
 
         if (fs.existsSync(workflowPath)) {
@@ -571,6 +682,13 @@ async function credentialRedirectScenario(kind, status) {
                 && pullAt > 0);
             ok('⛔ តែ job ត្រូវក្លាយជាក្រហម ➜ អ្នកប្រើដឹង (ជំហានឈរក្រោយ upload)',
                 redAt > uploadAt && uploadAt > 0);
+            const prepareAt = wf.indexOf('node firebase-backup/ci-config.js');
+            const prepareRedAt = wf.indexOf("steps.prepare.outcome == 'failure'");
+            ok('⛔ target ខូចក្នុង ZOE_BACKUP_TARGETS មិនបញ្ឈប់ backup របស់ target ផ្សេង (ជំហានត្រៀម continue-on-error)',
+                /id: prepare\n\s+if: steps\.guard\.outputs\.ready == 'yes'\n\s+continue-on-error: true/.test(wf)
+                && prepareAt > 0 && prepareAt < pullAt);
+            ok('⛔ ជំហានត្រៀមដែលធ្លាក់ធ្វើឲ្យ job ក្រហមក្រោយ upload ដូចការទាញធ្លាក់',
+                prepareRedAt > uploadAt && uploadAt > 0 && Math.abs(prepareRedAt - redAt) < 200);
             ok('⛔ ការស្កេន plaintext មិនត្រូវកាត់ដោយ head (pipefail ➜ សារបាត់)',
                 !/! -name '\*\.enc'[^\n]*\| head/.test(wf));
             const leakScan = (wf.match(/^\s+leaked=\$\(find [^\n]*$/m) || [''])[0];

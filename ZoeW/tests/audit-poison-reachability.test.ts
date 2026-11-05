@@ -5,7 +5,7 @@ import { parse } from 'acorn';
 import { describe, expect, it } from 'vitest';
 
 const guard = readFileSync('../audit-tools/exit-code-integrity.js', 'utf8');
-const poison = vm.runInNewContext(guard.slice(guard.indexOf('const POISON ='), guard.indexOf('const BUDGET_MS')) + '\npoisonSource;', {});
+const poison = vm.runInNewContext(guard.slice(guard.indexOf('const POISON ='), guard.indexOf('function durationMs(')) + '\npoisonSource;', {});
 const verdict = vm.runInNewContext(guard.slice(guard.indexOf('function poisonVerdict('), guard.indexOf('\n{\n    const cases', guard.indexOf('function poisonVerdict('))) + '\npoisonVerdict;', {});
 const fixture = `let fail = 0;
 function ok(label, cond, detail) { if (!cond) fail++; }

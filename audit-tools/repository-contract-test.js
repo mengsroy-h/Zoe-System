@@ -552,6 +552,152 @@ scenario('comments រំលងតែទិដ្ឋភាព React ដែលប
     } finally { fs.rmSync(temp, { recursive: true, force: true }); }
 });
 
+// XML Android ដែលគម្រោងថែទាំ (`android/app/src/main` ៖ `AndroidManifest.xml` · `res/**/*.xml`) ៖ មានតែ comment template របស់
+// Capacitor (អត្ថបទដដែល · ឯកសារដដែល · ផ្ទៀងជាមួយ template ដែលដំឡើង) · comment របស់គម្រោង ➜ comments.js ធ្លាក់ · strip-comments សម្អាត
+function tarGzFixture(entries) {
+    const blocks = [];
+    for (const [name, body] of Object.entries(entries)) {
+        const data = Buffer.from(body, 'utf8');
+        const header = Buffer.alloc(512);
+        header.write(name, 0, 100, 'utf8');
+        header.write('0000644\0', 100, 8);
+        header.write('0000000\0', 108, 8);
+        header.write('0000000\0', 116, 8);
+        header.write(data.length.toString(8).padStart(11, '0') + '\0', 124, 12);
+        header.write('00000000000\0', 136, 12);
+        header.write('        ', 148, 8);
+        header.write('0', 156, 1);
+        header.write('ustar\0', 257, 6);
+        header.write('00', 263, 2);
+        let sum = 0;
+        for (const byte of header) sum += byte;
+        header.write(sum.toString(8).padStart(6, '0') + '\0 ', 148, 8);
+        blocks.push(header, data, Buffer.alloc((512 - (data.length % 512)) % 512));
+    }
+    blocks.push(Buffer.alloc(1024));
+    return require('zlib').gzipSync(Buffer.concat(blocks));
+}
+
+scenario('comments ៖ XML Android ដែល ship មានតែ comment template របស់ Capacitor', () => {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-comment-android-xml-'));
+    try {
+        const app = path.join(temp, 'ZoeW');
+        const main = path.join(app, 'android/app/src/main');
+        fs.mkdirSync(path.join(app, 'src'), { recursive: true });
+        fs.mkdirSync(path.join(app, 'public'));
+        fs.writeFileSync(path.join(app, 'src/main.tsx'), 'export const main = 1;\n');
+        for (let i = 0; i < 50; i++) fs.writeFileSync(path.join(app, 'src', 'fixture-' + i + '.ts'), 'export const value = 1;\n');
+        fs.writeFileSync(path.join(app, 'netlify.toml'), '[build]\n  publish = "dist"\n');
+        for (const rel of ['android/build.gradle', 'android/variables.gradle', 'android/app/build.gradle']) {
+            fs.mkdirSync(path.dirname(path.join(app, rel)), { recursive: true });
+            fs.writeFileSync(path.join(app, rel), 'ext {}\n');
+        }
+        const files = {
+            'AndroidManifest.xml': '<?xml version="1.0" encoding="utf-8"?>\n<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n'
+                + '    <application android:allowBackup="false" />\n\n    <!-- Permissions -->\n\n'
+                + '    <uses-permission android:name="android.permission.INTERNET" />\n</manifest>\n',
+            'res/values/styles.xml': '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n\n    <!-- Base application theme. -->\n'
+                + '    <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">\n        <!-- Customize your theme here. -->\n'
+                + '        <item name="colorPrimary">@color/colorPrimary</item>\n    </style>\n</resources>\n',
+            'res/values/strings.xml': '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n'
+                + '    <string name="note"><![CDATA[<!-- មិនមែន comment -->]]></string>\n</resources>\n',
+            'res/xml/data_extraction_rules.xml': '<?xml version="1.0" encoding="utf-8"?>\n<data-extraction-rules>\n'
+                + '    <cloud-backup>\n        <exclude domain="root" path="." />\n    </cloud-backup>\n</data-extraction-rules>\n'
+        };
+        for (const [rel, body] of Object.entries(files)) {
+            fs.mkdirSync(path.dirname(path.join(main, rel)), { recursive: true });
+            fs.writeFileSync(path.join(main, rel), body);
+        }
+        const generated = { 'assets/public/browserconfig.xml': '<!-- ចម្លងពី web ដោយ cap sync -->\n<browserconfig />\n' };
+        for (const [rel, body] of Object.entries(generated)) {
+            fs.mkdirSync(path.dirname(path.join(main, rel)), { recursive: true });
+            fs.writeFileSync(path.join(main, rel), body);
+        }
+        const cordova = path.join(app, 'android/capacitor-cordova-android-plugins/src/main/AndroidManifest.xml');
+        fs.mkdirSync(path.dirname(cordova), { recursive: true });
+        fs.writeFileSync(cordova, '<?xml version=\'1.0\' encoding=\'utf-8\'?>\n<!-- cap sync -->\n<manifest />\n');
+        const options = { cwd: ROOT, encoding: 'utf8', timeout: 20000,
+            env: { ...process.env, COMMENTS_APP_DIR: temp, STRIP_APP_DIR: temp } };
+        const runComments = () => cp.spawnSync(process.execPath, [path.join(__dirname, 'comments.js')], options);
+        const runStrip = (...args) => cp.spawnSync(process.execPath, [path.join(__dirname, 'strip-comments.js'), ...args], options);
+        const target = (rel) => path.join(main, rel);
+        let result = runComments();
+        check('comments ៖ XML Android ដែលមានតែ comment template (អត្ថបទ · ឯកសារដដែល) និង `<!--` ក្នុង CDATA ត្រូវឆ្លង',
+            result.status === 0, result.stdout + result.stderr);
+        check('comments ៖ រាប់ XML Android ដែលគម្រោងថែទាំ (manifest · res/**) ទាំង ៤ ឯកសារ · មិនរាប់ assets/public និងថត Cordova',
+            /ZoeW Android XML ៖ ស្កេន 4 ឯកសារ/.test(result.stdout), result.stdout);
+        const dataRules = target('res/xml/data_extraction_rules.xml');
+        const manifest = target('AndroidManifest.xml');
+        const styles = target('res/values/styles.xml');
+        const strings = target('res/values/strings.xml');
+        fs.writeFileSync(dataRules, files['res/xml/data_extraction_rules.xml'].replace('\n<data-extraction-rules>',
+            '\n<!--\n    សម្គាល់ហេតុផលរបស់គម្រោង\n-->\n<data-extraction-rules>'));
+        fs.writeFileSync(manifest, files['AndroidManifest.xml']
+            .replace('<application android:allowBackup="false" />', '<application android:allowBackup="false" /> <!-- ចុងជួរ -->')
+            .replace('    <uses-permission', '    <!-- សម្គាល់របស់គម្រោង -->\n    <uses-permission'));
+        fs.writeFileSync(styles, files['res/values/styles.xml']
+            .replace('    <!-- Base application theme. -->\n', '    <!-- Base application theme. -->\n    <!-- Base application theme. -->\n')
+            .replace('        <!-- Customize your theme here. -->\n', '        <!-- Customize your theme here. -->\n        <!-- Customize your theme here -->\n'));
+        fs.writeFileSync(strings, files['res/values/strings.xml'].replace('<resources>\n', '<resources>\n    <!-- Permissions -->\n'));
+        result = runComments();
+        const dirtyOut = result.stdout + result.stderr;
+        check('comments ៖ ចាប់ comment របស់គម្រោងក្នុង res/xml (ឯកសារមិនមែន template)',
+            result.status === 1 && result.stdout.includes('ZoeW/android/app/src/main/res/xml/data_extraction_rules.xml: xml-comments=1'), dirtyOut);
+        check('comments ៖ manifest ៖ រាប់តែ comment របស់គម្រោង (template «Permissions» មិនរាប់)',
+            result.stdout.includes('ZoeW/android/app/src/main/AndroidManifest.xml: xml-comments=2'), dirtyOut);
+        check('comments ៖ comment template ស្ទួន និងអត្ថបទ template ដែលកែ ➜ រាប់ (ត្រូវដូច template បេះបិទ ទាំងអត្ថបទ ទាំងចំនួន)',
+            result.stdout.includes('ZoeW/android/app/src/main/res/values/styles.xml: xml-comments=2'), dirtyOut);
+        check('comments ៖ អត្ថបទ template ក្នុងឯកសារខុស (Permissions ក្នុង strings.xml) ➜ រាប់ · `<!--` ក្នុង CDATA មិនរាប់',
+            result.stdout.includes('ZoeW/android/app/src/main/res/values/strings.xml: xml-comments=1'), dirtyOut);
+        result = runStrip('--check');
+        check('strip-comments --check ៖ រាយ XML Android ដែលមាន comment ហើយ exit ≠ 0 ដោយមិនកែ',
+            result.status === 1 && /data_extraction_rules\.xml/.test(result.stdout) && /សម្គាល់ហេតុផល/.test(fs.readFileSync(dataRules, 'utf8')),
+            result.stdout + result.stderr);
+        result = runStrip();
+        check('strip-comments ៖ លុប comment ក្រៅ template ក្នុង XML Android ហើយ markup និង comment template ដដែលមួយ byte',
+            result.status === 0 && ['res/xml/data_extraction_rules.xml', 'AndroidManifest.xml', 'res/values/styles.xml', 'res/values/strings.xml']
+                .every((rel) => fs.readFileSync(target(rel), 'utf8') === files[rel]), result.stdout + result.stderr);
+        check('strip-comments ៖ មិនប៉ះ assets/public និងថត Cordova ដែល cap sync បង្កើត',
+            fs.readFileSync(target('assets/public/browserconfig.xml'), 'utf8') === generated['assets/public/browserconfig.xml']
+            && fs.readFileSync(cordova, 'utf8').includes('<!-- cap sync -->'));
+        result = runComments();
+        check('comments ៖ ក្រោយ strip-comments XML Android ស្អាតត្រូវឆ្លង', result.status === 0, result.stdout + result.stderr);
+        const unterminated = files['res/xml/data_extraction_rules.xml'].replace('</data-extraction-rules>', '<!-- មិនបិទ\n</data-extraction-rules>');
+        fs.writeFileSync(dataRules, unterminated);
+        result = runStrip();
+        check('strip-comments ៖ `<!--` ដែលមិនបិទក្នុង XML Android ➜ FAIL ហើយឯកសារដដែលមួយ byte (មិនកាត់ markup ដល់ចុងឯកសារ)',
+            result.status === 1 && /data_extraction_rules\.xml/.test(result.stdout) && /FAIL/.test(result.stdout)
+            && fs.readFileSync(dataRules, 'utf8') === unterminated, result.stdout + result.stderr);
+        result = runComments();
+        check('comments ៖ `<!--` ដែលមិនបិទក្នុង XML Android ➜ រាប់ជា comment (ធ្លាក់)',
+            result.status === 1 && result.stdout.includes('res/xml/data_extraction_rules.xml: xml-comments=1'), result.stdout + result.stderr);
+        fs.writeFileSync(dataRules, files['res/xml/data_extraction_rules.xml']);
+        const templateAt = path.join(app, 'node_modules/@capacitor/cli/assets/android-template.tar.gz');
+        fs.mkdirSync(path.dirname(templateAt), { recursive: true });
+        fs.writeFileSync(templateAt, tarGzFixture({
+            'app/src/main/AndroidManifest.xml': files['AndroidManifest.xml'],
+            'app/src/main/res/values/styles.xml': files['res/values/styles.xml'].replace('        <!-- Customize your theme here. -->\n', '')
+        }));
+        result = runComments();
+        check('comments ៖ template ដែល tree ដំឡើង (node_modules ផ្ទាល់) លែងមាន comment allowlist ➜ ធ្លាក់ត្រឹមធាតុនោះ (មិនអនុញ្ញាតដោយស្ងាត់)',
+            result.status === 1 && /Customize your theme here/.test(result.stdout)
+            && !/Permissions|Base application theme/.test(result.stdout.slice(result.stdout.indexOf('វិសាលភាព'))), result.stdout + result.stderr);
+        fs.writeFileSync(templateAt, 'មិនមែន gzip\n');
+        result = runComments();
+        check('comments ៖ template របស់ Capacitor អានមិនបាន ➜ ធ្លាក់ (មិនរំលង)',
+            result.status === 1 && /template/.test(result.stdout), result.stdout + result.stderr);
+        fs.rmSync(path.join(app, 'node_modules'), { recursive: true });
+        fs.writeFileSync(manifest, files['AndroidManifest.xml'].replace('    <!-- Permissions -->\n', ''));
+        result = runComments();
+        check('comments ៖ allowlist ដែលឯកសារលែងប្រើ (dead entry) ➜ ធ្លាក់',
+            result.status === 1 && /Permissions/.test(result.stdout), result.stdout + result.stderr);
+        fs.rmSync(manifest);
+        result = runComments();
+        check('comments ៖ ថត Android គ្មាន AndroidManifest.xml ➜ ធ្លាក់ (ជាន់អប្បបរមា)',
+            result.status === 1 && /AndroidManifest\.xml/.test(result.stdout), result.stdout + result.stderr);
+    } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+});
+
 scenario('runner ៖ Linux audit និង Windows APK មាន mode ទាំងពីរ', () => {
     const audit = read('.github/workflows/audit.yml');
     const apk = read('.github/workflows/android-release.yml');
@@ -921,17 +1067,65 @@ scenario('runtime ក្នុង Linux image៖ កំណែខុសឬ Java �
     } finally { fs.rmSync(temp, { recursive: true, force: true }); }
 });
 
+function auditCacheWiring(audit, compose, preparation, runner, owner) {
+    const active = text => text.replace(/^\s*#.*$/gm, '');
+    const workflow = active(audit), shell = active(preparation), runall = active(runner);
+    const command = mode => new RegExp('^\\s*(?:run:\\s*)?bash tools/actions-runners/prepare-audit-cache\\.sh ' + mode + '(?:\\s+#.*)?\\s*$', 'm').exec(workflow);
+    const init = command('init'), chromium = command('chromium'), database = command('database');
+    const download = /^\s*PW_VERSION=/m.exec(workflow), execute = /^\s*bash audit-tools\/run-all\.sh\s*$/m.exec(workflow);
+    const mode = name => { const start = shell.indexOf('\n  ' + name + ')'); const end = shell.indexOf('\n    ;;', start); return start >= 0 && end > start ? shell.slice(start, end) : ''; };
+    const locked = name => name === 'chromium'
+        ? /^\s*flock "\$CACHE\/\.chromium\.lock" npx --no-install playwright install chromium\s*$/m.test(mode(name))
+        : /^\s*flock 9\s*$/m.test(mode(name));
+    const walks = node => {
+        const result = []; const visit = value => { if (!value || typeof value !== 'object') return; if (value.type) result.push(value);
+            for (const part of Object.values(value)) { if (Array.isArray(part)) part.forEach(visit); else if (part && typeof part === 'object') visit(part); } }; visit(node); return result;
+    };
+    let preparedJar = false, consumedJar = false;
+    try {
+        for (const block of mode('database').matchAll(/node <<'NODE'\s*\n([\s\S]*?)\nNODE/g)) {
+            const tree = acorn.parse(block[1], { ecmaVersion: 'latest' });
+            preparedJar ||= tree.body.some(statement => {
+                const call = statement.expression;
+                return call?.type === 'CallExpression' && call.callee.type === 'MemberExpression' && call.callee.property.name === 'appendFileSync'
+                    && block[1].slice(call.arguments[0]?.start, call.arguments[0]?.end) === 'process.env.GITHUB_ENV'
+                    && walks(call.arguments[1]).some(node => node.type === 'Literal' && node.value === 'ZOE_RTDB_JAR=');
+            });
+        }
+        const tree = acorn.parse(owner, { ecmaVersion: 'latest' }), verify = tree.body.find(node => node.type === 'FunctionDeclaration'
+            && walks(node).some(part => part.type === 'VariableDeclarator' && part.init?.type === 'MemberExpression'
+                && part.init.object.name === 'env' && part.init.property.name === 'ZOE_RTDB_JAR'));
+        const input = verify && walks(verify).find(node => node.type === 'VariableDeclarator' && node.init?.type === 'MemberExpression'
+            && node.init.object.name === 'env' && node.init.property.name === 'ZOE_RTDB_JAR')?.id.name;
+        consumedJar = !!input && walks(verify).some(node => node.type === 'CallExpression' && node.callee.property?.name === 'realpathSync' && node.arguments[0]?.name === input);
+    } catch (_) { return false; }
+    return (compose.match(/audit-binaries:\/opt\/zoe-cache/g) || []).length === 4
+        && !!init && !!download && init.index < download.index && !!chromium && !!database && !!execute && database.index < execute.index
+        && locked('chromium') && locked('database') && preparedJar && consumedJar
+        && /^\s*RUNALL_COMMAND=\(node audit-tools\/owned-rtdb-command\.js --state "\$RUNALL_OWNED_DIR" -- "\$@"\)\s*$/m.test(runall)
+        && !/\bjava\s+-jar\b/.test(workflow);
+}
+
 scenario('audit cache ៖ ទាញម្ដង · ផ្ទៀង checksum · មិនលាយ workspace', () => {
     const audit = read('.github/workflows/audit.yml');
     const compose = read('tools/actions-runners/compose.yml');
     const script = path.join(ROOT, 'tools/actions-runners/prepare-audit-cache.sh');
-    check('runner ទាំង ៤ mount binary cache រួម និង workflow ត្រៀមមុនទាញ',
-        (compose.match(/audit-binaries:\/opt\/zoe-cache/g) || []).length === 4
-        && audit.includes('bash tools/actions-runners/prepare-audit-cache.sh init')
-        && audit.indexOf('prepare-audit-cache.sh init') < audit.indexOf('PW_VERSION=')
-        && audit.includes('bash tools/actions-runners/prepare-audit-cache.sh chromium')
-        && audit.includes('bash tools/actions-runners/prepare-audit-cache.sh database')
-        && /JAR=\$\{ZOE_RTDB_JAR:\?/.test(audit));
+    const preparation = read('tools/actions-runners/prepare-audit-cache.sh'), runner = read('audit-tools/run-all.sh'), owner = read('audit-tools/owned-rtdb-command.js');
+    check('runner ទាំង ៤ mount binary cache រួម និង workflow ត្រៀមមុនទាញ', auditCacheWiring(audit, compose, preparation, runner, owner));
+    const mutations = [
+        ['cache mount ខ្វះត្រូវបដិសេធ', audit, compose.replace('audit-binaries:/opt/zoe-cache', 'missing:/opt/zoe-cache'), preparation, runner, owner],
+        ['comment មិនជំនួស init command', audit.replace('run: bash tools/actions-runners/prepare-audit-cache.sh init', '# run: bash tools/actions-runners/prepare-audit-cache.sh init'), compose, preparation, runner, owner],
+        ['database preparation ខ្វះត្រូវបដិសេធ', audit.replace('run: bash tools/actions-runners/prepare-audit-cache.sh database', 'run: echo database'), compose, preparation, runner, owner],
+        ['database preparation ក្រោយ run-all មិនត្រឹមត្រូវ', audit.replace('run: bash tools/actions-runners/prepare-audit-cache.sh database', 'run: echo database') + '\nrun: bash tools/actions-runners/prepare-audit-cache.sh database\n', compose, preparation, runner, owner],
+        ['JAR export ខ្វះត្រូវបដិសេធ', audit, compose, preparation.replace('ZOE_RTDB_JAR=', 'OTHER_JAR='), runner, owner],
+        ['owned wrapper ខ្វះត្រូវបដិសេធ', audit, compose, preparation, runner.replace('node audit-tools/owned-rtdb-command.js --state', 'node audit-tools/other.js --state'), owner],
+        ['owner មិនប្រើ prepared JAR ត្រូវបដិសេធ', audit, compose, preparation, runner, owner.replace('env.ZOE_RTDB_JAR', 'env.OTHER_JAR')],
+        ['global JVM មិនជំនួស owned lifecycle', audit + '\nrun: java -jar existing.jar --port 9000\n', compose, preparation, runner, owner],
+        ['database download lock ខ្វះត្រូវបដិសេធ', audit, compose, preparation.replace(/flock 9/g, 'echo unlocked'), runner, owner],
+        ['chromium download lock ខ្វះត្រូវបដិសេធ', audit, compose, preparation.replace('flock "$CACHE/.chromium.lock" npx', 'npx'), runner, owner],
+        ['chromium lock ផ្សេងមិនជំនួស shared lock', audit, compose, preparation.replace('flock "$CACHE/.chromium.lock" npx', 'flock "$CACHE/foreign.lock" npx'), runner, owner]
+    ];
+    for (const [label, ...inputs] of mutations) check(label, !auditCacheWiring(...inputs));
     check('មាន helper សម្រាប់វាស់ការទាញពិតជាមួយ fixture', fs.existsSync(script));
     if (!fs.existsSync(script)) return;
     const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe shared cache '));

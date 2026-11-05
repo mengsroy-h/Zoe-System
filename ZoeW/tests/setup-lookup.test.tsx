@@ -440,6 +440,74 @@ describe('Setup Lookup ៖ កូដលក់ពិត ➜ កូដទទួល
             expect(h.ctx.lastGeneratedSetupLink).toBe('');
         }
     });
+    it('⛔ A504 ៖ Link វែងពេកសម្រាប់ QR (qrcode.js ពិត) ➜ Link + កូដនៅប្រើបាន · ប្រាប់ឲ្យចម្លង Link · គ្មានសារ «មិនអាចបង្កើត» · key Apps Script ដកចេញពីវាលដដែល', async () => {
+        const qrSource = readFileSync(resolve(__dirname, '../../ZoeKeyGen/qrcode.js'), 'utf8');
+        const qrFns = ast.body.filter((n: any) => n.type === 'FunctionDeclaration' && ['makeQrCode', 'renderQrInto'].includes(n.id.name));
+        expect(qrFns.length).toBe(2);
+        const realQr = (h: any) => {
+            h.ctx.window = h.ctx;
+            runInNewContext(qrSource + '\n' + qrFns.map((n: any) => source.slice(n.start, n.end)).join('\n'), h.ctx);
+            return h;
+        };
+        const short = realQr(producerHarness());
+        await short.ctx.generateLookupSetupLink();
+        expect(short.ctx.alert).not.toHaveBeenCalled();
+        expect(short.element('setupLinkQrContainer').innerHTML, 'ទិសផ្ទុយ ៖ Link ខ្លី ➜ QR ពិត').toMatch(/^<svg/);
+        expect(short.ctx.showToast.mock.calls.map((c: any) => c[0]).join(), 'ទិសផ្ទុយ ៖ Link ខ្លីមិនព្រមាន QR').not.toMatch(/QR/);
+        const longSecret = 'Bearer ' + 'k'.repeat(1900);
+        const long = realQr(producerHarness());
+        long.element('setupLookupSecretInput').value = longSecret;
+        await long.ctx.generateLookupSetupLink();
+        const link = long.ctx.lastGeneratedSetupLink;
+        expect(link.length, 'លក្ខខណ្ឌចាំបាច់ ៖ Link លើសសមត្ថភាព QR').toBeGreaterThan(2331);
+        expect(long.ctx.alert, 'Link + កូដត្រឹមត្រូវ ➜ មិនប្រាប់ថា «មិនអាចបង្កើត Setup Link»').not.toHaveBeenCalled();
+        expect(long.element('setupLinkResultText').textContent).toBe(link);
+        const code = long.element('setupLookupCodeOutput').textContent.match(CODE_RE)[0];
+        expect(await decryptSetupLookup(decodeSetupPayload(linkSetup(link)).lookup, code)).toBe(longSecret);
+        expect(long.element('setupLinkQrContainer').innerHTML, 'គ្មាន QR ចាស់ ឬ QR ពាក់កណ្ដាល').toBe('');
+        expect(long.ctx.showToast.mock.calls.map((c: any) => c[0]).join(), 'ប្រាប់ឲ្យចម្លង Link ជំនួស QR').toMatch(/QR[\s\S]*ចម្លង Link/);
+        const keyedLong = 'https://script.google.com/macros/s/' + 'A'.repeat(2600) + '/exec?code={barcode}&key=SHEETKEY99';
+        const apps = realQr(producerHarness());
+        apps.element('setupLookupUrlInput').value = keyedLong;
+        apps.element('setupLookupHeaderInput').value = '';
+        apps.element('setupLookupSecretInput').value = '';
+        await apps.ctx.generateLookupSetupLink();
+        expect(apps.ctx.alert).not.toHaveBeenCalled();
+        expect(apps.ctx.lastGeneratedSetupLink.length).toBeGreaterThan(2331);
+        expect(apps.element('setupLinkQrContainer').innerHTML).toBe('');
+        expect(apps.element('setupLookupUrlInput').value, 'QR បរាជ័យ ➜ key នៅតែដកចេញពីវាល URL').toBe(keyedLong.replace('&key=SHEETKEY99', ''));
+        expect(apps.ctx.showToast.mock.calls.map((c: any) => c[0]).join()).toMatch(/Apps Script/);
+        const sealedKey = await decryptSetupLookup(decodeSetupPayload(linkSetup(apps.ctx.lastGeneratedSetupLink)).lookup, apps.element('setupLookupCodeOutput').textContent.match(CODE_RE)[0]);
+        expect(sealedKey).toBe('SHEETKEY99');
+    });
+    it('⛔ A505 ៖ QR បង្កើតមិនបាន (Link វែង · qrcode.js ពិត) ➜ ប៊ូតុង «💾 រក្សាទុក QR» ពិតលាក់ (ចុចមិនបាន ➜ គ្មាន ❌ · គ្មាន Sentry) · Link ខ្លីបន្ទាប់ ➜ ប៊ូតុងលេចវិញ', async () => {
+        const html = readFileSync(resolve(__dirname, '../../ZoeKeyGen/index.html'), 'utf8');
+        const saveButton = (html.match(/<button[^>]*data-act="saveSetupLinkQr"[^>]*>/) || [''])[0];
+        expect(saveButton, 'លក្ខខណ្ឌចាំបាច់ ៖ ប៊ូតុងរក្សាទុក QR របស់ Setup Link មាន id ដែលកូដបិទ/បើក').toMatch(/\bid="setupLinkQrSaveBtn"/);
+        const qrSource = readFileSync(resolve(__dirname, '../../ZoeKeyGen/qrcode.js'), 'utf8');
+        const qrFns = ast.body.filter((n: any) => n.type === 'FunctionDeclaration' && ['makeQrCode', 'renderQrInto'].includes(n.id.name));
+        const h = producerHarness();
+        h.ctx.window = h.ctx;
+        runInNewContext(qrSource + '\n' + qrFns.map((n: any) => source.slice(n.start, n.end)).join('\n'), h.ctx);
+        const classes = new Set<string>();
+        Object.assign(h.element('setupLinkQrSaveBtn'), { classList: {
+            add: (name: string) => { classes.add(name); }, remove: (name: string) => { classes.delete(name); },
+            toggle: (name: string, force?: boolean) => { const on = force === undefined ? !classes.has(name) : force; if (on) classes.add(name); else classes.delete(name); return on; },
+            contains: (name: string) => classes.has(name) } });
+        await h.ctx.generateLookupSetupLink();
+        expect(h.element('setupLinkQrContainer').innerHTML, 'លក្ខខណ្ឌចាំបាច់ ៖ Link ខ្លី ➜ QR ពិត').toMatch(/^<svg/);
+        expect(classes.has('hidden'), 'Link ខ្លី ➜ ប៊ូតុងរក្សាទុក QR បង្ហាញ').toBe(false);
+        h.element('setupLookupSecretInput').value = 'Bearer ' + 'k'.repeat(1900);
+        await h.ctx.generateLookupSetupLink();
+        expect(h.ctx.lastGeneratedSetupLink.length, 'លក្ខខណ្ឌចាំបាច់ ៖ Link លើសសមត្ថភាព QR').toBeGreaterThan(2331);
+        expect(h.element('setupLinkQrContainer').innerHTML).toBe('');
+        expect(classes.has('hidden'), '⛔ QR មិនមាន ➜ ប៊ូតុង «💾 រក្សាទុក QR» លាក់ (មុនកែ ៖ ចុចម្តងៗ ➜ «❌ រក្សាទុក QR មិនបាន!» + Sentry)').toBe(true);
+        h.element('setupLookupSecretInput').value = 'seller-private-header';
+        await h.ctx.generateLookupSetupLink();
+        expect(h.element('setupLinkQrContainer').innerHTML).toMatch(/^<svg/);
+        expect(classes.has('hidden'), 'Link ខ្លីបន្ទាប់ ➜ ប៊ូតុងរក្សាទុក QR លេចវិញ').toBe(false);
+        expect(h.ctx.alert).not.toHaveBeenCalled();
+    });
     it('សារបដិសេធ ZoeKeyGen និង README រាយពាក្យដូចការពិនិត្យពិត (lookupSetupSecretName)', () => {
         const kg = secretWordLists(source);
         const zw = secretWordLists(zoewSetupSource);

@@ -329,6 +329,7 @@ describe('ZTO-E6 ៖ របា «ZTO មិនទាន់បិទ» រលត�
     });
 
     it('closeZtoSignedBarcodes() មានតែ false (បញ្ជីបើក null) ➜ កត់ true · មិនបោះ', async () => {
+        dataState.scanHistory = [closedItem('closed', 'ZTE6K00002')];
         setZtoPickupVerdict('ZTE6K00002', false);
         const log = server(['ZTE6K00002']);
         const cfg = JSON.parse(appLocalStore.getItem('zoew_lookup_api_config')!);
@@ -352,6 +353,17 @@ describe('ZTO-E6 ៖ របា «ZTO មិនទាន់បិទ» រលត�
         const without = await run(false);
         expect(without, 'លក្ខខណ្ឌចាំបាច់ ៖ ជុំធម្មតាបិទកញ្ចប់បើកដែលមានក្នុងបញ្ជី').toEqual(['ZTE6N00001']);
         expect(await run(true)).toEqual(without);
+    });
+
+    it('ជុំ Sign បញ្ចប់ក្រោយបិទ current open ទោះមាន historical closed copy ដែល pending ដដែល', async () => {
+        dataState.scanHistory = [openItem('current', 'ZTE6COMPLETE', HOUR)];
+        dataState.deletedItems = [pickupTrash('historical', 'ZTE6COMPLETE', 3 * HOUR)];
+        setZtoPickupVerdict('ZTE6COMPLETE', false);
+        server(['ZTE6COMPLETE']);
+        await runZtoStatusSweep(false);
+        expect(h.calls.map((call) => call.code)).toEqual(['ZTE6COMPLETE']);
+        expect(verdictOf('ZTE6COMPLETE')).toBe(true);
+        expect(ztoState.ztoSignedCompleteAt).toBe(NOW);
     });
 
     it('⛔ ចម្លើយយឺតក្រោយចាកចេញ មិនកត់ true ចូលវគ្គថ្មី', async () => {

@@ -315,7 +315,11 @@ function usesApi(app, re) {
             if (hit || e.name === 'node_modules' || e.name.startsWith('.') || e.name === 'dist' || e.name.startsWith('dist-')) continue;
             const full = path.join(dir, e.name);
             if (e.isDirectory()) scan(full);
-            else if (/\.(js|ts|tsx)$/.test(e.name) && re.test(fs.readFileSync(full, 'utf8'))) hit = true;
+            else if (/\.(js|ts|tsx)$/.test(e.name)) {
+                let text = '';
+                try { text = fs.readFileSync(full, 'utf8'); } catch (readError) { continue; }
+                if (re.test(text)) hit = true;
+            }
         }
     })(path.join(ROOT, app));
     return hit;

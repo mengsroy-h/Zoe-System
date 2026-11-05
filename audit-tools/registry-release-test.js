@@ -92,7 +92,7 @@ function makeCtx(behaviour) {
     const ctx = {
         console, Math, JSON, Promise, setTimeout, clearTimeout, Object, Array, String, Number,
         parseFloat, parseInt, isNaN, isFinite, Date, Error, Map, Set, window: {},
-        db: {}, fb: {
+        db: {}, auth: null, fb: {
             ref: (_d, p) => ({ path: p }),
             update: (r, updates) => {
                 calls.push(Object.keys(updates));

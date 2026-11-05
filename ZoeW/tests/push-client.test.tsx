@@ -56,7 +56,7 @@ import {
     FCM_CHANNEL_ID, PUSH_STATE_KEY, PUSH_STATUS_TEXT, clearNotifications, consumePushOpenRequest, disablePush, enablePush, handleServiceWorkerMessage,
     pushNativeBuild, pushRuntime, pushSupport, refreshPushStatus, syncExpirySchedule, ensureNativePushListeners,
     togglePush, PUSH_TIMEOUT_MS, PUSH_NATIVE_REGISTER_TIMEOUT_MS, watchPushIdentity, resyncPush, b64urlToBytes,
-    PUSH_RESYNC_MS, PUSH_RESYNC_RETRY_MS
+    PUSH_RESYNC_MS, PUSH_RESYNC_RETRY_MS, resetPushScheduleSession
 } from '../src/features/push';
 import { closeSideDrawer } from '../src/ui/page-nav';
 import { NotifyDrawer } from '../src/app/components/NotifyDrawer';
@@ -73,7 +73,7 @@ function jsonResponse(data: unknown, status = 200) {
     return new Response(JSON.stringify(data), { status });
 }
 
-function stubServer(opts: { config?: any; subscribe?: any; configStatus?: number } = {}) {
+function stubServer(opts: { config?: any; subscribe?: any; unsubscribe?: any; configStatus?: number } = {}) {
     vi.stubGlobal('fetch', vi.fn(async (url: string, init: any = {}) => {
         const op = new URL(url, 'https://x.invalid/').searchParams.get('op') || '';
         order.push('fetch:' + op);
@@ -81,6 +81,7 @@ function stubServer(opts: { config?: any; subscribe?: any; configStatus?: number
         const body = init.body ? JSON.parse(init.body) : null;
         posts.push({ op, body });
         if (op === 'subscribe' && opts.subscribe) return jsonResponse(opts.subscribe.body, opts.subscribe.status);
+        if (op === 'unsubscribe' && opts.unsubscribe) return jsonResponse(opts.unsubscribe.body, opts.unsubscribe.status);
         return jsonResponse({ ok: true });
     }));
 }
@@ -115,7 +116,7 @@ beforeEach(() => {
     posts.length = 0;
     try { localStorage.clear(); } catch {}
     uiState.pushStatus = 'unknown';
-    Object.assign(pushRuntime, { nativeListeners: false, nativeEnabling: false, nativeWanted: false, scheduleAttemptAt: 0, scheduleInFlight: false, nativePendingToken: '', webKeyChecked: false });
+    Object.assign(pushRuntime, { nativeListeners: false, nativeEnabling: false, nativeWanted: false, scheduleAttemptAt: 0, scheduleInFlight: false, nativePendingToken: '', webKeyChecked: false, offSends: new Set() });
     pushNativeBuild.fcm = true;
     setLicense(LICENSE);
     delete (window as any).Capacitor;
@@ -519,6 +520,211 @@ describe('APK (FCM)', () => {
     });
 });
 
+describe('⛔ APK ៖ បិទការជូនដំណឹង ខណៈ Server មិនទាន់ទទួល ➜ ស្ថានភាពនិយាយការពិត · App ផ្ញើការបិទម្តងទៀតរហូត Server បញ្ជាក់', () => {
+    // plugin Capacitor `unregister()` ហៅ `deleteToken()` ដោយមិនរង់ចាំ ហើយ resolve ភ្លាម ➜ ក្រៅបណ្តាញ token FCM នៅមានសុពលភាព។
+    // មុនកែ App មិនមើលចម្លើយ `unsubscribe` លុប token ចេញ ហើយប្រកាស «បិទ» ➜ ការរំលឹក ៨ ព្រឹក និងដំណឹងអ្នកលក់នៅលោតមក ខណៈ 🔔 ថា «បិទ»
+    // ហើយគ្មានផ្លូវណាសាកម្តងទៀត (resync ឈប់ពេល `on` = false · token ថ្មីមិនទទួលពេលមិនចង់បាន)។
+    const TOKEN = 'fcmToken:' + 'o'.repeat(40);
+    let online = true;
+    function saved() {
+        return JSON.parse(localStorage.getItem(PUSH_STATE_KEY) || '{}');
+    }
+    function unsubscribes() {
+        return posts.filter((p) => p.op === 'unsubscribe' && p.body && p.body.sub && p.body.sub.token === TOKEN).length;
+    }
+    function failNetwork() {
+        vi.stubGlobal('fetch', vi.fn(async (url: string, init: any = {}) => {
+            const op = new URL(url, 'https://x.invalid/').searchParams.get('op') || '';
+            posts.push({ op, body: init.body ? JSON.parse(init.body) : null });
+            throw new TypeError('Failed to fetch');
+        }));
+    }
+    async function pushOn() {
+        stubServer();
+        expect(await enablePush()).toBe(true);
+        await pn.listeners.registration({ value: TOKEN });
+        await vi.waitFor(() => expect(uiState.pushStatus).toBe('on'));
+        posts.length = 0;
+    }
+    beforeEach(() => {
+        online = true;
+        Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => online });
+        (window as any).Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' };
+        pn.register.mockClear();
+        pn.unregister.mockClear();
+        pn.createChannel.mockClear();
+    });
+    afterEach(() => {
+        delete (window.navigator as any).onLine;
+    });
+
+    it('បិទក្រៅបណ្តាញ ➜ មិនប្រកាស «បិទ» ធម្មតា · token នៅរង់ចាំ · ក្រៅបណ្តាញ resync មិនផ្ញើ · អ៊ីនធឺណិតមកវិញ ➜ unsubscribe token នោះ ➜ «បិទ»', async () => {
+        await pushOn();
+        online = false;
+        failNetwork();
+        expect(await disablePush()).toBe(true);
+        expect(pn.unregister).toHaveBeenCalled();
+        expect(uiState.pushStatus).not.toBe('off');
+        expect(uiState.pushStatus).toBe('off-pending');
+        expect(saved()).toMatchObject({ on: false, offToken: TOKEN });
+        refreshPushStatus();
+        expect(uiState.pushStatus).toBe('off-pending');
+        const tried = posts.length;
+        expect(await resyncPush()).toBe(false);
+        expect(posts.length).toBe(tried);
+        online = true;
+        stubServer();
+        posts.length = 0;
+        expect(await resyncPush()).toBe(true);
+        expect(unsubscribes()).toBe(1);
+        expect(uiState.pushStatus).toBe('off');
+        expect(saved().offToken).toBe('');
+        expect(await resyncPush()).toBe(false);
+        expect(unsubscribes()).toBe(1);
+        await pn.listeners.registration({ value: TOKEN });
+        await new Promise((r) => setTimeout(r, 0));
+        expect(posts.filter((p) => p.op === 'subscribe').length).toBe(0);
+        expect(uiState.pushStatus).toBe('off');
+    });
+
+    it('Server ឆ្លើយបដិសេធ ➜ រង់ចាំ PUSH_RESYNC_RETRY_MS (មិនសាករាល់ visibilitychange) · បណ្តាញស្លាប់ (គ្មានចម្លើយ) ➜ សាកនៅដំណើរបន្ទាប់ភ្លាម', async () => {
+        await pushOn();
+        failNetwork();
+        expect(await disablePush()).toBe(true);
+        expect(uiState.pushStatus).toBe('off-pending');
+        posts.length = 0;
+        expect(await resyncPush()).toBe(false);
+        expect(unsubscribes()).toBe(1);
+        stubServer({ unsubscribe: { status: 500, body: { ok: false, reason: 'error' } } });
+        expect(await resyncPush()).toBe(false);
+        expect(unsubscribes()).toBe(2);
+        expect(await resyncPush()).toBe(false);
+        expect(unsubscribes()).toBe(2);
+        expect(uiState.pushStatus).toBe('off-pending');
+        stubServer();
+        localStorage.setItem(PUSH_STATE_KEY, JSON.stringify(Object.assign(saved(), { offFailedAt: Date.now() - PUSH_RESYNC_RETRY_MS - 1000 })));
+        expect(await resyncPush()).toBe(true);
+        expect(unsubscribes()).toBe(3);
+        expect(uiState.pushStatus).toBe('off');
+        expect(saved().offToken).toBe('');
+    });
+
+    it('⛔ ចុចបើកវិញ (token ដដែល) ខណៈ unsubscribe ដែលរង់ចាំកំពុងផ្ញើ ➜ register រង់ចាំវាចប់សិន · subscribe ជោគជ័យលុបការរង់ចាំ ➜ resync ក្រោយមិន unsubscribe ការចុះឈ្មោះដែលទើបបើក', async () => {
+        await pushOn();
+        failNetwork();
+        expect(await disablePush()).toBe(true);
+        expect(saved().offToken).toBe(TOKEN);
+        let release: (r: Response) => void = () => {};
+        vi.stubGlobal('fetch', vi.fn((url: string, init: any = {}) => {
+            const op = new URL(url, 'https://x.invalid/').searchParams.get('op') || '';
+            posts.push({ op, body: init.body ? JSON.parse(init.body) : null });
+            if (op === 'unsubscribe') return new Promise<Response>((r) => { release = r; });
+            return Promise.resolve(jsonResponse({ ok: true }));
+        }));
+        posts.length = 0;
+        const retry = resyncPush();
+        await vi.waitFor(() => expect(unsubscribes()).toBe(1));
+        expect(await resyncPush()).toBe(false);
+        expect(unsubscribes()).toBe(1);
+        pn.register.mockClear();
+        const enabling = togglePush();
+        await vi.waitFor(() => expect(pn.createChannel).toHaveBeenCalled());
+        for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0));
+        expect(pn.register).not.toHaveBeenCalled();
+        release(jsonResponse({ ok: true }));
+        expect(await retry).toBe(true);
+        expect(await enabling).toBe(true);
+        expect(pn.register).toHaveBeenCalledTimes(1);
+        await pn.listeners.registration({ value: TOKEN });
+        await vi.waitFor(() => expect(uiState.pushStatus).toBe('on'));
+        expect(saved()).toMatchObject({ on: true, token: TOKEN, offToken: '' });
+        posts.length = 0;
+        expect(await resyncPush()).toBe(false);
+        expect(posts.filter((p) => p.op === 'unsubscribe').length).toBe(0);
+    });
+
+    it('⛔ ចុចបើកវិញខណៈការបិទរង់ចាំ តែ subscribe ធ្លាក់ ➜ App នៅចង់បើក (token យឺតអាចមក) ➜ resync មិនផ្ញើ unsubscribe ប្រជែង · token យឺតជោគជ័យ ➜ «បើក» ហើយលុបការរង់ចាំ', async () => {
+        await pushOn();
+        failNetwork();
+        expect(await disablePush()).toBe(true);
+        expect(saved().offToken).toBe(TOKEN);
+        stubServer({ subscribe: { status: 503, body: { ok: false, reason: 'fcm:unset' } } });
+        expect(await togglePush()).toBe(true);
+        await pn.listeners.registration({ value: TOKEN });
+        await vi.waitFor(() => expect(uiState.pushStatus).toBe('server-off'));
+        posts.length = 0;
+        expect(await resyncPush()).toBe(false);
+        expect(unsubscribes()).toBe(0);
+        stubServer();
+        await pn.listeners.registration({ value: TOKEN });
+        await vi.waitFor(() => expect(uiState.pushStatus).toBe('on'));
+        expect(saved()).toMatchObject({ on: true, token: TOKEN, offToken: '' });
+        expect(unsubscribes()).toBe(0);
+    });
+
+    it('⛔ បិទខណៈ token កំពុងចុះឈ្មោះ ➜ subscribe យឺតជោគជ័យ ➜ unsubscribe សងវិញធ្លាក់ ➜ token នៅរង់ចាំ · ស្ថានភាពនិយាយការពិត ➜ សាកម្តងទៀតរហូត Server បញ្ជាក់', async () => {
+        localStorage.setItem(PUSH_STATE_KEY, JSON.stringify({ on: true, kind: 'fcm', token: TOKEN, syncedAt: 1, schedSig: '', schedAt: 0 }));
+        uiState.pushStatus = 'on';
+        let release: (v: Response) => void = () => {};
+        let net = true;
+        vi.stubGlobal('fetch', vi.fn((url: string, init: any = {}) => {
+            const op = new URL(url, 'https://x.invalid/').searchParams.get('op') || '';
+            posts.push({ op, body: init.body ? JSON.parse(init.body) : null });
+            if (op === 'subscribe') return new Promise<Response>((r) => { release = r; });
+            if (!net) return Promise.reject(new TypeError('Failed to fetch'));
+            return Promise.resolve(jsonResponse({ ok: true }));
+        }));
+        await ensureNativePushListeners();
+        pn.listeners.registration({ value: TOKEN });
+        await vi.waitFor(() => expect(posts.some((x) => x.op === 'subscribe')).toBe(true));
+        expect(await disablePush()).toBe(true);
+        expect(uiState.pushStatus).toBe('off');
+        net = false;
+        release(jsonResponse({ ok: true }));
+        await vi.waitFor(() => expect(unsubscribes()).toBe(2));
+        await vi.waitFor(() => expect(uiState.pushStatus).toBe('off-pending'));
+        expect(saved()).toMatchObject({ on: false, offToken: TOKEN });
+        net = true;
+        expect(await resyncPush()).toBe(true);
+        expect(unsubscribes()).toBe(3);
+        expect(uiState.pushStatus).toBe('off');
+        expect(saved().offToken).toBe('');
+    });
+
+    it('⛔ ចម្លើយ ok របស់ unsubscribe ដែលផ្ញើមុន subscribe យឺតជោគជ័យ មិនលុបការរង់ចាំថ្មី (server អាចដំណើរការវាមុន subscribe) ➜ នៅរង់ចាំ ➜ សាកម្តងទៀត', async () => {
+        localStorage.setItem(PUSH_STATE_KEY, JSON.stringify({ on: true, kind: 'fcm', token: TOKEN, syncedAt: 1, schedSig: '', schedAt: 0 }));
+        uiState.pushStatus = 'on';
+        let releaseSub: (v: Response) => void = () => {};
+        let releaseFirstOff: (v: Response) => void = () => {};
+        let net = true;
+        vi.stubGlobal('fetch', vi.fn((url: string, init: any = {}) => {
+            const op = new URL(url, 'https://x.invalid/').searchParams.get('op') || '';
+            posts.push({ op, body: init.body ? JSON.parse(init.body) : null });
+            if (op === 'subscribe') return new Promise<Response>((r) => { releaseSub = r; });
+            if (op === 'unsubscribe' && unsubscribes() === 1) return new Promise<Response>((r) => { releaseFirstOff = r; });
+            if (!net) return Promise.reject(new TypeError('Failed to fetch'));
+            return Promise.resolve(jsonResponse({ ok: true }));
+        }));
+        await ensureNativePushListeners();
+        pn.listeners.registration({ value: TOKEN });
+        await vi.waitFor(() => expect(posts.some((x) => x.op === 'subscribe')).toBe(true));
+        const off = disablePush();
+        await vi.waitFor(() => expect(unsubscribes()).toBe(1));
+        net = false;
+        releaseSub(jsonResponse({ ok: true }));
+        await vi.waitFor(() => expect(unsubscribes()).toBe(2));
+        await new Promise((r) => setTimeout(r, 0));
+        releaseFirstOff(jsonResponse({ ok: true }));
+        expect(await off).toBe(true);
+        expect(uiState.pushStatus).toBe('off-pending');
+        expect(saved()).toMatchObject({ on: false, offToken: TOKEN });
+        net = true;
+        expect(await resyncPush()).toBe(true);
+        expect(unsubscribes()).toBe(3);
+        expect(uiState.pushStatus).toBe('off');
+    });
+});
+
 describe('⛔ ការព្យួរ ≠ ការធ្លាក់ ៖ ស្ថានភាព «កំពុងភ្ជាប់» មិនត្រូវជាប់ជារៀងរហូត', () => {
     beforeEach(() => { vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] }); });
     afterEach(() => { vi.useRealTimers(); });
@@ -861,6 +1067,18 @@ describe('ផ្ទាំង 🔔 ៖ ផ្នែក «ជូនដំណឹង
         const icon = (document.querySelector('#notifyPushSection .notify-section-title')!.textContent || '').trim().split(' ')[0];
         for (const text of Object.values(PUSH_STATUS_TEXT)) expect(text.startsWith(icon), text).toBe(false);
     });
+
+    it('off-pending ➜ ការព្រមានថា Server មិនទាន់បញ្ជាក់ការបិទ (មិនមែនសារ «បិទ») · ប៊ូតុងបើកនៅចុចបាន', () => {
+        vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ items: [] })));
+        uiState.pushStatus = 'off-pending';
+        mount(<NotifyDrawer />);
+        const status = document.getElementById('notifyPushStatus')!;
+        expect(PUSH_STATUS_TEXT['off-pending']).toMatch(/Server/);
+        expect(status.textContent).toBe(PUSH_STATUS_TEXT['off-pending']);
+        expect(status.textContent).not.toBe(PUSH_STATUS_TEXT.off);
+        expect(status.className).toContain('is-warn');
+        expect(document.getElementById('notifyPushBtn')!.textContent).toContain('បើក');
+    });
 });
 
 describe('Service Worker ៖ push · notificationclick', () => {
@@ -1080,6 +1298,98 @@ describe('⛔ Push ជារបស់ហាង (សំណើម្ចាស់�
         expect(posts.filter((p) => p.op === 'subscribe').length).toBe(2);
     });
 
+    // ⛔ ពិដាន PUSH_RESYNC_RETRY_MS ជារបស់ហាងដែលការចុះឈ្មោះធ្លាក់ ៖ មុនកែ `failedAt` របស់ហាង A បិទការចុះឈ្មោះហាង B ១៥ នាទី
+    // ➜ server រក្សា `keyId` ហាង A (`subscribe` ទើបផ្លាស់វា) ➜ ការរំលឹក ៨ ព្រឹករបស់ហាង A មកឧបករណ៍ដែលកំពុងប្រើហាង B ហើយរបស់ហាង B មិនមក ·
+    // resync រត់តែពេល boot · visibilitychange · ចូលប្រព័ន្ធ ➜ ឧបករណ៍នៅតុដែលបើកជានិច្ចអាចចងខុសហាងរាប់ម៉ោង។
+    it('⛔ web · Supabase ៖ resync ហាង A ធ្លាក់ (failedAt) ➜ ចូលហាង B ក្នុងចន្លោះសាកឡើងវិញ ➜ ចុះឈ្មោះក្រោមហាង B ភ្លាម · កាលវិភាគហាង B ផ្ញើ', async () => {
+        stubServer({ subscribe: { status: 503, body: { ok: false, reason: 'supabase:unreachable' } } });
+        webSubscribed();
+        sbShop('tenant-a');
+        saveOn({ shop: SB + '#tenant-a', syncedAt: Date.now() - PUSH_RESYNC_MS - 1000 });
+        refreshPushStatus();
+        expect(await resyncPush()).toBe(false);
+        expect(saved().failedAt).toBeGreaterThan(saved().syncedAt);
+        stubServer();
+        sbShop('tenant-b');
+        refreshPushStatus();
+        expect(await resyncPush()).toBe(true);
+        expect(posts.filter((p) => p.op === 'subscribe').map((p) => p.body.supabase)).toEqual(['tok-tenant-a', 'tok-tenant-b']);
+        expect(saved().shop).toBe(SB + '#tenant-b');
+        await vi.waitFor(() => expect(posts.filter((p) => p.op === 'schedule').length).toBe(1));
+        expect(posts.find((p) => p.op === 'schedule')!.body.supabase).toBe('tok-tenant-b');
+    });
+
+    it('⛔ failedAt ដែលមិនកត់ហាងរបស់ការធ្លាក់ (ការកំណត់ពីមុន) ជារបស់ហាងដែលចុះឈ្មោះ ➜ ប្តូរហាង ➜ web ចុះឈ្មោះភ្លាម', async () => {
+        stubServer();
+        webSubscribed();
+        sbShop('tenant-a');
+        saveOn({ shop: SB + '#tenant-a', failedAt: Date.now() - 30000 });
+        sbShop('tenant-b');
+        refreshPushStatus();
+        expect(await resyncPush()).toBe(true);
+        expect(posts.filter((p) => p.op === 'subscribe').map((p) => p.body.supabase)).toEqual(['tok-tenant-b']);
+        expect(saved().shop).toBe(SB + '#tenant-b');
+    });
+
+    it('⛔ APK · Supabase ៖ failedAt របស់ហាង A ➜ ចូលហាង B ➜ PN.register ភ្លាម ➜ token ចុះឈ្មោះក្រោមហាង B', async () => {
+        (window as any).Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' };
+        stubServer();
+        sbShop('tenant-a');
+        saveOn({ kind: 'fcm', token: FCM, shop: SB + '#tenant-a', failedAt: Date.now() - 30000 });
+        sbShop('tenant-b');
+        refreshPushStatus();
+        const before = pn.register.mock.calls.length;
+        expect(await resyncPush()).toBe(true);
+        expect(pn.register.mock.calls.length).toBe(before + 1);
+        await ensureNativePushListeners();
+        await pn.listeners.registration({ value: FCM });
+        await vi.waitFor(() => expect(posts.filter((p) => p.op === 'subscribe').length).toBe(1));
+        expect(posts.find((p) => p.op === 'subscribe')!.body.supabase).toBe('tok-tenant-b');
+        await vi.waitFor(() => expect(saved().shop).toBe(SB + '#tenant-b'));
+    });
+
+    it('⛔ APK ៖ token ចុះឈ្មោះក្រោមហាង B ធ្លាក់ ➜ ការធ្លាក់ជារបស់ហាង B ➜ resync មិន register រាល់ visibilitychange (រង់ចាំ PUSH_RESYNC_RETRY_MS)', async () => {
+        (window as any).Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' };
+        stubServer({ subscribe: { status: 503, body: { ok: false, reason: 'supabase:unreachable' } } });
+        sbShop('tenant-a');
+        saveOn({ kind: 'fcm', token: FCM, shop: SB + '#tenant-a' });
+        sbShop('tenant-b');
+        refreshPushStatus();
+        const before = pn.register.mock.calls.length;
+        expect(await resyncPush()).toBe(true);
+        await ensureNativePushListeners();
+        await pn.listeners.registration({ value: FCM });
+        await vi.waitFor(() => expect(saved().failedAt).toBeGreaterThan(saved().syncedAt));
+        expect(saved().failedShop).toBe(SB + '#tenant-b');
+        expect(await resyncPush()).toBe(false);
+        expect(await resyncPush()).toBe(false);
+        expect(pn.register.mock.calls.length).toBe(before + 1);
+        localStorage.setItem(PUSH_STATE_KEY, JSON.stringify(Object.assign(saved(), { failedAt: Date.now() - PUSH_RESYNC_RETRY_MS - 1000 })));
+        expect(await resyncPush()).toBe(true);
+        expect(pn.register.mock.calls.length).toBe(before + 2);
+    });
+
+    it('⛔ ហាង B ចុះឈ្មោះធ្លាក់ ➜ ត្រឡប់ហាង A ➜ ចុះឈ្មោះក្រោមហាង A ឡើងវិញភ្លាម (សំណើហាង B អាចដល់ server ទោះចម្លើយធ្លាក់) · control ៖ ការធ្លាក់របស់ហាង A ខ្លួនឯង ➜ រង់ចាំ PUSH_RESYNC_RETRY_MS', async () => {
+        stubServer({ subscribe: { status: 503, body: { ok: false, reason: 'supabase:unreachable' } } });
+        webSubscribed();
+        sbShop('tenant-a');
+        saveOn({ shop: SB + '#tenant-a' });
+        sbShop('tenant-b');
+        refreshPushStatus();
+        expect(await resyncPush()).toBe(false);
+        stubServer();
+        sbShop('tenant-a');
+        refreshPushStatus();
+        expect(await resyncPush()).toBe(true);
+        expect(posts.filter((p) => p.op === 'subscribe').map((p) => p.body.supabase)).toEqual(['tok-tenant-b', 'tok-tenant-a']);
+        expect(saved().shop).toBe(SB + '#tenant-a');
+        stubServer({ subscribe: { status: 503, body: { ok: false, reason: 'supabase:unreachable' } } });
+        localStorage.setItem(PUSH_STATE_KEY, JSON.stringify(Object.assign(saved(), { syncedAt: Date.now() - PUSH_RESYNC_MS - 1000 })));
+        expect(await resyncPush()).toBe(false);
+        expect(await resyncPush()).toBe(false);
+        expect(posts.filter((p) => p.op === 'subscribe').length).toBe(3);
+    });
+
     it('⛔ APK · Supabase ៖ ហាង A ➜ B ➜ PN.register ➜ token ចុះឈ្មោះដោយ token ហាង B · កត់ហាង B', async () => {
         (window as any).Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' };
         stubServer();
@@ -1108,5 +1418,77 @@ describe('⛔ Push ជារបស់ហាង (សំណើម្ចាស់�
         expect(posts.find((p) => p.op === 'subscribe')!.body.license).toBe(LICENSE);
         await vi.waitFor(() => expect(posts.filter((p) => p.op === 'schedule').length).toBe(1));
         expect(saved().shop).toBe(FB_B);
+    });
+});
+
+describe('busy ជាសោរបស់ flow ៖ identity ប្តូរកណ្តាល flow មិនទុក busy ជារៀងរហូត', () => {
+    it('web ៖ សិទ្ធិឆ្លើយក្រោយ identity ប្តូរ ➜ ស្ថានភាពត្រឡប់តាមការពិត ហើយចុចម្តងទៀតបាន', async () => {
+        const w = stubWebPush('granted');
+        stubServer();
+        let grant: (v: string) => void = () => {};
+        w.Notification.requestPermission = vi.fn(() => new Promise<string>((resolve) => { grant = resolve; }));
+        const first = enablePush();
+        expect(uiState.pushStatus).toBe('busy');
+        firebaseState.authGeneration++;
+        w.Notification.permission = 'granted';
+        grant('granted');
+        expect(await first).toBe(false);
+        expect(uiState.pushStatus).toBe('off');
+        w.Notification.requestPermission = vi.fn(() => Promise.resolve('granted'));
+        expect(await togglePush()).toBe(true);
+        expect(uiState.pushStatus).toBe('on');
+    });
+
+    it('web ៖ បិទ ហើយ identity ប្តូរកណ្តាល ➜ មិនជាប់ busy · ស្ថានភាពតាម subscription ដែលនៅ', async () => {
+        const w = stubWebPush('granted');
+        stubServer();
+        expect(await enablePush()).toBe(true);
+        let ready: (v: any) => void = () => {};
+        Object.defineProperty(window.navigator, 'serviceWorker', { configurable: true, value: { ready: new Promise((resolve) => { ready = resolve; }) } });
+        const off = disablePush();
+        expect(uiState.pushStatus).toBe('busy');
+        firebaseState.authGeneration++;
+        ready({ pushManager: w.pushManager });
+        expect(await off).toBe(false);
+        expect(uiState.pushStatus).toBe('on');
+        expect(JSON.parse(localStorage.getItem(PUSH_STATE_KEY)!).on).toBe(true);
+    });
+
+    it('APK ៖ identity ប្តូរខណៈ checkPermissions ➜ មិនជាប់ busy · register មិនត្រូវហៅ', async () => {
+        (window as any).Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' };
+        stubServer();
+        pn.register.mockClear();
+        let answer: (v: any) => void = () => {};
+        pn.checkPermissions.mockImplementationOnce(() => new Promise((resolve) => { answer = resolve; }));
+        const p = enablePush();
+        await vi.waitFor(() => expect(pn.checkPermissions).toHaveBeenCalled());
+        expect(uiState.pushStatus).toBe('busy');
+        firebaseState.authGeneration++;
+        answer({ receive: 'granted' });
+        expect(await p).toBe(false);
+        expect(uiState.pushStatus).toBe('off');
+        expect(pn.register).not.toHaveBeenCalled();
+        expect(pushRuntime.nativeEnabling).toBe(false);
+    });
+
+    it('control ៖ flow ចាស់ដែលបោះបង់ មិនដោះ busy របស់ flow ថ្មីជាង', async () => {
+        const w = stubWebPush('granted');
+        stubServer();
+        let grantOld: (v: string) => void = () => {};
+        w.Notification.requestPermission = vi.fn(() => new Promise<string>((resolve) => { grantOld = resolve; }));
+        const old = enablePush();
+        resetPushScheduleSession();
+        expect(uiState.pushStatus).toBe('off');
+        let grantNew: (v: string) => void = () => {};
+        w.Notification.requestPermission = vi.fn(() => new Promise<string>((resolve) => { grantNew = resolve; }));
+        const fresh = enablePush();
+        expect(uiState.pushStatus).toBe('busy');
+        grantOld('granted');
+        expect(await old).toBe(false);
+        expect(uiState.pushStatus).toBe('busy');
+        w.Notification.permission = 'granted';
+        grantNew('granted');
+        expect(await fresh).toBe(true);
+        expect(uiState.pushStatus).toBe('on');
     });
 });

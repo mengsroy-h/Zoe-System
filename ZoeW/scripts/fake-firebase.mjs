@@ -28,7 +28,16 @@ export const FAKE_SDK = function (seed) {
             cur = cur[parts[i]];
         }
         const last = parts[parts.length - 1];
-        if (v === null) delete cur[last];
+        if (v === null) {
+            delete cur[last];
+            for (let i = parts.length - 2; i >= 1; i--) {
+                let parent = data;
+                for (let j = 0; j < i; j++) parent = parent[parts[j]];
+                const node = parent[parts[i]];
+                if (node && typeof node === 'object' && !Object.values(node).some((x) => x !== undefined && x !== null)) delete parent[parts[i]];
+                else break;
+            }
+        }
         else if (v && typeof v === 'object' && v.__fakeIncrement !== undefined) cur[last] = (Number(cur[last]) || 0) + v.__fakeIncrement;
         else cur[last] = v;
     }

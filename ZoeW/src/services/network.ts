@@ -16,6 +16,7 @@ import { probeDatabaseLiveness } from './connection';
 import { captureConnectionOperation } from './connection-flow';
 import { warnPendingScans } from './scan-pending';
 import { resumePendingScanOperations } from './scan-operation';
+import { resumePriceOperations } from './price-operation';
 
 export function preconnectToOrigin(rawUrl) {
     try {
@@ -75,6 +76,7 @@ export const debouncedRenderAfterHistorySync = debounce(() => {
     resumePickupIntents();
     warnPendingScans();
     resumePendingScanOperations();
+    resumePriceOperations();
     refreshCurrentHistoryView();
     updateRecentPhonesList();
     refreshEntryPagePanels();

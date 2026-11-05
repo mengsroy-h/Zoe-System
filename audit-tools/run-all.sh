@@ -85,8 +85,10 @@ if [ -z "$ZOE_MEASURE_ROOT" ] && [ -f ZoeW/src/main.tsx ] && [ ! -f ZoeW/app.js 
     MEASURE="$REPO/ZoeW/dist-audit/measure-root"
     zoe_measure_root "$REPO" "$MEASURE" git || { echo "*** FAIL *** ផ្គុំ root វាស់មិនបាន"; exit 1; }
     BASE_MEASURE=""
+    IMPORTPAIRED_BASE_SOURCE=""
     if [ "${BASE:+set}" = set ] && [ -d "$BASE" ]; then
         BASE="$(cd "$BASE" && pwd)"
+        IMPORTPAIRED_BASE_SOURCE="$BASE"
         if [ -f "$BASE/ZoeW/src/main.tsx" ] && [ ! -f "$BASE/ZoeW/app.js" ]; then
             zoe_build_audit "$BASE" || exit 1
             BASE_MEASURE="$BASE/ZoeW/dist-audit/measure-root"
@@ -112,7 +114,7 @@ if [ -z "$ZOE_MEASURE_ROOT" ] && [ -f ZoeW/src/main.tsx ] && [ ! -f ZoeW/app.js 
     # ⛔ `ZOE_MEASURE_ONLY=1` ៖ ផ្គុំ root វាស់ហើយឈប់ (បន្ទាត់ចុងក្រោយ = ផ្លូវ) ➜ job ដែលរត់ checker
     #    ជាក់លាក់ (ឧ. `emu/*` ក្នុង `.github/workflows/audit.yml`) វាស់ tree ដដែលនឹង run-all
     if [ "$ZOE_MEASURE_ONLY" = 1 ]; then printf '%s\n' "$MEASURE"; exit 0; fi
-    export ZOE_MEASURE_ROOT="$MEASURE" ZOE_REPO_ROOT="$REPO" NODE_PATH="$ZOE_NODE_MODULES"
+    export ZOE_MEASURE_ROOT="$MEASURE" ZOE_REPO_ROOT="$REPO" NODE_PATH="$ZOE_NODE_MODULES" IMPORTPAIRED_BASE_SOURCE
     # checker កម្រិត repo ៖ git · ប្រភព React
     export ZOEWSUITE_APP_DIR="${ZOEWSUITE_APP_DIR:-$REPO}" REPOCOVER_APP_DIR="${REPOCOVER_APP_DIR:-$REPO}" \
         VERSIONSCOPE_GIT_DIR="${VERSIONSCOPE_GIT_DIR:-$REPO}" DOCSCACHE_APP_DIR="${DOCSCACHE_APP_DIR:-$REPO}" \
@@ -206,6 +208,43 @@ runall_script_of() {
     local a
     for a in "$@"; do case "$a" in audit-tools/*.js|zto-import/*.js) printf '%s' "$a"; return ;; esac; done
 }
+RUNALL_OWNED_DIR=''
+runall_needs_rtdb() {
+    case "$(runall_script_of "$@")" in
+        audit-tools/emu/import-paired-ci-runner.js) return 1 ;; # runner owns an RTDB scope per profile
+        audit-tools/emu/*|audit-tools/money-guardian-test.js|audit-tools/supabase-scan-rules-test.js|audit-tools/money-checker-truthfulness-test.js|audit-tools/checker-coverage.js|audit-tools/exit-code-integrity.js) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+runall_owned_init() {
+    [ -n "$RUNALL_OWNED_DIR" ] && return 0
+    RUNALL_OWNED_DIR="$(mktemp -d "${TMPDIR:-/tmp}/zoe-runall-owned.XXXXXX")"
+}
+runall_prepare_command() {
+    RUNALL_COMMAND=("$@")
+    if runall_needs_rtdb "$@"; then
+        RUNALL_COMMAND=(node audit-tools/owned-rtdb-command.js --state "$RUNALL_OWNED_DIR" -- "$@")
+    elif [ "$(runall_script_of "$@")" = audit-tools/emu/import-paired-ci-runner.js ]; then
+        # Runner owns the emulator; share the existing scheduler fence, never an outer owner.
+        RUNALL_COMMAND=(env "IMPORTPAIRED_OWNER_STATE=$RUNALL_OWNED_DIR" "$@")
+    fi
+}
+runall_owned() {
+    runall_owned_init || return 1
+    runall_prepare_command "$@"
+    "${RUNALL_COMMAND[@]}"
+}
+runall_cleanup_owned() {
+    [ -n "$RUNALL_OWNED_DIR" ] && [ -d "$RUNALL_OWNED_DIR" ] || return 0
+    if [ -d "$RUNALL_OWNED_DIR/active" ] || [ -f "$RUNALL_OWNED_DIR/blocked.json" ]; then
+        echo "FAIL owned RTDB cleanup unproven; evidence retained: $RUNALL_OWNED_DIR"
+        return 1
+    elif [ -f "$RUNALL_OWNED_DIR/failed.json" ] || [ -f "$RUNALL_OWNED_DIR/prototype-evidence.json" ]; then
+        echo "   owned RTDB evidence retained: $RUNALL_OWNED_DIR"
+    else
+        rm -rf "$RUNALL_OWNED_DIR"
+    fi
+}
 runall_timeout_for() {
     if [ -n "$RUNALL_TIMEOUT_OVERRIDE" ]; then printf '%s' "$RUNALL_TIMEOUT_OVERRIDE"; return; fi
     case "$(runall_script_of "$@")" in
@@ -218,7 +257,7 @@ runall_lane() {
     local s; s="$(runall_script_of "$@")"
     case "$s" in
         audit-tools/checker-coverage.js|audit-tools/exit-code-integrity.js) printf excl ;;
-        audit-tools/emu/*|audit-tools/money-guardian-test.js|audit-tools/supabase-scan-rules-test.js|audit-tools/money-checker-truthfulness-test.js) printf emu ;;
+        audit-tools/import-paired-ci-runner-test.js|audit-tools/emu/*|audit-tools/money-guardian-test.js|audit-tools/supabase-scan-rules-test.js|audit-tools/money-checker-truthfulness-test.js) printf emu ;;
         *) if [ -n "$s" ] && grep -q 'chromium\.launch(' "$s" 2>/dev/null; then printf browser; else printf any; fi ;;
     esac
 }
@@ -239,10 +278,26 @@ run() {
     runall_add job "$label" "$(printf '%q ' "$@")" "$(runall_lane "$@")" "${s%.js}" "$(runall_timeout_for "$@")"
 }
 
+# ⛔ កិច្ចសន្យា exit ៖ job `node …` នីមួយៗ preload `runall-exit-guard.cjs` ➜ exit code ចាប់ផ្តើម «មិនទាន់សម្រេច» ហើយ
+#    តែសេចក្តីសង្ខេបរបស់ checker (`process.exitCode = 0` · `process.exit(0)`) ទេដែលបន្ថយវា ➜ checker ដែល `await` promise
+#    ដែលមិនដែល settle (event loop ហូរអស់ ➜ Node ចេញ 0 ដោយការអះអាងមិនបានរត់) ក្លាយជា FAIL មិនមែន PASS។
+#    ⛔ ផ្លូវដាច់ខាត (មិនមែន `audit-tools/*.js`) ➜ `runall_script_of` · lane · owned scope នៅឃើញ checker ដដែល ·
+#    ឯកសារបាត់ ➜ node បរាជ័យ ➜ FAIL (មិនដែលរត់ដោយគ្មានកិច្ចសន្យាស្ងាត់ៗ)។
+#    `RUNALL_JOB_TIMEOUT` (ពិដាន job នេះ · DURATION ដូច `timeout`) + `RUNALL_JOB_STARTED_MS` (ពេលចាប់ផ្តើម ms) ➜ meta-checker ដែលបើក
+#    កូនច្រើន (exit-code-integrity) ចែកពេលរបស់ខ្លួនតាម deadline ពិត ជំនួសថវិកាថេរ។
+RUNALL_EXIT_GUARD="$PWD/audit-tools/runall-exit-guard.cjs"
 runall_exec() {  # <i> — រត់ក្នុង subshell ៖ output ➜ <i>.out · pid ➜ <i>.pid · «rc ms» ➜ <i>.rc (atomic)
     local i="$1" rc=0 t0 pid
     local CHECKER_TIMEOUT="${J_TIMEOUT[$i]}"
     eval "set -- ${J_CMD[$i]}"
+    if [ "${1:-}" = node ]; then
+        shift
+        set -- node --require "$RUNALL_EXIT_GUARD" "$@"
+        export ZOE_RUNALL_EXIT_GUARD=1
+    fi
+    export RUNALL_JOB_TIMEOUT="$CHECKER_TIMEOUT" RUNALL_JOB_STARTED_MS="$(runall_now_ms)"
+    runall_prepare_command "$@"
+    set -- "${RUNALL_COMMAND[@]}"
     t0="$(runall_now_ms)"
     if [ "$HAS_TIMEOUT" = 1 ]; then
         timeout -k 10 "$CHECKER_TIMEOUT" "$@" > "$RUNALL_DIR/$i.out" 2>&1 < /dev/null &
@@ -258,17 +313,23 @@ runall_exec() {  # <i> — រត់ក្នុង subshell ៖ output ➜ <i>.
 
 runall_judge() {  # <i> — សាលក្រមដូច run() ជាជួរជំនាន់មុនបេះបិទ ៖ PASS · PARTIAL · SKIPPED · FAIL · ព្យួរ
     local i="$1" rc='' ms='' n skip_line out
+    out="$RUNALL_DIR/$i.out"
     [ -f "$RUNALL_DIR/$i.rc" ] && read -r rc ms < "$RUNALL_DIR/$i.rc"
-    out="$(cat "$RUNALL_DIR/$i.out" 2>/dev/null)"
+    # ⛔ អានជាឯកសារដោយ grep/sed/tr (ពេលលីនេអ៊ែរ) — កុំផ្ទុក output ចូលអថេរ bash ៖ `${out//[[:space:]]/}` លើ output ធំ
+    #    (របាយការណ៍ JSON ច្រើន MB) ក្នុង locale UTF-8 ប្រើពេល quadratic ➜ shell មេរវល់ ១០០% CPU · មិន reap · មិនចាប់ផ្តើម
+    #    checker ថ្មី · trap TERM រង់ចាំ expansion ចប់ (runall-runner-test «output ១ MB»)។
     J_MS[$i]="$ms"; J_SHOW[$i]=0; J_ST[$i]=done
     if [ -z "$rc" ]; then
         J_V[$i]=FAIL; J_TEXT[$i]="*** FAIL *** (ម៉ាស៊ីនរត់ ៖ checker ស្លាប់ដោយគ្មានលទ្ធផល)"; J_SHOW[$i]=1
     elif [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
         J_V[$i]=FAIL; J_TEXT[$i]="*** FAIL *** (ព្យួរ — លើសពិដាន ${J_TIMEOUT[$i]}s)"; J_SHOW[$i]=1
+    elif [ "$rc" -eq 0 ] && [ "${J_ID[$i]}" = emu/import-paired-ci-runner ] && ! runall_native_summary "$RUNALL_DIR/$i.out" "${J_LABEL[$i]}" >/dev/null; then
+        J_V[$i]=FAIL; J_TEXT[$i]="*** FAIL *** (native result missing or invalid)"; J_SHOW[$i]=0
     elif [ "$rc" -eq 0 ]; then
-        n=$(printf '%s\n' "$out" | grep -cE 'ok    ')
-        skip_line=$(printf '%s\n' "$out" | sed -n '/^[[:space:]]*\(SKIP\|PARTIAL PASS\)/ { s/^[[:space:]]*//; p; q; }')
-        if [ -z "${out//[[:space:]]/}" ] || printf '%s\n' "$out" | grep -qE '^[[:space:]]*(FAIL[[:space:]]|❌[[:space:]]|\*\*\* FAIL \*\*\*)'; then
+        n=$(grep -cE 'ok    ' "$out" 2>/dev/null); n="${n:-0}"
+        skip_line=$(sed -n '/^[[:space:]]*\(SKIP\|PARTIAL PASS\)/ { s/^[[:space:]]*//; p; q; }' "$out" 2>/dev/null)
+        if [ "$(LC_ALL=C tr -d '\000[:space:]' < "$out" 2>/dev/null | head -c 1 | wc -c)" -eq 0 ] \
+            || grep -qE '^[[:space:]]*(FAIL[[:space:]]|❌[[:space:]]|\*\*\* FAIL \*\*\*)' "$out" 2>/dev/null; then
             J_V[$i]=FAIL; J_TEXT[$i]="*** FAIL *** (exit 0 តែ output ទទេ ឬរាយ FAIL)"; J_SHOW[$i]=1
         elif [ -n "$skip_line" ]; then
             if [ "$n" -gt 0 ]; then J_V[$i]=PARTIAL; J_TEXT[$i]="PARTIAL PASS ($n; $skip_line)"
@@ -433,7 +494,17 @@ RUNALL_HINTS="emu/money-multidevice-emu-test:244 money-guardian-test:242 zoew-su
 
 # checker ដដែលដែលរត់ជា sub-suite មានពេលខុសគ្នា ៖ ស្លាកពេញជាកូនសោដូច RUNALL_STATE។
 declare -A RUNALL_LABEL_HINTS=(
+    ["emu/import-native-I100-cookie-unsigned"]=15
+    ["emu/import-native-I100-cookie-signed"]=15
+    ["emu/import-native-I100-cookie-mixed"]=15
+    ["emu/import-native-I100-cookie-mixed-same-group"]=15
+    ["emu/import-native-I100-palm-unsigned"]=15
+    ["emu/import-native-I100-palm-signed"]=15
+    ["emu/import-native-I100-palm-mixed"]=15
+    ["emu/import-native-I100-palm-mixed-same-group"]=15
     ["emu/scan-operation-sdk"]=5
+    ["exit-code-integrity 1/2 (meta)"]=150
+    ["exit-code-integrity 2/2 (meta)"]=140
     ["emu/scan-month-coordination-sdk"]=10
     ["emu/scan-month-delay-sdk"]=2
     ["emu/scan-month-reconnect-sdk"]=3
@@ -601,6 +672,92 @@ runall_reap() {  # រង់ចាំ checker ណាមួយចប់ ➜ ស�
     done
     RUNALL_RUNNING=("${keep[@]}")
 }
+# Print only reconstructed, allowlisted native summary fields; never replay raw stdout.
+runall_native_summary() { # <output-file> <label>
+    node -e '
+const fs=require("fs");
+(function(){try {
+  const [file,label]=process.argv.slice(1), m=/^emu\/import-native-(I100-(?:cookie|palm)-(?:unsigned|signed|mixed|mixed-same-group))$/.exec(label);
+  if(!m){process.exitCode=1;return;}
+  const st=fs.statSync(file);if(!st.isFile()||st.size>65536){process.exitCode=1;return;}
+  const prefix="IMPORT_PAIRED_CI_RESULT ", rows=fs.readFileSync(file,"utf8").split(/\r?\n/).filter(Boolean);
+  if(rows.length!==1||!rows[0].startsWith(prefix)){process.exitCode=1;return;}
+  const r=JSON.parse(rows[0].slice(prefix.length)), p=r?.profiles;
+  if(Object.keys(r).sort().join(",")!=="batchSha256,crossProviderParity,emulatorJarHashStatus,emulatorJarSHA256,nativeRulesHashStatus,nativeRulesSha256,profiles,scope,sourceHashes,sql,status"||r.status!=="PASS"||r.scope!=="NATIVE_ONLY"||r.sql!=="UNRUN"||r.crossProviderParity!=="UNRUN_SINGLE_PROVIDER"||!Array.isArray(p)||p.length!==1||p[0]?.id!==m[1]||Object.keys(p[0]).sort().join(",")!=="category,childDiagnostic,id,outcome,output,ownerDiagnostic,phase,status"||p[0].status!=="PASS"||p[0].outcome!=="PROVEN"||p[0].phase!==null||p[0].category!==null||p[0].ownerDiagnostic!==null||p[0].childDiagnostic!==null){process.exitCode=1;return;}
+  const o=p[0].output, zero=["stderrBytes","unexpectedLines","failureLines","skipLines","warningLines","vmWarnings","vmErrors","vmUnsupported"];
+  if(!o||typeof o!=="object"||!Number.isSafeInteger(o.stdoutBytes)||o.stdoutBytes<1||zero.some(k=>o[k]!==0)||o.vmCountStatus!=="FINAL"||o.overflow!==false||o.streamCountsComplete!==true||o.countsComplete!==true){process.exitCode=1;return;}
+  const isHash=v=>typeof v==="string"&&/^[a-f0-9]{64}$/.test(v);if(r.nativeRulesHashStatus!=="VERIFIED_AFTER"||r.emulatorJarHashStatus!=="REPORTED_BY_OWNER"||!isHash(r.sourceHashes?.raw)||!isHash(r.sourceHashes?.instrumented)||!isHash(r.nativeRulesSha256)||!isHash(r.emulatorJarSHA256)||!isHash(r.batchSha256)){process.exitCode=1;return;}
+  console.log("      native-result: "+JSON.stringify({case:m[1],status:"PASS",scope:"NATIVE_ONLY",sql:"UNRUN",crossProviderParity:"UNRUN_SINGLE_PROVIDER",sourceHashes:{raw:r.sourceHashes.raw,instrumented:r.sourceHashes.instrumented},nativeRulesSha256:r.nativeRulesSha256,nativeRulesHashStatus:"VERIFIED_AFTER",emulatorJarSHA256:r.emulatorJarSHA256,emulatorJarHashStatus:"REPORTED_BY_OWNER",batchSha256:r.batchSha256}));
+}catch(_){process.exitCode=1;}})();' "$1" "$2"
+}
+# A failure projection never changes the exit verdict or asserts business failure.
+runall_native_failure_summary() { # <output-file> <label>
+    node -e '
+const fs=require("fs");
+(function(){try {
+ const [file,label]=process.argv.slice(1),m=/^emu\/import-native-(I100-(?:cookie|palm)-(?:unsigned|signed|mixed|mixed-same-group))$/.exec(label);
+ if(!m){process.exitCode=1;return;}
+ const st=fs.statSync(file);if(!st.isFile()||st.size>65536){process.exitCode=1;return;}
+ const prefix="IMPORT_PAIRED_CI_RESULT ",lines=fs.readFileSync(file,"utf8").split(/\r?\n/).filter(Boolean);
+ const rows=lines.filter(x=>x.startsWith(prefix)),fixed=new Set(["FAIL native import case; evidence retained","FAIL paired import runner"]);
+ if(rows.length!==1||lines.some(x=>!x.startsWith(prefix)&&!fixed.has(x))){process.exitCode=1;return;}
+ const r=JSON.parse(rows[0].slice(prefix.length)),p=r?.profiles;
+ const keys="batchSha256,crossProviderParity,emulatorJarHashStatus,emulatorJarSHA256,nativeRulesHashStatus,nativeRulesSha256,profiles,scope,sourceHashes,sql,status";
+ if(!r||Object.keys(r).sort().join(",")!==keys||r.status!=="FAIL"||r.scope!=="NATIVE_ONLY"||r.sql!=="UNRUN"||r.crossProviderParity!=="UNRUN_SINGLE_PROVIDER"||!Array.isArray(p)||p.length!==1||p[0]?.id!==m[1]||Object.keys(p[0]).sort().join(",")!=="category,childDiagnostic,id,outcome,output,ownerDiagnostic,phase,status"||p[0].status!=="FAIL"||p[0].outcome!=="UNKNOWN"){process.exitCode=1;return;}
+ const phases=new Set(["PREFLIGHT","DISK","RULE_IDENTITY","CAPTURE_SETUP","INITIAL_RECEIPT","OWNED_WRAPPER","CHILD_OUTPUT","NATIVE_SNAPSHOT","CHILD_EVIDENCE"]),categories=new Set(["PREFLIGHT_FAILED","ASSERTION_FAILED","SYNTAX_ERROR","TYPE_ERROR","ERROR"]);
+ if(!phases.has(p[0].phase)||!(p[0].category===null||categories.has(p[0].category))){process.exitCode=1;return;}
+ let output=null;
+ if(p[0].output!==null){
+  const v=p[0].output, fields=["stdoutBytes","stderrBytes","unexpectedLines","failureLines","skipLines","warningLines","vmWarnings","vmErrors","vmUnsupported","vmCountStatus","overflow","streamCountsComplete","countsComplete"];
+  if(!v||typeof v!=="object"||Array.isArray(v)||Object.keys(v).sort().join(",")!==fields.slice().sort().join(",")){process.exitCode=1;return;}
+  const count=["stdoutBytes","stderrBytes","unexpectedLines","failureLines","skipLines","warningLines"],vm=["vmWarnings","vmErrors","vmUnsupported"];
+  if(count.some(k=>!Number.isSafeInteger(v[k])||v[k]<0)||!["UNKNOWN","LOWER_BOUND","FINAL"].includes(v.vmCountStatus)||["overflow","streamCountsComplete","countsComplete"].some(k=>typeof v[k]!=="boolean")){process.exitCode=1;return;}
+  if(vm.some(k=>v.vmCountStatus==="UNKNOWN"?v[k]!==null:!Number.isSafeInteger(v[k])||v[k]<0)||v.countsComplete!==(v.vmCountStatus==="FINAL")||(v.countsComplete&&!v.streamCountsComplete)||(v.overflow&&v.streamCountsComplete)){process.exitCode=1;return;}
+  output=Object.fromEntries(fields.map(k=>[k,v[k]]));
+ }
+ // Only fixed projections may leave this process; never copy raw diagnostics.
+ const own=p[0].ownerDiagnostic,child=p[0].childDiagnostic;
+ const boolOrNull=v=>v===null||typeof v==="boolean";
+ let ownerDiagnostic=null,childDiagnostic=null;
+ if(own!==null){
+  const fields=["status","cleanup","commandStarted","commandCompleted","childCode","childSignal","outputPresent","failureLine","skipLine","snapshot","snapshotReason"];
+  const reasons=["MARKER_UNREADABLE","MARKER_INVALID","MARKER_MISMATCH","OWNER_UNPROVEN","READ_ERROR","SNAPSHOT_TIMEOUT","RECEIPT_TIMEOUT","RECEIPT_WRITE_FAILED","ROOT_INVALID","ROOT_UNREADABLE","ROOT_TOO_LARGE","NON_SYNTHETIC_CONTENT","SENSITIVE_CONTENT","ROOT_LIMIT","STATE_DIRECTORY_INVALID","STATE_DIRECTORY_UNREADABLE"];
+  if(!own||typeof own!=="object"||Array.isArray(own)||Object.keys(own).sort().join(",")!==fields.slice().sort().join(",")||!["PASS","FAIL","UNRUN","UNKNOWN"].includes(own.status)||!["WRAPPER_CONFIRMED","UNKNOWN"].includes(own.cleanup)||["commandStarted","commandCompleted","outputPresent","failureLine","skipLine"].some(k=>!boolOrNull(own[k]))||!(own.childCode===null||Number.isInteger(own.childCode)&&own.childCode>=0&&own.childCode<=255)||!["NONE","SIGTERM","SIGKILL","SIGINT","OTHER","UNKNOWN"].includes(own.childSignal)||!["OBSERVED_POINT_IN_TIME_ONLY","UNREADABLE","NOT_ATTEMPTED","UNKNOWN"].includes(own.snapshot)||!(own.snapshotReason===null||reasons.includes(own.snapshotReason))){process.exitCode=1;return;}
+  ownerDiagnostic=Object.fromEntries(fields.map(k=>[k,own[k]]));
+ }
+ if(child!==null){
+  const fields=["evidence","ledger","category","wait","location","aggregate"],newFields=[...fields,"assertionDiagnostic"],waits=["AUTHORITATIVE_100","ORIGINS_ACK_FENCE","AUTHORITATIVE_LISTENERS","FIRST_ACK_QUIESCENCE","FIRST_STATUS_QUIESCENCE","FIRST_POST_STATUS_ACK","REPEAT_ACK_QUIESCENCE","REPEAT_STATUS_QUIESCENCE","REPEAT_POST_STATUS_ACK","NATIVE_TRANSPORT_QUIESCENCE","BACKGROUND_QUIESCENCE"];
+  if(!child||typeof child!=="object"||Array.isArray(child)||![fields,newFields].some(keys=>Object.keys(child).sort().join(",")===keys.slice().sort().join(","))||child.evidence!=="PRIVATE_CHILD_REPORTED"||!["FAIL","UNRUN","IN_PROGRESS","UNKNOWN"].includes(child.ledger)||!["WAIT_TIMEOUT_REPORTED","ASSERTION_REPORTED","OTHER_REPORTED","UNKNOWN"].includes(child.category)||!(child.wait===null||waits.includes(child.wait))||(child.category==="WAIT_TIMEOUT_REPORTED")!==(child.wait!==null)||!ownerDiagnostic||ownerDiagnostic.status!=="FAIL"||ownerDiagnostic.cleanup!=="WRAPPER_CONFIRMED"||ownerDiagnostic.commandStarted!==true||ownerDiagnostic.commandCompleted!==true||!Number.isInteger(ownerDiagnostic.childCode)||ownerDiagnostic.childCode<=0||ownerDiagnostic.childSignal!=="NONE"){process.exitCode=1;return;}
+  let location=null;if(child.location!==null){const l=child.location;if(!l||typeof l!=="object"||Array.isArray(l)||Object.keys(l).sort().join(",")!=="file,function"||l.file!=="import-paired-sdk-test.js"||!["until","runCore","nativeBackend","ready","main"].includes(l.function)){process.exitCode=1;return;}location={file:l.file,function:l.function};}
+  let assertionDiagnostic=null;
+  if(Object.prototype.hasOwnProperty.call(child,"assertionDiagnostic")&&child.assertionDiagnostic!==null){
+   const d=child.assertionDiagnostic,allowed={FIRST_ORACLE:["core.oracle","core.codes-phones","core.prices-incarnations","core.prices-incarnations.mirrors","core.pending-empty","core.same-batch"],SAME_BATCH_REPEAT:["core.repeat-unchanged","core.effects-unchanged","core.upstream","core.no-outbound","core.journals-empty","core.no-source-errors"]};
+   if(child.ledger!=="FAIL"||child.category!=="ASSERTION_REPORTED"||child.wait!==null||!d||typeof d!=="object"||Array.isArray(d)||!["assertionId,phase","assertionId,eventCounts,phase"].includes(Object.keys(d).sort().join(","))||!Object.prototype.hasOwnProperty.call(allowed,d.phase)||!allowed[d.phase].includes(d.assertionId)){process.exitCode=1;return;}
+   assertionDiagnostic={phase:d.phase,assertionId:d.assertionId};
+   if(Object.prototype.hasOwnProperty.call(d,"eventCounts")){const c=d.eventCounts,keys=["SCAN_EVIDENCE_PENDING","LIST_PICKUP","LISTENER","SUBSCRIPTION","TRANSPORT","SWEEP","CALLBACK","CONSOLE","HISTORY_MERGE","HISTORY_SAVE","HISTORY_PATCH","PICKUP_COLLECTED","PICKUP_RECOVERY","CLEANUP_COLLECTED","CLEANUP_RECOVERY","SCAN_LEDGER","SCAN_OUTCOME","TX_OUTCOME","OTHER"],codes=["PERMISSION","PENDING","JOURNAL_UNAVAILABLE","EVIDENCE_UNAVAILABLE","SDK_UNAVAILABLE","TRANSPORT","SCOPE_CHANGED","OTHER"];const valid=(obj,ks)=>obj&&typeof obj==="object"&&!Array.isArray(obj)&&Object.keys(obj).sort().join(",")===ks.slice().sort().join(",")&&ks.every(k=>Number.isSafeInteger(obj[k])&&obj[k]>=0&&obj[k]<=10000);if(d.phase!=="SAME_BATCH_REPEAT"||d.assertionId!=="core.no-source-errors"||!c||typeof c!=="object"||Array.isArray(c)||Object.keys(c).sort().join(",")!=="categories,codes,overflow"||typeof c.overflow!=="boolean"||!valid(c.categories,keys)||!valid(c.codes,codes)){process.exitCode=1;return;}const total=keys.reduce((n,k)=>n+c.categories[k],0),codeTotal=codes.reduce((n,k)=>n+c.codes[k],0);if(total<1||total>10000||codeTotal!==total){process.exitCode=1;return;}assertionDiagnostic.eventCounts={categories:Object.fromEntries(keys.map(k=>[k,c.categories[k]])),codes:Object.fromEntries(codes.map(k=>[k,c.codes[k]])),overflow:c.overflow};}
+
+  }
+  let aggregate=null;
+  if(child.aggregate!==null){
+   const a=child.aggregate,keys=["schema","evidence","availability","consistency","case","phase","error","counts"],fields=["historyGroups","historyBarcodes","historyUniqueBarcodes","registryEntries","operationsAdmitted","operationsPrepared","operationsCommitted","operationsCancelled","operationsOther","journalStorageKeys","capturedEvents","pendingJournalOperations"];
+   const unsigned=m[1]==="I100-cookie-unsigned"&&child.wait==="AUTHORITATIVE_100"&&a?.case===m[1]&&a?.error==="AUTHORITATIVE_100_TIMEOUT",origin=m[1]==="I100-cookie-mixed-same-group"&&child.wait==="ORIGINS_ACK_FENCE"&&a?.case===m[1]&&a?.error==="ORIGINS_ACK_FENCE_TIMEOUT";
+   if(origin)fields.push("originsMatched","originsMissingOrOther");
+   if(!a||typeof a!=="object"||Array.isArray(a)||Object.keys(a).sort().join(",")!==keys.slice().sort().join(",")||!(unsigned||origin)||child.ledger!=="FAIL"||child.category!=="WAIT_TIMEOUT_REPORTED"||a.schema!==1||a.evidence!=="PRIVATE_CHILD_REPORTED"||!["AVAILABLE","UNAVAILABLE"].includes(a.availability)||a.consistency!=="POST_TIMEOUT_NONATOMIC"||a.phase!=="FIRST_IMPORT"||!a.counts||typeof a.counts!=="object"||Array.isArray(a.counts)||Object.keys(a.counts).sort().join(",")!==fields.slice().sort().join(",")){process.exitCode=1;return;}
+   for(const key of fields){const n=a.counts[key];if(a.availability==="UNAVAILABLE"||key==="pendingJournalOperations"){if(n!==null){process.exitCode=1;return;}}else if(!Number.isSafeInteger(n)||n<0||n>10000){process.exitCode=1;return;}}
+   if(a.availability==="AVAILABLE"&&(a.counts.operationsOther!==0||a.counts.historyUniqueBarcodes>100||a.counts.registryEntries>100||a.counts.historyUniqueBarcodes>a.counts.historyBarcodes||(a.counts.historyBarcodes>0&&(a.counts.historyGroups===0||a.counts.historyUniqueBarcodes===0))||a.counts.operationsAdmitted+a.counts.operationsPrepared+a.counts.operationsCommitted+a.counts.operationsCancelled>10000)){process.exitCode=1;return;}
+   if(origin&&a.availability==="AVAILABLE"&&a.counts.originsMatched+a.counts.originsMissingOrOther!==a.counts.historyBarcodes){process.exitCode=1;return;}
+   aggregate={schema:1,evidence:"PRIVATE_CHILD_REPORTED",availability:a.availability,consistency:"POST_TIMEOUT_NONATOMIC",case:m[1],phase:"FIRST_IMPORT",error:origin?"ORIGINS_ACK_FENCE_TIMEOUT":"AUTHORITATIVE_100_TIMEOUT",counts:Object.fromEntries(fields.map(k=>[k,a.counts[k]]))};
+  }
+  childDiagnostic={evidence:"PRIVATE_CHILD_REPORTED",ledger:child.ledger,category:child.category,wait:child.wait,location,assertionDiagnostic,aggregate};
+ }
+ const isHash=v=>typeof v==="string"&&/^[a-f0-9]{64}$/.test(v);
+ if(!(r.sourceHashes===null||(r.sourceHashes&&Object.keys(r.sourceHashes).sort().join(",")==="instrumented,raw"&&isHash(r.sourceHashes.raw)&&isHash(r.sourceHashes.instrumented)))){process.exitCode=1;return;}
+ if(!(r.batchSha256===null||isHash(r.batchSha256))){process.exitCode=1;return;}
+ if(!((r.nativeRulesSha256===null&&r.nativeRulesHashStatus==="UNAVAILABLE")||(isHash(r.nativeRulesSha256)&&["OBSERVED_PRECHECK","VERIFIED_AFTER"].includes(r.nativeRulesHashStatus)))){process.exitCode=1;return;}
+ if(!((r.emulatorJarSHA256===null&&r.emulatorJarHashStatus==="UNAVAILABLE")||(isHash(r.emulatorJarSHA256)&&r.emulatorJarHashStatus==="REPORTED_BY_OWNER"))){process.exitCode=1;return;}
+ console.log("      native-failure: "+JSON.stringify({case:m[1],status:"FAIL",outcome:"UNKNOWN",scope:"NATIVE_ONLY",sql:"UNRUN",crossProviderParity:"UNRUN_SINGLE_PROVIDER",phase:p[0].phase,category:p[0].category,ownerDiagnostic,childDiagnostic,output,sourceHashes:r.sourceHashes,nativeRulesSha256:r.nativeRulesSha256,nativeRulesHashStatus:r.nativeRulesHashStatus,emulatorJarSHA256:r.emulatorJarSHA256,emulatorJarHashStatus:r.emulatorJarHashStatus,batchSha256:r.batchSha256}));
+}catch(_){process.exitCode=1;}})();' "$1" "$2"
+}
 runall_emit() {  # <i> — បោះពុម្ពតាមលំដាប់បញ្ជី + រាប់ + ចងចាំឈ្មោះសម្រាប់សេចក្តីសង្ខេប
     local i="$1" mark=''
     case "${J_ST[$i]}" in
@@ -615,7 +772,20 @@ runall_emit() {  # <i> — បោះពុម្ពតាមលំដាប់�
     fi
     RUNALL_PRINTED=1
     printf '  %-32s %7s  %s%s\n' "${J_LABEL[$i]}" "$(runall_fmt_ms "${J_MS[$i]}")" "${J_TEXT[$i]}" "$mark"
-    [ "${J_SHOW[$i]}" = 1 ] && sed 's/^/      /' "$RUNALL_DIR/$i.out"
+    if [ "${J_ID[$i]}" = emu/import-paired-ci-runner ] && [ "${J_ST[$i]}" = done ]; then
+        if [ "${J_V[$i]}" = PASS ]; then
+            runall_native_summary "$RUNALL_DIR/$i.out" "${J_LABEL[$i]}"
+        else
+            local native_rc=''
+            [ -f "$RUNALL_DIR/$i.rc" ] && read -r native_rc _ < "$RUNALL_DIR/$i.rc"
+            if [ -z "$native_rc" ] || [ "$native_rc" = 0 ] || [ "$native_rc" = 124 ] || [ "$native_rc" = 137 ] || ! runall_native_failure_summary "$RUNALL_DIR/$i.out" "${J_LABEL[$i]}"; then
+                echo '      native outcome UNKNOWN; SQL/parity UNRUN'
+            fi
+        fi
+    fi
+    if [ "${J_SHOW[$i]}" = 1 ] && [ "${J_ID[$i]}" != emu/import-paired-ci-runner ]; then
+        sed 's/^/      /' "$RUNALL_DIR/$i.out"
+    fi
     case "${J_V[$i]}" in
         PASS) pass=$((pass + 1)) ;;
         PARTIAL) partial=$((partial + 1)); RUNALL_PARTIAL_NAMES+=("${J_LABEL[$i]}") ;;
@@ -645,6 +815,7 @@ runall_abort() {  # INT · TERM · HUP ➜ បញ្ឈប់ checker ដែល�
     done
     [ -n "$RUNALL_STATE" ] && echo "   លទ្ធផលដែលចប់រួចនៅក្នុង $RUNALL_STATE ➜ បន្ត ៖ RUNALL_RESUME=1 bash audit-tools/run-all.sh"
     rm -rf "$RUNALL_DIR"
+    runall_cleanup_owned
     exit 130
 }
 runall_drain() {  # រត់បញ្ជីទាំងមូល ➜ 0 · បដិសេធ (RUNALL_ONLY/RESUME) ➜ 2 · គ្មាន bash ថ្មីគ្រប់ ➜ 1
@@ -659,6 +830,7 @@ runall_drain() {  # រត់បញ្ជីទាំងមូល ➜ 0 · ប�
     fi
     RUNALL_DIR="$(mktemp -d "${TMPDIR:-/tmp}/zoe-runall.XXXXXX")" || { echo "*** FAIL *** mktemp"; fail=$((fail + 1)); return 1; }
     runall_select || { rm -rf "$RUNALL_DIR"; return 2; }
+    runall_owned_init || { rm -rf "$RUNALL_DIR"; return 1; }
     # ⛔ ការជ្រើស (SHARD · ONLY · RESUME) ជារបស់ run-all នេះតែប៉ុណ្ណោះ ៖ checker កូនដែលរត់ម៉ាស៊ីននេះខាងក្នុង (hang-guard ·
     #    runall-runner-test) ទទួលវា ➜ fixture ត្រូវបែងចែកចោល ➜ ធ្លាក់តែលើ CI ជាផ្នែក (runall-runner-test ៧ខ)
     export -n RUNALL_SHARD RUNALL_ONLY RUNALL_RESUME
@@ -803,7 +975,8 @@ done
 run "checker-coverage (meta)" node audit-tools/checker-coverage.js
 run "hang-guard (meta)" node audit-tools/hang-guard.js
 run "runall-runner (meta)" node audit-tools/runall-runner-test.js
-run "exit-code-integrity (meta)" node audit-tools/exit-code-integrity.js
+run "exit-code-integrity 1/2 (meta)" node audit-tools/exit-code-integrity.js --part=1/2
+run "exit-code-integrity 2/2 (meta)" node audit-tools/exit-code-integrity.js --part=2/2
 run "version-bump-scope" node audit-tools/version-bump-scope.js
 run "semantic-ui-color" node audit-tools/semantic-ui-color-test.js
 run "user-guide" node audit-tools/user-guide-test.js
@@ -838,6 +1011,17 @@ run "emu/scan-month-reconnect-sdk" node audit-tools/emu/scan-operation-sdk-test.
 run "emu/trash-generation-sdk" node audit-tools/emu/trash-generation-sdk-test.js
 run "emu/cleanup-consumed-sdk" node audit-tools/emu/cleanup-consumed-sdk-test.js
 run "emu/empty-delete-sdk" node audit-tools/emu/empty-delete-sdk-test.js
+run "emu/registry-purge-atomic-sdk" node audit-tools/emu/registry-purge-atomic-sdk-test.js
+run "emu/pickup-reset-applied-sdk" node audit-tools/emu/pickup-reset-applied-sdk-test.js
+run "emu/import-native-I100-cookie-unsigned" node audit-tools/emu/import-paired-ci-runner.js --case=I100-cookie-unsigned --provider=native
+run "emu/import-native-I100-cookie-signed" node audit-tools/emu/import-paired-ci-runner.js --case=I100-cookie-signed --provider=native
+run "emu/import-native-I100-cookie-mixed" node audit-tools/emu/import-paired-ci-runner.js --case=I100-cookie-mixed --provider=native
+run "emu/import-native-I100-cookie-mixed-same-group" node audit-tools/emu/import-paired-ci-runner.js --case=I100-cookie-mixed-same-group --provider=native
+run "emu/import-native-I100-palm-unsigned" node audit-tools/emu/import-paired-ci-runner.js --case=I100-palm-unsigned --provider=native
+run "emu/import-native-I100-palm-signed" node audit-tools/emu/import-paired-ci-runner.js --case=I100-palm-signed --provider=native
+run "emu/import-native-I100-palm-mixed" node audit-tools/emu/import-paired-ci-runner.js --case=I100-palm-mixed --provider=native
+run "emu/import-native-I100-palm-mixed-same-group" node audit-tools/emu/import-paired-ci-runner.js --case=I100-palm-mixed-same-group --provider=native
+run "import-paired-ci-runner-test" node audit-tools/import-paired-ci-runner-test.js
 run "emu/supabase-adapter-parity" node audit-tools/emu/supabase-adapter-parity-test.js
 # ⛔ «សំណុំបៃតង» មិនមែនភស្តុតាង — ឧបករណ៍នេះបំបែកតក្កវិជ្ជាលុយដោយចេតនា
 # រួចទាមទារថា **អ្នកយាមយ៉ាងតិច ១ ត្រូវក្រហម**។ បើអ្នកយាមចុងក្រោយងងឹត
@@ -956,8 +1140,8 @@ section "== ឧបករណ៍បង្កើតអតិថិជនថ្ម�
 run "firebase-provision (CLI + firebase-tools ពិត · mutation)" node audit-tools/firebase-provision-test.js
 
 section "== ទម្លាប់គម្រោង =="
-run "node syntax ៖ ZoeW module view · ZoeKeyGen/app.js" node -e 'const fs=require("fs"),vm=require("vm"),{auditModuleSources}=require("./audit-tools/react-view"); for(const a of ["ZoeW","ZoeKeyGen"]){const source=fs.readFileSync(a+"/app.js","utf8");for(const part of auditModuleSources(a,source))new vm.Script(part,{filename:a+"/app.js"});} console.log("  ok    syntax ត្រឹមត្រូវទាំង ២");'
-run "rules JSON valid" node -e "const fs=require('fs');JSON.parse(fs.readFileSync('firebase-database.rules.json','utf8'));JSON.parse(fs.readFileSync('ZoeKeyGen/firebase-database.rules.json','utf8'));console.log('  ok    rules JSON ត្រឹមត្រូវទាំង ២');"
+run "node syntax ៖ ZoeW module view · ZoeKeyGen/app.js" node -e 'const fs=require("fs"),vm=require("vm"),{auditModuleSources}=require("./audit-tools/react-view"); for(const a of ["ZoeW","ZoeKeyGen"]){const source=fs.readFileSync(a+"/app.js","utf8");for(const part of auditModuleSources(a,source))new vm.Script(part,{filename:a+"/app.js"});} console.log("  ok    syntax ត្រឹមត្រូវទាំង ២"); process.exitCode=0;'
+run "rules JSON valid" node -e "const fs=require('fs');JSON.parse(fs.readFileSync('firebase-database.rules.json','utf8'));JSON.parse(fs.readFileSync('ZoeKeyGen/firebase-database.rules.json','utf8'));console.log('  ok    rules JSON ត្រឹមត្រូវទាំង ២');process.exitCode=0;"
 run "license-verify.js byte-identical ×2" bash -c 'cmp -s ZoeW/license-verify.js ZoeKeyGen/license-verify.js && printf "  ok    license-verify.js ដូចគ្នាទាំង ២\n"'
 run "error-reporting.js byte-identical ×2" bash -c 'cmp -s ZoeW/error-reporting.js ZoeKeyGen/error-reporting.js && printf "  ok    error-reporting.js ដូចគ្នាទាំង ២\n"'
 run "គ្មាន trailing whitespace" bash -c 'grep -l "[[:space:]]$" ZoeW/app.js ZoeKeyGen/app.js; [ "$?" -eq 1 ] && printf "  ok    គ្មាន trailing whitespace\n"'
@@ -1079,11 +1263,11 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     DEPSEC_APP_DIR="$BASE" node audit-tools/dependency-security-test.js 2>&1 | tail -1 | sed 's/^/   dependency-sec:  /'
     FBACKUP_APP_DIR="$BASE" node audit-tools/firebase-backup-test.js 2>&1 | tail -1 | sed 's/^/   firebase-backup: /'
     FBPROVISION_APP_DIR="$BASE" node audit-tools/firebase-provision-test.js 2>&1 | tail -1 | sed 's/^/   fb-provision:    /'
-    CRUDFLOW_APP_DIR="$BASE" node audit-tools/emu/crud-rules-flow.js 2>&1 | tail -1 | sed 's/^/   emu-crud-flow:   /'
-    DEADLOCK_APP_DIR="$BASE" node audit-tools/emu/restore-deadlock-test.js 2>&1 | tail -1 | sed 's/^/   emu-deadlock:    /'
-    LEDGEREMU_APP_DIR="$BASE" node audit-tools/emu/ledger-revert-emu-test.js 2>&1 | tail -1 | sed 's/^/   emu-ledger-rev:  /'
-    RESTOREMUTATION_APP_DIR="$BASE" node audit-tools/emu/restore-mutation-emu-test.js 2>&1 | tail -1 | sed 's/^/   restore-mutation:/'
-    MONEYGUARD_APP_DIR="$BASE" node audit-tools/money-guardian-test.js 2>&1 | tail -1 | sed 's/^/   money-guardian:  /'
+    CRUDFLOW_APP_DIR="$BASE" runall_owned node audit-tools/emu/crud-rules-flow.js 2>&1 | tail -1 | sed 's/^/   emu-crud-flow:   /'
+    DEADLOCK_APP_DIR="$BASE" runall_owned node audit-tools/emu/restore-deadlock-test.js 2>&1 | tail -1 | sed 's/^/   emu-deadlock:    /'
+    LEDGEREMU_APP_DIR="$BASE" runall_owned node audit-tools/emu/ledger-revert-emu-test.js 2>&1 | tail -1 | sed 's/^/   emu-ledger-rev:  /'
+    RESTOREMUTATION_APP_DIR="$BASE" runall_owned node audit-tools/emu/restore-mutation-emu-test.js 2>&1 | tail -1 | sed 's/^/   restore-mutation:/'
+    MONEYGUARD_APP_DIR="$BASE" runall_owned node audit-tools/money-guardian-test.js 2>&1 | tail -1 | sed 's/^/   money-guardian:  /'
     MONEYREALTEST_APP_DIR="$BASE" node audit-tools/money-reality-test.js 2>&1 | tail -1 | sed 's/^/   money-reality:   /'
     REPOCOVER_APP_DIR="$BASE" node audit-tools/repository-file-coverage.js 2>&1 | tail -1 | sed 's/^/   file-coverage:   /'
     MODULE_RUNTIME_SCOPE_APP_DIR="$BASE" node audit-tools/module-runtime-scope-test.js 2>&1 | tail -1 | sed 's/^/   module-runtime:  /'
@@ -1091,7 +1275,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     SECURITYGUARD_APP_DIR="$BASE" node audit-tools/security-guard-test.js 2>&1 | tail -1 | sed 's/^/   security-guard:  /'
     HANGGUARD_APP_DIR="$BASE" node audit-tools/hang-guard.js 2>&1 | tail -1 | sed 's/^/   hang-guard:      /'
     RUNALLRUNNER_APP_DIR="$BASE" node audit-tools/runall-runner-test.js 2>&1 | tail -1 | sed 's/^/   runall-runner:   /'
-    EXITCODE_APP_DIR="$BASE" node audit-tools/exit-code-integrity.js 2>&1 | tail -1 | sed 's/^/   exit-code:       /'
+    EXITCODE_APP_DIR="$BASE" runall_owned node audit-tools/exit-code-integrity.js 2>&1 | tail -1 | sed 's/^/   exit-code:       /'
     VERSIONSCOPE_APP_DIR="$BASE" node audit-tools/version-bump-scope.js 2>&1 | tail -1 | sed 's/^/   version-scope:   /'
     BOOTANIM_APP_DIR="$BASE" node audit-tools/boot-animation-test.js 2>&1 | tail -1 | sed 's/^/   boot-animation:  /'
     INLINEXSS_APP_DIR="$BASE" node audit-tools/inline-handler-xss-test.js 2>&1 | tail -1 | sed 's/^/   inline-xss:      /'
@@ -1127,18 +1311,76 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     LICROLLBACK_APP_DIR="$BASE" node audit-tools/license-clock-rollback-test.js 2>&1 | tail -1 | sed 's/^/   license-rollback:/'
     LICRACE_APP_DIR="$BASE" node audit-tools/license-record-race-test.js 2>&1 | tail -1 | sed 's/^/   license-race:    /'
     LICSEAT_APP_DIR="$BASE" node audit-tools/license-seat-test.js 2>&1 | tail -1 | sed 's/^/   license-seat:    /'
-    LICSEATEMU_APP_DIR="$BASE" node audit-tools/emu/license-seat-rules-test.js 2>&1 | tail -1 | sed 's/^/   license-seat-emu:/'
-    TXEMU_APP_DIR="$BASE" node audit-tools/emu/tx-disconnect-emu-test.js 2>&1 | tail -1 | sed 's/^/   tx-disconnect-emu:/'
-    APPWRITES_APP_DIR="$BASE" node audit-tools/emu/app-writes-rules-test.js 2>&1 | tail -1 | sed 's/^/   app-writes-emu:  /'
-    NETE2E_APP_DIR="$BASE" node audit-tools/emu/app-network-e2e-test.js 2>&1 | tail -1 | sed 's/^/   app-network-e2e: /'
-    MONEYTRUTH_APP_DIR="$BASE" node audit-tools/money-checker-truthfulness-test.js 2>&1 | tail -1 | sed 's/^/   money-truth:     /'
-    MONEYMD_APP_DIR="$BASE" node audit-tools/emu/money-multidevice-emu-test.js 2>&1 | tail -1 | sed 's/^/   money-multidev:  /'
-    SBPARITY_APP_DIR="$BASE" node audit-tools/emu/supabase-rules-parity-test.js 2>&1 | tail -1 | sed 's/^/   sb-rules-parity: /'
-    SCANRULES_APP_DIR="$BASE" node audit-tools/emu/scan-operation-rules-test.js 2>&1 | tail -1 | sed 's/^/   scan-rules:     /'
-    SBADAPTER_APP_DIR="$BASE" node audit-tools/emu/supabase-adapter-parity-test.js 2>&1 | tail -1 | sed 's/^/   sb-adapter-parity: /'
+    LICSEATEMU_APP_DIR="$BASE" runall_owned node audit-tools/emu/license-seat-rules-test.js 2>&1 | tail -1 | sed 's/^/   license-seat-emu:/'
+    TXEMU_APP_DIR="$BASE" runall_owned node audit-tools/emu/tx-disconnect-emu-test.js 2>&1 | tail -1 | sed 's/^/   tx-disconnect-emu:/'
+    APPWRITES_APP_DIR="$BASE" runall_owned node audit-tools/emu/app-writes-rules-test.js 2>&1 | tail -1 | sed 's/^/   app-writes-emu:  /'
+    NETE2E_APP_DIR="$BASE" runall_owned node audit-tools/emu/app-network-e2e-test.js 2>&1 | tail -1 | sed 's/^/   app-network-e2e: /'
+    MONEYTRUTH_APP_DIR="$BASE" runall_owned node audit-tools/money-checker-truthfulness-test.js 2>&1 | tail -1 | sed 's/^/   money-truth:     /'
+    MONEYMD_APP_DIR="$BASE" runall_owned node audit-tools/emu/money-multidevice-emu-test.js 2>&1 | tail -1 | sed 's/^/   money-multidev:  /'
+    SBPARITY_APP_DIR="$BASE" runall_owned node audit-tools/emu/supabase-rules-parity-test.js 2>&1 | tail -1 | sed 's/^/   sb-rules-parity: /'
+    SCANRULES_APP_DIR="$BASE" runall_owned node audit-tools/emu/scan-operation-rules-test.js 2>&1 | tail -1 | sed 's/^/   scan-rules:     /'
+    # ⛔ checker SDK ទាំងនេះ build `ZoeW/src` ➜ ចង្អុលទៅប្រភព baseline (root វាស់ `$BASE` គ្មាន `ZoeW/src`)
+    SCANSDK_APP_DIR="$IMPORTPAIRED_BASE_SOURCE" runall_owned node audit-tools/emu/scan-operation-sdk-test.js 2>&1 | tail -1 | sed 's/^/   scan-sdk:        /'
+    SCANSDK_APP_DIR="$IMPORTPAIRED_BASE_SOURCE" runall_owned node audit-tools/emu/scan-operation-sdk-test.js --month-wire=delay 2>&1 | tail -1 | sed 's/^/   scan-month-delay: /'
+    SCANSDK_APP_DIR="$IMPORTPAIRED_BASE_SOURCE" runall_owned node audit-tools/emu/scan-operation-sdk-test.js --month-wire=reconnect 2>&1 | tail -1 | sed 's/^/   scan-month-reconnect: /'
+    SCANSDK_APP_DIR="$IMPORTPAIRED_BASE_SOURCE" runall_owned node audit-tools/emu/scan-month-coordination-sdk-test.js 2>&1 | tail -1 | sed 's/^/   scan-month-coord: /'
+    SCANSDK_APP_DIR="$IMPORTPAIRED_BASE_SOURCE" runall_owned node audit-tools/emu/trash-generation-sdk-test.js 2>&1 | tail -1 | sed 's/^/   trash-generation: /'
+    SCANSDK_APP_DIR="$IMPORTPAIRED_BASE_SOURCE" runall_owned node audit-tools/emu/cleanup-consumed-sdk-test.js 2>&1 | tail -1 | sed 's/^/   cleanup-consumed: /'
+    SCANSDK_APP_DIR="$IMPORTPAIRED_BASE_SOURCE" runall_owned node audit-tools/emu/empty-delete-sdk-test.js 2>&1 | tail -1 | sed 's/^/   empty-delete:    /'
+    SBADAPTER_APP_DIR="$BASE" runall_owned node audit-tools/emu/supabase-adapter-parity-test.js 2>&1 | tail -1 | sed 's/^/   sb-adapter-parity: /'
+    F03_APP_DIR="$BASE" runall_owned node audit-tools/emu/registry-purge-atomic-sdk-test.js 2>&1 | tail -1 | sed 's/^/   registry-purge-sdk: /'
+    PICKUPRESET_APP_DIR="$BASE" runall_owned node audit-tools/emu/pickup-reset-applied-sdk-test.js 2>&1 | tail -1 | sed 's/^/   pickup-reset-sdk: /'
+    if [ -n "$IMPORTPAIRED_BASE_SOURCE" ] && [ -f "$IMPORTPAIRED_BASE_SOURCE/ZoeW/src/main.tsx" ]; then
+        # BASE is a diagnostic single native profile, not eight-profile or SQL coverage.
+        {
+            IMPORTPAIRED_OWNER_STATE="$RUNALL_OWNED_DIR" IMPORTPAIRED_APP_DIR="$IMPORTPAIRED_BASE_SOURCE" node audit-tools/emu/import-paired-ci-runner.js --case=I100-cookie-unsigned --provider=native > "$RUNALL_OWNED_DIR/import-native-base.out" 2>&1
+        } 2>/dev/null
+        PAIRED_BASE_RC=$?
+        if [ "$PAIRED_BASE_RC" -ne 0 ]; then
+            printf '   import-native-BASE: FAIL (BASE exit %s)\n' "$PAIRED_BASE_RC"
+            if [ "$PAIRED_BASE_RC" = 124 ] || [ "$PAIRED_BASE_RC" = 137 ] || ! runall_native_failure_summary "$RUNALL_OWNED_DIR/import-native-base.out" emu/import-native-I100-cookie-unsigned; then
+                echo '      native outcome UNKNOWN; SQL/parity UNRUN'
+            fi
+        elif ! runall_native_summary "$RUNALL_OWNED_DIR/import-native-base.out" emu/import-native-I100-cookie-unsigned; then
+            echo '   import-native-BASE: FAIL (invalid native result; one case, SQL UNRUN)'
+            echo '      native outcome UNKNOWN; SQL/parity UNRUN'
+        fi
+    else
+        echo '   import-native-BASE: FAIL (BASE source unavailable; SQL UNRUN)'
+    fi
     SUPABASE_APP_DIR="$BASE" node audit-tools/supabase-rls-test.js 2>&1 | tail -1 | sed 's/^/   supabase-rls:    /'
+    if runall_owned_init 2>/dev/null; then
+        {
+            IMPORTPAIRED_RUNNER_TEST_APP_DIR="$BASE" node audit-tools/import-paired-ci-runner-test.js > "$RUNALL_OWNED_DIR/import-paired-runner-base.out" 2>&1
+        } 2>/dev/null
+        PAIRED_RUNNER_BASE_RC=$?
+        PAIRED_RUNNER_OUTPUT_RC=1
+        if [ "$PAIRED_RUNNER_BASE_RC" -eq 0 ]; then
+            node -e '
+              const fs=require("fs");
+              try {
+                const file=process.argv[1], st=fs.statSync(file);
+                if (!st.isFile() || st.size > 65536) throw Error("invalid summary file");
+                const expected=[
+                  {status:"PASS",nativeOnlySynthetic:25,scope:"fake owner and private evidence, no backend"},
+                  {status:"PASS",cases:60,mutants:4,scope:"actual owned wrapper with fake process/HTTP adapters; no backend, network or real signals; synthetic files retained"},
+                  {status:"PASS",cases:48,scope:"synthetic runner and actual owner/CLI entry with fake adapters; no backend, network or real process signals"}
+                ].map(x=>JSON.stringify(x)).join("\n")+"\n";
+                if (fs.readFileSync(file,"utf8")!==expected) process.exitCode=1;
+              } catch (_) { process.exitCode=1; }
+            ' "$RUNALL_OWNED_DIR/import-paired-runner-base.out" > /dev/null 2>&1
+            PAIRED_RUNNER_OUTPUT_RC=$?
+        fi
+        if [ "$PAIRED_RUNNER_BASE_RC" -eq 0 ] && [ "$PAIRED_RUNNER_OUTPUT_RC" -eq 0 ]; then
+            echo '   import-paired-runner-test: PASS'
+        else
+            printf '   import-paired-runner-test: FAIL (BASE exit %s)\n' "$PAIRED_RUNNER_BASE_RC"
+        fi
+    else
+        echo '   import-paired-runner-test: FAIL (private output unavailable)'
+    fi
     SUPABASE_DS_APP_DIR="$BASE" node audit-tools/supabase-datastore-test.js 2>&1 | tail -1 | sed 's/^/   supabase-ds:     /'
-    SBSCAN_APP_DIR="$BASE" node audit-tools/supabase-scan-rules-test.js 2>&1 | tail -1 | sed 's/^/   sb-scan-rules:   /'
+    SBSCAN_APP_DIR="$BASE" runall_owned node audit-tools/supabase-scan-rules-test.js 2>&1 | tail -1 | sed 's/^/   sb-scan-rules:   /'
     SUPABASE_FN_APP_DIR="$BASE" node audit-tools/supabase-functions-test.js 2>&1 | tail -1 | sed 's/^/   supabase-fn:     /'
     KEYGEN_SBADMIN_APP_DIR="$BASE" node audit-tools/keygen-supabase-admin-test.js 2>&1 | tail -1 | sed 's/^/   keygen-sbadmin:  /'
     SBDATA_APP_DIR="$BASE" node audit-tools/supabase-data-tools-test.js 2>&1 | tail -1 | sed 's/^/   supabase-data:   /'
@@ -1180,4 +1422,6 @@ fi
 
 runall_summary
 runall_exit_status
-exit $?
+RUNALL_RESULT=$?
+if ! runall_cleanup_owned; then [ "$RUNALL_RESULT" -ne 0 ] || RUNALL_RESULT=1; fi
+exit "$RUNALL_RESULT"

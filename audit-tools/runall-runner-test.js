@@ -70,11 +70,18 @@ function fixture(dir, rel, opts) {
         o.browser ? '// ' + BROWSER_MARK + ' — សញ្ញា lane browser (មិនបើក browser ពិតទេ)' : '',
         "const log = (w) => fs.appendFileSync(process.env.FX_LOG, w + ' ' + " + name + " + ' ' + Date.now() + ' ' + process.pid + '\\n');",
         "log('start');",
+        o.ownedProbe ? "if(!process.env.FX_OWNED_SCOPE){console.log('FAIL missing owned fixture');process.exit(1);}fs.appendFileSync(process.env.FX_LOG+'.owners',JSON.stringify({owner:process.env.FX_OWNED_SCOPE})+'\\n');" : '',
         o.envProbe ? "fs.writeFileSync(process.env.FX_LOG + '.env', JSON.stringify(Object.keys(process.env).filter((k) => /^RUNALL_(SHARD|ONLY|RESUME)$/.test(k))));" : ''
     ];
     if (o.hang) lines.push('setInterval(() => {}, 1 << 30);');
-    else {
+    else if (o.drain) {
+        for (const l of o.out) lines.push('console.log(' + JSON.stringify(l) + ');');
+        if (o.drain === 'await') lines.push('(async () => { await new Promise(() => {}); log(\'end\'); process.exit(0); })();');
+        else if (o.drain === 'lowered') lines.push("log('end');", 'process.exitCode = 0;');
+        else lines.push("log('end');");
+    } else {
         lines.push('setTimeout(() => {');
+        if (o.bigLine) lines.push('    console.log(' + JSON.stringify(o.bigText || 'ក ') + '.repeat(' + Number(o.bigLine) + '));');
         for (const l of o.out) lines.push('    console.log(' + JSON.stringify(l) + ');');
         if (o.dependencyEnv) lines.push('    if (!process.env[' + JSON.stringify(o.dependencyEnv) + ']) console.log("SKIP dependency unavailable");' +
             (o.out.length === 0 ? ' else console.log("  ok    dependency available");' : ''));
@@ -85,9 +92,12 @@ function fixture(dir, rel, opts) {
     fs.writeFileSync(file, lines.join('\n') + '\n');
 }
 
+// ⛔ ម៉ាស៊ីនរត់ preload `runall-exit-guard.cjs` របស់ tree ខ្លួន (`$PWD/audit-tools/`) ➜ ករណីនីមួយៗទទួលច្បាប់ចម្លងពិតរបស់ tree នេះ
+const EXIT_GUARD = path.join(ROOT, 'audit-tools', 'runall-exit-guard.cjs');
 function newCase(fixtures) {
     const dir = path.join(TMP, 'c' + (++caseNo));
     fs.mkdirSync(path.join(dir, 'audit-tools', 'emu'), { recursive: true });
+    if (fs.existsSync(EXIT_GUARD)) fs.copyFileSync(EXIT_GUARD, path.join(dir, 'audit-tools', 'runall-exit-guard.cjs'));
     for (const [rel, opts] of fixtures) fixture(dir, rel, opts);
     return dir;
 }
@@ -100,25 +110,33 @@ function harnessEnv(dir, extra) {
     return Object.assign(env, { FX_LOG: path.join(dir, 'fx.log'), RUNALL_STATE: '' }, extra || {});
 }
 
+function privateOwnedFixture(dir) {
+    const file = path.join(dir, 'owned-fixture.cjs');
+    fs.writeFileSync(file, "const fs=require('fs'),cp=require('child_process');const result=cp.spawnSync(process.argv[2],process.argv.slice(3),{stdio:'inherit',env:{...process.env,FX_OWNED_SCOPE:String(process.pid)}});process.exitCode=result.status===null?1:result.status;\n");
+    return '\nrunall_prepare_command() { RUNALL_COMMAND=("$@"); if runall_needs_rtdb "$@"; then RUNALL_COMMAND=(node ' + JSON.stringify(file) + ' "$@"); fi; }\n';
+}
 function writeHarness(dir, body, timeoutSecs) {
     const h = path.join(dir, 'harness.sh');
     fs.writeFileSync(h,
         'pass=0; fail=0; skip=0; partial=0\n' +
         'CHECKER_TIMEOUT=' + (timeoutSecs || 30) + '\n' +
         'if command -v timeout >/dev/null 2>&1; then HAS_TIMEOUT=1; else HAS_TIMEOUT=0; fi\n' +
-        block + '\n' + body + '\n' +
+        block + '\n' + privateOwnedFixture(dir) + body + '\n' +
         'if declare -F runall_drain >/dev/null; then runall_drain || exit $?; fi\n' +
+        'if declare -F runall_cleanup_owned >/dev/null; then runall_cleanup_owned; fi\n' +
         'if declare -F runall_summary >/dev/null; then runall_summary; fi\n' +
         'if declare -F runall_exit_status >/dev/null; then runall_exit_status; exit $?; fi\n' +
         'exit "$fail"\n');
     return h;
 }
 
-function runHarness(dir, body, extraEnv, timeoutSecs) {
+function runHarness(dir, body, extraEnv, timeoutSecs, limitMs) {
     try { fs.rmSync(path.join(dir, 'fx.log'), { force: true }); } catch (e) {}
     const h = writeHarness(dir, body, timeoutSecs);
     const t0 = Date.now();
-    const r = cp.spawnSync('bash', [h], { cwd: dir, env: harnessEnv(dir, extraEnv), encoding: 'utf8', timeout: 90000 });
+    // limitMs ➜ SIGKILL ៖ shell ដែលជាប់ក្នុង expansion មិនរត់ trap TERM ទេ ➜ ពិដានត្រូវបញ្ចប់វាពិតប្រាកដ
+    const r = cp.spawnSync('bash', [h], { cwd: dir, env: harnessEnv(dir, extraEnv), encoding: 'utf8', timeout: limitMs || 90000,
+        killSignal: limitMs ? 'SIGKILL' : 'SIGTERM', maxBuffer: 64 * 1024 * 1024 });
     return { rc: r.status, out: String(r.stdout || '') + String(r.stderr || ''), ms: Date.now() - t0, events: readLog(dir) };
 }
 
@@ -263,6 +281,83 @@ const indentedSkip = runHarness(falseGreen, 'run "fx-indented-skip" node audit-t
 ok('⛔ SKIP មានចន្លោះខាងមុខ មិនមែន PASS', /SKIPPED/.test(indentedSkip.out) && !/✅/.test(indentedSkip.out), indentedSkip.out);
 const strictSkip = runHarness(falseGreen, 'run "fx-indented-skip" node audit-tools/fx-indented-skip.js', { RUNALL_STRICT: '1' });
 ok('⛔ RUNALL_STRICT=1 ៖ dependency មិនបានវាស់ ត្រូវ exit មិនសូន្យ', strictSkip.rc !== 0, strictSkip.out);
+// ⛔ សាលក្រមអាន output ជាឯកសារក្នុងពេលលីនេអ៊ែរ ៖ checker ដែលបោះពុម្ពបន្ទាត់ធំ (របាយការណ៍ JSON ច្រើន MB) មិនអាចបង្កក
+//    shell មេបានទេ (`${out//[[:space:]]/}` ក្នុង locale UTF-8 ប្រើពេល quadratic ➜ shell មេរវល់ ១០០% CPU · មិន reap ·
+//    មិនចាប់ផ្តើម checker ថ្មី ហើយ `timeout` របស់ checker មិនការពារវា) ➜ ១ MB ក្នុង C.UTF-8 ត្រូវចប់ក្នុងពេលខ្លី និងរក្សាសាលក្រមដដែល។
+const UTF8 = { LC_ALL: 'C.UTF-8', LANG: 'C.UTF-8' };
+const bigOutput = newCase([
+    ['audit-tools/fx-big-pass.js', { bigLine: 500000, out: ['  ok    បន្ទាត់ធំ'] }],
+    ['audit-tools/fx-big-fail.js', { bigLine: 500000, out: ['  ok    មុន', '  FAIL  ក្រោយបន្ទាត់ធំ'] }],
+    ['audit-tools/fx-big-blank.js', { bigLine: 500000, bigText: ' \t', out: [] }],
+    ['audit-tools/fx-big-skip.js', { bigLine: 500000, out: ['  SKIP គ្មាន dependency'] }]
+]);
+const bigPass = runHarness(bigOutput, 'run "fx-big-pass" node audit-tools/fx-big-pass.js', UTF8, undefined, 45000);
+ok('⛔ output ១ MB (C.UTF-8) ៖ សាលក្រម PASS ក្នុងពេលខ្លី (មិនបង្កក shell មេ)', bigPass.rc === 0
+    && /fx-big-pass[^\n]*PASS {2}\(1\)/.test(bigPass.out) && bigPass.ms < 30000, { ms: bigPass.ms, rc: bigPass.rc, tail: bigPass.out.slice(-300) });
+const bigFail = runHarness(bigOutput, 'run "fx-big-fail" node audit-tools/fx-big-fail.js', UTF8, undefined, 45000);
+ok('⛔ output ធំ ៖ បន្ទាត់ FAIL ក្រោយបន្ទាត់ធំនៅតែជា FAIL', bigFail.rc !== 0 && /fx-big-fail[^\n]*\*\*\* FAIL/.test(bigFail.out)
+    && bigFail.ms < 30000, { ms: bigFail.ms, rc: bigFail.rc });
+const bigBlank = runHarness(bigOutput, 'run "fx-big-blank" node audit-tools/fx-big-blank.js', UTF8, undefined, 45000);
+ok('⛔ output ធំដែលមានតែចន្លោះ ៖ នៅតែជា output ទទេ (FAIL)', bigBlank.rc !== 0 && /fx-big-blank[^\n]*output ទទេ/.test(bigBlank.out)
+    && bigBlank.ms < 30000, { ms: bigBlank.ms, rc: bigBlank.rc });
+const bigSkip = runHarness(bigOutput, 'run "fx-big-skip" node audit-tools/fx-big-skip.js', UTF8, undefined, 45000);
+ok('⛔ output ធំ ៖ SKIP ក្រោយបន្ទាត់ធំនៅតែជា SKIPPED', /fx-big-skip[^\n]*SKIPPED/.test(bigSkip.out) && bigSkip.ms < 30000,
+    { ms: bigSkip.ms, tail: bigSkip.out.slice(-200) });
+// ⛔ exit 0 ដោយ event loop ហូរអស់ ≠ សេចក្តីសង្ខេប ៖ checker ដែល `await` promise ដែលមិនដែល settle បោះពុម្ព ok ខ្លះ ហើយ
+//    Node ចេញ 0 ដោយគ្មានការអះអាងនៅសល់ ➜ ម៉ាស៊ីនរត់ត្រូវទាមទារការសម្រេច exit code ពី checker (`process.exitCode = 0` ·
+//    `process.exit(0)`) មិនមែនទទួល exit 0 ធម្មជាតិ។ ទិសផ្ទុយ ៖ checker ដែលបន្ថយ exit code ខ្លួនឯង នៅ PASS។
+const drained = newCase([
+    ['audit-tools/fx-hung-await.js', { drain: 'await', out: ['  ok    ក្បាល', '  ok    មុន await ដែលមិនដែល settle'] }],
+    ['audit-tools/fx-fall-off.js', { drain: 'fall', out: ['  ok    គ្មានការសម្រេច exit code'] }],
+    ['audit-tools/fx-lowered.js', { drain: 'lowered', out: ['  ok    សេចក្តីសង្ខេបបន្ថយ exit code'] }]
+]);
+for (const name of ['hung-await', 'fall-off']) {
+    const r = runHarness(drained, 'run "fx-' + name + '" node audit-tools/fx-' + name + '.js', { RUNALL_STRICT: '1' });
+    ok('⛔ exit 0 ដោយ event loop ហូរអស់ (' + name + ') ត្រូវ FAIL មិនមែន PASS', r.rc !== 0
+        && new RegExp('fx-' + name + '[^\\n]*\\*\\*\\* FAIL').test(r.out) && !/✅/.test(r.out), r.out);
+}
+const hungAwait = runHarness(drained, 'run "fx-hung-await" node audit-tools/fx-hung-await.js');
+ok('⛔ checker ដែល await មិនដែល settle ៖ output ប្រាប់ថាគ្មានការសម្រេច exit code (មិនមែន FAIL គ្មានមូលហេតុ)',
+    /ZOE_RUNALL_EXIT_GUARD/.test(hungAwait.out) && !hungAwait.events.some((e) => e.kind === 'end'), hungAwait.out);
+const lowered = runHarness(drained, 'run "fx-lowered" node audit-tools/fx-lowered.js', { RUNALL_STRICT: '1' });
+ok('ទិសផ្ទុយ ៖ checker ដែលសេចក្តីសង្ខេបបន្ថយ exit code ខ្លួនឯង នៅ PASS', lowered.rc === 0
+    && /fx-lowered[^\n]*PASS/.test(lowered.out) && !/ZOE_RUNALL_EXIT_GUARD/.test(lowered.out), lowered.out);
+// ⛔ កិច្ចសន្យាជារបស់ checker job តែប៉ុណ្ណោះ ៖ កូនរបស់វា (`spawn` · `fork`) មិនទទួល env/ការ preload ដែលសកម្ម ➜ vitest ·
+//    emulator · checker កូនរបស់ meta-checker ដែលចេញ 0 ធម្មជាតិមិនត្រូវប្រែជា exit 1 ទេ។
+fs.writeFileSync(path.join(drained, 'audit-tools', 'fx-children.js'), [
+    "const cp = require('child_process');",
+    "const env = cp.spawnSync(process.execPath, ['-e', 'process.stdout.write(String(process.env.ZOE_RUNALL_EXIT_GUARD || \"\"))'], { encoding: 'utf8' });",
+    "const spawned = cp.spawnSync(process.execPath, ['-e', 'console.log(1)'], { encoding: 'utf8' });",
+    "const forked = cp.fork(require('path').join(__dirname, '..', 'fx-forked-child.js'), [], { silent: true });",
+    "forked.on('exit', (code) => {",
+    "    const good = env.stdout === '' && spawned.status === 0 && code === 0;",
+    "    console.log(good ? '  ok    កូនមិនទទួលកិច្ចសន្យា exit' : '  FAIL  កូនទទួលកិច្ចសន្យា ' + JSON.stringify([env.stdout, spawned.status, code]));",
+    "    process.exitCode = good ? 0 : 1;",
+    "});"
+].join('\n') + '\n');
+fs.writeFileSync(path.join(drained, 'fx-forked-child.js'), "if (!process.execArgv.some((a) => /runall-exit-guard/.test(a))) process.exitCode = 3;\nconsole.log('forked');\n");
+const children = runHarness(drained, 'run "fx-children" node audit-tools/fx-children.js');
+ok('ទិសផ្ទុយ ៖ កូន spawn/fork របស់ checker មិនទទួល env ឬកិច្ចសន្យា exit (ចេញ 0 ធម្មជាតិនៅ 0)',
+    children.rc === 0 && /fx-children[^\n]*PASS/.test(children.out), children.out);
+// ⛔ deadline ពិតរបស់ job ទៅដល់ checker (`RUNALL_JOB_TIMEOUT` = ពិដាន · `RUNALL_JOB_STARTED_MS` = ពេលចាប់ផ្តើម) ➜ meta-checker
+//    ចែកថវិកាកូនតាមវា ជំនួសលេខថេរ (exit-code-integrity)។
+fs.writeFileSync(path.join(drained, 'audit-tools', 'fx-deadline.js'),
+    "require('fs').writeFileSync(process.env.FX_LOG + '.deadline', JSON.stringify([process.env.RUNALL_JOB_TIMEOUT, Number(process.env.RUNALL_JOB_STARTED_MS), Date.now()]));\n"
+    + "console.log('  ok    deadline');\nprocess.exitCode = 0;\n");
+const deadlineEnvT0 = Date.now();
+const deadlineEnv = runHarness(drained, 'run "fx-deadline" node audit-tools/fx-deadline.js', {}, 37);
+let deadlineSeen = null;
+try { deadlineSeen = JSON.parse(fs.readFileSync(path.join(drained, 'fx.log.deadline'), 'utf8')); } catch (e) {}
+ok('⛔ checker ទទួល deadline ពិតរបស់ job ៖ RUNALL_JOB_TIMEOUT = CHECKER_TIMEOUT · RUNALL_JOB_STARTED_MS ក្នុងចន្លោះការរត់',
+    deadlineEnv.rc === 0 && Array.isArray(deadlineSeen) && deadlineSeen[0] === '37'
+    && deadlineSeen[1] >= deadlineEnvT0 && deadlineSeen[1] <= deadlineSeen[2], { seen: deadlineSeen, out: deadlineEnv.out.slice(-400) });
+const unguarded = newCase([['audit-tools/fx-plain.js', {}]]);
+fs.rmSync(path.join(unguarded, 'audit-tools', 'runall-exit-guard.cjs'), { force: true });
+const missingGuard = runHarness(unguarded, 'run "fx-plain" node audit-tools/fx-plain.js');
+ok('⛔ ឯកសារកិច្ចសន្យា exit បាត់ ➜ job node FAIL (មិនរត់ដោយគ្មានកិច្ចសន្យាស្ងាត់ៗ)',
+    missingGuard.rc !== 0 && /fx-plain[^\n]*\*\*\* FAIL/.test(missingGuard.out), missingGuard.out);
+const shellJob = runHarness(unguarded, 'run "fx-shell" bash -c \'printf "  ok    shell\\n"\'');
+ok('ទិសផ្ទុយ ៖ job ដែលមិនមែន node (bash) មិនត្រូវការឯកសារកិច្ចសន្យា', shellJob.rc === 0 && /fx-shell[^\n]*PASS/.test(shellJob.out), shellJob.out);
 const stablePlan = newCase([['audit-tools/fx-plan.js', {}]]);
 const stableBody = 'if [ "$FX_SKIP" = 1 ]; then skipm "fx-plan"; else run "fx-plan" node audit-tools/fx-plan.js; fi\n' +
     'printf "IDENTITY=%s LANE=%s\\n" "${J_ID[0]}" "${J_LANE[0]}"';
@@ -388,15 +483,17 @@ const deadlineScripts = [EMU + 'money-multidevice-emu-test.js',
 const realTimeout = String(cp.spawnSync('sh', ['-c', 'command -v timeout'], { encoding: 'utf8' }).stdout || '').trim();
 function runDeadlineFixture(override, hanging) {
     const dir = newCase(deadlineScripts.map((rel) => [rel, { hang: hanging }]));
-    fs.copyFileSync(RUNALL, path.join(dir, 'audit-tools', 'run-all.sh'));
+    fs.writeFileSync(path.join(dir, 'audit-tools', 'run-all.sh'), runall.replace(/^#@runner-end$/m, '\nrunall_prepare_command() { RUNALL_COMMAND=("$@"); }\n#@runner-end'));
     for (const app of ['ZoeW', 'ZoeKeyGen']) {
         fs.mkdirSync(path.join(dir, app), { recursive: true });
         fs.writeFileSync(path.join(dir, app, 'sw.js'), '');
     }
     const bin = path.join(dir, 'bin');
     fs.mkdirSync(bin);
+    // ⛔ script = argument `audit-tools/*` ដំបូង មិនមែនទីតាំងថេរ ៖ `node --require <exit guard> <script>` ផ្លាស់ទីតាំងវា
     fs.writeFileSync(path.join(bin, 'timeout'), '#!/bin/sh\n' +
-        'printf \'%s\\t%s\\n\' "$3" "$5" >> "$FX_TIMEOUT_LOG"\n' +
+        'script=""; for a in "$@"; do case "$a" in audit-tools/*) script="$a"; break ;; esac; done\n' +
+        'printf \'%s\\t%s\\n\' "$3" "$script" >> "$FX_TIMEOUT_LOG"\n' +
         'exec "$FX_REAL_TIMEOUT" "$@"\n', { mode: 0o755 });
     const env = harnessEnv(dir, { RUNALL_ONLY: deadlineScripts.join(','), RUNALL_JOBS: '3',
         PATH: bin + path.delimiter + process.env.PATH, FX_REAL_TIMEOUT: realTimeout,
@@ -552,11 +649,11 @@ async function sectionSix() {
         const h = path.join(dir, 'plan.sh');
         fs.writeFileSync(h, 'cd ' + JSON.stringify(ROOT) + ' || exit 1\n' + block + '\n'
             + runall.slice(listAt, listEnd).replace(/^#@runner-end$/m, '') + '\n'
-            + 'for i in "${!J_KIND[@]}"; do printf \'%s\\t%s\\t%s\\t%s\\n\' "${J_KIND[$i]}" "${J_LABEL[$i]}" "${J_ID[$i]}" "${J_LANE[$i]}"; done\n'
+            + 'for i in "${!J_KIND[@]}"; do eval "set -- ${J_CMD[$i]}"; owned=0; runall_needs_rtdb "$@" && owned=1; printf \'%s\\t%s\\t%s\\t%s\\t%s\\n\' "${J_KIND[$i]}" "${J_LABEL[$i]}" "${J_ID[$i]}" "${J_LANE[$i]}" "$owned"; done\n'
             + 'for h in $RUNALL_HINTS; do printf \'hint\\t%s\\t%s\\t-\\n\' "${h%%:*}" "${h##*:}"; done\n');
         const r = cp.spawnSync('bash', [h], { encoding: 'utf8', timeout: 60000, env: harnessEnv(dir) });
         plan = String(r.stdout || '').split('\n').filter(Boolean).map((l) => l.split('\t'))
-            .filter((p) => p[0] !== 'hdr').map(([kind, label, id, laneName]) => ({ kind, label, id, lane: laneName }));
+            .filter((p) => p[0] !== 'hdr').map(([kind, label, id, laneName, owned]) => ({ kind, label, id, lane: laneName, owned }));
     }
     const hintRows = plan.filter((p) => p.kind === 'hint');
     plan = plan.filter((p) => p.kind !== 'hint');
@@ -671,8 +768,231 @@ async function sectionSix() {
     const missingFlags = rbFlags.filter((f) => !new RegExp('\\b' + f + ":\\s*'1'").test(shardStep));
     ok('⛔ ជំហាន run-all ក្នុង CI មានទង់ STRICT ទាំងអស់របស់ Runbook (' + rbFlags.length + ') ➜ CI ស្មើការរត់ក្នុង session',
         rbFlags.length >= 4 && shardStep.includes('bash audit-tools/run-all.sh') && missingFlags.length === 0, { rbFlags, missingFlags });
-    ok('CI បើក RTDB emulator មុន run-all (emu/* · money-guardian ពេញ មិនមែន SKIP)',
-        wf.indexOf('java -jar') !== -1 && shardStep.length > 0 && wf.indexOf('java -jar') < wf.indexOf(shardStep));
+    const ownerGuardSource = fs.readFileSync(path.join(ROOT, 'audit-tools/runall-runner-test.js'), 'utf8');
+    const ownerGuardActive = source => {
+        let ast; try { ast = acorn.parse(source, { ecmaVersion: 'latest' }); } catch (_) { return false; }
+        const nodes = []; const visit = node => { if (!node || typeof node !== 'object') return; if (node.type) nodes.push(node); for (const value of Object.values(node)) { if (Array.isArray(value)) value.forEach(visit); else if (value && typeof value === 'object') visit(value); } }; visit(ast);
+        return nodes.some(node => node.type === 'FunctionDeclaration' && node.id?.name === 'sectionOwnedRuntime')
+            && nodes.some(node => node.type === 'CallExpression' && ['ArrowFunctionExpression', 'FunctionExpression'].includes(node.callee?.type)
+                && node.callee.body?.body?.some(statement => statement.type === 'ExpressionStatement' && statement.expression.type === 'AwaitExpression'
+                    && statement.expression.argument.type === 'CallExpression' && statement.expression.argument.callee.name === 'sectionOwnedRuntime'));
+    };
+    ok('owned helper ដែលមិនរាប់ជា checker មាន readiness/ownership guard សកម្ម; missing-guard mutant ត្រូវចាប់',
+        ownerGuardActive(ownerGuardSource) && !ownerGuardActive(ownerGuardSource.replace(/^    await sectionOwnedRuntime\(\);$/m, '')));
+    const internalOwnedRunner = job => job.id === 'emu/import-paired-ci-runner';
+    const internalOwnerContractTest = job => job.id === 'import-paired-ci-runner-test';
+    const expectedOwned = job => !internalOwnedRunner(job) && !internalOwnerContractTest(job) && (job.lane === 'emu' || ['checker-coverage', 'exit-code-integrity'].includes(job.id));
+    ok('CI គ្មាន global JVM ហើយ normal tasks ដែលត្រូវការ RTDB ឆ្លង owned scope ពេញ',
+        !/java -jar|zoe-emulator\.pid/.test(wf) && shardStep.length > 0 && wf.includes('real.rules.json')
+        && jobs.length >= 150 && jobs.every(job => (job.owned === '1') === expectedOwned(job))
+        && jobs.filter(job => job.owned === '1').length >= 26);
+    const base = runall.slice(runall.search(/^if \[ -n "\$BASE" \]/m));
+    const baseCommands = [...base.matchAll(/^\s*([A-Z0-9_]+_APP_DIR)="\$BASE" (runall_owned )?node (audit-tools\/[A-Za-z0-9_/-]+\.js)/gm)];
+    const requiredBase = entry => entry[3].startsWith(EMU) || ['money-guardian-test.js', 'money-checker-truthfulness-test.js', 'exit-code-integrity.js', 'supabase-scan-rules-test.js'].some(name => entry[3] === 'audit-tools/' + name);
+    const missingOwned = text => [...text.matchAll(/^\s*([A-Z0-9_]+_APP_DIR)="\$BASE" (runall_owned )?node (audit-tools\/[A-Za-z0-9_/-]+\.js)/gm)].filter(entry => requiredBase(entry) && !entry[2]);
+    ok('BASE RTDB consumers ប្រើ owned API ដូច normal ដោយរក្សា source overrides ទាំងអស់',
+        baseCommands.filter(requiredBase).length === 18 && missingOwned(base).length === 0
+        && /runall_prepare_command "\$@"/.test(runall));
+    const pairedJobs = jobs.filter(internalOwnedRunner);
+    const pairedContractJobs = jobs.filter(job => job.id === 'import-paired-ci-runner-test');
+    const pairedContractLaneValid = rows => rows.length === 1 && rows[0].lane === 'emu' && rows[0].owned === '0';
+    ok('paired contract lane mutant rejected without an outer owner', pairedContractLaneValid(pairedContractJobs)
+        && !pairedContractLaneValid(pairedContractJobs.map(row => ({ ...row, lane: 'any' }))));
+    const cases = ['I100-cookie-unsigned', 'I100-cookie-signed', 'I100-cookie-mixed', 'I100-cookie-mixed-same-group',
+        'I100-palm-unsigned', 'I100-palm-signed', 'I100-palm-mixed', 'I100-palm-mixed-same-group'];
+    const pairedValid = rows => rows.length === cases.length && cases.every(id => rows.some(row => row.label === 'emu/import-native-' + id))
+        && rows.every(row => row.lane === 'emu' && row.owned === '0');
+    const pairedCalls = [...runall.matchAll(/^run "emu\/import-native-([^"\n]+)" node audit-tools\/emu\/import-paired-ci-runner\.js --case=([^\s]+) --provider=native$/gm)];
+    ok('eight distinct native profiles are serial emu jobs without an outer owner', pairedValid(pairedJobs)
+        && !pairedValid(pairedJobs.map((row, i) => i ? row : ({ ...row, lane: 'any' })))
+        && pairedCalls.length === 8 && pairedCalls.every(match => match[1] === match[2] && cases.includes(match[1])));
+    const prepare = shardProbe('RUNALL_OWNED_DIR=/tmp/synthetic-owner; runall_prepare_command node audit-tools/emu/import-paired-ci-runner.js --case=I100-cookie-unsigned --provider=native; printf \'%s\\n\' "${RUNALL_COMMAND[@]}"; runall_timeout_for node audit-tools/emu/import-paired-ci-runner.js', { CHECKER_TIMEOUT: '300' });
+    ok('actual command preparation injects the existing owner state; timeout remains 300', prepare.status === 0
+        && prepare.stdout.trim().split('\n').join('|') === 'env|IMPORTPAIRED_OWNER_STATE=/tmp/synthetic-owner|node|audit-tools/emu/import-paired-ci-runner.js|--case=I100-cookie-unsigned|--provider=native|300', prepare.stdout);
+    ok('BASE explicitly reports one native diagnostic and passes chosen source and owner scope',
+        /IMPORTPAIRED_BASE_SOURCE="\$BASE"/.test(runall) && /export [^\n]*IMPORTPAIRED_BASE_SOURCE/.test(runall)
+        && /IMPORTPAIRED_OWNER_STATE="\$RUNALL_OWNED_DIR" IMPORTPAIRED_APP_DIR="\$IMPORTPAIRED_BASE_SOURCE" node audit-tools\/emu\/import-paired-ci-runner\.js --case=I100-cookie-unsigned --provider=native/.test(base)
+        && /one case[,;] SQL UNRUN/.test(base) && /PAIRED_BASE_RC=\$\?/.test(base) && /runall_native_summary/.test(base));
+    const pairedDir = newCase([]), pairedScript = path.join(pairedDir, EMU, 'import-paired-ci-runner.js');
+    fs.writeFileSync(pairedScript, "const fs=require('fs'),path=require('path');const d=process.env.IMPORTPAIRED_OWNER_STATE;const name=process.argv[2].slice(7);"
+        + "if(!d||process.env.FX_OWNED_SCOPE)process.exit(4);"
+        + "const log=(x)=>fs.appendFileSync(process.env.FX_LOG,x+' '+name+' '+Date.now()+' '+process.pid+'\\n');"
+        + "if(fs.existsSync(path.join(d,'active'))||fs.existsSync(path.join(d,'blocked.json'))){log('refused');console.log('FAIL owned state');process.exit(1)}"
+        + "fs.mkdirSync(path.join(d,'active'));log('start');if(process.env.FX_HANG==='1')setInterval(()=>{},1<<30);else setTimeout(()=>{if(process.env.FX_UNKNOWN!=='1')fs.rmdirSync(path.join(d,'active'));log('end');"
+        + "if(process.env.FX_FAILURE==='1')console.log('FAIL fixture');else console.log('IMPORT_PAIRED_CI_RESULT '+JSON.stringify({status:'PASS',scope:'NATIVE_ONLY',sql:'UNRUN',crossProviderParity:'UNRUN_SINGLE_PROVIDER',profiles:[{id:name,status:'PASS',outcome:'PROVEN',phase:null,category:null,ownerDiagnostic:null,childDiagnostic:null,output:{stdoutBytes:1,stderrBytes:0,unexpectedLines:0,failureLines:0,skipLines:0,warningLines:0,vmWarnings:0,vmErrors:0,vmUnsupported:0,vmCountStatus:'FINAL',overflow:false,streamCountsComplete:true,countsComplete:true}}],sourceHashes:{raw:'a'.repeat(64),instrumented:'b'.repeat(64)},nativeRulesSha256:'c'.repeat(64),nativeRulesHashStatus:'VERIFIED_AFTER',emulatorJarSHA256:'d'.repeat(64),emulatorJarHashStatus:'REPORTED_BY_OWNER',batchSha256:'e'.repeat(64)}));process.exit(process.env.FX_FAILURE==='1'?1:0)},20);");
+    const pairedBody = cases.slice(0,2).map(id => 'run "emu/import-native-' + id + '" node audit-tools/emu/import-paired-ci-runner.js --case=' + id + ' --provider=native').join('\n');
+    // Restore actual command preparation: the generic fixture overrides it to avoid real owner startup.
+    const actualPrep = runall.slice(runall.indexOf('runall_prepare_command() {'), runall.indexOf('\nrunall_owned() {'));
+    const safeFakeBody = actualPrep + '\n' + pairedBody;
+    const summaryId='I100-cookie-unsigned', summaryLabel='emu/import-native-'+summaryId;
+    const validSummary={status:'PASS',scope:'NATIVE_ONLY',sql:'UNRUN',crossProviderParity:'UNRUN_SINGLE_PROVIDER',profiles:[{id:summaryId,status:'PASS',outcome:'PROVEN',phase:null,category:null,ownerDiagnostic:null,childDiagnostic:null,output:{stdoutBytes:1,stderrBytes:0,unexpectedLines:0,failureLines:0,skipLines:0,warningLines:0,vmWarnings:0,vmErrors:0,vmUnsupported:0,vmCountStatus:'FINAL',overflow:false,streamCountsComplete:true,countsComplete:true}}],sourceHashes:{raw:'a'.repeat(64),instrumented:'b'.repeat(64)},nativeRulesSha256:'c'.repeat(64),nativeRulesHashStatus:'VERIFIED_AFTER',emulatorJarSHA256:'d'.repeat(64),emulatorJarHashStatus:'REPORTED_BY_OWNER',batchSha256:'e'.repeat(64)};
+    const summaryPrefix='IMPORT_PAIRED_CI_RESULT ';
+    function summaryFixture(lines,code=0,id=summaryId){
+        const d=newCase([[EMU+'import-paired-ci-runner.js',{out:lines,code}]]);
+        return runHarness(d,actualPrep+'\nrun "emu/import-native-'+id+'" node audit-tools/emu/import-paired-ci-runner.js --case='+id+' --provider=native',{RUNALL_JOBS:'2',TMPDIR:d});
+    }
+    const summaryOkay=summaryFixture([summaryPrefix+JSON.stringify(validSummary)]);
+    const summaryHostile=summaryFixture([summaryPrefix+JSON.stringify({...validSummary,hostile:'SYNTHETIC_SECRET_CANARY'}),'SYNTHETIC_EXTRA_CANARY']);
+    ok('native success prints validated case and identities; extra canary output fails without disclosure', summaryOkay.rc===0
+        && summaryOkay.out.includes('native-result:') && summaryOkay.out.includes('UNRUN_SINGLE_PROVIDER')
+        && summaryOkay.out.includes(validSummary.sourceHashes.raw) && summaryHostile.rc!==0
+        && !/SYNTHETIC_(SECRET|EXTRA)_CANARY/.test(summaryHostile.out),summaryHostile.out);
+    const summaryInvalid=summaryFixture([summaryPrefix+'{not-json']);
+    const summaryDuplicate=summaryFixture([summaryPrefix+JSON.stringify(validSummary),summaryPrefix+JSON.stringify(validSummary)]);
+    const summaryHashArray=summaryFixture([summaryPrefix+JSON.stringify({...validSummary,sourceHashes:{...validSummary.sourceHashes,raw:['a'.repeat(64)]}})]);
+    const summaryMissing=summaryFixture(['ok fixture']);const summarySkip=summaryFixture(['SKIP SYNTHETIC_SKIP_CANARY']);
+    const summaryWrong=summaryFixture([summaryPrefix+JSON.stringify({...validSummary,profiles:[{...validSummary.profiles[0],id:'I100-palm-signed'}]})]);
+    const summaryContradiction=summaryFixture([summaryPrefix+JSON.stringify({...validSummary,profiles:[{...validSummary.profiles[0],output:{...validSummary.profiles[0].output,vmWarnings:1}}]})]);
+    const summaryFailure=summaryFixture([summaryPrefix+JSON.stringify(validSummary),'SYNTHETIC_FAILURE_CANARY'],1);
+    ok('invalid JSON, duplicate anchored summaries and nonzero exit never produce a success summary',
+        summaryInvalid.rc!==0 && summaryDuplicate.rc!==0 && summaryHashArray.rc!==0 && summaryMissing.rc!==0 && summarySkip.rc!==0 && summaryWrong.rc!==0 && summaryContradiction.rc!==0
+        && !summarySkip.out.includes('SYNTHETIC_SKIP_CANARY') && !summaryInvalid.out.includes('native-result:') && !summaryDuplicate.out.includes('native-result:')
+        && summaryFailure.rc!==0 && !summaryFailure.out.includes('native-result:') && !summaryFailure.out.includes('SYNTHETIC_FAILURE_CANARY'),
+        {invalid:summaryInvalid.out,duplicate:summaryDuplicate.out,failure:summaryFailure.out});
+    const validFailure={...validSummary,status:'FAIL',profiles:[{id:summaryId,status:'FAIL',outcome:'UNKNOWN',phase:'CHILD_EVIDENCE',category:'ASSERTION_FAILED',ownerDiagnostic:null,childDiagnostic:null,output:null}],sourceHashes:null,nativeRulesHashStatus:'OBSERVED_PRECHECK',emulatorJarHashStatus:'REPORTED_BY_OWNER',batchSha256:null};
+    const projectedFailure=summaryFixture([summaryPrefix+JSON.stringify(validFailure),'FAIL native import case; evidence retained'],1);
+    ok('validated native failure projects phase/category, observed hashes and UNKNOWN only',projectedFailure.rc!==0
+        && projectedFailure.out.includes('native-failure:') && projectedFailure.out.includes('CHILD_EVIDENCE')
+        && projectedFailure.out.includes('ASSERTION_FAILED') && projectedFailure.out.includes('OBSERVED_PRECHECK')
+        && projectedFailure.out.includes('UNKNOWN') && projectedFailure.out.includes(validFailure.nativeRulesSha256),projectedFailure.out);
+    const lowerBoundCounts={stdoutBytes:50,stderrBytes:17,unexpectedLines:2,failureLines:1,skipLines:0,warningLines:1,vmWarnings:2,vmErrors:1,vmUnsupported:0,vmCountStatus:'LOWER_BOUND',overflow:false,streamCountsComplete:false,countsComplete:false};
+    const countsFailure=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],output:lowerBoundCounts}]})],1);
+    let countProjection=null;try{countProjection=JSON.parse((/native-failure: (\{[^\n]+\})/.exec(countsFailure.out)||[])[1]);}catch(_){}
+    const preflightFailure=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],phase:'PREFLIGHT',category:'PREFLIGHT_FAILED',output:null}],nativeRulesSha256:null,nativeRulesHashStatus:'UNAVAILABLE',emulatorJarSHA256:null,emulatorJarHashStatus:'UNAVAILABLE'})],1);
+    let preflightProjection=null;try{preflightProjection=JSON.parse((/native-failure: (\{[^\n]+\})/.exec(preflightFailure.out)||[])[1]);}catch(_){}
+    const unknownCounts={...lowerBoundCounts,vmWarnings:null,vmErrors:null,vmUnsupported:null,vmCountStatus:'UNKNOWN'};
+    const unknownFailure=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],output:unknownCounts}]})],1);
+    let unknownProjection=null;try{unknownProjection=JSON.parse((/native-failure: (\{[^\n]+\})/.exec(unknownFailure.out)||[])[1]);}catch(_){}
+    ok('failure counts are validated and projected with lower-bound status; preflight stays null',countsFailure.rc!==0
+        && JSON.stringify(countProjection?.output)===JSON.stringify(lowerBoundCounts) && preflightFailure.rc!==0 && preflightProjection?.output===null
+        && unknownFailure.rc!==0 && JSON.stringify(unknownProjection?.output)===JSON.stringify(unknownCounts),
+        {counts:countsFailure.out,preflight:preflightFailure.out});
+    const invalidCount=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],output:{...lowerBoundCounts,vmWarnings:'SYNTHETIC_COUNTER_CANARY'}}]})],1);
+    const contradictoryCount=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],output:{...lowerBoundCounts,countsComplete:true}}]})],1);
+    const extraCount=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],output:{...lowerBoundCounts,secret:'SYNTHETIC_EXTRA_CANARY'}}]})],1);
+    ok('malformed or contradictory counts stay UNKNOWN without publishing canaries',
+        [invalidCount,contradictoryCount,extraCount].every(x=>x.rc!==0&&x.out.includes('native outcome UNKNOWN')&&!x.out.includes('native-failure:'))
+        && !/SYNTHETIC_(COUNTER|EXTRA)_CANARY/.test(invalidCount.out+extraCount.out));
+    const badHash=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,nativeRulesSha256:'SYNTHETIC_HASH_CANARY'})],1);
+    const badHashArray=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,nativeRulesSha256:['c'.repeat(64)]})],1);
+    const badOutcome=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],outcome:'APPLIED'}]})],1);
+    const badExtra=summaryFixture([summaryPrefix+JSON.stringify(validFailure),'SYNTHETIC_FAILURE_EXTRA_CANARY'],1);
+    ok('malformed hash, false definite outcome and extra failure output stay fixed UNKNOWN without canaries',
+        [badHash,badHashArray,badOutcome,badExtra].every(x=>x.rc!==0&&x.out.includes('native outcome UNKNOWN')&&!x.out.includes('native-failure:'))
+        && !/SYNTHETIC_(HASH|FAILURE_EXTRA)_CANARY/.test(badHash.out+badExtra.out),{badHash:badHash.out,badOutcome:badOutcome.out,badExtra:badExtra.out});
+    const diagnosticOwner={status:'FAIL',cleanup:'WRAPPER_CONFIRMED',commandStarted:true,commandCompleted:true,childCode:1,childSignal:'NONE',outputPresent:true,failureLine:true,skipLine:false,snapshot:'OBSERVED_POINT_IN_TIME_ONLY',snapshotReason:null};
+    const diagnosticChild={evidence:'PRIVATE_CHILD_REPORTED',ledger:'FAIL',category:'WAIT_TIMEOUT_REPORTED',wait:'AUTHORITATIVE_100',location:{file:'import-paired-sdk-test.js',function:'until'},assertionDiagnostic:null,aggregate:null};
+    const diagnosticFailure=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],ownerDiagnostic:diagnosticOwner,childDiagnostic:diagnosticChild}]})],1);
+    let diag=null;try{diag=JSON.parse((/native-failure: (\{[^\n]+\})/.exec(diagnosticFailure.out)||[])[1]);}catch(_){}
+    ok('native FAIL projects only wrapper-confirmed, bounded private child attribution',diagnosticFailure.rc!==0&&diag?.outcome==='UNKNOWN'
+        && JSON.stringify(diag.ownerDiagnostic)===JSON.stringify(diagnosticOwner)&&JSON.stringify(diag.childDiagnostic)===JSON.stringify(diagnosticChild),diagnosticFailure.out);
+    const aggregateCounts={historyGroups:8,historyBarcodes:99,historyUniqueBarcodes:99,registryEntries:99,operationsAdmitted:1,operationsPrepared:0,operationsCommitted:99,operationsCancelled:0,operationsOther:0,journalStorageKeys:1,capturedEvents:0,pendingJournalOperations:null};
+    const aggregate={schema:1,evidence:'PRIVATE_CHILD_REPORTED',availability:'AVAILABLE',consistency:'POST_TIMEOUT_NONATOMIC',case:'I100-cookie-unsigned',phase:'FIRST_IMPORT',error:'AUTHORITATIVE_100_TIMEOUT',counts:aggregateCounts};
+    const aggregateSummary=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],ownerDiagnostic:diagnosticOwner,childDiagnostic:{...diagnosticChild,aggregate}}]})],1);
+    let aggregateOut=null;try{aggregateOut=JSON.parse((/native-failure: (\{[^\n]+\})/.exec(aggregateSummary.out)||[])[1]);}catch(_){}
+    ok('only synthetic post-timeout checkpoint counts project as child-reported UNKNOWN',aggregateSummary.rc!==0&&aggregateOut?.outcome==='UNKNOWN'&&JSON.stringify(aggregateOut.childDiagnostic.aggregate)===JSON.stringify(aggregate),aggregateSummary.out);
+    const emptyAggregate={...aggregate,counts:{...aggregateCounts,historyGroups:0,historyBarcodes:0,historyUniqueBarcodes:0,registryEntries:0,operationsAdmitted:0,operationsPrepared:0,operationsCommitted:0,operationsCancelled:0,operationsOther:0}};
+    const emptyAggregateRun=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],ownerDiagnostic:diagnosticOwner,childDiagnostic:{...diagnosticChild,aggregate:emptyAggregate}}]})],1);
+    ok('observed empty root counts stay zero but outcome remains UNKNOWN',emptyAggregateRun.rc!==0&&emptyAggregateRun.out.includes('\"outcome\":\"UNKNOWN\"')&&emptyAggregateRun.out.includes('\"historyBarcodes\":0')&&emptyAggregateRun.out.includes('\"pendingJournalOperations\":null'));
+    const duplicate101={...aggregate,counts:{...aggregateCounts,historyBarcodes:101,historyUniqueBarcodes:100,registryEntries:100}};
+    const duplicate101Run=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],ownerDiagnostic:diagnosticOwner,childDiagnostic:{...diagnosticChild,aggregate:duplicate101}}]})],1);
+    let duplicate101Out=null;try{duplicate101Out=JSON.parse((/native-failure: (\{[^\n]+\})/.exec(duplicate101Run.out)||[])[1]);}catch(_){}
+    ok('101 barcode entries with 100 distinct fixture codes remain a valid UNKNOWN observation',duplicate101Run.rc!==0&&duplicate101Out?.outcome==='UNKNOWN'&&JSON.stringify(duplicate101Out?.childDiagnostic?.aggregate)===JSON.stringify(duplicate101),duplicate101Run.out);
+    const aggregateUnavailable={...aggregate,availability:'UNAVAILABLE',counts:Object.fromEntries(Object.keys(aggregateCounts).map(key=>[key,null]))};
+    const unavailableAggregateRun=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],ownerDiagnostic:diagnosticOwner,childDiagnostic:{...diagnosticChild,aggregate:aggregateUnavailable}}]})],1);
+    ok('unavailable checkpoint remains UNKNOWN with null counts',unavailableAggregateRun.rc!==0&&unavailableAggregateRun.out.includes('\"availability\":\"UNAVAILABLE\"')&&unavailableAggregateRun.out.includes('\"historyBarcodes\":null'));
+    const invalidAggregates=[{...aggregate,raw:'SYNTHETIC_AGGREGATE_CANARY'},{...aggregate,case:'I100-palm-signed'},{...aggregate,counts:{...aggregateCounts,historyBarcodes:10001}},{...aggregate,counts:{...aggregateCounts,pendingJournalOperations:0}},{...aggregate,counts:{...aggregateCounts,operationsOther:1}},{...aggregate,counts:{...aggregateCounts,historyUniqueBarcodes:100}},{...aggregate,counts:{...aggregateCounts,historyBarcodes:101,historyUniqueBarcodes:101}},{...aggregate,counts:{...aggregateCounts,registryEntries:101}},{...aggregate,counts:{...aggregateCounts,historyGroups:0}},{...aggregate,counts:{...aggregateCounts,historyUniqueBarcodes:0}},{...aggregate,counts:{...aggregateCounts,operationsAdmitted:10000}},{...aggregate,availability:'UNAVAILABLE'}];
+    const invalidAggregateRuns=invalidAggregates.map(a=>summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],ownerDiagnostic:diagnosticOwner,childDiagnostic:{...diagnosticChild,aggregate:a}}]})],1));
+    const wrongWaitAggregate=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],ownerDiagnostic:diagnosticOwner,childDiagnostic:{...diagnosticChild,wait:'ORIGINS_ACK_FENCE',aggregate}}]})],1);
+    ok('foreign case, wrong wait, forged keys, overflow and false pending counts reject aggregate without leakage',
+        [...invalidAggregateRuns,wrongWaitAggregate].every(x=>x.rc!==0&&x.out.includes('native outcome UNKNOWN')&&!x.out.includes('native-failure:'))
+        && !invalidAggregateRuns.some(x=>x.out.includes('SYNTHETIC_AGGREGATE_CANARY')));
+    const mixedId='I100-cookie-mixed-same-group',mixedCounts={...aggregateCounts,originsMatched:97,originsMissingOrOther:2},mixedAggregate={...aggregate,case:mixedId,error:'ORIGINS_ACK_FENCE_TIMEOUT',counts:mixedCounts};
+    const mixedResult=child=>({...validFailure,profiles:[{...validFailure.profiles[0],id:mixedId,ownerDiagnostic:diagnosticOwner,childDiagnostic:child}]});
+    const mixedChild={...diagnosticChild,wait:'ORIGINS_ACK_FENCE',aggregate:mixedAggregate};
+    const mixedRun=summaryFixture([summaryPrefix+JSON.stringify(mixedResult(mixedChild))],1,mixedId);let mixedOut=null;try{mixedOut=JSON.parse((/native-failure: (\{[^\n]+\})/.exec(mixedRun.out)||[])[1]);}catch(_){}
+    const mixedBad=summaryFixture([summaryPrefix+JSON.stringify(mixedResult({...mixedChild,aggregate:{...mixedAggregate,counts:{...mixedCounts,originsMatched:98}}}))],1,mixedId);
+    const mixedSecret=summaryFixture([summaryPrefix+JSON.stringify(mixedResult({...mixedChild,aggregate:{...mixedAggregate,counts:{...mixedCounts,originsMatched:'SYNTHETIC_ORIGIN_CANARY'}}}))],1,mixedId);
+    const assertionChild={...diagnosticChild,category:'ASSERTION_REPORTED',wait:null,assertionDiagnostic:{phase:'FIRST_ORACLE',assertionId:'core.prices-incarnations.mirrors'}};
+    const assertionRun=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],ownerDiagnostic:diagnosticOwner,childDiagnostic:assertionChild}]})],1);let assertionOut=null;try{assertionOut=JSON.parse((/native-failure: (\{[^\n]+\})/.exec(assertionRun.out)||[])[1]);}catch(_){}
+    const assertionSecret=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],ownerDiagnostic:diagnosticOwner,childDiagnostic:{...assertionChild,assertionDiagnostic:{...assertionChild.assertionDiagnostic,extra:'SYNTHETIC_LABEL_CANARY'}}}]})],1);
+    ok('mixed origins and fixed assertion labels project only bounded child evidence; canaries fail closed',mixedRun.rc!==0&&mixedOut?.outcome==='UNKNOWN'&&JSON.stringify(mixedOut?.childDiagnostic?.aggregate)===JSON.stringify(mixedAggregate)&&assertionRun.rc!==0&&JSON.stringify(assertionOut?.childDiagnostic?.assertionDiagnostic)===JSON.stringify(assertionChild.assertionDiagnostic)&&[mixedBad,mixedSecret,assertionSecret].every(x=>x.rc!==0&&!x.out.includes('native-failure:'))&&!/SYNTHETIC_(ORIGIN|LABEL)_CANARY/.test(mixedSecret.out+assertionSecret.out));
+    const eventCounts={categories:{SCAN_EVIDENCE_PENDING:1,LIST_PICKUP:0,LISTENER:0,SUBSCRIPTION:0,TRANSPORT:0,SWEEP:0,CALLBACK:0,CONSOLE:0,HISTORY_MERGE:0,HISTORY_SAVE:0,HISTORY_PATCH:0,PICKUP_COLLECTED:0,PICKUP_RECOVERY:0,CLEANUP_COLLECTED:0,CLEANUP_RECOVERY:0,SCAN_LEDGER:0,SCAN_OUTCOME:0,TX_OUTCOME:0,OTHER:1},codes:{PERMISSION:0,PENDING:0,JOURNAL_UNAVAILABLE:0,EVIDENCE_UNAVAILABLE:0,SDK_UNAVAILABLE:0,TRANSPORT:0,SCOPE_CHANGED:0,OTHER:2},overflow:false};
+    const eventChild={...assertionChild,assertionDiagnostic:{phase:'SAME_BATCH_REPEAT',assertionId:'core.no-source-errors',eventCounts}};
+    const eventRun=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],ownerDiagnostic:diagnosticOwner,childDiagnostic:eventChild}]})],1);let eventOut=null;try{eventOut=JSON.parse((/native-failure: (\{[^\n]+\})/.exec(eventRun.out)||[])[1]);}catch(_){}
+    const eventPoisons=[{...eventCounts,categories:{...eventCounts.categories,OTHER:'SYNTHETIC_EVENT_CANARY'}},{...eventCounts,EXTRA:'SYNTHETIC_EVENT_CANARY'},{...eventCounts,codes:{...eventCounts.codes,OTHER:10001}},{...eventCounts,categories:{...eventCounts.categories,OTHER:-1}},{...eventCounts,overflow:'SYNTHETIC_EVENT_CANARY'}];
+    const eventBad=eventPoisons.map(c=>summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],ownerDiagnostic:diagnosticOwner,childDiagnostic:{...eventChild,assertionDiagnostic:{...eventChild.assertionDiagnostic,eventCounts:c}}}]})],1));
+    ok('captured event categories are bounded and never change native UNKNOWN or expose canaries',eventRun.rc!==0&&eventOut?.outcome==='UNKNOWN'&&JSON.stringify(eventOut.childDiagnostic.assertionDiagnostic.eventCounts)===JSON.stringify(eventCounts)&&eventBad.every(x=>x.rc!==0&&!x.out.includes('native-failure:')&&!x.out.includes('SYNTHETIC_EVENT_CANARY')));
+    const diagnosticBadCleanup=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],ownerDiagnostic:{...diagnosticOwner,cleanup:'UNKNOWN'},childDiagnostic:diagnosticChild}]})],1);
+    const diagnosticCanary=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],ownerDiagnostic:diagnosticOwner,childDiagnostic:{...diagnosticChild,location:{...diagnosticChild.location,file:'SYNTHETIC_PRIVATE_CANARY'}}}]})],1);
+    const diagnosticExtra=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],ownerDiagnostic:{...diagnosticOwner,secret:'SYNTHETIC_EXTRA_CANARY'},childDiagnostic:null}]})],1);
+    const diagnosticFunction=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],ownerDiagnostic:diagnosticOwner,childDiagnostic:{...diagnosticChild,location:{...diagnosticChild.location,function:'SYNTHETIC_FUNCTION_CANARY'}}}]})],1);
+    const diagnosticNumeric=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],ownerDiagnostic:diagnosticOwner,childDiagnostic:{...diagnosticChild,location:{...diagnosticChild.location,line:867530,column:4137}}}]})],1);
+    const diagnosticPass=summaryFixture([summaryPrefix+JSON.stringify({...validSummary,profiles:[{...validSummary.profiles[0],ownerDiagnostic:diagnosticOwner}]})]);
+    ok('unconfirmed cleanup, invalid location, extra fields and diagnostics on PASS fail without leaks',
+        [diagnosticBadCleanup,diagnosticCanary,diagnosticExtra,diagnosticFunction,diagnosticNumeric,diagnosticPass].every(x=>x.rc!==0&&!x.out.includes('native-failure:')&&!x.out.includes('native-result:'))
+        && !/SYNTHETIC_(PRIVATE|EXTRA|FUNCTION)_CANARY|867530|4137/.test(diagnosticCanary.out+diagnosticExtra.out+diagnosticFunction.out+diagnosticNumeric.out));
+    const baseStart=base.indexOf('    if [ -n "$IMPORTPAIRED_BASE_SOURCE" ]'), baseEnd=base.indexOf('    SUPABASE_APP_DIR=',baseStart);
+    const baseBody=baseStart>=0&&baseEnd>baseStart?base.slice(baseStart,baseEnd):'';
+    const baseDir=path.join(TMP,'native-base');fs.mkdirSync(path.join(baseDir,'ZoeW/src'),{recursive:true});fs.writeFileSync(path.join(baseDir,'ZoeW/src/main.tsx'),'synthetic');
+    const baseOwned=path.join(baseDir,'owned');fs.mkdirSync(baseOwned);const baseCapture=path.join(baseDir,'env.txt');
+    const baseProgram='RUNALL_OWNED_DIR='+JSON.stringify(baseOwned)+'\nnode() { if [ "$1" = "-e" ]; then command node "$@"; else printf \'%s|%s\' "$IMPORTPAIRED_APP_DIR" "$IMPORTPAIRED_OWNER_STATE" > "$FX_BASE_CAPTURE"; printf \'%s\\n\' "$FX_BASE_OUTPUT"; return "$FX_BASE_RC"; fi; }\n'+baseBody;
+    const baseEnv={IMPORTPAIRED_BASE_SOURCE:baseDir,FX_BASE_CAPTURE:baseCapture,FX_BASE_OUTPUT:summaryPrefix+JSON.stringify(validSummary),FX_BASE_RC:'0'};
+    const goodBase=shardProbe(baseProgram,baseEnv);
+    const baseIdentity=fs.existsSync(baseCapture)?fs.readFileSync(baseCapture,'utf8'):'';
+    const hostileBase=shardProbe(baseProgram,{...baseEnv,FX_BASE_OUTPUT:baseEnv.FX_BASE_OUTPUT+'\nSYNTHETIC_BASE_CANARY'});
+    const failedBase=shardProbe(baseProgram,{...baseEnv,FX_BASE_OUTPUT:'SYNTHETIC_BASE_FAILURE_CANARY',FX_BASE_RC:'17'});
+    ok('BASE diagnostic uses selected source and owner, hides hostile success/failure output',baseBody.length>0
+        && goodBase.status===0&&goodBase.stdout.includes('native-result:')&&baseIdentity===baseDir+'|'+baseOwned
+        && /FAIL/.test(hostileBase.stdout)&&/native outcome UNKNOWN/.test(hostileBase.stdout)&&!/SYNTHETIC_BASE_CANARY/.test(hostileBase.stdout)
+        && /FAIL.*17/.test(failedBase.stdout)&&!/SYNTHETIC_BASE_FAILURE_CANARY/.test(failedBase.stdout),
+        {good:goodBase.stdout,hostile:hostileBase.stdout,failed:failedBase.stdout});
+    const invalidOwner=path.join(baseDir,'SYNTHETIC_OWNER_PATH_CANARY','missing');
+    const badNativeOpen=shardProbe(baseProgram.replace(JSON.stringify(baseOwned),JSON.stringify(invalidOwner)),baseEnv);
+    ok('BASE native open failure reports fixed FAIL and UNKNOWN without leaking owner path', /FAIL/.test(badNativeOpen.stdout)
+        && /native outcome UNKNOWN/.test(badNativeOpen.stdout) && !/SYNTHETIC_OWNER_PATH_CANARY/.test(badNativeOpen.stdout+badNativeOpen.stderr),
+        {out:badNativeOpen.stdout,error:badNativeOpen.stderr});
+    const testBaseStart=base.indexOf('    if runall_owned_init 2>/dev/null; then'),testBaseEnd=base.indexOf('    SUPABASE_DS_APP_DIR=',testBaseStart);
+    const testBaseBody=testBaseStart>=0&&testBaseEnd>testBaseStart?base.slice(testBaseStart,testBaseEnd):'';
+    const testProgram='BASE='+JSON.stringify(baseDir)+'\nRUNALL_OWNED_DIR='+JSON.stringify(invalidOwner)
+        +'\nrunall_owned_init() { return 0; }\nnode() { printf \'%s\\n\' "$FX_BASE_OUTPUT"; return "$FX_BASE_RC"; }\n'+testBaseBody;
+    const badTestOpen=shardProbe(testProgram,baseEnv);
+    const badTestInit=shardProbe(testProgram.replace('runall_owned_init() { return 0; }','runall_owned_init() { echo SYNTHETIC_INIT_CANARY >&2; return 1; }'),baseEnv);
+    ok('BASE runner-test init/open failures remain fixed FAIL without leaking private paths',testBaseBody.length>0
+        && /FAIL \(BASE exit/.test(badTestOpen.stdout)&&!/SYNTHETIC_OWNER_PATH_CANARY/.test(badTestOpen.stdout+badTestOpen.stderr)
+        && /FAIL \(private output unavailable\)/.test(badTestInit.stdout)&&!/SYNTHETIC_INIT_CANARY/.test(badTestInit.stdout+badTestInit.stderr),
+        {open:badTestOpen.stdout,init:badTestInit.stdout});
+    const pairOk = runHarness(pairedDir, safeFakeBody, { RUNALL_JOBS: '4', TMPDIR: pairedDir });
+    ok('two native fake profiles share one owner state and run serially without outer owner',
+        pairOk.rc === 0 && pairOk.events.length === 4 && maxOverlap(pairOk.events, () => true) === 1, pairOk.out);
+    const pairOnly = runHarness(pairedDir, safeFakeBody, { RUNALL_JOBS: '4', RUNALL_ONLY: 'emu/import-native-I100-cookie-signed', TMPDIR: pairedDir });
+    ok('unique profile label selects exactly that native fake case', pairOnly.rc === 0
+        && pairOnly.events.filter(event => event.kind === 'start').length === 1
+        && pairOnly.events.find(event => event.kind === 'start')?.name === 'I100-cookie-signed', pairOnly.out);
+    const pairById = runHarness(pairedDir, safeFakeBody, { RUNALL_JOBS: '4', RUNALL_ONLY: 'emu/import-paired-ci-runner', TMPDIR: pairedDir });
+    ok('shared script identity selects both fake cases', pairById.rc === 0
+        && pairById.events.filter(event => event.kind === 'start').length === 2, pairById.out);
+    const pairFail = runHarness(pairedDir, safeFakeBody, { RUNALL_JOBS: '4', FX_FAILURE: '1', TMPDIR: pairedDir });
+    ok('settled failures remain failures and later independent profile runs', pairFail.rc !== 0
+        && pairFail.events.filter(event => event.kind === 'start').length === 2, pairFail.out);
+    const pairUnknown = runHarness(pairedDir, safeFakeBody, { RUNALL_JOBS: '4', FX_FAILURE: '1', FX_UNKNOWN: '1', TMPDIR: pairedDir });
+    ok('unresolved active owner prevents later fake profile and remains a failure', pairUnknown.rc !== 0
+        && pairUnknown.events.filter(event => event.kind === 'start').length === 1
+        && pairUnknown.events.filter(event => event.kind === 'refused').length === 1, pairUnknown.out);
+    const pairTimeout = runHarness(pairedDir, safeFakeBody, { RUNALL_JOBS: '4', FX_HANG: '1', TMPDIR: pairedDir }, 1);
+    ok('native fake timeout stays FAIL and prevents a later profile after unresolved ownership', pairTimeout.rc !== 0
+        && pairTimeout.events.filter(event => event.kind === 'start').length === 1
+        && pairTimeout.events.filter(event => event.kind === 'refused').length === 1, pairTimeout.out);
+    const blockedBody = 'runall_owned_init() { RUNALL_OWNED_DIR="$(mktemp -d "${TMPDIR:-/tmp}/zoe-runall-blocked.XXXXXX")"; touch "$RUNALL_OWNED_DIR/blocked.json"; }\n' + safeFakeBody;
+    const pairBlocked = runHarness(pairedDir, blockedBody, { RUNALL_JOBS: '4', TMPDIR: pairedDir });
+    ok('blocked owner prevents both later fake profile admissions', pairBlocked.rc !== 0
+        && pairBlocked.events.filter(event => event.kind === 'start').length === 0
+        && pairBlocked.events.filter(event => event.kind === 'refused').length === 2, pairBlocked.out);
+    const blockedProbe = shardProbe('d="$FX_LOG.blocked"; mkdir -p "$d"; touch "$d/blocked.json"; RUNALL_OWNED_DIR="$d"; runall_cleanup_owned >/dev/null && exit 9; [ -f "$d/blocked.json" ]');
+    ok('blocked owner makes cleanup fail and preserves evidence', blockedProbe.status === 0, blockedProbe.stderr);
+    const baseFixture = 'F03_APP_DIR="$BASE" runall_owned node ' + EMU + 'registry-purge-atomic-sdk-test.js';
+    ok('BASE lost-wrapper mutant ត្រូវបានចាប់ មិនមែនជាការលុប startup guard',
+        missingOwned(baseFixture).length === 0 && missingOwned(baseFixture.replace('runall_owned ', '')).length === 1);
     if (N >= 1 && blockAt !== -1 && listAt !== -1 && listEnd > listAt) {
         const dir2 = path.join(TMP, 'shards');
         fs.mkdirSync(dir2, { recursive: true });
@@ -784,7 +1104,47 @@ async function sectionProgress() {
         && /^  fx-fail\s+.*FAIL/m.test(silent.out), silent.out);
 }
 
+async function sectionOwnedRuntime() {
+    const helper = require(path.join(ROOT, 'audit-tools/owned-rtdb-command.js'));
+    const make = options => {
+        let time = 0, count = 0, engine, changed = false; const calls = [];
+        const handle = kind => { let finish; const value = { child: { pid: ++count }, spawned: Promise.resolve(), done: false };
+            value.exit = new Promise(resolve => { finish = resolve; }); value.ended = () => value.done;
+            value.finish = code => { value.done = true; finish({ code, signal: null, outputPresent: true, failureLine: false, skipLine: false }); }; value.kind = kind; return value; };
+        const adapter = { validateSource() {}, now: () => time, delay: async ms => { time += ms; }, verifyJar: () => ({ jar: '/fake/jar', sha256: 'a'.repeat(64) }),
+            portFree: async () => { if (options.foreign) throw new Error('foreign port'); },
+            launch: () => { calls.push('launch'); engine = handle('engine'); return engine; },
+            identity: pid => ({ pid, start: changed ? 'changed' : 'owned', exe: '/java', args: ['java', ...helper.javaArguments('/fake/jar')] }),
+            ownsListener: () => true, readyRead: async () => { if (options.change) changed = true; return true; },
+            command: () => { calls.push('command'); const child = handle('command'); queueMicrotask(() => child.finish(options.fail ? 17 : 0)); return child; },
+            signal: child => { calls.push('signal'); if (!options.unsettled) child.finish(0); },
+            within: async promise => { if (options.unsettled) throw new Error('cleanup deadline'); return promise; } };
+        return { adapter, calls };
+    };
+    const run = async options => { const fake = make(options); const dir = fs.mkdtempSync(path.join(TMP, 'owned-')); return { fake, dir,
+        value: await helper.runOwnedCommand({ stateDir: dir, args: ['node', 'synthetic.js'], env: { RUNALL_STRICT: '1' } }, fake.adapter) }; };
+    const ownedDir = newCase([[EMU + 'owned-a.js', { ownedProbe: true }], [EMU + 'owned-b.js', { ownedProbe: true }]]);
+    const ownedBody = 'run a node ' + EMU + 'owned-a.js\nrun b node ' + EMU + 'owned-b.js';
+    const owned = runHarness(ownedDir, ownedBody, { RUNALL_JOBS: '2' });
+    let owners = []; try { owners = fs.readFileSync(path.join(ownedDir, 'fx.log.owners'), 'utf8').trim().split('\n').map(line => JSON.parse(line)); } catch (_) {}
+    ok('actual runner tasks require two successive private owner scopes', owned.rc === 0 && owners.length === 2 && new Set(owners.map(row => row.owner)).size === 2, owned.out);
+    const lost = runHarness(ownedDir, 'runall_prepare_command() { RUNALL_COMMAND=("$@"); }\n' + ownedBody, { RUNALL_JOBS: '2' });
+    ok('lost-wrapper behavior mutant cannot run green without owned readiness', lost.rc !== 0 && /missing owned fixture/.test(lost.out), lost.out);
+    const healthy = await run({});
+    ok('owned readiness មុន command ម្តង ហើយ cleanup ពេញ', healthy.value.code === 0 && healthy.value.report.cleanup && healthy.fake.calls.join(',') === 'launch,command,signal');
+    const foreign = await run({ foreign: true });
+    ok('foreign port មិន launch/adopt/signal ឬ dispatch', foreign.value.code !== 0 && foreign.fake.calls.length === 0);
+    const changed = await run({ change: true });
+    ok('foreign PID/start-time mutant មិន signal និងមិនអាច PASS', changed.value.code !== 0 && changed.value.report.cleanup === false && !changed.fake.calls.includes('signal'));
+    const next = make({});
+    const blocked = await helper.runOwnedCommand({ stateDir: changed.dir, args: ['node', 'synthetic.js'], env: { RUNALL_STRICT: '1' } }, next.adapter);
+    ok('cleanup unknown blocks task បន្ទាប់ មិនដាក់ engine ទីពីរ', blocked.code !== 0 && next.calls.length === 0);
+    const failed = await run({ fail: true });
+    ok('original FAIL17 នៅ FAIL17 ទោះ owned cleanup ជោគជ័យ', failed.value.code === 17 && failed.value.report.cleanup === true && failed.value.report.childResult.code === 17);
+}
+
 (async () => {
+    await sectionOwnedRuntime();
     await sectionProgress();
     await sectionFive();
     await sectionSix();

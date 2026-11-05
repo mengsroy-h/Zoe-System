@@ -139,6 +139,7 @@ for (const app of ['ZoeW']) {
         if (palmResetFn) vm.runInContext(palmResetFn, ctx);
         const pushDecls = [
             (src.match(/^ *const pushRuntime = \{[\s\S]*?^ *\};/m) || [])[0],
+            (src.match(/^ *let pushSessionGeneration = .*$/m) || [])[0],
             (src.match(/^ *let pushScheduleRun = .*$/m) || [])[0],
             sliceFn(src, 'resetPushScheduleSession')
         ];

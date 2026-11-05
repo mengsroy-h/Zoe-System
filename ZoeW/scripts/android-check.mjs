@@ -169,6 +169,30 @@ ok('⛔ សិទ្ធិ ACCESS_FINE_LOCATION + ACCESS_COARSE_LOCATION ព្�
     geoUsers.length > 0 && manifestPermissions.has('android.permission.ACCESS_FINE_LOCATION') && manifestPermissions.has('android.permission.ACCESS_COARSE_LOCATION'),
     'ឯកសារ ' + geoUsers.length);
 ok('⛔ គ្មានសិទ្ធិទីតាំងពេលនៅខាងក្រោយ (ACCESS_BACKGROUND_LOCATION)', !manifestPermissions.has('android.permission.ACCESS_BACKGROUND_LOCATION'));
+/* ៣ក. 📷 ក្នុងផ្ទាំង Sign ៖ `<input accept="image/*" capture>` ➜ BridgeWebChromeClient របស់ Capacitor ដែលដំឡើង រក App កាមេរ៉ាតាម
+ *    `new Intent(ACTION_IMAGE_CAPTURE).resolveActivity()` ។ targetSdk ≥ 30 (Android 11+ package visibility) ៖ គ្មាន `<queries>` ➜ App កាមេរ៉ា
+ *    មើលមិនឃើញ ➜ null ➜ Capacitor បើកផ្ទាំងជ្រើសឯកសារជំនួសកាមេរ៉ា ។ `<queries>` ជាកូនផ្ទាល់របស់ `<manifest>` (មិនមែនក្នុង `<application>`) ·
+ *    វាមិនមែនសិទ្ធិ ៖ សំណុំ `<uses-permission>` ដដែល ។ */
+const chromeClientSrc = read('node_modules/@capacitor/android/capacitor/src/main/java/com/getcapacitor/BridgeWebChromeClient.java');
+const targetSdk = Number((read('android/variables.gradle').match(/targetSdkVersion\s*=\s*(\d+)/) || [])[1] || 0);
+const captureUsers = listFiles('src').filter((f) => /<input\b[^>]*\baccept="image\/[^"]*"[^>]*\bcapture=|<input\b[^>]*\bcapture=[^>]*\baccept="image\//.test(read(f)));
+const cameraByVisibility = /new Intent\(MediaStore\.ACTION_IMAGE_CAPTURE\);\s*if \(takePictureIntent\.resolveActivity\(/.test(chromeClientSrc);
+const imageCaptureQueried = (xml) => {
+    const outside = xml.replace(/<!--[\s\S]*?-->/g, '').replace(/<application\b[\s\S]*?<\/application>/g, '');
+    return [...outside.matchAll(/<queries>([\s\S]*?)<\/queries>/g)]
+        .some((m) => /<intent>\s*<action\s+android:name="android\.media\.action\.IMAGE_CAPTURE"\s*\/>\s*<\/intent>/.test(m[1]));
+};
+ok('ជាន់អប្បបរមា ៖ អាន BridgeWebChromeClient.java (Capacitor ដែលដំឡើង) · targetSdk · input capture រូបក្នុង src',
+    chromeClientSrc.length > 2000 && targetSdk > 0 && captureUsers.length > 0 && cameraByVisibility,
+    chromeClientSrc.length + ' · targetSdk ' + targetSdk + ' · ' + captureUsers.join(',') + ' · resolveActivity ' + cameraByVisibility);
+ok('⛔ <queries> IMAGE_CAPTURE ក្នុង AndroidManifest (Android 11+ ៖ 📷 បើកកាមេរ៉ា មិនមែនផ្ទាំងជ្រើសឯកសារ)',
+    targetSdk < 30 || imageCaptureQueried(manifest), 'targetSdk ' + targetSdk);
+ok('ទិសផ្ទុយ ៖ គ្មាន <queries> · <queries> ក្នុងមតិយោបល់ · <queries> ក្នុង <application> · action ផ្សេង ➜ មិនរាប់',
+    !imageCaptureQueried(manifest.replace(/<queries>[\s\S]*?<\/queries>/g, '')) &&
+    !imageCaptureQueried('<manifest><!-- <queries><intent><action android:name="android.media.action.IMAGE_CAPTURE" /></intent></queries> --><application></application></manifest>') &&
+    !imageCaptureQueried('<manifest><application><queries><intent><action android:name="android.media.action.IMAGE_CAPTURE" /></intent></queries></application></manifest>') &&
+    !imageCaptureQueried('<manifest><queries><intent><action android:name="android.media.action.VIDEO_CAPTURE" /></intent></queries><application></application></manifest>') &&
+    imageCaptureQueried('<manifest><queries><intent><action android:name="android.media.action.IMAGE_CAPTURE" /></intent></queries><application></application></manifest>'));
 ok('⛔ សិទ្ធិ REQUEST_INSTALL_PACKAGES (Android 8+ ៖ បើកផ្ទាំងដំឡើង APK ពី App)', manifestPermissions.has('android.permission.REQUEST_INSTALL_PACKAGES'));
 const probeBody = javaMethodBody(apkPluginSrc, 'void probe(');
 ok('probe ៖ HEAD · មិនតាម redirect · មាន = redirect ទៅ *.githubusercontent.com (https) · 404 = គ្មាន',
@@ -217,6 +241,30 @@ ok('info ៖ Android ID តាម Settings.Secure.ANDROID_ID · ការបរ�
 ok('⛔ គ្មានសិទ្ធិទូរស័ព្ទ (READ_PHONE_STATE · READ_PRIVILEGED_PHONE_STATE) · គ្មាន Build.getSerial()',
     !manifestPermissions.has('android.permission.READ_PHONE_STATE') && !manifestPermissions.has('android.permission.READ_PRIVILEGED_PHONE_STATE') && !/getSerial\(/.test(devicePluginSrc));
 ok('Java DeviceInfoPlugin គ្មាន comment', !/\/\/|\/\*/.test(devicePluginSrc.replace(/"(?:[^"\\]|\\.)*"/g, '""')));
+
+/* ── ៣ឃ. សម្អាតរូបកាមេរ៉ា Sign (`ZoeCaptureCleanup`) ─────────────────────────
+ * ⛔ Capacitor `BridgeWebChromeClient` (input `capture`) បង្កើត `JPEG_<ម៉ោង>_<លេខ>.jpg` ក្នុង
+ *    getExternalFilesDir(Pictures) រាល់ការបើកកាមេរ៉ា ហើយមិនលុប ➜ រូបពេញទំហំនៅក្រៅ outbox ដែលអ៊ិនគ្រីប (USB · App ផ្សេង Android ≤ 10)។
+ *    plugin លុបតែឈ្មោះ/ថតនោះ ➜ ឈ្មោះ និងថតត្រូវដេរីវេពីប្រភព Capacitor ពិត (Capacitor ប្តូរ ➜ ក្រហម មិនមែនសម្អាតស្ងាត់ឈប់)។ */
+const capturePluginSrc = read(`android/app/src/main/java/${(appId || '').split('.').join('/')}/CaptureCleanupPlugin.java`);
+const captureJsSrc = read('src/platform/capture-cleanup.ts');
+const capturePluginName = (capturePluginSrc.match(/@CapacitorPlugin\(name = "(\w+)"\)/) || [])[1] || '';
+const chromeSrc = read('node_modules/@capacitor/android/capacitor/src/main/java/com/getcapacitor/BridgeWebChromeClient.java');
+const imageFileBody = javaMethodBody(chromeSrc, 'File createImageFile(');
+ok('ជាន់អប្បបរមា ៖ អាន CaptureCleanupPlugin.java · src/platform/capture-cleanup.ts · BridgeWebChromeClient.createImageFile', capturePluginSrc.length > 1500 && captureJsSrc.length > 500 && imageFileBody.length > 100,
+    capturePluginSrc.length + ' · ' + captureJsSrc.length + ' · ' + imageFileBody.length);
+ok('ឈ្មោះ plugin Java ស្មើ CAPTURE_CLEANUP_PLUGIN_NAME ក្នុង JS', !!capturePluginName && captureJsSrc.includes(`export const CAPTURE_CLEANUP_PLUGIN_NAME = '${capturePluginName}';`), capturePluginName);
+ok('MainActivity ៖ registerPlugin(CaptureCleanupPlugin.class) មុន super.onCreate (load() សម្អាតមុនទំព័រផ្ទុក)', /registerPlugin\(CaptureCleanupPlugin\.class\);/.test(beforeSuper));
+ok('Capacitor បង្កើតរូបកាមេរ៉ាជា "JPEG_" + SimpleDateFormat("yyyyMMdd_HHmmss") + "_" + createTempFile(…, ".jpg", getExternalFilesDir(DIRECTORY_PICTURES)) ដូច CAPTURE_NAME',
+    /"JPEG_" \+ timeStamp \+ "_"/.test(imageFileBody) && /new SimpleDateFormat\("yyyyMMdd_HHmmss"\)/.test(imageFileBody) &&
+    /getExternalFilesDir\(Environment\.DIRECTORY_PICTURES\)/.test(imageFileBody) && /File\.createTempFile\(imageFileName, "\.jpg", storageDir\)/.test(imageFileBody) &&
+    capturePluginSrc.includes('Pattern.compile("JPEG_\\\\p{Nd}{8}_\\\\p{Nd}{6}_[0-9]{1,20}\\\\.jpg")') && /getExternalFilesDir\(Environment\.DIRECTORY_PICTURES\)/.test(capturePluginSrc));
+ok('ថតច្បាប់ចម្លងចែករំលែក ស្មើ queued-photo-output.ts (cache/queue-photo/<sha256>/<ឈ្មោះ>.jpg)',
+    /static final String QUEUE_PHOTO_DIR = "queue-photo";/.test(capturePluginSrc) && read('src/platform/queued-photo-output.ts').includes("const path = 'queue-photo/' + hash + '/' + filename;"));
+const captureJsMethods = new Set([...captureJsSrc.matchAll(/captureCleanupPlugin\.(\w+)\(/g)].map((m) => m[1]));
+const captureJavaMethods = new Set([...capturePluginSrc.matchAll(/@PluginMethod\s+public void (\w+)\(PluginCall call\)/g)].map((m) => m[1]));
+ok('JS ហៅតែ method ដែល Java មាន @PluginMethod (ZoeCaptureCleanup)', captureJsMethods.size >= 1 && [...captureJsMethods].every((m) => captureJavaMethods.has(m)), [...captureJsMethods].join(','));
+ok('Java CaptureCleanupPlugin គ្មាន comment', !/\/\/|\/\*/.test(capturePluginSrc.replace(/"(?:[^"\\]|\\.)*"/g, '""')));
 
 /* ── ៤. Logo ──────────────────────────────────────────────────────────── */
 const DENSITIES = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };

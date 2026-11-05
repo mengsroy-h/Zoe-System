@@ -24,6 +24,8 @@ import { barcodeRegistryKey } from '../src/domain/registry';
 import { clearCustomerDataTableCache } from '../src/features/customer-table';
 import { ZTO_LIST_IMPORT_CONCURRENCY, ZTO_LIST_IMPORT_MAX, importZtoListRows } from '../src/features/zto-list-sync';
 import { clearZtoPickupStatusStore } from '../src/features/zto-status';
+import { createScanEvidenceJournal } from '../src/services/scan-evidence';
+import { pendingScanScope } from '../src/services/scan-pending';
 
 const NOW = Date.UTC(2026, 9, 6, 3, 0, 0);
 const HISTORY = 'zoew_scan_history_cod_dod';
@@ -474,7 +476,13 @@ it('ការបញ្ចូលជួរយករួចស្របគ្នា�
     for (const entry of rows) (entry as any).ztoClosed = true;
     loadList(rows);
     Object.assign(ztoState.ztoListSyncResult, { verifiedAt: NOW, verifiedServerAt: NOW });
+    const captured: any[] = [];
+    (window as any).ZoeErrors = { capture: (error: any, extra: any) => { captured.push(extra && extra.context); } };
+    uiState.toasts = [];
     await importZtoListRows();
+    expect(captured.filter((context) => context === 'scan evidence pending'), 'ជួរ lane ផ្សេងដែលកំពុងរត់ មិនមែនភស្តុតាងដែលនៅជាប់').toEqual([]);
+    expect(uiState.toasts.filter((toast: any) => /បានរក្សាទុក និងផ្ទៀងប្រាក់រួច|មិនទាន់មានភស្តុតាងបញ្ចប់/.test(toast.msg))).toEqual([]);
+    expect(createScanEvidenceJournal(appLocalStore, 2).list(pendingScanScope())).toEqual([]);
     expect(lab.maxClaimOverlap).toBeGreaterThanOrEqual(2);
     expect(tally()).toEqual({ saved: rows.length, pending: 0, failed: 0, notTried: 0 });
     const stored = Object.values(lab.store[HISTORY] || {}).flatMap((item: any) => item.barcodes);
@@ -484,4 +492,7 @@ it('ការបញ្ចូលជួរយករួចស្របគ្នា�
     expect(ledger.codDollar).toBe(rows.reduce((sum, entry) => sum + entry.cod, 0));
     expect(ledger.totalCount).toBe(rows.length);
     expect(numberAfter('🔒 យករួច')).toBe(rows.length);
+    const pickup = (lab.store.zoew_daily_pickup_cod_dod || {})['2026-10-05'] || {};
+    expect(pickup.packagesPickedUp, 'lane ស្របគ្នាទាំងអស់ចូល «យករួច» ម្តង (CAS revision ប្រកួតគ្នា)').toBe(rows.length);
+    expect(Object.keys(pickup.pickedUpBarcodes || {}).sort()).toEqual(rows.map((entry) => barcodeRegistryKey(entry.barcode)).sort());
 }, 20000);

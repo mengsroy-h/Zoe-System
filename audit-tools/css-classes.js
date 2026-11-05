@@ -96,3 +96,4 @@ if (problems) {
     process.exit(1);
 }
 console.log('\n✅ គ្រប់ class ដែលប្រើ មានច្បាប់ CSS · គ្មាន CSS ស្លាប់ក្រៅ allowlist ដែលមានហេតុផល');
+process.exitCode = 0;

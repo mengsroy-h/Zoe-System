@@ -56,7 +56,7 @@ function scenario(name, fn) {
 function readOr(file) { try { return fs.readFileSync(file, 'utf8'); } catch (_) { return ''; } }
 
 const SRC = readOr(APP_JS);
-const protocolRuntime = moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
+const protocolRuntime = moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
 const HTML = readOr(INDEX_HTML);
 const RULES = readOr(RULES_JSON);
 
@@ -422,7 +422,7 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
     }
     function snap(p) { const value = clone(read(p)); return { exists: () => value !== null, val: () => clone(value) }; }
     const box = {
-        crypto: require('crypto').webcrypto, console, queueMicrotask, Date, Intl, setTimeout, clearTimeout, Promise, Set, Map,
+        crypto: require('crypto').webcrypto, console, queueMicrotask, Date, Intl, setTimeout, clearTimeout, Promise, Set, Map, WeakMap, performance: require('node:perf_hooks').performance,
         db: { app: { options: { databaseURL: 'https://collected-fixture.invalid' } } },
         auth: { currentUser: { uid: 'fixture-user' } }, isInitializingFirebase: false, dataState: { pickupPendingVersion: 0 },
         authGeneration: 0, dbRefHistory: { path: HISTORY }, dbRefDeleted: { path: TRASH },
@@ -469,7 +469,7 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
         'CLEANUP_STAGE_SLOT', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_UNDO',
         'RESTORE_CLAIM_LEASE_MS', 'DB_OP_TIMEOUT_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'DAILY_COLLECTED_KEEP_DAYS',
         'ABANDON_AGE_MS', 'TWO_HOURS_MS', 'TRASH_RETENTION_MS', 'RETURNED_TRASH_RETENTION_MS', 'LEDGER_OP_RING_MAX', 'ZTO_TRASH_MODE_ACTIVE_MS', 'TRASH_FINAL_CONFIRM_NOTE', 'RESTORE_IN_PROGRESS_CLOSE_TEXT', 'COLLECTED_SETTLE_HOLD_MS', 'TRASH_REASON_META',
-        'PICKUP_KEY_ADD_MAX', 'pickupAddClock', 'pickupKeyLastAdd']) {
+        'PICKUP_KEY_ADD_MAX', 'pickupAddClock', 'pickupKeyLastAdd', 'monthlyQueues', 'livePriceTokens', 'priceOperationSeen', 'PRICE_HISTORY_ROOT', 'PRICE_LIVE_LOCK_PREFIX']) {
         const declaration = operationDeclarations.filter(node => node.type === 'VariableDeclaration').flatMap(node => node.declarations).find(node => node.id.name === name);
         if (declaration && !protocolRuntime.names.has(name)) box[name] = vm.runInContext("(" + SRC.slice(declaration.init.start, declaration.init.end) + ")", box);
     }
@@ -515,13 +515,21 @@ function holdHistoryReply(s) {
     let reached;
     const arrival = new Promise(resolve => { reached = resolve; });
     const transaction = s.box.fb.runTransaction;
+    const update = s.box.fb.update;
+    let held = false;
+    const hold = result => new Promise((resolve, reject) => {
+        held = true;
+        release = async () => { try { resolve(await result); } catch (error) { reject(error); } };
+        reached();
+    });
     s.box.fb.runTransaction = (ref, updater) => {
         const result = transaction(ref, updater);
-        if (ref.path !== HISTORY + '/fixture_item') return result;
-        return new Promise(resolve => {
-            release = async () => resolve(await result);
-            reached();
-        });
+        if (held || ref.path !== HISTORY + '/fixture_item') return result;
+        return hold(result);
+    };
+    s.box.fb.update = (ref, updates) => {
+        if (held || updates[HISTORY + '/fixture_item/pricePending/phase'] !== 'history') return update(ref, updates);
+        return hold(update(ref, updates));
     };
     return {
         async started() {
@@ -831,12 +839,18 @@ async function closeOperation(s, method, closed) {
             let release;
             const transaction = s.box.fb.runTransaction;
             const held = delay === 'collected' ? holdNextCollectedWrite(s) : null;
+            const commitUpdate = s.box.fb.update;
             if (delay === 'history') s.box.fb.runTransaction = (ref, updater) => {
                 const result = transaction(ref, updater);
                 return Promise.resolve(result).then(snapshot => {
                     if (ref.path !== HISTORY + '/fixture_item' || release || snapshot.snapshot.val()?.pricePending?.phase !== 'history') return snapshot;
                     return new Promise(resolve => { release = async () => resolve(snapshot); });
                 });
+            };
+            if (delay === 'history') s.box.fb.update = (ref, updates) => {
+                const result = commitUpdate(ref, updates);
+                if (release || updates[HISTORY + '/fixture_item/pricePending/phase'] !== 'history') return result;
+                return Promise.resolve(result).then(() => new Promise(resolve => { release = async () => resolve(); }));
             };
             editOperation(s, 24.5, 1.75);
             for (let count = 0; !release && count < 30; count++) {

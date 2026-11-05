@@ -148,7 +148,8 @@ async function supabaseReal(tree: any): Promise<Backend & { close: () => void }>
                 });
                 return { docs: out };
             }
-            if (fn !== 'zoe_write') throw new Error('unexpected ' + fn);
+            if (fn !== 'zoe_write_v2') throw new Error('unexpected ' + fn);
+            expect.soft(args.p_expected_tenant).toBe('t1');
             const size = JSON.stringify(args.p_ops).length;
             const collectedOps = args.p_ops.filter((op: any) => op.p[0] === COLLECTED);
             if (collectedOps.length) { bytes += size; collectedOps.forEach((op: any) => paths.push(op.p.join('/'))); }

@@ -26,10 +26,11 @@ function fakeBackend() {
     const reply = (body: any) => Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } }));
     const fetch = async (input: any, init: any) => {
         const u = String(input && input.url ? input.url : input);
-        const fn = (u.match(/\/rpc\/([a-z_]+)/) || [])[1] || u;
+        const fn = (u.match(/\/rpc\/([a-z0-9_]+)/) || [])[1] || u;
         const args = init && init.body ? JSON.parse(String(init.body)) : {};
         if (fn === 'zoe_pull') return reply({ seq, more: false, reset: true, head: seq, tenant: 't1', now: Date.now(), rows: [] });
-        if (fn === 'zoe_write') {
+        if (fn === 'zoe_write_v2') {
+            expect.soft(args.p_expected_tenant).toBe('t1');
             writes.push(args.p_ops.length);
             seq += args.p_ops.length;
             return reply({ ok: true, seq, docs: [] });
@@ -46,8 +47,10 @@ async function openDb() {
     const local = memStore();
     local.setItem(SB_AUTH_STORAGE_KEY, JSON.stringify({ access_token: 'live.token.x', refresh_token: 'r', token_type: 'bearer', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: 'u1', email: 'a@users.zoew.invalid', aud: 'authenticated' } }));
     const transport = createSupabaseTransport({ supabaseUrl: URL, supabaseKey: 'sb_publishable_test' }, { fetch: backend.fetch, localStorage: local, sessionStorage: memStore(), fetchTimeoutMs: 2000 });
+    transport.subscribe = () => () => {};
     const db = rtdb.createSupabaseDatabase(transport, { onListenerError: () => {}, onSynced: () => {}, onForbidden: () => {}, onTxOutcomeUnknown: () => {} },
         { retryStepsMs: [5, 10, 20], pollFallbackMs: 600000, rpcTimeoutMs: 1000 });
+    db.setTenantTopic('zoe:t1');
     db.setAuthed(true, 'scope');
     let fired = false;
     db.onValue(db.ref('zoew_barcode_registry'), () => { fired = true; });
@@ -106,6 +109,8 @@ const CALLERS: Record<string, string> = {
     'services/scan-operation.ts#admittedOperation': 'BOUNDED ៖ operation admitted និង pending index ផ្លូវ ២ ក្នុង batch atomic តែមួយ',
     'services/scan-operation.ts#cancelScanOperation': 'BOUNDED ៖ operation cancelled និង pending index ផ្លូវ ២ · បន្ថែម registry null ១ តែពេល own tuple ត្រូវគ្នា ➜ សរុប ≤ ៣ ត្រូវ atomic',
     'services/scan-operation.ts#finalizeScanOperation': 'BOUNDED ៖ operation committed · pending index · row marker · registry ផ្លូវ ៤ + increment ៣ ក្នុងមួយថ្ងៃ/ខែ ២ ➜ សរុប ១០ ត្រូវ atomic មិនបំបែក',
+    'services/price-operation.ts#commitPriceOperation': 'BOUNDED ៖ ការកែតម្លៃ (A526) ៖ ជួរ ៦ ផ្លូវ (cod · dod របស់ barcode · cod · dod · price របស់ជួរ · pricePending/phase) + increment COD/DOD ក្នុងថ្ងៃ និងខែ ≤ ៤ ➜ ≤ ១០ ផ្លូវ ត្រូវ atomic (rules ទទួលតែពេលជួរនៅ admitted ➜ ប្រាក់ម្តង)',
+    'services/evidence-retention.ts#retireEvidence': 'IDEMPOTENT ៖ លុបកំណត់ត្រាភស្តុតាងចាស់ (null គ្រប់ផ្លូវ · ≤ EVIDENCE_SWEEP_BATCH) ➜ បំបែកបានដោយគ្មានការផ្លាស់ប្តូរន័យ',
     'services/registry-purge.ts#purgeTrashWithRegistry': 'BOUNDED ៖ source null និង consumption ២ + registry null និង receipt មួយគូក្នុង barcode នីមួយៗ · rowCount = N និង ១ ≤ N ≤ ២៤៩ ➜ ២ + ២N ≤ ៥០០ ផ្លូវ · parser បដិសេធ batch មិនពេញលេញ ឬលើសពិដាន មិនបំបែក',
     'features/clear-history.ts#finalizeClaimedHistoryClear': 'BOUNDED ៖ ផ្លូវ ៣ (finalization · ធុងសំរាម · history) ➜ របងត្រូវ atomic',
     'services/zto-shop-sweep.ts#markZtoShopSweep': 'IDEMPOTENT ៖ { activeAt · completeAt } តម្លៃដាច់ខាត ផ្លូវ ≤ ២',
@@ -149,7 +154,8 @@ describe('SUPABASE-6 ៖ អ្នកហៅ fb.update( គ្រប់កន្�
 
     const INCREMENT_FEEDS: Record<string, string> = {
         'features/restore.ts#appendRestoreRevenueIncrements': 'features/restore.ts#finalizeClaimedRestore',
-        'services/scan-operation.ts#finalizeScanOperation': 'services/scan-operation.ts#finalizeScanOperation'
+        'services/scan-operation.ts#finalizeScanOperation': 'services/scan-operation.ts#finalizeScanOperation',
+        'services/price-operation.ts#commitPriceOperation': 'services/price-operation.ts#commitPriceOperation'
     };
 
     function incrementCallers(overrides: Record<string, string> = {}) {

@@ -114,7 +114,7 @@ function buildWorld(mode) {
         navigator: { onLine: true },
         ZoeErrors: errorRecorder,
         window: { ZoeErrors: errorRecorder },
-        crypto: require('crypto').webcrypto,
+        crypto: require('crypto').webcrypto, TextEncoder,
         appLocalStore: memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://fixture.invalid' }) }),
         __log: log
     };
@@ -175,8 +175,8 @@ globalThis.__notifyIfSlow = notifyIfSlow;
     const modules = [
         ['src/domain/barcode-key.ts', ['canonicalBarcodeRegistryKey']],
         ['src/services/row-operation-lock.ts', ['rowOperationActive']],
-        ['src/domain/trash-generation.ts', ['TRASH_CONSUMPTIONS_ROOT', 'trashConsumptionSame', 'trashConsumptionOf', 'trashGenerationOf', 'trashSourceUnconsumed']],
-        ['src/domain/registry-purge-proof.ts', ['REGISTRY_RELEASES_ROOT', 'REGISTRY_PURGE_MAX_WRITES', 'registryPurgeIntent', 'registryPurgeReceiptMatches']],
+        ['src/domain/trash-generation.ts', ['TRASH_CONSUMPTIONS_ROOT', 'trashConsumptionSame', 'trashConsumptionOf', 'trashGenerationOf', 'trashSourceUnconsumed', 'purgeCertificateOf']],
+        ['src/domain/registry-purge-proof.ts', ['REGISTRY_RELEASES_ROOT', 'REGISTRY_PURGE_MAX_WRITES', 'boundedRegistryPurgeIntent', 'slotRegistryPurgeIntent', 'registryPurgeIntent', 'registryPurgeReceiptMatches']],
         ['src/domain/scan-protocol.ts', ['SCAN_OPERATIONS_ROOT', 'scanOperationValid', 'scanRegistryOwned']],
         ['src/services/registry-purge.ts', ['purgeTrashWithRegistry']]
     ].map(([name, exported]) => {
@@ -198,6 +198,12 @@ globalThis.__notifyIfSlow = notifyIfSlow;
         let parent = tree;
         for (const part of parts) parent = parent[part] ||= {};
         if (value === null) delete parent[leaf]; else parent[leaf] = clone(value);
+        // RTDB ៖ node ដែលគ្មានកូនលែងមាន ➜ purge តាម slot/វាល (F03) លុបជួរទាំងមូលដូច server ពិត
+        if (value === null) for (let depth = parts.length; depth > 0; depth--) {
+            const node = parts.slice(0, depth).reduce((at, part) => at && at[part], tree);
+            if (!node || typeof node !== 'object' || Object.keys(node).length) break;
+            delete parts.slice(0, depth - 1).reduce((at, part) => at[part], tree)[parts[depth - 1]];
+        }
     };
     const seed = ctx.__seed;
     ctx.__seed = values => {
@@ -310,7 +316,7 @@ const WAIT_AFTER_TIMEOUT = DB_TIMEOUT + 2500;
         const w = buildWorld('ok');
         w.ctx.__seed([
             { id: 'id_2_a', deletedAt: Date.now() - 40 * 24 * 3600 * 1000, trashReason: 'delete', barcodes: [{ code: 'AA1' }] },
-            { id: 'id_2_b', deletedAt: Date.now() - 3 * 24 * 3600 * 1000, trashReason: 'returned', barcodes: [{ code: 'BB2' }] },
+            { id: 'id_2_b', deletedAt: Date.now() - 3 * 24 * 3600 * 1000, trashReason: 'returned', barcodes: [{ code: 'BB2', isDeducted: true }] },
             { id: 'id_2_c', deletedAt: Date.now() - 1000, trashReason: 'delete', barcodes: [{ code: 'CC3' }] }
         ]);
         w.ctx.__runPurge();

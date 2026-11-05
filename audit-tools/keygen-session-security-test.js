@@ -171,6 +171,8 @@ function build(options) {
     // ⛔ ថេរ/function ថ្មីរបស់ផ្លូវ «ព្យួរ ➜ ⏳» ៖ អវត្តមាន (កូដមុនកែ) ➜ stub ដែលធ្វើឲ្យការអះអាងខាងក្រោម **ធ្លាក់ដោយមានឈ្មោះ** មិនមែនគាំង
     const pendingDecl = (src.match(/^const ADMIN_WRITE_PENDING_TEXT = .*;$/m) || [])[0];
     vm.runInContext(pendingDecl || "const ADMIN_WRITE_PENDING_TEXT = '(អវត្តមាន)';", ctx);
+    const releasePendingDecl = (src.match(/^const RELEASE_PENDING_TEXT = .*;$/m) || [])[0];
+    vm.runInContext(releasePendingDecl || "const RELEASE_PENDING_TEXT = '(អវត្តមាន RELEASE_PENDING_TEXT)';", ctx);
     if (src.indexOf('function armAdminLateWrite(') === -1) vm.runInContext('function armAdminLateWrite() {}', ctx);
     vm.runInContext(`
         var sensitiveSessionGeneration = 0;
@@ -185,6 +187,7 @@ function build(options) {
         var extendTargetId = 'key-a';
         var keyListCache = [{ id: 'key-a', paths: ['ADM'], perApp: { ADM: { expiresAt: 1000 } }, expiresAt: 1000, revoked: false, maxDevices: 1, seatDevices: [{ device: 'device-1', at: 1 }] }, { id: 'key-b', paths: ['ADM'], perApp: { ADM: { expiresAt: 1000 } }, expiresAt: 1000, revoked: false, maxDevices: 1, seatDevices: [] }];
         var seatReadFailed = false;
+        var serverTimeSynced = true;
         var SIGNING_KEY_SESSION_STORAGE_KEY = 'zoekeygen_signing_key_enc';
     `, ctx);
     // ⛔ normalizer Private Key (សំណើម្ចាស់គម្រោង) ៖ អវត្តមាន (កូដមុនកែ) ➜ loadSigningKey ប្រើ JSON.parse ផ្ទាល់ ➜ ការអះអាងខាងក្រោមធ្លាក់ដោយមានឈ្មោះ
@@ -212,6 +215,8 @@ function build(options) {
         'toggleRevokeKey',
         ...(src.indexOf('function armAdminLateWrite(') !== -1 ? ['armAdminLateWrite'] : []),
         'setKeySeatLimit',
+        ...(src.indexOf('function patchLicenseViaRest(') !== -1 ? ['patchLicenseViaRest'] : []),
+        ...(src.indexOf('function readKeyReleaseViaRest(') !== -1 ? ['readKeyReleaseViaRest'] : []),
         'releaseKeySeat',
         'copySensitiveText',
         'copyTextarea',
@@ -294,7 +299,10 @@ function adminRetryFixture() {
 
 async function verifyAdminRetryOwnership() {
     console.log('-- Admin retry ពិត ៖ វគ្គដើមជាម្ចាស់ការសរសេរ --');
-    const actions = ['setKeySeatLimit', 'releaseKeySeat', 'sendNotice', 'deleteNotice'];
+    // ⛔ A505 ៖ «🔓 ដោះឧបករណ៍» មិននៅក្នុងបញ្ជីនេះទៀតទេ ៖ វាផ្ញើតាម REST PATCH តែម្តង ⛔ គ្មាន retry (ការផ្ញើម្តងទៀតក្រោយចម្លើយបាត់ = កំហុសដែលត្រូវការពារ)
+    //    ម្ចាស់វគ្គរបស់វា វាស់ក្នុង verifyReleaseOverRest() ៖ R12 (ចាកចេញ · Login ម្តងទៀតដោយ admin ដដែល · admin ផ្សេង · Reconfig ទៅ Database ផ្សេង
+    //    ទាំងពេលរង់ចាំ ID token និងចម្លើយ PATCH) · R13 (បិទប្រអប់ PIN = មិនមែនការប្តូរវគ្គ ➜ ✅ នៅបង្ហាញ) · R1 (គ្មានការប្តូរ)
+    const actions = ['setKeySeatLimit', 'sendNotice', 'deleteNotice'];
     for (const action of actions) {
         for (const change of ['none', 'pin', 'other-user', 'same-user', 'database']) {
             const f = adminRetryFixture();
@@ -443,8 +451,248 @@ function listRefreshFixture(kind) {
         body: () => el(kind === 'key' ? 'keyListBody' : 'sbTenantListBody').innerHTML };
 }
 
+// ⛔ A505 (សេចក្តីសម្រេចម្ចាស់គម្រោង) ៖ «🔓 ដោះឧបករណ៍» ផ្ញើ update root តែមួយ (លុបកៅអី + `releasedAt` ម៉ោង server) តាម REST PATCH ជាមួយ ID token
+//    របស់ admin ទៅ Database របស់ប្រតិបត្តិការ ⛔ មិនមែនតាម SDK (`fb.update` · `fb.set`) ៖ RTDB SDK ផ្ញើការសរសេរដែលបាត់ចម្លើយម្តងទៀតពេលភ្ជាប់វិញ
+//    (មានតែ transaction ដែលត្រូវបោះបង់) ➜ ការដោះចុះម្តងទៀត លុបកៅអីដែលឧបករណ៍ថ្មីទើបកក់ ហើយចុះត្រា `releasedAt` ថ្មីជាង ➜ ឧបករណ៍ថ្មីទទួល seat-released។
+//    ចម្លើយបាត់ក្រោយផ្ញើ ➜ អានពី Database ដដែល (មិនមែន Config ផ្ទាល់) ៖ កៅអីអវត្តមាន + `releasedAt` ≥ ម៉ោងផ្ញើ ➜ ✅ · ផ្សេងពីនេះ ឬអានមិនបាន ➜ ⏳ + Refresh ·
+//    ⛔ មិនផ្ញើម្តងទៀតឡើយ។ Server ក្លែងខាងក្រោមអនុវត្ត PATCH ពិត (null = លុប · `{'.sv':'timestamp'}` = ម៉ោង server) ហើយអាចបាត់ចម្លើយក្រោយអនុវត្ត។
+const RELEASE_DB_HOST = 'kg-release.firebaseio.com';
+const RELEASE_STAMP_AT = 6000;
+function releaseRestFixture(options) {
+    const o = Object.assign({ seats: { d1: { device: 'device-1', at: 1 } }, releasedAt: null, sentAt: 5000, synced: true, patch: ['ok'] }, options || {});
+    const h = build();
+    h.ctx.console = { error() {}, log() {}, warn() {} };
+    h.ctx.URL = URL;
+    h.ctx.db = { app: { options: { databaseURL: 'https://' + RELEASE_DB_HOST + '/' } } };
+    h.ctx.appLocalStore = { getItem: (k) => (k === 'zoew_firebase_config' ? JSON.stringify({ databaseURL: 'https://kg-live-config.firebaseio.com' }) : null) };
+    h.ctx.getServerNow = () => o.sentAt;
+    vm.runInContext('var serverTimeSynced = ' + (o.synced ? 'true' : 'false') + ';', h.ctx);
+    const tokens = [];
+    h.ctx.auth.currentUser.getIdToken = () => { tokens.push(h.ctx.auth.currentUser.uid); return o.token ? o.token.promise : Promise.resolve('admin-id-token'); };
+    const store = { seats: { 'key-a': o.seats, 'key-b': null }, releasedAt: { 'key-a': o.releasedAt, 'key-b': null } };
+    const server = {
+        get seats() { return store.seats['key-a']; }, set seats(value) { store.seats['key-a'] = value; },
+        get releasedAt() { return store.releasedAt['key-a']; }, set releasedAt(value) { store.releasedAt['key-a'] = value; },
+        store
+    };
+    const sdk = [];
+    h.ctx.fb.update = (ref, value) => { sdk.push(['update', ref && ref.path, value]); return Promise.resolve(); };
+    h.ctx.fb.set = (ref, value) => { sdk.push(['set', ref && ref.path, value]); return Promise.resolve(); };
+    const requests = [];
+    const respond = (status, text) => ({ ok: status >= 200 && status < 300, status, text: () => Promise.resolve(text), json: () => Promise.resolve(JSON.parse(text)) });
+    const modes = o.patch.slice();
+    const lost = () => Promise.reject(new TypeError('Failed to fetch'));
+    h.ctx.fetch = (url, init) => {
+        const method = (init && init.method) || 'GET';
+        const u = new URL(String(url));
+        requests.push({ method, host: u.host, path: u.pathname, auth: u.searchParams.get('auth'), body: init && typeof init.body === 'string' ? JSON.parse(init.body) : undefined });
+        if (method === 'PATCH') {
+            const mode = modes.length > 1 ? modes.shift() : modes[0];
+            const body = JSON.parse(init.body);
+            const stamps = Object.keys(body).some((k) => /\/releasedAt$/.test(k));
+            if (mode === 'pending') return o.pending.promise;
+            if (mode === 'deny' || (mode === 'refuse-stamp' && stamps)) return Promise.resolve(respond(401, '{\n  "error" : "Permission denied"\n}\n'));
+            if (mode === 'expired') return Promise.resolve(respond(401, '{\n  "error" : "Auth token is expired"\n}\n'));
+            if (mode === 'down') return lost();
+            Object.keys(body).forEach((k) => {
+                const seat = k.match(/^license_seats\/ADM\/([^/]+)$/);
+                const stamp = k.match(/^license_keys\/ADM\/([^/]+)\/releasedAt$/);
+                if (seat && body[k] === null) store.seats[seat[1]] = null;
+                if (stamp && body[k] && body[k]['.sv'] === 'timestamp') store.releasedAt[stamp[1]] = RELEASE_STAMP_AT;
+            });
+            if (mode === 'lost' || mode === 'refuse-stamp-lost') return lost();
+            if (mode === 'lost-claim') {
+                server.seats = { d1: { device: 'device-new', at: RELEASE_STAMP_AT + 1, releaseEpoch: server.releasedAt } };
+                return lost();
+            }
+            if (mode === 'gateway') return Promise.resolve(respond(503, 'Service Unavailable'));
+            return Promise.resolve(respond(200, init.body));
+        }
+        if (o.readDown) return lost();
+        const seatRead = u.pathname.match(/^\/license_seats\/ADM\/([^/]+)\.json$/);
+        const stampRead = u.pathname.match(/^\/license_keys\/ADM\/([^/]+)\/releasedAt\.json$/);
+        if (seatRead) return Promise.resolve(respond(200, JSON.stringify(store.seats[seatRead[1]] === undefined ? null : store.seats[seatRead[1]])));
+        if (stampRead) return Promise.resolve(respond(200, JSON.stringify(store.releasedAt[stampRead[1]] === undefined ? null : store.releasedAt[stampRead[1]])));
+        return Promise.resolve(respond(200, 'null'));
+    };
+    return Object.assign(h, { server, sdk, requests, tokens });
+}
+
+async function verifyReleaseOverRest() {
+    console.log('-- ⛔ A505 ៖ ដោះឧបករណ៍តាម REST PATCH ៖ ចម្លើយបាត់មិនផ្ញើម្តងទៀត · អានពី Database របស់ប្រតិបត្តិការ --');
+    const patches = (f) => f.requests.filter((r) => r.method === 'PATCH');
+    const reads = (f) => f.requests.filter((r) => r.method === 'GET');
+    const stampedBody = JSON.stringify({ 'license_seats/ADM/key-a': null, 'license_keys/ADM/key-a/releasedAt': { '.sv': 'timestamp' } });
+    const seatsOnlyBody = JSON.stringify({ 'license_seats/ADM/key-a': null });
+    const pendingText = (f) => vm.runInContext('RELEASE_PENDING_TEXT', f.ctx);
+    const released = (f) => f.log.toasts.some((t) => t.startsWith('✅')) && f.log.alerts.length === 0 && f.log.refreshed >= 1;
+    const pending = (f) => f.log.alerts.length === 1 && f.log.alerts[0] === pendingText(f) && !f.log.toasts.some((t) => t.startsWith('✅')) && f.log.refreshed >= 1;
+    const unstamped = (f) => f.log.alerts.length === 1 && /Publish/.test(f.log.alerts[0]) && /releasedAt/.test(f.log.alerts[0])
+        && !f.log.toasts.some((t) => t.startsWith('✅')) && f.log.refreshed >= 1;
+    const restOnly = (f) => f.sdk.length === 0 && f.requests.every((r) => r.host === RELEASE_DB_HOST);
+    const runRelease = async (options, keyId) => {
+        const f = releaseRestFixture(options);
+        if (options && options.prepare) options.prepare(f);
+        await f.ctx.releaseKeySeat(keyId || 'key-a');
+        await drain();
+        return f;
+    };
+    const detail = (f) => ({ requests: f.requests, sdk: f.sdk, server: f.server, log: f.log });
+
+    let f = await runRelease();
+    const sent = patches(f)[0] || {};
+    ok('R1 ៖ ដោះ ➜ PATCH root តែមួយតាម REST (ID token admin · Database របស់ប្រតិបត្តិការ មិនមែន Config ផ្ទាល់) · ⛔ គ្មានការសរសេរតាម SDK',
+        patches(f).length === 1 && sent.path === '/.json' && sent.auth === 'admin-id-token' && JSON.stringify(sent.body) === stampedBody && restOnly(f), detail(f));
+    ok('R1 ៖ ចុះទាន់ពេល ➜ កៅអីទំនេរ · releasedAt ម៉ោង server · ✅ + Refresh',
+        f.server.seats === null && f.server.releasedAt === RELEASE_STAMP_AT && released(f), detail(f));
+
+    f = await runRelease({ patch: ['lost'] });
+    ok('R2 ៖ ចម្លើយបាត់ក្រោយចុះ ➜ អានត្រលប់ពី Database ដដែល (កៅអីអវត្តមាន · releasedAt ≥ ម៉ោងផ្ញើ) ➜ ✅ · ផ្ញើតែម្តង',
+        patches(f).length === 1 && reads(f).length >= 2 && restOnly(f) && released(f), detail(f));
+
+    f = await runRelease({ patch: ['lost-claim'] });
+    ok('⛔ R3 ៖ ចម្លើយបាត់ · ឧបករណ៍ថ្មីកក់កៅអីក្នុងចន្លោះ ➜ ⏳ មិនទាន់បញ្ជាក់ + Refresh · ⛔ មិនផ្ញើម្តងទៀត (កៅអីថ្មីនៅ · releasedAt មិនប្តូរ)',
+        patches(f).length === 1 && restOnly(f) && !!f.server.seats && f.server.seats.d1.device === 'device-new'
+            && f.server.releasedAt === RELEASE_STAMP_AT && pending(f), detail(f));
+
+    f = await runRelease({ patch: ['down'] });
+    ok('R4 ៖ ការផ្ញើមិនដល់ Server (កៅអីនៅ) ➜ ⏳ + Refresh · មិនផ្ញើម្តងទៀត', patches(f).length === 1 && restOnly(f) && pending(f), detail(f));
+
+    f = await runRelease({ patch: ['lost'], readDown: true });
+    ok('R5 ៖ ចម្លើយបាត់ · អានត្រលប់មិនបាន ➜ ⏳ + Refresh (មិនទាយ ✅)', patches(f).length === 1 && restOnly(f) && pending(f), detail(f));
+
+    f = await runRelease({ patch: ['down'], seats: null, releasedAt: 4000 });
+    ok('R6 ៖ កៅអីទំនេរ តែ releasedAt ចាស់ជាងម៉ោងផ្ញើ (ការដោះមុន · ការផ្ញើនេះមិនដល់) ➜ ⏳ មិនមែន ✅',
+        patches(f).length === 1 && pending(f), detail(f));
+
+    f = await runRelease({ patch: ['lost'], synced: false });
+    ok('R7 ៖ ម៉ោង Server មិនទាន់ផ្ទៀងផ្ទាត់ ➜ ប្រៀប releasedAt នឹងម៉ោងផ្ញើមិនបាន ➜ ⏳', patches(f).length === 1 && pending(f), detail(f));
+
+    f = await runRelease({ patch: ['gateway'] });
+    ok('R8 ៖ Server ឆ្លើយ 5xx (អាចចុះរួច) ➜ អានត្រលប់ ➜ ✅ · ផ្ញើតែម្តង', patches(f).length === 1 && reads(f).length >= 2 && released(f), detail(f));
+
+    f = await runRelease({ patch: ['refuse-stamp', 'ok'] });
+    ok('R9 ៖ Rules ចាស់បដិសេធ releasedAt ➜ PATCH ទី ២ លុបតែកៅអី · ប្រាប់ឲ្យ Publish Rules (មិនមែន ✅ ដោះពេញ)',
+        patches(f).length === 2 && JSON.stringify(patches(f)[0].body) === stampedBody && JSON.stringify(patches(f)[1].body) === seatsOnlyBody
+            && f.server.seats === null && restOnly(f) && unstamped(f), detail(f));
+
+    f = await runRelease({ patch: ['refuse-stamp', 'refuse-stamp-lost'] });
+    ok('R9 ៖ Rules ចាស់ · ចម្លើយ PATCH លុបកៅអីបាត់ ➜ អានត្រលប់ (កៅអីអវត្តមាន) ➜ ប្រាប់ឲ្យ Publish Rules · មិនផ្ញើម្តងទៀត',
+        patches(f).length === 2 && restOnly(f) && unstamped(f), detail(f));
+
+    f = await runRelease({ patch: ['refuse-stamp', 'lost-claim'] });
+    ok('R9 ៖ Rules ចាស់ · ចម្លើយបាត់ · ឧបករណ៍ថ្មីកក់ក្នុងចន្លោះ ➜ ⏳ (មិនមែន «ដោះរួច»)', patches(f).length === 2 && pending(f), detail(f));
+
+    f = await runRelease({ patch: ['deny'] });
+    ok('R10 ៖ Rules បដិសេធទាំង ២ ➜ «មិនបាន» + ប្រាប់ឲ្យ Publish Rules · គ្មាន ⏳ · គ្មាន ✅',
+        patches(f).length === 2 && f.log.alerts.length === 1 && /មិនបាន/.test(f.log.alerts[0]) && /Publish/.test(f.log.alerts[0]) && f.log.alerts[0] !== pendingText(f)
+            && !f.log.toasts.some((t) => t.startsWith('✅')), detail(f));
+
+    f = await runRelease({ patch: ['expired'] });
+    ok('R11 ៖ 401 មិនមែនការបដិសេធរបស់ Rules (token ផុត) ➜ «មិនបាន» · ⛔ មិនដោះតែកៅអី',
+        patches(f).length === 1 && f.log.alerts.length === 1 && /មិនបាន/.test(f.log.alerts[0]) && f.server.seats !== null, detail(f));
+    ok('R11 ៖ សារ 401 ប្រាប់មូលហេតុពិត (HTTP 401) ⛔ មិនប្រាប់ឲ្យ Publish Rules',
+        f.log.alerts.length === 1 && /HTTP 401/.test(f.log.alerts[0]) && !/Publish/.test(f.log.alerts[0]), detail(f));
+
+    f = await runRelease({ token: { promise: Promise.reject(new Error('token refresh offline')) } });
+    ok('R11 ៖ ID token មិនបាន (offline) ➜ មិនផ្ញើ PATCH · «មិនទាន់ផ្ញើ» ⛔ មិនប្រាប់ឲ្យ Publish Rules · គ្មាន ⏳ · គ្មាន ✅',
+        patches(f).length === 0 && f.log.alerts.length === 1 && /មិនទាន់ផ្ញើ/.test(f.log.alerts[0]) && !/Publish/.test(f.log.alerts[0])
+            && f.log.alerts[0] !== pendingText(f) && !f.log.toasts.some((t) => t.startsWith('✅')) && f.server.seats !== null, detail(f));
+
+    // ⛔ R12 ៖ ម្ចាស់ការដោះ = admin ដដែល (`uid`) + `authGeneration` ដដែល (`adminOperationIsCurrent()`) + Database របស់ប្រតិបត្តិការ (`operationDb`)
+    //    ➜ ការប្តូរវគ្គនីមួយៗ វាស់ទាំងពេលរង់ចាំ ID token (មិនផ្ញើ PATCH) និងពេលរង់ចាំចម្លើយ PATCH (ចម្លើយមិនប៉ះ UI · មិន Refresh)៖
+    //    ចាកចេញ · Login ម្តងទៀតដោយ admin ដដែល (`uid` ដូចគ្នា តែ `authGeneration` ថ្មី) · admin ផ្សេង · Reconfig ទៅ Database ផ្សេង។
+    //    ⛔ ការក្លែង (mutant) ដែលដក `db === operationDb` ឬប្រើ `adminOwnerIsCurrent()` ជំនួស `adminOperationIsCurrent()` ត្រូវធ្លាក់នៅទីនេះ។
+    const OTHER_DB_HOST = 'kg-other.firebaseio.com';
+    const sessionChanges = {
+        logout: { label: 'ចាកចេញ', apply: (fx) => simulateLogout(fx.ctx) },
+        'same-user': {
+            label: 'Login ម្តងទៀតដោយ admin ដដែល',
+            apply: (fx) => {
+                simulateLogout(fx.ctx);
+                fx.ctx.auth.currentUser = { uid: fx.ctx.auth.currentUser.uid, email: 'admin@example.com', getIdToken: () => Promise.resolve('relogin-id-token') };
+                vm.runInContext('authGeneration++; isSignedInUiActive = true;', fx.ctx);
+            }
+        },
+        'other-user': {
+            label: 'Login ដោយ admin ផ្សេង',
+            apply: (fx) => {
+                simulateLogout(fx.ctx);
+                fx.ctx.auth.currentUser = { uid: 'admin-2', email: 'admin2@example.com', getIdToken: () => Promise.resolve('other-id-token') };
+                vm.runInContext('authGeneration++; isSignedInUiActive = true;', fx.ctx);
+            }
+        },
+        database: {
+            label: 'Reconfig ទៅ Database ផ្សេង',
+            apply: (fx) => { fx.ctx.db = { app: { options: { databaseURL: 'https://' + OTHER_DB_HOST + '/' } } }; }
+        }
+    };
+    for (const [kind, change] of Object.entries(sessionChanges)) {
+        for (const stage of ['token', 'patch']) {
+            const gate = deferred();
+            f = releaseRestFixture(stage === 'token' ? { token: gate } : { patch: ['pending'], pending: gate });
+            const task = f.ctx.releaseKeySeat('key-a');
+            await drain();
+            const before = f.requests.length;
+            const generationBefore = vm.runInContext('authGeneration', f.ctx);
+            change.apply(f);
+            const precondition = kind === 'database'
+                ? f.ctx.db.app.options.databaseURL.indexOf(OTHER_DB_HOST) !== -1 && vm.runInContext('authGeneration', f.ctx) === generationBefore
+                : vm.runInContext('authGeneration', f.ctx) > generationBefore
+                    && (kind === 'logout' ? !vm.runInContext('isSignedInUiActive', f.ctx)
+                        : vm.runInContext('isSignedInUiActive', f.ctx) && f.ctx.auth.currentUser.uid === (kind === 'same-user' ? 'admin-1' : 'admin-2'));
+            ok('R12/' + kind + '/' + stage + ' ៖ លក្ខខណ្ឌចាំបាច់ — ' + change.label + ' កើតពេលរង់ចាំ ' + (stage === 'token' ? 'ID token' : 'ចម្លើយ PATCH')
+                + ' (PATCH ' + (stage === 'token' ? '០' : '១') + ' មុនប្តូរ)', precondition && before === (stage === 'token' ? 0 : 1) && f.tokens.length === 1, detail(f));
+            gate.resolve(stage === 'token' ? 'admin-id-token' : { ok: true, status: 200, text: () => Promise.resolve('{}') });
+            await task;
+            await drain();
+            ok('R12/' + kind + '/' + stage + ' ៖ ' + change.label + ' ពេលរង់ចាំ '
+                + (stage === 'token' ? 'ID token ➜ មិនផ្ញើ PATCH' : 'ចម្លើយ PATCH ➜ ចម្លើយមិនប៉ះ UI វគ្គថ្មី · មិន Refresh')
+                + ' · គ្មានសំណើទៅ Database ផ្សេង · គ្មាន SDK',
+                patches(f).length === (stage === 'token' ? 0 : 1) && f.requests.length === before && f.tokens.length === 1
+                    && restOnly(f) && !f.log.toasts.length && !f.log.alerts.length && !f.log.refreshed, detail(f));
+        }
+    }
+
+    {
+        const gate = deferred();
+        f = releaseRestFixture({ patch: ['pending'], pending: gate });
+        vm.runInContext(slice(['closeModal', 'clearPinInputValues', 'clearKeypairOutputs']) + '\nvar pinTargetAction = null;', f.ctx);
+        const task = f.ctx.releaseKeySeat('key-a');
+        await drain();
+        f.getElementById('pinModal').classList.add('active');
+        f.ctx.closeModal('pinModal');
+        gate.resolve({ ok: true, status: 200, text: () => Promise.resolve('{}') });
+        await task;
+        await drain();
+        ok('R13 ៖ បិទប្រអប់ PIN កណ្តាល PATCH (មិនមែនការចាកចេញ) ➜ ✅ នៅបង្ហាញ + Refresh', patches(f).length === 1 && released(f), detail(f));
+    }
+
+    {
+        const gate = deferred();
+        f = releaseRestFixture({ patch: ['pending'], pending: gate });
+        let confirms = 0;
+        f.ctx.confirm = () => { confirms++; return true; };
+        const task = f.ctx.releaseKeySeat('key-a');
+        await drain();
+        const second = f.ctx.releaseKeySeat('key-a');
+        await drain();
+        const whileBusy = { patches: patches(f).length, confirms, toasts: f.log.toasts.slice() };
+        gate.resolve({ ok: true, status: 200, text: () => Promise.resolve('{}') });
+        await task; await second;
+        await drain();
+        ok('⛔ R14 ៖ ចុចដោះម្តងទៀតពេល PATCH មិនទាន់ឆ្លើយ ➜ មិនសួរ · មិនផ្ញើ PATCH ទី ២ · ⏳ ប្រាប់ឲ្យរង់ចាំ',
+            whileBusy.patches === 1 && whileBusy.confirms === 1 && whileBusy.toasts.some((t) => t.startsWith('⏳')), { whileBusy, ...detail(f) });
+        ok('R14 ៖ ក្រោយ PATCH ទី ១ ចប់ ➜ ✅ តែម្តង ហើយការដោះលើកក្រោយផ្ញើបាន', patches(f).length === 1 && released(f), detail(f));
+        await f.ctx.releaseKeySeat('key-a');
+        await drain();
+        ok('R14 ៖ busy ត្រូវដោះក្រោយចប់ (ការដោះបន្ទាប់សួរ និងផ្ញើ PATCH)', confirms === 2 && patches(f).length === 2, { confirms, ...detail(f) });
+    }
+}
+
 async function run() {
     await verifyAdminRetryOwnership();
+    await verifyReleaseOverRest();
     console.log('-- Refresh បញ្ជី Admin ស្របគ្នា ៖ ចម្លើយថ្មីជាម្ចាស់ UI --');
     for (const kind of ['key', 'shop']) {
         for (const staleFails of [false, true]) {
@@ -636,8 +884,9 @@ async function run() {
 
     // ⛔ ការកែ Key (Extend · Revoke · ចំនួនឧបករណ៍ · ដោះឧបករណ៍) ៖ បិទប្រអប់ PIN កណ្តាលការសរសេរ (`closeModal('pinModal')` ពិត) មិនមែនការចាកចេញ ➜
     //    ✅ + Refresh បញ្ជីនៅបង្ហាញ។ ទិសផ្ទុយ ៖ ចាកចេញ ➜ ចូលវិញដោយគណនីដដែល (វគ្គថ្មី · `authGeneration` ថ្មី) ➜ ការសរសេរចាស់ចប់មិនប៉ះ UI វគ្គថ្មី។
+    //    ដោះឧបករណ៍ (REST PATCH) ៖ verifyReleaseOverRest() R13។
     console.log('-- បិទប្រអប់ PIN ខណៈការកែ Key កំពុងសរសេរ --');
-    for (const kind of ['extend', 'revoke', 'seat', 'release']) {
+    for (const kind of ['extend', 'revoke', 'seat']) {
         h = build();
         vm.runInContext(slice(['closeModal', 'clearPinInputValues', 'clearKeypairOutputs']) + '\nvar pinTargetAction = null;', h.ctx);
         if (kind === 'extend') { h.ctx.openExtendModal('key-a'); h.getElementById('extendDaysInput').value = '7'; }
@@ -756,20 +1005,20 @@ async function run() {
     // ⛔ ការកែ Key ដែល **ព្យួរ** (អស់ពេល ១៥ វិ.) ខណៈ session នៅដដែល ៖ RTDB ចាក់ការសរសេរក្នុងជួរ ➜ វាអាចចុះពេលបណ្តាញមកវិញ ➜
     //    សារត្រូវជា «⏳ មិនទាន់បញ្ជាក់» (⛔ មិនមែន «មិនអាចធ្វើបច្ចុប្បន្នភាពបានទេ» ដែលធ្វើឲ្យ admin ធ្វើម្តងទៀត) ហើយការចុះយឺត ➜ ✅ (ចុះយឺត) + Refresh។
     //    ទិសផ្ទុយ ៖ ការបដិសេធពិត ➜ «មិនបាន» ដដែល · session ប្តូរ ➜ ស្ងាត់ (ផ្នែកខាងលើ)។
+    //    ដោះឧបករណ៍ (REST PATCH · គ្មានការផ្ញើម្តងទៀត · ចម្លើយបាត់ ➜ អានត្រលប់) ៖ verifyReleaseOverRest() R2–R10។
     console.log('-- ការកែ Key ព្យួរ ➜ «⏳ មិនទាន់បញ្ជាក់» · ចុះយឺត ➜ ✅ --');
     const PENDING_RE = /^⏳ /;
-    for (const kind of ['extend', 'revoke', 'seat', 'release']) {
+    for (const kind of ['extend', 'revoke', 'seat']) {
         h = build(); h.ctx.openExtendModal('key-a');
         h.ctx.prompt = () => '3';
         const pending = deferred(); const timed = deferred();
         h.ctx.fb.update = () => { h.log.updates++; return pending.promise; };
         h.ctx.fb.set = () => { h.log.updates++; return pending.promise; };
         h.ctx.withTimeout = () => timed.promise;
-        const task = kind === 'extend' ? h.ctx.confirmExtendKey() : kind === 'revoke' ? h.ctx.toggleRevokeKey('key-a')
-            : kind === 'seat' ? h.ctx.setKeySeatLimit('key-a') : h.ctx.releaseKeySeat('key-a');
+        const task = kind === 'extend' ? h.ctx.confirmExtendKey() : kind === 'revoke' ? h.ctx.toggleRevokeKey('key-a') : h.ctx.setKeySeatLimit('key-a');
         await drain();
         ok(kind + '/ព្យួរ ៖ write ចាប់ផ្តើមពិត', h.log.updates === 1, h.log.updates);
-        timed.reject(new Error(kind === 'seat' ? 'Seat limit update timed out' : kind === 'release' ? 'Release timed out' : 'Update timed out'));
+        timed.reject(new Error(kind === 'seat' ? 'Seat limit update timed out' : 'Update timed out'));
         await task; await drain();
         ok(kind + '/ព្យួរ ៖ សារ «⏳ មិនទាន់បញ្ជាក់» (មិនមែន «មិនបាន») · គ្មាន ✅ មុន commit',
             h.log.alerts.length === 1 && PENDING_RE.test(h.log.alerts[0]) && !h.log.toasts.some((t) => t.startsWith('✅')), h.log);
@@ -777,14 +1026,13 @@ async function run() {
         ok(kind + '/ព្យួរ ➜ ចុះយឺត ៖ ✅ (ចុះយឺត) + Refresh បញ្ជី',
             h.log.toasts.filter((t) => t.startsWith('✅') && /ចុះយឺត/.test(t)).length === 1 && h.log.refreshed >= 1, h.log);
     }
-    for (const kind of ['seat', 'release']) {
+    {
         h = build();
         h.ctx.prompt = () => '3';
         h.ctx.fb.update = () => { h.log.updates++; return Promise.reject(new Error('PERMISSION_DENIED')); };
-        h.ctx.fb.set = () => { h.log.updates++; return Promise.reject(new Error('PERMISSION_DENIED')); };
-        await (kind === 'seat' ? h.ctx.setKeySeatLimit('key-a') : h.ctx.releaseKeySeat('key-a'));
+        await h.ctx.setKeySeatLimit('key-a');
         await drain();
-        ok(kind + '/បដិសេធពិត ➜ «មិនបាន» (ទិសផ្ទុយ ៖ មិនមែន ⏳)',
+        ok('seat/បដិសេធពិត ➜ «មិនបាន» (ទិសផ្ទុយ ៖ មិនមែន ⏳ · ដោះឧបករណ៍ ៖ R10)',
             h.log.alerts.length === 1 && !PENDING_RE.test(h.log.alerts[0]) && /មិនបាន/.test(h.log.alerts[0]), h.log);
     }
     {
@@ -799,6 +1047,58 @@ async function run() {
         simulateLogout(h.ctx);
         pending.resolve(); await drain(); await drain();
         ok('ព្យួរ ➜ ចាកចេញ ➜ ចុះយឺត ៖ គ្មាន ✅ លើ session ថ្មី', !h.log.toasts.some((t) => t.startsWith('✅')), h.log);
+    }
+    // ⛔ A504 ៖ «🔓 ដោះឧបករណ៍» ខណៈ Rules License ចាស់បដិសេធ `releasedAt` ➜ PATCH លុបតែកៅអី (ទាន់ពេល · ចម្លើយបាត់) ➜ សារ Publish Rules
+    //    ⛔ មិនមែន «✅ បានដោះឧបករណ៍» ដែលប្រាប់ថាដោះពេញ ៖ verifyReleaseOverRest() R9។
+
+    // ⛔ A504 ៖ Generate ព្យួរលើសពិដាន ➜ «⏳ មិនទាន់បញ្ជាក់» · ការសរសេរចុះយឺត ➜ Key string ត្រូវបង្ហាញក្នុងប្រអប់លទ្ធផល (ចម្លងប្រគល់អតិថិជនបាន)
+    //    ⛔ មិនមែនត្រឹម toast ប្រាប់ id (Key សកម្មក្នុងបញ្ជី តែគ្មាននរណាយក Key string បាន) · ទិសផ្ទុយ ៖ Generate ថ្មីចាប់ផ្តើមក្រោយពិដាន ➜
+    //    Key ចាស់ដែលចុះយឺតមិនជាន់ Key ថ្មីក្នុងប្រអប់ (អ្នកលក់មិនចម្លង Key ខុសថ្ងៃ/ឧបករណ៍)
+    console.log('-- Generate ព្យួរ ➜ ចុះយឺត ➜ Key string បង្ហាញ --');
+    for (const newer of ['none', 'written', 'clock-aborted', 'sign-aborted']) {
+        h = build({ privateKey: reloadKey });
+        h.ctx.console = { error() {}, log() {}, warn() {} };
+        h.getElementById('genDaysInput').value = '30';
+        h.getElementById('genResultBox').classList.add('hidden');
+        const lateWrite = deferred(); const timed = deferred();
+        h.ctx.fb.update = () => { h.log.updates++; return lateWrite.promise; };
+        h.ctx.withTimeout = (promise, ms, message) => (message === 'Generate key timed out' ? timed.promise : promise);
+        const task = h.ctx.generateLicenseKey();
+        await drain();
+        const label = 'Generate ព្យួរ/' + ({ none: 'គ្មាន Generate ថ្មី', written: 'Generate ថ្មីក្រោយពិដាន', 'clock-aborted': 'Generate ថ្មីឈប់មុនសរសេរ (ម៉ោង Server)', 'sign-aborted': 'Generate ថ្មីឈប់មុនសរសេរ (ចុះហត្ថលេខាមិនបាន)' })[newer];
+        ok(label + ' ៖ លក្ខខណ្ឌចាំបាច់ — ការសរសេរចាប់ផ្តើម', h.log.updates === 1, h.log.updates);
+        timed.reject(new Error('Generate key timed out'));
+        await task; await drain();
+        ok(label + ' ៖ «⏳ មិនទាន់បញ្ជាក់» · Key មិនទាន់បង្ហាញ · សោ Generate ដោះ',
+            h.log.alerts.length === 1 && /^⏳ /.test(h.log.alerts[0]) && h.ctx.lastGeneratedKey === '' && h.ctx.isGeneratingKey === false, h.log.alerts);
+        if (newer === 'written') {
+            h.ctx.fb.update = () => { h.log.updates++; return Promise.resolve(); };
+            h.ctx.withTimeout = (promise) => promise;
+            h.license.signNewKey = () => Promise.resolve({ keyString: 'synthetic-newer-key', payload: { id: 'synthetic-newer-id' } });
+            await h.ctx.generateLicenseKey();
+            ok(label + ' ៖ លក្ខខណ្ឌចាំបាច់ — Generate ថ្មីបង្ហាញ Key ថ្មី', h.ctx.lastGeneratedKey === 'synthetic-newer-key', h.ctx.lastGeneratedKey);
+        } else if (newer !== 'none') {
+            // ⛔ A505 (review) ៖ Generate ថ្មីដែលឈប់ **មុនចាប់ផ្តើមសរសេរ** (ម៉ោង Server មិនបាន · ចុះហត្ថលេខាមិនបាន) មិនបានបង្កើត Key ណាទេ ➜ មិនត្រូវ
+            //    រាប់ជា «Generate ថ្មី» ដែលលាក់ Key ចាស់ចុះយឺត (មុនកែ ៖ ជំនាន់កើនពេលចាប់ផ្តើម ➜ Key ចាស់សកម្មក្នុងបញ្ជី តែគ្មាននរណាយក Key string បាន)
+            const before = h.log.updates;
+            if (newer === 'clock-aborted') h.ctx.waitForServerTimeSync = () => Promise.resolve(false);
+            else h.license.signNewKey = () => Promise.reject(new Error('synthetic sign failure'));
+            await h.ctx.generateLicenseKey();
+            ok(label + ' ៖ លក្ខខណ្ឌចាំបាច់ — Generate ថ្មីឈប់មុនសរសេរ', h.log.updates === before && h.log.alerts.length === 2
+                && h.ctx.isGeneratingKey === false && h.ctx.lastGeneratedKey === '', { updates: h.log.updates, alerts: h.log.alerts });
+        }
+        lateWrite.resolve(); await drain(); await drain();
+        const lateToast = h.log.toasts.find((t) => /⏱️/.test(t)) || '';
+        if (newer !== 'written') {
+            ok('⛔ ' + label + ' ➜ ចុះយឺត ៖ Key string បង្ហាញក្នុងប្រអប់លទ្ធផល (ចម្លងបាន) · toast ប្រាប់ id · Refresh បញ្ជី',
+                h.ctx.lastGeneratedKey === 'signed-key' && h.getElementById('genResultKey').textContent === 'signed-key'
+                    && !h.getElementById('genResultBox').classList.contains('hidden') && /key-1/.test(lateToast) && h.log.refreshed >= 1,
+                { key: h.ctx.lastGeneratedKey, shown: h.getElementById('genResultKey').textContent, toasts: h.log.toasts, refreshed: h.log.refreshed });
+        } else {
+            ok(label + ' ➜ ចុះយឺត ៖ Key ចាស់មិនជាន់ Key ថ្មីក្នុងប្រអប់ · toast ប្រាប់ id ចាស់នៅ',
+                h.ctx.lastGeneratedKey === 'synthetic-newer-key' && h.getElementById('genResultKey').textContent === 'synthetic-newer-key' && /key-1/.test(lateToast),
+                { key: h.ctx.lastGeneratedKey, shown: h.getElementById('genResultKey').textContent, toasts: h.log.toasts });
+        }
     }
 
     {
@@ -937,45 +1237,41 @@ async function run() {
 
     // ⛔ deep audit ៩ (F2) ៖ «🔓 ដោះឧបករណ៍» លុបកៅអី + `releasedAt` (ម៉ោង server) ក្នុង update តែមួយ ➜ ឧបករណ៍ចាស់ដែលនៅដំណើរការឈប់ប្រើ Key
     //    (license-verify ៖ `activatedAt` ≤ `releasedAt` ➜ seat-released) · Rules License ចាស់បដិសេធ `releasedAt` ➜ ដោះកៅអីតែមួយ + ប្រាប់ឲ្យ Publish
+    //    (update តែមួយផ្ញើតាម REST PATCH ៖ verifyReleaseOverRest() R1 · R9)
     console.log('-- ⛔ ដោះឧបករណ៍ ៖ releasedAt ជាមួយការលុបកៅអី --');
     {
-        h = build();
-        const sent = [];
-        h.ctx.fb.update = (ref, value) => { h.log.updates++; sent.push({ path: ref.path, value }); return Promise.resolve(); };
+        const restPatches = (f) => f.requests.filter((r) => r.method === 'PATCH').map((r) => r.body);
+        h = releaseRestFixture();
         await h.ctx.releaseKeySeat('key-a');
         await drain();
-        const atomic = sent.find((w) => w.value && 'license_seats/ADM/key-a' in w.value);
+        const atomic = restPatches(h).find((body) => body && 'license_seats/ADM/key-a' in body);
         ok('F2 ៖ ដោះ ➜ update តែមួយ ៖ license_seats null + license_keys/…/releasedAt = ម៉ោង server',
-            !!atomic && atomic.value['license_seats/ADM/key-a'] === null
-                && JSON.stringify(atomic.value['license_keys/ADM/key-a/releasedAt']) === JSON.stringify({ '.sv': 'timestamp' })
-                && h.log.toasts.some((t) => t.startsWith('✅')), { sent, log: h.log });
-        h = build();
-        const seatsOnly = [];
-        h.ctx.fb.update = () => { h.log.updates++; return Promise.reject(Object.assign(new Error('PERMISSION_DENIED: Permission denied'), { code: 'PERMISSION_DENIED' })); };
-        h.ctx.fb.set = (ref, value) => { seatsOnly.push({ path: ref.path, value }); return Promise.resolve(); };
+            restPatches(h).length === 1 && !!atomic && atomic['license_seats/ADM/key-a'] === null
+                && JSON.stringify(atomic['license_keys/ADM/key-a/releasedAt']) === JSON.stringify({ '.sv': 'timestamp' })
+                && h.log.toasts.some((t) => t.startsWith('✅')), { patches: restPatches(h), log: h.log });
+        h = releaseRestFixture({ patch: ['refuse-stamp', 'ok'] });
         await h.ctx.releaseKeySeat('key-a');
         await drain();
+        const seatsOnly = restPatches(h).slice(1);
         // ⛔ re-audit (K2) ៖ ក្រោយ Rules ចាស់ ➜ កៅអីត្រូវលុបហើយ (គ្មានឧបករណ៍ក្នុងបញ្ជី) តែ Key គ្មាន `releasedAt` ➜ សារ «Publish Rules រួចដោះម្តងទៀត»
         //    ត្រូវដើរ ៖ ការដោះម្តងទៀតចុះត្រា `releasedAt` តែមួយ (មុនកែ ៖ «មិនទាន់ចងនឹងឧបករណ៍ណាទេ» ហើយមិនសរសេរ ➜ ឧបករណ៍ចាស់កក់កៅអីវិញ)
         {
-            const hs = build();
-            const stamps = [];
-            hs.ctx.fb.update = (ref, value) => { hs.log.updates++; stamps.push(value); return Promise.resolve(); };
+            const hs = releaseRestFixture();
             await hs.ctx.releaseKeySeat('key-b');
             await drain();
+            const stamps = restPatches(hs);
             ok('K2 ៖ គ្មានឧបករណ៍ក្នុងបញ្ជី · Key គ្មាន releasedAt ➜ ចុះត្រា releasedAt (ដោះម្តងទៀតដើរ)',
                 stamps.length === 1 && JSON.stringify(stamps[0]['license_keys/ADM/key-b/releasedAt']) === JSON.stringify({ '.sv': 'timestamp' })
-                    && hs.log.toasts.some((t) => t.startsWith('✅')), { stamps, log: hs.log });
-            const hn = build();
+                    && hs.server.store.releasedAt['key-b'] === RELEASE_STAMP_AT && hs.log.toasts.some((t) => t.startsWith('✅')), { stamps, log: hs.log });
+            const hn = releaseRestFixture();
             hn.ctx.keyListCache[1].perApp.ADM.releasedAt = 900;
-            hn.ctx.fb.update = () => { hn.log.updates++; return Promise.resolve(); };
             await hn.ctx.releaseKeySeat('key-b');
             await drain();
             ok('K2 ទិសផ្ទុយ ៖ Key មាន releasedAt រួច ហើយគ្មានឧបករណ៍ ➜ «គ្មានអ្វីត្រូវដោះ» · មិនសរសេរ',
-                hn.log.updates === 0 && hn.log.alerts.length === 1 && /មិនទាន់ចងនឹងឧបករណ៍/.test(hn.log.alerts[0]), hn.log);
+                hn.requests.length === 0 && hn.sdk.length === 0 && hn.log.alerts.length === 1 && /មិនទាន់ចងនឹងឧបករណ៍/.test(hn.log.alerts[0]), hn.log);
         }
         ok('F2 ៖ Rules ចាស់បដិសេធ releasedAt ➜ ដោះកៅអីតែមួយ · ប្រាប់ឲ្យ Publish Rules (មិនមែន «ដោះមិនបាន»)',
-            seatsOnly.length === 1 && seatsOnly[0].path === 'license_seats/ADM/key-a' && seatsOnly[0].value === null
+            seatsOnly.length === 1 && JSON.stringify(seatsOnly[0]) === JSON.stringify({ 'license_seats/ADM/key-a': null })
                 && h.log.alerts.length === 1 && /Publish/.test(h.log.alerts[0]) && !/មិនបាន/.test(h.log.alerts[0]), { seatsOnly, log: h.log });
     }
 
@@ -1131,6 +1427,22 @@ async function run() {
     idle = idleFixture();
     idle.clock.now -= 60000;
     ok('⛔ នាឡិកាថយក្រោយ ➜ ដក (fail-closed)', idle.ctx.expireIdleSigningKey() === true && vm.runInContext('signingPrivateKeyJwk === null', idle.ctx));
+    // ⛔ A504 ៖ ចុច/វាយដំបូងក្រោយទុកចោលលើសពិដាន (ភ្ញាក់ពីការដេក ៖ ផ្ទាំងនៅមើលឃើញ គ្មាន visibilitychange · វដ្ត ៣០ វិ. មិនទាន់ដល់)
+    //    ➜ listener pointerdown/keydown ត្រូវដក Key **មុន** មិនត្រូវចុះត្រាសកម្មភាពថ្មីលើ Key ដែលផុតពិដានរួច (ដូច sbAdminActivity)
+    idle = idleFixture();
+    idle.clock.now += idleMs + 1000;
+    const wakeGeneration = vm.runInContext('sensitiveSessionGeneration', idle.ctx);
+    idle.ctx.noteSigningKeyActivity();
+    ok('⛔ ចុច/វាយដំបូងក្រោយទុកចោលលើសពិដាន ➜ ដក Key មុន (មិនពន្យារពិដាន) · ប្រតិបត្តិការចាស់អស់សុពលភាព · ការពិនិត្យវដ្តក្រោយគ្មានអ្វីត្រូវដក',
+        vm.runInContext('signingPrivateKeyJwk === null && signingKeySessionKey === null && signingKeyLastUseAt === 0', idle.ctx)
+        && vm.runInContext('sensitiveSessionGeneration', idle.ctx) > wakeGeneration && idle.ctx.expireIdleSigningKey() === false
+        && idle.log.toasts.some((t) => /ដកចេញពីសតិ/.test(t)),
+        { loaded: vm.runInContext('!!signingPrivateKeyJwk', idle.ctx), lastUse: vm.runInContext('signingKeyLastUseAt', idle.ctx), toasts: idle.log.toasts });
+    idle = idleFixture();
+    idle.clock.now += idleMs - 1000;
+    idle.ctx.noteSigningKeyActivity();
+    ok('ទិសផ្ទុយ ៖ ចុច/វាយមុនដល់ពិដាន ➜ Key នៅ · ត្រាសកម្មភាព = ឥឡូវ',
+        vm.runInContext('!!signingPrivateKeyJwk && signingKeyLastUseAt === Date.now()', idle.ctx) && !idle.log.toasts.length, idle.log.toasts);
     idle = build();
     vm.runInContext(realDecl('SIGNING_KEY_IDLE_MS') + '\nvar signingKeyLastUseAt = 5;', idle.ctx);
     vm.runInContext(slice(['clearSigningKey']), idle.ctx);
@@ -1192,6 +1504,18 @@ async function run() {
     il = idleLogoutFixture(true);
     il.clock.now -= 60000;
     ok('⛔ នាឡិកាថយក្រោយ ➜ ចាកចេញ (fail-closed)', il.ctx.expireIdleKeygenSession() === true && il.ctx.__logouts.length === 1);
+    // ⛔ A504 ៖ ចុច/វាយដំបូងក្រោយទុកចោលលើស KEYGEN_IDLE_LOGOUT_MS (មុនវដ្ត ៣០ វិ. · គ្មាន visibilitychange) ➜ ចាកចេញមុន មិនពន្យារវគ្គ Admin
+    il = idleLogoutFixture(true);
+    il.clock.now += logoutMs + 1000;
+    il.ctx.noteKeygenActivity();
+    ok('⛔ ចុច/វាយដំបូងក្រោយទុកចោលលើសពិដាន ➜ ចាក់សោវគ្គ + ចាកចេញ (auto) មុន · មិនចុះត្រាសកម្មភាពថ្មី',
+        JSON.stringify(il.ctx.__locks) === '[true]' && JSON.stringify(il.ctx.__logouts) === '[true]' && vm.runInContext('keygenLastActivityAt', il.ctx) === 0
+        && il.log.toasts.some((t) => /ស្វ័យប្រវត្តិ/.test(t)), { locks: il.ctx.__locks, logouts: il.ctx.__logouts, last: vm.runInContext('keygenLastActivityAt', il.ctx) });
+    il = idleLogoutFixture(true);
+    il.clock.now += logoutMs - 1000;
+    il.ctx.noteKeygenActivity();
+    ok('ទិសផ្ទុយ ៖ ចុច/វាយមុនដល់ពិដាន ➜ នៅចូល · ត្រាសកម្មភាព = ឥឡូវ',
+        il.ctx.__logouts.length === 0 && vm.runInContext('keygenLastActivityAt === Date.now()', il.ctx), { logouts: il.ctx.__logouts });
     ok('⛔ ខ្សែភ្ជាប់ ៖ pointerdown/keydown ➜ noteKeygenActivity · setInterval ➜ expireIdleKeygenSession · visibilitychange ➜ expireIdleKeygenSession',
         /\['pointerdown', 'keydown'\]\.forEach\(\(evt\) => document\.addEventListener\(evt, noteKeygenActivity, \{ capture: true, passive: true \}\)\)/.test(bootBlock)
         && /setInterval\(expireIdleKeygenSession, \d+\)/.test(bootBlock)
@@ -1227,9 +1551,9 @@ async function run() {
     const toastsBefore = lk.log.toasts.length;
     vm.runInContext('sbAdminSession = null;', lk.ctx);
     lk.ctx.lockKeygenSession(false);
-    ok('lockKeygenSession ៖ clearSigningKey(true) · sbAdminLogout (ពេលមាន session) · invalidateSensitiveSession · refresh · toast តែពេលមិន silent',
+    ok('lockKeygenSession ៖ clearSigningKey(true) · sbAdminLogout រួមទាំង pending login · invalidateSensitiveSession · refresh · toast តែពេលមិន silent',
         JSON.stringify(silentCalls) === '["clearSigningKey:true","sbAdminLogout","invalidate","refresh"]' && toastsBefore === 0
-        && JSON.stringify(lk.ctx.__calls.slice(4)) === '["clearSigningKey:true","invalidate","refresh"]'
+        && JSON.stringify(lk.ctx.__calls.slice(4)) === '["clearSigningKey:true","sbAdminLogout","invalidate","refresh"]'
         && lk.log.toasts.length === 1 && /ចាក់សោ/.test(lk.log.toasts[0]), { silentCalls, calls: lk.ctx.__calls, toasts: lk.log.toasts });
 
     // ⛔ សំណើម្ចាស់គម្រោង ៖ Private Key ដែល ZoeKeyGen បង្កើត (`JSON.stringify(exportKey)` ៖ មាន `key_ops` · `ext`) ហើយចម្លងតាម chat/Notes/Password Manager

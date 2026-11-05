@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
 import { exportQueuedSignPhoto } from '../../../features/queued-sign-photo';
-import { palmSignOutboxState, actOnQueuedSign, refreshPalmSignQueue, type SignQueueView } from '../../../features/palm-sign-outbox';
+import { palmSignOutboxState, actOnQueuedSign, refreshPalmSignQueue, requestDiscardUnreadablePalmSignJobs, type SignQueueView } from '../../../features/palm-sign-outbox';
 import { securityState, uiState } from '../../../core/state';
 import { closeModal, openModalHelper } from '../../../ui/modal';
 import { useStoreFields, useStoreValue } from '../../hooks/useStore';
@@ -24,7 +24,7 @@ export function PalmSignQueueModal() {
 }
 
 function SignQueueContents() {
-    const v = useStoreFields(palmSignOutboxState, ['rows', 'recoveryRows', 'message']);
+    const v = useStoreFields(palmSignOutboxState, ['rows', 'recoveryRows', 'message', 'unreadable']);
     const locked = useStoreValue(securityState, (s) => s.appIsLocked || s.appLockVeiled);
     const [retained, setRetained] = useState(false);
     const [menuId, setMenuId] = useState<string | null>(null);
@@ -42,6 +42,8 @@ function SignQueueContents() {
                 {v.recoveryRows.length > 0 ? <button type="button" aria-pressed={retainedView} onClick={() => setRetained(true)}>{'សង្គ្រោះ ' + v.recoveryRows.length}</button> : null}
             </div>
             {v.message ? <p role="alert">{v.message}</p> : null}
+            {v.unreadable > 0 ? <div className="modal-btns"><button type="button" className="btn-cancel"
+                onClick={requestDiscardUnreadablePalmSignJobs}>🗑️ លុបការងារ Sign ដែលអានមិនបាន</button></div> : null}
             {retainedView ? <p className="sign-queue-hint">រូបនៅឧបករណ៍នេះ · មិនផ្ញើស្វ័យប្រវត្តិ</p> : null}
             {!rows.length ? <p className="sign-queue-empty" role="status">{retainedView ? 'គ្មានការងារត្រូវពិនិត្យ។' : 'គ្មានការងារ Sign រង់ចាំ។'}</p> : null}
             {rows.map(row => <SignQueueItem key={row.id} row={row} expanded={menuId === row.id} toggle={() => setMenuId(menuId === row.id ? null : row.id)} close={() => setMenuId(null)} />)}

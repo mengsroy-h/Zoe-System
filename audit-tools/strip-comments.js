@@ -172,10 +172,14 @@ const gradleSet = new Set((REACT_MODE ? tsComments.gradleShippedFiles(REACT_DIR)
 const tomlSet = new Set(tsComments.netlifyConfigFiles(REACT_MODE ? REACT_DIR : path.join(ROOT, 'ZoeW'), path.join(ROOT, 'ZoeKeyGen'))
     .map((f) => path.resolve(f)));
 
+// XML Android ដែលគម្រោងថែទាំ (`android/app/src/main` ៖ manifest · `res/**/*.xml`) ៖ លុបតែ comment ក្រៅ allowlist template របស់ Capacitor
+// (`ts-comments.js`) ➜ token ក្រៅ comment និង comment template ដែលរក្សាត្រូវដូចគ្នាមុន/ក្រោយ
+const androidXmlSet = new Set((REACT_MODE ? tsComments.androidXmlShippedFiles(REACT_DIR) : []).map((f) => path.resolve(f)));
+
 const args = process.argv.slice(2);
 const checkOnly = args.indexOf('--check') !== -1;
 const targets = args.filter((a) => a.indexOf('--') !== 0);
-const files = targets.length ? targets : shippedFiles().concat(reactFiles, [...htmlSet], [...gradleSet], [...tomlSet]);
+const files = targets.length ? targets : shippedFiles().concat(reactFiles, [...htmlSet], [...gradleSet], [...tomlSet], [...androidXmlSet]);
 
 let touched = 0;
 let failed = 0;
@@ -193,6 +197,18 @@ for (const rel of files) {
         const res = tsComments.stripGradle(src, file);
         if (!res.count) { clean++; continue; }
         if (res.unsafe) { console.log('  FAIL  ' + shown + ' — បោះបង់ (token ក្រៅ comment ប្រែ)'); failed++; continue; }
+        if (checkOnly) { console.log('  ...   ' + shown + ' — មាន comment ' + res.count + ' (មិនទាន់សម្អាត)'); touched++; continue; }
+        fs.writeFileSync(file, res.text);
+        console.log('  ok    ' + shown + ' — លុប comment ' + res.count);
+        touched++;
+        continue;
+    }
+
+    if (androidXmlSet.has(path.resolve(file)) || /\.xml$/.test(file)) {
+        const shown = path.relative(ROOT, file);
+        const res = tsComments.stripAndroidXml(src, file);
+        if (!res.count) { clean++; continue; }
+        if (res.unsafe) { console.log('  FAIL  ' + shown + ' — បោះបង់ (token ក្រៅ comment ប្រែ ៖ កែដោយដៃ)'); failed++; continue; }
         if (checkOnly) { console.log('  ...   ' + shown + ' — មាន comment ' + res.count + ' (មិនទាន់សម្អាត)'); touched++; continue; }
         fs.writeFileSync(file, res.text);
         console.log('  ok    ' + shown + ' — លុប comment ' + res.count);

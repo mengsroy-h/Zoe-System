@@ -94,7 +94,7 @@ it('Supabase ៖ discard drops the undecidable rows of this account and shop onl
   journal.put({ v: 1, scope: 'project|user', topic: 'zoe:B', stage: 'unresolved', opId: 'operation_othershopxyz', sentAfter: Date.now() - 1000, ops: [{ k: 'set', p: ['zoew_settings', 'exchange_rate'], v: 1 }] });
   const writes: any[] = [];
   const db = createSupabaseDatabase({ subscribe: () => () => {}, rpc: async (fn: string, args: any) => {
-    if (fn === 'zoe_write') { writes.push(args); return { ok: true, docs: [], now: Date.now() }; }
+    if (fn === 'zoe_write_v2') { expect.soft(args.p_expected_tenant).toBe('A'); writes.push(args); return { ok: true, docs: [], now: Date.now() }; }
     return { seq: 1, more: false, reset: true, tenant: 'A', now: Date.now(), rows: [] };
   } }, { onListenerError: vi.fn(), onSynced: vi.fn(), onForbidden: vi.fn(), onTxOutcomeUnknown: vi.fn() }, { writeJournal: journal });
   db.setTenantTopic('zoe:A'); db.setAuthed(true, 'project|user'); await turn();

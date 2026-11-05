@@ -498,3 +498,44 @@ it('cancel ក្រោយ closed ត្រូវ manual refusal មិនឆ្
     expect(out.statusCode).toBe(409); expect(JSON.parse(out.body)).toMatchObject({ manualReview: true, reason: 'preimage_uncertain', barcode: code, requestId: f.input.requestId });
     expect(JSON.parse(out.body).cancelled).not.toBe(true); expect(state(f)).toEqual(before); expect(nonTracking(f)).toHaveLength(reads);
 });
+it('blocked ពី claimed មុនរូប (ZTO បដិសេធ preorder) ➜ lease ត្រូវដោះ ហើយ receipt-cancel បោះបង់បាន ដោយគ្មានរូប ឬ 05', async () => {
+    const f = fixture(); const bound = await reserve(f); const real = f.request.getMockImplementation()!;
+    f.request.mockImplementation(async path => path.endsWith('queryPreOrderByBillCode') ? { status: false, result: null } as any : real(path));
+    expect(JSON.parse((await f.call(container(), bound)).body).code).toBe('ZTO_PALM_SIGN_CHECK_REJECTED');
+    expect(state(f)).toMatchObject({ phase: 'reservation-v1:blocked', leaseUntil: 0, photoAccepted: false });
+    const cancelled = JSON.parse((await f.call(container(), { ...bound, stage: 'receipt-cancel', photo: undefined })).body);
+    expect(cancelled).toMatchObject({ success: true, cancelled: true, stage: 'receipt-cancel', reservationOwner: bound.reservationOwner, reservationToken: bound.reservationToken });
+    expect(state(f).phase).toBe('reservation-v1:cancelled');
+    expect(f.count('saveBillPic')).toBe(0); expect(f.count('saveScanInfo')).toBe(0);
+});
+it('journal blocked ចាស់ដែល lease ផុតហើយ ➜ receipt-cancel បោះបង់បាន · lease នៅរស់ ➜ មិនបោះបង់', async () => {
+    const f = fixture(); const bound = await reserve(f); const [key, row] = [...f.rows][0];
+    for (const [leaseUntil, cancelled] of [[Date.now() + 60000, false], [Date.now() - 1000, true]] as const) {
+        f.rows.set(key, { ...row, data: JSON.stringify({ ...state(f), phase: 'reservation-v1:blocked', leaseStartedAt: leaseUntil - 90000, leaseUntil, blocked: { statusCode: 409, body: { code: 'ZTO_PALM_SIGN_CHECK_REJECTED' } } }) });
+        const out = JSON.parse((await f.call(container(), { ...bound, stage: 'receipt-cancel', photo: undefined })).body);
+        expect(out.cancelled === true).toBe(cancelled);
+    }
+    expect(state(f).phase).toBe('reservation-v1:cancelled'); expect(nonTracking(f)).toHaveLength(0);
+});
+it('DISPATCH_REQUIRED ពី claimed (ភស្តុតាងចែកចាយចាស់ ឬ token Palm ប្តូរ) ➜ journal ត្រឡប់ reserved មិន blocked ➜ ភស្តុតាងថ្មីបន្តដោយស្វ័យប្រវត្តិ ហើយ 05 តែម្តង', async () => {
+    const f = fixture(); const bound = await reserve(f);
+    const out = await f.call(container(), { ...bound, dispatchProof: '' });
+    expect(JSON.parse(out.body).code).toBe('ZTO_PALM_DISPATCH_REQUIRED');
+    expect(state(f)).toMatchObject({ phase: 'reservation-v1:reserved', leaseUntil: 0, photoAccepted: false });
+    expect(nonTracking(f)).toHaveLength(0);
+    const ready = JSON.parse((await poll(f, bound)).body);
+    expect(ready).toMatchObject({ code: 'ZTO_PALM_SIGN_RESUME_READY', reservationOwner: bound.reservationOwner });
+    const done = JSON.parse((await f.call(container(), { ...bound, reservationToken: ready.reservationToken })).body);
+    expect(done.scanCompleted).toBe(true); expect(f.count('saveBillPic')).toBe(1); expect(f.count('saveScanInfo')).toBe(1);
+});
+it('ភស្តុតាងចែកចាយចាស់ដដែលផ្ញើម្ដងទៀត (App ចាស់មិនអានភស្តុតាងថ្មី) ➜ លើកទីពីរ blocked មិនវិលជុំ · lease ដោះ និងបោះបង់បាន · គ្មានការសរសេរ ZTO', async () => {
+    const f = fixture(); const bound = await reserve(f);
+    expect(JSON.parse((await f.call(container(), { ...bound, dispatchProof: 'stale-proof' })).body).code).toBe('ZTO_PALM_DISPATCH_REQUIRED');
+    expect(state(f).phase).toBe('reservation-v1:reserved');
+    const again = JSON.parse((await poll(f, bound)).body);
+    expect(JSON.parse((await f.call(container(), { ...bound, reservationToken: again.reservationToken, dispatchProof: 'stale-proof' })).body).code).toBe('ZTO_PALM_DISPATCH_REQUIRED');
+    expect(state(f)).toMatchObject({ phase: 'reservation-v1:blocked', leaseUntil: 0, photoAccepted: false });
+    expect(JSON.parse((await f.call(container(), { ...bound, dispatchProof: 'stale-proof' })).body).code).not.toBe('ZTO_PALM_DISPATCH_REQUIRED');
+    expect(JSON.parse((await f.call(container(), { ...bound, stage: 'receipt-cancel', photo: undefined })).body).cancelled).toBe(true);
+    expect(nonTracking(f)).toHaveLength(0);
+});

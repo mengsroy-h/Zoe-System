@@ -169,7 +169,7 @@ function makeEnv(opts) {
         'isBiometricEnabled', 'biometricPlatformAvailable', 'wrapPinWithRawKey', 'unwrapPinWithRawKey',
         'biometricPrfFirst', 'biometricPrfEval', 'biometricPrfBytes', 'enrollBiometricRecord', 'biometricUnlockPin', 'setBiometricLabel', 'setBiometricBusy',
         'refreshBiometricUi', 'runBiometricUnlock', 'startBiometricEnrollment', 'toggleBiometricUnlock',
-        'initBiometricUi', 'capturePinFlow', 'completePinUnlock',
+        'initBiometricUi', 'capturePinFlow', 'unlockLookupSecretForPin', 'completePinUnlock',
         'noteAppLockExcuse'
     ].forEach((n) => vm.runInContext(sliceFn(src, n), ctx));
     return { ctx, sandbox, log, els, store, prfKey };

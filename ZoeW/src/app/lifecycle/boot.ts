@@ -26,6 +26,7 @@ import { probeDatabaseLivenessIfIdle, setupConnectionRecovery } from '../../serv
 import { restoreLookupSecretKey } from '../../services/crypto';
 import { updateRecentPhonesList } from '../../services/db-listeners';
 import { resumePendingScanOperations } from '../../services/scan-operation';
+import { resumePriceOperations } from '../../services/price-operation';
 import { initFirebase } from '../../services/firebase-init';
 import { initNotifications, NOTIFY_FEED_INTERVAL_MS, notifyPeriodicTick } from '../../features/notifications';
 import { loadDeviceInfo } from '../../features/device-info';
@@ -59,6 +60,7 @@ export function bootApplication(scope: LifecycleScope): void {
     scope.onLoad(() => {
         startCoreServices();
         listenSetupLinkNavigation(scope);
+        listenPushNetwork(scope);
         startPeriodicTasks(scope);
         scope.onDispose(setupConnectionRecovery());
         startScanEngine();
@@ -73,6 +75,10 @@ export function listenSetupLinkNavigation(scope: LifecycleScope): void {
     scope.listen(window, 'hashchange', () => {
         if (/^#setup=/.test(window.location.hash || '')) applySetupLinkFromUrl();
     });
+}
+
+export function listenPushNetwork(scope: LifecycleScope): void {
+    scope.listen(window, 'online', () => { resyncPush(); });
 }
 
 function bootShell(scope: LifecycleScope): void {
@@ -176,6 +182,7 @@ function startPeriodicTasks(scope: LifecycleScope): void {
         runScheduledCleanup();
         resumeInterruptedCleanups();
         resumePendingScanOperations();
+        resumePriceOperations();
         scheduleZtoStatusSweep();
         scheduleZtoFinalMarks();
         refreshZtoPalmSession();
@@ -191,6 +198,7 @@ function startPeriodicTasks(scope: LifecycleScope): void {
         runScheduledCleanup();
         resumeInterruptedCleanups();
         resumePendingScanOperations();
+        resumePriceOperations();
         scheduleZtoStatusSweep();
         scheduleZtoFinalMarks();
         refreshZtoPalmSession();

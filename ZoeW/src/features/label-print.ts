@@ -5,6 +5,7 @@ import { LABEL_PRINT_OPTIONS_KEY } from '../core/storage-keys';
 import { STATS_DAILY_VIEW_KEYS } from '../core/text';
 import { viewState } from '../core/view-state';
 import { emptyViewMessage } from '../services/db-listeners';
+import { rowOperationActive } from '../services/row-operation-lock';
 import { beginPdfPrint, filteredHistoryItems, getCurrentFilterLabel, getExportFilenameBase } from './export';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { showToast } from '../ui/toast';
@@ -51,6 +52,7 @@ export const LABEL_NO_PHONE_TEXT = '—';
 export const LABEL_PREVIEW_MAX = 6;
 export const LABEL_LAYOUTS: readonly LabelLayout[] = ['50x30', '40x30', '60x40', 'single', 'a4-3', 'a4-2'];
 export const DEFAULT_LABEL_OPTIONS: LabelOptions = { layout: '50x30', money: true, locker: true, date: true, openOnly: true };
+const LABEL_PRICE_PENDING_TEXT = '⏳ ការកែតម្លៃមិនទាន់ផ្ទៀងបញ្ចប់ — សូមរង់ចាំមុនបោះពុម្ព ឬរក្សាទុកស្លាក។';
 
 let labelPrintScope: LabelPrintScope | null = null;
 
@@ -123,6 +125,10 @@ function labelScopeItems(scope: LabelPrintScope | null) {
     return filteredHistoryItems();
 }
 
+function labelPricesAreSettled(items) {
+    return !(Array.isArray(items) ? items : []).some((item) => item?.pricePending != null && rowOperationActive(item));
+}
+
 function labelScopeTitle(scope: LabelPrintScope | null) {
     if (scope && scope.kind === 'item') {
         const item = dataState.scanHistory.find((i) => i && i.id === scope.id);
@@ -153,10 +159,12 @@ function applyLabelOptionsToFields(options: LabelOptions) {
 export function updateLabelPrintPreview() {
     const options = readLabelOptionsFromFields();
     saveLabelOptions(options);
-    const rows = buildLabelRows(labelScopeItems(labelPrintScope), options);
+    const items = labelScopeItems(labelPrintScope);
+    const settled = labelPricesAreSettled(items);
+    const rows = settled ? buildLabelRows(items, options) : [];
     const preview: LabelPrintPreview = { rows: rows.slice(0, LABEL_PREVIEW_MAX), total: rows.length, customers: labelCustomerCount(rows), options };
     viewState.labelPrintPreview = preview;
-    viewState.labelPrintSummary = rows.length
+    viewState.labelPrintSummary = !settled ? LABEL_PRICE_PENDING_TEXT : rows.length
         ? 'ស្លាក ' + rows.length + ' · អតិថិជន ' + preview.customers + (rows.length > LABEL_PREVIEW_MAX ? ' · បង្ហាញគំរូ ' + LABEL_PREVIEW_MAX + ' ដំបូង' : '')
         : (options.openOnly ? 'គ្មានកញ្ចប់ដែលមិនទាន់យកក្នុងវិសាលភាពនេះ — បិទ «បង្ហាញតែកញ្ចប់មិនទាន់យក» ដើម្បីបោះពុម្ពទាំងអស់' : 'គ្មានកញ្ចប់ក្នុងវិសាលភាពនេះ');
     return preview;
@@ -164,6 +172,7 @@ export function updateLabelPrintPreview() {
 
 export function openLabelPrintModal(scope: LabelPrintScope) {
     const items = labelScopeItems(scope);
+    if (!labelPricesAreSettled(items)) { showToast(LABEL_PRICE_PENDING_TEXT); return false; }
     if (!items.length || !buildLabelRows(items).length) {
         showToast(emptyViewMessage(STATS_DAILY_VIEW_KEYS, '⚠️ គ្មានកញ្ចប់សម្រាប់បោះពុម្ពស្លាកទេ!'));
         return false;
@@ -179,7 +188,9 @@ export function openLabelPrintModal(scope: LabelPrintScope) {
 function labelRowsFromModal(): { options: LabelOptions; rows: LabelRow[] } | null {
     const options = readLabelOptionsFromFields();
     saveLabelOptions(options);
-    const rows = buildLabelRows(labelScopeItems(labelPrintScope), options);
+    const items = labelScopeItems(labelPrintScope);
+    if (!labelPricesAreSettled(items)) { updateLabelPrintPreview(); showToast(LABEL_PRICE_PENDING_TEXT); return null; }
+    const rows = buildLabelRows(items, options);
     if (!rows.length) {
         showToast(emptyViewMessage(STATS_DAILY_VIEW_KEYS, '⚠️ គ្មានកញ្ចប់សម្រាប់បោះពុម្ពស្លាកទេ!'));
         return null;
@@ -207,8 +218,8 @@ export const LABEL_IMAGE_MAX = 200;
 export function labelImageFiles(rows: LabelRow[], options: LabelOptions): Array<{ name: string; dataUrl: string }> {
     const used = new Map<string, number>();
     const files: Array<{ name: string; dataUrl: string }> = [];
-    (Array.isArray(rows) ? rows : []).forEach((row) => {
-        if (!row || !row.barcode) return;
+    for (const row of Array.isArray(rows) ? rows : []) {
+        if (!row || !row.barcode) continue;
         const canvas = drawLabelImage({
             phone: row.phone,
             barcode: row.barcode,
@@ -216,13 +227,13 @@ export function labelImageFiles(rows: LabelRow[], options: LabelOptions): Array<
             date: options.date ? row.date : '',
             locker: options.locker ? row.locker : ''
         }, options.layout);
-        if (!canvas) return;
+        if (!canvas) return [];
         const base = 'ZoeW_label_' + (String(row.barcode).replace(/[^a-zA-Z0-9]/g, '') || 'x');
         const seen = (used.get(base) || 0) + 1;
         used.set(base, seen);
         const name = seen === 1 ? base + '.png' : base + '_' + seen + '.png';
         files.push({ name, dataUrl: canvas.toDataURL('image/png') });
-    });
+    }
     return files;
 }
 
@@ -236,7 +247,7 @@ export function saveLabelImagesFromModal() {
     }
     const files = labelImageFiles(rows, options);
     if (!files.length) {
-        showToast('❌ បង្កើតរូបភាពស្លាកមិនបាន');
+        showToast('❌ បង្កើតរូបភាពស្លាកមិនបាន — សូមផ្ទៀង Barcode និងជ្រើសទំហំស្លាកធំជាងនេះ។');
         return false;
     }
     noteAppLockExcuse();

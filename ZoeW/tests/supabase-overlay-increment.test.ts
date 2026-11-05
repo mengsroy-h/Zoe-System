@@ -15,7 +15,7 @@ describe('C11 ៖ overlay របស់ increment() បូក មិនជំន�
             ping: async () => true,
             rpc: async (fn: string) => {
                 if (fn === 'zoe_pull') return { seq: 1, more: false, reset: true, tenant: 'A', head: 1, now: 1, rows: [{ r: D, k: '2026-10-20', v: { codDollar: 10 }, s: 1 }] };
-                if (fn === 'zoe_write') return new Promise((resolve) => { release = resolve; });
+                if (fn === 'zoe_write_v2') return new Promise((resolve) => { release = resolve; });
                 return { ok: true, docs: [], now: 1 };
             }
         };

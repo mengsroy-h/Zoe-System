@@ -429,7 +429,7 @@ async function scenario(label, fn) {
             vm.runInContext(sliceFn('generateUniqueId'), ctx);
             ctx.pickupPendingVersion = 0;
             ctx.fetch = async () => ({ ok: true, status: 200, json: async () => ({ pickupRevision: 1, pickupResetEpoch: 0, pickedUpBarcodes: { BARCODE: item.phone }, packagesPickedUp: 1 }) });
-            const protocol = moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts']);
+            const protocol = moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts']);
             vm.runInContext(protocol.code, ctx);
             let pickupContext, pickupError;
             try { pickupContext = await vm.runInContext("capturePickupContext('2026-09-12')", ctx); } catch (error) { pickupError = error; }

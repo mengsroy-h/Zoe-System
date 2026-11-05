@@ -28,7 +28,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const { reactRuntime } = require('./react-view');
+const { moduleRuntime, reactRuntime } = require('./react-view');
 
 const ROOT = process.env.LOOKUPFRESH_APP_DIR ? path.resolve(process.env.LOOKUPFRESH_APP_DIR) : path.resolve(__dirname, '..');
 const APP_JS = path.join(ROOT, 'ZoeW', 'app.js');
@@ -264,6 +264,10 @@ async function measureUnlockLookupKey(functionSource) {
         safeFocusScanner: () => {}
     };
     vm.createContext(ctx);
+    vm.runInContext(moduleRuntime(ROOT, SRC, [
+        { path: 'src/features/app-lock.ts', expose: ['captureAppUnlock', 'appLockUnlockGeneration'] },
+        { path: 'src/features/pin.ts', expose: ['unlockLookupSecretForPin'] }
+    ]).code, ctx);
     vm.runInContext(functionSource || '', ctx);
     await vm.runInContext('completeAppUnlock("' + pin + '")', ctx);
     return { linked: ctx.lookupSecretKey === key, correctPin: calls.length === 1 && calls[0] === pin, completed };

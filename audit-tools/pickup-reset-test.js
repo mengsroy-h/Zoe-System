@@ -26,6 +26,8 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { webcrypto } = require('node:crypto');
+const { TextEncoder } = require('node:util');
 const { moduleRuntime, memoryStorage } = require('./react-view');
 
 const ROOT = process.env.PICKUPRESET_APP_DIR || path.join(__dirname, '..');
@@ -159,18 +161,37 @@ const NOW = Date.UTC(2026, 7, 27, 6, 0, 0);
 const patternDecl = (SRC.match(/const\s+PICKUP_DATE_KEY_PATTERN\s*=\s*\/.*?\/\s*;/) || [])[0];
 ok('PICKUP_DATE_KEY_PATTERN ត្រូវបានប្រកាសក្នុងកូដពិត', !!patternDecl, patternDecl);
 
-const pickupRuntime = moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts']);
+const pickupRuntime = moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts',
+    { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied', 'pickupResetAppliedReceipt', 'pickupResetAttemptId', 'pickupResetBatchHash', 'pickupResetBoundReceipt', 'pickupResetCasOf', 'pickupResetCasText', 'pickupResetContextOf', 'pickupResetReceiptMatches'] },
+    'src/domain/pickup.ts',
+    { path: 'src/services/tx-outcome.ts', expose: ['executeNativePickupReset', 'nativePickupResetStatus'] },
+    { path: 'src/services/pickup-reset.ts', expose: ['PICKUP_RESET_PENDING_TEXT', 'PICKUP_RESET_UNAVAILABLE_TEXT', 'pickupResetPendingState', 'runPickupResetBatch'] },
+    'src/domain/collected.ts']);
+const toastRuntime = moduleRuntime(ROOT, SRC, [{ path: 'src/ui/toast.ts', expose: ['toastKindOf'] }]);
 
 function makeCtx(opts) {
     const writes = [];
     const serverPickup = JSON.parse(JSON.stringify(opts.ledger || {}));
-    const storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://pickup-reset.invalid' }) });
+    const config = { databaseURL: 'http://127.0.0.1:1', projectId: 'pickup-reset-fixture' };
+    const baseStorage = opts.storage || memoryStorage({ zoew_firebase_config: JSON.stringify(config) });
+    // journal ដែល settled ចេញពី storage ➜ កត់តម្លៃចុងក្រោយដែល App សរសេរ ដើម្បីនៅតែផ្ទៀងខ្លឹមសាររបស់វាបាន
+    const written = new Map();
+    const storage = {
+        get length() { return baseStorage.length; },
+        key: (index) => baseStorage.key(index),
+        getItem: (key) => baseStorage.getItem(key),
+        setItem: (key, value) => { written.set(String(key), String(value)); baseStorage.setItem(key, value); },
+        removeItem: (key) => baseStorage.removeItem(key),
+        clear: () => baseStorage.clear()
+    };
     const toasts = [];
     const sandbox = {
-        console,
+        __written: written, __baseStorage: baseStorage,
+        console, crypto: webcrypto, TextEncoder, URL,
         window: {},
         appLocalStore: storage, appSessionStore: storage,
-        auth: { currentUser: { uid: 'pickup-reset-owner' } }, isInitializingFirebase: false, pickupPendingVersion: 0, dataState: { pickupPendingVersion: 0 },
+        auth: { currentUser: { uid: 'pickup-reset-owner', getIdToken: async () => 'synthetic-fixture-token' } }, firebaseConfig: config,
+        isInitializingFirebase: false, pickupPendingVersion: 0, dataState: { pickupPendingVersion: 0 },
         txRestUrl: () => '',
         // ⛔ `withTimeout()` ពិត ត្រូវការនាឡិកា host — vm context ទទេគ្មានវាទេ
         setTimeout,
@@ -179,27 +200,47 @@ function makeCtx(opts) {
         showToast: (m) => toasts.push(m),
         refreshCurrentHistoryView: () => { sandbox.__refreshed = (sandbox.__refreshed || 0) + 1; },
         getServerNow: () => NOW,
-        db: opts.db === undefined ? {} : opts.db,
+        db: opts.db === undefined ? { app: { options: config } } : opts.db,
         dbRefDailyPickup: opts.dbRefDailyPickup === undefined ? {} : opts.dbRefDailyPickup,
         fb: opts.fb === undefined ? {
             ref: (_db, p) => ({ path: p }),
+            get: async ref => ({ val: () => JSON.parse(JSON.stringify(serverPickup[ref.path.split('/').pop()] || null)) }),
             runTransaction: (ref, fn) => {
                 const date = ref.path.split('/').pop();
                 const value = fn(JSON.parse(JSON.stringify(serverPickup[date] || null)));
-                writes.push({ path: ref.path, value });
-                if (opts.failDates && opts.failDates.indexOf(ref.path.split('/').pop()) !== -1) {
-                    return Promise.reject(new Error('permission_denied'));
+                if (opts.unknownDates && opts.unknownDates.includes(date)) {
+                    return Promise.reject(Object.assign(new Error('synthetic outcome unknown'), { txOutcome: 'unknown' }));
                 }
                 if (value !== undefined) serverPickup[date] = JSON.parse(JSON.stringify(value));
                 return Promise.resolve({ committed: value !== undefined, snapshot: { val: () => JSON.parse(JSON.stringify(serverPickup[date] || null)) } });
             }
         } : opts.fb,
         __writes: writes,
+        __serverPickup: serverPickup,
         __toasts: toasts
     };
     const ctx = vm.createContext(sandbox);
+    const rawSdk = sandbox.fb;
+    sandbox.__rawTransactions = 0;
+    const rawTransaction = rawSdk.runTransaction.bind(rawSdk);
+    rawSdk.runTransaction = (...args) => { sandbox.__rawTransactions++; return rawTransaction(...args); };
+    const rawRef = rawSdk.ref.bind(rawSdk);
+    rawSdk.ref = (db, p) => Object.assign(rawRef(db, p), { toString: () => config.databaseURL + '/' + p });
+    sandbox.fetchWithTimeout = async url => {
+        const target = new URL(url);
+        if (target.origin !== config.databaseURL || !/^\/zoew_daily_pickup_cod_dod\/\d{4}-\d{2}-\d{2}\.json$/.test(target.pathname)) throw new Error('Unexpected fixture read');
+        return { body: (await rawSdk.get(rawSdk.ref(sandbox.db, target.pathname.slice(1, -5)))).val() };
+    };
+    const owner = current => ({ tenant: config.projectId, actorUid: sandbox.auth.currentUser.uid,
+        tokenRealm: async () => config.projectId, sessionCurrent: current });
+    rawSdk.executePickupReset = (ref, request, current) => {
+        writes.push({ path: ref.path, value: JSON.parse(request.casText).v, request: JSON.parse(JSON.stringify(request)) });
+        if (opts.failDates?.includes(ref.path.split('/').pop())) return Promise.reject(Object.assign(new Error('permission_denied'), { txOutcome: 'not-applied' }));
+        return ctx.executeNativePickupReset(rawSdk, ref, request, current, owner(current));
+    };
+    rawSdk.pickupResetStatus = (ref, request, current) => ctx.nativePickupResetStatus(ref, request, current, owner(current));
     vm.runInContext(patternDecl || 'const PICKUP_DATE_KEY_PATTERN = /^\\d{4}-\\d{2}-\\d{2}$/;', ctx);
-    vm.runInContext('let pickupResetInFlight = false; let pickupResetOwner = null; let authGeneration = 0;', ctx);
+    vm.runInContext(pickupRuntime.withoutBindings('let pickupResetInFlight = false; let pickupResetOwner = null; let authGeneration = 0;'), ctx);
     vm.runInContext('let currentFilterMode = ' + JSON.stringify(opts.mode || 'today') + ';', ctx);
     vm.runInContext('let customFilterDate = ' + JSON.stringify(opts.customDate || '') + ';', ctx);
     vm.runInContext('let dailyPickupData = ' + JSON.stringify(opts.ledger || {}) + ';', ctx);
@@ -211,6 +252,7 @@ function makeCtx(opts) {
     vm.runInContext(sliceFn('withTimeout'), ctx);
     vm.runInContext(sliceFn('dbOp'), ctx);
     vm.runInContext(sliceFn('dbOpStalled'), ctx);
+    vm.runInContext(sliceFn('elapsedSince'), ctx);
     vm.runInContext(sliceConstDecl('APP_TIME_ZONE'), ctx);
     vm.runInContext(sliceConstDecl('APP_TIME_ZONE_OFFSET_MINUTES'), ctx);
     vm.runInContext(sliceFn('appZoneParts'), ctx);
@@ -220,8 +262,9 @@ function makeCtx(opts) {
     vm.runInContext('const dbListenerPendingPaths = new Set(' + JSON.stringify(opts.stalePickup ? ['dailyPickup'] : []) + '); const dbListenerFailedPaths = new Set();', ctx);
     vm.runInContext(['safeStoreGet', 'safeStoreSet', 'safeStoreRemove', 'generateUniqueId'].map(sliceFn).join('\n'), ctx);
     vm.runInContext(pickupRuntime.code, ctx);
+    vm.runInContext(toastRuntime.code, ctx);
     ['getFilterTargetDateKey', 'getPickupResetTargetDates', 'getCurrentFilterLabel',
-     'dbListenerViewIsStale', 'pickupStatsAreMeasurable', 'resetPickupStats'].forEach((n) => vm.runInContext(fnSrc[n], ctx));
+     'dbListenerViewIsStale', 'pickupStatsAreMeasurable', 'resetPickupStats'].filter((n) => !pickupRuntime.names.has(n)).forEach((n) => vm.runInContext(fnSrc[n], ctx));
     return { ctx, sandbox };
 }
 
@@ -239,6 +282,16 @@ async function runReset(opts) {
         toasts: sandbox.__toasts,
         ledger: vm.runInContext('dailyPickupData', ctx),
         inFlight: vm.runInContext('pickupResetInFlight', ctx),
+        storage: sandbox.__baseStorage,
+        pendingKeys: Array.from({ length: sandbox.appLocalStore.length }, (_, index) => sandbox.appLocalStore.key(index))
+            .filter((key) => key.startsWith('zoew_pickup_reset_pending_v2:') && !JSON.parse(sandbox.appLocalStore.getItem(key)).settled),
+        evidence: [...new Set([...sandbox.__written.keys(), ...Array.from({ length: sandbox.appLocalStore.length }, (_, index) => sandbox.appLocalStore.key(index))])]
+            .filter(key => key.startsWith('zoew_pickup_reset_pending_v2:'))
+            .map(key => JSON.parse(sandbox.appLocalStore.getItem(key) ?? sandbox.__written.get(key))),
+        storedEvidence: Array.from({ length: sandbox.appLocalStore.length }, (_, index) => sandbox.appLocalStore.key(index))
+            .filter(key => key.startsWith('zoew_pickup_reset_pending_v2:')),
+        serverPickup: sandbox.__serverPickup, rawTransactions: sandbox.__rawTransactions,
+        toastKinds: sandbox.__toasts.map((message) => ctx.toastKindOf(message)),
         refreshed: sandbox.__refreshed || 0
     };
 }
@@ -276,6 +329,14 @@ async function runReset(opts) {
         ok('toast ជោគជ័យចេញ (ចាប់ផ្តើមដោយ ✅)',
             r.toasts.length && r.toasts[r.toasts.length - 1].startsWith('✅'), r.toasts);
         ok('សោ in-flight ត្រូវដោះវិញ', r.inFlight === false);
+        ok('typed Reset ប្រើ raw CAS ពិតមួយ ហើយ server proof ត្រូវនឹង immutable original attempt',
+            r.rawTransactions === 1 && r.serverPickup['2026-08-26'].packagesPickedUp === 0
+            && r.serverPickup['2026-08-26'].pickupResetApplied.attemptId === r.writes[0].request.attemptId,
+            { rawTransactions: r.rawTransactions, server: r.serverPickup['2026-08-26'] });
+        ok('ACK ដែលបានបញ្ជាក់ ៖ journal ចុងក្រោយ settled · complete · receipt ត្រូវនឹង server ហើយចេញពី storage (មិនបំពេញ localStorage)',
+            r.evidence.length === 1 && r.evidence[0].settled && r.evidence[0].complete
+            && JSON.stringify(r.evidence[0].days[0].attempts[0].receipt) === JSON.stringify(r.serverPickup['2026-08-26'].pickupResetApplied)
+            && r.storedEvidence.length === 0, { evidence: r.evidence, stored: r.storedEvidence });
     }
 
     {
@@ -356,6 +417,22 @@ async function runReset(opts) {
             r.ledger['2026-08-26'].packagesPickedUp === 5, r.ledger['2026-08-26']);
         ok('បរាជ័យខ្លះ ➜ toast ព្រមាន មិនមែនជោគជ័យពេញ',
             r.toasts.some((t) => t.startsWith('⚠️')) && !r.toasts.some((t) => t.startsWith('✅')), r.toasts);
+    }
+
+    {
+        const r = await runReset({ mode: 'all', unknownDates: ['2026-08-26'], ledger: JSON.parse(JSON.stringify(LEDGER)) });
+        const pending = r.toasts[r.toasts.length - 1] || '';
+        ok('⛔ Reset មិនច្បាស់ក្រោយថ្ងៃជោគជ័យមួយ ➜ ឈប់មុនថ្ងៃបន្ទាប់ និងរក្សា marker ដើម',
+            JSON.stringify(r.writes.map((write) => write.path.split('/').pop())) === '["2026-08-25","2026-08-26"]'
+            && r.pendingKeys.length === 1 && !r.inFlight && r.ledger['2026-08-25'].packagesPickedUp === 0
+            && r.ledger['2026-08-26'].packagesPickedUp === 5 && r.ledger['2026-08-27'].packagesPickedUp === 3, r);
+        ok('⛔ សារផ្នែកជោគជ័យ និង unknown ចាប់ផ្ដើមដោយ ⏳ ហើយរក្សាន័យមិនទាន់ផ្ទៀងផ្ទាត់',
+            pending.startsWith('⏳') && pending.includes('មិនទាន់ផ្ទៀងផ្ទាត់') && !pending.startsWith('✅')
+            && r.toastKinds[r.toastKinds.length - 1] === 'info', { pending, kinds: r.toastKinds });
+        const replay = await runReset({ mode: 'all', ledger: JSON.parse(JSON.stringify(r.ledger)), storage: r.storage });
+        ok('⛔ pending marker ដើមក្រោយ restart ➜ មិនបញ្ជូន Reset ថ្មី និងរក្សា evidence',
+            replay.writes.length === 0 && JSON.stringify(replay.pendingKeys) === JSON.stringify(r.pendingKeys)
+            && replay.toasts.some((message) => message.startsWith('⏳') && message.includes('មិនទាន់ផ្ទៀងផ្ទាត់')), replay);
     }
 
     // ៤.៩ គ្មានការតភ្ជាប់ ➜ មិនកុហក
@@ -443,4 +520,5 @@ async function runReset(opts) {
         process.exit(1);
     }
     console.log('✅ ជោគជ័យ (' + pass + ')');
+    process.exitCode = 0;
 })();

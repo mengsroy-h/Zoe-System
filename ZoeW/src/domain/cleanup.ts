@@ -1,4 +1,4 @@
-import { trashConsumptionSame, trashGenerationOf, trashSourceUnconsumed } from './trash-generation';
+import { trashConsumptionSame, trashConsumptionValid, trashGenerationOf, trashSourceUnconsumed } from './trash-generation';
 import { allocateTrashGeneration, captureTrashGenerationOwner, readTrashConsumption, trashGenerationOwnerCurrent } from '../services/trash-generation';
 import { purgeTrashWithRegistry } from '../services/registry-purge';
 import { rowOperationActive } from '../services/row-operation-lock';
@@ -19,6 +19,7 @@ import { activeRestoreClaims, cloneRestoreItem, isActiveRestoreClaim, readRestor
 import { ABANDON_AGE_MS, RETURNED_TRASH_RETENTION_MS, TRASH_RETENTION_MS, TRASH_WRITE_SLOW_NOTICE_MS, TWO_HOURS_MS } from '../features/session';
 import { ZTO_STATUS_TTL_MS, loadZtoPickupStatusOnce, ztoAbandonCleanupIsHeld, ztoAutoCloseEnabled, getZtoPickupVerdict, ztoVerdictCandidate } from '../features/zto-status';
 import { dbListenerViewIsStale } from '../services/db-listeners';
+import { runEvidenceRetentionSweep } from '../services/evidence-retention';
 import { saveSingleDeletedItemToFirebase } from '../services/history-write';
 import { LOCK_STALL_RELEASE_MS, armLateCommit, dbOp, dbOpStalled, notifyIfSlow, retryAsync, settleLockWithin } from '../services/network';
 import { recalcItemMoneyFromBarcodes } from '../ui/modal-stack';
@@ -936,7 +937,13 @@ export async function resumeCleanupJournalEntry(trashId) {
     let restoreReceipt;
     if (!await cleanupTrashUnconsumed(trashItem, generationOwner, collected)) {
         const proof = collected && await cleanupCollectedRestoreProven(trashItem, generationOwner);
-        if (!proof) return '';
+        if (!proof) {
+            if (!collected && entry.stage !== CLEANUP_STAGE_UNDO && await cleanupTrashPurged(trashItem, generationOwner)) {
+                clearCleanupJournalEntry(trashItem.id, trashItem, entry.scope);
+                if (window.ZoeErrors) ZoeErrors.capture(new Error('Cleanup journal retired: trash purged'), { zone: 'data', context: 'resumeCleanupJournalEntry purged', itemId: trashItem.id });
+            }
+            return '';
+        }
         restoreReceipt = proof.receipt;
     }
     const priorMode = trashItem.trashMode;
@@ -1085,6 +1092,7 @@ export async function restoreClaimedItemToScanHistory(id, claimedWhole, claimedP
         normalizeBarcodesOf(currentItem);
         if (claimedWhole && !currentItem) {
             const updated = cloneRestoreItem(claimedWhole);
+            barcodeEntriesOf(updated.barcodes).forEach(({ barcode }) => stripTrashClaim(barcode));
             delete updated.trashGeneration;
             delete updated.restoreClaim;
             delete updated.restoreClaimId;
@@ -1094,7 +1102,7 @@ export async function restoreClaimedItemToScanHistory(id, claimedWhole, claimedP
         }
         const source = claimedWhole ? cloneRestoreItem(claimedWhole) : claimedPartial;
         if (claimedWhole) ensureBarcodeArrayForItem(source);
-        const reclaimed = barcodeEntriesOf(source.barcodes).map(({ barcode }) => { const { isDeducted, ...rest } = barcode; return rest; });
+        const reclaimed = barcodeEntriesOf(source.barcodes).map(({ barcode }) => { const { isDeducted, ...rest } = barcode; return stripTrashClaim(rest); });
         if (!reclaimed.length) return currentItem;
         const base = currentItem || { ...claimedPartial, barcodes: [] };
         if (!currentItem) {
@@ -1163,6 +1171,14 @@ export async function cleanupTrashUnconsumed(trashItem, owner = captureTrashGene
         const confirmed = await readTrashConsumption(trashItem.id, owner);
         return confirmed.ok && trashGenerationOwnerCurrent(owner) && trashSourceUnconsumed(trashItem, confirmed.value);
     } catch (error) { return false; }
+}
+
+export async function cleanupTrashPurged(trashItem, owner = captureTrashGenerationOwner()) {
+    if (!owner || !trashGenerationOwnerCurrent(owner)) return false;
+    const consumption = await readTrashConsumption(trashItem?.id, owner);
+    const receipt = consumption.ok ? consumption.value : null;
+    return trashGenerationOwnerCurrent(owner) && trashConsumptionValid(receipt) && receipt.kind === 'purge' && receipt.sourceId === trashItem.id
+        && receipt.generation === trashGenerationOf(trashItem) && receipt.deletedAt === trashItem.deletedAt;
 }
 
 async function cleanupCollectedRestoreProven(trashItem, owner, expectedReceipt?) {
@@ -1641,6 +1657,59 @@ export async function claimAndCleanupItem(id, reason, opts?) {
 
 let deletedCleanupOwner = null;
 let deletedCleanupCursor = null;
+export const PURGE_DEDUCTION_RETRY_MS = 10 * 60 * 1000;
+export const PURGE_DEDUCTION_RETRY_MAX_MS = 6 * 60 * 60 * 1000;
+export const purgeDeductionWaits = new Map();
+
+function purgeDeductionWaitKey(item) {
+    return item.id + '|' + item.deletedAt;
+}
+
+function samePurgeOwner(left, right) {
+    return !!left && !!right && left.db === right.db && left.sdk === right.sdk && left.generation === right.generation && left.uid === right.uid && left.scope === right.scope;
+}
+
+function notePurgeDeductionWait(owner, item, state) {
+    const key = purgeDeductionWaitKey(item);
+    const prior = purgeDeductionWaits.get(key);
+    const same = !!prior && samePurgeOwner(prior.owner, owner);
+    const gap = same ? Math.min(prior.gap * 2, PURGE_DEDUCTION_RETRY_MAX_MS) : PURGE_DEDUCTION_RETRY_MS;
+    purgeDeductionWaits.set(key, { owner, at: Date.now(), gap, reported: same && prior.reported });
+    if (same && prior.reported) return;
+    purgeDeductionWaits.get(key).reported = true;
+    if (window.ZoeErrors) ZoeErrors.capture(new Error('Trash purge waits for its deduction'), { zone: 'money', context: 'settlePurgeDeduction', itemId: item.id, state: String(state) });
+}
+
+export async function settlePurgeDeduction(candidate, owner, current) {
+    const id = candidate && candidate.id;
+    const local = candidate && candidate.source;
+    if (!local || typeof id !== 'string' || !/^[a-zA-Z0-9_-]{1,64}$/.test(id) || !current()) return null;
+    if (local.trashReason !== 'returned' && local.trashReason !== 'remove') return null;
+    const wait = purgeDeductionWaits.get(purgeDeductionWaitKey(local));
+    if (wait && samePurgeOwner(wait.owner, owner) && elapsedSince(wait.at) < wait.gap) return null;
+    let journaled = true;
+    try { journaled = cleanupJournalLive.has(id) || readCleanupJournal().some(entry => entry.trashItem.id === id); } catch (journalError) {}
+    if (journaled) return null;
+    let item;
+    try { item = await readRestoreServerNode(owner.sdk, owner.db, `zoew_recently_deleted_cod_dod/${id}`); } catch (readError) { return null; }
+    if (!current() || !item || typeof item !== 'object' || item.deletedAt !== local.deletedAt || item.trashReason !== local.trashReason
+        || !Number.isSafeInteger(item.deletedAt) || item.deletedAt <= 0 || getServerNow() - item.deletedAt <= trashRetentionMs(item)
+        || itemHasRestoreMarkers(item) || item.clearClaim || rowOperationActive(item)) return null;
+    const owedBarcodes = barcodeEntriesOf(item.barcodes).map(({ barcode }) => barcode).filter(barcode => barcode && barcode.isDeducted !== true);
+    if (!owedBarcodes.length) return null;
+    const owed: any = { barcodes: owedBarcodes, count: owedBarcodes.length };
+    recalcItemMoneyFromBarcodes(owed);
+    const rev = { scanDate: cleanupScanDateOf(item), cod: owed.cod, dod: owed.dod, count: owed.count };
+    if (typeof rev.scanDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(rev.scanDate)) { notePurgeDeductionWait(owner, item, 'day'); return null; }
+    const state = await deductCleanupLedgerKeyed({ ...item, id }, rev, null);
+    if (!current()) return null;
+    if (state !== 'deducted') { notePurgeDeductionWait(owner, item, state); return null; }
+    return rev.scanDate;
+}
+
+export function notePurgeDeductionHeld(owner, item) {
+    notePurgeDeductionWait(owner, item, 'held');
+}
 
 function deletedCleanupCurrent(owner) {
     return !!owner && owner.db === firebaseState.db && owner.sdk === firebaseState.fb && owner.generation === firebaseState.authGeneration
@@ -1687,9 +1756,20 @@ export async function runAutomaticDeletedCleanup() {
                 try {
                     if (candidate.staleClaim && !await releaseStaleRestoreClaimForPurge(candidate.id, current)) { held = true; continue; }
                     if (!current()) return;
-                    const done = await purgeTrashWithRegistry(candidate.source, current);
+                    let done = await purgeTrashWithRegistry(candidate.source, current);
                     if (!current()) return;
-                    if (!done) { held = true; continue; }
+                    if (done === null) {
+                        const day = await settlePurgeDeduction(candidate, owner, current);
+                        if (!current()) return;
+                        if (day) {
+                            done = await purgeTrashWithRegistry(candidate.source, current);
+                            if (!current()) return;
+                            if (done === null) notePurgeDeductionHeld(owner, candidate.source);
+                            else if (done) purgeDeductionWaits.delete(purgeDeductionWaitKey(candidate.source));
+                            if (done && candidate.source.trashReason === 'returned') candidate.ledgerKey = { scanDate: day };
+                        }
+                    }
+                    if (!done) { if (done !== null) held = true; continue; }
                     const captured = JSON.stringify(candidate.source);
                     dataState.deletedItems = dataState.deletedItems.filter(item => item.id !== candidate.id || JSON.stringify(item) !== captured);
                     await releaseCleanupLedgerKeys([candidate], current);
@@ -1712,4 +1792,5 @@ export function runScheduledCleanup() {
     runCleanupLedgerKeySweep();
     runAutomaticCollectedCleanup();
     resumePickupIntents();
+    void runEvidenceRetentionSweep();
 }

@@ -1,0 +1,371 @@
+// ម៉ាស៊ីនមេ Supabase ក្លែង (តែផ្នែកដែល ZoeW ប្រើ) លើ Postgres ពិត ៖
+//   · GoTrue ៖ POST /auth/v1/token?grant_type=password|refresh_token · POST /auth/v1/logout · GET /auth/v1/user · GET /auth/v1/health
+//     JWT HS256 ពិត (sub · role · exp · iat · amr[{method,timestamp}] · session_id) ➜ supabase-js ពិត decode/refresh បាន
+//     session ពិតក្នុង `auth.sessions` ដូច GoTrue ៖ Login បង្កើតជួរ · refresh រក្សា `session_id` ដដែល ហើយបដិសេធ (400 refresh_token_not_found)
+//     ពេលជួរបាត់ (revoke · logout) · logout `scope=local|global|others` លុបជួរតាម scope
+//   · PostgREST ៖ POST /rest/v1/rpc/<fn> ➜ ផ្ទៀង JWT ➜ `set local role` + `request.jwt.claims` (ដូច PostgREST) ➜ ហៅ function តាមឈ្មោះ
+//     argument (type ពី pg_proc) ➜ scalar ➜ តម្លៃ JSON · table ➜ array · កំហុស ➜ {code, message, details, hint} + status ដូច PostgREST
+//     (42501 ➜ 403 authenticated / 401 anon · 22023/P0001/P0002 ➜ 400 · `PTxyz` ➜ HTTP xyz · JWT ខុស/ផុត ➜ 401 PGRST301/PGRST303)
+//   · Edge Function ៖ POST /functions/v1/<name> ➜ handler ដែលអ្នកហៅផ្តល់ (ឬ 404)
+//   · `GET` តារាង ៖ `limit`/`offset` · `order` ច្រើនជួរឈរ · ពិដាន `maxRows` (១០០០ ដូច Max rows លំនាំដើមរបស់ Supabase ➜ កាត់ស្ងាត់ដូច PostgREST)
+//   · ការគ្រប់គ្រងសម្រាប់តេស្ត ៖ `setMode('down' | 'hang' | 'drop-response' | 'ok')` · `requests` · `issueToken()` · `expireTokens()` · `setAuthAge(វិ.)` (token ថ្មីរាយម៉ោងចូលប្រព័ន្ធថយក្រោយ ➜ ការផុតកំណត់ ៤ ម៉ោង)
+//   · Secret key (`opts.secretKey` · `sb_secret_…` ក្នុង header `apikey` តែប៉ុណ្ណោះ) ឬ JWT role service_role ➜ role `service_role` ·
+//     `sb_secret_…` ខុស ➜ 401 ដូច gateway · `setRpcHook(fn)` ៖ `fn({ fn, body, phase: 'before' | 'after' })` ➜ `'drop'` (បិទ socket ·
+//     phase after = commit រួចតែចម្លើយបាត់) · `'hang'` (មិនឆ្លើយ) · `{ status, body }` (ចម្លើយក្លែង មុន SQL) · ផ្សេង ➜ ធម្មតា
+//   · `setAuthHook(fn)` ៖ `fn({ path })` រង់ចាំមុន `/auth/v1/logout` លុបជួរ session ➜ តេស្តកំណត់លំដាប់ «សំណួរ ➜ logout ➜ ចម្លើយ» មិនពឹងល្បឿន Postgres
+// ⛔ Realtime (websocket) មិនធ្វើត្រាប់ ➜ adapter ត្រូវធ្លាក់ចុះទៅការទាញតាមវដ្ត/`goOnline()` (ការវាស់នោះជាផ្នែកនៃតេស្ត)។
+'use strict';
+
+const http = require('http');
+const crypto = require('crypto');
+const { performance } = require('perf_hooks');
+
+const b64u = (buf) => Buffer.from(buf).toString('base64url');
+
+function signJwt(payload, secret) {
+    const h = b64u(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+    const p = b64u(JSON.stringify(payload));
+    const s = b64u(crypto.createHmac('sha256', secret).update(h + '.' + p).digest());
+    return h + '.' + p + '.' + s;
+}
+
+function verifyJwt(token, secret, nowSec) {
+    const parts = String(token || '').split('.');
+    if (parts.length !== 3) return { ok: false, code: 'PGRST301' };
+    const want = b64u(crypto.createHmac('sha256', secret).update(parts[0] + '.' + parts[1]).digest());
+    if (want !== parts[2]) return { ok: false, code: 'PGRST301' };
+    let claims;
+    try { claims = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8')); } catch (e) { return { ok: false, code: 'PGRST301' }; }
+    if (!(Number(claims.exp) > nowSec)) return { ok: false, code: 'PGRST303' };
+    return { ok: true, claims };
+}
+
+// PostgREST បញ្ជូន timestamptz តាម JSON របស់ Postgres (microsecond · `T` · `+00:00`) ➜ client ដែលបញ្ជូនតម្លៃនោះត្រឡប់ (CAS) ស្មើពិតប្រាកដ។
+// node-pg លំនាំដើមបំប្លែងជា Date (millisecond) ➜ fake ក្លាយជាបាត់ microsecond ➜ ផ្តល់ `pgTypes` ដើម្បីធ្វើត្រាប់ PostgREST។
+function postgrestTimestamptz(text) {
+    const iso = String(text).replace(' ', 'T');
+    return /[+-]\d\d$/.test(iso) ? iso + ':00' : iso;
+}
+
+async function startFakeSupabase(opts) {
+    const secret = opts.jwtSecret || crypto.randomBytes(32).toString('hex');
+    const pool = opts.pool;
+    const rowTypes = opts.pgTypes
+        ? { getTypeParser: (oid, format) => (oid === 1184 ? postgrestTimestamptz : opts.pgTypes.getTypeParser(oid, format)) }
+        : undefined;
+    const users = new Map();
+    const refreshTokens = new Map();
+    const requests = [];
+    const functions = opts.functions || {};
+    let mode = 'ok';
+    let tokenTtlSec = opts.tokenTtlSec || 3600;
+    let expireBefore = 0;
+    let rpcHook = null;
+    let authHook = null;
+    let authAge = 0;
+    const signatures = new Map();
+    const maxRows = Number.isInteger(opts.maxRows) && opts.maxRows > 0 ? opts.maxRows : 1000;
+    const sockets = new Set();
+    // A socket can close before an asynchronous request handler releases its PG client.
+    // Track both until settlement; an uncompleted handler is never treated as drained.
+    const ownedResponses = new Set();
+    const ownedRequests = new Set();
+    const ownedHandlers = new Set();
+    const ownedErrors = [];
+    let closingOwned = false, serverClosed = false, closeError = null;
+
+    const addUser = (email, password, id) => { users.set(email.toLowerCase(), { id, email: email.toLowerCase(), password }); };
+    const openSession = async (userId) => {
+        const sessionId = crypto.randomUUID();
+        const c = await pool.connect();
+        try {
+            await c.query('insert into auth.sessions (id, user_id, created_at, updated_at) values ($1, $2, now(), now())', [sessionId, userId]);
+        } finally {
+            c.release();
+        }
+        return sessionId;
+    };
+    const sessionAlive = async (sessionId) => {
+        const c = await pool.connect();
+        try {
+            return (await c.query('select 1 from auth.sessions where id = $1', [sessionId])).rows.length === 1;
+        } finally {
+            c.release();
+        }
+    };
+    const endSessions = async (claims, scope) => {
+        const c = await pool.connect();
+        try {
+            if (scope === 'global') await c.query('delete from auth.sessions where user_id = $1', [claims.sub]);
+            else if (scope === 'others') await c.query('delete from auth.sessions where user_id = $1 and id <> $2', [claims.sub, claims.session_id]);
+            else await c.query('delete from auth.sessions where id = $1', [claims.session_id]);
+        } finally {
+            c.release();
+        }
+    };
+    const httpStatusOf = (code, role) => /^PT\d{3}$/.test(code || '') ? parseInt(code.slice(2), 10)
+        : code === '42501' ? (role === 'anon' ? 401 : 403) : code === 'P0002' ? 404 : code === '23505' ? 409 : code === '57014' ? 500 : 400;
+    const issueToken = (user, authTime, sessionId) => {
+        const now = Math.floor(Date.now() / 1000);
+        const access = signJwt({ iss: opts.jwtIssuer ? url + '/auth/v1' : undefined, aud: 'authenticated', role: 'authenticated', sub: user.id, email: user.email, iat: now, exp: now + tokenTtlSec,
+            session_id: sessionId, amr: [{ method: 'password', timestamp: (authTime || now) - authAge }], app_metadata: {}, user_metadata: {} }, secret);
+        const refresh = crypto.randomBytes(16).toString('hex');
+        refreshTokens.set(refresh, { user, authTime: authTime || now, sessionId });
+        return {
+            access_token: access, token_type: 'bearer', expires_in: tokenTtlSec, expires_at: now + tokenTtlSec, refresh_token: refresh,
+            user: { id: user.id, aud: 'authenticated', role: 'authenticated', email: user.email, app_metadata: {}, user_metadata: {},
+                created_at: '2026-01-01T00:00:00Z', email_confirmed_at: '2026-01-01T00:00:00Z' }
+        };
+    };
+
+    async function signatureOf(fn) {
+        if (signatures.has(fn)) return signatures.get(fn);
+        const c = await pool.connect();
+        try {
+            const r = await c.query(`select p.proargnames as names, array(select format_type(t, null) from unnest(p.proargtypes) t) as types,
+                    p.proretset as setof, format_type(p.prorettype, null) as ret, rt.typtype as rettype
+                from pg_proc p join pg_namespace n on n.oid = p.pronamespace join pg_type rt on rt.oid = p.prorettype
+                where n.nspname = 'public' and p.proname = $1`, [fn]);
+            const sig = r.rows[0] ? { names: r.rows[0].names || [], types: r.rows[0].types || [], setof: r.rows[0].setof, ret: r.rows[0].ret, composite: r.rows[0].rettype === 'c' } : null;
+            signatures.set(fn, sig);
+            return sig;
+        } finally {
+            c.release();
+        }
+    }
+
+    function send(res, status, body, headers) {
+        if (res.__record) res.__record.status = status;
+        const text = body === undefined ? '' : JSON.stringify(body);
+        res.writeHead(status, Object.assign({ 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }, headers || {}));
+        res.end(text);
+    }
+
+    async function rpc(req, res, fn, body) {
+        const auth = String(req.headers.authorization || '');
+        const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+        const apikey = String(req.headers.apikey || '');
+        let role = 'anon';
+        let claims = { role: 'anon' };
+        if (/^sb_secret_/.test(apikey)) {
+            if (!opts.secretKey || apikey !== opts.secretKey) return send(res, 401, { message: 'Invalid API key', hint: 'Double check your Supabase API key.' });
+            if (!token || token === apikey) {
+                role = 'service_role';
+                claims = { role: 'service_role' };
+            }
+        }
+        if (role !== 'service_role' && token && token.split('.').length === 3) {
+            const v = verifyJwt(token, secret, Math.floor(Date.now() / 1000));
+            if (!v.ok) return send(res, 401, { code: v.code, message: v.code === 'PGRST303' ? 'JWT expired' : 'JWSError', details: null, hint: null });
+            if (v.claims.iat < expireBefore) return send(res, 401, { code: 'PGRST303', message: 'JWT expired', details: null, hint: null });
+            claims = v.claims;
+            role = v.claims.role === 'authenticated' ? 'authenticated' : v.claims.role === 'service_role' ? 'service_role' : 'anon';
+        }
+        const before = rpcHook ? await rpcHook({ fn, body, phase: 'before' }) : null;
+        if (before === 'drop') { req.socket.destroy(); return; }
+        if (before === 'hang') return;
+        if (before && typeof before === 'object') return send(res, before.status, before.body);
+        const sig = await signatureOf(fn);
+        if (!sig) return send(res, 404, { code: 'PGRST202', message: 'Could not find the function public.' + fn, details: null, hint: null });
+        const args = body && typeof body === 'object' ? body : {};
+        const parts = [];
+        const params = [];
+        for (const name of Object.keys(args)) {
+            const idx = sig.names.indexOf(name);
+            if (idx === -1) return send(res, 404, { code: 'PGRST202', message: 'Could not find the function public.' + fn + ' with argument ' + name, details: null, hint: null });
+            const type = sig.types[idx];
+            const v = args[name];
+            params.push(v === null ? null : (type === 'jsonb' || type === 'json') ? JSON.stringify(v) : (typeof v === 'object' ? JSON.stringify(v) : String(v)));
+            parts.push(name + ' => $' + params.length + '::' + type);
+        }
+        const call = 'public.' + fn + '(' + parts.join(', ') + ')';
+        const sql = sig.setof || sig.composite || /^record$/.test(sig.ret) ? 'select * from ' + call : 'select ' + call + ' as r';
+        const c = await pool.connect();
+        try {
+            await c.query('begin');
+            await c.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify(claims)]);
+            await c.query('set local role ' + role);
+            const r = await c.query({ text: sql, values: params, types: rowTypes });
+            await c.query('commit');
+            if (mode === 'drop-response') { req.socket.destroy(); return; }
+            const after = rpcHook ? await rpcHook({ fn, body, phase: 'after', result: r.rows }) : null;
+            if (after === 'drop') { req.socket.destroy(); return; }
+            if (after === 'hang') return;
+            if (sig.setof) return send(res, 200, r.rows);
+            if (sig.composite) return send(res, 200, r.rows[0] && Object.values(r.rows[0]).some((v) => v !== null) ? r.rows[0] : null);
+            const scalar = r.rows[0] ? r.rows[0].r : null;
+            return send(res, 200, sig.ret === 'bigint' && typeof scalar === 'string' && /^-?\d+$/.test(scalar) ? JSON.parse(scalar) : scalar);
+        } catch (e) {
+            try { await c.query('rollback'); } catch (x) { ownedErrors.push(x); }
+            const status = httpStatusOf(e.code, role);
+            return send(res, status, { code: e.code || '', message: e.message, details: e.detail || null, hint: null });
+        } finally {
+            c.release();
+        }
+    }
+
+    async function selectTable(req, res, table, params) {
+        const auth = String(req.headers.authorization || '');
+        const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+        let role = 'anon';
+        let claims = { role: 'anon' };
+        if (token && token.split('.').length === 3) {
+            const v = verifyJwt(token, secret, Math.floor(Date.now() / 1000));
+            if (!v.ok || v.claims.iat < expireBefore) return send(res, 401, { code: 'PGRST303', message: 'JWT expired', details: null, hint: null });
+            claims = v.claims;
+            role = v.claims.role === 'authenticated' ? 'authenticated' : 'anon';
+        }
+        const ident = /^[a-z_][a-z0-9_]*$/;
+        const cols = String(params.get('select') || '*').split(',').map((x) => x.trim());
+        if (!cols.every((x) => x === '*' || ident.test(x))) return send(res, 400, { code: 'PGRST100', message: 'bad select' });
+        let order = '';
+        const ord = params.get('order');
+        if (ord) {
+            const parts = ord.split(',').map((x) => /^([a-z_][a-z0-9_]*)\.(asc|desc)$/.exec(x.trim()));
+            if (parts.some((m) => !m)) return send(res, 400, { code: 'PGRST100', message: 'bad order' });
+            order = ' order by ' + parts.map((m) => m[1] + ' ' + m[2]).join(', ');
+        }
+        const lim = params.get('limit');
+        const off = params.get('offset');
+        if ((lim !== null && !/^\d+$/.test(lim)) || (off !== null && !/^\d+$/.test(off))) return send(res, 400, { code: 'PGRST100', message: 'bad limit/offset' });
+        const page = ' limit ' + Math.min(lim === null ? maxRows : Number(lim), maxRows) + ' offset ' + (off === null ? 0 : Number(off));
+        const c = await pool.connect();
+        try {
+            await c.query('begin');
+            await c.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify(claims)]);
+            await c.query('set local role ' + role);
+            const r = await c.query({ text: 'select ' + cols.join(', ') + ' from public.' + table + order + page, types: rowTypes });
+            await c.query('commit');
+            return send(res, 200, r.rows);
+        } catch (e) {
+            try { await c.query('rollback'); } catch (x) { ownedErrors.push(x); }
+            return send(res, /^PT\d{3}$/.test(e.code || '') || e.code === '42501' ? httpStatusOf(e.code, role) : 400, { code: e.code || '', message: e.message, details: null, hint: null });
+        } finally {
+            c.release();
+        }
+    }
+
+    const server = http.createServer((req, res) => {
+        if (closingOwned) { res.writeHead(503); res.end(); return; }
+        ownedResponses.add(res); ownedRequests.add(req);
+        res.once('close', () => ownedResponses.delete(res));
+        let aborted = false;
+        const abortRequest = () => { aborted = true; ownedRequests.delete(req); };
+        req.once('aborted', abortRequest);
+        req.once('error', error => { ownedErrors.push(error); abortRequest(); });
+        let data = '';
+        req.on('data', (d) => { data += d; });
+        req.once('end', () => {
+            if (aborted) return;
+            const work = (async () => {
+            let body = null;
+            try { body = data ? JSON.parse(data) : null; } catch (e) { body = null; }
+            const u = new URL(req.url, 'http://x');
+            const record = { method: req.method, path: u.pathname, search: u.search, body, status: 0,
+                keyHash: req.headers.apikey ? crypto.createHash('sha256').update(String(req.headers.apikey)).digest('hex').slice(0, 16) : '' };
+            requests.push(record);
+            res.__record = record;
+            if (req.method === 'OPTIONS') return send(res, 204);
+            if (mode === 'down') { req.socket.destroy(); return; }
+            if (mode === 'hang') return;
+            try {
+                if (u.pathname === '/auth/v1/health') return send(res, 200, { name: 'GoTrue', version: 'fake' });
+                if (u.pathname === '/auth/v1/token' && req.method === 'POST') {
+                    const grant = u.searchParams.get('grant_type');
+                    if (grant === 'password') {
+                        const user = users.get(String(body && body.email || '').toLowerCase());
+                        if (!user || user.password !== (body && body.password)) {
+                            return send(res, 400, { code: 'invalid_credentials', error_code: 'invalid_credentials', msg: 'Invalid login credentials' }, { 'X-Supabase-Api-Version': '2024-01-01' });
+                        }
+                        return send(res, 200, issueToken(user, 0, await openSession(user.id)));
+                    }
+                    if (grant === 'refresh_token') {
+                        const rt = refreshTokens.get(body && body.refresh_token);
+                        if (!rt || !(await sessionAlive(rt.sessionId))) {
+                            if (rt) refreshTokens.delete(body.refresh_token);
+                            return send(res, 400, { code: 'refresh_token_not_found', error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token: Refresh Token Not Found' }, { 'X-Supabase-Api-Version': '2024-01-01' });
+                        }
+                        refreshTokens.delete(body.refresh_token);
+                        return send(res, 200, issueToken(rt.user, rt.authTime, rt.sessionId));
+                    }
+                    return send(res, 400, { code: 'unsupported_grant_type', msg: 'bad grant' });
+                }
+                if (u.pathname === '/auth/v1/logout') {
+                    if (authHook) await authHook({ path: u.pathname });
+                    const v = verifyJwt(String(req.headers.authorization || '').slice(7), secret, Math.floor(Date.now() / 1000));
+                    if (v.ok && v.claims.session_id) await endSessions(v.claims, u.searchParams.get('scope') || 'local');
+                    return send(res, 204);
+                }
+                if (u.pathname === '/auth/v1/user' && req.method === 'GET') {
+                    const token = String(req.headers.authorization || '').slice(7);
+                    const v = verifyJwt(token, secret, Math.floor(Date.now() / 1000));
+                    if (!v.ok) return send(res, 401, { code: 'bad_jwt', msg: 'invalid JWT' });
+                    return send(res, 200, { id: v.claims.sub, aud: 'authenticated', role: 'authenticated', email: v.claims.email });
+                }
+                const m = u.pathname.match(/^\/rest\/v1\/rpc\/([a-z_][a-z0-9_]*)$/);
+                if (m && req.method === 'POST') return await rpc(req, res, m[1], body);
+                const t = u.pathname.match(/^\/rest\/v1\/([a-z_][a-z0-9_]*)$/);
+                if (t && req.method === 'GET') return await selectTable(req, res, t[1], u.searchParams);
+                const f = u.pathname.match(/^\/functions\/v1\/([a-z0-9-]+)$/);
+                if (f && functions[f[1]]) {
+                    const out = await functions[f[1]](body, req);
+                    return send(res, out.status, out.body);
+                }
+                return send(res, 404, { message: 'no route ' + u.pathname });
+            } catch (e) {
+                ownedErrors.push(e);
+                return send(res, 500, { message: String(e && e.message || e) });
+            }
+            })();
+            ownedHandlers.add(work);
+            ownedRequests.delete(req);
+            work.then(() => ownedHandlers.delete(work), error => {
+                ownedHandlers.delete(work);
+                ownedErrors.push(error);
+                req.socket.destroy();
+            });
+        });
+    });
+    server.on('connection', (s) => { sockets.add(s); s.on('close', () => sockets.delete(s)); });
+    server.on('upgrade', (req, socket) => { socket.destroy(); });
+    await new Promise((r) => server.listen(0, '127.0.0.1', r));
+    const url = 'http://127.0.0.1:' + server.address().port;
+    return {
+        url,
+        secret,
+        maxRows,
+        requests,
+        addUser,
+        setMode(next) { mode = next; },
+        setRpcHook(fn) { rpcHook = typeof fn === 'function' ? fn : null; },
+        setAuthHook(fn) { authHook = typeof fn === 'function' ? fn : null; },
+        setTokenTtl(sec) { tokenTtlSec = sec; },
+        setAuthAge(sec) { authAge = sec; },
+        expireTokens() { expireBefore = Math.floor(Date.now() / 1000) + 1; },
+        // Close admission without forcing sockets or dropping pending handlers. A timeout
+        // is an UNKNOWN lifecycle result, never a successful drain or cancellation.
+        async closeOwned(timeoutMs = 15000) {
+            if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new TypeError('Owned fake server timeout must be positive and finite');
+            if (!closingOwned) {
+                closingOwned = true;
+                server.close(error => { closeError = error || null; serverClosed = true; });
+                if (server.closeIdleConnections) server.closeIdleConnections();
+            }
+            const deadline = performance.now() + timeoutMs;
+            while (!(serverClosed && ownedRequests.size === 0 && ownedResponses.size === 0 && ownedHandlers.size === 0 && sockets.size === 0)) {
+                if (performance.now() >= deadline) return { quiescent: false, reason: 'deadline', serverClosed,
+                    requests: ownedRequests.size, responses: ownedResponses.size, handlers: ownedHandlers.size, sockets: sockets.size, errors: ownedErrors.length };
+                await new Promise(resolve => setTimeout(resolve, Math.min(10, Math.max(0, deadline - performance.now()))));
+            }
+            if (closeError || ownedErrors.length) throw new AggregateError([...(closeError ? [closeError] : []), ...ownedErrors], 'Owned fake server failed');
+            return { quiescent: true, serverClosed: true, requests: 0, responses: 0, handlers: 0, sockets: 0, errors: 0 };
+        },
+        ownedCounts() { return { closing: closingOwned, serverClosed, requests: ownedRequests.size, responses: ownedResponses.size, handlers: ownedHandlers.size, sockets: sockets.size, errors: ownedErrors.length }; },
+        close() {
+            for (const s of sockets) s.destroy();
+            return new Promise((r) => server.close(() => r()));
+        }
+    };
+}
+
+module.exports = { startFakeSupabase, signJwt, verifyJwt };

@@ -1,5 +1,7 @@
 'use strict';
 
+const { NATIVE_F03_CANONICAL_GUARD } = require('./rtdb-canonical-key.cjs');
+
 const METHODS = new Map([
     ['child', 1], ['parent', 0], ['val', 0], ['exists', 0], ['isString', 0], ['isNumber', 0], ['isBoolean', 0],
     ['hasChildren', -1], ['hasChild', 1]
@@ -14,6 +16,11 @@ function tokenize(src) {
     while (i < src.length) {
         const ch = src[i];
         if (/\s/.test(ch)) { i++; continue; }
+        if (src.startsWith(NATIVE_F03_CANONICAL_GUARD, i)) {
+            out.push({ k: 'f03_key' });
+            i += NATIVE_F03_CANONICAL_GUARD.length;
+            continue;
+        }
         if (ch === "'" || ch === '"') {
             let j = i + 1;
             let text = '';
@@ -111,6 +118,11 @@ function parseExpression(src, scope) {
     }
     function primary() {
         const t = peek();
+        if (t.k === 'f03_key') {
+            if (scope.length !== 1 || scope[0] !== '$releaseId') throw new Error('canonical key guard outside release scope');
+            pos++;
+            return { t: 'f03_registry_key' };
+        }
         if (t.k === 'num') { pos++; return { t: 'l', v: t.v }; }
         if (t.k === 'str') { pos++; return { t: 'l', v: t.v }; }
         if (t.k === 'p' && t.v === '(') { pos++; const e = level(0); eat('p', ')'); return e; }

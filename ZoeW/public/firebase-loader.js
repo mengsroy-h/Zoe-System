@@ -12,6 +12,7 @@
             var appMod = mods[0];
             var authMod = mods[1];
             var dbMod = mods[2];
+            if (typeof dbMod.forceWebSockets === 'function') dbMod.forceWebSockets();
 
             window.firebaseSDK = {
                 initializeApp: appMod.initializeApp,

@@ -101,7 +101,7 @@ export { firebaseState, dataState, uiState } from './ZoeW/src/core/state';`, res
     globalThis.ZoeErrors = window.ZoeErrors = { capture: (error, context) => console.log('fixture captured', error?.message, context?.context) };
     let blockReads = false;
     globalThis.fetch = (url, init) => blockReads ? Promise.reject(new TypeError('fixture read lost')) : localRequest(String(url), init);
-    for (const mode of wireMode ? ['new'] : ['new', 'merge']) for (const fault of wireMode ? ['month-evicted', 'month-pruned-recreated'] : ['before-stage', 'lost-stage-ack', 'prepared-lost-ack', 'final-lost-ack', 'final-before-send']) {
+    for (const mode of wireMode ? ['new'] : ['new', 'merge']) for (const fault of wireMode ? ['month-evicted', 'month-pruned-recreated'] : ['before-stage', 'lost-stage-ack', 'prepared-lost-ack', 'final-lost-ack', 'final-before-send', 'staged-month-evicted']) {
         const ns = 'demo-scan-sdk-' + process.pid + '-' + results.length;
         const endpoint = 'http://127.0.0.1:' + port + '/?ns=' + ns;
         const owner = async (location = '', method = 'GET', body) => {
@@ -173,6 +173,15 @@ export { firebaseState, dataState, uiState } from './ZoeW/src/core/state';`, res
                         await database.runTransaction(ref, update, options); armed = false; blockReads = true; stageReached();
                         throw Object.assign(new Error('fixture prepared ACK unavailable'), { txOutcome: 'unknown' });
                     }
+                    if (armed && fault === 'staged-month-evicted' && String(ref).includes('/' + H + '/')) {
+                        const staged = await database.runTransaction(ref, update, options);
+                        armed = false;
+                        const bucket = await owner(M + '/' + month);
+                        assert.ok(Object.keys(bucket.ops || {}).some(key => key.startsWith('op_m')), 'witness ស្កេនមានមុន churn');
+                        const ops = Object.fromEntries(Array.from({ length: 12 }, (_, index) => ['op_y' + String(index).padStart(8, '0'), 100 + index]));
+                        await owner(M + '/' + month, 'PUT', { codDollar: bucket.codDollar, dodDollar: bucket.dodDollar, totalCount: bucket.totalCount, op: 'op_y00000011', ops });
+                        return staged;
+                    }
                     if (armed && ['before-stage', 'lost-stage-ack'].includes(fault) && String(ref).includes('/' + H + '/')) {
                         armed = false;
                         if (fault === 'lost-stage-ack') await database.runTransaction(ref, update, options);
@@ -197,7 +206,8 @@ export { firebaseState, dataState, uiState } from './ZoeW/src/core/state';`, res
                 connectionWrites: Object.keys(localStorage).filter(key => key.startsWith('zoew_connection_writes_v1:')).map(key => JSON.parse(localStorage.getItem(key))) }));
             throw error;
         }
-        assert.equal(api.createScanEvidenceJournal(localStorage, 2).list(api.pendingScanScope()).length, 1);
+        assert.equal(api.createScanEvidenceJournal(localStorage, 2).list(api.pendingScanScope()).length, fault === 'staged-month-evicted' ? 0 : 1);
+        if (fault === 'staged-month-evicted') assert.equal(await saving, true, 'witness ដែលត្រូវរុញចេញក្រោយ stage ត្រូវរៀបឡើងវិញ ហើយ save ចប់');
         if (wireMode) {
             const operation = Object.values(await owner('zoew_scan_operations'))[0];
             const committedMonth = await owner(M + '/' + month);
@@ -252,7 +262,7 @@ export { firebaseState, dataState, uiState } from './ZoeW/src/core/state';`, res
         await bounded(second.sdk.retryWriteRecovery(second.db), 'transport recovery');
         api.dataState.scanHistory = Object.values(await owner(H) || {});
         await bounded(api.resumePendingScanOperations(), 'business recovery');
-        const after = await owner(); const committed = fault === 'lost-stage-ack' || fault === 'final-lost-ack';
+        const after = await owner(); const committed = fault === 'lost-stage-ack' || fault === 'final-lost-ack' || fault === 'staged-month-evicted';
         for (const [root, key] of [[D, day], [M, month]]) {
             assert.equal(after[root][key].codDollar, committed ? 15 : 10);
             assert.equal(after[root][key].totalCount, committed ? 2 : 1);
@@ -269,7 +279,7 @@ export { firebaseState, dataState, uiState } from './ZoeW/src/core/state';`, res
         results.push({ mode, fault, agedRows, money: after[D][day].codDollar, count: after[D][day].totalCount, pending: held ? 1 : 0, expectedHold: held });
         await second.sdk.deleteApp(second.app); api.firebaseState.authGeneration++;
     }
-    assert.equal(results.length, wireMode ? 2 : 10); assert.equal(negativeResults.length, 5);
+    assert.equal(results.length, wireMode ? 2 : 12); assert.equal(negativeResults.length, 5);
     console.log(JSON.stringify({ actualSdkAndRtdb: true, simulatedProcessDeathAndReadLoss: true, coldCacheNegativeControls: negativeResults, cases: results }, null, 2));
     for (const app of apps) if (getApps().includes(app)) await deleteApp(app);
     await window.happyDOM.close();

@@ -54,7 +54,12 @@ beforeEach(() => {
         ref: (_db: any, p = '') => ref(p),
         increment: (n: number) => ({ __inc: n }),
         get: async (r: any) => snap(r, getAt(r.path)),
-        update: async (r: any, ups: any) => { for (const [k, v] of Object.entries(ups)) setAt([r.path, k].filter(Boolean).join('/'), v); },
+        update: async (r: any, ups: any) => {
+            for (const [k, v] of Object.entries(ups) as any[]) {
+                const p = [r.path, k].filter(Boolean).join('/');
+                setAt(p, v && typeof v === 'object' && '__inc' in v ? Math.round(((getAt(p) || 0) + v.__inc) * 100) / 100 : v);
+            }
+        },
         set: async (r: any, v: any) => setAt(r.path, v),
         runTransaction: async (r: any, fn: any) => {
             if (fn && fn.connectionIntent) lab.intents.push(clone(fn.connectionIntent));
@@ -93,13 +98,12 @@ it('price edit ចាប់ផ្ដើមមុន ➜ scan លើ row ដដ�
     const gate = new Promise<void>(resolve => { unlock = resolve; });
     const ready = new Promise<void>(resolve => { entered = resolve; });
     let firstHistory = true;
-    sdk.runTransaction = async (r: any, update: any) => {
-        if (r.path === D + '/' + DAY() && update.connectionIntent?.companion?.code === 'A100000001') {
-            entered(); await gate;
-        }
-        if (r.path === H + '/itemI' && firstHistory && update(getAt(r.path))?.pricePending?.phase === 'history') { firstHistory = false; await gate; }
-        return original(r, update);
+    const originalUpdate = sdk.update;
+    sdk.update = async (r: any, ups: any) => {
+        if (firstHistory && Object.keys(ups).some((k) => k.endsWith('/pricePending/phase') && ups[k] === 'history')) { firstHistory = false; entered(); await gate; }
+        return originalUpdate(r, ups);
     };
+    sdk.runTransaction = async (r: any, update: any) => original(r, update);
     saveEditedBarcodePrice();
     await ready;
     const before = money();

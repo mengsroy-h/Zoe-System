@@ -50,6 +50,18 @@ export const PIN_PROMPT_MESSAGES = {
         verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីលុបការសរសេររង់ចាំដែលផ្ទៀងផ្ទាត់មិនបាន',
         setup: 'សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការលុបការសរសេររង់ចាំ លើកក្រោយ'
     },
+    resolvePriceOperations: {
+        verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីបញ្ចប់ការកែតម្លៃដែលជាប់',
+        setup: 'សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការបញ្ចប់ការកែតម្លៃដែលជាប់ លើកក្រោយ'
+    },
+    discardUnreadableSign: {
+        verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីលុបការងារ Sign ដែលអានមិនបាន',
+        setup: 'សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការលុបការងារ Sign ដែលអានមិនបាន លើកក្រោយ'
+    },
+    resolveScanEvidence: {
+        verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីបញ្ចប់ភស្តុតាងស្កេនរង់ចាំ',
+        setup: 'សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការបញ្ចប់ភស្តុតាងស្កេនរង់ចាំ លើកក្រោយ'
+    },
     clearHistory: {
         verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីលុបទិន្នន័យទាំងអស់',
         setup: 'សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការលុបទិន្នន័យទាំងអស់ លើកក្រោយ'
@@ -190,12 +202,18 @@ export async function verifySecurityPin() {
     }
 }
 
-export async function completePinUnlock(pin, isCurrent = capturePinFlow(), savedPin = safeStoreGet(appLocalStore, 'zoew_security_pin_hash')) {
+export async function unlockLookupSecretForPin(pin, savedPin, isCurrent) {
     if (!isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
     const key = await deriveLookupSecretKey(pin);
     if (!isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
     securityState.lookupSecretKey = key;
     await rememberLookupSecretKey(key);
+    if (!isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
+    return true;
+}
+
+export async function completePinUnlock(pin, isCurrent = capturePinFlow(), savedPin = safeStoreGet(appLocalStore, 'zoew_security_pin_hash')) {
+    if (!await unlockLookupSecretForPin(pin, savedPin, isCurrent)) return false;
     if (!isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
     safeStoreRemove(appLocalStore, 'zoew_pin_fail_count');
     safeStoreRemove(appLocalStore, 'zoew_pin_lockout_until');

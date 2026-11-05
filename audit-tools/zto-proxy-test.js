@@ -269,12 +269,12 @@ group('ទម្រង់ API ណាក៏បាន', async () => {
     console.log('\n== ៤. ការត្រៀមសម្រាប់ API ផ្លូវការ (ទម្រង់ណាក៏បាន) ==');
 
     const shapes = [
-        ['data ធម្មតា', { success: true, data: { billCode: 'A1', consigneePhone: '011', agentAmount: 2, arrivalServiceCharge: 1 } }],
-        ['code:"0" + ឈ្មោះ field ផ្សេង', { code: '0', data: { waybillNo: 'A1', receiverMobile: '011', codAmount: '2', dodAmount: 1 } }],
-        ['result:true + data.data', { result: true, data: { data: { mailNo: 'A1', recipientPhone: '011', collectionAmount: 2 } } }],
-        ['data ជា array', { success: true, data: [{ billCode: 'A1', consigneeMobile: '011', cod: 2 }] }],
-        ['root ផ្ទាល់ (គ្មាន wrapper)', { billCode: 'A1', phone: '011', cod: 2, dod: 1 }],
-        ['code:"000000"', { code: '000000', data: { billCode: 'A1', consigneeTel: '011', codFee: 2 } }]
+        ['data ធម្មតា', { success: true, data: { billCode: 'A1B2C3D4', consigneePhone: '011', agentAmount: 2, arrivalServiceCharge: 1 } }],
+        ['code:"0" + ឈ្មោះ field ផ្សេង', { code: '0', data: { waybillNo: 'A1B2C3D4', receiverMobile: '011', codAmount: '2', dodAmount: 1 } }],
+        ['result:true + data.data', { result: true, data: { data: { mailNo: 'A1B2C3D4', recipientPhone: '011', collectionAmount: 2 } } }],
+        ['data ជា array', { success: true, data: [{ billCode: 'A1B2C3D4', consigneeMobile: '011', cod: 2 }] }],
+        ['root ផ្ទាល់ (គ្មាន wrapper)', { billCode: 'A1B2C3D4', phone: '011', cod: 2, dod: 1 }],
+        ['code:"000000"', { code: '000000', data: { billCode: 'A1B2C3D4', consigneeTel: '011', codFee: 2 } }]
     ];
     for (const entry of shapes) {
         resetEnv({ ZTO_AUTHORIZATION: 'Bearer x' });
@@ -285,7 +285,7 @@ group('ទម្រង់ API ណាក៏បាន', async () => {
     }
 
     resetEnv({ ZTO_AUTHORIZATION: 'Bearer x', ZTO_FIELD_PHONE: 'contact.tel' });
-    global.fetch = jsonResponder({ success: true, data: { billCode: 'A1', contact: { tel: '077' }, agentAmount: 1 } });
+    global.fetch = jsonResponder({ success: true, data: { billCode: 'A1B2C3D4', contact: { tel: '077' }, agentAmount: 1 } });
     const nested = await call({ barcode: 'A1B2C3D4' });
     ok('ZTO_FIELD_PHONE ➜ ផ្លូវ dotted ដើរ', JSON.parse(nested.body).phone === '077', nested.body);
 
@@ -302,7 +302,7 @@ group('ទម្រង់ API ណាក៏បាន', async () => {
         ZTO_REQUEST_QUERY_PARAM: 'waybillNo',
         ZTO_REQUEST_HEADERS_JSON: '{"X-App-Key":"app-1"}'
     });
-    global.fetch = jsonResponder({ success: true, data: { waybillNo: 'A1', receiverPhone: '011', codAmount: 3 } });
+    global.fetch = jsonResponder({ success: true, data: { waybillNo: 'A1B2C3D4', receiverPhone: '011', codAmount: 3 } });
     const getMode = await call({ barcode: 'A1B2C3D4' });
     ok('GET mode ➜ 200', getMode.statusCode === 200, getMode.body);
     ok('GET mode ➜ URL និង query param ត្រឹមត្រូវ',
@@ -326,6 +326,24 @@ group('ទម្រង់ API ណាក៏បាន', async () => {
         jsonResponder.last.options.headers.Cookie === undefined
         && jsonResponder.last.options.headers.Authorization === 'Bearer x',
         jsonResponder.last.options.headers);
+});
+
+group('Cookie barcode ផ្សេងត្រូវបដិសេធ', async () => {
+    for (const flags of [{}, { status: '1' }, { restore: '1' }]) {
+        resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=synthetic-binding-only', ZTO_UPSTREAM_RETRIES: '2' });
+        const before = jsonResponder.calls || 0;
+        global.fetch = jsonResponder({ success: true, data: {
+            billCode: 'FOREIGN0001', waybillNo: 'A1B2C3D4', phone: '012000111', cod: 9, dod: 1
+        } });
+        const response = await call(Object.assign({ barcode: 'A1B2C3D4' }, flags));
+        const body = JSON.parse(response.body);
+        ok('⛔ explicit selected barcode ខុស ➜ 502 មិនមែន not-found ' + JSON.stringify(flags),
+            response.statusCode === 502 && body.code === 'ZTO_INVALID_RESPONSE', response.body);
+        ok('⛔ refusal គ្មាន customer/status/restore/raw fields ' + JSON.stringify(flags),
+            Object.keys(body).sort().join(',') === 'code,error'
+            && !response.body.includes('012000111') && !response.body.includes('FOREIGN0001'), response.body);
+        ok('⛔ mismatch fatal មិន retry upstream ' + JSON.stringify(flags), (jsonResponder.calls || 0) - before === 1);
+    }
 });
 
 group('Config ខុស ➜ ធ្លាក់ដែលមានឈ្មោះ', async () => {

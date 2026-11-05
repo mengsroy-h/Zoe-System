@@ -21,6 +21,7 @@ const APPS = {
 const ACCEPTED = {
     ZoeW: {
         running: 'Sign outbox drain mutex; settles in finally after bounded IndexedDB reads. Do not reset on logout and overlap a drain; all callbacks check shop/auth/database/key/lifecycle identity (palm-sign-outbox.test.tsx).',
+        discardingUnreadable: 'Sign outbox owner-discard in-flight boolean; reset in its finally, no user data. Each discard derives a fresh authenticated context.',
         rerun: 'Sign outbox wake boolean; consumed and reset in drain finally, no user data. The next drain derives a fresh authenticated context.',
         lifecycle: 'Sign outbox page scope; listeners and timer live until boot disposal across sign-ins. Its disposed flag and captured scope identity fence old callbacks; it contains no parcel data.',
         firebaseConfig: 'device provisioning, survives logout by design',
@@ -39,6 +40,9 @@ const ACCEPTED = {
         connectionRecoveryCleanup: 'page lifecycle cleanup, contains only online/offline/visibility handlers and no user data; survives logout for the next login and runs on app scope disposal; connection-flow-contract.test.ts checks replacement and disposal',
         authRecoveryTimeout: 'cleared in the auth callback itself',
         authGeneration: 'monotonic counter, resetting it would break generation guards',
+        appLockUnlockGeneration: 'លំដាប់ unlock កើនជានិច្ច; reset អាចឱ្យ derive/remember callback ចាស់ផ្គូផ្គងសំណើថ្មី។ មិនផ្ទុកទិន្នន័យឬ credentials; app-lock-ownership-fixes និង pin-flow-race ផ្ទៀង stale callbacks និង post-await fences។',
+        appLockLogoutOwner: 'ម្ចាស់ signOut កំពុងរង់ចាំក្នុង memory រក្សា auth/SDK references, UID និង authGeneration ដើម; មិនមែន object ទទេ។ Session ដដែលទប់សំណើស្ទួន; session ថ្មីអាចជំនួស ហើយ callback ចាស់ផ្ទៀង owner/UID/epoch មុនប៉ះ UI។ ដោះពេល settle ឬជំនួស និងមិន persist; promise ព្យួរអាចរក្សា references រហូតដល់ settle/reload។ Actual owner/refresh/late-result controls នៅ app-lock-ownership-fixes។',
+        pushBusyOwner: 'លំដាប់ម្ចាស់ busy របស់ Push កើនជានិច្ច · គ្មានទិន្នន័យ ឬ credentials ៖ reset នឹងឲ្យ flow ចាស់ដែលបោះបង់មានលេខដូច flow ថ្មី ហើយដោះ busy របស់វា (control ក្នុង ZoeW/tests/push-client.test.tsx)',
         lookupSaveGeneration: 'លំដាប់សំណើកើនជានិច្ច; reset អាចឱ្យ promise ចាស់មានលេខដូចសំណើថ្មី · គ្មានទិន្នន័យឬសោ',
         lookupTestGeneration: 'លំដាប់សាក API កើនជានិច្ច; reset អាចឱ្យ promise ចាស់មានលេខដូចសំណើថ្មី · គ្មានទិន្នន័យឬសោ',
         documentHiddenAt: 'page-visibility timestamp used only to measure time spent in the background before a database liveness probe; it describes the device tab, not the user, and holds no customer data',
@@ -70,6 +74,8 @@ const ACCEPTED = {
         palmSignFontLoad: 'សន្យាផ្ទុក font សាធារណៈរបស់ App គ្មានទិន្នន័យគណនី; ប្រើដដែលគ្រប់ session',
         palmSignLocationEpoch: 'លេខរាប់ឡើងសុទ្ធរារាំង GPS callback ពីផ្ទាំងចាស់; reset វិញអាចទទួល callback ចាស់',
         scanBeepPlugin: 'Capacitor bridge proxy គ្មាន credential ឬទិន្នន័យអ្នកប្រើ; Java ដោះលែង tone/volume ពេល pause/destroy',
+        captureCleanupPlugin: 'Capacitor bridge proxy របស់ ZoeCaptureCleanup (APK) គ្មាន credential ឬទិន្នន័យអ្នកប្រើ; ប្រើដដែលគ្រប់ session ដូច scanBeepPlugin',
+        cameraReads: 'ចំនួនការអានរូបកាមេរ៉ា Sign ដែលកំពុងហោះ (លេខរាប់ គ្មានទិន្នន័យ) — readCameraCapture() ដកវាវិញក្នុង finally ផ្ទាល់ ៖ reset ពេលចាកចេញខណៈការអាននៅហោះធ្វើឲ្យវាអវិជ្ជមាន ➜ releaseCameraCaptures() បោសឯកសារកាមេរ៉ាដែលការអាននោះមិនទាន់អានចប់',
         globalAudioCtx: 'audio handle, no user data',
         ownCaptureCanvas: 'scratch canvas, overwritten on next frame',
         ownCaptureCtx: 'scratch canvas context',
@@ -295,3 +301,4 @@ if (failed) {
     process.exit(1);
 }
 console.log('\n✅ គ្មានអថេរ state ណាដែលរស់រានក្រោយចាកចេញ ដោយគ្មានហេតុផលកត់ត្រាទេ');
+process.exitCode = 0;

@@ -357,11 +357,14 @@ async function scenario(api) {
 
         let releaseOwnAck = () => {};
         let heldOwnAck = false;
+        let ownAckRpc = '';
         let ownSnapshotView = null;
         const offOwnSnapshot = A.sdk.onValue(A.sdk.ref(A.db, 'sbp_own_snapshot/n'), (s) => { ownSnapshotView = s.val(); });
         fake.setRpcHook(async ({ fn, body, phase }) => {
             const op = body && Array.isArray(body.p_ops) && body.p_ops[0];
-            if (fn === 'zoe_write' && phase === 'after' && op && op.k === 'cas' && op.p.join('/') === 'sbp_own_snapshot/n' && op.v === 1) {
+            if ((fn === 'zoe_write' || fn === 'zoe_write_v2') && phase === 'after' && op && op.k === 'cas' && op.p.join('/') === 'sbp_own_snapshot/n' && op.v === 1) {
+                if (fn === 'zoe_write_v2') check(body.p_expected_tenant === tA, 'លក្ខខណ្ឌចាំបាច់ ៖ ACK gate v2 រក្សា expected tenant ដើមរបស់ transaction A', body.p_expected_tenant);
+                ownAckRpc = fn;
                 heldOwnAck = true;
                 await new Promise((resolve) => { releaseOwnAck = resolve; });
             }
@@ -372,6 +375,7 @@ async function scenario(api) {
             const committedBeforeAck = await until(async () => heldOwnAck && (await c.query(
                 "select value from public.zoe_docs where tenant_id = $1 and root = 'sbp_own_snapshot' and key = 'n'", [tA])).rows[0]?.value === 1, 5000);
             check(committedBeforeAck, 'លក្ខខណ្ឌចាំបាច់ ៖ transaction A commit ពិតលើ Postgres ប៉ុន្តែ ACK នៅរង់ចាំ');
+            check(ownAckRpc === 'zoe_write_v2', 'លក្ខខណ្ឌចាំបាច់ ៖ ACK gate បាញ់ actual versioned write របស់ adapter', ownAckRpc);
             await D.sdk.set(D.sdk.ref(D.db, 'sbp_own_snapshot/n'), 2);
             A.sdk.goOnline(A.db);
             const newerSeen = await until(() => ownSnapshotView === 2, 5000);

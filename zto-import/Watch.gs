@@ -1,4 +1,4 @@
-var WATCH_TRIGGER_FN = 'watchInboxFolder';
+var WATCH_TRIGGER_FN = 'watchInboxFolder_';
 var WATCH_INTERVAL_MINUTES = 5;
 var WATCH_MAX_FILES_PER_RUN = 10;
 var WATCH_MAX_FILES_SCANNED = 200;
@@ -13,7 +13,10 @@ var CONVERTIBLE_MIME_TYPES = [
     'text/plain'
 ];
 
-function setupInboxWatch() {
+var TEXT_MIME_TYPES = ['text/csv', 'text/tab-separated-values', 'text/plain'];
+var TEXT_DELIMITERS = [',', '\t', ';', '|'];
+
+function setupInboxWatch_() {
     var props = scriptProps_();
     var root = folderByIdOrCreate_(readProp_(PROP_INBOX), 'ZTO-Inbox', null);
     var done = folderByIdOrCreate_(readProp_(PROP_DONE), 'ZTO-Done', root);
@@ -22,7 +25,7 @@ function setupInboxWatch() {
     props.setProperty(PROP_DONE, done.getId());
     props.setProperty(PROP_FAILED, failed.getId());
 
-    removeInboxWatch();
+    removeInboxWatch_();
     ScriptApp.newTrigger(WATCH_TRIGGER_FN).timeBased().everyMinutes(WATCH_INTERVAL_MINUTES).create();
 
     var message = 'រួចរាល់។ ទម្លាក់ឯកសារ Excel ចូល folder នេះ៖ ' + root.getUrl();
@@ -30,11 +33,12 @@ function setupInboxWatch() {
     return message;
 }
 
-function removeInboxWatch() {
+function removeInboxWatch_() {
     var triggers = ScriptApp.getProjectTriggers();
     var removed = 0;
     for (var i = 0; i < triggers.length; i++) {
-        if (triggers[i].getHandlerFunction() === WATCH_TRIGGER_FN) {
+        var handler = triggers[i].getHandlerFunction();
+        if (handler === WATCH_TRIGGER_FN || handler === 'watchInboxFolder') {
             ScriptApp.deleteTrigger(triggers[i]);
             removed++;
         }
@@ -60,7 +64,7 @@ function folderByIdOrCreate_(id, name, parent) {
     return DriveApp.createFolder(name);
 }
 
-function watchInboxFolder() {
+function watchInboxFolder_() {
     var inboxId = readProp_(PROP_INBOX);
     if (!inboxId) return;
     var lock = LockService.getScriptLock();
@@ -181,6 +185,10 @@ function readFileAsValues_(file) {
     if (file.getMimeType() === MimeType.GOOGLE_SHEETS) {
         return firstSheetValues_(file.getId());
     }
+    var text = delimitedTextOf_(file);
+    if (text !== null) {
+        return parseDelimitedText_(text, file.getMimeType());
+    }
     var copy = Drive.Files.copy(
         { title: 'zto-temp-' + Date.now(), mimeType: MimeType.GOOGLE_SHEETS },
         file.getId(),
@@ -195,6 +203,100 @@ function readFileAsValues_(file) {
             Logger.log('លុបឯកសារបណ្តោះអាសន្នមិនបាន៖ ' + err.message);
         }
     }
+}
+
+function delimitedTextOf_(file) {
+    var blob = file.getBlob();
+    var bytes = blob.getBytes();
+    var at = function (index) { return index < bytes.length ? bytes[index] & 0xff : -1; };
+    var zip = at(0) === 0x50 && at(1) === 0x4b;
+    var ole = at(0) === 0xd0 && at(1) === 0xcf && at(2) === 0x11 && at(3) === 0xe0;
+    if (zip || ole) return null;
+    var charset = at(0) === 0xff && at(1) === 0xfe ? 'UTF-16LE' : at(0) === 0xfe && at(1) === 0xff ? 'UTF-16BE' : 'UTF-8';
+    var text = String(blob.getDataAsString(charset)).replace(/^\uFEFF/, '');
+    if (TEXT_MIME_TYPES.indexOf(file.getMimeType()) === -1 && /^\s*</.test(text)) return null;
+    return text;
+}
+
+function parseDelimitedText_(text, mimeType) {
+    var body = String(text);
+    var delimiter;
+    var hint = /^sep=([^\r\n])(\r\n|\r|\n)/i.exec(body);
+    if (hint) {
+        delimiter = hint[1];
+        body = body.slice(hint[0].length);
+    } else if (mimeType === 'text/tab-separated-values') {
+        delimiter = '\t';
+    } else {
+        delimiter = guessDelimiter_(body.slice(0, 4096));
+    }
+    var rows = [];
+    var row = [];
+    var cell = '';
+    var quoted = false;
+    for (var i = 0; i < body.length; i++) {
+        var ch = body.charAt(i);
+        if (quoted) {
+            if (ch !== '"') {
+                cell += ch;
+            } else if (body.charAt(i + 1) === '"') {
+                cell += '"';
+                i++;
+            } else {
+                quoted = false;
+            }
+        } else if (ch === '"' && cell === '') {
+            quoted = true;
+        } else if (ch === delimiter) {
+            row.push(excelTextCell_(cell));
+            cell = '';
+        } else if (ch === '\r' || ch === '\n') {
+            if (ch === '\r' && body.charAt(i + 1) === '\n') i++;
+            row.push(excelTextCell_(cell));
+            rows.push(row);
+            row = [];
+            cell = '';
+        } else {
+            cell += ch;
+        }
+    }
+    if (cell !== '' || row.length) {
+        row.push(excelTextCell_(cell));
+        rows.push(row);
+    }
+    return rows.filter(function (values) { return values.join('').trim() !== ''; });
+}
+
+function excelTextCell_(cell) {
+    var marked = /^="([\s\S]*)"$/.exec(cell);
+    return marked ? marked[1].replace(/""/g, '"') : cell;
+}
+
+function guessDelimiter_(sample) {
+    var counts = {};
+    var quoted = false;
+    for (var i = 0; i < sample.length; i++) {
+        var ch = sample.charAt(i);
+        if (ch === '"') {
+            quoted = !quoted;
+        } else if (!quoted && (ch === '\r' || ch === '\n')) {
+            var found = mostUsedDelimiter_(counts);
+            if (found) return found;
+            counts = {};
+        } else if (!quoted && TEXT_DELIMITERS.indexOf(ch) !== -1) {
+            counts[ch] = (counts[ch] || 0) + 1;
+        }
+    }
+    return mostUsedDelimiter_(counts) || ',';
+}
+
+function mostUsedDelimiter_(counts) {
+    var best = '';
+    for (var i = 0; i < TEXT_DELIMITERS.length; i++) {
+        var candidate = TEXT_DELIMITERS[i];
+        if ((counts[candidate] || 0) > (best ? counts[best] : 0)) best = candidate;
+    }
+    return best;
 }
 
 function firstSheetValues_(spreadsheetId) {

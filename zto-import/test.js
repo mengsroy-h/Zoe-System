@@ -137,6 +137,48 @@ equal('money on blank is zero', toMoney_(''), 0);
 equal('money on junk is zero', toMoney_('abc'), 0);
 equal('money keeps negative', toMoney_('-3.5'), -3.5);
 
+// ទឹកប្រាក់ជាអត្ថបទ ៖ «,» ឬ «.» ដែលមានតែមួយខ្ទង់ ១-២ ខាងក្រោយ ជាចុចទសភាគជានិច្ច · ក្រុម ៣ ខ្ទង់ច្រើនក្រុម ជាសញ្ញាបំបែកខ្ទង់ ·
+// ក្រុមតែមួយ (1.234 · 1,234) ទាយមិនបាន ➜ សម្រេចតាមភស្តុតាងក្នុងឯកសារដដែល បើគ្មាន ➜ null (បដិសេធ)
+const MONEY_TEXT_CASES = [
+    ['5,50', '', 5.5], ['5,5', '', 5.5], ['0,75', '', 0.75], ['1234,5', '', 1234.5], ['5.50', '', 5.5], ['$ 13.18', '', 13.18],
+    ['1.234,50', '', 1234.5], ['1,234.50', '', 1234.5], ['1.234.567', '', 1234567], ['1,234,567', '', 1234567], ['1 234,50', '', 1234.5],
+    ['="5,50"', '', 5.5], ['-3,5', '', -3.5], ['12', '', 12], ['abc', '', 0], ['', '', 0],
+    ['1.234', '', null], ['1,234', '', null], ['5,500', '', null], ['1.234', ',', 1234], ['1.234', '.', 1.23], ['1,234', '.', 1234], ['1,234', ',', 1.23],
+    ['1,23,456', '', null], ['5-6', '', null], ['1.234,5.6', '', null]
+];
+for (const [cell, mark, expected] of MONEY_TEXT_CASES) {
+    equal('money text «' + cell + '» (ចុចទសភាគក្នុងឯកសារ «' + mark + '»)', toMoney_(cell, mark), expected);
+}
+equal('money number stays a number (no text rule)', toMoney_(1234.567, ''), 1234.57);
+const markOf = (cells) => (typeof sandbox.moneyDecimalMark_ === 'function' ? sandbox.moneyDecimalMark_(cells) : 'missing');
+equal('decimal mark ៖ 5,50 ➜ «,»', markOf(['5,50', '20', '']), ',');
+equal('decimal mark ៖ 1.234,50 ➜ «,»', markOf(['1.234,50']), ',');
+equal('decimal mark ៖ 15.5 · 1,234,567 ➜ «.»', markOf(['15.5', '1,234,567', 7]), '.');
+equal('decimal mark ៖ គ្មានភស្តុតាង (1.234 · 20) ➜ មិនដឹង', markOf(['1.234', '20']), '');
+equal('decimal mark ៖ ភស្តុតាងផ្ទុយគ្នា (5,50 · 5.50) ➜ មិនដឹង', markOf(['5,50', '5.50']), '');
+equal('normalizeRecords_ ៖ ឯកសារ «,» ➜ 1.234 = 1234 · 5,50 = 5.5', (() => {
+    try { return normalizeRecords_([['A1', '1.234', '5,50', '0']]).records.map((r) => [r.dod, r.cod]); } catch (error) { return 'threw: ' + error.message; }
+})(), [[1234, 5.5]]);
+let ambiguousError = null;
+try { normalizeRecords_([['A1', '1.234', '20', '0'], ['', '9,999', '', '']]); } catch (error) { ambiguousError = error; }
+check('normalizeRecords_ ៖ ទឹកប្រាក់មិនច្បាស់ (1.234 គ្មានភស្តុតាង) ➜ បដិសេធ ហើយប្រាប់ Barcode និងតម្លៃ', !!ambiguousError
+    && /អានមិនច្បាស់/.test(ambiguousError.message) && /A1/.test(ambiguousError.message) && /1\.234/.test(ambiguousError.message),
+    ambiguousError && ambiguousError.message);
+check('normalizeRecords_ ៖ ជួរដែលគ្មាន Barcode មិនបដិសេធឯកសារ', (() => { try { return normalizeRecords_([['A1', '2', '3', '0'], ['', '9,999', '', '']]).records.length === 1; } catch (_) { return false; } })());
+
+// ករណី CSV ពេញ (ផ្លូវ Watch និងទំព័រ Web ត្រូវឲ្យលទ្ធផលដូចគ្នា) ៖ [ឈ្មោះ, ឯកសារ, អត្ថបទ, ជួរដេកដែលសរសេរ (null = បដិសេធ)]
+const MONEY_CSV_CASES = [
+    ['CSV ; + «,» ទសភាគ ៖ 5,50 = 5.50 · 1,5 = 1.5 · សូន្យខាងមុខនៅដដែល', 'eu.csv',
+        'Barcode;Phone;COD($);DOD($)\n00888;011000444;5,50;1,5\n0099;012000111;12;0,75\n',
+        [['00888', 1.5, 5.5, '011000444'], ['0099', 0.75, 12, '012000111']]],
+    ['CSV ; ៖ 1.234,50 (ក្រុមខ្ទង់ «.») = 1234.50', 'eu-group.csv', 'Barcode;COD($)\n0012;1.234,50\n', [['0012', 0, 1234.5, '']]],
+    ['CSV ; ៖ 1.234 សម្រេចដោយភស្តុតាង 5,50 ក្នុងឯកសារ ➜ 1234', 'eu-resolved.csv', 'Barcode;COD($);DOD($)\n0012;1.234;5,50\n', [['0012', 5.5, 1234, '']]],
+    ['CSV , ៖ "1,234" សម្រេចដោយភស្តុតាង 15.5 ➜ 1234 (control ៖ ក្រុមខ្ទង់ «,» នៅដដែល)', 'us.csv',
+        'Barcode,COD($),DOD($)\n0034,"1,234",15.5\n', [['0034', 15.5, 1234, '']]],
+    ['CSV ; ៖ 1.234 គ្មានភស្តុតាង', 'eu-ambiguous.csv', 'Barcode;COD($)\n0012;1.234\n0013;20\n', null],
+    ['CSV ; ៖ 5,500 គ្មានភស្តុតាង', 'eu-ambiguous2.csv', 'Barcode;COD($)\n0012;5,500\n', null]
+];
+
 equal('long barcode number keeps all digits', cleanText_(77130500002395), '77130500002395');
 equal('text barcode is trimmed', cleanText_('  77130500002395 '), '77130500002395');
 equal('phone with dash is untouched', cleanText_('855-070000071'), '855-070000071');
@@ -392,15 +434,408 @@ function zoewSheetImportConst(name) {
     watch.importDriveFile_ = (f) => { imported.push(f.getName()); if (f.getName() === 'old.csv') { f.moveTo = () => { throw new Error('quota'); }; } return { added: 1, updated: 0, unchanged: 0 }; };
     let mail = '';
     watch.notify_ = (_subject, body) => { mail = body; };
-    watch.watchInboxFolder();
+    let watchError;
+    try { watch[watch.WATCH_TRIGGER_FN](); } catch (error) { watchError = error; }
+    check('Watch ៖ handler ពិតអាចរត់ចប់', !watchError, watchError && watchError.message);
     equal('Watch ៖ នាំចូលតាមលំដាប់', imported, ['old.csv', 'new.csv']);
     check('Watch ៖ ឯកសារមិនមែន Excel ចេញពីប្រអប់ (មិនស្ទះ)', files[1].moved === 'failed');
     check('Watch ៖ ផ្លាស់ទីបរាជ័យមិនបញ្ឈប់រង្វិល · អ៊ីមែលនៅតែផ្ញើ', /new\.csv/.test(mail) && /ផ្លាស់ទីឯកសារមិនបាន/.test(mail), mail);
 }
 
-console.log('');
-console.log('zto-import — ' + passed + ' assertions passed, ' + failed + ' failed');
-if (failed) {
-    failures.forEach((f) => console.log('  ✗ ' + f));
-    process.exit(1);
+function blobOfBytes(buffer) {
+    return {
+        getBytes: () => Array.from(buffer, (byte) => (byte > 127 ? byte - 256 : byte)),
+        getDataAsString(charset) {
+            const name = String(charset || 'UTF-8').toUpperCase();
+            if (name === 'UTF-16LE') return buffer.toString('utf16le');
+            if (name === 'UTF-16BE') return Buffer.from(buffer).swap16().toString('utf16le');
+            return buffer.toString('utf8');
+        }
+    };
 }
+
+// គំរូការបំលែង CSV ➜ Google Sheets របស់ Drive (`convert: true`) ៖ Sheets បំលែងអត្ថបទដែលមើលទៅដូចលេខ ទៅជាលេខ
+// (លំនាំដើមរបស់ការនាំចូល CSV) ➜ សូន្យខាងមុខ និង + បាត់ ⛔ មិនមែនកូដរបស់ Watch.gs ទេ
+function sheetsCsvConversionModel(text, delimiter) {
+    const rows = [];
+    let row = [];
+    let cell = '';
+    let quoted = false;
+    for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (quoted) {
+            if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; } else if (ch === '"') quoted = false; else cell += ch;
+        } else if (ch === '"' && cell === '') quoted = true;
+        else if (ch === delimiter) { row.push(cell); cell = ''; }
+        else if (ch === '\n' || ch === '\r') {
+            if (ch === '\r' && text[i + 1] === '\n') i++;
+            row.push(cell); rows.push(row); row = []; cell = '';
+        } else cell += ch;
+    }
+    if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+    return rows.map((r) => r.map((value) => (/^\s*[+-]?(\d+(\.\d*)?|\.\d+)\s*$/.test(value) ? Number(value) : value)));
+}
+
+function watcherAccessFixture(handlers, options) {
+    const settings = options || {};
+    const source = settings.source || null;
+    const state = {
+        effects: [],
+        serviceCalls: [],
+        rows: [['Barcode', 'DOD($)', 'COD($)', 'Phone'], ['SYNTHETIC-OLD', 0, 1, '000']],
+        moved: '',
+        releases: 0,
+        conversions: 0,
+        removedCopies: [],
+        converted: {},
+        triggers: (handlers || []).map((name) => ({ getHandlerFunction: () => name }))
+    };
+    const properties = {
+        SHEET_ID: 'synthetic-target', IMPORT_PASSWORD: 'synthetic-password',
+        INBOX_FOLDER_ID: 'in', DONE_FOLDER_ID: 'done', FAILED_FOLDER_ID: 'failed',
+        NOTIFY_EMAIL: 'synthetic@example.invalid'
+    };
+    if (settings.passwordMissing) delete properties.IMPORT_PASSWORD;
+    const service = (name) => state.serviceCalls.push(name);
+    const sourceRows = [['Barcode', 'DOD($)', 'COD($)', 'Phone'], ['SYNTHETIC-NEW', 2, 3, '001']];
+    const file = {
+        getId: () => 'synthetic-source', getName: () => (source ? source.name : 'synthetic-sheet'),
+        getDateCreated: () => new Date(1), getMimeType: () => (source ? source.mime : 'application/vnd.google-apps.spreadsheet'),
+        getBlob() { service('blob'); return blobOfBytes(source ? source.bytes : Buffer.alloc(0)); },
+        moveTo(folder) { state.effects.push('move'); state.moved = folder.getId(); }
+    };
+    const folders = {};
+    for (const id of ['in', 'done', 'failed']) {
+        folders[id] = {
+            getId: () => id, getUrl: () => 'https://example.invalid/' + id,
+            getFiles() {
+                const files = state.moved ? [] : [file];
+                let index = 0;
+                return { hasNext: () => index < files.length, next: () => files[index++] };
+            }
+        };
+    }
+    const sheet = {
+        getName: () => 'Customers', getParent: () => ({ getName: () => 'Synthetic target' }),
+        getLastRow: () => state.rows.length, getMaxRows: () => 20,
+        getRange(start, col, count, width) {
+            service('sheet-range');
+            return {
+                getValues: () => Array.from({ length: count }, (_, index) => (state.rows[start - 1 + index] || ['', '', '', '']).slice(col - 1, col - 1 + width)),
+                setNumberFormat() {},
+                setValues(values) {
+                    state.effects.push('write');
+                    for (let index = 0; index < count; index++) state.rows[start - 1 + index] = Array.from(values[index]);
+                },
+                clearContent() {
+                    state.effects.push('clear');
+                    for (let index = 0; index < count; index++) state.rows[start - 1 + index] = ['', '', '', ''];
+                }
+            };
+        }
+    };
+    const context = vm.createContext({
+        Logger: { log() { service('log'); } },
+        Utilities: {
+            DigestAlgorithm: { SHA_256: 'SHA_256' }, Charset: { UTF_8: 'UTF_8' },
+            computeDigest(_algorithm, value) { service('digest'); return Array.from(require('crypto').createHash('sha256').update(value).digest(), (byte) => byte > 127 ? byte - 256 : byte); }
+        },
+        PropertiesService: { getScriptProperties() {
+            service('properties');
+            return {
+                getProperty: (key) => properties[key] || null,
+                setProperty(key, value) { state.effects.push('property'); properties[key] = value; }
+            };
+        } },
+        LockService: { getScriptLock() {
+            service('lock');
+            return { tryLock: () => !settings.lockBusy, releaseLock() { state.releases++; } };
+        } },
+        DriveApp: { getFolderById(id) { service('folder'); if (!folders[id]) throw new Error('synthetic-folder'); return folders[id]; } },
+        Drive: { Files: {
+            copy(resource, id, copyOptions) {
+                if (!source || id !== 'synthetic-source' || !copyOptions || copyOptions.convert !== true) throw new Error('unexpected-conversion');
+                service('convert');
+                state.conversions++;
+                const copyId = 'synthetic-converted-' + state.conversions;
+                state.converted[copyId] = source.converted ? source.converted()
+                    : sheetsCsvConversionModel(source.bytes.toString('utf8'), source.mime === 'text/tab-separated-values' ? '\t' : ',');
+                return { id: copyId };
+            },
+            remove(id) {
+                if (!source || !state.converted[id]) throw new Error('unexpected-conversion');
+                state.removedCopies.push(id);
+            }
+        } },
+        MailApp: { sendEmail(_to, _subject, body) { service('mail'); state.effects.push('mail'); state.mail = String(body); } },
+        MimeType: { GOOGLE_SHEETS: 'application/vnd.google-apps.spreadsheet' },
+        ScriptApp: {
+            getProjectTriggers() { service('list-triggers'); return state.triggers.slice(); },
+            deleteTrigger(trigger) { service('delete-trigger'); state.effects.push('delete-trigger'); state.triggers = state.triggers.filter((item) => item !== trigger); },
+            newTrigger(name) {
+                service('new-trigger');
+                let minutes;
+                const builder = {
+                    timeBased() { return this; }, everyMinutes(value) { minutes = value; return this; },
+                    create() { state.effects.push('create-trigger'); state.triggers.push({ getHandlerFunction: () => name, minutes }); }
+                };
+                return builder;
+            }
+        },
+        SpreadsheetApp: {
+            openById(id) {
+                service('spreadsheet');
+                if (id === 'synthetic-target') return { getSheetByName: () => sheet };
+                if (state.converted[id]) {
+                    const values = state.converted[id];
+                    return { getSheets: () => [{ getLastRow: () => values.length, getLastColumn: () => Math.max(0, ...values.map((row) => row.length)),
+                        getRange: () => ({ getValues: () => values.map((row) => row.slice()) }) }] };
+                }
+                if (id !== 'synthetic-source' || source) throw new Error('synthetic-spreadsheet');
+                return { getSheets: () => [{ getLastRow: () => sourceRows.length, getLastColumn: () => sourceRows[0].length, getRange: () => ({ getValues: () => sourceRows }) }] };
+            },
+            flush() { service('flush'); }
+        }
+    });
+    vm.runInContext(fs.readFileSync(path.join(root, 'Code.gs'), 'utf8'), context, { filename: 'Code.gs' });
+    const codeGlobals = new Set(Object.keys(context));
+    vm.runInContext(fs.readFileSync(path.join(root, 'Watch.gs'), 'utf8'), context, { filename: 'Watch.gs' });
+    const watchFunctions = Object.keys(context).filter((name) => !codeGlobals.has(name) && typeof context[name] === 'function');
+    const publicFunctions = Object.keys(context).filter((name) => typeof context[name] === 'function' && !name.endsWith('_'));
+    function scriptRunner(success, failure) {
+        const runner = {
+            withSuccessHandler: (next) => scriptRunner(next, failure),
+            withFailureHandler: (next) => scriptRunner(success, next)
+        };
+        for (const name of publicFunctions) {
+            runner[name] = (...args) => {
+                let result;
+                try { result = context[name](...args); } catch (error) { if (failure) failure(error); else throw error; return; }
+                if (success) success(result);
+            };
+        }
+        return runner;
+    }
+    const google = { script: { run: scriptRunner() } };
+    function browser(name, args) {
+        const outcome = {};
+        const runner = google.script.run.withSuccessHandler((value) => { outcome.value = value; outcome.ok = true; })
+            .withFailureHandler((error) => { outcome.error = error; outcome.ok = false; });
+        try { runner[name](...(args || [])); } catch (error) { outcome.error = error; outcome.ok = false; }
+        return outcome;
+    }
+    return { context, state, watchFunctions, publicFunctions, google, browser };
+}
+
+{
+    const fixture = watcherAccessFixture();
+    equal('Watch ៖ ផ្ទៃ function សាធារណៈមានតែច្រក Web និង API ដែលបានកំណត់', fixture.publicFunctions.sort(), ['clearRows', 'doGet', 'doPost', 'getStatus', 'importRows', 'prepare']);
+    check('Watch ៖ វាស់ helper ពិតគ្រប់គ្រាន់ ហើយទាំងអស់ជាឯកជន', fixture.watchFunctions.length >= 12 && fixture.watchFunctions.every((name) => name.endsWith('_')), fixture.watchFunctions.join(', '));
+    equal('Watch ៖ google.script.run បង្ហាញតែ function សាធារណៈដូចឯកសារ Google', Object.keys(fixture.google.script.run).filter((name) => !name.startsWith('with')).sort(), fixture.publicFunctions.sort());
+    const names = new Set([...fixture.watchFunctions, 'setupInboxWatch', 'removeInboxWatch', 'watchInboxFolder', 'setupInboxWatch_', 'removeInboxWatch_', 'watchInboxFolder_']);
+    for (const name of names) {
+        const attempt = watcherAccessFixture(['watchInboxFolder', 'watchInboxFolder_', 'unrelatedJob']);
+        const outcome = attempt.browser(name);
+        check('Watch browser ៖ ' + name + ' ត្រូវបដិសេធ', outcome.ok === false);
+        equal('Watch browser ៖ ' + name + ' មិនប៉ះ service ណាមួយ', attempt.state.serviceCalls, []);
+        equal('Watch browser ៖ ' + name + ' មិនសរសេរ ឬកែ trigger', attempt.state.effects, []);
+    }
+}
+{
+    const fixture = watcherAccessFixture(['watchInboxFolder', 'watchInboxFolder_', 'unrelatedJob', 'watchInboxFolder']);
+    let result;
+    try { result = fixture.context.setupInboxWatch_(); } catch (_) {}
+    check('Watch owner ៖ private setup អាចរត់ក្នុង editor', typeof result === 'string' && result.includes('https://example.invalid/in'));
+    equal('Watch owner ៖ setup ជំនួស trigger ចាស់និងថ្មី ដោយរក្សា job ផ្សេង', fixture.state.triggers.map((trigger) => trigger.getHandlerFunction()).sort(), ['unrelatedJob', 'watchInboxFolder_']);
+    const trigger = fixture.state.triggers.find((item) => item.getHandlerFunction() === 'watchInboxFolder_');
+    check('Watch owner ៖ trigger ថ្មីភ្ជាប់ private worker និងចន្លោះពេលតាម source', !!trigger && typeof fixture.context[trigger.getHandlerFunction()] === 'function' && trigger.minutes === fixture.context.WATCH_INTERVAL_MINUTES);
+    try { fixture.context.setupInboxWatch_(); } catch (_) {}
+    equal('Watch owner ៖ setup ម្តងទៀតមិនបង្កើត job ស្ទួន', fixture.state.triggers.map((item) => item.getHandlerFunction()).sort(), ['unrelatedJob', 'watchInboxFolder_']);
+    let removed;
+    try { removed = fixture.context.removeInboxWatch_(); } catch (_) {}
+    equal('Watch owner ៖ private remove លុប current job មួយ', removed, 1);
+    equal('Watch owner ៖ remove រក្សា job ផ្សេង', fixture.state.triggers.map((item) => item.getHandlerFunction()), ['unrelatedJob']);
+    const legacy = watcherAccessFixture(['watchInboxFolder', 'watchInboxFolder_', 'unrelatedJob']);
+    try { removed = legacy.context.removeInboxWatch_(); } catch (_) { removed = undefined; }
+    equal('Watch owner ៖ remove ស្គាល់ persistent handler ចាស់និងថ្មី', removed, 2);
+    equal('Watch owner ៖ legacy cleanup មិនប៉ះ job ផ្សេង', legacy.state.triggers.map((item) => item.getHandlerFunction()), ['unrelatedJob']);
+}
+{
+    const fixture = watcherAccessFixture();
+    let error;
+    try { fixture.context[fixture.context.WATCH_TRIGGER_FN](); } catch (caught) { error = caught; }
+    check('Watch schedule ៖ handler អាចរត់ដោយគ្មាន browser password', !error && fixture.state.rows.some((row) => row[0] === 'SYNTHETIC-NEW'), error && error.message);
+    check('Watch schedule ៖ ឯកសាររួចចូល Done ហើយដោះសោ', fixture.state.moved === 'done' && fixture.state.releases === 1 && fixture.state.effects.includes('mail'));
+    const busy = watcherAccessFixture([], { lockBusy: true });
+    try { busy.context[busy.context.WATCH_TRIGGER_FN](); } catch (_) {}
+    equal('Watch schedule ៖ lock កំពុងប្រើ មិនសរសេរ ឬផ្លាស់ទី', busy.state.effects, []);
+}
+{
+    // ឯកសារអត្ថបទ (CSV · TSV · .txt) ត្រូវអានជាអត្ថបទដូចទំព័រ Web (raw) ➜ សូន្យខាងមុខរបស់ Barcode/លេខទូរស័ព្ទ និង + មិនបាត់
+    const runSource = (name, mime, bytes, converted) => {
+        const fixture = watcherAccessFixture([], { source: { name, mime, bytes, converted } });
+        let error;
+        try { fixture.context[fixture.context.WATCH_TRIGGER_FN](); } catch (caught) { error = caught; }
+        return { state: fixture.state, error, added: fixture.state.rows.slice(2).map((row) => row.slice()) };
+    };
+    const csv = runSource('zto.csv', 'text/csv', Buffer.from('Barcode,DOD($),COD($),Phone\n0012300456,1.5,2,012345678\nZT0002,0,3.25,+85512345678\n'));
+    equal('Watch CSV ៖ សូន្យខាងមុខរបស់ Barcode និងលេខទូរស័ព្ទ · + នៅដដែល', csv.added,
+        [['0012300456', 1.5, 2, '012345678'], ['ZT0002', 0, 3.25, '+85512345678']]);
+    check('Watch CSV ៖ អានជាអត្ថបទ (មិនបំលែងតាម Drive) · ឯកសារចូល Done', !csv.error && csv.state.conversions === 0 && csv.state.moved === 'done',
+        JSON.stringify({ error: csv.error && csv.error.message, conversions: csv.state.conversions, moved: csv.state.moved }));
+    const quoted = runSource('quoted.csv', 'text/csv', Buffer.from('﻿Waybill No,Receiver Phone,COD Amount,Remark\r\n'
+        + '"ZT-B1","012 000 111","5","say ""hi"", then\r\nleave"\r\n\r\nZT-B2,0970000222,7.5,plain\r\n', 'utf8'));
+    equal('Watch CSV ៖ cell មាន , · ចុះបន្ទាត់ · "" ក្នុងសញ្ញាដកស្រង់ · CRLF · BOM · ជួរទទេ', quoted.added,
+        [['ZT-B1', 0, 5, '012 000 111'], ['ZT-B2', 0, 7.5, '0970000222']]);
+    const tsv = runSource('zto.tsv', 'text/tab-separated-values', Buffer.from('Barcode\tPhone\tCOD($)\n00777\t010000333\t4\n'));
+    equal('Watch TSV ៖ បំបែកដោយ tab · សូន្យខាងមុខនៅដដែល', tsv.added, [['00777', 0, 4, '010000333']]);
+    const semicolon = runSource('zto.txt', 'text/plain', Buffer.from('Barcode;Phone;COD($)\n00888;011000444;2.5\n'));
+    equal('Watch .txt ៖ រកសញ្ញាបំបែក (;) ពីជួរ header · សូន្យខាងមុខនៅដដែល', semicolon.added, [['00888', 0, 2.5, '011000444']]);
+    const unicodeText = runSource('unicode.txt', 'text/plain',
+        Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from('Barcode\tPhone\r\n00999\t012000555\r\n', 'utf16le')]));
+    equal('Watch «Unicode Text» របស់ Excel (UTF-16LE + BOM · tab) ៖ អានបាន · សូន្យខាងមុខនៅដដែល', unicodeText.added, [['00999', 0, 0, '012000555']]);
+    const labelled = runSource('export.csv', 'application/vnd.ms-excel', Buffer.from('Barcode,Phone\n000111,016000666\n'));
+    equal('Watch ៖ CSV ដែល Drive ដាក់ប្រភេទ Excel (upload ពី Windows) នៅអានជាអត្ថបទ', labelled.added, [['000111', 0, 0, '016000666']]);
+    check('Watch ៖ CSV ប្រភេទ Excel មិនបំលែងតាម Drive', labelled.state.conversions === 0, String(labelled.state.conversions));
+    const hinted = runSource('hint.csv', 'text/csv', Buffer.from('sep=;\nBarcode;Phone\n="000222";="017000888"\n'));
+    equal('Watch CSV ៖ បន្ទាត់ sep= · cell ="…" របស់ Excel ជាអត្ថបទ', hinted.added, [['000222', 0, 0, '017000888']]);
+    const blank = runSource('blank.csv', 'text/csv', Buffer.from('\r\n\r\n  \r\n'));
+    check('Watch CSV ៖ មានតែជួរទទេ ➜ «ឯកសារទទេ» · ចូល Failed', blank.state.moved === 'failed' && /ឯកសារទទេ/.test(blank.state.mail || ''),
+        JSON.stringify({ moved: blank.state.moved, mail: blank.state.mail }));
+    const xlsx = runSource('zto.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        Buffer.from('PK\u0003\u0004synthetic-xlsx', 'latin1'), () => [['Barcode', 'Phone'], ['ZTX1', '012000777']]);
+    equal('control ៖ xlsx (ZIP) នៅបំលែងតាម Drive', xlsx.added, [['ZTX1', 0, 0, '012000777']]);
+    check('control ៖ xlsx ➜ Drive.Files.copy ១ ដង · លុបឯកសារបណ្តោះអាសន្ន', xlsx.state.conversions === 1 && xlsx.state.removedCopies.length === 1,
+        JSON.stringify({ conversions: xlsx.state.conversions, removed: xlsx.state.removedCopies }));
+    const ole = runSource('zto.xls', 'application/vnd.ms-excel', Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]),
+        () => [['Barcode', 'Phone'], ['ZTX2', '012000888']]);
+    const html = runSource('table.xls', 'application/vnd.ms-excel', Buffer.from('  <html><table><tr><td>Barcode</td></tr></table></html>'),
+        () => [['Barcode', 'Phone'], ['ZTX3', '012000999']]);
+    check('control ៖ xls (OLE) និង HTML ដែលដាក់ឈ្មោះ .xls នៅបំលែងតាម Drive', ole.state.conversions === 1 && html.state.conversions === 1
+        && JSON.stringify(ole.added) === JSON.stringify([['ZTX2', 0, 0, '012000888']]) && JSON.stringify(html.added) === JSON.stringify([['ZTX3', 0, 0, '012000999']]),
+        JSON.stringify({ ole: ole.added, html: html.added }));
+
+    // CSV ពីតំបន់ដែលប្រើ «,» ជាចុចទសភាគ (Excel ក្នុងតំបន់នោះបំបែក column ដោយ ;) ➜ 5,50 = 5.50 មិនមែន 550 · ទឹកប្រាក់ដែលនៅមិនច្បាស់ ➜ បដិសេធ មិនទាយ
+    for (const [label, name, text, expected] of MONEY_CSV_CASES) {
+        const run = runSource(name, 'text/csv', Buffer.from(text));
+        if (expected) {
+            equal('Watch ' + label, run.added, expected);
+        } else {
+            check('Watch ' + label + ' ៖ បដិសេធ (Failed · អ៊ីមែលប្រាប់តម្លៃ) · មិនសរសេរ Sheet', run.state.moved === 'failed' && !run.state.effects.includes('write')
+                && /អានមិនច្បាស់/.test(run.state.mail || '') && /1\.234|5,500/.test(run.state.mail || ''),
+                JSON.stringify({ moved: run.state.moved, effects: run.state.effects, mail: run.state.mail, added: run.added }));
+        }
+    }
+}
+{
+    for (const password of [undefined, '', 'wrong']) {
+        for (const name of ['getStatus', 'prepare', 'importRows', 'clearRows']) {
+            const fixture = watcherAccessFixture();
+            const result = fixture.browser(name, [password, name === 'prepare' ? ['Barcode'] : name === 'clearRows' ? 'CLEAR' : { rows: [['SYNTHETIC-NEW', 2, 3, '001']] }]);
+            check('Web password ៖ ' + name + ' បដិសេធ ' + String(password), result.ok === false);
+            equal('Web password ៖ ' + name + ' មិនសរសេរពេលពាក្យសម្ងាត់ខុស/បាត់ ' + String(password), fixture.state.effects, []);
+        }
+    }
+    const missing = watcherAccessFixture([], { passwordMissing: true });
+    check('Web password ៖ មិនកំណត់ IMPORT_PASSWORD ត្រូវបដិសេធ', missing.browser('importRows', ['synthetic-password', { rows: [['SYNTHETIC-NEW', 2, 3, '001']] }]).ok === false);
+    equal('Web password ៖ property បាត់ មិនសរសេរ', missing.state.effects, []);
+    const fixture = watcherAccessFixture();
+    check('Web password ៖ getStatus ទទួលពាក្យសម្ងាត់ត្រឹមត្រូវ', fixture.browser('getStatus', ['synthetic-password']).ok === true);
+    const result = fixture.browser('importRows', ['synthetic-password', { rows: [['SYNTHETIC-NEW', 2, 3, '001']], mode: 'replace' }]);
+    check('Web password ៖ ការនាំចូលធម្មតានៅដំណើរការតាម google.script.run', result.ok === true && result.value && result.value.rowsAfter === 1);
+    equal('Web password ៖ import សរសេរទិន្នន័យសិប្បនិម្មិតពិត', fixture.state.rows[1], ['SYNTHETIC-NEW', 2, 3, '001']);
+}
+
+// ទំព័រ Web (Index.html ពិត + SheetJS ពិតដែលទំព័រផ្ទុក + google.script.run ➜ Code.gs ពិត) ៖ CSV ដដែលត្រូវឲ្យទឹកប្រាក់ដូចផ្លូវ Watch
+function sheetJsLibrary() {
+    const repo = path.resolve(root, '..');
+    const html = fs.readFileSync(path.join(root, 'Index.html'), 'utf8');
+    const integrity = (/xlsx\.full\.min\.js"\s+integrity="(sha384-[^"]+)"/.exec(html) || [])[1] || '';
+    for (const rel of ['ZoeW/vendor/xlsx.full.min.js', 'ZoeW/public/vendor/xlsx.full.min.js']) {
+        const file = path.join(repo, rel);
+        if (!fs.existsSync(file)) continue;
+        const bytes = fs.readFileSync(file);
+        const sri = 'sha384-' + require('crypto').createHash('sha384').update(bytes).digest('base64');
+        return { XLSX: sri === integrity ? require(file) : null, sri, integrity, file };
+    }
+    return { XLSX: null, sri: '', integrity, file: '' };
+}
+
+function webPageFixture(XLSX) {
+    const fixture = watcherAccessFixture();
+    const html = fs.readFileSync(path.join(root, 'Index.html'), 'utf8');
+    const script = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)].map((m) => m[1]).filter((text) => text.trim()).join('\n');
+    const elements = new Map();
+    const node = () => {
+        const item = { value: '', disabled: false, textContent: '', className: '', children: [], listeners: {},
+            classList: { toggle() {}, add() {}, remove() {} },
+            appendChild(child) { this.children.push(child); if (child.value && !this.value) this.value = child.value; },
+            addEventListener(name, fn) { this.listeners[name] = fn; }, click() {} };
+        Object.defineProperty(item, 'innerHTML', { get: () => '', set: () => { item.children = []; } });
+        return item;
+    };
+    const el = (id) => { if (!elements.has(id)) elements.set(id, node()); return elements.get(id); };
+    const calls = [];
+    const run = {
+        withSuccessHandler: (success) => ({ withFailureHandler: (failure) => new Proxy({}, { get: (_, name) => (...args) => {
+            calls.push({ name, args: JSON.parse(JSON.stringify(args)) });
+            fixture.google.script.run.withSuccessHandler(success).withFailureHandler(failure)[name](...args);
+        } }) })
+    };
+    class Reader {
+        readAsArrayBuffer(file) { Promise.resolve().then(() => this.onload({ target: { result: Uint8Array.from(file.bytes).buffer } })); }
+    }
+    const context = vm.createContext({ console, Promise, Uint8Array, FileReader: Reader, XLSX, window: { confirm: () => true },
+        localStorage: { removeItem() {} }, document: { getElementById: el, createElement: () => node() }, google: { script: { run } } });
+    vm.runInContext(script, context, { filename: 'Index.html' });
+    context.state.password = 'synthetic-password';
+    const texts = (id) => el(id).children.map((child) => child.textContent).join(' | ');
+    return { fixture, context, el, calls, texts };
+}
+
+async function settle() {
+    for (let i = 0; i < 6; i++) await new Promise((resolve) => setImmediate(resolve));
+}
+
+async function webMoneyTests() {
+    const lib = sheetJsLibrary();
+    check('Web ៖ SheetJS ក្នុង repo គឺឯកសារដដែលដែលទំព័រផ្ទុក (SRI របស់ Index.html)', !!lib.XLSX && lib.sri === lib.integrity, JSON.stringify(lib));
+    if (!lib.XLSX) return;
+    for (const [label, name, text, expected] of MONEY_CSV_CASES) {
+        const web = webPageFixture(lib.XLSX);
+        web.context.handleFile({ name, bytes: Buffer.from(text) });
+        await settle();
+        web.context.runImport();
+        await settle();
+        const imports = web.calls.filter((call) => call.name === 'importRows');
+        const added = web.fixture.state.rows.slice(2).map((row) => row.slice());
+        if (expected) {
+            equal('Web ' + label, added, expected);
+            equal('Web ' + label + ' ៖ payload ដែលផ្ញើទៅ importRows', imports.length === 1 ? imports[0].args[1].rows : imports.length, expected);
+        } else {
+            const shown = web.texts('chips') + ' | ' + web.texts('goMsg');
+            check('Web ' + label + ' ៖ បដិសេធ (គ្មាន importRows · មិនសរសេរ Sheet · ប្រាប់ «អានមិនច្បាស់»)', imports.length === 0
+                && !web.fixture.state.effects.includes('write') && web.el('importBtn').disabled === true && /អានមិនច្បាស់/.test(shown),
+                JSON.stringify({ imports: imports.length, effects: web.fixture.state.effects, disabled: web.el('importBtn').disabled, shown, added }));
+        }
+    }
+    const web = webPageFixture(lib.XLSX);
+    const pageToMoney = web.context.toMoney;
+    const pageMark = web.context.moneyDecimalMark;
+    const sameAsServer = MONEY_TEXT_CASES.filter(([cell, mark]) => typeof pageToMoney !== 'function' || JSON.stringify(pageToMoney(cell, mark)) !== JSON.stringify(toMoney_(cell, mark)));
+    check('Web ↔ Code.gs ៖ toMoney() របស់ទំព័រ = toMoney_() របស់ server គ្រប់ករណី', typeof pageToMoney === 'function' && sameAsServer.length === 0,
+        JSON.stringify(sameAsServer.map(([cell, mark]) => [cell, mark, typeof pageToMoney === 'function' ? pageToMoney(cell, mark) : 'missing', toMoney_(cell, mark)])));
+    const markSets = [['5,50', '20'], ['15.5', '1,234,567'], ['1.234', '20'], ['5,50', '5.50'], ['1.234,50'], [3, '', '7']];
+    check('Web ↔ Code.gs ៖ moneyDecimalMark() ដូចគ្នា', typeof pageMark === 'function' && markSets.every((cells) => pageMark(cells) === markOf(cells)),
+        JSON.stringify(markSets.map((cells) => [typeof pageMark === 'function' ? pageMark(cells) : 'missing', markOf(cells)])));
+}
+
+webMoneyTests().catch((error) => check('Web money tests ៖ រត់ចប់ដោយគ្មាន exception', false, error && error.stack)).then(() => {
+    console.log('');
+    console.log('zto-import — ' + passed + ' assertions passed, ' + failed + ' failed');
+    if (failed) {
+        failures.forEach((f) => console.log('  ✗ ' + f));
+        process.exit(1);
+    }
+    process.exitCode = 0;
+});

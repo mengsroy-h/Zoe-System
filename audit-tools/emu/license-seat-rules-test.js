@@ -48,6 +48,68 @@ function sliceFn(source, name) {
     }
     return source.slice(start, i);
 }
+// ⛔ A505 (សេចក្តីសម្រេចម្ចាស់) ៖ «🔓 ដោះឧបករណ៍» ពិតរបស់ ZoeKeyGen ផ្ញើ update root តែមួយតាម REST PATCH (ID token admin) ⛔ មិនមែនតាម SDK
+//    ដែលផ្ញើម្តងទៀតក្រោយចម្លើយបាត់។ ស្រង់ `releaseKeySeat()` និងជំនួយ REST ពិតពីកូដ ship ហើយបញ្ជូន `fetch` របស់វាទៅ emulator ពិតដែលផ្ទុក rules ពិត
+//    (`?auth=` របស់ admin ➜ auth_variable_override uid admin · ការអានគ្មាន auth ➜ អានសាធារណៈ) ➜ PATCH · ការអានត្រលប់ · rules វាស់ជាមួយគ្នា។
+function sliceShippedFn(source, name) {
+    const asyncAt = source.indexOf('async function ' + name + '(');
+    const plainAt = source.indexOf('function ' + name + '(');
+    const start = asyncAt !== -1 && asyncAt < plainAt ? asyncAt : plainAt;
+    if (plainAt === -1) return null;
+    let depth = 0;
+    let i = source.indexOf('{', start);
+    for (; i < source.length; i++) {
+        if (source[i] === '{') depth++;
+        else if (source[i] === '}') { depth--; if (depth === 0) { i++; break; } }
+    }
+    return source.slice(start, i);
+}
+function loadSeatReleaser(onRequest) {
+    const src = fs.readFileSync(path.join(ROOT, 'ZoeKeyGen/app.js'), 'utf8');
+    const pendingDecl = (src.match(/^const ADMIN_WRITE_PENDING_TEXT = .*;$/m) || [])[0];
+    const releasePendingDecl = (src.match(/^const RELEASE_PENDING_TEXT = .*;$/m) || [])[0] || "const RELEASE_PENDING_TEXT = '(អវត្តមាន RELEASE_PENDING_TEXT)';";
+    const names = ['releaseKeySeat', 'patchLicenseViaRest', 'readKeyReleaseViaRest', 'databaseUrlOf', 'isFirebaseDatabaseHost', 'fetchWithTimeout'];
+    const fns = names.map((name) => sliceShippedFn(src, name)).filter(Boolean);
+    if (!pendingDecl || !fns.length || fns[0].indexOf('releaseKeySeat') === -1) return null;
+    const log = { alerts: [], toasts: [], refreshed: 0, sdk: [] };
+    const user = { uid: 'adminUid', email: 'admin@example.test', getIdToken: () => Promise.resolve('emu-admin-token') };
+    const ctx = {
+        console: { error() {}, log() {}, warn() {} }, Promise, Error, JSON, Object, Array, String, Number, Math, Date, URL, AbortController,
+        setTimeout, clearTimeout, encodeURIComponent,
+        window: {}, ZoeErrors: { capture() {} },
+        db: { app: { options: { databaseURL: 'https://licseat-emu.firebaseio.com/' } } },
+        auth: { currentUser: user },
+        captureSensitiveSession: () => ({ user }),
+        adminOperationIsCurrent: () => true,
+        withTimeout: (promise) => promise,
+        retryAsync: (fn) => fn(),
+        serverTimeSynced: true,
+        getServerNow: () => Date.now(),
+        seatReadFailed: false,
+        keyListCache: [],
+        confirm: () => true,
+        alert: (message) => log.alerts.push(message),
+        showToast: (message) => log.toasts.push(message),
+        refreshKeyList: () => { log.refreshed++; },
+        fb: {
+            ref: (database, refPath) => ({ refPath }),
+            update: (ref, value) => { log.sdk.push(['update', ref.refPath, value]); return Promise.resolve(); },
+            set: (ref, value) => { log.sdk.push(['set', ref.refPath, value]); return Promise.resolve(); }
+        },
+        fetch: async (url, init) => {
+            const u = new URL(String(url));
+            const method = (init && init.method) || 'GET';
+            const body = init && typeof init.body === 'string' ? JSON.parse(init.body) : undefined;
+            const query = NS + (u.searchParams.get('auth') === 'emu-admin-token' ? '&' + ADMIN : '');
+            const r = await req(method, u.pathname + '?' + query, body, u.searchParams.has('auth') ? OWNER : undefined);
+            await onRequest({ method, path: u.pathname, body, status: r.status });
+            return { ok: r.status >= 200 && r.status < 300, status: r.status, text: async () => r.body, json: async () => JSON.parse(r.body || 'null') };
+        }
+    };
+    vm.createContext(ctx);
+    vm.runInContext(pendingDecl + '\n' + releasePendingDecl + '\n' + fns.join('\n\n'), ctx);
+    return { ctx, log, pendingText: vm.runInContext('RELEASE_PENDING_TEXT', ctx) };
+}
 function loadNoticeWriter() {
     const src = fs.readFileSync(path.join(ROOT, 'ZoeKeyGen/app.js'), 'utf8');
     const decls = ['NOTICE_TITLE_MAX', 'NOTICE_BODY_MAX', 'NOTICE_KEEP_MAX', 'NOTICE_KIND_LABELS', 'NOTICE_ID_ALPHABET']
@@ -466,6 +528,44 @@ const keyPath = (keyId) => '/license_keys/' + APP + '/' + keyId + '.json';
         check(allowed(removed), 'A453 ៖ admin លុប seat និងប្តូរ epoch ក្នុង write តែមួយ', removed.status);
         const delayed = await anon('PUT', seatPath(KEY5, SLOTS[0]), { device: DEV_A, at: RELEASED + 3000, releaseEpoch: RELEASED });
         check(denied(delayed), 'A453 ៖ PUT ពី epoch មុនដែលចូលយឺត ➜ បដិសេធ', delayed.status);
+    }
+
+    // ⛔ A505 ៖ «🔓 ដោះឧបករណ៍» ពិត (REST PATCH) លើ rules ពិត ៖ ទាន់ពេល ➜ ✅ · ចម្លើយបាត់ក្រោយចុះ ➜ អានត្រលប់ ➜ ✅ ·
+    //    ចម្លើយបាត់ ហើយឧបករណ៍ថ្មីកក់កៅអីក្នុងចន្លោះ ➜ ⏳ · ⛔ គ្មានការផ្ញើម្តងទៀតដែលលុបកៅអីថ្មី ឬចុះត្រា releasedAt ថ្មីជាង (មុនកែ ៖ SDK `fb.update`)
+    for (const [label, keyId, mode] of [['ទាន់ពេល', 'RELEASEREST1234567AB', 'ok'], ['ចម្លើយបាត់', 'RELEASEREST1234567CD', 'lost'], ['ចម្លើយបាត់ · ឧបករណ៍ថ្មីកក់ក្នុងចន្លោះ', 'RELEASEREST1234567EF', 'lost-claim']]) {
+        await owner('PUT', keyPath(keyId), { expiresAt: 4102444800000, revoked: false, maxDevices: 1 });
+        await owner('PUT', seatPath(keyId, SLOTS[0]), { device: DEV_A, at: 1700000000000 });
+        const patches = [];
+        let claimed = null;
+        const releaser = loadSeatReleaser(async (r) => {
+            if (r.method !== 'PATCH') return;
+            patches.push(r);
+            if (mode === 'ok') return;
+            if (mode === 'lost-claim') {
+                const key = JSON.parse((await owner('GET', keyPath(keyId))).body || 'null');
+                claimed = await anon('PUT', seatPath(keyId, SLOTS[0]), { device: DEV_B, at: Date.now(), releaseEpoch: key && key.releasedAt });
+            }
+            throw new TypeError('Failed to fetch');
+        });
+        check(!!releaser, '⛔ លក្ខខណ្ឌចាំបាច់ ៖ ស្រង់ releaseKeySeat + ADMIN_WRITE_PENDING_TEXT ពី ZoeKeyGen/app.js បាន');
+        if (!releaser) continue;
+        releaser.ctx.keyListCache = [{ id: keyId, paths: [APP], perApp: { [APP]: { expiresAt: 4102444800000 } }, maxDevices: 1, seatDevices: [{ slot: SLOTS[0], device: DEV_A }] }];
+        await releaser.ctx.releaseKeySeat(keyId);
+        const key = JSON.parse((await owner('GET', keyPath(keyId))).body || 'null');
+        const seats = JSON.parse((await anon('GET', seatPath(keyId))).body || 'null');
+        const shown = { patches: patches.map((r) => r.status), sdk: releaser.log.sdk, alerts: releaser.log.alerts, toasts: releaser.log.toasts, key, seats };
+        check(patches.length === 1 && patches[0].path === '/.json' && allowed(patches[0]) && releaser.log.sdk.length === 0,
+            'A505 ៖ ' + label + ' ➜ PATCH root តែមួយតាម REST ត្រូវ rules ពិតទទួល · ⛔ គ្មាន SDK · ⛔ មិនផ្ញើម្តងទៀត', shown);
+        if (mode === 'lost-claim') {
+            check(!!claimed && allowed(claimed) && !!seats && !!seats[SLOTS[0]] && seats[SLOTS[0]].device === DEV_B && typeof key.releasedAt === 'number'
+                && releaser.log.alerts.length === 1 && releaser.log.alerts[0] === releaser.pendingText
+                && !releaser.log.toasts.some((t) => t.startsWith('✅')) && releaser.log.refreshed >= 1,
+                '⛔ A505 ៖ ' + label + ' ➜ កៅអីឧបករណ៍ថ្មីនៅ · releasedAt មិនប្តូរ · «⏳ មិនទាន់បញ្ជាក់» + Refresh (មិនមែន ✅)', Object.assign({ claimed: claimed && claimed.status }, shown));
+        } else {
+            check(seats === null && !!key && typeof key.releasedAt === 'number' && key.releasedAt > 0 && releaser.log.alerts.length === 0
+                && releaser.log.toasts.some((t) => t.startsWith('✅')) && releaser.log.refreshed >= 1,
+                'A505 ៖ ' + label + ' ➜ កៅអីទំនេរ · releasedAt ម៉ោង server · ✅ (ចម្លើយបាត់ ➜ អានត្រលប់ពី Database ដដែល)', shown);
+        }
     }
 
     console.log('\n' + pass + ' ok, ' + fail + ' FAIL');

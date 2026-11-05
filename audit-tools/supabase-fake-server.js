@@ -2,7 +2,8 @@
 //   · GoTrue ៖ POST /auth/v1/token?grant_type=password|refresh_token · POST /auth/v1/logout · GET /auth/v1/user · GET /auth/v1/health
 //     JWT HS256 ពិត (sub · role · exp · iat · amr[{method,timestamp}] · session_id) ➜ supabase-js ពិត decode/refresh បាន
 //     session ពិតក្នុង `auth.sessions` ដូច GoTrue ៖ Login បង្កើតជួរ · refresh រក្សា `session_id` ដដែល ហើយបដិសេធ (400 refresh_token_not_found)
-//     ពេលជួរបាត់ (revoke · logout) · logout `scope=local|global|others` លុបជួរតាម scope
+//     ពេលជួរបាត់ (revoke · logout) · logout `scope=local|global|others` លុបជួរតាម scope · គ្មាន `scope` ➜ `global` (លំនាំដើមរបស់ GoTrue ពិត ៖
+//     ដក session ទាំងអស់របស់អ្នកប្រើ ➜ client ដែលចង់ចេញតែផ្ទាំងខ្លួនត្រូវផ្ញើ `scope=local`)
 //   · PostgREST ៖ POST /rest/v1/rpc/<fn> ➜ ផ្ទៀង JWT ➜ `set local role` + `request.jwt.claims` (ដូច PostgREST) ➜ ហៅ function តាមឈ្មោះ
 //     argument (type ពី pg_proc) ➜ scalar ➜ តម្លៃ JSON · table ➜ array · កំហុស ➜ {code, message, details, hint} + status ដូច PostgREST
 //     (42501 ➜ 403 authenticated / 401 anon · 22023/P0001/P0002 ➜ 400 · `PTxyz` ➜ HTTP xyz · JWT ខុស/ផុត ➜ 401 PGRST301/PGRST303)
@@ -276,7 +277,7 @@ async function startFakeSupabase(opts) {
                 if (u.pathname === '/auth/v1/logout') {
                     if (authHook) await authHook({ path: u.pathname });
                     const v = verifyJwt(String(req.headers.authorization || '').slice(7), secret, Math.floor(Date.now() / 1000));
-                    if (v.ok && v.claims.session_id) await endSessions(v.claims, u.searchParams.get('scope') || 'local');
+                    if (v.ok && v.claims.session_id) await endSessions(v.claims, u.searchParams.get('scope') || 'global');
                     return send(res, 204);
                 }
                 if (u.pathname === '/auth/v1/user' && req.method === 'GET') {

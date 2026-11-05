@@ -38,48 +38,69 @@ function serviceAccountObject(entry) {
     return raw;
 }
 
+function targetLabel(entry, index) {
+    const name = entry && typeof entry === 'object' ? entry.name : undefined;
+    return typeof name === 'string' && /^[A-Za-z0-9._-]+$/.test(name) ? name : `#${index + 1}`;
+}
+
+function addTarget(entry, outRoot, secretsDir, names) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+        throw new Error('This entry is not an object.');
+    }
+    const dir = backup.resolveBusinessDir(outRoot, entry.name);
+    const name = path.basename(dir);
+    const claimName = () => {
+        if (names.has(name.toLowerCase())) throw new Error(`Duplicate business name "${name}" in ${TARGETS_ENV}.`);
+        names.add(name.toLowerCase());
+    };
+    if (entry.type === 'supabase') {
+        const url = supabase.normalizeSupabaseUrl(entry.url);
+        const key = supabase.validateSecretKey(entry.secretKey);
+        claimName();
+        const keyPath = path.join(secretsDir, `${name}.key`);
+        fs.writeFileSync(keyPath, key + '\n', { mode: 0o600 });
+        return {
+            business: { name, type: 'supabase', url, secretKeyPath: path.join('secrets', `${name}.key`) },
+            summary: `${name} -> ${new URL(url).host} (supabase)`
+        };
+    }
+    if (entry.type !== undefined && entry.type !== 'firebase') {
+        throw new Error(`Entry "${entry.name}" has an unknown type (use "firebase" or "supabase").`);
+    }
+    const databaseURL = backup.normalizeDatabaseUrl(entry.databaseURL);
+    const serviceAccount = backup.validateServiceAccount(serviceAccountObject(entry));
+    claimName();
+    const keyPath = path.join(secretsDir, `${name}.json`);
+    fs.writeFileSync(keyPath, JSON.stringify({
+        client_email: serviceAccount.clientEmail,
+        private_key: serviceAccount.privateKey,
+        token_uri: serviceAccount.tokenUri
+    }), { mode: 0o600 });
+    return {
+        business: { name, serviceAccountPath: path.join('secrets', `${name}.json`), databaseURL },
+        summary: `${name} -> ${new URL(databaseURL).hostname}`
+    };
+}
+
 function buildRunDirectory(outRoot, targets) {
     const secretsDir = path.join(outRoot, 'secrets');
     fs.mkdirSync(secretsDir, { recursive: true, mode: 0o700 });
     const businesses = [];
     const summary = [];
-    for (const entry of targets) {
-        if (!entry || typeof entry !== 'object') {
-            throw new Error(`${TARGETS_ENV} contains an entry that is not an object.`);
+    const failed = [];
+    const names = new Set();
+    targets.forEach((entry, index) => {
+        try {
+            const added = addTarget(entry, outRoot, secretsDir, names);
+            businesses.push(added.business);
+            summary.push(added.summary);
+        } catch (e) {
+            failed.push(`${targetLabel(entry, index)}: ${e && e.message ? e.message : 'Unknown error'}`);
         }
-        const dir = backup.resolveBusinessDir(outRoot, entry.name);
-        const name = path.basename(dir);
-        if (entry.type === 'supabase') {
-            const url = supabase.normalizeSupabaseUrl(entry.url);
-            const key = supabase.validateSecretKey(entry.secretKey);
-            const keyPath = path.join(secretsDir, `${name}.key`);
-            fs.writeFileSync(keyPath, key + '\n', { mode: 0o600 });
-            businesses.push({
-                name,
-                type: 'supabase',
-                url,
-                secretKeyPath: path.join('secrets', `${name}.key`)
-            });
-            summary.push(`${name} -> ${new URL(url).host} (supabase)`);
-            continue;
-        }
-        if (entry.type !== undefined && entry.type !== 'firebase') {
-            throw new Error(`Entry "${entry.name}" has an unknown type (use "firebase" or "supabase").`);
-        }
-        const databaseURL = backup.normalizeDatabaseUrl(entry.databaseURL);
-        const serviceAccount = backup.validateServiceAccount(serviceAccountObject(entry));
-        const keyPath = path.join(secretsDir, `${name}.json`);
-        fs.writeFileSync(keyPath, JSON.stringify({
-            client_email: serviceAccount.clientEmail,
-            private_key: serviceAccount.privateKey,
-            token_uri: serviceAccount.tokenUri
-        }), { mode: 0o600 });
-        businesses.push({
-            name,
-            serviceAccountPath: path.join('secrets', `${name}.json`),
-            databaseURL
-        });
-        summary.push(`${name} -> ${new URL(databaseURL).hostname}`);
+    });
+    if (!businesses.length) {
+        throw new Error([`No valid target in ${TARGETS_ENV} — nothing to back up.`]
+            .concat(failed.map((line) => `[FAIL] ${line}`)).join('\n'));
     }
     const config = {
         backupDir: './backups',
@@ -92,7 +113,7 @@ function buildRunDirectory(outRoot, targets) {
     const configPath = path.join(outRoot, 'config.json');
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2), { mode: 0o600 });
     backup.validateBusinesses(config, path.join(outRoot, 'backups'));
-    return { configPath, summary, count: businesses.length };
+    return { configPath, summary, failed, count: businesses.length, total: targets.length };
 }
 
 function main(argv) {
@@ -106,13 +127,17 @@ function main(argv) {
     }
     const result = buildRunDirectory(outRoot, parseTargets(process.env[TARGETS_ENV]));
     for (const line of result.summary) console.log(`[TARGET] ${line}`);
-    console.log(`\nPrepared ${result.count} target(s) at ${result.configPath}`);
+    for (const line of result.failed) console.error(`[FAIL] ${line}`);
+    console.log(`\nPrepared ${result.count} of ${result.total} target(s) at ${result.configPath}`);
+    if (result.failed.length) {
+        console.error(`${result.failed.length} target(s) in ${TARGETS_ENV} are left out of this backup. Fix them; the job turns red after the other backups are uploaded.`);
+    }
     return result;
 }
 
 if (require.main === module) {
     try {
-        main();
+        if (main().failed.length) process.exitCode = 1;
     } catch (e) {
         console.error(e && e.message ? e.message : e);
         process.exitCode = 1;

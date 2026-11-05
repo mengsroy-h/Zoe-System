@@ -125,6 +125,7 @@ if (unexpected.length) {
     process.exitCode = 1;
 } else {
     console.log('\n✅ គ្មានការបែកគ្នាដែលមិនរំពឹងទុកទេ');
+    process.exitCode = 0;
 }
 
 const showIdx = process.argv.indexOf('--show');

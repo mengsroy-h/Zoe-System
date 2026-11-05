@@ -145,3 +145,4 @@ if (failures) {
     process.exit(1);
 }
 console.log('✅ កំណែ App ស៊ីគ្នាទាំង ២ (កូដដែលវាស់ ↔ manifest.json ↔ index.html)');
+process.exitCode = 0;

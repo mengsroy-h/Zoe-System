@@ -67,7 +67,16 @@ const BOOT = function (seed) {
         let cur = target;
         for (let i = 0; i < parts.length - 1; i++) { if (cur[parts[i]] === null || typeof cur[parts[i]] !== 'object') cur[parts[i]] = {}; cur = cur[parts[i]]; }
         const last = parts[parts.length - 1];
-        if (val === null) delete cur[last]; else cur[last] = resolveWrite(val, cur[last]);
+        if (val === null) {
+            delete cur[last];
+            for (let i = parts.length - 2; i >= 1; i--) {
+                let parent = target;
+                for (let j = 0; j < i; j++) parent = parent[parts[j]];
+                const node = parent[parts[i]];
+                if (node && typeof node === 'object' && !Object.values(node).some((x) => x !== undefined && x !== null)) delete parent[parts[i]];
+                else break;
+            }
+        } else cur[last] = resolveWrite(val, cur[last]);
     }
     function snapOf(p){ const v=getPath(p); return { val:()=>(v===undefined||v===null)?null:(typeof v==='object'?JSON.parse(JSON.stringify(v)):v), exists:()=>v!==null&&v!==undefined }; }
     function fire(p){ listeners.filter(l=>l.path===p).forEach(l=>{try{l.cb(snapOf(p));}catch(e){}}); }

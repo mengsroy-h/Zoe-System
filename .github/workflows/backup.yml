@@ -65,8 +65,14 @@ jobs:
           fi
           echo "ready=yes" >> "$GITHUB_OUTPUT"
 
+      # ⛔ `continue-on-error` ដោយចេតនា ៖ `ci-config.js` ទុក target ដែលខូច (សោកាត់ខ្លី ·
+      #    publishable key · URL ខុស · ឈ្មោះស្ទួន) ចោល ហើយបន្តសាង config សម្រាប់ target
+      #    ដែលល្អ រួចចេញ exit មិនមែន 0។ បើជំហាននេះបញ្ឈប់ job នោះ target មួយខូច
+      #    ធ្វើឲ្យគ្រប់អាជីវកម្មបាត់ backup ➜ job ក្រហមនៅជំហានចុងក្រោយ ក្រោយ upload។
       - name: ត្រៀម config និងសោ (ក្រៅ checkout)
+        id: prepare
         if: steps.guard.outputs.ready == 'yes'
+        continue-on-error: true
         env:
           ZOE_BACKUP_TARGETS: ${{ secrets.ZOE_BACKUP_TARGETS }}
         run: node firebase-backup/ci-config.js "$RUNNER_TEMP/zoe-backup"
@@ -136,7 +142,15 @@ jobs:
       # ⛔ ឈរ **ក្រោយ** upload ដោយចេតនា ៖ backup ដែលបានត្រូវរក្សាទុកជាមុន
       #    រួចទើប job ក្លាយជាក្រហម។ ⛔ កុំផ្លាស់វាឡើងលើ។
       - name: បញ្ចប់ជាក្រហមបើអាជីវកម្មណាមួយធ្លាក់
-        if: steps.guard.outputs.ready == 'yes' && steps.pull.outcome == 'failure'
+        if: steps.guard.outputs.ready == 'yes' && (steps.prepare.outcome == 'failure' || steps.pull.outcome == 'failure')
+        env:
+          PREPARE_OUTCOME: ${{ steps.prepare.outcome }}
+          PULL_OUTCOME: ${{ steps.pull.outcome }}
         run: |
-          echo "❌ អាជីវកម្ម ឬហាងយ៉ាងតិច ១ ទាញមិនបាន — មើល log ជំហាន «ទាញទិន្នន័យពី Firebase · Supabase»" >&2
+          if [ "${PREPARE_OUTCOME}" = "failure" ]; then
+            echo "❌ target យ៉ាងតិច ១ ក្នុង ZOE_BACKUP_TARGETS ខូច ហើយត្រូវទុកចោល — មើលបន្ទាត់ [FAIL] ក្នុង log ជំហាន «ត្រៀម config និងសោ (ក្រៅ checkout)»" >&2
+          fi
+          if [ "${PULL_OUTCOME}" = "failure" ]; then
+            echo "❌ អាជីវកម្ម ឬហាងយ៉ាងតិច ១ ទាញមិនបាន — មើល log ជំហាន «ទាញទិន្នន័យពី Firebase · Supabase»" >&2
+          fi
           exit 1

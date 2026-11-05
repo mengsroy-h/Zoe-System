@@ -49,7 +49,8 @@ function fakeServer() {
                 if (mode === 'down') throw new SbNetworkError('network');
                 return now();
             }
-            if (fn !== 'zoe_write') throw new Error('unexpected ' + fn);
+            if (fn !== 'zoe_write_v2') throw new Error('unexpected ' + fn);
+            expect.soft(args.p_expected_tenant).toBe('t1');
             if (mode === 'down') throw new SbNetworkError('network');
             const res = apply(args);
             if (mode === 'drop') throw new SbNetworkError('timeout');
@@ -75,6 +76,7 @@ async function open(server: ReturnType<typeof fakeServer>, wait: (ms: number) =>
     const db = createSupabaseDatabase(server.transport, {
         onListenerError: () => {}, onSynced: () => {}, onForbidden: () => {}, onTxOutcomeUnknown: (p: string[]) => { unknown.push(p.join('/')); }
     }, { retryStepsMs: [5, 10, 600000], pollFallbackMs: 600000, rpcTimeoutMs: 1000 });
+    db.setTenantTopic('zoe:t1');
     db.setAuthed(true, 'scope');
     let fired = false;
     db.onValue(db.ref('ledger'), () => { fired = true; });

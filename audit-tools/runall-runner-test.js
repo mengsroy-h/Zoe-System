@@ -30,6 +30,7 @@ const RUNALL = path.join(ROOT, 'audit-tools', 'run-all.sh');
 // ⛔ សញ្ញាទាំង ២ ផ្គុំពីបំណែក ៖ ឯកសារនេះមិនបើក browser និងមិនប្រើ emulator ➜ ផ្នែក ៦ មិនត្រូវចាត់វាខុស lane
 const BROWSER_MARK = 'chromium' + '.launch(';
 const EMU = 'audit-tools/' + 'emu/';
+const F03 = EMU + 'registry-purge-atomic-sdk-test.js';
 
 let pass = 0, fail = 0;
 function ok(label, cond, detail) {
@@ -442,6 +443,7 @@ ok('⛔ syntax module ៖ manifest មិនត្រូវនឹង source ត�
 // ═══ ២. lane ៖ emu ម្តងមួយ · excl ម្នាក់ឯង · browser មានពិដាន ═══
 console.log('\n=== ២. lane ៖ emu ម្តងមួយ · meta ម្នាក់ឯង · browser ≤ RUNALL_BROWSER_JOBS ===');
 const laneFx = [
+    [F03, { ms: 400, ownedProbe: true }],
     [EMU + 'fx-e1.js', { ms: 400 }], [EMU + 'fx-e2.js', { ms: 400 }], [EMU + 'fx-e3.js', { ms: 400 }],
     ['audit-tools/fx-b1.js', { ms: 400, browser: true }], ['audit-tools/fx-b2.js', { ms: 400, browser: true }],
     ['audit-tools/fx-b3.js', { ms: 400, browser: true }], ['audit-tools/fx-b4.js', { ms: 400, browser: true }],
@@ -453,15 +455,16 @@ const body2 = laneFx.map(([rel]) => 'run "' + path.basename(rel, '.js') + '" nod
 const lane = runHarness(c2, body2, { RUNALL_JOBS: '4', RUNALL_BROWSER_JOBS: '2' });
 const isEmu = (n) => n.indexOf('/emu/') !== -1;
 const isBrowser = (n) => /fx-b\d/.test(n);
-const isExcl = (n) => /checker-coverage|exit-code-integrity/.test(n);
+const isExcl = (n) => /checker-coverage|exit-code-integrity|registry-purge-atomic-sdk-test/.test(n);
 ok('⛔ emu/* មិនដែលជាន់គ្នា (emulator តែមួយ)', maxOverlap(lane.events, isEmu) === 1 && lane.events.length >= 24,
     { overlap: maxOverlap(lane.events, isEmu), events: lane.events.length });
 ok('⛔ browser ≤ RUNALL_BROWSER_JOBS (២)', maxOverlap(lane.events, isBrowser) === 2, maxOverlap(lane.events, isBrowser));
-const exclIv = intervals(lane.events).filter((iv) => isExcl(iv.name));
-const others = intervals(lane.events).filter((iv) => !isExcl(iv.name));
-const exclAlone = exclIv.length === 2 && exclIv.every((x) => others.every((o) => o.end <= x.start || o.start >= x.end))
-    && !(exclIv[0].end > exclIv[1].start && exclIv[1].end > exclIv[0].start);
-ok('⛔ checker meta (checker-coverage · exit-code-integrity) រត់ម្នាក់ឯង — គ្មានអ្វីជាន់', exclAlone, exclIv);
+const laneIntervals = intervals(lane.events), exclIv = laneIntervals.filter((iv) => isExcl(iv.name));
+const exclAlone = exclIv.length === 3 && exclIv.every((x) => laneIntervals.every((o) => o === x
+    || o.end <= x.start || o.start >= x.end));
+ok('⛔ checker meta និង F03 ដែលវាស់ deadline រត់ម្នាក់ឯង — គ្មានអ្វីជាន់', exclAlone, exclIv);
+const purgeOwners = fs.existsSync(path.join(c2, 'fx.log.owners')) ? fs.readFileSync(path.join(c2, 'fx.log.owners'), 'utf8').trim().split('\n').map(JSON.parse) : [];
+ok('F03 រក្សា owned emulator scope ពេលរត់ម្នាក់ឯង', lane.rc === 0 && purgeOwners.length === 1 && /^\d+$/.test(purgeOwners[0].owner), purgeOwners);
 ok('ពិដានរួម ≤ RUNALL_JOBS (៤) ហើយនៅតែស្របគ្នា (≥ ៣)', maxOverlap(lane.events) <= 4 && maxOverlap(lane.events) >= 3,
     maxOverlap(lane.events));
 
@@ -734,13 +737,15 @@ async function sectionSix() {
         const poison = c.indexOf('.tmp-poison-') !== -1 && /\bunlinkSync\s*\(/.test(c);
         const emu = j.id.indexOf('emu/') === 0 || EMU_EVIDENCE.test(c);
         const browser = src.indexOf(BROWSER_MARK) !== -1;
+        const isolatedPurge = j.id === F03.slice('audit-tools/'.length, -3) && c.includes('controlledDeadlinePass(');
         if (j.lane === 'excl') exclN++;
         if (j.lane === 'emu') emuN++;
         if (j.lane === 'browser') browserN++;
         if (poison && j.lane !== 'excl') wrong.push(j.id + ' ៖ សរសេរ/បោស .tmp-poison-* តែ lane=' + j.lane + ' (ត្រូវ excl)');
+        if (isolatedPurge && j.lane !== 'excl') wrong.push(j.id + ' ៖ F03 វាស់ deadline តែ lane=' + j.lane + ' (ត្រូវ excl)');
         if (emu && j.lane !== 'emu' && j.lane !== 'excl') wrong.push(j.id + ' ៖ ប្រើ emulator តែ lane=' + j.lane + ' (ត្រូវ emu)');
         if (!poison && !emu && browser && j.lane !== 'browser') wrong.push(j.id + ' ៖ បើក browser តែ lane=' + j.lane);
-        if (j.lane === 'excl' && !poison) unjustified.push(j.id + ' ៖ excl គ្មានភស្តុតាង .tmp-poison-*');
+        if (j.lane === 'excl' && !poison && !isolatedPurge) unjustified.push(j.id + ' ៖ excl គ្មានភស្តុតាង .tmp-poison-* ឬ F03 deadline');
         if (j.lane === 'emu' && !emu) unjustified.push(j.id + ' ៖ emu គ្មានភស្តុតាង emulator');
         if (j.lane === 'browser' && !browser) unjustified.push(j.id + ' ៖ browser គ្មាន ' + BROWSER_MARK);
     }
@@ -781,7 +786,7 @@ async function sectionSix() {
         ownerGuardActive(ownerGuardSource) && !ownerGuardActive(ownerGuardSource.replace(/^    await sectionOwnedRuntime\(\);$/m, '')));
     const internalOwnedRunner = job => job.id === 'emu/import-paired-ci-runner';
     const internalOwnerContractTest = job => job.id === 'import-paired-ci-runner-test';
-    const expectedOwned = job => !internalOwnedRunner(job) && !internalOwnerContractTest(job) && (job.lane === 'emu' || ['checker-coverage', 'exit-code-integrity'].includes(job.id));
+    const expectedOwned = job => !internalOwnedRunner(job) && !internalOwnerContractTest(job) && (job.id.startsWith('emu/') || job.lane === 'emu' || ['checker-coverage', 'exit-code-integrity'].includes(job.id));
     ok('CI គ្មាន global JVM ហើយ normal tasks ដែលត្រូវការ RTDB ឆ្លង owned scope ពេញ',
         !/java -jar|zoe-emulator\.pid/.test(wf) && shardStep.length > 0 && wf.includes('real.rules.json')
         && jobs.length >= 150 && jobs.every(job => (job.owned === '1') === expectedOwned(job))

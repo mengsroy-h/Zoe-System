@@ -1564,7 +1564,8 @@ require the emulator and fail rather than treating missing execution as success.
 `emu/supabase-rules-parity` · `emu/supabase-adapter-parity` print **`SKIPPED`**; `emu/crud-rules-flow` and
 `emu/restore-mutation` print **`PARTIAL PASS (… SKIP …)`** — it contains the word `PASS` while the real-rules assertions
 never ran. `emu/registry-purge-atomic-sdk` uses the owned loopback RTDB emulator and the real Supabase SDK with
-loopback HTTP/PostgreSQL, in the serial emulator lane. Without local opt-in it reports UNRUN/SKIP; STRICT mode fails
+loopback HTTP/PostgreSQL, in the exclusive scheduler lane so sibling checkers cannot contend with its bounded timing measurements.
+It retains the same serial owned emulator scope. Without local opt-in it reports UNRUN/SKIP; STRICT mode fails
 when a required runtime is unavailable or fixtures-only mode is requested. Construction probes never prove backend
 parity. The individual checker does not install or start an emulator; normal run-all supplies its owned scope.
 An explicitly supplied, externally owned emulator remains a standalone diagnostic contract, not a normal-CI fallback.

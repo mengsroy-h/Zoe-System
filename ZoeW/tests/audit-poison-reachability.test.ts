@@ -1,5 +1,8 @@
 import { readFileSync, readdirSync } from 'node:fs';
+import * as fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import vm from 'node:vm';
 import { parse } from 'acorn';
 import { describe, expect, it } from 'vitest';
@@ -15,6 +18,71 @@ const run = (source: string) => {
     const result = spawnSync(process.execPath, ['-e', source], { encoding: 'utf8', timeout: 2000 });
     return { code: result.status, signal: result.signal, timedOut: !!result.error, out: result.stdout + result.stderr };
 };
+
+const cleanupStartup = guard.slice(guard.indexOf('const POISON_PREFIX ='), guard.indexOf('\nlet poisoned ='));
+const cleanupFinally = guard.slice(guard.indexOf('try {\n    await runPoisonQueues'), guard.indexOf('\nconst slowest ='));
+async function withCleanupFixture(child: boolean, check: (fixture: {
+    tools: string; context: vm.Context; parents: string[];
+}) => void | Promise<void>) {
+    const root = fs.mkdtempSync(path.join(tmpdir(), 'zoe-poison-owner-'));
+    const tools = path.join(root, 'audit-tools');
+    fs.mkdirSync(path.join(tools, 'emu'), { recursive: true });
+    fs.mkdirSync(path.join(root, 'zto-import'));
+    const parents = [tools, path.join(tools, 'emu'), path.join(root, 'zto-import')]
+        .map(directory => path.join(directory, '.tmp-poison-parent-repository-contract-test.js'));
+    for (const parent of parents) fs.writeFileSync(parent, 'console.log("parent checker started");');
+    const context = vm.createContext({
+        fs, path, TOOLS: tools, ROOT: root, liveChildren: new Set(),
+        process: { env: child ? { EXITCODE_CHILD: '1' } : {}, on() {}, exit() { throw new Error('unexpected exit'); } },
+        mine: [], CONCURRENCY: 2, poisonOne: async () => {}, runPoisonQueues: async () => {}
+    });
+    try {
+        vm.runInContext(cleanupStartup, context);
+        await check({ tools, context, parents });
+    } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+}
+
+describe('poison cleanup៖ ឯកសារស្រមោលមានម្ចាស់តាម process', () => {
+    it('កូនចាប់ផ្តើមមិនលុប checker របស់ឪពុកដែលមិនទាន់បានចាប់ផ្តើម', async () => {
+        await withCleanupFixture(true, ({ parents }) => {
+            for (const parent of parents) {
+                const result = spawnSync(process.execPath, [parent], { encoding: 'utf8', timeout: 2000 });
+                expect(result.status, result.stderr).toBe(0);
+                expect(result.stdout).toContain('parent checker started');
+            }
+        });
+    });
+    it('កូនបញ្ចប់សម្អាតរបស់ខ្លួន ហើយរក្សា checker របស់ឪពុកឱ្យរត់បាន', async () => {
+        await withCleanupFixture(true, async ({ tools, context, parents }) => {
+            for (const parent of parents) fs.writeFileSync(parent, 'console.log("parent checker started");');
+            const own = path.join(tools, '.tmp-poison-child-own.js');
+            fs.writeFileSync(own, '');
+            context.own = own;
+            vm.runInContext('shadows.add(own)', context);
+            await vm.runInContext('(async () => {\n' + cleanupFinally + '\n})()', context);
+            expect(fs.existsSync(own)).toBe(false);
+            for (const parent of parents) {
+                const result = spawnSync(process.execPath, [parent], { encoding: 'utf8', timeout: 2000 });
+                expect(result.status, result.stderr).toBe(0);
+                expect(result.stdout).toContain('parent checker started');
+            }
+        });
+    });
+    it('process មេនៅតែសម្អាតឯកសារសល់ពេលចាប់ផ្តើម', async () => {
+        await withCleanupFixture(false, ({ parents }) => {
+            for (const parent of parents) expect(fs.existsSync(parent)).toBe(false);
+        });
+    });
+    it('process មេនៅតែសម្អាតឯកសារសល់ពេលបញ្ចប់', async () => {
+        await withCleanupFixture(false, async ({ context, parents }) => {
+            for (const parent of parents) fs.writeFileSync(parent, '');
+            await vm.runInContext('(async () => {\n' + cleanupFinally + '\n})()', context);
+            for (const parent of parents) expect(fs.existsSync(parent)).toBe(false);
+        });
+    });
+});
 
 describe('exit poison៖ ការគាំងមិនមែនភស្តុតាងថាអះអាងធ្លាក់', () => {
     it('បំបែក poison ដែលបានរត់ពី syntax, startup, dependency និង runtime crash', () => {

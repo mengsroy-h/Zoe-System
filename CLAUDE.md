@@ -1490,7 +1490,7 @@ Scan Management ➜ Arrival Scan ➜ a Waybill (`POST https://aargus-api.ztoglob
 - ⛔ Label-only `ok()` never called conditionally; count arguments with a real parser.
 - ⛔ `checker-coverage.js` skips part 5 under `EXITCODE_CHILD`; hash snapshots skip `.tmp-poison-*`.
 - ⛔ A SKIP marker starts its line (`run-all.sh` judges `^\s*SKIP`; a mid-line «— SKIP» reads as a full PASS) ➜ `checker-coverage`.
-- ⛔ Poison shadow files (`.tmp-poison-<pid>-<name>.js`), never originals.
+- ⛔ Poison shadow files (`.tmp-poison-<pid>-<name>.js`), never originals. A nested `EXITCODE_CHILD` must never sweep another process's shadows at startup or completion; exit/signal cleanup removes only its owned set. Verify sibling files remain executable in every swept directory, while top-level stale-file cleanup still runs (`ZoeW/tests/audit-poison-reachability.test.ts`).
 - ⛔ Depth parameters default to at least the depth measured as necessary.
 - ⛔ Ceiling assertions use the real ceiling (`cap + N`).
 - ⛔ Fuzz floors derive from `RUNS` with a reserved share per state (never a fixed number).

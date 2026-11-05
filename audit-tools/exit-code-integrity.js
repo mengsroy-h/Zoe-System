@@ -644,7 +644,7 @@ process.on('exit', () => { killLiveChildren(); dropShadows(); });
 ['SIGINT', 'SIGTERM', 'SIGHUP'].forEach((sig) => {
     process.on(sig, () => { killLiveChildren(); dropShadows(); process.exit(1); });
 });
-sweepPoisonLeftovers();
+if (!process.env.EXITCODE_CHILD) sweepPoisonLeftovers();
 
 let poisoned = 0, unpoisonable = [], fakeGreen = [], skippedInPoison = [], unverified = [];
 let ztoPoison = null;
@@ -713,7 +713,7 @@ try {
 } finally {
     killLiveChildren();
     dropShadows();
-    sweepPoisonLeftovers();
+    if (!process.env.EXITCODE_CHILD) sweepPoisonLeftovers();
 }
 const slowest = timings.slice().sort((a, b) => b[1] - a[1]).slice(0, 5)
     .map(([rel, ms]) => rel + ' ' + (ms / 1000).toFixed(1) + 's').join(' · ');

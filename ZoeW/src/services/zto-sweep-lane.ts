@@ -36,10 +36,16 @@ export function ztoSweepLaneOf(cfg, palm) {
     if (palm) {
         id = cfg && cfg.palmAccount && typeof cfg.palmAccount.siteCode === 'string' ? cfg.palmAccount.siteCode : '';
     } else {
+        const project = firebaseState.firebaseConfig && firebaseState.firebaseConfig.projectId;
+        if (typeof project === 'string' && /^[a-z0-9][a-z0-9-]{2,62}$/.test(project)) {
+            let hash = 2166136261;
+            for (let i = 0; i < project.length; i++) hash = Math.imul(hash ^ project.charCodeAt(i), 16777619);
+            id = project.length <= 40 ? project : project.slice(0, 30) + '_' + (hash >>> 0).toString(16);
+        }
         const user = firebaseState.auth && firebaseState.auth.currentUser;
         const email = user && typeof user.email === 'string' ? user.email : '';
         const at = email.lastIndexOf('@');
-        id = at > 0 ? email.slice(at + 1) : '';
+        if (!id) id = at > 0 ? email.slice(at + 1) : '';
     }
     const part = ztoSweepLanePart(id);
     const lane = (palm ? 'palm_' : 'cookie_') + part;

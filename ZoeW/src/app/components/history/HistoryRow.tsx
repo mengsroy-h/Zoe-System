@@ -44,7 +44,7 @@ function CallAction({ row }: { row: HistoryRowModel }) {
     if (row.callKind === 'fix-phone') {
         return (
             <button className="btn-sm fix-phone-btn btn-primary-action" title="លេខខុស — សូមកែលេខថ្មី"
-                onClick={onAct('openEditModal', { args: [row.id] })}>✏️ កែលេខ</button>
+                onClick={onAct('requestEditPhone', { args: [row.id] })}>✏️ កែលេខ</button>
         );
     }
     if (row.callKind === 'called') {

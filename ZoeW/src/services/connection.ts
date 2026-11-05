@@ -14,6 +14,7 @@ import { dbListenerPendingPaths } from '../core/text';
 import { resumePendingScanOperations } from './scan-operation';
 import { resumePriceOperations } from './price-operation';
 import { connectionFlowSnapshot } from './connection-flow';
+import { watchFirebaseWebsocket, firebaseWebsocketIsBlocked, FIREBASE_WEBSOCKET_BLOCKED_TEXT } from './firebase-websocket-observation';
 
 export const RECONNECT_FORCE_MIN_GAP_MS = 3000;
 
@@ -56,6 +57,7 @@ export function connectionIsSettlingIn() {
 }
 
 export function renderConnectionStatus() {
+    watchFirebaseWebsocket(renderConnectionStatus);
     viewState.connectionPhase = connectionFlowSnapshot().phase;
     const transportOnline = connectionLooksOnline() && viewState.connectionPhase !== 'unavailable';
     const pendingData = transportOnline && ['syncing', 'recovering', 'blocked'].includes(viewState.connectionPhase);
@@ -70,6 +72,7 @@ export function renderConnectionStatus() {
             ? "កំពុងភ្ជាប់ឡើងវិញ..."
             : (settling ? "កំពុងភ្ជាប់..." : (firebaseSdkNeedsRefresh() ? "សូម Refresh ទំព័រ" : "ក្រៅបណ្ដាញ")));
     if (viewState.connectionPhase === 'blocked') viewState.connectionText = 'មានការសរសេរមិនទាន់ផ្ទៀងផ្ទាត់ — សូមពិនិត្យទិន្នន័យ ឬលុបវាតាម ☰ ឧបករណ៍';
+    else if (firebaseWebsocketIsBlocked()) viewState.connectionText = FIREBASE_WEBSOCKET_BLOCKED_TEXT;
     else if (pendingData) viewState.connectionText = viewState.connectionPhase === 'syncing' ? 'កំពុងទាញទិន្នន័យ...' : 'កំពុងផ្ទៀងផ្ទាត់ការសរសេរ...';
     refreshLiveToasts();
     noteConnectionTransition(prevStatus, viewState.connectionStatus);

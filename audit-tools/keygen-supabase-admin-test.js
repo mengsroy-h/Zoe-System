@@ -179,7 +179,7 @@ function staticSeams() {
     ok('SB_TENANT_DAYS_MAX = ព្រំដែនថ្ងៃរបស់ admin_extend_tenant (1–' + (extendDays ? extendDays[2] : '?') + ')', !!extendDays
         && Number(extendDays[1]) === 1 && Number(extendDays[2]) === C.SB_TENANT_DAYS_MAX, { app: C.SB_TENANT_DAYS_MAX, sql: extendDays && extendDays.slice(1) });
 
-    const called = ['admin_create_tenant', 'admin_update_tenant', 'admin_extend_tenant', 'admin_issue_invite', 'admin_issue_reset_code'];
+    const called = ['admin_create_tenant', 'admin_update_tenant', 'admin_extend_tenant', 'admin_issue_invite', 'admin_issue_reset_code', 'admin_remove_member'];
     const usedInApp = called.filter((fn) => src.indexOf("'" + fn + "'") !== -1);
     ok('⛔ លក្ខខណ្ឌចាំបាច់ ៖ ZoeKeyGen ហៅ RPC admin_* ទាំង ' + called.length, usedInApp.length === called.length, usedInApp);
     // ⛔ លើកលែងតែមួយ ៖ `*-collision` បោះតែក្រោយកូដ ~១០០ bit ប៉ះគ្នា ៥ ដងជាប់ (មិនកើតក្នុងការអនុវត្ត) ➜ សារទូទៅ «Supabase បដិសេធ (…)» គ្រប់គ្រាន់
@@ -334,20 +334,21 @@ function decodeEntities(s) {
 }
 
 async function adminMutationFailureModes() {
-    const actions = ['sb-invite', 'sb-extend', 'sb-revoke', 'reset'];
+    const actions = ['sb-invite', 'sb-extend', 'sb-revoke', 'reset', 'remove'];
     for (const action of actions) {
         for (const mode of ['reject', 'absent', 'hang', 'late']) {
             const K = buildKeygen();
             const C = K.ctx;
             C.sbAdminSession = { url: 'https://admin.zoe.test', key: 'publishable-test', token: 'test', operation: C.captureSensitiveSession(true) };
             C.sbTenantCache = [{ id: 'tenant-test', name: 'ហាង', expires_at: new Date(Date.now() + 86400000).toISOString(), revoked: false }];
+            C.sbMemberCache = [{ tenant_id: 'tenant-test', username: 'sokha', role: 'member' }];
             K.set('sbResetUsernameInput', 'sokha');
             C.SB_ADMIN_TIMEOUT_MS = 20;
             let finishResponse = null;
             if (mode === 'reject') C.fetch = () => Promise.reject(new Error('offline'));
             if (mode === 'absent') C.fetch = undefined;
             if (mode === 'hang' || mode === 'late') C.fetch = () => new Promise((resolve) => { finishResponse = resolve; });
-            const pending = action === 'reset' ? C.sbIssueResetCode() : C.sbTenantAction('tenant-test', action);
+            const pending = action === 'reset' ? C.sbIssueResetCode() : action === 'remove' ? C.sbRemoveMember('tenant-test', 'sokha') : C.sbTenantAction('tenant-test', action);
             ok(action + ' / ' + mode + ' ៖ ការងារចាប់ផ្តើម ➜ ប៊ូតុងចេញកូដជាប់', C.sbAdminBusy === true && K.dom.el('sbIssueResetBtn').disabled === true);
             await pending;
             ok(action + ' / ' + mode + ' ៖ បរាជ័យ/ដល់ពិដាន ➜ ប្រាប់បញ្ហា · ដោះប៊ូតុង', C.sbAdminBusy === false && K.dom.el('sbIssueResetBtn').disabled === false && K.log.alerts.length === 1);
@@ -962,6 +963,56 @@ async function behavior() {
         ok('⛔ K5 ៖ ឧបករណ៍ ' + dbDevices + ' (> ' + fake.maxRows + ') · last_seen ប្រែចំកណ្តាល page ➜ គ្រប់ឧបករណ៍ · មិនស្ទួន',
             bumped && dbDevices > fake.maxRows && C.sbDeviceCache.length === dbDevices && seenDevices.size === dbDevices,
             { bumped, dbDevices, cached: C.sbDeviceCache.length, distinct: seenDevices.size });
+        console.log('   · ដកសមាជិក ៖ សិទ្ធិ · session · ម្ចាស់ចុងក្រោយ · ការដកព្រមគ្នា');
+        const removeTenant = (await c.query("insert into public.tenants(name,branch_code,expires_at) values('ដកសមាជិក','REMOVE',now()+interval '1 day') returning id")).rows[0].id;
+        const removeUsers = [];
+        const loginMember = async (email) => {
+            const response = await fetch(fake.url + '/auth/v1/token?grant_type=password', { method: 'POST', headers: { apikey: PUB, 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password: 'remove-pass' }) });
+            return (await response.json()).access_token;
+        };
+        for (const [username, role] of [['remove_one', 'owner'], ['remove_two', 'owner'], ['remove_staff', 'member']]) {
+            const email = username + '@users.zoew.invalid';
+            const uid = await H.makeAuthUser(c, email);
+            await c.query('insert into public.tenant_members(user_id,tenant_id,username,role) values($1,$2,$3,$4)', [uid, removeTenant, username, role]);
+            fake.addUser(email, 'remove-pass', uid);
+            removeUsers.push({ uid, username, token: await loginMember(email) });
+        }
+        const memberRequest = async (user, fn, args) => {
+            const response = await fetch(fake.url + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { apikey: PUB, Authorization: 'Bearer ' + user.token, 'Content-Type': 'application/json' }, body: JSON.stringify(args) });
+            return { status: response.status, body: await response.json() };
+        };
+        const argsRemove = (username) => ({ p_tenant_id: removeTenant, p_username: username });
+        const deniedRemove = await memberRequest(removeUsers[2], 'admin_remove_member', argsRemove('remove_one'));
+        ok('non-admin ដកសមាជិក ➜ forbidden', deniedRemove.body.message === 'forbidden', deniedRemove);
+        const noSession = await H.as(c, { role: 'authenticated', sub: adminId }, 'select public.admin_remove_member($1,$2)', [removeTenant, 'remove_staff']);
+        ok('platform admin គ្មាន active session ➜ session-revoked', noSession.error?.message === 'session-revoked', noSession);
+        await C.sbAdminRpc(C.sbAdminSession, 'admin_issue_reset_code', { p_username: 'remove_staff', p_valid_hours: 24 });
+        const seqBeforeRemove = (await c.query('select coalesce(max(seq),0) as seq from public.zoe_tenant_state where tenant_id=$1', [removeTenant])).rows[0].seq;
+        await C.sbAdminRefresh();
+        ok('បញ្ជីគណនីមានប៊ូតុងដកចេញពីហាង', el('sbTenantListBody').innerHTML.includes('data-username="remove_staff" data-action="sb-remove-member">ដកចេញពីហាង'));
+        K.answers.confirm.push(false);
+        await C.sbRemoveMember(removeTenant, 'remove_staff');
+        ok('បោះបង់ confirm ➜ សមាជិកនៅដដែល', (await c.query('select 1 from public.tenant_members where user_id=$1', [removeUsers[2].uid])).rowCount === 1);
+        await C.sbRemoveMember(removeTenant, 'remove_staff');
+        const seqAfterRemove = (await c.query('select seq from public.zoe_tenant_state where tenant_id=$1', [removeTenant])).rows[0].seq;
+        ok('ដក ➜ refresh បញ្ជី · លុប reset codes · seq កើន', !C.sbMemberCache.some((m) => m.username === 'remove_staff')
+            && (await c.query('select 1 from public.member_reset_codes where user_id=$1', [removeUsers[2].uid])).rowCount === 0 && Number(seqAfterRemove) > Number(seqBeforeRemove));
+        const removedRead = await memberRequest(removeUsers[2], 'zoe_read', { p_root: 'zoew_barcode_registry' });
+        ok('session ដែលដក ➜ request បន្ទាប់ 401', removedRead.status === 401, removedRead);
+        const removedWithoutSession = await H.as(c, { role: 'authenticated', sub: removeUsers[2].uid }, 'select public.zoe_read($1,null)', ['zoew_barcode_registry']);
+        ok('គ្មាន membership ➜ អានទិន្នន័យហាងមិនបាន ទោះគ្មាន session claim', removedWithoutSession.error?.message === 'forbidden', removedWithoutSession);
+        const unaffected = await memberRequest(removeUsers[0], 'zoe_read', { p_root: 'zoew_barcode_registry' });
+        ok('សមាជិកផ្សេងអានបានដដែល', unaffected.status === 200, unaffected);
+        const removeRace = await Promise.all(removeUsers.slice(0, 2).map((user) => C.sbAdminRpc(C.sbAdminSession, 'admin_remove_member', argsRemove(user.username))));
+        ok('ដកម្ចាស់ពីរនាក់ព្រមគ្នា ➜ មួយជោគជ័យ មួយ last-owner · នៅសល់ម្ចាស់មួយ', removeRace.filter((r) => r.ok).length === 1
+            && removeRace.filter((r) => r.body?.message === 'last-owner').length === 1
+            && (await c.query("select 1 from public.tenant_members where tenant_id=$1 and role='owner'", [removeTenant])).rowCount === 1, removeRace);
+        const unknownRemove = await C.sbAdminRpc(C.sbAdminSession, 'admin_remove_member', argsRemove('remove_staff'));
+        ok('ដកសមាជិកមិនស្គាល់ ➜ member-not-found ផ្ទាល់', unknownRemove.body?.message === 'member-not-found', unknownRemove);
+        const spare = await H.makeAuthUser(c, 'remove_duplicate@users.zoew.invalid');
+        await c.query("insert into public.tenant_members(user_id,tenant_id,username,role) values($1,$2,'remove_duplicate','member')", [spare, removeTenant]);
+        const duplicateRemove = await Promise.all([1, 2].map(() => C.sbAdminRpc(C.sbAdminSession, 'admin_remove_member', argsRemove('remove_duplicate'))));
+        ok('ដកម្នាក់ពីរដងព្រមគ្នា ➜ មួយជោគជ័យ មួយ member-not-found', duplicateRemove.filter((r) => r.ok).length === 1 && duplicateRemove.filter((r) => r.body?.message === 'member-not-found').length === 1, duplicateRemove);
         ok('⛔ គ្មាន console.error ពីផ្លូវខាងលើ', K.log.errors.length === 0, K.log.errors);
     } catch (e) {
         ok('ការវាស់មិនគាំង', false, String(e && e.stack || e));

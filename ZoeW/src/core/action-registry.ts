@@ -4,13 +4,14 @@ import { cancelLogout, confirmLogout, drawerAuthFlow, drawerBiometricFlow, drawe
 import { drawerAppLockFlow, forgetAppLockPin, runAppLockBiometric, submitAppLockForm } from '../features/app-lock';
 import { logoutApp } from '../features/auth';
 import { backToLoginForm, openRegisterForm, openResetPasswordForm, submitRegisterForm, submitResetPasswordForm } from '../features/account';
-import { closeEditBarcodeModal, openEditBarcodePriceModal, openViewListModal, saveEditedBarcodePrice, toggleIndividualBarcodeClose } from '../features/barcode-ops';
+import { closeEditBarcodeModal, openViewListModal, saveEditedBarcodePrice, toggleIndividualBarcodeClose } from '../features/barcode-ops';
 import { runBiometricUnlock } from '../features/biometric';
 import { applySetupLinkFromInput, cancelPinEntryFlow, cancelPinSetupFlow, connectPendingSetupLink, saveFirebaseConfig, selectConfigBackend, toggleConfigManual } from '../features/config';
 import { closeConfigQrScanner, decodeConfigQrImage, openConfigQrScanner } from '../features/config-qr';
 import { fetchCustomerDataTableRows, filterCustomerDataTable } from '../features/customer-table';
 import { closeCameraManually, submitManualBarcode } from '../features/daily-stats';
-import { handleCallAction, openCallMarkModal, openEditModal, saveEditedPhone, setCallMark, toggleCloseStatus } from '../features/entry-ops';
+import { handleCallAction, openCallMarkModal, saveEditedPhone, setCallMark, toggleCloseStatus } from '../features/entry-ops';
+import { requestEditBarcodePrice, requestEditPhone } from '../features/protected-edits';
 import { saveExchangeRate } from '../features/exchange-rate';
 import { exportDataAsCsvForSheets, exportDataAsExcel, exportDataAsPDF } from '../features/export';
 import { openBatchScanModal, startBatchScan, stopBatchScan, updateBatchScanCount } from '../features/batch-scan';
@@ -132,8 +133,8 @@ export const ACTION_REGISTRY: Record<string, (...args: any[]) => any> = Object.f
     openCollectedStatsModal,
     openConfigQrScanner,
     openDailyStatsModal,
-    openEditBarcodePriceModal,
-    openEditModal,
+    requestEditBarcodePrice,
+    requestEditPhone,
     openHealthCheck,
     openLockerPicker,
     openNotifyDrawer,

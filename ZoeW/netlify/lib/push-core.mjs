@@ -20,7 +20,7 @@ export const PUSH_SCHEDULE_HORIZON_MS = 9 * 24 * 60 * 60 * 1000;
 export const PUSH_SUBS_PER_KEY_MAX = 10;
 export const PUSH_SUBS_TOTAL_MAX = 5000;
 export const PUSH_SEND_CONCURRENCY = 16;
-export const PUSH_EXPIRY_CONCURRENCY = 8;
+export const PUSH_EXPIRY_CONCURRENCY = 16;
 export const PUSH_NOTICE_CHUNK = PUSH_SEND_CONCURRENCY;
 export const PUSH_SEND_TIMEOUT_MS = 6000;
 export const PUSH_READ_TIMEOUT_MS = 4000;
@@ -715,7 +715,13 @@ export function createPushService(deps) {
         const zone = zoneParts(startedAt);
         if (zone.hour !== PUSH_EXPIRY_HOUR) return { ok: true, reason: 'not-hour', sent: 0 };
         const listed = await store.list({ prefix: 'sched/' });
-        const scheds = listed && Array.isArray(listed.blobs) ? listed.blobs.map((b) => b.key) : [];
+        const ordered = listed && Array.isArray(listed.blobs) ? listed.blobs.map((b) => b.key).sort() : [];
+        const cursorKey = 'state/expiry-cursor';
+        const savedCursor = await readJson(cursorKey);
+        const after = savedCursor?.data?.day === zone.day && typeof savedCursor.data.after === 'string' ? savedCursor.data.after : '';
+        const start = after ? ordered.findIndex((key) => key > after) : 0;
+        const split = start < 0 ? 0 : start;
+        const scheds = ordered.slice(split).concat(ordered.slice(0, split));
         const total = { ok: true, reason: 'done', sent: 0, gone: 0, fail: 0, skip: 0, cut: 0, keys: 0 };
         const claimOpen = () => elapsedSince(startedAt, now()) <= PUSH_RUN_BUDGET_MS - PUSH_CLAIM_RESERVE_MS;
         async function remind(schedKey) {
@@ -740,16 +746,19 @@ export function createPushService(deps) {
             Object.keys(tally).forEach((k) => { total[k] = (total[k] || 0) + tally[k]; });
         }
         let next = 0;
+        let lastStarted = '';
         async function worker() {
             while (next < scheds.length) {
                 if (!claimOpen()) { total.cut += scheds.length - next; next = scheds.length; return; }
                 const schedKey = scheds[next++];
+                lastStarted = schedKey;
                 try { await remind(schedKey); } catch (_) { total.fail++; }
             }
         }
         const workers = [];
         for (let w = 0; w < Math.min(PUSH_EXPIRY_CONCURRENCY, scheds.length); w++) workers.push(worker());
         await Promise.all(workers);
+        if (lastStarted) await store.setJSON(cursorKey, { day: zone.day, after: lastStarted }, savedCursor ? { onlyIfMatch: savedCursor.etag } : { onlyIfNew: true });
         return total;
     }
 

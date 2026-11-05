@@ -4672,6 +4672,33 @@
     },
     "zto-import/test.js": {
       "policy": "guard-1"
+    },
+    "supabase/migrations/20261105080000_zoe_admin_remove_member.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261105080100_zoe_admin_write_no_replace.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261105080200_zoe_daily_delta_pull.sql": {
+      "policy": "supabase-db"
+    },
+    "ZoeW/src/services/firebase-websocket-observation.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/tests/firebase-websocket-observation.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-daily-delta.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-scale-boundaries.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/features/protected-edits.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/tests/edit-pin-gates.test.tsx": {
+      "policy": "zoew-self-verification"
     }
   }
 }

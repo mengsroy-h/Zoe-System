@@ -147,7 +147,10 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
         state.purged = true;
         if (elapsedSince(Number(safeStoreGet(appLocalStore, purgeStampKey))) < NATIVE_RECEIPT_PURGE_GAP_MS) return;
         safeStoreSet(appLocalStore, purgeStampKey, Date.now());
-        const snapshot = await sdk.get(sdk.ref(db, NATIVE_WRITE_RECEIPTS));
+        const receiptsRef = sdk.ref(db, NATIVE_WRITE_RECEIPTS);
+        const ownReceipts = typeof sdk.query === 'function' && typeof sdk.orderByChild === 'function' && typeof sdk.equalTo === 'function'
+            ? sdk.query(receiptsRef, sdk.orderByChild('uid'), sdk.equalTo(uid)) : receiptsRef;
+        const snapshot = await sdk.get(ownReceipts);
         if (!current()) return;
         const receipts = snapshot && typeof snapshot.val === 'function' ? snapshot.val() : null;
         const cutoff = getServerNow() - NATIVE_RECEIPT_RETENTION_MS - NATIVE_RECEIPT_PURGE_MARGIN_MS;

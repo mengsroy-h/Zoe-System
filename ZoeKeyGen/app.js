@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.32';
+const APP_VERSION = '2.24.33';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -3429,6 +3429,7 @@ const SB_ADMIN_ERROR_TEXT = {
     'tenant-changed': 'ហាងនេះត្រូវបានកែពីឧបករណ៍ផ្សេង ឬសំណើមុនបានសម្រេចរួច — បញ្ជីត្រូវបានធ្វើបច្ចុប្បន្នភាព សូមពិនិត្យថ្ងៃផុតកំណត់មុនពន្យារម្តងទៀត!',
     'extend-invalid': 'ចំនួនថ្ងៃពន្យារមិនត្រឹមត្រូវ!',
     'member-not-found': 'រកឈ្មោះគណនីនេះមិនឃើញ!',
+    'last-owner': 'មិនអាចដកម្ចាស់ចុងក្រោយបានទេ — សូមបន្ថែមម្ចាស់ហាងម្នាក់ទៀតសិន!',
     'invite-invalid': 'ការកំណត់កូដអញ្ជើញមិនត្រឹមត្រូវ!',
     'reset-invalid': 'ការកំណត់កូដប្តូរពាក្យសម្ងាត់មិនត្រឹមត្រូវ!',
     'forbidden': 'គណនីនេះមិនមែន Admin របស់ Supabase ទេ (តារាង platform_admins)!'
@@ -3796,7 +3797,8 @@ function renderSbTenantList() {
     body.innerHTML = sbTenantCache.map((row) => {
         const sbStatusHtml = badges[sbTenantState(row)];
         const sbMembersHtml = sbMemberReadFailed ? '<span class="sb-member">⚠️ អានបញ្ជីគណនីមិនបាន</span>' : (sbMemberCache.filter((m) => m.tenant_id === row.id)
-            .map((m) => (m.role === 'owner' ? '<span class="sb-member sb-owner" title="ម្ចាស់ហាង">' : '<span class="sb-member">') + escapeHtml(m.username) + '</span>').join('') || '-');
+            .map((m) => (m.role === 'owner' ? '<span class="sb-member sb-owner" title="ម្ចាស់ហាង">' : '<span class="sb-member">') + escapeHtml(m.username) + '</span>'
+                + '<button class="btn-mini" data-tenant-id="' + escapeHtml(row.id) + '" data-username="' + escapeHtml(m.username) + '" data-action="sb-remove-member">ដកចេញពីហាង</button>').join('') || '-');
         const sbDevicesCell = sbDevicesHtml(row.id);
         const until = Date.parse(String(row.expires_at || ''));
         const untilText = isFinite(until) ? new Date(until).toLocaleDateString('km-KH') : '-';
@@ -3981,6 +3983,28 @@ async function sbIssueResetCode() {
             if (box) box.classList.remove('hidden');
         } catch (e) {
             if (sbAdminIsCurrent(session)) alert('ចេញកូដមិនបាន — សូមពិនិត្យអ៊ីនធឺណិត!');
+        }
+    });
+}
+
+async function sbRemoveMember(tenantId, username) {
+    const session = sbAdminSession;
+    if (!session || sbAdminBusy || !sbAdminIsCurrent(session) || sbMemberReadFailed) return;
+    const member = sbMemberCache.find((m) => m.tenant_id === tenantId && m.username === username);
+    const tenant = sbTenantCache.find((t) => t.id === tenantId);
+    if (!member || !tenant) return;
+    if (!confirm('ដក «' + username + '» ចេញពីហាង «' + tenant.name + '»?\nគណនីនេះនឹងចាកចេញ ហើយអានទិន្នន័យហាងមិនបានទៀត។')) return;
+    if (!sbAdminIsCurrent(session)) return;
+    return sbAdminWrite(session, async () => {
+        try {
+            const out = await sbAdminRpc(session, 'admin_remove_member', { p_tenant_id: tenantId, p_username: username });
+            if (!sbAdminIsCurrent(session)) return;
+            if (!out.ok) { alert('ដកគណនីមិនបាន ៖ ' + sbAdminErrorText(out)); return; }
+            showToast('✅ បានដក «' + username + '» ចេញពីហាង!');
+            await sbAdminRefresh();
+            if (!sbAdminIsCurrent(session)) return;
+        } catch (e) {
+            if (sbAdminIsCurrent(session)) alert('ដកគណនីមិនបាន — សូមពិនិត្យអ៊ីនធឺណិត ហើយ Refresh បញ្ជីមុនសាកម្តងទៀត!');
         }
     });
 }
@@ -4228,6 +4252,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sbTenantListBody.addEventListener('click', (e) => {
             const btn = e.target.closest('button[data-tenant-id]');
             if (!btn) return;
+            if (btn.dataset.action === 'sb-remove-member') { sbRemoveMember(btn.dataset.tenantId, btn.dataset.username); return; }
             sbTenantAction(btn.dataset.tenantId, btn.dataset.action);
         });
     }

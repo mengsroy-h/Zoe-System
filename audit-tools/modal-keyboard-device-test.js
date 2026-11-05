@@ -1121,6 +1121,9 @@ const SAFE_TOP = function (px) {
                 }
 
                 if (dev.apk || dev.android) {
+                    const retarget = await openApp(browser, port, dev, inits, dev.android ? { userAgent: ANDROID_UA } : null);
+                    const page = retarget.page;
+                    if (!retarget.ready) throw new Error('(ឆ) ' + dev.label + ' ៖ retarget audit bridge');
                     const id = 'phoneModal';
                     await page.setViewportSize({ width: dev.w, height: dev.h });
                     await page.evaluate(() => { window.__kb.set(0); window.__kb.pan(0); });
@@ -1158,6 +1161,7 @@ const SAFE_TOP = function (px) {
                         JSON.stringify(cont));
                     await page.evaluate(() => window.__kb.open(0));
                     await settle(page, 400);
+                    await retarget.ctx.close();
                 }
 
                 if (dev.android) {

@@ -468,6 +468,23 @@ ok('F03 រក្សា owned emulator scope ពេលរត់ម្នាក�
 ok('ពិដានរួម ≤ RUNALL_JOBS (៤) ហើយនៅតែស្របគ្នា (≥ ៣)', maxOverlap(lane.events) <= 4 && maxOverlap(lane.events) >= 3,
     maxOverlap(lane.events));
 
+// Vitest មាន workers ផ្ទាល់ខ្លួន ហើយ build/browser បើកក្នុង child scripts៖ គ្រប់ផ្នែកត្រូវនៅម្នាក់ឯង។
+for (const part of [1, 2, 3]) {
+    const suiteCase = newCase([
+        ['audit-tools/zoew-suite-test.js', { ms: 900 }],
+        ['audit-tools/supabase-money-multishop-test.js', { ms: 900 }]
+    ]);
+    const suiteRun = runHarness(suiteCase,
+        'run "suite" node audit-tools/zoew-suite-test.js --part=' + part + '/3\n'
+        + 'run "money" node audit-tools/supabase-money-multishop-test.js',
+        { RUNALL_JOBS: '2', RUNALL_BROWSER_JOBS: '1' });
+    const ranges = intervals(suiteRun.events);
+    ok('⛔ zoew-suite ' + part + '/3 រត់ម្នាក់ឯង ទោះមាន money checker រង់ចាំ',
+        suiteRun.rc === 0 && ranges.length === 2 && ranges.every((x) => ranges.every((other) => other === x
+            || other.end <= x.start || other.start >= x.end)),
+        { rc: suiteRun.rc, ranges });
+}
+
 // ═══ ៣. ការព្យួរ ➜ FAIL ដែលមានឈ្មោះ · checker ដទៃមិនរង ═══
 console.log('\n=== ៣. checker ព្យួរ ➜ «ព្យួរ» FAIL ក្នុងពិដាន ខណៈ lane ផ្សេងបន្ត ===');
 const c3 = newCase([['audit-tools/fx-hang.js', { hang: true }], ['audit-tools/fx-ok1.js', { ms: 300 }], ['audit-tools/fx-ok2.js', { ms: 300 }]]);
@@ -738,14 +755,17 @@ async function sectionSix() {
         const emu = j.id.indexOf('emu/') === 0 || EMU_EVIDENCE.test(c);
         const browser = src.indexOf(BROWSER_MARK) !== -1;
         const isolatedPurge = j.id === F03.slice('audit-tools/'.length, -3) && c.includes('controlledDeadlinePass(');
+        const isolatedSuite = j.id === 'zoew-suite-test' && /\bcp\.spawnSync\s*\(\s*['"]npm['"]\s*,\s*args\b/.test(c)
+            && c.includes("'--maxWorkers='");
         if (j.lane === 'excl') exclN++;
         if (j.lane === 'emu') emuN++;
         if (j.lane === 'browser') browserN++;
         if (poison && j.lane !== 'excl') wrong.push(j.id + ' ៖ សរសេរ/បោស .tmp-poison-* តែ lane=' + j.lane + ' (ត្រូវ excl)');
         if (isolatedPurge && j.lane !== 'excl') wrong.push(j.id + ' ៖ F03 វាស់ deadline តែ lane=' + j.lane + ' (ត្រូវ excl)');
+        if (isolatedSuite && j.lane !== 'excl') wrong.push(j.id + ' ៖ Vitest workers ក្នុង npm child តែ lane=' + j.lane + ' (ត្រូវ excl)');
         if (emu && j.lane !== 'emu' && j.lane !== 'excl') wrong.push(j.id + ' ៖ ប្រើ emulator តែ lane=' + j.lane + ' (ត្រូវ emu)');
         if (!poison && !emu && browser && j.lane !== 'browser') wrong.push(j.id + ' ៖ បើក browser តែ lane=' + j.lane);
-        if (j.lane === 'excl' && !poison && !isolatedPurge) unjustified.push(j.id + ' ៖ excl គ្មានភស្តុតាង .tmp-poison-* ឬ F03 deadline');
+        if (j.lane === 'excl' && !poison && !isolatedPurge && !isolatedSuite) unjustified.push(j.id + ' ៖ excl គ្មានភស្តុតាង .tmp-poison-* ឬ F03 deadline ឬ Vitest child');
         if (j.lane === 'emu' && !emu) unjustified.push(j.id + ' ៖ emu គ្មានភស្តុតាង emulator');
         if (j.lane === 'browser' && !browser) unjustified.push(j.id + ' ៖ browser គ្មាន ' + BROWSER_MARK);
     }

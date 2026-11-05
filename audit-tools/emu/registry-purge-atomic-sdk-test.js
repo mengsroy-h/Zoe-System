@@ -1251,7 +1251,13 @@ async function retainedAfterLostAck(provider) {
     await provider.settle();
     const entry = originalJournal(provider.row.id);
     if (outcome !== false || !entry || provider.stats.dropped !== 1 || provider.stats.commits !== 1
-        || provider.stats.deniedReads < 1 || provider.recovery().blocked < 1) throw new Error('Actual committed lost ACK did not retain unknown original journal');
+        || provider.stats.deniedReads < 1 || provider.recovery().blocked < 1) {
+        throw new Error('Actual committed lost ACK did not retain unknown original journal: ' + JSON.stringify({
+            outcome, journalRetained: !!entry, executeRequests: provider.stats.executeRequests,
+            dropped: provider.stats.dropped, commits: provider.stats.commits, deniedReads: provider.stats.deniedReads,
+            recovery: provider.recovery(), captureCount: provider.stats.captures.length
+        }));
+    }
     return clone(entry);
 }
 function backendSnapshotEvidence(provider, ops, controlled, after, rejection, initialMoney) {

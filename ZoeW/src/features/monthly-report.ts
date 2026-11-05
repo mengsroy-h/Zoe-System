@@ -75,7 +75,7 @@ export function buildMonthlyReport(ym) {
     const revenueMap = (dataState.dailyRevenueData && typeof dataState.dailyRevenueData === 'object') ? dataState.dailyRevenueData : {};
     const pickupMap = (dataState.dailyPickupData && typeof dataState.dailyPickupData === 'object') ? dataState.dailyPickupData : {};
     const uncollectedMap = uncollectedValueByDate();
-    report.totals.collectedMeasurable = collectedValueIsMeasurable();
+    report.totals.collectedMeasurable = collectedValueIsMeasurable(month);
     report.totals.pickupMeasurable = pickupStatsAreMeasurable();
     const dates = {};
     [revenueMap, pickupMap].forEach((map) => {

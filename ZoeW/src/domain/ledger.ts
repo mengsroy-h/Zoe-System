@@ -280,6 +280,11 @@ export function ledgerTotalsOf(record) {
     };
 }
 
+export function ledgerMonthTrimmed(months, ymKey) {
+    const kept = months && typeof months === 'object' && !Array.isArray(months) ? months : {};
+    return !Object.prototype.hasOwnProperty.call(ledgerLatestMonths({ ...kept, [ymKey]: kept[ymKey] || {} }), ymKey);
+}
+
 export function ledgerLatestMonths(months) {
     const latest = {};
     Object.keys(months).sort().reverse().slice(0, 3).forEach((key) => {
@@ -338,6 +343,10 @@ export function commitLedgerEventStep(bucket, scanDateStr, trashId, at, mode, am
         verdict = null;
         const months = daily ? null : (value && typeof value === 'object' ? value : {});
         const record = daily ? value : (months[ymKey] || null);
+        if (!daily && ledgerMonthTrimmed(months, ymKey)) {
+            verdict = { state: 'already', trimmed: true };
+            return undefined;
+        }
         const decision: any = ledgerEventDecision(daily, mode, record, trashId, at, prior, deductionPrior);
         if (decision.state !== 'apply') {
             verdict = decision;

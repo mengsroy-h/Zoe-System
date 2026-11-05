@@ -350,6 +350,11 @@ export function createSupabaseSdk(makeTransport, env) {
         accountOf(auth) {
             return auth && auth._account ? Object.assign({}, auth._account) : null;
         },
+        async evidenceCandidates(auth, root, before, limit) {
+            if (!auth || !auth.currentUser || !auth._account) return null;
+            const out = await auth._transport.rpc('zoe_evidence_candidates', { p_root: String(root), p_before: Math.floor(Number(before)), p_limit: Math.floor(Number(limit)) }, 20000);
+            return out && Array.isArray(out.docs) ? out.docs : null;
+        },
         async noteDevice(auth, meta) {
             if (!auth || !auth.currentUser || !auth._account || !meta || !meta.serial) return false;
             await auth._transport.rpc('note_my_device', { p_serial: String(meta.serial), p_model: String(meta.model || ''), p_platform: String(meta.platform || '') }, 20000);

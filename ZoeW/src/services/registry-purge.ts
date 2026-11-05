@@ -3,7 +3,7 @@ import { liveShopScope } from '../core/shop-scope';
 import { getFormattedDate } from '../core/timezone';
 import { canonicalBarcodeRegistryKey } from '../domain/barcode-key';
 import { barcodeEntriesOf } from '../domain/barcode';
-import { ledgerDedOf } from '../domain/ledger';
+import { ledgerDedOf, ledgerMonthTrimmed } from '../domain/ledger';
 import { REGISTRY_RELEASES_ROOT, registryPurgeReceiptMatches, slotRegistryPurgeIntent, type RegistryPurgeReceipt } from '../domain/registry-purge-proof';
 import { TRASH_CONSUMPTIONS_ROOT, purgeCertificateOf, trashConsumptionOf, trashGenerationOf, trashSourceUnconsumed } from '../domain/trash-generation';
 import { SCAN_OPERATIONS_ROOT, scanOperationValid, scanRegistryOwned } from '../domain/scan-protocol';
@@ -54,8 +54,10 @@ async function deductionSettled(source, sourceId: string, read: (path: string) =
         || barcodeEntriesOf(source.barcodes).every(({ barcode }) => barcode?.isDeducted === true)) return true;
     const day = source.scanDate || getFormattedDate(source.deletedAt);
     if (typeof day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return false;
-    const records = await Promise.all([read('zoew_daily_revenue_cod_dod/' + day), read('zoew_monthly_revenue_cod_dod/' + day.slice(0, 7))]);
-    return records.every(record => { const entry = ledgerDedOf(record, sourceId); return !!entry && entry.at === source.deletedAt && !entry.back; });
+    const [dayRecord, months] = await Promise.all([read('zoew_daily_revenue_cod_dod/' + day), read('zoew_monthly_revenue_cod_dod')]);
+    const landed = record => { const entry = ledgerDedOf(record, sourceId); return !!entry && entry.at === source.deletedAt && !entry.back; };
+    const month = day.slice(0, 7);
+    return landed(dayRecord) && (ledgerMonthTrimmed(months, month) || landed(months && typeof months === 'object' ? months[month] : null));
 }
 
 export async function purgeTrashWithRegistry(source, isCurrent = () => true): Promise<boolean | null> {

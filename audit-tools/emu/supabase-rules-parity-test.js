@@ -457,6 +457,55 @@ async function trashModeCases(realRules, compileRules, rulesSql) {
     await sc.drop();
 }
 
+// ⛔ អាយុ root ភស្តុតាង ៖ ការលុបកំណត់ត្រាចាស់ជាង ៦០ ថ្ងៃ មានតែពេលគ្មានទិន្នន័យរស់ណាយោងវា (registry · scan_pending · ធុងសំរាម · history ·
+//    restore finalization) ➜ verdict ដូចគ្នាទាំង RTDB/Postgres ហើយការបដិសេធទុកកំណត់ត្រាដដែល
+async function evidenceRetentionCases(realRules, compileRules, rulesSql) {
+    console.log('\n── អាយុ root ភស្តុតាង (scan operation · registry release · trash consumption) ៖ លុបតែកំណត់ត្រាចាស់ដែលគ្មានអ្វីយោង ──');
+    await pgSetRules(realRules, compileRules, rulesSql);
+    const sc = makeScenario('evidence-retention');
+    await sc.loadRules(realRules);
+    const now = Date.now(), old = now - 61 * 86400000, young = now - 59 * 86400000;
+    const op = (id, phase, birth, key = 'ZTREG1') => ({ v: 2, id, actorUid: 'uid-old', phase, birth, registryKey: key, code: key });
+    const release = (id, deletedAt, trashId = 'trash_old', key = 'ZTREG1') => ({ v: 1, id, kind: 'scan', deletedAt, trashId, registryKey: key, releasedBy: 'uid-old' });
+    const consumption = (sourceId, deletedAt) => ({ v: 1, sourceId, generation: 1, kind: 'purge', actorUid: 'uid-old', scope: 's', deletedAt, rowBirth: 1 });
+    const write = policyWriter(sc, 'evidence-retention', 'អាយុភស្តុតាង', 'កំណត់ត្រា និងទិន្នន័យទាំងអស់នៅដដែលទាំង backend ២');
+    const scanId = 'scan_' + 'a'.repeat(32);
+    const trial = async (label, seed, location, deny) => {
+        await both(sc, 'owner', 'SNAP', '', seed);
+        await write('PUT', location, null, deny, label);
+    };
+    await trial('scan operation committed ចាស់ · registry មិនជារបស់វា ➜ លុបបាន', { zoew_scan_operations: { [scanId]: op(scanId, 'committed', old) } }, 'zoew_scan_operations/' + scanId, false);
+    await trial('scan operation cancelled ចាស់ ➜ លុបបាន', { zoew_scan_operations: { [scanId]: op(scanId, 'cancelled', old) } }, 'zoew_scan_operations/' + scanId, false);
+    await trial('scan operation committed ថ្មីជាង ៦០ ថ្ងៃ ➜ បដិសេធ', { zoew_scan_operations: { [scanId]: op(scanId, 'committed', young) } }, 'zoew_scan_operations/' + scanId, true);
+    await trial('scan operation prepared ចាស់ ➜ បដិសេធ', { zoew_scan_operations: { [scanId]: op(scanId, 'prepared', old) } }, 'zoew_scan_operations/' + scanId, true);
+    await trial('scan operation admitted ចាស់ ➜ បដិសេធ', { zoew_scan_operations: { [scanId]: op(scanId, 'admitted', old) } }, 'zoew_scan_operations/' + scanId, true);
+    await trial('scan operation ចាស់ ដែល registry នៅជារបស់វា ➜ បដិសេធ', { zoew_scan_operations: { [scanId]: op(scanId, 'committed', old) },
+        zoew_barcode_registry: { ZTREG1: { v: 2, intent: scanId, actorUid: 'uid-old', birth: old } } }, 'zoew_scan_operations/' + scanId, true);
+    await trial('scan operation ចាស់ ដែលមាន scan_pending ➜ បដិសេធ', { zoew_scan_operations: { [scanId]: op(scanId, 'cancelled', old) },
+        zoew_scan_pending: { [scanId]: 'uid-old' } }, 'zoew_scan_operations/' + scanId, true);
+    await trial('scan operation ចាស់ ដែល registry ជារបស់ការស្កេនផ្សេង ➜ លុបបាន', { zoew_scan_operations: { [scanId]: op(scanId, 'committed', old) },
+        zoew_barcode_registry: { ZTREG1: { v: 2, intent: 'scan_' + 'b'.repeat(32), actorUid: 'uid-new', birth: now } } }, 'zoew_scan_operations/' + scanId, false);
+    await trial('registry release ចាស់ · ធុងសំរាមលែងមាន ➜ លុបបាន', { zoew_registry_releases: { [scanId]: release(scanId, old) } }, 'zoew_registry_releases/' + scanId, false);
+    await trial('registry release ថ្មីជាង ៦០ ថ្ងៃ ➜ បដិសេធ', { zoew_registry_releases: { [scanId]: release(scanId, young) } }, 'zoew_registry_releases/' + scanId, true);
+    await trial('registry release ចាស់ ដែលធុងសំរាមនៅ ➜ បដិសេធ', { zoew_registry_releases: { [scanId]: release(scanId, old) },
+        zoew_recently_deleted_cod_dod: { trash_old: { id: 'trash_old', deletedAt: old } } }, 'zoew_registry_releases/' + scanId, true);
+    await trial('registry release ចាស់ ដែល registry នៅជារបស់ intent នោះ ➜ បដិសេធ', { zoew_registry_releases: { [scanId]: release(scanId, old) },
+        zoew_barcode_registry: { ZTREG1: { v: 2, intent: scanId, actorUid: 'uid-old', birth: old } } }, 'zoew_registry_releases/' + scanId, true);
+    await trial('trash consumption ចាស់ · ធុងសំរាម និង history លែងមាន ➜ លុបបាន', { zoew_trash_consumptions: { trash_old: consumption('trash_old', old) } }, 'zoew_trash_consumptions/trash_old', false);
+    await trial('trash consumption ថ្មីជាង ៦០ ថ្ងៃ ➜ បដិសេធ', { zoew_trash_consumptions: { trash_old: consumption('trash_old', young) } }, 'zoew_trash_consumptions/trash_old', true);
+    await trial('trash consumption ចាស់ ដែល history នៅ (restore) ➜ បដិសេធ', { zoew_trash_consumptions: { trash_old: consumption('trash_old', old) },
+        zoew_scan_history_cod_dod: { trash_old: { id: 'trash_old', phone: '012', barcodes: [{ code: 'ZT1' }] } } }, 'zoew_trash_consumptions/trash_old', true);
+    await trial('trash consumption ចាស់ ដែលធុងសំរាមនៅ ➜ បដិសេធ', { zoew_trash_consumptions: { trash_old: consumption('trash_old', old) },
+        zoew_recently_deleted_cod_dod: { trash_old: { id: 'trash_old', deletedAt: old } } }, 'zoew_trash_consumptions/trash_old', true);
+    await trial('trash consumption ចាស់ ដែលមាន restore finalization ➜ បដិសេធ', { zoew_trash_consumptions: { trash_old: consumption('trash_old', old) },
+        zoew_restore_finalizations: { trash_old: { targetId: 'trash_old' } } }, 'zoew_trash_consumptions/trash_old', true);
+    await both(sc, 'owner', 'SNAP', '', { zoew_scan_operations: { [scanId]: op(scanId, 'committed', old) }, zoew_registry_releases: { [scanId]: release(scanId, old) },
+        zoew_trash_consumptions: { trash_old: consumption('trash_old', old) } });
+    await write('PATCH', '', { ['zoew_scan_operations/' + scanId]: null, ['zoew_registry_releases/' + scanId]: null, ['zoew_trash_consumptions/trash_old']: null }, false,
+        'PATCH ច្រើនផ្លូវលុប root ភស្តុតាងទាំង ៣ ដែលចាស់ ➜ ទទួល');
+    await sc.drop();
+}
+
 function generationConsumption(source, kind, token, targetId) {
     return { v: 1, sourceId: source.id, generation: source.trashGeneration ?? 0, kind, actorUid: member.sub, scope: 'audit-scope', deletedAt: source.deletedAt, rowBirth: source.createdAt ?? 0,
         ...(kind === 'restore' ? { token, targetId } : {}) };
@@ -1217,6 +1266,7 @@ function capture() {
         await oldAppTrashCases(realRules, compileRules, rulesSql);
         await monthlyDeductionCases(realRules, compileRules, rulesSql);
         await trashModeCases(realRules, compileRules, rulesSql);
+        await evidenceRetentionCases(realRules, compileRules, rulesSql);
         await pickupProtocolCases(realRules, compileRules, rulesSql);
         await slotPurgeCases(realRules, compileRules, rulesSql, 'source');
         const artifactText = fs.readFileSync(path.join(ROOT, 'firebase-database.rules.min.json'), 'utf8');

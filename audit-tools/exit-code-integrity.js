@@ -225,7 +225,10 @@ function exitDecisionOffenders(ast) {
 }
 const lateLowering = [];
 let scannedDecision = 0;
-for (const rel of checkers) {
+// ⛔ driver `*-test.cjs` (រត់ពី vitest pg ៖ `supabase-*.pg.test.ts`) ក៏ត្រូវតាមកិច្ចសន្យា exit ដូច checker ដែរ ➜ ស្កេនផង
+const cjsDrivers = fs.readdirSync(TOOLS).filter((f) => /-test\.cjs$/.test(f) && !f.startsWith('.tmp-poison-')).sort();
+ok('driver .cjs ត្រូវបានស្កេនកិច្ចសន្យា exit (≥ ៤)', cjsDrivers.length >= 4, cjsDrivers);
+for (const rel of checkers.concat(cjsDrivers)) {
     let src;
     try { src = fs.readFileSync(path.join(TOOLS, rel), 'utf8'); } catch (e) { continue; }
     let ast;
@@ -250,7 +253,10 @@ const POISON = [
     [/function ok\(cond, label, got\) \{/, 'function ok(cond, label, got) { cond = false;'],
     [/function ok\(label, condition, detail\) \{/, 'function ok(label, condition, detail) { condition = false;'],
     [/function ok\(label, cond, got\) \{/, 'function ok(label, cond, got) { cond = false;'],
-    [/const ok = \(n, c, d\) => results\.push\(\[n, !!c, d\]\);/, 'const ok = (n, c, d) => results.push([n, false, d]);']
+    [/const ok = \(n, c, d\) => results\.push\(\[n, !!c, d\]\);/, 'const ok = (n, c, d) => results.push([n, false, d]);'],
+    [/function check\(row, label, condition\) \{/, 'function check(row, label, condition) { condition = false;'],
+    [/async function check\(label, tree, location, body, allow, method = 'PATCH', actor = uid, interleave = null\) \{/,
+        "async function check(label, tree, location, body, allow, method = 'PATCH', actor = uid, interleave = null) { allow = !allow;"]
 ];
 
 function poisonSource(src) {

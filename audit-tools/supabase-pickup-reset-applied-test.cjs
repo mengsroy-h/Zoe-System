@@ -452,7 +452,7 @@ async function main() {
                 && files.length >= 47
                 && files.length >= 50 && nativeRules > '20261101222215_zoe_rules.sql'
                 && composition.canonicalGeneratedFresh && composition.installedCanonicalEqual
-                && composition.f03LegacyPolicyHash === '024b8de7d13968240170810b573cdf47b7b8328f95eee6966bdffa6b213ed772'
+                && composition.f03LegacyPolicyHash === '9dacfafd574466ed623c36eaf3b595b182abae648ded6428ef4f2bec5f343e33'
                 && composition.f09DailyPolicyHash === 'c3280874e9c28bb0b01a97b7c82d892c88ce434428fcc4b9142607e1087d2049', composition);
             const composedFixture = async (basis, label) => {
                 const name = 'compose_' + (++serial), actor = await H.makeAuthUser(c, name + '@u.zoe.test');

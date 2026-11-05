@@ -66,7 +66,7 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
         return result;
     };
     const receiptMatches = (receipt, row) => !!receipt && receipt.uid === uid && receipt.hash === row.hash;
-    const purgeLike = (ops) => ops.some(op => op?.p?.[0] === REGISTRY_RELEASES_ROOT
+    const purgeLike = (ops) => ops.some(op => op?.p?.[0] === REGISTRY_RELEASES_ROOT && op.v !== null
         || op?.p?.[0] === 'zoew_trash_consumptions' && op?.v?.kind === 'purge');
     const purgeRefused = (code) => Object.assign(new Error('Purge requires complete durable evidence'), { code, txOutcome: 'not-applied', noRetry: true, nativeUnsent: true });
     const sendAtomic = async (row) => {

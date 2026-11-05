@@ -276,6 +276,50 @@ async function body(c, rec, extra) {
     rec('housekeeping (seq % 64) ៖ tombstone ចាស់ជាង ៧ ថ្ងៃលុប · purged_seq កើន', hk.seq === 64 && tomb === 0 && Number(st.purged_seq) > 0, { st, tomb, seq: hk.seq });
     const stale = await pull(A.who, 1);
     rec('cursor ចាស់ជាង purged_seq ➜ reset (client មិនបាត់ការលុប)', stale.reset === true, { reset: stale.reset, seq: stale.seq });
+    // ⛔ ការជួសជុល tombstone ចាស់ (migration retro resync) ៖ ជួរដែលលុបក្រៅ App មុន migration tombstone គ្មាន tombstone ➜
+    //    ឧបករណ៍ដែល cursor = head មិនដែលឃើញការលុប ➜ migration បង្កើន seq និង purged_seq ➜ ទាញពេញម្តង ហើយជួរនោះចេញ · ក្រោយមកមិនវិលទាញពេញ
+    const retroBase = await pull(A.who, 0);
+    const retroVictim = retroBase.rows.find((r) => r.r === REG && r.v !== null);
+    const retroVictimBytes = (await c.query('select private.zoe_doc_bytes($1, $2, value) as b from public.zoe_docs where tenant_id = $3 and root = $1 and key = $2', [retroVictim.r, retroVictim.k, A.id])).rows[0].b;
+    await c.query("select set_config('zoe.raw_docs', 'on', false)");
+    try { await c.query('delete from public.zoe_docs where tenant_id = $1 and root = $2 and key = $3', [A.id, retroVictim.r, retroVictim.k]); }
+    finally { await c.query("select set_config('zoe.raw_docs', 'off', false)"); }
+    await c.query('update public.zoe_tenant_state set bytes = bytes - $2 where tenant_id = $1', [A.id, retroVictimBytes]);
+    const unseen = await pull(A.who, retroBase.seq);
+    rec('មុន retro ៖ ការលុបក្រៅ App ដែលគ្មាន tombstone មើលមិនឃើញក្នុង delta (ឧបករណ៍រក្សាជួរចាស់)', unseen.reset === false && !unseen.rows.some((r) => r.k === retroVictim.k), unseen);
+    await c.query(fs.readFileSync(path.join(ROOT, 'supabase', 'migrations', '20261105000000_zoe_tombstone_retro_resync.sql'), 'utf8'));
+    const repaired = await pull(A.who, retroBase.seq);
+    rec('retro resync ៖ cursor ចាស់ ➜ ទាញពេញម្តង · ជួរដែលលុបក្រៅ App មិននៅក្នុងទិដ្ឋភាព', repaired.reset === true && repaired.rows.length > 0
+        && !repaired.rows.some((r) => r.r === retroVictim.r && r.k === retroVictim.k), { reset: repaired.reset, rows: repaired.rows.length });
+    const settledPull = await pull(A.who, repaired.seq);
+    rec('retro resync ៖ ក្រោយទាញពេញ cursor = head ➜ delta ធម្មតា (មិនវិលទាញពេញ)', settledPull.reset === false, settledPull);
+
+    // ⛔ zoe_evidence_candidates ៖ បញ្ជីកំណត់ត្រាភស្តុតាងចាស់ (អានតែប៉ុណ្ណោះ · ហាងខ្លួនឯង · តម្រៀបតាមអាយុ · មានព្រំដែន) ➜ ការលុបនៅតាម rules ពិត
+    const EV = 'zoew_scan_operations';
+    const evId = (ch) => 'scan_' + ch.repeat(32);
+    const evOp = (id, birth) => ({ v: 2, id, actorUid: A.who.sub, phase: 'committed', birth, registryKey: 'ZEV' + id.slice(5, 8), code: 'ZEV' + id.slice(5, 8) });
+    const evNow = Date.now();
+    await admin(A.id, [{ k: 'set', p: [EV, evId('1')], v: evOp(evId('1'), 1000) }, { k: 'set', p: [EV, evId('2')], v: evOp(evId('2'), 500) },
+        { k: 'set', p: [EV, evId('3')], v: evOp(evId('3'), evNow) }]);
+    await admin(B.id, [{ k: 'set', p: [EV, evId('4')], v: evOp(evId('4'), 100) }]);
+    const candidates = async (who, root, before, limit) => {
+        const r = await as(c, who, 'select public.zoe_evidence_candidates($1, $2, $3) as r', [root, before, limit]);
+        return r.rows ? r.rows[0].r : r;
+    };
+    const evOne = await candidates(A.who, EV, evNow - 1000, 1);
+    const evAll = await candidates(A.who, EV, evNow - 1000, 50);
+    rec('zoe_evidence_candidates ៖ តែកំណត់ត្រាចាស់ជាង before · តម្រៀបតាមអាយុ · limit', Array.isArray(evOne.docs) && evOne.docs.map((d) => d.k).join() === evId('2')
+        && evAll.docs.map((d) => d.k).join() === [evId('2'), evId('1')].join(), { one: evOne.docs, all: evAll.docs && evAll.docs.map((d) => d.k) });
+    const evB = await candidates(B.who, EV, evNow - 1000, 50);
+    rec('zoe_evidence_candidates ៖ ហាងនីមួយៗឃើញតែកំណត់ត្រារបស់ខ្លួន', evB.docs.map((d) => d.k).join() === evId('4'), evB.docs);
+    rec('zoe_evidence_candidates ៖ root ក្រៅបញ្ជី · limit លើស ២០០ ➜ បដិសេធ', !!(await candidates(A.who, REG, evNow, 10)).error && !!(await candidates(A.who, EV, evNow, 201)).error);
+    rec('zoe_evidence_candidates ៖ anon ➜ បដិសេធ', denied(await as(c, ANON, 'select public.zoe_evidence_candidates($1, $2, $3)', [EV, evNow, 10])));
+    const evDel = await write(A.who, [{ k: 'set', p: [EV, evId('2')], v: null }]);
+    const evYoung = await write(A.who, [{ k: 'set', p: [EV, evId('3')], v: null }]);
+    rec('rules ៖ លុបកំណត់ត្រាចាស់ (committed · គ្មាន registry/scan_pending) បាន · កំណត់ត្រាថ្មីបដិសេធ', !!evDel && evDel.ok === true && !!evYoung && !evYoung.ok
+        && (docOf(await read(A.who, EV, evId('2')), EV, evId('2')) || {}).v === null && !!(docOf(await read(A.who, EV, evId('3')), EV, evId('3')) || {}).v, { evDel, evYoung });
+    await admin(A.id, [{ k: 'set', p: [EV, evId('1')], v: null }, { k: 'set', p: [EV, evId('3')], v: null }]);
+    await admin(B.id, [{ k: 'set', p: [EV, evId('4')], v: null }]);
 
     const pullFull = async (who, since, limit, fullHead) => {
         const r = await as(c, who, 'select public.zoe_pull($1, $2, $3) as r', [since, limit, fullHead]);

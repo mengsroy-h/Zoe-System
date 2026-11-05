@@ -389,6 +389,21 @@ function testSelectedProducerControls(){
  assert.equal(fs.existsSync(script),true,'selected producer control missing');const actual=run(selectedRoot);
  assert.equal(valid(actual),true,'selected producer controls failed, timed out or output invalid');
 }
+// ⛔ controls ដែល repository-file-coverage កត់ hash ត្រូវរត់ពិតដែរ (hash បញ្ជាក់តែ bytes) ➜ control នីមួយៗរបស់ tree ដែលជ្រើស ត្រូវចេញ 0
+//    ហើយបោះពុម្ពបន្ទាត់ PASS ចុងក្រោយ · control ដែលចេញ 0 ដោយគ្មាន PASS មិនត្រូវរាប់ថាឆ្លង
+const RETAINED_CONTROLS=['import-paired-base-root-controls.cjs','import-paired-diagnostic-controls.cjs','import-paired-diagnostic-integration-controls.cjs',
+ 'import-paired-gate-controls.cjs','import-paired-native-cleanup-controls.cjs'];
+function testRetainedControls(){
+ const cp=require('child_process');
+ const run=(root,name)=>cp.spawnSync(process.execPath,[path.join(root,'audit-tools','emu',name)],{cwd:path.join(root,'audit-tools','emu'),env:{...process.env,IMPORTPAIRED_APP_DIR:root,ZOE_REPO_ROOT:root},encoding:'utf8',timeout:120000,maxBuffer:1<<20});
+ const passed=result=>result?.status===0&&!result.signal&&/(^|\n)(PASS\b[^\n]*|\{"status":"PASS"[^\n]*)\n?$/.test(String(result.stdout||'').trimEnd()+'\n')&&!/^\s*FAIL\b/m.test(String(result.stdout||'')+String(result.stderr||''));
+ const wrong=fs.mkdtempSync(path.join(os.tmpdir(),'zoe-wrong-control-'));fs.mkdirSync(path.join(wrong,'audit-tools','emu'),{recursive:true});
+ fs.writeFileSync(path.join(wrong,'audit-tools','emu','silent.cjs'),'process.exit(0);\n');fs.writeFileSync(path.join(wrong,'audit-tools','emu','failing.cjs'),"console.log('PASS');process.exitCode=1;\n");
+ assert.equal(passed(run(wrong,'silent.cjs')),false,'control ដែលចេញ 0 ដោយគ្មាន PASS មិនត្រូវរាប់ថាឆ្លង');
+ assert.equal(passed(run(wrong,'failing.cjs')),false,'control ដែលចេញ 1 មិនត្រូវរាប់ថាឆ្លង');
+ for(const name of RETAINED_CONTROLS){assert.equal(fs.existsSync(path.join(selectedRoot,'audit-tools','emu',name)),true,'control បាត់ ៖ '+name);
+  const result=run(selectedRoot,name);assert.equal(passed(result),true,'control '+name+' ធ្លាក់ ឬផុតពេល ៖ status='+result.status+' '+String(result.stdout||'').slice(-200)+String(result.stderr||'').slice(-200));}
+}
 async function testNativeOnly(){
  const id=runner.PROFILES[0];let count=0;
  function nativeResult(){const v=childResult(id);v.schema=1;v.providerSelection='native';v.caseSelection=id;v.crossProviderParity='UNRUN_SINGLE_PROVIDER';v.status='NATIVE_ONLY_CORE';v.unrunProviders=['sql'];v.caseLedger=[{provider:'native',id,status:'PASS'}];v.cases=v.cases.filter(x=>x.provider==='native');v.providerEvidence=[v.providerEvidence[0]];v.providerEvidence[0].provenance={ruleLoads:1,ruleSha256:HASH,ns:'paired-import-123-aaaaaaaa'};return v;}
@@ -495,13 +510,14 @@ async function main() {
     }
     await testFailureDiagnostics();
     testSelectedProducerControls();
+    testRetainedControls();
     await testNativeOnly();
     await testActualNativeCliContract();
     await testRealWrapperEntry();
     await testRealWrapperEntry(true);
     await testActualCliOwnerContract();
     await runSnapshotControls();
-    console.log(JSON.stringify({ status: 'PASS', cases: 48, scope: 'synthetic runner and actual owner/CLI entry with fake adapters; no backend, network or real process signals' }));
+    console.log(JSON.stringify({ status: 'PASS', cases: 49, scope: 'synthetic runner and actual owner/CLI entry with fake adapters; no backend, network or real process signals' }));
     process.exitCode = 0;
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

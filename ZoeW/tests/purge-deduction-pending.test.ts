@@ -97,6 +97,18 @@ beforeEach(() => {
 afterEach(() => { firebaseState.authGeneration++; vi.useRealTimers(); vi.unstubAllGlobals(); delete (window as any).ZoeErrors; });
 
 for (const reason of ['returned', 'remove']) {
+    // A522 «ខែលែងនៅក្នុង ៣ ខែចុងក្រោយ» ៖ root ខែរក្សាតែ ៣ ខែថ្មី ➜ receipt ខែសរសេរមិនបាន ➜ មុនកែ hold ជារៀងរហូត ➜ ខែដែលកាត់ចេញ = ដកតាមថ្ងៃតែប៉ុណ្ណោះ
+    it(reason + ' ៖ ខែរបស់ធាតុលែងនៅក្នុង root ខែ (៣ ខែថ្មីជាង) ➜ ដកតែថ្ងៃម្តង · purge បាន · មិនបង្កើតខែចាស់ឡើងវិញ', async () => {
+        arrange(reason, false);
+        store[M] = { '2026-11': { codDollar: 1, dodDollar: 0, totalCount: 1 }, '2026-12': { codDollar: 2, dodDollar: 0, totalCount: 1 }, '2027-01': { codDollar: 3, dodDollar: 0, totalCount: 1 } };
+        dataState.monthlyRevenueData = clone(store[M]);
+        await runAutomaticDeletedCleanup();
+        expect(totals(at(D + '/' + DAY)), 'ថ្ងៃដកម្តង').toEqual([0, 0, 0]);
+        expect(Object.keys(at(M)).sort(), 'មិនបង្កើតខែ 2026-10 ឡើងវិញ').toEqual(['2026-11', '2026-12', '2027-01']);
+        expect({ copy: at(T + '/source'), purges: purgeWrites }).toEqual({ copy: null, purges: 1 });
+        await runAutomaticDeletedCleanup();
+        expect(totals(at(D + '/' + DAY)), 'ដកតែម្តង').toEqual([0, 0, 0]);
+    });
     it(reason + ' ៖ ផុតរយៈរក្សាទុក គ្មាន flag · គ្មាន receipt · គ្មាន journal នៅឧបករណ៍នេះ ➜ purge ដក keyed event ម្តង រួចលុប copy (A522)', async () => {
         arrange(reason, false);
         await runAutomaticDeletedCleanup();
@@ -195,6 +207,18 @@ for (const reason of ['returned', 'remove']) {
         await resumeCleanupJournalEntry('source');
         expect([totals(at(D + '/' + DAY)), totals(at(M + '/2026-10'))], 'ការដកចុះតែម្តង').toEqual(after);
         expect(at(T + '/source'), 'មិនសរសេរ copy ដែល purge រួចឡើងវិញ').toBeNull();
+        expect(readCleanupJournal().map(entry => entry.trashItem.id), 'journal stale ចេញ ៖ purge consumption នៃ copy ដដែល').toEqual([]);
+    });
+    it(reason + ' ៖ control ៖ consumption របស់ copy ផ្សេង (deletedAt ផ្សេង) ➜ journal នៅដដែល (មិនស្មាន)', async () => {
+        arrange(reason, false);
+        const copy = clone(at(T + '/source'));
+        await runAutomaticDeletedCleanup();
+        expect(at(T + '/source')).toBeNull();
+        const other = { ...copy, deletedAt: copy.deletedAt - 1000 };
+        noteCleanupJournalEntry({ id: 'source', reason: reason === 'returned' ? 'abandon' : 'remove', journalAt: other.deletedAt, stage: 'moved', trashItem: other,
+            actorUid: 'purge-user', revenue: { scanDate: DAY, cod: 7, dod: 2, count: 1 } });
+        await resumeCleanupJournalEntry('source');
+        expect(readCleanupJournal().map(entry => entry.trashItem.id)).toEqual(['source']);
     });
 
     it(reason + ' ៖ ✖️ លុបដោយដៃក៏រង់ចាំដូចគ្នា (គ្មាន receipt ខែ)', async () => {

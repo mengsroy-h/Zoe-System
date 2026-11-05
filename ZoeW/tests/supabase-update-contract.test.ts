@@ -110,6 +110,7 @@ const CALLERS: Record<string, string> = {
     'services/scan-operation.ts#cancelScanOperation': 'BOUNDED ៖ operation cancelled និង pending index ផ្លូវ ២ · បន្ថែម registry null ១ តែពេល own tuple ត្រូវគ្នា ➜ សរុប ≤ ៣ ត្រូវ atomic',
     'services/scan-operation.ts#finalizeScanOperation': 'BOUNDED ៖ operation committed · pending index · row marker · registry ផ្លូវ ៤ + increment ៣ ក្នុងមួយថ្ងៃ/ខែ ២ ➜ សរុប ១០ ត្រូវ atomic មិនបំបែក',
     'services/price-operation.ts#commitPriceOperation': 'BOUNDED ៖ ការកែតម្លៃ (A526) ៖ ជួរ ៦ ផ្លូវ (cod · dod របស់ barcode · cod · dod · price របស់ជួរ · pricePending/phase) + increment COD/DOD ក្នុងថ្ងៃ និងខែ ≤ ៤ ➜ ≤ ១០ ផ្លូវ ត្រូវ atomic (rules ទទួលតែពេលជួរនៅ admitted ➜ ប្រាក់ម្តង)',
+    'services/evidence-retention.ts#retireEvidence': 'IDEMPOTENT ៖ លុបកំណត់ត្រាភស្តុតាងចាស់ (null គ្រប់ផ្លូវ · ≤ EVIDENCE_SWEEP_BATCH) ➜ បំបែកបានដោយគ្មានការផ្លាស់ប្តូរន័យ',
     'services/registry-purge.ts#purgeTrashWithRegistry': 'BOUNDED ៖ source null និង consumption ២ + registry null និង receipt មួយគូក្នុង barcode នីមួយៗ · rowCount = N និង ១ ≤ N ≤ ២៤៩ ➜ ២ + ២N ≤ ៥០០ ផ្លូវ · parser បដិសេធ batch មិនពេញលេញ ឬលើសពិដាន មិនបំបែក',
     'features/clear-history.ts#finalizeClaimedHistoryClear': 'BOUNDED ៖ ផ្លូវ ៣ (finalization · ធុងសំរាម · history) ➜ របងត្រូវ atomic',
     'services/zto-shop-sweep.ts#markZtoShopSweep': 'IDEMPOTENT ៖ { activeAt · completeAt } តម្លៃដាច់ខាត ផ្លូវ ≤ ២',

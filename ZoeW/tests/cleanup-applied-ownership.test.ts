@@ -694,7 +694,7 @@ it.each(['legacy', 'scan'].flatMap(kind => ['copy', 'purge-race', 'purge-termina
         restoreCleanupStorage(interruptedJournal); cleanupJournalLive.clear(); cleanupInFlight.clear();
         dataState.deletedItems = [];
         await resumeCleanupJournalEntry(oldTrashId);
-        expect(readCleanupJournal().some(entry => entry.trashItem.id === oldTrashId)).toBe(true);
+        expect(readCleanupJournal().some(entry => entry.trashItem.id === oldTrashId)).toBe(false);
         expect.soft(trashCopiesOf('A'), JSON.stringify({ trash: getAt(TRASH), receipts: getAt('zoew_registry_releases'), journal: readCleanupJournal() })).toHaveLength(0);
         dataState.deletedItems = Object.values(getAt(TRASH) || {});
         dataState.scanHistory = Object.values(getAt(HISTORY) || {});

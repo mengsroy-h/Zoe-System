@@ -4,8 +4,10 @@
             setPersistence, browserLocalPersistence, browserSessionPersistence, getIdTokenResult
         } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
         import {
-            getDatabase, ref, onValue, off, get, set, update, goOnline, goOffline, runTransaction
+            getDatabase, ref, onValue, off, get, set, update, goOnline, goOffline, runTransaction, forceWebSockets
         } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
+
+        forceWebSockets();
 
         window.firebaseSDK = {
             initializeApp, getApps, deleteApp,

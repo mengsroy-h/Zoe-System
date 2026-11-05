@@ -374,10 +374,12 @@ export function collectedValueOf(ledgerCod, ledgerDod, uncollected) {
     return { cod: cod, dod: dod, total: Math.round((cod + dod) * 100) / 100 };
 }
 
-export function collectedValueIsMeasurable() {
+export function collectedValueIsMeasurable(scope = '') {
     if (![dataState.scanHistory, dataState.deletedItems].every(list =>
         Array.isArray(list) && list.every(item => item !== null && typeof item === 'object' && !Array.isArray(item)))) return false;
-    return !dataState.scanHistory.some(item => scanPendingSlot(item) === null || item.pricePending && rowOperationActive(item))
+    const prefix = String(scope);
+    return !dataState.scanHistory.some(item => (scanPendingSlot(item) === null || item.pricePending && rowOperationActive(item))
+            && !(typeof item.scanDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(item.scanDate) && !item.scanDate.startsWith(prefix)))
         && !dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY)
         && !dbListenerViewIsStale(DB_LISTENER_KEY_DELETED)
         && !dbListenerViewIsStale(DB_LISTENER_KEY_DAILY_REVENUE);

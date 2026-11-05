@@ -318,6 +318,7 @@ function buildContext() {
         attachZtoSweepLaneListener: () => false,
         runAutomaticCollectedCleanup: () => {},
         resumePickupIntents: () => {},
+        runEvidenceRetentionSweep: () => {},
         runAutomaticCleanupRules: () => { log.cleanupRuns++; },
         CLEANUP_SWEEP_BATCH: 8,
         ZoeErrors: { capture: (e) => log.captures.push(e) }

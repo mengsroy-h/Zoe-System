@@ -2374,12 +2374,12 @@ function firstBody(requests) {
     const ENTRY_NAMES = ['addOrUpdateEntry', 'barcodeRegistryKey', 'getZoneDateKey', 'getFormattedClockTime',
         'appZoneParts', 'appZoneWallClockToMillis', 'ztoScanStampMillis',
         'getFormattedDate', 'normalizeBarcodesOf', 'barcodeEntriesOf',
-        'recalcItemMoneyFromBarcodes', 'applyBarcodeCloseState', 'ledgerDeltaCompanion'];
+        'recalcItemMoneyFromBarcodes', 'applyBarcodeCloseState', 'ledgerDeltaCompanion', 'inScanSaveLane'];
     const entryParts = ENTRY_NAMES.map((name) => fnOrStub(APP_SRC, name));
     const entryMissingNames = ENTRY_NAMES.filter((name) => !extractFn(APP_SRC, name));
     ok('ជាន់អប្បបរមា ៖ ស្រង់ `addOrUpdateEntry` និងផ្លូវនាឡិកាពិតបាន',
         entryMissingNames.length === 0, entryMissingNames);
-    const ENTRY_CONST_NAMES = ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES'];
+    const ENTRY_CONST_NAMES = ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'SCAN_SAVE_LANE_WAIT_MS', 'scanSaveLanes'];
     const entryConsts = ENTRY_CONST_NAMES.map((name) => constOrStub(APP_SRC, name));
     ok('ជាន់អប្បបរមា ៖ ថេរតំបន់ម៉ោងអានចេញពីកូដពិត',
         ENTRY_CONST_NAMES.every((name) => !!extractConst(APP_SRC, name)), entryConsts);

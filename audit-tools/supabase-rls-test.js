@@ -73,6 +73,7 @@ const EXPECT_PUBLIC_EXEC = {
     zoe_pickup_reset_execute_v1: ['authenticated'],
     zoe_pickup_reset_status_v1: ['authenticated'],
     zoe_read: ['authenticated'],
+    zoe_evidence_candidates: ['authenticated'],
     zoe_pull: ['authenticated'],
     zoe_now: ['authenticated'],
     zoe_admin_write: ['service_role'],

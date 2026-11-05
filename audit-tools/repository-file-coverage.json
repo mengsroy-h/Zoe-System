@@ -709,6 +709,14 @@
       "evidence": "តេស្ត runner ពិតជាមួយ synthetic owner, output និង snapshot adapters; វាស់ failure, ownership និង projection លើករណីដែលមាន assertion។",
       "limitation": "Adapters និងទិន្នន័យជាក្លែង; មិនមែនភស្តុតាងថា native emulator, PostgreSQL ឬ provider parity បានឆ្លងទេ។"
     },
+    "import-paired-controls-run": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/import-paired-ci-runner-test.js"
+      ],
+      "evidence": "checker រត់ control នីមួយៗរបស់ tree ដែលជ្រើស ហើយទាមទារ exit 0 និងបន្ទាត់ PASS ចុងក្រោយ · control ដែលចេញ 0 ដោយគ្មាន PASS ឬចេញ 1 ត្រូវបដិសេធ។",
+      "limitation": "Controls ជា synthetic គ្មាន backend ៖ មិនមែនភស្តុតាងថា native emulator, PostgreSQL ឬ provider parity បានឆ្លងទេ។"
+    },
     "runall-exit-guard": {
       "category": "behavior",
       "guards": [
@@ -1978,6 +1986,9 @@
     "ZoeW/src/services/db-listeners.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/services/evidence-retention.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/src/services/firebase-auth-owner.ts": {
       "policy": "zoew-self-verification"
     },
@@ -2306,6 +2317,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/durable-connection-write.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/evidence-retention.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/exchange-rate-backend-switch.test.ts": {
@@ -2890,7 +2904,13 @@
     "ZoeW/tests/revenue-fuzz-fixture-contract.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/rtdb-websocket-only.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/rules-shape-primitive-union.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-background-save.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/scan-camera-session.test.ts": {
@@ -2924,9 +2944,6 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/scan-late-claim-evidence.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/scan-background-save.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/scan-month-coordination.test.ts": {
@@ -3590,31 +3607,25 @@
       "policy": "guard-1"
     },
     "audit-tools/emu/import-paired-base-root-controls.cjs": {
-      "policy": "import-paired-harness-integrity",
-      "sha256": "ed8d5969ff84a4b318b27f632bf1fcf51978c31e44659ef4ec94c7e7718ec4fc"
+      "policy": "import-paired-controls-run"
     },
     "audit-tools/emu/import-paired-ci-runner.js": {
       "policy": "import-paired-runner-synthetic"
     },
     "audit-tools/emu/import-paired-diagnostic-controls.cjs": {
-      "policy": "import-paired-harness-integrity",
-      "sha256": "8f4400cfc6e20a3fc4b96a0872176b74f35b1b913ff93fd8d1bb28a02dc0147a"
+      "policy": "import-paired-controls-run"
     },
     "audit-tools/emu/import-paired-diagnostic-integration-controls.cjs": {
-      "policy": "import-paired-harness-integrity",
-      "sha256": "a1a96ffbd3ba387915a22c617efb172e1d87f0a64bf76c39e0f970a6f8683297"
+      "policy": "import-paired-controls-run"
     },
     "audit-tools/emu/import-paired-evidence-controls.cjs": {
-      "policy": "import-paired-harness-integrity",
-      "sha256": "4c5cc258c8b3f63cb0a6dd6b4a786cabffa5ba40de59c5d0c9b07eb72a34b4fb"
+      "policy": "import-paired-controls-run"
     },
     "audit-tools/emu/import-paired-gate-controls.cjs": {
-      "policy": "import-paired-harness-integrity",
-      "sha256": "cd7d3e3b53c13d02bc8facca8edb1d514b778552a857c6b0c83b6eb8c9a0dfd3"
+      "policy": "import-paired-controls-run"
     },
     "audit-tools/emu/import-paired-native-cleanup-controls.cjs": {
-      "policy": "import-paired-harness-integrity",
-      "sha256": "7ddb3bc9cf7bc283d7d8b2d75a32a7489ecff14da0a753da1b13bd2bea4deaaf"
+      "policy": "import-paired-controls-run"
     },
     "audit-tools/emu/import-paired-sdk-test.js": {
       "policy": "import-paired-harness-integrity",
@@ -4463,6 +4474,15 @@
     },
     "supabase/migrations/20261104095910_zoe_rules.sql": {
       "policy": "supabase-rules-generator"
+    },
+    "supabase/migrations/20261105000000_zoe_tombstone_retro_resync.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261105010507_zoe_rules.sql": {
+      "policy": "supabase-rules-generator"
+    },
+    "supabase/migrations/20261105011000_zoe_evidence_candidates.sql": {
+      "policy": "supabase-db"
     },
     "supabase/package-lock.json": {
       "policy": "supabase-config"

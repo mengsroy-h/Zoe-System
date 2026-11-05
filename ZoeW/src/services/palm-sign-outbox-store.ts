@@ -23,6 +23,7 @@ export const PALM_RESERVATION_PROTOCOL = 'original-reservation-v1';
 const STORE = 'jobs';
 export const SIGN_OUTBOX_MAX = 40;
 export const SIGN_OUTBOX_UNREADABLE_MAX = 40;
+export const SIGN_OUTBOX_SIGNED_MAX = 400;
 export const SIGN_OUTBOX_LEASE_MS = 90000;
 const DEADLINE_MS = 5000;
 
@@ -107,22 +108,26 @@ function countSignJobs(owner: string): Promise<number> {
     });
 }
 
-async function unreadableSignJobs(owner: string, key: CryptoKey) {
+async function classifySignJobs(owner: string, key: CryptoKey) {
     const held = new Set<string>();
+    const signed = new Set<string>();
     for (const row of await listSignJobs(owner)) {
-        try { await openSignJob(row, key); } catch { held.add(row.id); }
+        try {
+            if ((await openSignJob(row, key)).signedCleanupConfirmed === true) signed.add(row.id);
+        } catch { held.add(row.id); }
     }
-    return held;
+    return { held, signed };
 }
 
 export async function addSignJob(row: SignEnvelope, current: () => boolean, key?: CryptoKey): Promise<boolean> {
-    const held = key && await countSignJobs(row.owner) >= SIGN_OUTBOX_MAX ? await unreadableSignJobs(row.owner, key) : new Set<string>();
+    const known = key && await countSignJobs(row.owner) >= SIGN_OUTBOX_MAX ? await classifySignJobs(row.owner, key) : { held: new Set<string>(), signed: new Set<string>() };
     return transact('readwrite', (store, result) => {
         const stored = store.index('owner').getAllKeys(row.owner);
         stored.onsuccess = () => {
             const ids = stored.result.map(String);
-            if (!current() || ids.filter((id) => !held.has(id)).length >= SIGN_OUTBOX_MAX
-                || ids.length >= SIGN_OUTBOX_MAX + SIGN_OUTBOX_UNREADABLE_MAX) { store.transaction.abort(); return; }
+            const signed = ids.filter((id) => known.signed.has(id)).length;
+            if (!current() || ids.filter((id) => !known.held.has(id) && !known.signed.has(id)).length >= SIGN_OUTBOX_MAX
+                || signed >= SIGN_OUTBOX_SIGNED_MAX || ids.length - signed >= SIGN_OUTBOX_MAX + SIGN_OUTBOX_UNREADABLE_MAX) { store.transaction.abort(); return; }
             const request = store.get(row.id);
             request.onsuccess = () => {
                 if (!current()) { store.transaction.abort(); return; }

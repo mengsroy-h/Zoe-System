@@ -1,3 +1,4 @@
+import { evidenceSweep, runEvidenceRetentionSweep } from '../src/services/evidence-retention';
 import { createHash, webcrypto } from 'node:crypto';
 import { appLocalStore } from '../src/core/storage';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -335,6 +336,11 @@ const SCENARIOS: Scenario[] = [
     { name: 'កែតម្លៃ barcode (saveEditedBarcodePrice)', prepare: () => { uiState.activeParentItemId = ID1; uiState.activeEditingBarcode = 'C'; inputValue('editBcCodInput', '9'); inputValue('editBcDodInput', '0'); }, run: () => saveEditedBarcodePrice() },
     { name: 'អត្រាប្រាក់ (saveExchangeRate)', prepare: () => { dataState.exchangeRateSaveInFlight = false; inputValue('exchangeRateInput', '4050'); }, run: () => saveExchangeRate() },
     { name: 'សម្អាតស្វ័យប្រវត្តិទាំងអស់ (runAutomaticCleanupRules)', run: () => runAutomaticCleanupRules() },
+    { name: 'បោសភស្តុតាងចាស់ (runEvidenceRetentionSweep)', prepare: () => {
+        evidenceSweep.at = 0; evidenceSweep.running = false;
+        const id = 'scan_' + 'e'.repeat(32);
+        lab.store.zoew_scan_operations = { [id]: { v: 2, id, actorUid: 'u', phase: 'committed', birth: getServerNow() - 70 * 86400000, registryKey: 'ZEVID', code: 'ZEVID' } };
+    }, run: () => runEvidenceRetentionSweep() },
     {
         name: 'resume journal (stage ledger keyed)',
         prepare: () => {

@@ -11,7 +11,7 @@ import { getFormattedDate } from '../core/timezone';
 import { barcodeEntriesOf, barcodeZtoSigned, generateUniqueId, itemHasRestoreMarkers, normalizeBarcodesOf } from '../domain/barcode';
 import { reconcileCollectedHistory } from '../domain/collected';
 import { getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, pickupIntentTracker } from '../domain/pickup';
-import { ledgerDedOf } from '../domain/ledger';
+import { ledgerDedOf, ledgerMonthTrimmed } from '../domain/ledger';
 import { TRASH_WRITE_SLOW_NOTICE_MS } from './session';
 import { openRecentlyDeletedModal, renderRecentlyDeleted, trashReasonDeducted } from './trash';
 import { dbListenerViewIsStale, updateRecentPhonesList } from '../services/db-listeners';
@@ -423,12 +423,15 @@ export async function restoreLedgerKeyFor(item, trashId, revenueDeltas) {
     const generation = firebaseState.authGeneration;
     const api = firebaseState.fb;
     const paths = [`zoew_daily_revenue_cod_dod/${scanDate}`, `zoew_monthly_revenue_cod_dod/${scanDate.substring(0, 7)}`];
-    const records = await Promise.all(paths.map(path => readRestoreServerNode(api, readDb, path)));
+    const [dayRecord, months] = await Promise.all([readRestoreServerNode(api, readDb, paths[0]), readRestoreServerNode(api, readDb, 'zoew_monthly_revenue_cod_dod')]);
     if (firebaseState.db !== readDb || firebaseState.authGeneration !== generation) throw new Error('RESTORE_SESSION_SWITCHED');
-    const entries = records.map(record => {
+    const monthTrimmed = ledgerMonthTrimmed(months, scanDate.substring(0, 7));
+    const records = [dayRecord, months && typeof months === 'object' ? months[scanDate.substring(0, 7)] ?? null : null];
+    const entries: any[] = records.map(record => {
         const entry = ledgerDedOf(record, trashId);
         return entry && entry.at === at ? entry : null;
     });
+    if (monthTrimmed && entries[0]) entries[1] = { ...entries[0], trimmed: true };
     if (needsProof && entries.some(entry => !entry)) {
         const listed = barcodeEntriesOf(item.barcodes);
         const pending = listed.length > 0 && !listed.some(({ barcode }) => barcode?.isDeducted) && entries.every(entry => !entry);
@@ -442,6 +445,7 @@ export async function restoreLedgerKeyFor(item, trashId, revenueDeltas) {
     const keys = [];
     ['daily', 'monthly'].forEach((bucket, i) => {
         const entry = entries[i];
+        if (entry?.trimmed || bucket === 'monthly' && monthTrimmed) return;
         if (!entry) {
             fallback.forEach(delta => revenueDeltas.push({ ...delta, bucket }));
             return;

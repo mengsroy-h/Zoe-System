@@ -135,6 +135,10 @@ describe('ការកែតម្លៃដែលត្រូវរំខាន 
     it('reload ក្រោយ admission (v2 · admitted) ➜ ក្រោយ grace App commit ៖ ប្រាក់ +10 ម្តង · settled · ចំណូលយករួចវាស់បាន', async () => {
         seed(row(10, marker(v2Token, 'admitted')));
         expect(collectedValueIsMeasurable()).toBe(false);
+        expect(collectedValueIsMeasurable(DAY()), 'ថ្ងៃដែលការកែតម្លៃនៅជាប់ ➜ —').toBe(false);
+        expect(collectedValueIsMeasurable(DAY().slice(0, 7)), 'ខែដែលការកែតម្លៃនៅជាប់ ➜ —').toBe(false);
+        expect(collectedValueIsMeasurable('2001-01-01'), 'ថ្ងៃផ្សេងមិនប៉ះពាល់ ➜ វាស់បាន').toBe(true);
+        expect(collectedValueIsMeasurable('2001-01'), 'ខែផ្សេងមិនប៉ះពាល់ ➜ វាស់បាន').toBe(true);
         await resume(); await settle();
         expect(serverRow().pricePending.phase, 'ក្នុង grace មិនទាន់ប៉ះ').toBe('admitted');
         await afterGrace();

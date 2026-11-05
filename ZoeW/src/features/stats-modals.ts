@@ -97,7 +97,6 @@ export function openDailyStatsModal() {
 
     let sortedKeys = Object.keys(dataState.dailyRevenueData).sort().reverse();
     const uncollectedMap = uncollectedValueByDate();
-    const measurable = collectedValueIsMeasurable();
 
     if (sortedKeys.length === 0) {
         uiState.dailyStatsView = { empty: emptyViewMessage(STATS_DAILY_VIEW_KEYS, 'គ្មានទិន្នន័យប្រចាំថ្ងៃទេ'), cards: [] };
@@ -108,7 +107,7 @@ export function openDailyStatsModal() {
                 const data = dataState.dailyRevenueData[dateStr] || {};
                 return buildStatCardItem('ថ្ងៃទី', dateStr,
                     statsMoney(data.codDollar), statsMoney(data.dodDollar), statsCount(data.totalCount),
-                    collectedValueOf(data.codDollar, data.dodDollar, uncollectedMap[dateStr]), measurable);
+                    collectedValueOf(data.codDollar, data.dodDollar, uncollectedMap[dateStr]), collectedValueIsMeasurable(dateStr));
             })
         };
     }

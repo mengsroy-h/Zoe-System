@@ -737,7 +737,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         ? opt.registryPurge : null;
     const pickupResetRules = opt.pickupReset && typeof opt.pickupReset.boundReceipt === 'function'
         && typeof opt.pickupReset.receiptMatches === 'function' && typeof opt.pickupReset.cas === 'function' ? opt.pickupReset : null;
-    const purgeLikeOps = (ops) => ops.some(op => op?.p?.[0] === REGISTRY_RELEASES_ROOT
+    const purgeLikeOps = (ops) => ops.some(op => op?.p?.[0] === REGISTRY_RELEASES_ROOT && op.v !== null
         || op?.p?.[0] === 'zoew_trash_consumptions' && op.v?.kind === 'purge')
         || ops.some(op => op?.p?.[0] === 'zoew_recently_deleted_cod_dod' && op.v === null)
             && ops.some(op => op?.p?.[0] === 'zoew_barcode_registry' && op.v === null);

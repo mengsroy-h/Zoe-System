@@ -158,6 +158,7 @@ const LOCAL_CLOCK_OK = {
 
 // អនុញ្ញាតតែចំណុចកំណត់ពេល local ជាក់លាក់ មិនមែន function ទាំងមូល; server fields/retention នៅផ្ទៀងដដែល។
 const LOCAL_CLOCK_SITES = [
+    { fn: 'runEvidenceRetentionSweep', expression: 'evidenceSweep.at=Date.now()', reason: 'ចន្លោះពេលរវាងការបោសភស្តុតាងក្នុង page (វាស់តាម elapsedSince() ៖ នាឡិកាថយក្រោយ ➜ បោសម្តងទៀត fail-open) · ព្រំអាយុលុបប្រើ getServerNow() និង rules ពិនិត្យ now របស់ server។' },
     { fn: 'runPickupResetBatch', binding: 'value', property: 'at', expression: 'Date.now()', reason: 'ត្រាពេល diagnostic ក្នុង local Reset intent ប៉ុណ្ណោះ; pending reader ផ្ទៀង key/scope/UID មិនអានអាយុ ឬផ្តល់សិទ្ធិ replay ពីត្រានេះ។' },
     { fn: 'completeResetCancelledPickup', property: 'completedAt', expression: 'Date.now()', reason: 'ត្រាតម្រៀបបង្កាន់ដៃ Reset ក្នុងឧបករណ៍; មិនសម្រេចលុយ ឬអនុញ្ញាត replay ហើយមិនលុប journal រង់ចាំតាមអាយុ។' },
     { fn: 'restartQueuedSign', expression: 'pendingDeadline(value.row.leaseUntil,Date.now(),SIGN_OUTBOX_LEASE_MS)', reason: 'ផ្ទៀង lease local មុនស្នើចាប់ផ្ដើមថ្មី; Server នៅផ្ទៀង lease/អាយុរបស់ខ្លួន។' },

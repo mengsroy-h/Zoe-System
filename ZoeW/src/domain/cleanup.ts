@@ -1,4 +1,4 @@
-import { trashConsumptionSame, trashGenerationOf, trashSourceUnconsumed } from './trash-generation';
+import { trashConsumptionSame, trashConsumptionValid, trashGenerationOf, trashSourceUnconsumed } from './trash-generation';
 import { allocateTrashGeneration, captureTrashGenerationOwner, readTrashConsumption, trashGenerationOwnerCurrent } from '../services/trash-generation';
 import { purgeTrashWithRegistry } from '../services/registry-purge';
 import { rowOperationActive } from '../services/row-operation-lock';
@@ -19,6 +19,7 @@ import { activeRestoreClaims, cloneRestoreItem, isActiveRestoreClaim, readRestor
 import { ABANDON_AGE_MS, RETURNED_TRASH_RETENTION_MS, TRASH_RETENTION_MS, TRASH_WRITE_SLOW_NOTICE_MS, TWO_HOURS_MS } from '../features/session';
 import { ZTO_STATUS_TTL_MS, loadZtoPickupStatusOnce, ztoAbandonCleanupIsHeld, ztoAutoCloseEnabled, getZtoPickupVerdict, ztoVerdictCandidate } from '../features/zto-status';
 import { dbListenerViewIsStale } from '../services/db-listeners';
+import { runEvidenceRetentionSweep } from '../services/evidence-retention';
 import { saveSingleDeletedItemToFirebase } from '../services/history-write';
 import { LOCK_STALL_RELEASE_MS, armLateCommit, dbOp, dbOpStalled, notifyIfSlow, retryAsync, settleLockWithin } from '../services/network';
 import { recalcItemMoneyFromBarcodes } from '../ui/modal-stack';
@@ -936,7 +937,13 @@ export async function resumeCleanupJournalEntry(trashId) {
     let restoreReceipt;
     if (!await cleanupTrashUnconsumed(trashItem, generationOwner, collected)) {
         const proof = collected && await cleanupCollectedRestoreProven(trashItem, generationOwner);
-        if (!proof) return '';
+        if (!proof) {
+            if (!collected && entry.stage !== CLEANUP_STAGE_UNDO && await cleanupTrashPurged(trashItem, generationOwner)) {
+                clearCleanupJournalEntry(trashItem.id, trashItem, entry.scope);
+                if (window.ZoeErrors) ZoeErrors.capture(new Error('Cleanup journal retired: trash purged'), { zone: 'data', context: 'resumeCleanupJournalEntry purged', itemId: trashItem.id });
+            }
+            return '';
+        }
         restoreReceipt = proof.receipt;
     }
     const priorMode = trashItem.trashMode;
@@ -1164,6 +1171,14 @@ export async function cleanupTrashUnconsumed(trashItem, owner = captureTrashGene
         const confirmed = await readTrashConsumption(trashItem.id, owner);
         return confirmed.ok && trashGenerationOwnerCurrent(owner) && trashSourceUnconsumed(trashItem, confirmed.value);
     } catch (error) { return false; }
+}
+
+export async function cleanupTrashPurged(trashItem, owner = captureTrashGenerationOwner()) {
+    if (!owner || !trashGenerationOwnerCurrent(owner)) return false;
+    const consumption = await readTrashConsumption(trashItem?.id, owner);
+    const receipt = consumption.ok ? consumption.value : null;
+    return trashGenerationOwnerCurrent(owner) && trashConsumptionValid(receipt) && receipt.kind === 'purge' && receipt.sourceId === trashItem.id
+        && receipt.generation === trashGenerationOf(trashItem) && receipt.deletedAt === trashItem.deletedAt;
 }
 
 async function cleanupCollectedRestoreProven(trashItem, owner, expectedReceipt?) {
@@ -1777,4 +1792,5 @@ export function runScheduledCleanup() {
     runCleanupLedgerKeySweep();
     runAutomaticCollectedCleanup();
     resumePickupIntents();
+    void runEvidenceRetentionSweep();
 }

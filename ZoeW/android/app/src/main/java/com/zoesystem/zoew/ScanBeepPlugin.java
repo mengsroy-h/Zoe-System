@@ -56,14 +56,16 @@ public class ScanBeepPlugin extends Plugin {
                     int before = audio.getStreamVolume(AudioManager.STREAM_MUSIC);
                     int maximum = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
                     if (before < maximum) {
-                        originalVolume = before;
-                        forcedVolume = maximum;
                         audio.setStreamVolume(AudioManager.STREAM_MUSIC, maximum, 0);
-                        if (audio.getStreamVolume(AudioManager.STREAM_MUSIC) != maximum) {
-                            originalVolume = -1;
-                            forcedVolume = -1;
-                            audio.setStreamVolume(AudioManager.STREAM_MUSIC, before, 0);
+                        int reached = audio.getStreamVolume(AudioManager.STREAM_MUSIC);
+                        if (reached != maximum && reached > before) {
+                            audio.setStreamVolume(AudioManager.STREAM_MUSIC, reached, 0);
+                            if (audio.getStreamVolume(AudioManager.STREAM_MUSIC) != reached) reached = before;
                         }
+                        if (reached > before) {
+                            originalVolume = before;
+                            forcedVolume = reached;
+                        } else audio.setStreamVolume(AudioManager.STREAM_MUSIC, before, 0);
                     }
                 }
                 played = tone != null && tone.startTone(ToneGenerator.TONE_PROP_PROMPT, 150);

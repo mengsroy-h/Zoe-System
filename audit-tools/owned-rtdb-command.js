@@ -120,8 +120,8 @@ function productionAdapters(sinks = { stdout: process.stdout, stderr: process.st
                     if (piece.length) stream.started = true;
                     stream.prefix = (stream.prefix + piece).slice(0, 128);
                     failureLine ||= /^(?:FAIL\s|❌\s|\*\*\* FAIL \*\*\*)/u.test(stream.prefix);
-                    skipLine ||= /^(?:SKIP|PARTIAL PASS)\s/u.test(stream.prefix)
-                        || ended && /^(?:SKIP|PARTIAL PASS)(?:\s|$)/u.test(stream.prefix);
+                    skipLine ||= /^(?:SKIP(?:PED)?|PARTIAL PASS)\s/u.test(stream.prefix)
+                        || ended && /^(?:SKIP(?:PED)?|PARTIAL PASS)(?:\s|$)/u.test(stream.prefix);
                     if (ended) { stream.prefix = ''; stream.started = false; }
                 }
             };

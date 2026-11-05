@@ -185,7 +185,9 @@ it('chunked output keeps whole-glyph failures and positive word boundaries disti
         ["process.stdout.write('SKIP');setTimeout(()=>process.stdout.write('PER positive\\n'),80)", 0],
         ["console.log('   ok    FAIL appears within a positive assertion')", 0],
         ["console.log('*** FAILURE word is not the canonical failure marker')", 0],
-        ["process.stdout.write('SKIP');setTimeout(()=>process.stdout.write('\\n'),80)", 1]
+        ["process.stdout.write('SKIP');setTimeout(()=>process.stdout.write('\\n'),80)", 1],
+        ["console.log('SKIPPED synthetic missing runtime')", 1],
+        ["process.stdout.write('SKIPP');setTimeout(()=>process.stdout.write('ED (runtime)\\n'),80)", 1]
     ];
     for (const [script, expected] of cases) {
         const fake = fakeRuntime(); fake.adapter.command = helper.productionAdapters({ stdout: { write() {} }, stderr: { write() {} } }).command;

@@ -74,3 +74,11 @@ it('REST ចាស់ក្រោយប្ដូរគណនី មិនបញ�
     finish(new Response('null')); await vi.advanceTimersByTimeAsync(0);
     expect(shown()).not.toContain(message);
 });
+
+it.each([-1, 30001])('នាឡិកាប្រែ %s ms ក្រោយ REST ➜ មិនប្រើភស្តុតាងអនាគត ឬផុតអាយុ', async shift => {
+    renderConnectionStatus(); await vi.advanceTimersByTimeAsync(20000);
+    expect(shown()).toEqual([message, message]);
+    vi.setSystemTime(Date.now() + shift);
+    renderConnectionStatus();
+    expect(shown()).not.toContain(message);
+});

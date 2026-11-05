@@ -324,9 +324,10 @@ async function checkMenuAnimation(page) {
                 await page.waitForTimeout(120);
                 await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
                 await page.waitForTimeout(900);
-                const rateOpen = await page.evaluate(() => getComputedStyle(document.getElementById('exchangeRateModal')).display === 'flex');
-                check(rateOpen, 'header: ចុចធាតុម៉ឺនុយ (💱) ខណៈ momentum តារាងនៅបន្ត ➜ ធាតុដំណើរការ');
-                await page.evaluate(() => { closeModal('exchangeRateModal'); closeGlobalMoreMenu(); document.getElementById('tableResponsive').scrollTop = 0; });
+                const pinOpen = await page.evaluate(() => getComputedStyle(document.getElementById('pinSetupModal')).display === 'flex');
+                check(pinOpen, 'header: ចុចធាតុម៉ឺនុយ (💱) ខណៈ momentum តារាងនៅបន្ត ➜ សុំ PIN');
+                await page.click('#pinSetupModal .btn-cancel');
+                await page.evaluate(() => { closeGlobalMoreMenu(); document.getElementById('tableResponsive').scrollTop = 0; });
                 await settle(page);
                 await page.locator('.header-more-btn').first().tap();
                 check(await visible(), 'header: បើកម្តងទៀតមុនរមូរដោយ input ថ្មី');
@@ -373,9 +374,9 @@ async function checkMenuAnimation(page) {
                 check(await visible(), 'ចាប់ផ្តើមចុចក្នុងម៉ឺនុយ ➜ រក្សាម៉ឺនុយដើម្បីប្រើប៊ូតុង');
                 await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
             } else await action.click();
-            await page.waitForFunction(() => document.getElementById('exchangeRateModal').style.display === 'flex');
+            await page.waitForFunction(() => document.getElementById('pinSetupModal').style.display === 'flex');
             check(!await visible(), 'ប៊ូតុងម៉ឺនុយដំណើរការពិត ហើយបិទម៉ឺនុយ');
-            await page.evaluate(() => closeModal('exchangeRateModal'));
+            await page.click('#pinSetupModal .btn-cancel');
 
             if (mobile) await header.tap(); else await header.click();
             const menuScrollTop = await page.evaluate(() => {

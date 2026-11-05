@@ -159,10 +159,14 @@ async function pgUser(method, p, v) {
 }
 
 async function pgOwnerOps(ops, replace) {
-    for (let i = 0; i < Math.max(ops.length, replace ? 1 : 0); i += 400) {
+    if (replace) {
+        const existing = await pg.query('select root, key from public.zoe_docs where tenant_id = $1 and value is not null', [tenant]);
+        await pgOwnerOps(existing.rows.map((row) => ({ k: 'set', p: [row.root, row.key], v: null })), false);
+    }
+    for (let i = 0; i < ops.length; i += 400) {
         const chunk = ops.slice(i, i + 400);
         const r = await H.as(pg, { role: 'service_role' }, 'select public.zoe_admin_write($1, $2, $3::jsonb, $4) as r',
-            [tenant, opId(), JSON.stringify(chunk.length ? chunk : [{ k: 'set', p: ['zoew_barcode_registry', '__parity_noop__'], v: null }]), replace && i === 0]);
+            [tenant, opId(), JSON.stringify(chunk), false]);
         if (r.error) throw new Error('owner write on Postgres failed: ' + r.error.message + ' ' + JSON.stringify(chunk.map((o) => o.p)).slice(0, 600));
     }
 }

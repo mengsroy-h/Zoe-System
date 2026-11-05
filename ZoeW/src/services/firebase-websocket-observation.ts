@@ -1,4 +1,5 @@
 import { firebaseState } from '../core/state';
+import { elapsedSince } from '../core/elapsed';
 import { healthDatabaseRead } from '../features/health-database-read';
 import { isSupabaseConfig } from './supabase-config';
 
@@ -70,6 +71,5 @@ export function watchFirebaseWebsocket(notify: () => void) {
 export function firebaseWebsocketIsBlocked() {
     const observation = websocketObservation;
     if (!observation || !observationIsCurrent(observation) || !observation.blocked || observation.connectedOnce || firebaseState.isDatabaseConnected) return false;
-    const age = Date.now() - observation.verifiedAt;
-    return age >= 0 && age <= FIREBASE_WEBSOCKET_RECHECK_MS;
+    return elapsedSince(observation.verifiedAt) <= FIREBASE_WEBSOCKET_RECHECK_MS;
 }

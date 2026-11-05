@@ -426,8 +426,13 @@ async function main() {
         const afterCatalog = await catalog();
         catalogEvidence = { before: beforeCatalog, after: afterCatalog,
             existingResetTables: beforeCatalog.relations.filter(row => row.kind === 'r' && row.name.includes('reset')).map(row => row.schema + '.' + row.name) };
+        const deltaRelations = new Set(['zoe_daily_delta_heads', 'zoe_daily_delta_heads_pkey', 'zoe_daily_deltas', 'zoe_daily_deltas_pkey']);
+        const isDailyDelta = row => row.schema === 'private' && deltaRelations.has(row.name);
+        const withoutDailyDelta = { ...afterCatalog, relations: afterCatalog.relations.filter(row => !isDailyDelta(row)) };
         check('no new reset persistence tables or lifetime quota namespace', beforeCatalog !== null
-            && isDeepStrictEqual(afterCatalog, beforeCatalog) && catalogEvidence.existingResetTables.includes('public.member_reset_codes'), catalogEvidence);
+            && isDeepStrictEqual(withoutDailyDelta, beforeCatalog)
+            && isDeepStrictEqual(afterCatalog.relations.filter(isDailyDelta).map(row => row.name), [...deltaRelations])
+            && catalogEvidence.existingResetTables.includes('public.member_reset_codes'), catalogEvidence);
         // F09 native-day composition regression begin.
         {
             const nativeRules = files.filter(name => /_zoe_rules\.sql$/.test(name)).at(-1);

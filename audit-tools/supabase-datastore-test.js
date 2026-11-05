@@ -1340,6 +1340,7 @@ async function dailyDeltaGuard() {
         }
         ok('៣០០ ➜ ៦០០ ៖ delta លីនេអ៊ែរ (<២.៣ដង)', sizes[1].newBytes < sizes[0].newBytes * 2.3, sizes);
         console.log('A352_DAILY_BYTES=' + JSON.stringify(sizes));
+        fs.writeFileSync(path.join(ROOT, 'supabase-daily-bytes.json'), JSON.stringify(sizes, null, 2) + '\n');
     } finally { await c.end().catch(() => {}); }
 }
 

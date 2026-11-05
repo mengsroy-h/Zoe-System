@@ -171,7 +171,10 @@ async function run() {
     const cancelled = { [O]: { [id]: { ...prepared, phase: 'cancelled' } } };
     await check('cancel tombstone រារាំង late registry claim', cancelled, at(R + '/' + base.registryKey), owner, false, 'PUT');
     await check('cancel tombstone រារាំង late stage', cancelled, at(H + '/' + target), row, false, 'PUT');
-    await check('cancel tombstone មិនអាចលុប', cancelled, at(O + '/' + id), null, false, 'PUT');
+    await check('cancel tombstone ថ្មី (ក្រោម ៦០ ថ្ងៃ) មិនអាចលុប', { [O]: { [id]: { ...prepared, phase: 'cancelled', birth: Date.now() } } }, at(O + '/' + id), null, false, 'PUT');
+    await check('cancel tombstone ចាស់ជាង ៦០ ថ្ងៃ ដែលគ្មានអ្វីយោង ➜ លុបបាន', cancelled, at(O + '/' + id), null, true, 'PUT');
+    await check('cancel tombstone ចាស់ ដែល scan pending នៅយោង មិនអាចលុប', { ...cancelled, [I]: { [id]: uid } }, at(O + '/' + id), null, false, 'PUT');
+    await check('cancel tombstone ចាស់ ដែល registry នៅយោង មិនអាចលុប', { ...cancelled, [R]: { [base.registryKey]: copy(owner) } }, at(O + '/' + id), null, false, 'PUT');
     await check('writer ចាស់មិនលុប row active scan', staged(), at(H + '/' + target), null, false, 'PUT');
     await check('writer ចាស់មិនកែ child ខណៈ active scan', staged(), at(H + '/' + target + '/phone'), '099', false, 'PUT');
     await check('writer ចាស់មិនជំនួស row ទោះរក្សា marker', staged(), at(H + '/' + target), { ...row, isCalled: true }, false, 'PUT');
@@ -376,7 +379,10 @@ async function run() {
     const purgeTerminal = { [O]: { [id]: { ...prepared, phase: 'committed' } }, [L]: { [id]: copy(receipt) }, [G]: { [trashId]: certified(receipt) } };
     await check('purge lost ACK៖ receipt read បានតែ full replay ត្រូវបដិសេធ', purgeTerminal, '/.json', purgePatch(receipt), false);
     await check('release receipt មិនអាចសរសេរដដែល', purgeTerminal, at(L + '/' + id), receipt, false, 'PUT');
-    await check('release receipt មិនអាចលុប', purgeTerminal, at(L + '/' + id), null, false, 'PUT');
+    await check('release receipt ថ្មី (ក្រោម ៦០ ថ្ងៃ) មិនអាចលុប', { ...purgeTerminal, [L]: { [id]: { ...copy(receipt), deletedAt: Date.now() } } }, at(L + '/' + id), null, false, 'PUT');
+    await check('release receipt ចាស់ជាង ៦០ ថ្ងៃ ដែលគ្មានអ្វីយោង ➜ លុបបាន', purgeTerminal, at(L + '/' + id), null, true, 'PUT');
+    await check('release receipt ចាស់ ដែលធុងសំរាមនៅមាន មិនអាចលុប', { ...purgeTerminal, [T]: { [trashId]: { id: trashId } } }, at(L + '/' + id), null, false, 'PUT');
+    await check('release receipt ចាស់ ដែល registry នៅយោង មិនអាចលុប', { ...purgeTerminal, [R]: { [base.registryKey]: { ...copy(owner), intent: id } } }, at(L + '/' + id), null, false, 'PUT');
     await check('committed operation ក្រោយ purge មិនអាច late claim registry ឡើងវិញ', purgeTerminal, at(R + '/' + base.registryKey), owner, false, 'PUT');
     const nextId = 'scan_' + 'f'.repeat(32), nextBase = { ...base, id: nextId, monthToken: 'op_m' + 'f'.repeat(32) };
     const nextClaim = copy(purgeTerminal); nextClaim[O][nextId] = nextBase; nextClaim[I] = { [nextId]: uid };
@@ -471,7 +477,11 @@ async function run() {
         await check('ក្រោយ consume1 source ថ្មីត្រូវជា2៖ ' + String(value), consumed, at(T + '/' + trashId), next, value === 2, 'PUT');
     }
     await check('consumption tuple ដដែលជាការសរសេរមិនប្រែតម្លៃ', consumed, at(G + '/' + trashId), consumption(receipt), true, 'PUT');
-    await check('consumption មិនអាចលុប', consumed, at(G + '/' + trashId), null, false, 'PUT');
+    await check('consumption ថ្មី (ក្រោម ៦០ ថ្ងៃ) មិនអាចលុប', { [G]: { [trashId]: { ...consumption(receipt), deletedAt: Date.now() } } }, at(G + '/' + trashId), null, false, 'PUT');
+    await check('consumption ចាស់ជាង ៦០ ថ្ងៃ ដែលគ្មានអ្វីយោង ➜ លុបបាន', consumed, at(G + '/' + trashId), null, true, 'PUT');
+    for (const [label, holder] of [['ធុងសំរាម', T], ['history', H], ['restore finalization', F]]) {
+        await check('consumption ចាស់ ដែល ' + label + ' នៅយោង id ដដែល មិនអាចលុប', { ...consumed, [holder]: { [trashId]: { id: trashId } } }, at(G + '/' + trashId), null, false, 'PUT');
+    }
     for (const [field, value] of [['actorUid', 'foreign'], ['scope', 'OTHER'], ['deletedAt', 2001], ['rowBirth', 1001], ['generation', 0], ['token', 'extra']]) {
         await check('consumption generation ដដែលមិនអាចកែ៖ ' + field, consumed, at(G + '/' + trashId), { ...consumption(receipt), [field]: value }, false, 'PUT');
     }

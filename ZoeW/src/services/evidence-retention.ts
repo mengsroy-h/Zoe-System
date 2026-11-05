@@ -6,6 +6,7 @@ import { DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY } from '../core/text';
 import { REGISTRY_RELEASES_ROOT } from '../domain/registry-purge-proof';
 import { SCAN_OPERATIONS_ROOT } from '../domain/scan-protocol';
 import { TRASH_CONSUMPTIONS_ROOT } from '../domain/trash-generation';
+import { connectionFlowSnapshot } from './connection-flow';
 import { dbListenerViewIsStale } from './db-listeners';
 import { dbOp } from './network';
 import { txReadServerValue, txRestUrl } from './tx-outcome';
@@ -116,6 +117,8 @@ export async function runEvidenceRetentionSweep() {
     if (evidenceSweep.running || elapsedSince(evidenceSweep.at) < EVIDENCE_SWEEP_GAP_MS) return 0;
     if (!firebaseState.isDatabaseInitialized || firebaseState.dbListenersFailed || !cleanupClockIsTrustworthy() || shopScopePending()) return 0;
     if (dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY) || dbListenerViewIsStale(DB_LISTENER_KEY_DELETED)) return 0;
+    const flow = connectionFlowSnapshot();
+    if (flow.phase !== 'ready' || flow.pendingWrites > 0) return 0;
     const owner = captureEvidenceOwner();
     if (!owner) return 0;
     evidenceSweep.running = true;

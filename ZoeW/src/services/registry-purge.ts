@@ -54,10 +54,11 @@ async function deductionSettled(source, sourceId: string, read: (path: string) =
         || barcodeEntriesOf(source.barcodes).every(({ barcode }) => barcode?.isDeducted === true)) return true;
     const day = source.scanDate || getFormattedDate(source.deletedAt);
     if (typeof day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return false;
-    const [dayRecord, months] = await Promise.all([read('zoew_daily_revenue_cod_dod/' + day), read('zoew_monthly_revenue_cod_dod')]);
-    const landed = record => { const entry = ledgerDedOf(record, sourceId); return !!entry && entry.at === source.deletedAt && !entry.back; };
     const month = day.slice(0, 7);
-    return landed(dayRecord) && (ledgerMonthTrimmed(months, month) || landed(months && typeof months === 'object' ? months[month] : null));
+    const [dayRecord, monthRecord] = await Promise.all([read('zoew_daily_revenue_cod_dod/' + day), read('zoew_monthly_revenue_cod_dod/' + month)]);
+    const landed = record => { const entry = ledgerDedOf(record, sourceId); return !!entry && entry.at === source.deletedAt && !entry.back; };
+    if (!landed(dayRecord)) return false;
+    return landed(monthRecord) || monthRecord === null && ledgerMonthTrimmed(await read('zoew_monthly_revenue_cod_dod'), month);
 }
 
 export async function purgeTrashWithRegistry(source, isCurrent = () => true): Promise<boolean | null> {

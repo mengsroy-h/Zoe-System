@@ -423,10 +423,10 @@ export async function restoreLedgerKeyFor(item, trashId, revenueDeltas) {
     const generation = firebaseState.authGeneration;
     const api = firebaseState.fb;
     const paths = [`zoew_daily_revenue_cod_dod/${scanDate}`, `zoew_monthly_revenue_cod_dod/${scanDate.substring(0, 7)}`];
-    const [dayRecord, months] = await Promise.all([readRestoreServerNode(api, readDb, paths[0]), readRestoreServerNode(api, readDb, 'zoew_monthly_revenue_cod_dod')]);
+    const records = await Promise.all(paths.map(path => readRestoreServerNode(api, readDb, path)));
     if (firebaseState.db !== readDb || firebaseState.authGeneration !== generation) throw new Error('RESTORE_SESSION_SWITCHED');
-    const monthTrimmed = ledgerMonthTrimmed(months, scanDate.substring(0, 7));
-    const records = [dayRecord, months && typeof months === 'object' ? months[scanDate.substring(0, 7)] ?? null : null];
+    const monthTrimmed = records[1] === null && ledgerMonthTrimmed(await readRestoreServerNode(api, readDb, 'zoew_monthly_revenue_cod_dod'), scanDate.substring(0, 7));
+    if (firebaseState.db !== readDb || firebaseState.authGeneration !== generation) throw new Error('RESTORE_SESSION_SWITCHED');
     const entries: any[] = records.map(record => {
         const entry = ledgerDedOf(record, trashId);
         return entry && entry.at === at ? entry : null;

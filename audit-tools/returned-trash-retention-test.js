@@ -150,6 +150,8 @@ function build(items, ledgerDays, ledgerMonths, exitState = 'failed') {
         balancedFunction('trashRetentionMs'),
         optionalFunction('ledgerNumber', 'function ledgerNumber(v) { const n = parseFloat(v); return isFinite(n) ? n : 0; }'),
         optionalFunction('ledgerDedOf', 'function ledgerDedOf() { return null; }'),
+        balancedFunction('ledgerLatestMonths'),
+        balancedFunction('ledgerMonthTrimmed'),
         optionalFunction('cleanupEventAt', 'function cleanupEventAt() { return 0; }'),
         optionalFunction('cleanupScanDateOf', 'function cleanupScanDateOf(item) { return item && item.scanDate; }'),
         optionalFunction('cleanupLedgerKeyOf', 'function cleanupLedgerKeyOf() { return null; }'),

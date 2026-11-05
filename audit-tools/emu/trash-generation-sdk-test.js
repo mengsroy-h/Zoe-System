@@ -145,7 +145,7 @@ export { firebaseState, dataState, uiState, ztoState } from './ZoeW/src/core/sta
         for (const [key, value] of Object.entries(journal)) localStorage.setItem(key, value);
         api.cleanupJournalLive.clear(); api.cleanupInFlight.clear(); api.dataState.deletedItems = [];
         const before = await owner(); await bounded(api.resumeCleanupJournalEntry(firstId), 'old journal replay');
-        assert.deepEqual(await owner(), before); assert.equal(api.readCleanupJournal().length, 1);
+        assert.deepEqual(await owner(), before); assert.equal(api.readCleanupJournal().length, scenario === 'purge' ? 0 : 1);
         if (scenario !== 'purge') {
             api.dataState.deletedItems = Object.values((await owner(T)) || {});
             api.uiState.pendingPermanentDeleteId = finalId; await bounded(api.executePermanentDelete(), 'purge newer source');
@@ -156,7 +156,7 @@ export { firebaseState, dataState, uiState, ztoState } from './ZoeW/src/core/sta
         const done = copy(server); await api.resumeCleanupJournalEntry(firstId); assert.deepEqual(await owner(), done);
         assert.equal(Object.values(server[H] || {}).some(row => Object.values(row.barcodes || {}).some(barcode => barcode.code === code)), false);
         results.push({ scenario, originalGeneration: 1, finalGeneration: server[G][finalId].generation, money: expectedMoney, count: expectedCount,
-            oldJournalHeld: api.readCleanupJournal().length === 1, originalRegistryOwner: registry, noResurrection: true });
+            oldJournalHeld: api.readCleanupJournal().length === (scenario === 'purge' ? 0 : 1), originalRegistryOwner: registry, noResurrection: true });
         for (const unsubscribe of unsubscribers) unsubscribe(); await sdk.deleteApp(app); api.firebaseState.authGeneration++; await owner('', 'DELETE');
     }
     assert.equal(results.length, 3);

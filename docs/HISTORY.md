@@ -191,6 +191,7 @@
 - **Sign ៖ ការងារដែល ZTO បញ្ជាក់រួច (A537)**៖ ការងាររក្សាទុក ២៤ ម៉ោងមានព្រំដែនផ្ទាល់ (`SIGN_OUTBOX_SIGNED_MAX` ៤០០) ⛔ មិនស៊ីកន្លែង ៤០ របស់ការងារថ្មី ➜ សាខាដែល Sign លើស ៤០ ក្នុងមួយថ្ងៃ Sign បន្តបាន។
 - **CSP ៖ គ្មាន host database ក្នុង `script-src` (A539 · App ទាំង ២)**៖ RTDB ប្រើ WebSocket តែប៉ុណ្ណោះ (`forceWebSockets()`) ➜ JSONP long-polling ពី project Firebase ណាក៏បាន រំលង CSP មិនបាន។
 - **root ភស្តុតាងលែងកើនរហូត (A540)**៖ rules អនុញ្ញាតលុប scan operation · registry release · trash consumption ដែលចាស់ជាង ៦០ ថ្ងៃ ហើយគ្មានទិន្នន័យរស់យោង · App បោសម្តងក្នុងមួយម៉ោង (Firebase តាម query មាន index · Supabase តាម `zoe_evidence_candidates()`)។
+- **ការស្ដារការសរសេរដែលអាន Server មិនបាន (A542)**៖ ព្យាយាមម្តងទៀតដោយខ្លួនឯងរៀងរាល់ `NATIVE_RECOVERY_RETRY_GAP_MS` ពេល online ទោះគ្មានការសរសេររង់ចាំ ➜ ស្ថានភាព «កំពុងផ្ទៀងផ្ទាត់ការសរសេរ...» មិនស្ថិតរហូត · ការបោសភស្តុតាង (A540) រត់តែពេលការតភ្ជាប់ `ready` និងគ្មានការសរសេររង់ចាំ។
 - **នៅបើក**៖ F03 ៖ ជម្រើស (ខ) + D0 បានអនុវត្ត (A523) · ការវាស់លើ backend hosted និងឧបករណ៍ពិតនៅមិនទាន់ (📌 សកម្មភាពដោយដៃ F03)។ R2 conditional evidence/control restriction រក្សា។ F09 receipt/status-only preparation ធ្វើដាច់ មិនរួមក្នុង CI repair candidate នេះ។ C04 v1 clients មិនមាន original-tenant protection; migration និង client drain នៅជាតម្រូវការ។ C06 hosted trigger migration និង R1 rollout/re-login មិនបានអនុវត្ត។ Routine startup/diagnostic correction នេះមិនប្ដូរ SQL/rules/security grants។
 
 **មុនចេញប្រើ**៖ ផ្ទៀង independent review និង allowed-check results របស់ patch ចុងក្រោយ; guards ដែល blocked/មិនបានរត់មិនរាប់ជា PASS។ ត្រូវសម្រេចបញ្ហាដែលនៅបើក និង rollout ជាមុន។ កុំសម្អាត storage ឬ replay unknown money ជាសំណើថ្មី។ Apps Script និងឧបករណ៍ Windows ត្រូវ manual rollout ដាច់ដោយឡែកក្រោយអនុញ្ញាត; ការងារនេះមិន deploy។ Native device, hosted backend និង printer/decoder នៅមិនទាន់បានវាស់។ Windows CMD canonical9/33 និង additional13/108 បានវាស់លើ pinned ba620764 និង exact repaired bytes; specific desktop hardlink នៅ UNRUN ក្រោយ OS EPERM។
@@ -1918,7 +1919,8 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 - **A538 · OpenCode ទទួលអត្ថបទអ្នកក្រៅពេលមាន API key (ផ្ទាល់)**៖ ជំហាន `thread` អាន author_association របស់ម្ចាស់ issue/PR · comment · review comment · review (`gh api --paginate`) ➜ មានអ្នកក្រៅក្រុម (មិនមែន OWNER/MEMBER/COLLABORATOR ឬ App `Bot`) ➜ ជំហាន secret មិនរត់ · API បរាជ័យ ➜ ជំហានធ្លាក់ (fail-closed)។ 🧪 `security-guard-test` ៖ ច្បាប់ថ្មី + ទិសផ្ទុយ (workflow ពិតដែលដកលក្ខខណ្ឌ) ធ្លាក់មុនកែ ២ ➜ ៦០ ok · ឡូជីក shell វាស់ជាមួយ `gh` ក្លែង (អ្នកក្រៅ ➜ false · Bot ➜ true · gh បរាជ័យ ➜ ធ្លាក់)។ ព្រំដែន ៖ comment ដែលចូលក្រោយការពិនិត្យ និងមុន OpenCode អាន (ចន្លោះខ្លី)។
 - **A539 · CSP `script-src` ទទួល host database (ផ្ទាល់)**៖ `https://*.firebaseio.com` · `https://*.firebasedatabase.app` ក្នុង `script-src` (App ទាំង ២) ទុកសម្រាប់ JSONP long-polling ➜ project ណាក៏បាន ផ្តល់ script បាន ➜ loader ទាំង ២ ហៅ `forceWebSockets()` មុន SDK បើក ហើយ host ទាំងនោះចេញពី `script-src` (`connect-src` ដដែល)។ SDK ចាប់ផ្តើមដោយ long-polling ពេល WebSocket ធ្លាប់បរាជ័យ (`firebase:previous_websocket_failure`) ➜ ផ្លូវនោះកើតញឹកញាប់ពិត។ 🧪 `tests/rtdb-websocket-only.test.ts` (loader ពិត + SDK browser build ពិត ៖ មុនកែ iframe long-polling · ក្រោយកែគ្មាន) · `security-guard-test` (ហាម host database ក្នុង script-src + loader ទាំង ២) ធ្លាក់មុនកែ ៣។ ព្រំដែន ៖ បណ្តាញដែលបិទ WebSocket ភ្ជាប់ Firebase មិនបាន (📌)។
 - **A540 · root ភស្តុតាងកើនរហូត (ផ្ទាល់)**៖ `zoew_scan_operations` (មួយក្នុងមួយការស្កេន) · `zoew_registry_releases` · `zoew_trash_consumptions` ទទួលតែការសរសេរ ➜ ទំហំហាង (Supabase `quota_bytes`) · ការទាញពេញ · backup កើនរហូត ➜ rules ថ្មីអនុញ្ញាតលុបកំណត់ត្រាចាស់ជាង ៦០ ថ្ងៃ ដែលគ្មានអ្វីយោង (registry · scan_pending · ធុងសំរាម · history · restore finalization) + `.indexOn` · `runEvidenceRetentionSweep()` (App · ម្តងក្នុងមួយម៉ោង · ≤ ៥០/root) · Supabase `zoe_evidence_candidates()` (invoker · អានតែប៉ុណ្ណោះ) · ការលុប receipt តែឯងមិនមែន purge (native · adapter)។ ការវិភាគ ៖ ការស្កេនដែល record ត្រូវលុប ➜ ឧបករណ៍ចាស់ HOLD (មិនមែន cancel) · generation ចាប់ពី ១ វិញតែពេល history និងធុងសំរាមបាត់ ៦០ ថ្ងៃ។ 🧪 `emu/supabase-rules-parity-test` (RTDB emulator + Postgres ពិត ៖ ១៨ ករណីលុប/បដិសេធ) ៧៦៦ PASS · `tests/evidence-retention.test.ts` ៥ · `tests/session-switch-fuzz.test.ts` ៧៧ (scenario ថ្មី) · `supabase-datastore-test` (RPC) · `supabase-rls-test` · F03 pin `f03LegacyPolicyHash` ថ្មី (rules release ប្រែដោយចេតនា) · rules artifact 248,771 bytes ≤ 251,904។
-- **A541 · meta-checker មើលមិនឃើញអ្នកយាមថ្មីខ្លះ (📌 meta-checker · ផ្ទាល់)**៖ (១) `import-paired-{base-root,diagnostic,diagnostic-integration,gate,native-cleanup}-controls.cjs` កត់តែ hash គ្មាន runner ➜ `import-paired-ci-runner-test` រត់ control នីមួយៗរបស់ tree ដែលជ្រើស ហើយទាមទារ exit 0 + បន្ទាត់ PASS ចុងក្រោយ (control ក្លែងដែលចេញ 0 ដោយគ្មាន PASS ឬចេញ 1 ➜ បដិសេធ) · mapping `import-paired-controls-run` (behavior) · (២) driver `*-test.cjs` ៤ (pg vitest) ចូលការស្កេនកិច្ចសន្យា exit របស់ `exit-code-integrity` (ជាន់ ≥ ៤) · (៣) `emu/pickup-reset-applied-sdk-test` · `emu/scan-operation-rules-test` ពុលបាន (លំនាំ POISON ថ្មី ៖ `condition = false` · `allow = !allow`) · `emu/import-paired-sdk-test` (matrix ធំ) នៅការពារដោយ AST + runall-exit-guard + checker-coverage (ថតទទេ) · (៤) ការពុល `zto-list-sync-test` បង្ហាញ sandbox ខ្វះ `inScanSaveLane` (A528) ➜ crash ➜ `exit-code-integrity` ធ្លាក់ (CI1167 shard ២) ➜ ស្រង់ `inScanSaveLane` · `SCAN_SAVE_LANE_WAIT_MS` · `scanSaveLanes` ពីកូដពិត (៦៣៣ ok) · (៥) shard ១ CI1167 ធ្លាក់ព្រោះ fixture `queued-sign-photo-layout` ខ្វះ export A530 ➜ បន្ថែម (៩/៩)។
+- **A541 · meta-checker មើលមិនឃើញអ្នកយាមថ្មីខ្លះ (📌 meta-checker · ផ្ទាល់)**៖ (១) `import-paired-{base-root,diagnostic,diagnostic-integration,gate,native-cleanup}-controls.cjs` កត់តែ hash គ្មាន runner ➜ `import-paired-ci-runner-test` រត់ control នីមួយៗរបស់ tree ដែលជ្រើស ហើយទាមទារ exit 0 + បន្ទាត់ PASS ចុងក្រោយ (control ក្លែងដែលចេញ 0 ដោយគ្មាន PASS ឬចេញ 1 ➜ បដិសេធ) · mapping `import-paired-controls-run` (behavior) · (២) driver `*-test.cjs` ៤ (pg vitest) ចូលការស្កេនកិច្ចសន្យា exit របស់ `exit-code-integrity` (ជាន់ ≥ ៤) · (៣) `emu/pickup-reset-applied-sdk-test` · `emu/scan-operation-rules-test` ពុលបាន (លំនាំ POISON ថ្មី ៖ `condition = false` · `allow = !allow`) · `emu/import-paired-sdk-test` (matrix ធំ) នៅការពារដោយ AST + runall-exit-guard + checker-coverage (ថតទទេ) · (៤) ការពុល `zto-list-sync-test` បង្ហាញ sandbox ខ្វះ `inScanSaveLane` (A528) ➜ crash ➜ `exit-code-integrity` ធ្លាក់ (CI1167 shard ២) ➜ ស្រង់ `inScanSaveLane` · `SCAN_SAVE_LANE_WAIT_MS` · `scanSaveLanes` ពីកូដពិត (៦៣៣ ok) · (៥) shard ១ CI1167 ធ្លាក់ព្រោះ fixture `queued-sign-photo-layout` ខ្វះ export A530 ➜ បន្ថែម (៩/៩) · (៦) checker sandbox ដែលស្រង់ `commitLedgerEventStep` · `deductionSettled` (១៣) ខ្វះ `ledgerMonthTrimmed` (A535) ➜ ReferenceError ក្នុង updater ត្រូវលេប ➜ ការដកមិនចុះ ➜ checker ធ្លាក់ (battery ក្នុង session មុន push) ➜ ស្រង់ពីកូដពិត · `connection-recovery-test` stub `runEvidenceRetentionSweep` (A540)។
+- **A542 · CI1168 ៖ recovery ដែល deferred មិនព្យាយាមម្តងទៀតដោយខ្លួនឯង (ផ្ទាល់ · រកឃើញតាម `emu/app-network-e2e`)**៖ ការអាន receipt ក្រោយ reload អស់ពេល (socket HTTP keep-alive ដែល browser ទុក ងាប់ក្នុងដំណាក់កាល zombie របស់តេស្ត · sweep A540 ជាអ្នកបើក socket REST នោះមុន) ➜ `state.deferred` ហើយ pass ថ្មីរត់តែពេលមានការសរសេររង់ចាំ (`verified()`) ➜ journal នៅ · ស្ថានភាព «កំពុងផ្ទៀងផ្ទាត់ការសរសេរ...» ស្ថិតរហូតដល់ការសរសេរបន្ទាប់ ➜ `scheduleDeferredRetry()` (timer មួយ · ចន្លោះ `NATIVE_RECOVERY_RETRY_GAP_MS` · offline ➜ រង់ចាំ · session ប្តូរ ➜ ឈប់) ដូចដែល CLAUDE.md ចែងរួច · sweep A540 ទាមទារ phase `ready` + `pendingWrites` 0។ 🧪 `tests/native-recovery-plain-cas.test.ts` ២ ករណីថ្មី (មុនកែ ២/២ ធ្លាក់ · ក្រោយកែ ១៤/១៤) · `emu/app-network-e2e` ៤៤/៤៤ (មុនកែធ្លាក់គ្រប់ដង ៣/៣ ក្នុងម៉ាស៊ីន) · `tests/evidence-retention.test.ts` ៦ (ច្រកទ្វារ phase ថ្មី ៖ ដកច្រកទ្វារ ➜ ធ្លាក់)។ ការកែផ្សេងក្នុង CI1168 ៖ restore · purge អាន root ខែតែពេលកំណត់ត្រាខែទទេ (`restoreLedgerKeyFor()` · `deductionSettled()` ៖ fake server ផ្ទះល្វែងរបស់ `zto-final-marks` មិនចាប់ផ្តើមស្តារ) · តេស្តដែលរំពឹងភស្តុតាងលុបមិនបានជានិច្ច (`emu/scan-operation-rules-test` · `supabase-scan-rules` ៖ fixture `birth` 1000) ➜ ផ្ទៀងទាំងពីរទិស ៖ ថ្មី ➜ បដិសេធ · ចាស់គ្មានអ្វីយោង ➜ អនុញ្ញាត · ចាស់ដែល pending · registry · ធុងសំរាម · history · restore finalization យោង ➜ បដិសេធ (backend ទាំង ២) · `trash-generation-admission` · `emu/trash-generation-sdk` ៖ journal របស់ copy ដែល purge រួច ➜ បញ្ចប់ (A534 · collected/undo នៅកាន់) · sandbox `emu/crud-rules-flow` ខ្វះ `ledgerMonthTrimmed` · `runEvidenceRetentionSweep`។
 
 ### 2026-11-04 — PR384 ជុំ ២–៦ ៖ ការកែតាម audit ទូទាំងគម្រោង (A496–A525)
 
@@ -4153,14 +4155,17 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `emu/app-writes-rules-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ · ផ្នែក ៩ |
 | `emu/crud-rules-flow` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `emu/import-paired-ci-runner` | ផ្នែក ២ | — |
+| `emu/import-paired-sdk-test` | ផ្នែក ២ | — |
 | `emu/ledger-revert-emu-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `emu/license-seat-rules-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៥ · ផ្នែក ៧ · ផ្នែក ៨ |
 | `emu/money-multidevice-emu-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ · ផ្នែក ៩ |
 | `emu/ns` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `emu/pickup-reset-applied-sdk-test` | ផ្នែក ២ | — |
 | `emu/registry-purge-atomic-sdk-test` | ផ្នែក ២ | — |
 | `emu/restore-deadlock-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `emu/restore-mutation-emu-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៩ |
 | `emu/scan-month-coordination-sdk-test` | ផ្នែក ២ | — |
+| `emu/scan-operation-rules-test` | ផ្នែក ២ | — |
 | `emu/supabase-rules-parity-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
 | `emu/tx-disconnect-emu-test` | ផ្នែក ២ | ផ្នែក ៦ · ផ្នែក ៧ |
 | `exit-code-integrity` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៧ · ផ្នែក ៩ |
@@ -4179,6 +4184,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `history-patch-retry-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `html-sink-escaping` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៧ · ផ្នែក ៩ |
 | `idtoken-fixture` | — | ផ្នែក ៧ · ផ្នែក ៨ |
+| `import-paired-ci-runner-test` | ផ្នែក ២ | — |
 | `inline-handler-xss-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `ios-panel-glide-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៧ · ផ្នែក ៨ |
 | `item-money-integrity-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ |
@@ -4380,6 +4386,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/device-info.test.tsx` | — | ផ្នែក ៨ |
 | `ZoeW/tests/discard-pending-writes.test.tsx` | — | ផ្នែក ៨ |
 | `ZoeW/tests/durable-connection-write.test.ts` | — | ផ្នែក ៨ |
+| `ZoeW/tests/evidence-retention.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/exchange-rate-backend-switch.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/exchange-rate-completion-race.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/exchange-rate-shop-switch.test.ts` | — | ផ្នែក ៨ |
@@ -4445,7 +4452,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/native-live-failure.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/native-lost-ack-resend.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/native-receipt-retention.test.ts` | ផ្នែក ១ | ផ្នែក ៨ |
-| `ZoeW/tests/native-recovery-plain-cas.test.ts` | ផ្នែក ១ | ផ្នែក ៨ |
+| `ZoeW/tests/native-recovery-plain-cas.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/native/app-lock-away.test.tsx` | — | ផ្នែក ៨ |
 | `ZoeW/tests/native/capture-cleanup-plugin.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/native/immediate-ui.test.tsx` | — | ផ្នែក ៦ |
@@ -4492,9 +4499,9 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/pin-salted-hash-only.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/price-edit-unknown.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/price-operation-lock.test.ts` | ផ្នែក ១ | — |
-| `ZoeW/tests/price-operation-resume.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/price-operation-resume.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/print-relayout.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
-| `ZoeW/tests/purge-deduction-pending.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/purge-deduction-pending.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/purge-restore-registry-race.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/push-client.test.tsx` | ផ្នែក ១ | ផ្នែក ៧ · ផ្នែក ៨ |
 | `ZoeW/tests/push-online-resync.test.ts` | ផ្នែក ១ | — |
@@ -4518,6 +4525,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/restore-prepared-retry.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/restore-resync-read-gate.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/restore-terminal-cancel.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/rtdb-websocket-only.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/scan-camera-session.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/scan-engine-recovery.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/scan-evidence-live-lock.test.ts` | ផ្នែក ១ | — |

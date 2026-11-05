@@ -268,6 +268,16 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
     };
     let recovery: Promise<void> = Promise.resolve();
     let rerun = false;
+    let deferredRetry: ReturnType<typeof setTimeout> | null = null;
+    const scheduleDeferredRetry = () => {
+        if (deferredRetry || !state.deferred || !current()) return;
+        deferredRetry = setTimeout(() => {
+            deferredRetry = null;
+            if (!state.deferred || !current() || state.recovering) return;
+            if ((navigator.onLine as boolean) === false) { scheduleDeferredRetry(); return; }
+            runRecovery();
+        }, NATIVE_RECOVERY_RETRY_GAP_MS);
+    };
     const reverify = () => {
         if (state.recovering) { rerun = true; return; }
         runRecovery();
@@ -302,7 +312,8 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
             state.recovering = false;
             changed();
             if (rerun && current()) { rerun = false; runRecovery(); }
-            else if (journaled && !state.deferred && !state.blocked && current()) purgeReceipts().catch(() => {});
+            else if (state.deferred) scheduleDeferredRetry();
+            else if (journaled && !state.blocked && current()) purgeReceipts().catch(() => {});
         }
         })();
         return recovery;

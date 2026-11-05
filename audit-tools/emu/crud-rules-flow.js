@@ -76,7 +76,7 @@ const FNS = ['getZtoPickupVerdict', 'ztoVerdictCandidate', 'ztoImportLegacyValid
 //    ដើម្បីឲ្យ payload `ded` ពិតទៅដល់ rules ពិត (ផ្នែក ៥)។ tree មុនកែ ➜ stub (ផ្លូវចាស់មិនហៅវា)។
 const KEYED_FNS = ['ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'applyLedgerBucketDelta', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness',
     'ledgerTagged', 'runLedgerTransaction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf',
-    'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep',
+    'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMonthTrimmed', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep',
     'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue',
     'cleanupJournalClaimMatches', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'cleanupPartialTrashId', 'trashSlotSharesClaim'];
 
@@ -185,7 +185,7 @@ function makeSandbox(store, now) {
         }),
         remove: (ref) => Promise.resolve().then(() => { w.writes.push({ method: 'PUT', path: ref.path, value: null }); set(ref.path, null); })
     };
-    const ctx = vm.createContext({ ztoState: { ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 }, ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 } }, ZTO_TRASH_MODE_ACTIVE_MS: 7 * 24 * 60 * 60 * 1000, ztoTrashModeSeen: null, serverTimeOffsetMs: 0, hasEverConnectedToDatabase: true, 
+    const ctx = vm.createContext({ runEvidenceRetentionSweep: async () => 0, ztoState: { ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 }, ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 } }, ZTO_TRASH_MODE_ACTIVE_MS: 7 * 24 * 60 * 60 * 1000, ztoTrashModeSeen: null, serverTimeOffsetMs: 0, hasEverConnectedToDatabase: true, 
         console, queueMicrotask, setTimeout, clearTimeout, Promise, Math, Date, JSON, Set, Map, URL, TextEncoder, window: { location: { href: 'https://example.invalid/' } }, ZoeErrors: null,
         navigator: { onLine: true },
         db: { app: { options: { databaseURL: 'https://crud-fixture.invalid' } } }, authGeneration: 0, isInitializingFirebase: false, fb,

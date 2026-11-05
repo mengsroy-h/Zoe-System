@@ -140,6 +140,20 @@ it('ច្រកទ្វារ ៖ នាឡិកា server មិនទុក
     expect(await runEvidenceRetentionSweep()).toBe(4);
 });
 
+it('ច្រកទ្វារ ៖ ការសរសេរកំពុងស្ដារ · ស្ដារមិនបាន · រង់ចាំ (phase មិនទាន់ ready ឬ pendingWrites) ➜ មិនបោស និងមិនអានអ្វី', async () => {
+    seed();
+    const recovery = { blocked: 0, recovering: true, pending: 0 };
+    (firebaseState.db as any).recoveryState = () => ({ ...recovery });
+    expect(await runEvidenceRetentionSweep()).toBe(0);
+    recovery.recovering = false; recovery.blocked = 1;
+    expect(await runEvidenceRetentionSweep()).toBe(0);
+    recovery.blocked = 0; recovery.pending = 2;
+    expect(await runEvidenceRetentionSweep()).toBe(0);
+    expect({ deletes: lab.deletes, reads: (fetch as any).mock.calls.length }).toEqual({ deletes: [], reads: 0 });
+    recovery.pending = 0;
+    expect(await runEvidenceRetentionSweep()).toBe(4);
+});
+
 it('session ប្តូរកណ្តាលការបោស ➜ គ្មានការលុបតាមក្រោយ', async () => {
     seed();
     lab.afterRead = (at) => { if (at === 'zoew_scan_operations') firebaseState.authGeneration++; };

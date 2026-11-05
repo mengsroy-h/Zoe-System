@@ -1556,7 +1556,9 @@ npm ci --prefix tools/firebase-provision --ignore-scripts   # real firebase-tool
 
 Ordinary `run-all.sh` uses `owned-rtdb-command.js` for emulator-lane tasks and the exclusive meta tasks that run
 emulator children, including the BASE diagnostic calls. Each canonical task gets a fresh owned loopback JVM; nested
-meta children share that task's JVM. Keep one resident emulator, the configured heap and the original checker/case
+meta children share that task's JVM. Derive RTDB ownership from resource use, independently of the scheduling lane;
+moving a consumer to exclusive execution must preserve its owned scope and the real-plan ownership expectations.
+Keep one resident emulator, the configured heap and the original checker/case
 deadlines. Startup and cleanup consume the existing outer task budget. Do not prestart a global server: an occupied
 port is an ownership conflict, never permission to adopt or kill its listener. An unproven cleanup blocks later RTDB
 scopes and must remain nonzero, including after BASE presentation pipelines. Original FAIL/UNKNOWN evidence is not

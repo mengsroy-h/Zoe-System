@@ -832,11 +832,19 @@ async function sectionSix() {
         ownerGuardActive(ownerGuardSource) && !ownerGuardActive(ownerGuardSource.replace(/^    await sectionOwnedRuntime\(\);$/m, '')));
     const internalOwnedRunner = job => job.id === 'emu/import-paired-ci-runner';
     const internalOwnerContractTest = job => job.id === 'import-paired-ci-runner-test';
-    const expectedOwned = job => !internalOwnedRunner(job) && !internalOwnerContractTest(job) && (job.id.startsWith('emu/') || job.lane === 'emu' || ['checker-coverage', 'exit-code-integrity'].includes(job.id));
+    const expectedOwned = job => !internalOwnedRunner(job) && !internalOwnerContractTest(job) && (job.id.startsWith('emu/') || job.lane === 'emu' || ['checker-coverage', 'exit-code-integrity', 'money-guardian-test'].includes(job.id));
+    const ownershipMatches = rows => rows.every(job => (job.owned === '1') === expectedOwned(job));
+    const ownershipMismatches = jobs.filter(job => (job.owned === '1') !== expectedOwned(job))
+        .map(job => ({ id: job.id, label: job.label, lane: job.lane, owned: job.owned, expected: expectedOwned(job) }));
     ok('CI គ្មាន global JVM ហើយ normal tasks ដែលត្រូវការ RTDB ឆ្លង owned scope ពេញ',
         !/java -jar|zoe-emulator\.pid/.test(wf) && shardStep.length > 0 && wf.includes('real.rules.json')
-        && jobs.length >= 150 && jobs.every(job => (job.owned === '1') === expectedOwned(job))
-        && jobs.filter(job => job.owned === '1').length >= 26);
+        && jobs.length >= 150 && ownershipMatches(jobs)
+        && jobs.filter(job => job.owned === '1').length >= 26, ownershipMismatches);
+    const guardianJobs = jobs.filter(job => job.id === 'money-guardian-test');
+    ok('money-guardian ទាំងពីរផ្នែកនៅតែត្រូវការ owned RTDB ទោះរត់ម្នាក់ឯង',
+        guardianJobs.length === 2 && guardianJobs.every(job => job.lane === 'excl' && expectedOwned(job)) && ownershipMatches(guardianJobs), guardianJobs);
+    ok('ទិសផ្ទុយ ៖ ដក owned scope ពី money-guardian ត្រូវបានចាប់ ទោះ lane នៅ excl',
+        guardianJobs.length === 2 && guardianJobs.every(target => !ownershipMatches(jobs.map(job => job === target ? { ...job, owned: '0' } : job))));
     const base = runall.slice(runall.search(/^if \[ -n "\$BASE" \]/m));
     const baseCommands = [...base.matchAll(/^\s*([A-Z0-9_]+_APP_DIR)="\$BASE" (runall_owned )?node (audit-tools\/[A-Za-z0-9_/-]+\.js)/gm)];
     const requiredBase = entry => entry[3].startsWith(EMU) || ['money-guardian-test.js', 'money-checker-truthfulness-test.js', 'exit-code-integrity.js', 'supabase-scan-rules-test.js'].some(name => entry[3] === 'audit-tools/' + name);

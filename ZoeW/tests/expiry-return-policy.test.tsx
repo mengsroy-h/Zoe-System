@@ -54,6 +54,8 @@ beforeEach(() => {
             { id: 'GONE', phone: '0972000003', deletedAt: now - 60 * 1000, barcodes: [{ code: 'KH0000000003', locker: 'B-2' }], trashReason: 'returned', isFromDeletion: false }
         ];
         firebaseState.isDatabaseInitialized = true;
+        firebaseState.serverClockTrusted = true;
+        firebaseState.serverTimeOffsetMs = 0;
     });
     mount(<NotifyDrawer />);
 });

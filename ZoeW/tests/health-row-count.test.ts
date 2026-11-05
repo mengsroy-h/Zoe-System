@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { runInNewContext } from 'node:vm';
 import { transformSync } from 'esbuild';
 import { describe, expect, it } from 'vitest';
@@ -183,7 +183,7 @@ describe('Postgres scan rules៖ dependency មកពី repo ពិត មិ�
             } } : require(name)
         });
         await expect(setup()).rejects.toBe(stop);
-        expect(options.depsDirs).toEqual(['/explicit', '/measure/supabase/node_modules', '/real-repository/supabase/node_modules']);
+        expect(options.depsDirs).toEqual(['/explicit', join('/measure', 'supabase', 'node_modules'), join('/real-repository', 'supabase', 'node_modules')]);
         expect(options.wantMajor).toBe(17);
     });
 });

@@ -485,6 +485,29 @@ for (const part of [1, 2, 3]) {
         { rc: suiteRun.rc, ranges });
 }
 
+// Money guardian មាន child pool ផ្ទាល់ខ្លួន៖ checker ធ្ងន់ផ្សេងមិនត្រូវចែក CPU ក្នុងពិដានរបស់វា។
+for (const [part, wrapped] of [[1, false], [2, false], [1, true]]) {
+    const guardianCase = newCase([
+        ['audit-tools/money-guardian-test.js', { ms: 900, ownedProbe: true }],
+        ['audit-tools/supabase-money-multishop-test.js', { ms: 900, browser: true }],
+        [EMU + 'fx-guardian-neighbor.js', { ms: 900, ownedProbe: true }]
+    ]);
+    const guardianRun = runHarness(guardianCase,
+        'run "guardian" node ' + (wrapped ? '--require ./audit-tools/runall-exit-guard.cjs ' : '') + 'audit-tools/money-guardian-test.js --part=' + part + '/2\n'
+        + 'run "money" node audit-tools/supabase-money-multishop-test.js\n'
+        + 'run "emulator" node ' + EMU + 'fx-guardian-neighbor.js',
+        { RUNALL_JOBS: '2', RUNALL_BROWSER_JOBS: '1' });
+    const ranges = intervals(guardianRun.events), guardian = ranges.find(x => x.name === 'audit-tools/money-guardian-test.js');
+    ok('⛔ money-guardian ' + part + '/2' + (wrapped ? ' មាន preload' : '') + ' រត់ម្នាក់ឯង ទោះមាន money/browser និង emulator រង់ចាំ',
+        guardianRun.rc === 0 && ranges.length === 3 && guardian && ranges.every(other => other === guardian
+            || other.end <= guardian.start || other.start >= guardian.end),
+        { rc: guardianRun.rc, ranges });
+    const owners = fs.existsSync(path.join(guardianCase, 'fx.log.owners')) ? fs.readFileSync(path.join(guardianCase, 'fx.log.owners'), 'utf8').trim().split('\n').map(JSON.parse) : [];
+    ok('money-guardian និង emulator នៅរក្សា owned scopes ដាច់ដោយឡែក',
+        guardianRun.rc === 0 && owners.length === 2 && owners.every(value => /^\d+$/.test(value.owner)) && new Set(owners.map(value => value.owner)).size === 2,
+        owners);
+}
+
 // ═══ ៣. ការព្យួរ ➜ FAIL ដែលមានឈ្មោះ · checker ដទៃមិនរង ═══
 console.log('\n=== ៣. checker ព្យួរ ➜ «ព្យួរ» FAIL ក្នុងពិដាន ខណៈ lane ផ្សេងបន្ត ===');
 const c3 = newCase([['audit-tools/fx-hang.js', { hang: true }], ['audit-tools/fx-ok1.js', { ms: 300 }], ['audit-tools/fx-ok2.js', { ms: 300 }]]);
@@ -757,15 +780,18 @@ async function sectionSix() {
         const isolatedPurge = j.id === F03.slice('audit-tools/'.length, -3) && c.includes('controlledDeadlinePass(');
         const isolatedSuite = j.id === 'zoew-suite-test' && /\bcp\.spawnSync\s*\(\s*['"]npm['"]\s*,\s*args\b/.test(c)
             && c.includes("'--maxWorkers='");
+        const isolatedGuardian = j.id === 'money-guardian-test' && /\bexecFile\s*\(\s*process\.execPath\b/.test(c)
+            && c.includes('await runPool(tasks.map(');
         if (j.lane === 'excl') exclN++;
         if (j.lane === 'emu') emuN++;
         if (j.lane === 'browser') browserN++;
         if (poison && j.lane !== 'excl') wrong.push(j.id + ' ៖ សរសេរ/បោស .tmp-poison-* តែ lane=' + j.lane + ' (ត្រូវ excl)');
         if (isolatedPurge && j.lane !== 'excl') wrong.push(j.id + ' ៖ F03 វាស់ deadline តែ lane=' + j.lane + ' (ត្រូវ excl)');
         if (isolatedSuite && j.lane !== 'excl') wrong.push(j.id + ' ៖ Vitest workers ក្នុង npm child តែ lane=' + j.lane + ' (ត្រូវ excl)');
+        if (isolatedGuardian && j.lane !== 'excl') wrong.push(j.id + ' ៖ mutation child pool តែ lane=' + j.lane + ' (ត្រូវ excl)');
         if (emu && j.lane !== 'emu' && j.lane !== 'excl') wrong.push(j.id + ' ៖ ប្រើ emulator តែ lane=' + j.lane + ' (ត្រូវ emu)');
         if (!poison && !emu && browser && j.lane !== 'browser') wrong.push(j.id + ' ៖ បើក browser តែ lane=' + j.lane);
-        if (j.lane === 'excl' && !poison && !isolatedPurge && !isolatedSuite) unjustified.push(j.id + ' ៖ excl គ្មានភស្តុតាង .tmp-poison-* ឬ F03 deadline ឬ Vitest child');
+        if (j.lane === 'excl' && !poison && !isolatedPurge && !isolatedSuite && !isolatedGuardian) unjustified.push(j.id + ' ៖ excl គ្មានភស្តុតាង .tmp-poison-* ឬ F03 deadline ឬ Vitest child ឬ mutation child pool');
         if (j.lane === 'emu' && !emu) unjustified.push(j.id + ' ៖ emu គ្មានភស្តុតាង emulator');
         if (j.lane === 'browser' && !browser) unjustified.push(j.id + ' ៖ browser គ្មាន ' + BROWSER_MARK);
     }
@@ -806,11 +832,19 @@ async function sectionSix() {
         ownerGuardActive(ownerGuardSource) && !ownerGuardActive(ownerGuardSource.replace(/^    await sectionOwnedRuntime\(\);$/m, '')));
     const internalOwnedRunner = job => job.id === 'emu/import-paired-ci-runner';
     const internalOwnerContractTest = job => job.id === 'import-paired-ci-runner-test';
-    const expectedOwned = job => !internalOwnedRunner(job) && !internalOwnerContractTest(job) && (job.id.startsWith('emu/') || job.lane === 'emu' || ['checker-coverage', 'exit-code-integrity'].includes(job.id));
+    const expectedOwned = job => !internalOwnedRunner(job) && !internalOwnerContractTest(job) && (job.id.startsWith('emu/') || job.lane === 'emu' || ['checker-coverage', 'exit-code-integrity', 'money-guardian-test'].includes(job.id));
+    const ownershipMatches = rows => rows.every(job => (job.owned === '1') === expectedOwned(job));
+    const ownershipMismatches = jobs.filter(job => (job.owned === '1') !== expectedOwned(job))
+        .map(job => ({ id: job.id, label: job.label, lane: job.lane, owned: job.owned, expected: expectedOwned(job) }));
     ok('CI គ្មាន global JVM ហើយ normal tasks ដែលត្រូវការ RTDB ឆ្លង owned scope ពេញ',
         !/java -jar|zoe-emulator\.pid/.test(wf) && shardStep.length > 0 && wf.includes('real.rules.json')
-        && jobs.length >= 150 && jobs.every(job => (job.owned === '1') === expectedOwned(job))
-        && jobs.filter(job => job.owned === '1').length >= 26);
+        && jobs.length >= 150 && ownershipMatches(jobs)
+        && jobs.filter(job => job.owned === '1').length >= 26, ownershipMismatches);
+    const guardianJobs = jobs.filter(job => job.id === 'money-guardian-test');
+    ok('money-guardian ទាំងពីរផ្នែកនៅតែត្រូវការ owned RTDB ទោះរត់ម្នាក់ឯង',
+        guardianJobs.length === 2 && guardianJobs.every(job => job.lane === 'excl' && expectedOwned(job)) && ownershipMatches(guardianJobs), guardianJobs);
+    ok('ទិសផ្ទុយ ៖ ដក owned scope ពី money-guardian ត្រូវបានចាប់ ទោះ lane នៅ excl',
+        guardianJobs.length === 2 && guardianJobs.every(target => !ownershipMatches(jobs.map(job => job === target ? { ...job, owned: '0' } : job))));
     const base = runall.slice(runall.search(/^if \[ -n "\$BASE" \]/m));
     const baseCommands = [...base.matchAll(/^\s*([A-Z0-9_]+_APP_DIR)="\$BASE" (runall_owned )?node (audit-tools\/[A-Za-z0-9_/-]+\.js)/gm)];
     const requiredBase = entry => entry[3].startsWith(EMU) || ['money-guardian-test.js', 'money-checker-truthfulness-test.js', 'exit-code-integrity.js', 'supabase-scan-rules-test.js'].some(name => entry[3] === 'audit-tools/' + name);

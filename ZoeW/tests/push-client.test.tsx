@@ -122,6 +122,8 @@ beforeEach(() => {
     delete (window as any).Capacitor;
     Object.keys(pn.listeners).forEach((k) => delete pn.listeners[k]);
     firebaseState.isDatabaseInitialized = true;
+    firebaseState.serverClockTrusted = true;
+    firebaseState.serverTimeOffsetMs = 0;
     dbListenerPendingPaths.clear();
     dataState.scanHistory = [];
     uiState.notifyFeed = [];

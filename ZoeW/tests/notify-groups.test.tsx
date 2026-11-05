@@ -62,6 +62,8 @@ beforeEach(() => {
         dataState.scanHistory = Array.from({ length: N_EXPIRY }, (_, i) => openItem(i));
         dataState.deletedItems = Array.from({ length: N_REMOVED }, (_, i) => trashItem(i));
         firebaseState.isDatabaseInitialized = true;
+    firebaseState.serverClockTrusted = true;
+    firebaseState.serverTimeOffsetMs = 0;
     });
     mount(<><AppNavbar /><DrawerBackdrop /><SideDrawer /><NotifyDrawer /></>);
 });

@@ -3,15 +3,37 @@
 // (registry · scan_pending · ធុងសំរាម · history · restore finalization) តាម query REST មានព្រំដែន ហើយមិនសរសេរក្រោយ session ប្តូរ។
 import fs from 'node:fs';
 import path from 'node:path';
+import { createRequire } from 'node:module';
+import vm from 'node:vm';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { dataState, firebaseState } from '../src/core/state';
+import * as storage from '../src/core/storage';
+import * as evidenceRetention from '../src/services/evidence-retention';
 import { dbListenerFailedPaths, dbListenerPendingPaths, DB_LISTENER_KEY_DELETED } from '../src/core/text';
 import { EVIDENCE_RETENTION_MS, EVIDENCE_SWEEP_BATCH, EVIDENCE_SWEEP_GAP_MS, evidenceSweep, runEvidenceRetentionSweep } from '../src/services/evidence-retention';
 
 const HOST = 'https://audit-evidence.firebaseio.com';
 const NOW = Date.UTC(2026, 10, 5, 2);
 const OLD = NOW - EVIDENCE_RETENTION_MS - 2 * 86400000, YOUNG = NOW - EVIDENCE_RETENTION_MS + 86400000;
-const lab = { store: {} as any, deletes: [] as string[], afterRead: null as null | ((p: string) => void) };
+type Page = { at: string; backend: 'native' | 'supabase'; order: string; after: string | null; limit: number; keys: string[] };
+const lab = { store: {} as any, deletes: [] as string[], pages: [] as Page[], writes: [] as string[][], unknownDelete: null as null | 'landed' | 'unsent',
+    beforeWrite: null as null | ((paths: string[]) => void), unordered: false, nativeArrays: false, failListing: false, tenant: 'shop-a',
+    afterRead: null as null | ((p: string) => void), afterDelete: null as null | (() => void) };
+
+// Execute only the comparator and its literal dependencies from the installed SDK.
+// This oracle is independent of the retention service's cursor comparator.
+const firebaseSource = fs.readFileSync(createRequire(import.meta.url).resolve('@firebase/database'), 'utf8');
+const firebaseNames = ['MIN_NAME', 'MAX_NAME', 'INTEGER_REGEXP_', 'INTEGER_32_MIN', 'INTEGER_32_MAX', 'tryParseInt', 'nameCompare'];
+const firebaseComparatorSource = firebaseNames.map(name => {
+    const pattern = name === 'tryParseInt' || name === 'nameCompare'
+        ? new RegExp('const ' + name + ' = function \\([^]*?\\n};')
+        : new RegExp('const ' + name + ' = [^\\n]+;');
+    const match = firebaseSource.match(pattern);
+    if (!match) throw new Error('Installed Firebase comparator changed: ' + name);
+    return match[0];
+}).join('\n');
+const firebaseKeyCompare: (a: string, b: string) => number = vm.runInNewContext(firebaseComparatorSource + '\nnameCompare;');
+const lexicalCompare = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
 const clone = <V,>(v: V): V => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
 const parts = (p: string) => p.split('/').filter(Boolean);
 const getAt = (p: string) => clone(parts(p).reduce((n: any, k) => n?.[k], lab.store) ?? null);
@@ -39,14 +61,31 @@ function rulesAllowDelete(p: string) {
         && getAt('zoew_scan_history_cod_dod/' + key) === null && getAt('zoew_restore_finalizations/' + key) === null;
     return false;
 }
-function sdk() {
+function sdk(supabase = false) {
     return {
-        ref: (_db: any, p = '') => ref(p),
-        get: async (r: any) => snap(r, getAt(r.path)),
+        __supabase: supabase,
+        tenantScope: () => lab.tenant,
+        evidenceCandidates: vi.fn(async (_auth: any, root: string, before: number, limit: number, after?: string) => {
+            const field = root === 'zoew_scan_operations' ? 'birth' : 'deletedAt';
+            const picked = Object.entries(getAt(root) || {}).filter(([key, value]: any) => Number.isFinite(value?.[field])
+                && value[field] < before && (!after || lexicalCompare(key, after) > 0))
+                .sort(([a], [b]) => lexicalCompare(a, b)).slice(0, limit);
+            lab.pages.push({ at: root, backend: 'supabase', order: 'key', after: after || null, limit, keys: picked.map(([key]) => key) });
+            if (lab.failListing) { lab.failListing = false; throw new Error('temporary listing failure'); }
+            lab.afterRead?.(root);
+            return picked.map(([k, v]) => ({ r: root, k, v }));
+        }),
+        ref: (_db: any, p = '') => supabase ? { ...ref(p), toString: () => 'supabase://audit/' + p } : ref(p),
+        get: async (r: any) => { const value = getAt(r.path); lab.afterRead?.(r.path); return snap(r, value); },
         update: async (r: any, ups: any) => {
             const paths = Object.keys(ups).map((k) => [r.path, k].filter(Boolean).join('/'));
+            lab.writes.push(paths); lab.beforeWrite?.(paths);
+            const unknown = lab.unknownDelete; lab.unknownDelete = null;
+            if (unknown === 'unsent') throw Object.assign(new Error('lost delete acknowledgement'), { code: 'disconnect', txOutcome: 'unknown' });
             if (paths.some((p) => ups[p.slice(r.path ? r.path.length + 1 : 0)] !== null || !rulesAllowDelete(p))) throw Object.assign(new Error('permission_denied'), { code: 'PERMISSION_DENIED' });
             for (const p of paths) { lab.deletes.push(p); setAt(p, null); }
+            lab.afterDelete?.();
+            if (unknown === 'landed') throw Object.assign(new Error('lost delete acknowledgement'), { code: 'disconnect', txOutcome: 'unknown' });
         },
         onValue: () => () => {}, off: () => {}
     };
@@ -59,12 +98,22 @@ function serverRead(input: string | URL | Request) {
     let value = getAt(at);
     const orderBy = url.searchParams.get('orderBy');
     if (orderBy !== null) {
-        const field = JSON.parse(orderBy), endAt = Number(url.searchParams.get('endAt')), limit = Number(url.searchParams.get('limitToFirst'));
-        expect(limit).toBe(EVIDENCE_SWEEP_BATCH);
+        const order = JSON.parse(orderBy), limit = Number(url.searchParams.get('limitToFirst'));
+        const after = url.searchParams.has('startAt') ? JSON.parse(url.searchParams.get('startAt')!) : null;
         const picked = Object.entries(value && typeof value === 'object' ? value : {})
-            .filter(([, v]: any) => typeof v?.[field] === 'number' && v[field] <= endAt)
-            .sort(([a, x]: any, [b, y]: any) => x[field] - y[field] || (a < b ? -1 : 1)).slice(0, limit);
-        value = picked.length ? Object.fromEntries(picked) : null;
+            .filter(([, v]) => v !== null && v !== undefined)
+            .filter(([key, v]: any) => order === '$key' ? after === null || firebaseKeyCompare(key, after) >= 0
+                : typeof v?.[order] === 'number' && v[order] <= Number(url.searchParams.get('endAt')))
+            .sort(([a, x]: any, [b, y]: any) => order === '$key' ? firebaseKeyCompare(a, b) : x[order] - y[order] || lexicalCompare(a, b))
+            .slice(0, limit);
+        expect(limit).toBe(EVIDENCE_SWEEP_BATCH + (order === '$key' && after !== null ? 1 : 0));
+        lab.pages.push({ at, backend: 'native', order, after, limit, keys: picked.map(([key]) => key) });
+        if (lab.failListing) { lab.failListing = false; return Promise.reject(new Error('temporary listing failure')); }
+        value = picked.length ? Object.fromEntries(lab.unordered ? picked.reverse() : picked) : null;
+        if (lab.nativeArrays && picked.length && picked.every(([key]) => /^\d+$/.test(key))) {
+            value = [];
+            for (const [key, child] of picked) value[Number(key)] = child;
+        }
     }
     lab.afterRead?.(at);
     return Promise.resolve(new Response(JSON.stringify(value), { status: 200, headers: { 'Content-Type': 'application/json' } }));
@@ -98,10 +147,12 @@ const keys = (root: string) => Object.keys(getAt(root) || {}).sort();
 
 beforeEach(() => {
     vi.useFakeTimers(); vi.setSystemTime(NOW);
-    lab.store = {}; lab.deletes = []; lab.afterRead = null;
+    lab.store = {}; lab.deletes = []; lab.pages = []; lab.writes = []; lab.unknownDelete = null; lab.beforeWrite = null; lab.afterRead = null; lab.afterDelete = null; lab.unordered = false; lab.nativeArrays = false; lab.failListing = false; lab.tenant = 'shop-a';
     evidenceSweep.at = 0; evidenceSweep.running = false;
+    (evidenceSweep as any).owner = null; (evidenceSweep as any).cursors = {};
     dbListenerPendingPaths.clear(); dbListenerFailedPaths.clear();
     firebaseState.authGeneration++; firebaseState.db = { name: 'audit-evidence-db' } as any; firebaseState.fb = sdk() as any;
+    firebaseState.isInitializingFirebase = false;
     firebaseState.auth = { currentUser: { uid: 'audit-user', getIdToken: async () => 'synthetic-id' } } as any;
     firebaseState.firebaseConfig = { databaseURL: HOST } as any;
     localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: HOST }));
@@ -182,4 +233,405 @@ it('rules ពិតមានលក្ខខណ្ឌលុបដូចគ្ន�
     expect(rel.$releaseId['.write']).toContain("data.child('deletedAt').val() < " + age);
     expect(con.$sourceId['.write']).toContain("data.child('deletedAt').val() < " + age);
     expect(con.$sourceId['.write']).toContain("root.child('zoew_restore_finalizations').child($sourceId).exists()");
+});
+
+
+function heldHead(equalBirth = false) {
+    const root = 'zoew_scan_operations', held = [];
+    lab.store = { [root]: {}, zoew_scan_pending: {} };
+    for (let i = 0; i < EVIDENCE_SWEEP_BATCH + 1; i++) {
+        const id = 'scan_' + i.toString(16).padStart(32, '0');
+        lab.store[root][id] = op(id, 'committed', equalBirth ? OLD : OLD + i, 'ZH' + i);
+        if (i < EVIDENCE_SWEEP_BATCH) { lab.store.zoew_scan_pending[id] = 'u'; held.push(id); }
+    }
+    dataState.scanHistory = []; dataState.deletedItems = [];
+    return { root, held, tail: 'scan_' + EVIDENCE_SWEEP_BATCH.toString(16).padStart(32, '0') };
+}
+const nextSweep = async () => { vi.setSystemTime(Date.now() + EVIDENCE_SWEEP_GAP_MS); return runEvidenceRetentionSweep(); };
+
+it.each([false, true])('held evidence head never starves safe tail (equal birth: %s)', async (equalBirth) => {
+    const { root, held, tail } = heldHead(equalBirth);
+    expect(await runEvidenceRetentionSweep()).toBe(0);
+    expect(await nextSweep()).toBe(1);
+    expect(getAt(root + '/' + tail)).toBeNull();
+    expect(keys(root)).toEqual(held);
+});
+
+
+function useSupabase() {
+    firebaseState.fb = sdk(true) as any;
+    firebaseState.db = { name: 'audit-supabase-db', app: { options: { supabaseUrl: 'https://audit.supabase.co' } } } as any;
+    (firebaseState.auth as any).app = { options: { supabaseUrl: 'https://audit.supabase.co' } };
+    localStorage.setItem('zoew_firebase_config', JSON.stringify({ supabaseUrl: 'https://audit.supabase.co' }));
+}
+const rootPages = (root: string) => lab.pages.filter(page => page.at === root);
+const savedCursors = () => Object.fromEntries(Object.keys(localStorage).filter(key => key !== 'zoew_firebase_config').map(key => [key, localStorage.getItem(key)]));
+
+it('native query oracle follows installed Firebase integer-key ordering', () => {
+    const input = ['a', '2147483648', '10', '02', '2', '-1', '0', '00', '-2147483648', '_', 'z', '00000000001', '1'];
+    expect([...input].sort(firebaseKeyCompare)).toEqual(['-2147483648', '-1', '0', '00', '1', '00000000001', '2', '02', '10', '2147483648', '_', 'a', 'z']);
+    expect([...input].sort(lexicalCompare)).not.toEqual([...input].sort(firebaseKeyCompare));
+});
+
+it.each(['native', 'supabase'])('%s progresses independently through held pages of all three evidence roots', async backend => {
+    const { root, held, tail } = heldHead(true);
+    const releases: Record<string, any> = {}, consumptions: Record<string, any> = {};
+    for (const [i, key] of [...held, tail].entries()) {
+        releases[key] = release(key, OLD, key, 'ZR' + i);
+        consumptions[key] = consumption(key, OLD);
+        if (i < EVIDENCE_SWEEP_BATCH) setAt('zoew_recently_deleted_cod_dod/' + key, { id: key });
+    }
+    lab.store.zoew_registry_releases = releases;
+    lab.store.zoew_trash_consumptions = consumptions;
+    if (backend === 'supabase') useSupabase();
+    expect(await runEvidenceRetentionSweep()).toBe(0);
+    expect(await nextSweep()).toBe(3);
+    for (const at of [root, 'zoew_registry_releases', 'zoew_trash_consumptions']) {
+        expect(getAt(at + '/' + tail)).toBeNull();
+        expect(rootPages(at)).toHaveLength(2);
+        expect(rootPages(at)[1].after).toBe(held.at(-1));
+        expect(lab.deletes.filter(p => p.startsWith(at + '/'))).toHaveLength(1);
+    }
+    if (backend === 'supabase') expect(fetch).not.toHaveBeenCalled();
+});
+
+it.each(['young', 'malformed'])('native raw %s head advances before age/schema filtering', async kind => {
+    const { root, held, tail } = heldHead(true);
+    lab.store.zoew_scan_pending = {};
+    for (const key of held) lab.store[root][key] = kind === 'young' ? op(key, 'committed', YOUNG, 'ZY') : 'invalid receipt';
+    expect(await runEvidenceRetentionSweep()).toBe(0);
+    expect(rootPages(root)[0]).toMatchObject({ order: '$key', limit: EVIDENCE_SWEEP_BATCH });
+    expect(await nextSweep()).toBe(1);
+    expect(rootPages(root)[1]).toMatchObject({ after: held.at(-1), limit: EVIDENCE_SWEEP_BATCH + 1 });
+    expect(getAt(root + '/' + tail)).toBeNull();
+    expect(keys(root)).toEqual(held);
+});
+
+it.each(['native', 'supabase'])('%s continues if another device deletes the cursor key', async backend => {
+    const { root, held, tail } = heldHead(true);
+    if (backend === 'supabase') useSupabase();
+    expect(await runEvidenceRetentionSweep()).toBe(0);
+    setAt(root + '/' + held.at(-1), null);
+    expect(await nextSweep()).toBe(1);
+    expect(getAt(root + '/' + tail)).toBeNull();
+    expect(rootPages(root)[1].after).toBe(held.at(-1));
+});
+
+it.each(['native', 'supabase'])('%s wraps after the tail and revisits a newly eligible held head', async backend => {
+    const { root, held, tail } = heldHead(true);
+    if (backend === 'supabase') useSupabase();
+    expect(await runEvidenceRetentionSweep()).toBe(0);
+    expect(await nextSweep()).toBe(1);
+    expect(getAt(root + '/' + tail)).toBeNull();
+    setAt('zoew_scan_pending/' + held[0], null);
+    // A full final page may need one empty request to establish the end of a lap.
+    let removed = await nextSweep();
+    if (!removed) removed += await nextSweep();
+    expect(removed).toBe(1);
+    expect(getAt(root + '/' + held[0])).toBeNull();
+    expect(rootPages(root).at(-1)?.after).toBeNull();
+});
+
+it('native paging sorts unordered response objects with Firebase key semantics', async () => {
+    const root = 'zoew_trash_consumptions';
+    const all = ['-2147483648', '-1', '0', '00', '1', '00000000001', '2', '02', '10', '2147483648', ...Array.from({ length: EVIDENCE_SWEEP_BATCH + 7 }, (_, i) => 'row_' + String(i).padStart(3, '0'))];
+    const ordered = [...all].sort(firebaseKeyCompare), held = ordered.slice(0, EVIDENCE_SWEEP_BATCH), tail = ordered.slice(EVIDENCE_SWEEP_BATCH);
+    lab.store = { [root]: Object.fromEntries([...all].reverse().map(key => [key, consumption(key, OLD)])),
+        zoew_scan_history_cod_dod: Object.fromEntries(held.map(key => [key, { id: key }])) };
+    dataState.scanHistory = []; dataState.deletedItems = []; lab.unordered = true;
+    expect(await runEvidenceRetentionSweep()).toBe(0);
+    expect(await nextSweep()).toBe(tail.length);
+    expect(rootPages(root)[0].keys).toEqual(held);
+    expect(rootPages(root)[1].after).toBe(held.at(-1));
+    expect(lab.deletes.map(p => parts(p).at(-1)).sort()).toEqual(tail.sort());
+});
+
+it.each(['native', 'supabase'])('%s retries the same cursor after a transient listing failure', async backend => {
+    const { root, held, tail } = heldHead(true);
+    if (backend === 'supabase') useSupabase();
+    expect(await runEvidenceRetentionSweep()).toBe(0);
+    const beforeFailure = savedCursors();
+    lab.failListing = true;
+    expect(await nextSweep()).toBe(0);
+    expect(savedCursors()).toEqual(beforeFailure);
+    expect(await nextSweep()).toBe(1);
+    expect(getAt(root + '/' + tail)).toBeNull();
+    expect(rootPages(root).slice(1).map(p => p.after)).toEqual([held.at(-1), held.at(-1)]);
+});
+
+it('native raw-page deletion remains bounded when the overlap cursor disappeared', async () => {
+    const { root, held } = heldHead(true);
+    for (let i = EVIDENCE_SWEEP_BATCH + 1; i < EVIDENCE_SWEEP_BATCH * 2 + 9; i++) {
+        const key = 'scan_' + i.toString(16).padStart(32, '0');
+        lab.store[root][key] = op(key, 'committed', OLD, 'ZB' + i);
+    }
+    expect(await runEvidenceRetentionSweep()).toBe(0);
+    setAt(root + '/' + held.at(-1), null);
+    expect(await nextSweep()).toBe(EVIDENCE_SWEEP_BATCH);
+    expect(lab.deletes).toHaveLength(EVIDENCE_SWEEP_BATCH);
+    expect(await nextSweep()).toBe(9);
+});
+
+it('localStorage refusal preserves live cursor progress in memory', async () => {
+    const { root, tail } = heldHead(true);
+    // Keep the already resolved shop readable while only advisory cursor storage fails.
+    const get = storage.safeStoreGet;
+    vi.spyOn(storage, 'safeStoreGet').mockImplementation((store, key) => key === 'zoew_firebase_config' ? get(store, key) : null);
+    vi.spyOn(storage, 'safeStoreSet').mockReturnValue(false);
+    expect(await runEvidenceRetentionSweep()).toBe(0);
+    expect(await nextSweep()).toBe(1);
+    expect(getAt(root + '/' + tail)).toBeNull();
+});
+
+const ownerChanges = ['db', 'sdk', 'auth', 'generation', 'uid', 'scope'] as const;
+function switchOwner(change: typeof ownerChanges[number]) {
+    const saved = { db: firebaseState.db, fb: firebaseState.fb, auth: firebaseState.auth, generation: firebaseState.authGeneration,
+        uid: firebaseState.auth.currentUser.uid, config: localStorage.getItem('zoew_firebase_config')! };
+    if (change === 'db') firebaseState.db = { name: 'new-db' } as any;
+    if (change === 'sdk') firebaseState.fb = sdk() as any;
+    if (change === 'auth') firebaseState.auth = { currentUser: { uid: 'audit-user', getIdToken: async () => 'synthetic-id' } } as any;
+    if (change === 'generation') firebaseState.authGeneration++;
+    if (change === 'uid') firebaseState.auth.currentUser.uid = 'other-user';
+    if (change === 'scope') localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: HOST + '/other' }));
+    return () => {
+        firebaseState.db = saved.db; firebaseState.fb = saved.fb; firebaseState.auth = saved.auth;
+        firebaseState.authGeneration = saved.generation; firebaseState.auth.currentUser.uid = saved.uid;
+        localStorage.setItem('zoew_firebase_config', saved.config);
+    };
+}
+
+it.each(ownerChanges.flatMap(change => ['token', 'listing', 'holder'].map(stage => [change, stage] as const)))('%s switch at %s await cannot publish a cursor or start a delete', async (change, stage) => {
+    const { root, held, tail } = heldHead(true);
+    expect(await runEvidenceRetentionSweep()).toBe(0);
+    const beforeSwitch = savedCursors();
+    let restore: (() => void) | undefined;
+    const flip = () => { if (!restore) restore = switchOwner(change); };
+    if (stage === 'token') {
+        firebaseState.auth.currentUser.getIdToken = async () => { flip(); return 'synthetic-id'; };
+    } else {
+        lab.afterRead = at => {
+            if (at === (stage === 'listing' ? root : 'zoew_scan_pending/' + tail)) flip();
+        };
+    }
+    expect(await nextSweep()).toBe(0);
+    expect(restore).toBeTypeOf('function');
+    expect(lab.deletes).toEqual([]);
+    expect(savedCursors()).toEqual(beforeSwitch);
+    restore!();
+    firebaseState.auth.currentUser.getIdToken = async () => 'synthetic-id'; lab.afterRead = null;
+    expect(await nextSweep()).toBe(1);
+    expect(getAt(root + '/' + tail)).toBeNull();
+    expect(rootPages(root).at(-1)?.after).toBe(held.at(-1));
+});
+
+it('server clock controls retention after an initially wrong device clock', async () => {
+    seed();
+    const wrongDeviceNow = NOW + EVIDENCE_RETENTION_MS * 3;
+    vi.setSystemTime(wrongDeviceNow);
+    firebaseState.serverClockTrusted = false;
+    expect(await runEvidenceRetentionSweep()).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    firebaseState.serverTimeOffsetMs = NOW - wrongDeviceNow;
+    firebaseState.serverClockTrusted = true;
+    expect(await runEvidenceRetentionSweep()).toBe(4);
+    expect(getAt('zoew_scan_operations/' + scanId('c'))).not.toBeNull();
+});
+
+
+it.each(['native', 'supabase'])('%s boot reload resumes the persisted held-head cursor', async backend => {
+    const { root, held, tail } = heldHead(true);
+    if (backend === 'supabase') useSupabase();
+    expect(await runEvidenceRetentionSweep()).toBe(0);
+    const cursorKey = evidenceRetention.evidenceCursorKey(backend === 'supabase' ? 'https://audit.supabase.co#shop-a' : HOST, 'audit-user');
+    const persisted = JSON.parse(localStorage.getItem(cursorKey)!);
+    expect(persisted).toMatchObject({ v: 1, uid: 'audit-user', roots: { [root]: held.at(-1) } });
+    // Reset all exported process state while retaining only storage, like a reboot.
+    (evidenceSweep as any).owner = null; (evidenceSweep as any).cursors = {}; evidenceSweep.at = 0; evidenceSweep.running = false;
+    firebaseState.authGeneration++;
+    firebaseState.db = { ...firebaseState.db } as any;
+    firebaseState.fb = sdk(backend === 'supabase') as any;
+    expect(await runEvidenceRetentionSweep()).toBe(1);
+    expect(getAt(root + '/' + tail)).toBeNull();
+    expect(rootPages(root)[1].after).toBe(held.at(-1));
+});
+
+it.each(['uid', 'scope'])('a persisted cursor never crosses another %s', async identity => {
+    const { root } = heldHead(true);
+    expect(await runEvidenceRetentionSweep()).toBe(0);
+    (evidenceSweep as any).owner = null; (evidenceSweep as any).cursors = {};
+    if (identity === 'uid') firebaseState.auth.currentUser.uid = 'other-user';
+    else localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: HOST + '/other' }));
+    expect(await nextSweep()).toBe(0);
+    expect(rootPages(root).at(-1)?.after).toBeNull();
+    expect(lab.deletes).toEqual([]);
+});
+
+it.each(['bad JSON', 'wrong version', 'forbidden key', 'too long key'])('invalid advisory cursor fails safely (%s)', async problem => {
+    const { root } = heldHead(true);
+    const cursorKey = evidenceRetention.evidenceCursorKey(HOST, 'audit-user');
+    const payload = { v: 1, scope: HOST, uid: 'audit-user', roots: { [root]: 'scan_' + '0'.repeat(32) } };
+    if (problem === 'wrong version') payload.v = 999;
+    if (problem === 'forbidden key') payload.roots[root] = 'unsafe/key';
+    if (problem === 'too long key') payload.roots[root] = 'x'.repeat(769);
+    localStorage.setItem(cursorKey, problem === 'bad JSON' ? '{broken' : JSON.stringify(payload));
+    expect(await runEvidenceRetentionSweep()).toBe(0);
+    expect(rootPages(root)[0].after).toBeNull();
+    expect(lab.deletes).toEqual([]);
+});
+
+it.each(['unicode', 'long'])('native malformed %s receipt keys advance and survive cursor reload', async shape => {
+    const root = 'zoew_scan_operations', tail = scanId('z');
+    const rawKeys = Array.from({ length: EVIDENCE_SWEEP_BATCH }, (_, i) => 'a' + String(i).padStart(3, '0') + (shape === 'unicode' ? '\u1780' : 'x'.repeat(140)));
+    lab.store = { [root]: Object.fromEntries(rawKeys.map(key => [key, 'malformed'])), zoew_scan_pending: {} };
+    lab.store[root][tail] = op(tail, 'committed', OLD, 'ZTAIL');
+    dataState.scanHistory = []; dataState.deletedItems = [];
+    expect(await runEvidenceRetentionSweep()).toBe(0);
+    (evidenceSweep as any).owner = null; (evidenceSweep as any).cursors = {};
+    expect(await nextSweep()).toBe(1);
+    expect(rootPages(root)[1].after).toBe(rawKeys.at(-1));
+    expect(getAt(root + '/' + tail)).toBeNull();
+    expect(keys(root)).toEqual(rawKeys);
+});
+
+it.each(['native', 'supabase'])('%s session switch after delete ACK cannot publish a cursor or write another root', async backend => {
+    const { root, tail } = heldHead(true);
+    const other = scanId('z');
+    lab.store.zoew_registry_releases = { [other]: release(other, OLD, 'gone', 'ZOTHER') };
+    if (backend === 'supabase') useSupabase();
+    // Advance only the scan root on the first pass; introduce another-root candidate later.
+    delete lab.store.zoew_registry_releases;
+    expect(await runEvidenceRetentionSweep()).toBe(0);
+    lab.store.zoew_registry_releases = { [other]: release(other, OLD, 'gone', 'ZOTHER') };
+    const persisted = savedCursors();
+    const pagesBefore = lab.pages.length;
+    lab.afterDelete = () => { firebaseState.authGeneration++; };
+    await nextSweep();
+    expect(lab.deletes).toEqual([root + '/' + tail]);
+    expect(getAt('zoew_registry_releases/' + other)).not.toBeNull();
+    expect(lab.pages.slice(pagesBefore).map(page => page.at)).toEqual([root]);
+    expect(savedCursors()).toEqual(persisted);
+});
+
+
+it('native array-shaped pages ignore null holes and advance through numeric keys', async () => {
+    const root = 'zoew_trash_consumptions', held = Array.from({ length: EVIDENCE_SWEEP_BATCH }, (_, i) => String(i + 1));
+    const tail = String(EVIDENCE_SWEEP_BATCH + 1);
+    lab.store = { [root]: [null, ...[...held, tail].map(key => consumption(key, OLD))],
+        zoew_scan_history_cod_dod: Object.fromEntries(held.map(key => [key, { id: key }])) };
+    dataState.scanHistory = []; dataState.deletedItems = []; lab.nativeArrays = true;
+    expect(await runEvidenceRetentionSweep()).toBe(0);
+    expect(await nextSweep()).toBe(1);
+    expect(rootPages(root)[1].after).toBe(held.at(-1));
+    expect(lab.deletes).toEqual([root + '/' + tail]);
+});
+
+it('an unavailable Supabase paging capability never falls back to full-tree reads', async () => {
+    heldHead(true); useSupabase();
+    delete (firebaseState.fb as any).evidenceCandidates;
+    const get = vi.spyOn(firebaseState.fb as any, 'get');
+    expect(await runEvidenceRetentionSweep()).toBe(0);
+    expect(get).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(lab.deletes).toEqual([]);
+});
+
+
+it.each(['unsent', 'landed'] as const)('unknown delete outcome (%s) preserves its cursor and never starts individual retries', async outcome => {
+    const { root, held } = heldHead(true);
+    for (let i = EVIDENCE_SWEEP_BATCH + 1; i < EVIDENCE_SWEEP_BATCH * 2 + 7; i++) {
+        const key = 'scan_' + i.toString(16).padStart(32, '0');
+        lab.store[root][key] = op(key, 'committed', OLD, 'ZU' + i);
+    }
+    expect(await runEvidenceRetentionSweep()).toBe(0);
+    const checkpoint = savedCursors();
+    lab.unknownDelete = outcome;
+    expect(await nextSweep()).toBe(0);
+    expect(lab.writes).toHaveLength(1);
+    expect(lab.writes[0]).toHaveLength(EVIDENCE_SWEEP_BATCH);
+    expect(savedCursors()).toEqual(checkpoint);
+    expect(lab.deletes).toHaveLength(outcome === 'landed' ? EVIDENCE_SWEEP_BATCH : 0);
+    expect(await nextSweep()).toBe(outcome === 'landed' ? 7 : EVIDENCE_SWEEP_BATCH);
+    expect(rootPages(root).slice(1).map(page => page.after)).toEqual([held.at(-1), held.at(-1)]);
+    expect(lab.writes).toHaveLength(2);
+    if (outcome === 'unsent') expect(await nextSweep()).toBe(7);
+});
+
+it.each(['native', 'supabase'])('%s definitive batch refusal retries records and retains a newly held receipt', async backend => {
+    const root = 'zoew_scan_operations', ids = Array.from({ length: 3 }, (_, i) => scanId(String(i)));
+    lab.store = { [root]: Object.fromEntries(ids.map((id, i) => [id, op(id, 'committed', OLD, 'ZRACE' + i)])) };
+    dataState.scanHistory = []; dataState.deletedItems = [];
+    if (backend === 'supabase') useSupabase();
+    lab.beforeWrite = () => {
+        lab.beforeWrite = null;
+        setAt('zoew_scan_pending/' + ids[0], 'u');
+    };
+    expect(await runEvidenceRetentionSweep()).toBe(2);
+    expect(lab.writes.map(paths => paths.length)).toEqual([3, 1, 1, 1]);
+    expect(keys(root)).toEqual([ids[0]]);
+    expect(lab.deletes).toEqual(ids.slice(1).map(id => root + '/' + id));
+});
+
+it.each(['native', 'supabase'])('%s listing failure in one root leaves the other roots live', async backend => {
+    const id = seed();
+    if (backend === 'supabase') useSupabase();
+    lab.failListing = true;
+    expect(await runEvidenceRetentionSweep()).toBe(2);
+    expect(getAt('zoew_scan_operations/' + id.a)).not.toBeNull();
+    expect(getAt('zoew_scan_operations/' + id.e)).not.toBeNull();
+    expect(getAt('zoew_registry_releases/' + id.g)).toBeNull();
+    expect(getAt('zoew_trash_consumptions/row_gone')).toBeNull();
+    expect(await nextSweep()).toBe(2);
+    expect(getAt('zoew_scan_operations/' + id.a)).toBeNull();
+    expect(getAt('zoew_scan_operations/' + id.e)).toBeNull();
+    expect(rootPages('zoew_scan_operations').map(page => page.after)).toEqual([null, null]);
+});
+
+it.each(['listing', 'holder'])('Supabase tenant change after %s read fences the old cursor and writes', async stage => {
+    const { root, tail } = heldHead(true); useSupabase();
+    expect(await runEvidenceRetentionSweep()).toBe(0);
+    const checkpoint = savedCursors();
+    lab.afterRead = at => { if (at === (stage === 'listing' ? root : 'zoew_scan_pending/' + tail)) lab.tenant = 'shop-b'; };
+    expect(await nextSweep()).toBe(0);
+    expect(lab.deletes).toEqual([]);
+    expect(savedCursors()).toEqual(checkpoint);
+    lab.tenant = 'shop-a'; lab.afterRead = null;
+    expect(await nextSweep()).toBe(1);
+    expect(getAt(root + '/' + tail)).toBeNull();
+});
+
+it.each([NaN, Infinity, -Infinity])('invalid server-clock offset %s starts no evidence effects', async offset => {
+    seed();
+    firebaseState.serverTimeOffsetMs = offset;
+    expect(await runEvidenceRetentionSweep()).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(lab.writes).toEqual([]);
+    expect(savedCursors()).toEqual({});
+    firebaseState.serverTimeOffsetMs = 0;
+    expect(await runEvidenceRetentionSweep()).toBe(4);
+    expect(lab.deletes).toHaveLength(4);
+});
+
+it.each([NaN, Infinity, -Infinity])('clock becoming %s during a holder read cannot delete or checkpoint', async offset => {
+    const { root, tail } = heldHead(true);
+    expect(await runEvidenceRetentionSweep()).toBe(0);
+    const checkpoint = savedCursors();
+    lab.afterRead = at => { if (at === 'zoew_scan_pending/' + tail) firebaseState.serverTimeOffsetMs = offset; };
+    expect(await nextSweep()).toBe(0);
+    expect(lab.writes).toEqual([]);
+    expect(savedCursors()).toEqual(checkpoint);
+    firebaseState.serverTimeOffsetMs = 0; lab.afterRead = null;
+    expect(await nextSweep()).toBe(1);
+    expect(getAt(root + '/' + tail)).toBeNull();
+});
+
+it('alternating owners preserve their independent cursor progress', async () => {
+    const { root, held, tail } = heldHead(true);
+    expect(await runEvidenceRetentionSweep()).toBe(0);
+    firebaseState.auth.currentUser.uid = 'other-user';
+    expect(await runEvidenceRetentionSweep()).toBe(0);
+    expect(rootPages(root).at(-1)?.after).toBeNull();
+    firebaseState.auth.currentUser.uid = 'audit-user';
+    expect(await runEvidenceRetentionSweep()).toBe(1);
+    expect(rootPages(root).at(-1)?.after).toBe(held.at(-1));
+    expect(getAt(root + '/' + tail)).toBeNull();
 });

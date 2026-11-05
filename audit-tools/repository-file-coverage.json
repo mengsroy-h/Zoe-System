@@ -1701,6 +1701,9 @@
     "ZoeW/src/core/palm-sign-state.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/src/core/rtdb-key.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/src/core/runtime.ts": {
       "policy": "zoew-app"
     },
@@ -3052,6 +3055,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/supabase-durable-discard.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-evidence-candidates.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/supabase-fake-clock-wire.test.ts": {
@@ -4482,6 +4488,9 @@
       "policy": "supabase-rules-generator"
     },
     "supabase/migrations/20261105011000_zoe_evidence_candidates.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261105080300_zoe_evidence_candidates_page.sql": {
       "policy": "supabase-db"
     },
     "supabase/package-lock.json": {

@@ -196,13 +196,14 @@ runall_fmt_ms() {  # <ms> ➜ «12.3s» · មិនមែនលេខ ➜ «—
     case "$1" in ''|*[!0-9]*) printf '—' ;; *) printf '%d.%ds' "$(( $1 / 1000 ))" "$(( $1 % 1000 / 100 ))" ;; esac
 }
 
-# ⛔ lane ដេរីវេពីឯកសារ checker ពិត លើកលែង ២ ក្រុមដែលមានហេតុផល (runall-runner-test ផ្ទៀងវាទល់នឹងប្រភព) ៖
+# ⛔ lane ដេរីវេពីឯកសារ checker ពិត លើកលែងក្រុមដែលមានហេតុផល (runall-runner-test ផ្ទៀងវាទល់នឹងប្រភព) ៖
 #   excl    ៖ រត់ម្នាក់ឯង (គ្មាន checker ផ្សេងរត់ជាមួយ) ៖ checker-coverage · exit-code-integrity **សរសេរ ហើយបោស**
 #             ឯកសារស្រមោល `.tmp-poison-*` ក្នុង audit-tools/ (ការបោសរបស់មួយ លុបស្រមោលដែលមួយទៀតកំពុងរត់)
 #             ហើយ fan out ខាងក្នុងរួចស្រាប់ (probe ស្របគ្នា · ការរត់ checker ពុលរួម emu/* លើ emulator ដដែល)
 #             registry-purge-atomic-sdk វាស់ deadline ១៥ វិ. លើ JVM ផ្ទាល់ ➜ មិនចែក CPU ជាមួយ checker ផ្សេង។
 #             zoew-suite បើក Vitest workers និង browser ក្នុង child scripts ➜ រត់ម្នាក់ឯង ដោយរក្សាពិដាន 240s/step និង 300s/checker។
-#   emu     ៖ ម្តងមួយ ៖ RTDB emulator តែមួយ (127.0.0.1:9000) · money-guardian រត់អ្នកយាម emu/* ខាងក្នុង
+#             money-guardian មាន mutation child pool ផ្ទាល់ខ្លួន ➜ មិនចែក CPU ជាមួយ browser/Postgres ដោយរក្សា matrix និងពិដានដដែល។
+#   emu     ៖ ម្តងមួយ ៖ RTDB emulator តែមួយ (127.0.0.1:9000)
 #             money-checker-truthfulness អាន/ស្រង់ emulator harness៖ ដាក់ serial ដោយប្រុងប្រយ័ត្ន ទោះ VM probe ខ្លួនវាមិនបើក emulator។
 #   browser ៖ ប្រភពមាន `chromium.launch(` ➜ ពិដាន RUNALL_BROWSER_JOBS
 #   any     ៖ ផ្សេងៗ (ពិដានរួម RUNALL_JOBS អនុវត្តលើគ្រប់ lane)
@@ -258,8 +259,8 @@ runall_timeout_for() {
 runall_lane() {
     local s; s="$(runall_script_of "$@")"
     case "$s" in
-        audit-tools/checker-coverage.js|audit-tools/exit-code-integrity.js|audit-tools/emu/registry-purge-atomic-sdk-test.js|audit-tools/zoew-suite-test.js) printf excl ;;
-        audit-tools/import-paired-ci-runner-test.js|audit-tools/emu/*|audit-tools/money-guardian-test.js|audit-tools/supabase-scan-rules-test.js|audit-tools/money-checker-truthfulness-test.js) printf emu ;;
+        audit-tools/checker-coverage.js|audit-tools/exit-code-integrity.js|audit-tools/emu/registry-purge-atomic-sdk-test.js|audit-tools/zoew-suite-test.js|audit-tools/money-guardian-test.js) printf excl ;;
+        audit-tools/import-paired-ci-runner-test.js|audit-tools/emu/*|audit-tools/supabase-scan-rules-test.js|audit-tools/money-checker-truthfulness-test.js) printf emu ;;
         *) if [ -n "$s" ] && grep -q 'chromium\.launch(' "$s" 2>/dev/null; then printf browser; else printf any; fi ;;
     esac
 }

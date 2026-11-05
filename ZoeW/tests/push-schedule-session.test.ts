@@ -31,6 +31,8 @@ beforeEach(() => {
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ supabaseUrl: BASE }));
     viewState.backendKind = 'supabase';
     firebaseState.isDatabaseInitialized = true;
+    firebaseState.serverClockTrusted = true;
+    firebaseState.serverTimeOffsetMs = 0;
     firebaseState.isInitializingFirebase = false;
     firebaseState.db = { name: 'push-test' } as any;
     firebaseState.fb = { tenantScope: (auth: any) => auth?._account?.tenant_id || '' } as any;
@@ -139,4 +141,28 @@ describe('កាលវិភាគ Push ៖ ចម្លើយយឺតមិន
         expect(await running).toBe(false);
         expect(saved()).toMatchObject({ on: false, schedAt: 0 });
     });
+});
+
+
+it.each([[false, 0], [true, NaN], [true, Infinity]])('Push៖ force មិនជំនួស schedule ពេលម៉ោងមិនទាន់ទុកចិត្ត %s/%s', async (trusted, offset) => {
+    const now = Date.now();
+    const day = 24 * 60 * 60 * 1000;
+    vi.setSystemTime(now + 9 * day);
+    firebaseState.serverClockTrusted = trusted as boolean;
+    firebaseState.serverTimeOffsetMs = offset as number;
+    appLocalStore.setItem(PUSH_STATE_KEY, JSON.stringify({ ...saved(), schedSig: 'keep-existing', schedAt: now }));
+    const before = appLocalStore.getItem(PUSH_STATE_KEY);
+    const posts: any[] = [];
+    const fetch = vi.fn(async (_url, options) => { posts.push(JSON.parse(options.body)); return reply(); });
+    vi.stubGlobal('fetch', fetch);
+    expect(await syncExpirySchedule(true)).toBe(false);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(appLocalStore.getItem(PUSH_STATE_KEY)).toBe(before);
+    expect(pushRuntime.scheduleAttemptAt).toBe(0);
+    firebaseState.serverClockTrusted = true;
+    firebaseState.serverTimeOffsetMs = -9 * day;
+    expect(await syncExpirySchedule(true)).toBe(true);
+    expect(posts).toHaveLength(1);
+    expect(posts[0].times).toHaveLength(1);
+    expect(posts[0].times[0]).toBeGreaterThan(now);
 });

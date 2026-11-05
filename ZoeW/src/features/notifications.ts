@@ -211,7 +211,8 @@ export function nearExpiryView(history, now, stale): NotifyView {
 }
 
 export function refreshNotifyView() {
-    const stale = !firebaseState.isDatabaseInitialized || dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY);
+    const stale = !firebaseState.serverClockTrusted || !Number.isFinite(firebaseState.serverTimeOffsetMs)
+        || !firebaseState.isDatabaseInitialized || dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY);
     uiState.notifyView = nearExpiryView(dataState.scanHistory, getServerNow(), stale);
     refreshNotifyRemovedView();
 }

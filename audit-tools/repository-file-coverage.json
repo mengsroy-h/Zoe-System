@@ -3629,7 +3629,7 @@
     },
     "audit-tools/emu/import-paired-sdk-test.js": {
       "policy": "import-paired-harness-integrity",
-      "sha256": "965cc4ea1f536178166bb3fc8f108ba6749f2b1179899913055afc8a45f3d69b"
+      "sha256": "3ffd5ec22a1e2d098caff7ba8159c2178fb8be05806ab135cee3bdd87eb42cca"
     },
     "audit-tools/emu/ledger-revert-emu-test.js": {
       "policy": "guard-1"

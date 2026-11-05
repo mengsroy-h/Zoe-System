@@ -1483,7 +1483,7 @@ Scan Management ➜ Arrival Scan ➜ a Waybill (`POST https://aargus-api.ztoglob
 - Every checker supports `*_APP_DIR` and is called in the `run-all.sh` baseline.
 - ⛔ Never exit when a function isn't found — stub it (exiting masks every later assertion).
 - ⛔ No single `try` around all scenarios; `await scenario()` for async ones.
-- ⛔ Every scenario starts from original stubs; add precondition assertions.
+- ⛔ Every scenario starts from original stubs; add precondition assertions. A scenario requiring an unlearned keyboard uses a fresh browser context; clearing storage alone does not reset module memory.
 - ⛔ `listen(0, '127.0.0.1')`; `emu/*` namespaces from `emu/ns.js` (`emuNamespace()`).
 - ⛔ Label-only `ok()` never called conditionally; count arguments with a real parser.
 - ⛔ `checker-coverage.js` skips part 5 under `EXITCODE_CHILD`; hash snapshots skip `.tmp-poison-*`.
@@ -1544,6 +1544,7 @@ npm ci --prefix tools/firebase-provision --ignore-scripts   # real firebase-tool
 
 - `run-all.sh` builds the measure tree itself; use that tree for guards that consume generated app text/markup. One such checker:
   `M=$(ZOE_MEASURE_ONLY=1 bash audit-tools/run-all.sh | tail -1)` then `(cd "$M" && node audit-tools/<x>.js)`.
+- `zoew-suite` owns its worker/browser budget and runs in the exclusive scheduler lane. Keep its per-step and outer deadlines; child processes must not compete with sibling checkers.
 - Full runs include real network interruption matrices and can take longer than ordinary checks. Run in the background and inspect the complete final verdict before reporting success.
 - Parallel and resumable ([`audit-tools/README.md`](audit-tools/README.md) section 2): `RUNALL_JOBS` lanes · state in
   `<git-dir>/zoe-runall-state.tsv` · `RUNALL_RESUME=1` with the same `*_STRICT` flags carries only full PASS and retries failed/unfinished/skipped/partial

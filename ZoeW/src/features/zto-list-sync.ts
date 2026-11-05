@@ -38,7 +38,12 @@ export const ZTO_FAST_MODE_HINT = 'ℹ️ សូមគូស «Fast Mode សម�
 
 export const ZTO_LIST_DEFAULT_DAYS = 4;
 
-export const ZTO_LIST_CLIENT_MAX_PAGES = 3;
+export const ZTO_LIST_CLIENT_MAX_PAGES = 20;
+
+export function ztoListPageLimit(body) {
+    const pages = Number(body && body.maxPages);
+    return Number.isInteger(pages) && pages > 0 ? Math.min(pages, ZTO_LIST_CLIENT_MAX_PAGES) : 3;
+}
 
 export const ZTO_PALM_LIST_MAX_PAGES = 1000;
 export const ZTO_PALM_LIST_TABS = ['3', '5'];
@@ -499,13 +504,14 @@ export async function fetchZtoScanPages(cfg, from, to, kind: 'returned' | 'sent'
         return out;
     }
     if (first[okField] !== true) return out;
+    const pageLimit = ztoListPageLimit(first);
     absorb(first);
     let pages = Number(first.pages);
     if (!isFinite(pages) || pages < 1) pages = 1;
     let open = first.pagesUnknown === true;
     let read = 1;
     for (;;) {
-        const last = Math.min(pages, ZTO_LIST_CLIENT_MAX_PAGES);
+        const last = Math.min(pages, pageLimit);
         if (last <= read) break;
         const work = [];
         for (let page = read + 1; page <= last; page++) work.push(fetchZtoListPage(cfg, from, to, page, kind).catch(() => null));
@@ -525,7 +531,7 @@ export async function fetchZtoScanPages(cfg, from, to, kind: 'returned' | 'sent'
         open = tail.pagesUnknown === true;
         if (!open && pages <= read) break;
     }
-    out.state = pages > ZTO_LIST_CLIENT_MAX_PAGES ? 'partial' : 'ok';
+    out.state = pages > pageLimit ? 'partial' : 'ok';
     return out;
 }
 
@@ -553,6 +559,7 @@ export async function fetchZtoListAllPages(cfg, from, to) {
     };
     const first = await fetchZtoListPage(cfg, from, to, 1, 'withSigned');
     if (!first) return out;
+    out.pageLimit = ztoListPageLimit(first);
     absorb(first, true);
     const settleReturned = async () => {
         const back = await returnedRun;
@@ -571,8 +578,8 @@ export async function fetchZtoListAllPages(cfg, from, to) {
     let readSigned = first.signedOk === true ? 1 : 0;
     let signedFailed = false;
     for (;;) {
-        const last = Math.min(out.pages, ZTO_LIST_CLIENT_MAX_PAGES);
-        const signedLast = signedFailed ? readSigned : Math.min(signedPages, ZTO_LIST_CLIENT_MAX_PAGES);
+        const last = Math.min(out.pages, out.pageLimit);
+        const signedLast = signedFailed ? readSigned : Math.min(signedPages, out.pageLimit);
         if (last <= readArrival && signedLast <= readSigned) break;
         const signedFrom = Math.max(last, readSigned) + 1;
         const arrivalWork = [];
@@ -617,7 +624,7 @@ export async function fetchZtoListAllPages(cfg, from, to) {
     if (metaless) out.total = Math.max(out.total, arrivalTotals);
     if (first.signedOk === true) {
         out.signedState = signedFailed ? 'partial'
-            : (signedPages > ZTO_LIST_CLIENT_MAX_PAGES ? 'partial' : 'ok');
+            : (signedPages > out.pageLimit ? 'partial' : 'ok');
     } else if (first.signed === null) {
         out.signedState = 'off';
     } else if (first.signedOk === false) {
@@ -1564,6 +1571,7 @@ export async function fetchZtoSignedPages(cfg, from, to) {
     const first = await fetchZtoListPage(cfg, from, to, 1, 'signedExact');
     if (!first) return null;
     if (first.signedOk !== true || !Array.isArray(first.signed)) return { measured: false, codes: [], truncated: false, partial: false };
+    const pageLimit = ztoListPageLimit(first);
     const codes = first.signed.slice();
     const signedRows = Array.isArray(first.signedRows) ? first.signedRows.slice() : [];
     let signedMismatch = ztoListPositiveCount(first.signedMismatch);
@@ -1573,7 +1581,7 @@ export async function fetchZtoSignedPages(cfg, from, to) {
     let read = 1;
     let partial = false;
     for (;;) {
-        const last = Math.min(pages, ZTO_LIST_CLIENT_MAX_PAGES);
+        const last = Math.min(pages, pageLimit);
         if (last <= read) break;
         const work = [];
         for (let page = read + 1; page <= last; page++) work.push(fetchZtoListPage(cfg, from, to, page, 'signedExact').catch(() => null));
@@ -1594,5 +1602,5 @@ export async function fetchZtoSignedPages(cfg, from, to) {
         if (isFinite(tailPages) && tailPages > 0) pages = tailPages;
         open = tail.pagesUnknown === true;
     }
-    return { measured: true, codes: codes, signedRows: signedRows, truncated: pages > ZTO_LIST_CLIENT_MAX_PAGES, partial: partial, signedMismatch: signedMismatch };
+    return { measured: true, codes: codes, signedRows: signedRows, truncated: pages > pageLimit, partial: partial, signedMismatch: signedMismatch };
 }

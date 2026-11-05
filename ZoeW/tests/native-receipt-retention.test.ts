@@ -12,10 +12,10 @@ const records = () => Object.keys(localStorage).filter(k => k.startsWith('zoew_c
 beforeEach(() => { localStorage.clear(); dbListenerPendingPaths.clear(); firebaseState.authGeneration++; receiptsOnServer = null; });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-function lab(update: any, uid = 'A', get: any = async () => ({ val: () => receiptsOnServer })) {
+function lab(update: any, uid = 'A', get: any = async () => ({ val: () => receiptsOnServer }), extra: any = {}) {
   const app = { options: { databaseURL: host } }; const auth = { app, currentUser: { uid, getIdToken: async () => 'fake-token' } }; const db = { app };
   const raw = { getAuth: () => auth, getDatabase: () => db, ref: (_db: any, path = '') => ({ path, toString: () => host + '/' + path }),
-    update, set: update, runTransaction: vi.fn(), deleteApp: async () => {}, get };
+    update, set: update, runTransaction: vi.fn(), deleteApp: async () => {}, get, ...extra };
   const sdk = withTransactionOutcomeResolution(raw); sdk.getAuth(app); sdk.getDatabase(app);
   Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db, isDatabaseInitialized: true,
     isInitializingFirebase: false, firebaseSdkUnavailable: false, isDatabaseConnected: true, sessionExpiryCheck: 'live', authLoginOperation: null });
@@ -27,6 +27,7 @@ it('the rules let a device delete only its own receipts older than the retention
   while (!existsSync(path.join(dir, 'firebase-database.rules.json')) && path.dirname(dir) !== dir) dir = path.dirname(dir);
   const rules = JSON.parse(readFileSync(path.join(dir, 'firebase-database.rules.json'), 'utf8'));
   const write = rules.rules[NATIVE_WRITE_RECEIPTS].$operation['.write'];
+  expect(rules.rules[NATIVE_WRITE_RECEIPTS]['.indexOn']).toEqual(expect.arrayContaining(['uid', 'at']));
   expect(write).toContain("data.exists() && !newData.exists() && data.child('uid').val() === auth.uid && data.child('at').val() < now - " + NATIVE_RECEIPT_RETENTION_MS);
   expect(write).toContain("!data.exists() && newData.exists() && newData.child('uid').val() === auth.uid");
 });
@@ -74,6 +75,18 @@ const purgeWriter = (purges: any[]) => async (_ref: any, value: any) => {
   purges.push(value);
   for (const key of Object.keys(value)) delete receiptsOnServer[key.slice(NATIVE_WRITE_RECEIPTS.length + 1)];
 };
+
+it('purge reads only the current account through the indexed uid query', async () => {
+  receiptsOnServer = {};
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json(null)));
+  const get = vi.fn(async () => ({ val: () => receiptsOnServer }));
+  const query = vi.fn((ref, ...constraints) => ({ ...ref, constraints }));
+  const native = lab(async () => {}, 'A', get, { query, orderByChild: (key: string) => ({ orderByChild: key }), equalTo: (value: string) => ({ equalTo: value }) });
+  await native.sdk.set(native.sdk.ref(native.db, 'zoew_settings/exchange_rate'), 4200);
+  await vi.waitFor(() => expect(get).toHaveBeenCalled());
+  expect(query).toHaveBeenCalledWith(expect.objectContaining({ path: NATIVE_WRITE_RECEIPTS }), { orderByChild: 'uid' }, { equalTo: 'A' });
+  await native.sdk.deleteApp(native.app);
+});
 
 it('reloads within the purge gap download the shared receipts root once per device and account, and again once the gap has passed', async () => {
   const base = Date.now(); let shift = 0;

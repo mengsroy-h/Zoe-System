@@ -59,7 +59,6 @@
 - 🧾 **សកម្មភាពដោយដៃ ជុំ A532–A541**៖ (១) Firebase គ្រប់ project អាជីវកម្ម ៖ Publish `firebase-database.rules.min.json` មុនចេញ App (rules លុបភស្តុតាងចាស់ ៦០ ថ្ងៃ + `.indexOn`) · (២) Supabase គ្រប់ project ៖ `20261105000000_zoe_tombstone_retro_resync.sql` (ឧបករណ៍នីមួយៗទាញពេញម្តង) រួច `20261105010507_zoe_rules.sql` និង `20261105011000_zoe_evidence_candidates.sql` (GitHub integration តាមលំដាប់ឈ្មោះ) · (៣) ផ្ទៀងលើបណ្តាញពិតថា Firebase ភ្ជាប់តាម WebSocket បាន (CSP លែងទទួល JSONP long-polling ➜ បណ្តាញដែលបិទ WebSocket ភ្ជាប់មិនបាន) · (៤) ផ្ទៀង OpenCode លើ thread ដែលមាន comment របស់ bot (App ដែលបានដំឡើង ទទួល · អ្នកក្រៅក្រុម បដិសេធ)។
 - **PR384 · ការផ្ទៀងឯករាជ្យ 2026-11-03 (branch `claude/nifty-ptolemy-1hix3c`)**៖ WIP ប្រភពកញ្ចប់ `8b70354` ដកចេញ (បំបែកមុខងារម្ចាស់ស្នើ «បំពេញប្រភពកញ្ចប់មានស្រាប់» · CI1152 ក្រហមទាំង ៤ shard)។ កែ A482–A486 (ផ្នែក ១ [2.50.180])។ CI1153 លើ `c3f22ae` ៖ shard 2 · 4 បៃតង · shard 3 ធ្លាក់តែ zoew-suite 1/3 · shard 1 F03 (នៅបើក)។ ត្រូវអាន CI លើ SHA ចុងក្រោយ មិនមែនលេខចាស់។
 - ⛔ **Rules ធំជាង 256 KiB**៖ ប្រភព `firebase-database.rules.json` 271,727 bytes (មាន space) ➜ Publish តែ artifact `firebase-database.rules.min.json` 248,771 bytes (token ដដែល · guard ចាក់សោ ≤ 251,904) · `tools/firebase-provision` ផ្ញើ artifact។ មិនទាន់ dry-run លើ project Firebase ពិតមុន Publish (emulator មិនបង្ខំដែន)។
-- 🗳️ **Supabase C04 ផ្ទុយ CLAUDE.md «Durable writes»**៖ ជួរកំណែចាស់ (គ្មាន `writeProtocol`) និង write ដែលមិនទាន់ admit ពេល app បិទ នៅ HOLD (caller ទទួល DISCONNECT) ខណៈច្បាប់ថា sign-out row replay ក្នុង window ⛔ មិន block ➜ ម្ចាស់សម្រេច រួចកែកូដ ឬ CLAUDE.md ក្នុង PR ដដែល។
 - 🔍 **Reset នៅបើក**៖ journal settled មិនដែលលុប (ផ្ទុក barcode/លេខទូរស័ព្ទ · Reset ៣០ ថ្ងៃ ៥ ដង ≈ 1.4M តួ ➜ localStorage ពេញ ➜ ស្កេនត្រូវបដិសេធ) · receipt Supabase ត្រូវ housekeeping ២ ថ្ងៃ ➜ HOLD អាចអចិន្ត្រៃយ៍ · គ្មានច្រកចេញរបស់ម្ចាស់ · 🗳️ reply បាត់ដែលគ្មាន receipt នៅ HOLD ជារៀងរហូត (recovery អានតែ status តាម CLAUDE.md) ទោះ epoch នៅដដែល ➜ ម្ចាស់សម្រេច ៖ ទទួល epoch ដដែលជាភស្តុតាង not-applied ក្នុង recovery ឬបង្កើតច្រកចេញ · client ចាស់ត្រូវ rules បដិសេធលើថ្ងៃដែល client ថ្មី Reset រួច (ច្បាប់ ១០ ៖ upgrade ទាំងអស់មុន Reset) · R2 ៖ ការងារ auth ចាស់ដែលមកយឺតក្រោយ Reset មិនទាន់ផ្ទៀងពេញ។
 - 🔍 **ផ្ទៀងមុន rollout**៖ Apps Script watcher ឥឡូវជា function `_` (private) ➜ សាកក្នុង sandbox ថា Run menu និង trigger ហៅបាន (ឯកសារ Google ថា private មិនបង្ហាញក្នុង Run) · Palm outbox ៖ 05 បានបញ្ជាក់ តែរូបមិនត្រូវ ➜ job លាក់ តែកញ្ចប់មិនបិទ (ម្ចាស់សម្រេច) · ជួរមិនត្រឹមមួយធ្វើឲ្យបញ្ជី Sign ទាំងមូលបរាជ័យ។
 
@@ -84,7 +83,7 @@
   ការស្កេនដែល save ឆ្លើយ «unknown» (Server បដិសេធ + បណ្តាញដាច់) ហើយ App បិទមុន Server អានបានវិញ ៖ delta ledger និងកូនសោ registry នៅ (A444 សម្រេចតែពេលទំព័ររស់ · Sentry money ប្រាប់ barcode)។
 - 🔍 **[Deep audit ៩ · មិនទាន់វាស់ (agent)]** ៖ គ្មានការវាស់ភាពរស់ពេល listener កំពុង pending (socket zombie ពេលផ្ទុកដំបូង) · `listener-leak-test` យាម active license/session និង data paths ៧ រួច (negative controls ៩ PASS); browser cycle ពិតនៅមិនទាន់វាស់ ·
   `android-release.yml` Run workflow លើ branch ណាក៏បានប្រើ keystore (ការពារដោយ GitHub Environment = ការកំណត់ម្ចាស់គម្រោង) · តំបន់ហាម PTR/ចលនា/ការរំកិល ៖ គ្មានកំហុសដែលវាស់បាន (កូដមិនប្រែ)។
-- 🗳️ **PR ក្រោយ** (ការសម្រេចម្ចាស់គម្រោង A401 · A352 · មិនទាន់ធ្វើ) ៖ X6 ដកសមាជិក Supabase · S5 `p_replace` (migration + Postgres ពិត) · A352 ៣ ក្រុម (ZTO LOCK ①②⑦ · Push ៨ ព្រឹក ③⑤ · Supabase/receipts ④⑥)។
+- ⏳ **[2.50.181 · ZoeKeyGen 2.24.33]** មុន rollout៖ Publish rules Business ដែលមាន receipt indexes · apply migrations `20261105080000` ➜ `20261105080100` ➜ `20261105080200` តាមលំដាប់ · ក្រោយ merge ដែលម្ចាស់អនុញ្ញាត ទើបធ្វើ APK និង update PWA/KeyGen។ កូដ X6 · S5 · A352 និងការសម្រេច A539/C04 នៅ PR ថ្មី; CI លើ SHA ចុងក្រោយត្រូវបៃតងមុនបិទការងារ។
 
 ### 🔧 សកម្មភាពដោយដៃដែលនៅបើក (ម្ចាស់គម្រោង)
 
@@ -117,6 +116,16 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ archive ផ្នែក ៩ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.181] · ZoeKeyGen [2.24.33] — 2026-11-05
+
+- តាមសំណើបន្ថែមរបស់ម្ចាស់៖ កែតម្លៃកញ្ចប់ កែលេខទូរស័ព្ទ និងប្តូរអត្រាប្រាក់ សុំ Security PIN មុនបើកប្រអប់កែ។ មិនទាន់មាន PIN ➜ កំណត់សិន; បោះបង់/ខុស/ប្តូរគណនី ឬហាងកណ្ដាលការផ្ទៀងផ្ទាត់ មិនបើក editor។
+- Firebase រក្សា WebSocket តែប៉ុណ្ណោះ និង CSP ដដែល។ ពេល online និង authenticated REST អានបាន តែ socket មិនដែលភ្ជាប់ក្រោយ ២០ វិនាទី ស្ថានភាព និង 🩺 Server ប្រាប់ឱ្យប្តូរ Wi-Fi ឬប្រើ 4G; ការដាច់ក្រោយធ្លាប់ភ្ជាប់ និង Supabase មិនទទួលសារនេះ។
+- ZoeKeyGen មានប៊ូតុង «ដកចេញពីហាង» តាមគណនី Supabase ជាមួយ confirm។ SQL ចាក់សោហាង និងសមាជិក បញ្ចប់ session និងកូដ reset ភ្លាម ហើយការពារម្ចាស់ចុងក្រោយ។ `zoe_admin_write` បដិសេធ `p_replace=true` មុន mutation។
+- តាមការអនុញ្ញាតម្ចាស់៖ ZTO ទទួល project ដល់ ១០២៤ ដោយ entry ខុសបិទតែ project របស់វា; client តាម server `maxPages` ដល់ ២០ និង lane Cookie តាម Firebase project។ បញ្ជីមិនគ្រប់នៅ partial។ LOCK repin ក្រោយ guards ឆ្លង។
+- Push ពេលព្រឹកវិល cursor តាមហាងក្នុងថ្ងៃ និង ledger ការពារផ្ញើស្ទួន; តេស្ត ៤០០/៦០០/១០០០ ហាងនៅក្នុងថវិកា ២០ វិនាទីក្នុងមួយរត់។ Retired subscriptions មិនរាប់ជាកន្លែង active ដូចកូដដែលមានស្រាប់។ Receipt purge មាន batch continuation រួច; បន្ថែម query UID និង indexes។
+- Supabase delta pull សម្រាប់ pickup/collected ប្រចាំថ្ងៃ រក្សាទម្រង់ទិន្នន័យ និង rules ដដែល។ Migration បង្កើត baseline លើឯកសារចាស់; snapshot ដំបូង និង reset ទទួលឯកសារពេញ។ Server ចាស់ដែលគ្មាន RPC នៅអានតាម API ចាស់។
+- C04 រក្សា HOLD តាមសេចក្តីសម្រេចម្ចាស់ និងកែ CLAUDE ឱ្យស្របកូដ។ Owner exit PIN ត្រូវផ្ទៀងប្រាក់ និងកញ្ចប់មុនប្រើ; មិនទាយលទ្ធផលប្រាក់។ សកម្មភាព rollout នៅ «📌»; មិនបាន deploy ឬ merge ក្នុង session។
 
 ### [2.50.180] · ZoeKeyGen [2.24.32] — 2026-11-01 · ការកែតាម deep audit សម្រាប់ពិនិត្យក្នុង Draft PR
 
@@ -1907,6 +1916,24 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-11-05 — ការងារបន្តពី PR385 តាមសំណើម្ចាស់គម្រោង
+
+- **A546 · C04 រក្សា HOLD និងកែច្បាប់តាមកូដ**៖ ម្ចាស់ជ្រើសរក្សាកូដដដែល។ «Durable writes» បញ្ជាក់ថា replay ក្រោយ sign-out ត្រូវជា protocol2 ដែល admit រួច និងមាន original account/shop/opId ក្នុង window; legacy non-CAS និង `awaitingRecovery` ដែល app បិទមុន admit នៅ HOLD។ Plain CAS រក្សាគោលការណ៍សម្រេចដើម។ `discard-pending-writes.test.tsx` ផ្ទៀងពីរទម្រង់៖ មុន owner exit មិនផ្ញើ · លុបតែគណនី/ហាងបច្ចុប្បន្ន · គណនីផ្សេង និងហាងផ្សេងនៅ · write ថ្មីដំណើរការ; drawer នៅក្រោយ PIN ដដែល។ Local ៦/៦ ឆ្លងលើ base `abb319a3` ជាមួយ test ថ្មី; គ្មានការប្ដូរ App ក្នុងចំណុចនេះ។
+
+- **A547 · A539 សារបណ្ដាញបិទ WebSocket**៖ guard ថ្មីលើ connection/health/advice ពិតធ្លាក់ positive ២ មុនកែ និង control ៧ ឆ្លង។ ក្រោយកែ ៩/៩ ឆ្លង៖ REST អានបានក្រោយ ceiling ➜ សារខ្មែរត្រឹមត្រូវ; REST បរាជ័យ · offline · stale auth · ធ្លាប់ភ្ជាប់ · zombie · Supabase ➜ គ្មានសារនេះ។ Extraction runtime ដក helper និង state ពិត; connection guard ២៤៥ និង health ២២៦ ឆ្លង។
+- **A548 · X6 ដកសមាជិក Supabase**៖ migration ថ្មីមាន private definer និង public invoker; active platform-admin session · tenant/member locks · last-owner/member-not-found · revoke sessions · reset-code cleanup · seq bump។ KeyGen មាន confirm និង ownership check ក្រោយ await។ Guard មុនកែធ្លាក់ function/RPC មិនមាន; local ៦៩ ករណីឆ្លងជាមួយ PG SKIP ដែលមិនរាប់ជា proof។ Linux CI ត្រូវវាស់ removed-token 401 · no-data · other member · non-admin · last owner · concurrent removal។
+- **A549 · S5 បដិសេធ replace**៖ migration រក្សា signature ហើយ `p_replace=true` បោះ `replace-unsupported` មុនសរសេរ។ PG guard ប្រៀបឯកសារទាំងអស់មុន/ក្រោយ និង false សរសេរធម្មតា; mutation ដកការបដិសេធ និងដាក់ semantics ចាស់វិញ ត្រូវធ្លាក់។
+- **A550 · A352 ①②⑦ ZTO ទំហំហាង**៖ សំណើម្ចាស់ក្នុង `next-session-prompt.md` អនុញ្ញាតកែឯកសារ LOCK ៣ សម្រាប់ project/page/lane។ Guard ថ្មី ៧ ធ្លាក់ពិតមុនកែ៖ project ១០០០ · malformed project តែឯង · ៤/១០/២០ ទំព័រ · ២៥ ទំព័រកាត់ត្រឹម ១០ នៅ partial · lane project រួម។ ក្រោយកែ targeted ២៩/២៩ ឆ្លង; ZTO unit ១៥២៤ · list ៦៣៣ · banner browser ២០៩ · proxy ២០៧ · signed-status ៥៨ · network ១១ · negative-cache ៣៥ · budget ៦៣ · cookie sync/store/session/capture ១៨៣/៩៣/៣៣/៥៦ ឆ្លង មុន repin hash ៣។ Ceiling project ១៦ ➜ ១០២៤; branch cap ១៦ នៅដដែល; invalid duplicate មិនធ្លាក់ទៅ email trust។
+- **A551 · A352 ③⑤⑥ Push និង receipts**៖ មុនកែ ៦០០ ហាងខ្វះ ២៤ និង ១០០០ ខ្វះ ៤២៤ ក្នុងម៉ោងព្រឹក; cursor តែឯង ១០០០ នៅខ្វះ ៤០។ Cursor + concurrency ១៦ + per-day ledger ទៅដល់គ្រប់ហាង ៤០០/៦០០/១០០០ ក្នុងថវិកា ២០ វិនាទីក្នុងមួយ cron។ Retired >៥០០០ មិនរាប់ក្នុង active cap មានរួច; active cap និង read uncertainty controls ឆ្លង។ A516 មាន purge ជុំ ៥០០ រហូត ៥០០០/boot និងបន្ត boot ក្រោយរួច; បន្ថែម UID query និង `.indexOn` `uid`/`at` (guards ២ ធ្លាក់មុនកែ)។ Push ៦៩ + receipts ៨ = ៧៧ ឆ្លង; backlog ១០០៧/៥០០៧ និង young/foreign controls រក្សាដដែល។ Rules min បង្កើតឡើងវិញ; SQL rules output មិនប្ដូរ ព្រោះ index មិនមែន verdict។
+- **A552 · A352 ④ daily delta**៖ migration ថ្មីបន្ថែម delta side tables និង RPC ដោយមិនប្តូរឯកសារអាជីវកម្ម។ Client guards ថ្មី ២ ធ្លាក់មុនកែ ហើយ ២៨ ករណីរួម paging/ownership ឆ្លងក្រោយកែ។ Linux CI លើ `0b9ff454` វាស់ Postgres ពិត៖ datastore ២៦៩ ឆ្លង រួម upgrade មុន/ក្រោយ migration · RLS · full reset · ៣០០/៦០០ barcode សម្រាប់ pickup និង collected។ ក្នុង fixture ដូចគ្នា delta តិចជាង ១០% នៃ full transfer ទាំងពីរទំហំ; ៣០០ ➜ ៦០០ delta កើនតិចជាង ២.៣ ដង។ CI បង្ហាញឯកសារលេខបៃពិតក្រោយ checker; local Windows គ្មាន runtime PG មិនរាប់ជា proof។
+- **A553 · Sentry តាមសំណើម្ចាស់**៖ ពិនិត្យ read-only ក្នុង org `zoew` project `javascript-react`៖ unresolved ៩ ក្នុង ៧ ថ្ងៃ។ `JAVASCRIPT-REACT-10`/`11` លើ release `2.50.180` iPhone Safari ក្រោយផ្អាក App មាន network requests ច្រើនបរាជ័យ និង Supabase link/stall; មិនមែនភស្តុតាង Firebase WebSocket បិទ។ `Z` មាន WebAssembly មិនមាន ៣ ដងក្នុង HeadlessChrome deploy preview; `Y` មាន Supabase 401 ពេល resume; scan-evidence issues នៅរក្សា HOLD។ មិន resolve issue ឬអះអាងថា patch នេះជួសជុលរបាយការណ៍ទាំងនោះទេ។
+
+- **A554 · PIN សម្រាប់កែតម្លៃ/លេខទូរស័ព្ទ/អត្រាប្រាក់**៖ ម្ចាស់ស្នើបន្ថែមក្នុង session។ `edit-pin-gates.test.tsx` គូរ React ពិតសម្រាប់ប៊ូតុងតម្លៃ និងប៊ូតុងកែលេខខុស ហើយហៅ menu handlers ពិតសម្រាប់កែលេខ/អត្រាប្រាក់៖ មុនកែ ១៧/១៧ ធ្លាក់ ព្រោះ editor បើកដោយគ្មាន PIN។ បន្ថែម `protected-edits.ts` ដែលចងគោលដៅ/arguments ទៅ auth/database ដើម; raw editor openers ចេញពី action registry/allowlist ហើយ UI បញ្ជូនតាម PIN wrappers។ Prompt ៣ ផ្ទាល់ខ្លួន ប្រើ Security PIN ដដែល។ ក្រោយកែ ១៧/១៧ ឆ្លង៖ PIN ត្រឹមត្រូវ · ខុស/បោះបង់ · first setup · session ប្តូរ · គ្មាន raw button bypass។ Area regressions ៦៤ ឆ្លង រួម phone/backend ownership, price protocol និង exchange-rate completion; មិនប្ដូរច្បាប់គណនាប្រាក់។
+
+- **A555 · CI លើ draft PR388 និងការផ្ទៀងឥទ្ធិពល**៖ ជុំដំបូង `0b9ff454`៖ F03 native fresh-JVM ទាំងពីរលំដាប់ និង Audit shard ២ ឆ្លង; datastore Postgres ២៦៩ និង KeyGen admin Postgres ១៨៦ ឆ្លង រួម X6/S5/upgrade delta ពិត។ Shard ផ្សេងក្រហម៖ age សារបណ្ដាញមិនឆ្លង `elapsedSince` · README ពិដាន project ចាស់ · RPC/grant និង schema catalog មិនទាន់ចាត់ថ្នាក់ delta tables · fixture នៅប្រើ admin replace · pin ចំនួន migrations ចាស់ · announcement មាន update ពីរ · តេស្ត menu/native មិនឆ្លង PIN។ ការកែរក្សា assertion និង deadlines ដដែល៖ ចាត់ថ្នាក់សិទ្ធិជាក់លាក់; catalog អនុញ្ញាតតែ tables/indexes delta ៤ ដែលមានឈ្មោះច្បាស់ ហើយវត្ថុចាស់ត្រូវដដែល; fixture លុបតាម key និងសរសេរ batch ≤៤០០ ដោយ false; network race ចាប់ទាំង RPC ចាស់/ថ្មី។ Local clock guards ១៧/២២ · menu browser ៦៤ · PIN/network/announcement unit ៥៩ ឆ្លង; provisioning contract ៤៥ ឆ្លង តែ firebase-tools SKIP មិនរាប់ជាពេញ។ ZTO lane identity វាស់លើ input ដូចគ្នា៖ សាខា ២/១០/១០០ ក្នុង project មួយ ពី lane ២/១០/១០០ ➜ ១/១/១ (វាស់ identity មិនមែន network calls ពិត)។ CI ជុំចុងក្រោយត្រូវផ្ទៀងលើ SHA នៅ PR មុនបញ្ចប់; គ្មាន merge ឬ deploy។
+
+ការផ្ទៀង local បន្ទាប់៖ native browser ១១៩/១១៩ និង history-window ០ FAIL; typecheck · lint · audit build · doc-scope ១១៥ · repository coverage ១០ ឆ្លង។ ការទាញ production PIN modal ត្រូវកំណត់ PIN តាមប៊ូតុងពិត មុនតេស្ត PTR ដដែល។
 
 ### 2026-11-05 — PR385 ជុំបញ្ចប់ ៖ កែការរកឃើញដែលនៅសល់ទាំងអស់ (A532–A541)
 
@@ -4388,8 +4415,9 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/daily-stats-mixed-pickup.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/db-liveness.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/device-info.test.tsx` | — | ផ្នែក ៨ |
-| `ZoeW/tests/discard-pending-writes.test.tsx` | — | ផ្នែក ៨ |
+| `ZoeW/tests/discard-pending-writes.test.tsx` | ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/durable-connection-write.test.ts` | — | ផ្នែក ៨ |
+| `ZoeW/tests/edit-pin-gates.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/evidence-retention.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/exchange-rate-backend-switch.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/exchange-rate-completion-race.test.ts` | — | ផ្នែក ៨ |

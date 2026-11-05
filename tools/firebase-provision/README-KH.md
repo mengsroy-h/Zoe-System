@@ -95,7 +95,7 @@ new-customer.cmd --branch 881859 --user sok,chan --app-url https://<ZoeW-site-�
 2. ផ្ញើ **Setup Link** (ឬ QR ពី ZoeKeyGen ដោយបិទភ្ជាប់ Firebase config ដែលបង្ហាញ) ទៅអតិថិជន។
 3. **ពេលប្រើ ZTO ដែលផ្ទៀងអត្តសញ្ញាណ Firebase** ៖ បន្ថែម Project ID និងសាខាដែលអនុញ្ញាតក្នុង Netlify env
    `FIREBASE_PROJECT_IDS` (ឧ. `zoew-881859:881859`, site `zoew`) រួច **Trigger deploy** — ផ្នែក «Still manual» ចុងបញ្ចប់បង្ហាញធាតុ `Project ID:សាខា` នេះរួចស្រេច។ ការចងសាខាចាំបាច់សម្រាប់ `/detail` ដែលកំណត់ branch restriction; កុំជឿលេខសាខាក្នុងអ៊ីមែលតែឯង។ របៀបកំណត់តាម [`ZoeW/ZTO-SETUP-KH.md`](../../ZoeW/ZTO-SETUP-KH.md)។
-   ⛔ Function អានបានច្រើនបំផុត **១៦** Project ID — លើសនោះ ឬមានធាតុខុសទម្រង់តែមួយ (ឧ. សាខាមិនមែនលេខ) មុខងារបញ្ជីបិទសម្រាប់ទាំងអស់គ្នា។
+   ⛔ Function អានបានច្រើនបំផុត **១០២៤** Project ID។ Project លើសពិដានមិនទទួលសិទ្ធិ; ធាតុខុសទម្រង់ (ឧ. សាខាមិនមែនលេខ) បិទតែ Project របស់វា ហើយមិនធ្លាក់ទៅការជឿសាខាក្នុងអ៊ីមែល។
 
 ### ដំឡើង Rules ថ្មីទៅអតិថិជនទាំងអស់
 

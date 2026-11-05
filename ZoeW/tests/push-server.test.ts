@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     FCM_CHANNEL_ID as SERVER_FCM_CHANNEL, LICENSE_APP_CODE, LICENSE_DB_URL_DEFAULT, LICENSE_KEY_PREFIX, LICENSE_PUBLIC_KEYS_JWK,
     PUSH_EXPIRY_HOUR, PUSH_NOTICE_MAX_AGE_MS, PUSH_OPEN_URL, PUSH_SCHEDULE_MAX_AGE_MS, PUSH_SUBS_PER_KEY_MAX, PUSH_SUBS_TOTAL_MAX,
-    PUSH_READ_TIMEOUT_MS, PUSH_SEND_TIMEOUT_MS, PUSH_SEND_CONCURRENCY,
+    PUSH_READ_TIMEOUT_MS, PUSH_SEND_TIMEOUT_MS, PUSH_SEND_CONCURRENCY, PUSH_RUN_BUDGET_MS,
     b64urlDecode, b64urlEncode, createPushService, encryptWebPushPayload, handlePushRequest, readPushConfig,
     resetPushStateForTests, runPushCron, subscriptionKey, supabaseTenantKeyId, vapidAuthorization, webPushEndpointAllowed
 } from '../netlify/lib/push-core.mjs';
@@ -838,8 +838,8 @@ describe('⛔ ហាងច្រើន ៖ ការរំលឹកម៉ោង 
         expect(await t.run(t.h.service.dispatchNotices(t.h.clock.now))).toMatchObject({ reason: 'none' });
     }, 90000);
 
-    it('⛔ ៤០០ ហាង · cron ១២ ដងក្នុងម៉ោង ៨ ➜ គ្រប់ហាងទទួលការរំលឹក ១ ដងគត់ · គ្មាន ledger ចាក់សោដោយមិនបានផ្ញើ · run នីមួយៗក្នុង ៣០ វិ.', async () => {
-        const t = scaledHarness(400);
+    it.each([400, 600, 1000])('⛔ %i ហាង · cron ១២ ដងក្នុងម៉ោង ៨ ➜ គ្រប់ហាងទទួលការរំលឹក ១ ដងគត់ · គ្មាន ledger ចាក់សោដោយមិនបានផ្ញើ', async (shops) => {
+        const t = scaledHarness(shops);
         await t.seed();
         const runs = await t.cronHour();
         const missing = t.endpoints.filter((url) => !t.sent.has(url));
@@ -849,7 +849,7 @@ describe('⛔ ហាងច្រើន ៖ ការរំលឹកម៉ោង 
         expect({ missing: missing.length, twice: twice.length, claimedNotSent: claimedNotSent.length })
             .toEqual({ missing: 0, twice: 0, claimedNotSent: 0 });
         expect(runs.every((run) => run.out.expiry && run.out.expiry.ok)).toBe(true);
-        expect(Math.max(...runs.map((run) => run.ms))).toBeLessThanOrEqual(30000);
+        expect(Math.max(...runs.map((run) => run.ms))).toBeLessThanOrEqual(PUSH_RUN_BUDGET_MS);
     }, 60000);
 });
 

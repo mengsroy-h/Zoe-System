@@ -216,8 +216,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         await page.click('#loginBtn');
         const bootOnline = await waitUntil(async () => (await statusText()) === ONLINE_TEXT && (await historyCount()) === 2, 30000);
         check(bootOnline >= 0, '«' + ONLINE_TEXT + '» + history ២ ជួរពី Postgres ពិត', { status: await statusText(), history: await historyCount() });
-        const rpcCalls = fake.requests.filter((r) => /^\/rest\/v1\/rpc\/zoe_pull$/.test(r.path)).length;
-        check(rpcCalls >= 1, 'លក្ខខណ្ឌចាំបាច់ ៖ App ទាញតាម `zoe_pull` លើ fake server (មិនមែន cache/ឯកសារក្លែង)', rpcCalls);
+        const rpcCalls = fake.requests.filter((r) => /^\/rest\/v1\/rpc\/zoe_pull(?:_delta)?$/.test(r.path)).length;
+        check(rpcCalls >= 1, 'លក្ខខណ្ឌចាំបាច់ ៖ App ទាញតាម RPC លើ fake server (មិនមែន cache/ឯកសារក្លែង)', rpcCalls);
 
         // ── ខ ──
         console.log('\n── ខ. browser offline ➜ online ──');
@@ -286,7 +286,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         // ── ជ ──
         console.log('\n── ជ. បើក App ក្រោយ ៦.៥ ម៉ោង ➜ ផុតកំណត់ ៤ ម៉ោង ➜ ចូលវិញដោយពាក្យសម្ងាត់ដែលចងចាំ ──');
         const loginVisible = () => page.evaluate(() => { const m = document.getElementById('loginModal'); return !!m && getComputedStyle(m).display !== 'none'; }).catch(() => null);
-        const pullsOf = (from) => fake.requests.slice(from).filter((r) => r.path === '/rest/v1/rpc/zoe_pull').map((r) => (r.body && r.body.p_since !== undefined ? Number(r.body.p_since) : -1));
+        const pullsOf = (from) => fake.requests.slice(from).filter((r) => /^\/rest\/v1\/rpc\/zoe_pull(?:_delta)?$/.test(r.path)).map((r) => (r.body && r.body.p_since !== undefined ? Number(r.body.p_since) : -1));
         const wholeHistory = await historyCount();
         await sleep(2500);
         const authStore = await page.evaluate(() => {
@@ -310,8 +310,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         const loggedOut = () => fake.requests.slice(reloadMark).some((r) => /\/auth\/v1\/logout/.test(r.path));
         const newPageRefreshed = () => fake.requests.slice(reloadMark).some((r) => /grant_type=refresh_token/.test(r.search || ''));
         fake.setRpcHook(async ({ fn, phase }) => {
-            if (fn === 'zoe_pull' && phase === 'before' && !race.pullBeforeLogout && newPageRefreshed() && !loggedOut()) race.pullBeforeLogout = true;
-            if (fn === 'zoe_pull' && phase === 'after' && race.pullBeforeLogout && !race.pullHeld) {
+            if ((fn === 'zoe_pull' || fn === 'zoe_pull_delta') && phase === 'before' && !race.pullBeforeLogout && newPageRefreshed() && !loggedOut()) race.pullBeforeLogout = true;
+            if ((fn === 'zoe_pull' || fn === 'zoe_pull_delta') && phase === 'after' && race.pullBeforeLogout && !race.pullHeld) {
                 race.pullHeld = true;
                 const t0 = Date.now();
                 while (!loggedOut() && Date.now() - t0 < 15000) await sleep(100);

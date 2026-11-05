@@ -396,9 +396,12 @@ async function body(c, rec, extra) {
     const ownFence = await write(A.who, [{ k: 'set', p: [HIST, 'tgt1'], v: Object.assign(item('tgt1'), { restoreClaimId: 'src1', restoreClaimToken: 'tokA' }) }]);
     rec('probe ទិសផ្ទុយ ៖ claim ស្តារនៅ A ផ្ទាល់ ➜ fence ឆ្លង', !!ownFence && ownFence.ok === true, ownFence);
 
-    const rep = await admin(A.id, [{ k: 'set', p: [REG, 'ONLY'], v: true }], true);
-    const afterReplace = await pull(A.who, 0);
-    rec('zoe_admin_write replace ៖ doc ចាស់ក្លាយ tombstone · នៅសល់តែ ONLY', !!rep && rep.ok && afterReplace.rows.length === 1 && afterReplace.rows[0].k === 'ONLY', afterReplace);
+    const beforeReplace = (await c.query('select * from public.zoe_docs where tenant_id = $1 order by root, key', [A.id])).rows;
+    const rep = await as(c, SERVICE, 'select public.zoe_admin_write($1,$2,$3::jsonb,true)', [A.id, newOp(), JSON.stringify([{ k: 'set', p: [REG, 'ONLY'], v: true }])]);
+    const afterReplace = (await c.query('select * from public.zoe_docs where tenant_id = $1 order by root, key', [A.id])).rows;
+    rec('zoe_admin_write replace ៖ បដិសេធមុនប្តូរឯកសារទាំងអស់', rep.error?.message === 'replace-unsupported' && JSON.stringify(beforeReplace) === JSON.stringify(afterReplace), rep);
+    const append = await admin(A.id, [{ k: 'set', p: [REG, 'ONLY'], v: true }], false);
+    rec('zoe_admin_write false ៖ បន្ថែមធម្មតា និងរក្សាឯកសារចាស់', append?.ok === true && (await pull(A.who, 0)).rows.length > 1, append);
     rec('zoe_admin_write មិនប៉ះ B', ((await pull(B.who, 0)).rows || []).some((r) => r.k === 'src1'));
 
     await c.query('update public.tenants set revoked = true where id = $1', [A.id]);
@@ -934,6 +937,9 @@ async function suite(sql, stopOnFail) {
 }
 
 const MUTATIONS = [
+    ['S5 ត្រឡប់អាកប្បកិរិយា replace មុនកែ', [
+        ["    if p_replace is true then\n        raise exception 'replace-unsupported' using errcode = '22023';\n    end if;\n", ''],
+        ['    return private.zoe_apply(p_tenant, p_op_id, p_ops, false, false);', '    return private.zoe_apply(p_tenant, p_op_id, p_ops, false, coalesce(p_replace, false));']]],
     ['Table Editor លុបជួរ ➜ មិនបង្កើត tombstone', '    insert into public.zoe_docs (tenant_id, root, key, value, seq, updated_at)\n    values (old.tenant_id, old.root, old.key, null, next_seq, now());', '    perform 1;'],
     ['Table Editor លុប tombstone ➜ trigger រំលង (លុបស្ងាត់ ដូចមុនកែ)',
         "    if pg_trigger_depth() > 1 or current_setting('zoe.raw_docs', true) = 'on'\n        or not exists (select 1 from public.tenants t where t.id = old.tenant_id) then",
@@ -1262,6 +1268,82 @@ async function rulesCompilerGuardRegression() {
 //    (reconcile `update()` ចូល root ចំណូលយករួច · `runTransaction` លើ root ទាំងមូល · ទាញ/អានឯកសារធំ) ក្រោម `statement_timeout` ៨ វិ.
 //    (លំនាំដើមរបស់ role `authenticated` លើ Supabase) ➜ ត្រូវឆ្លង · ទំហំឯកសារដែលការសរសេរមួយប៉ះមានពិដាន · ទំព័រ `zoe_pull` មានពិដានបៃ
 //    (ទំព័រច្រើន · គ្រប់ជួរមកដល់)។ ទំហំត្រូវជ្រើសឲ្យមុនកែលើសពិដានឆ្ងាយ (ការ៉េ) ហើយក្រោយកែតិចជាងពិដានច្រើនដង។
+async function dailyDeltaGuard() {
+    console.log('\n── A352 ៖ delta ប្រចាំថ្ងៃ · upgrade ហាងចាស់ · ៣០០/៦០០ barcode ──');
+    const { c } = await H.freshDb('default-grants');
+    try {
+        const deltaFile = migrationFiles.find((f) => f.endsWith('_zoe_daily_delta_pull.sql'));
+        await c.query(migrationFiles.filter((f) => f !== deltaFile).map((f) => fs.readFileSync(path.join(MIGRATIONS_DIR, f), 'utf8')).join('\n;\n'));
+        const { SERVICE, tenants } = await setupTenants(c);
+        const A = tenants.A, B = tenants.B;
+        const root = 'zoew_daily_pickup_cod_dod';
+        const day = '2026-11-05';
+        const adminSet = async (r, value) => {
+            const result = await as(c, SERVICE, 'select public.zoe_admin_write($1,$2,$3::jsonb,false) as r', [A.id, newOp(), JSON.stringify([{ k: 'set', p: [r, day], v: value }])]);
+            if (result.error) throw new Error(JSON.stringify(result.error));
+        };
+        const pull = async (who, since, delta = true) => {
+            const result = await as(c, who, 'select public.' + (delta ? 'zoe_pull_delta' : 'zoe_pull') + '($1,2000) as r', [since]);
+            if (result.error) throw new Error(JSON.stringify(result.error));
+            return result.rows[0].r;
+        };
+        const oldValue = { packagesPickedUp: 1, pickedUpBarcodes: { LEGACY: '0970000001' } };
+        await adminSet(root, oldValue);
+        const beforeUpgrade = await pull(A.who, 0, false);
+        await c.query(fs.readFileSync(path.join(MIGRATIONS_DIR, deltaFile), 'utf8'));
+        const afterUpgrade = await pull(A.who, 0);
+        ok('upgrade ៖ ទិន្នន័យហាងចាស់ និង full pull ដដែល', JSON.stringify(beforeUpgrade.rows) === JSON.stringify(afterUpgrade.rows));
+        await adminSet(root, { ...oldValue, packagesPickedUp: 2, pickedUpBarcodes: { ...oldValue.pickedUpBarcodes, NEW: '0970000002' } });
+        const firstDelta = await pull(A.who, beforeUpgrade.seq);
+        ok('upgrade ៖ cursor ចាស់ទទួលតែវាលថ្មី · គ្មាន barcode ចាស់ផ្ញើស្ទួន', firstDelta.rows[0]?.d?.some((x) => x.p.join('/') === 'pickedUpBarcodes/NEW')
+            && !JSON.stringify(firstDelta.rows[0]?.d).includes('LEGACY'), firstDelta);
+        ok('RLS delta ៖ ហាងផ្សេងអានមិនឃើញ', (await pull(B.who, 0)).rows.length === 0);
+        const denied = await as(c, { role: 'anon' }, 'select public.zoe_pull_delta(0,2000)');
+        ok('anon មិនអាចហៅ delta pull', !!denied.error, denied);
+        const bPrivate = await as(c, B.who, 'select count(*)::int as n from private.zoe_daily_deltas');
+        ok('private delta RLS ៖ ហាងផ្សេងអានតារាងផ្ទាល់ក៏០', bPrivate.rows?.[0]?.n === 0, bPrivate);
+        const sizes = [];
+        for (const count of [300, 600]) {
+            let oldBytes = 0, newBytes = 0;
+            for (const r of ['zoew_daily_pickup_cod_dod', 'zoew_daily_collected_cod_dod']) {
+                await adminSet(r, { seed: true });
+                let cursor = (await pull(A.who, 0)).seq;
+                const marks = {};
+                let reconstructed = { seed: true };
+                const setPath = (value, path, next) => {
+                    if (!path.length) return next;
+                    const out = { ...(value || {}) };
+                    const child = setPath(out[path[0]], path.slice(1), next);
+                    if (child === null) delete out[path[0]]; else out[path[0]] = child;
+                    return out;
+                };
+                for (let i = 0; i < count; i++) {
+                    marks['ZT' + String(i).padStart(12, '0')] = r === root ? '0970000001' : { cod: 3.5, dod: 0.5, count: 1 };
+                    const value = r === root ? { packagesPickedUp: i + 1, pickedUpPhones: { '0970000001': i + 1 }, pickedUpBarcodes: { ...marks } } : { ...marks };
+                    await adminSet(r, value);
+                    const full = await pull(A.who, cursor, false);
+                    const delta = await pull(A.who, cursor);
+                    oldBytes += Buffer.byteLength(JSON.stringify(full)); newBytes += Buffer.byteLength(JSON.stringify(delta));
+                    const row = delta.rows.find((x) => x.r === r);
+                    if (!row || !Array.isArray(row.d)) throw new Error('delta not used after first day snapshot');
+                    for (const patch of row.d) reconstructed = setPath(reconstructed, patch.p, patch.v);
+                    if (JSON.stringify(reconstructed) !== JSON.stringify(value)) {
+                        const actual = JSON.stringify(Object.keys(reconstructed).sort().map((k) => [k, reconstructed[k]]));
+                        const expected = JSON.stringify(Object.keys(value).sort().map((k) => [k, value[k]]));
+                        if (actual !== expected) throw new Error('delta differs from full day at ' + i);
+                    }
+                    cursor = delta.seq;
+                }
+            }
+            sizes.push({ count, oldBytes, newBytes });
+            ok(count + '/ថ្ងៃ ៖ delta < ១/១០ full transfer', newBytes < oldBytes / 10, { oldBytes, newBytes });
+        }
+        ok('៣០០ ➜ ៦០០ ៖ delta លីនេអ៊ែរ (<២.៣ដង)', sizes[1].newBytes < sizes[0].newBytes * 2.3, sizes);
+        console.log('A352_DAILY_BYTES=' + JSON.stringify(sizes));
+        fs.writeFileSync(path.join(ROOT, 'supabase-daily-bytes.json'), JSON.stringify(sizes, null, 2) + '\n');
+    } finally { await c.end().catch(() => {}); }
+}
+
 async function costGuard() {
     console.log('\n── ៣. ចំណាយលីនេអ៊ែរ ៖ រូបរាងហាងធំ ក្រោម statement_timeout ៨ វិ. · ពិដានទំហំដែលការសរសេរប៉ះ · ទំព័រ zoe_pull តាមបៃ ──');
     const { c } = await H.freshDb('default-grants');
@@ -1470,6 +1552,7 @@ async function main() {
     }
     await quotaUpgradeGuard();
     await foldHintEquivalence();
+    await dailyDeltaGuard();
     await costGuard();
     finish();
 }

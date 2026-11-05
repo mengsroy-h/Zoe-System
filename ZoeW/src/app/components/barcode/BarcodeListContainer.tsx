@@ -58,7 +58,7 @@ export function BarcodeListContainer() {
                                 {b.closed ? '❌ បើក' : palmMode ? '✍️ Sign' : '✅ បិទ'}
                             </button>}
                         <button disabled={b.operationBusy} className="btn-edit-item-price"
-                            onClick={onAct('openEditBarcodePriceModal', { args: [b.itemId, b.code] })}>✏️ កែ</button>
+                            onClick={onAct('requestEditBarcodePrice', { args: [b.itemId, b.code] })}>✏️ កែ</button>
                     </div>
                 </div>
             ))}

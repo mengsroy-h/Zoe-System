@@ -6,8 +6,8 @@ import { getZoneDateKey } from '../core/timezone';
 import { requestPinBeforeResetPickup } from '../domain/collected';
 import { openViewListModal } from '../features/barcode-ops';
 import { requestPinBeforeClearHistory } from '../features/clear-history';
-import { deleteSingleItem, openEditModal } from '../features/entry-ops';
-import { openExchangeRateModal } from '../features/exchange-rate';
+import { deleteSingleItem } from '../features/entry-ops';
+import { requestEditExchangeRate, requestEditPhone } from '../features/protected-edits';
 import { getCurrentFilterLabel, openExportDataModal } from '../features/export';
 import { applyCurrentFilter, openMonthlyReportModal } from '../features/monthly-report';
 import { requestPinBeforeConfig } from '../features/pin';
@@ -36,7 +36,7 @@ export function moreMenuMonthlyReport() { openMonthlyReportModal(); closeGlobalM
 
 export function moreMenuManualAdjust() { requestPinBeforeConfig(openManualAdjustModal, 'manualAdjust'); closeGlobalMoreMenu(); }
 
-export function moreMenuExchangeRate() { openExchangeRateModal(); closeGlobalMoreMenu(); }
+export function moreMenuExchangeRate() { requestEditExchangeRate(); closeGlobalMoreMenu(); }
 
 export function moreMenuRecentlyDeleted() { openRecentlyDeletedModal(); closeGlobalMoreMenu(); }
 
@@ -50,7 +50,7 @@ export function moreMenuPrintItemLabels(id?) { closeGlobalMoreMenu(); openLabelP
 
 export function moreMenuViewList(id?) { openViewListModal(id); closeGlobalMoreMenu(); }
 
-export function moreMenuEditPhone(id?) { openEditModal(id); closeGlobalMoreMenu(); }
+export function moreMenuEditPhone(id?) { requestEditPhone(id); closeGlobalMoreMenu(); }
 
 export function moreMenuDelete(id?) { deleteSingleItem(id); closeGlobalMoreMenu(); }
 

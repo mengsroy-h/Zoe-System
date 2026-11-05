@@ -106,11 +106,15 @@ async function setupPostgres() {
         }
         const value = mapped(body);
         if (actor === undefined && method === 'PUT' && location === '/.json') {
-            const operations = [];
-            for (const [root, entries] of Object.entries(value || {})) for (const [key, entry] of Object.entries(entries || {})) operations.push(operation([root, key], entry));
-            const seeded = await pgHarness.as(pgConnection, { role: 'service_role' }, 'select public.zoe_admin_write($1, $2, $3::jsonb, true) as r',
-                [tenant, operationId(), JSON.stringify(operations.length ? operations : [{ k: 'set', p: [R, '__scan_noop__'], v: null }])]);
-            if (seeded.error) throw new Error('seed Postgres: ' + JSON.stringify(seeded.error));
+            const existing = (await pgConnection.query('select root, key from public.zoe_docs where tenant_id = $1 and value is not null', [tenant])).rows;
+            const next = new Map(existing.map(row => [JSON.stringify([row.root, row.key]), operation([row.root, row.key], null)]));
+            for (const [root, entries] of Object.entries(value || {})) for (const [key, entry] of Object.entries(entries || {})) next.set(JSON.stringify([root, key]), operation([root, key], entry));
+            const operations = [...next.values()];
+            for (let offset = 0; offset < operations.length; offset += 400) {
+                const seeded = await pgHarness.as(pgConnection, { role: 'service_role' }, 'select public.zoe_admin_write($1, $2, $3::jsonb, false) as r',
+                    [tenant, operationId(), JSON.stringify(operations.slice(offset, offset + 400))]);
+                if (seeded.error) throw new Error('seed Postgres: ' + JSON.stringify(seeded.error));
+            }
             return { status: 200, text: JSON.stringify(value) };
         }
         assert.notEqual(actor, undefined, 'សំណើ fixture មិនស្គាល់');

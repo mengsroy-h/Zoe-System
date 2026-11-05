@@ -25,6 +25,7 @@ import { closeSideDrawer } from '../ui/page-nav';
 import { isNativeApp } from '../platform/native';
 import { HEALTH_ADVICE_LABELS, HEALTH_NO_BACKEND_TEXT, buildHealthAdvice } from './health-advice';
 import { isSupabaseConfig } from '../services/supabase-config';
+import { firebaseWebsocketIsBlocked, FIREBASE_WEBSOCKET_BLOCKED_TEXT } from '../services/firebase-websocket-observation';
 
 export const SHEET_SCRIPT_VERSION_EXPECTED = 2;
 
@@ -73,6 +74,7 @@ export async function healthNetworkLiveRow() {
 
 export function healthDatabaseRow() {
     if (healthBackendKind() === 'none') return healthRow('bad', HEALTH_ADVICE_LABELS.backend, HEALTH_NO_BACKEND_TEXT);
+    if (firebaseWebsocketIsBlocked()) return healthRow('bad', databaseHealthLabel(), FIREBASE_WEBSOCKET_BLOCKED_TEXT);
     if (!firebaseState.isDatabaseConnected) {
         return healthRow('bad', databaseHealthLabel(), firebaseState.hasEverConnectedToDatabase
             ? 'ដាច់ការតភ្ជាប់ — កំពុងព្យាយាមភ្ជាប់ឡើងវិញ'

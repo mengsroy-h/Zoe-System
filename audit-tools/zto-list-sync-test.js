@@ -1235,11 +1235,14 @@ function firstBody(requests) {
     // ⛔ ពិដានទំព័រខាង client មិនត្រូវលើសពិដានខាង server ៖ សំណើទំព័រទី ៤
     // នឹងធ្លាក់ 400 រាល់ដង ➜ ជុំទាញដែលចប់ដោយកំហុសរាល់ដងលើបញ្ជីវែង។
     const clientMax = /const ZTO_LIST_CLIENT_MAX_PAGES = (\d+);/.exec(APP_SRC);
-    const serverMax = /out\.maxPages = boundedInteger\(env\.ZTO_LIST_MAX_PAGES, (\d+),/.exec(FUNCTION_SRC);
+    const serverMax = /out\.maxPages = boundedInteger\(env\.ZTO_LIST_MAX_PAGES, (\d+), \d+, (\d+)\)/.exec(FUNCTION_SRC);
     ok('ជាន់អប្បបរមា ៖ អានពិដានទំព័រទាំង ២ ខាងចេញពីកូដពិត',
         !!clientMax && !!serverMax, { c: clientMax && clientMax[1], s: serverMax && serverMax[1] });
-    ok('⛔ ពិដានទំព័រខាង client មិនលើសលំនាំដើមខាង server',
-        !!clientMax && !!serverMax && Number(clientMax[1]) <= Number(serverMax[1]),
+    const limitFn = extractFn(APP_SRC, 'ztoListPageLimit') || '';
+    const limitOf = clientMax && limitFn ? vm.runInNewContext(clientMax[0] + ';' + limitFn + ';ztoListPageLimit') : null;
+    ok('⛔ client តាម maxPages server · គ្មាន metadata ប្រើលំនាំដើម · មានពិដាន',
+        !!clientMax && !!serverMax && !!limitOf && Number(clientMax[1]) <= Number(serverMax[2])
+            && limitOf({}) === Number(serverMax[1]) && limitOf({ maxPages: 10 }) === 10 && limitOf({ maxPages: 999 }) === Number(clientMax[1]),
         { c: clientMax && clientMax[1], s: serverMax && serverMax[1] });
 
     // ⛔ ការចុចរបស់អ្នកប្រើឈ្នះ ៖ ជុំទាញជា **ចេតនាផ្ទាល់** មិនមែនការងារ

@@ -285,11 +285,13 @@ const REACT_HELPERS = [
     // ការសម្អាតផ្ទៃ (`blankElementById()`) ៖ ជំនួស `el.value = ''` / `el.innerHTML = ''` របស់ App ដើម ➜ សរសេរ
     // ឃ្លាំងដែល JSX គូរ (តារាង · ប្រអប់ · សារ) — `clearSensitiveModalFields()` ឆ្លងកាត់វា
     'blankElementById', 'resetReactOwned', 'blankScanRemoveText',
-    'safeStoreGet', 'safeStoreSet', 'safeStoreRemove', 'emptySheetImportView', 'sheetPatch', 'sheetMsgClear', 'sheetMapClear', 'patchSheetImportView', 'sheetImportViewNow'
+    'safeStoreGet', 'safeStoreSet', 'safeStoreRemove', 'emptySheetImportView', 'sheetPatch', 'sheetMsgClear', 'sheetMapClear', 'patchSheetImportView', 'sheetImportViewNow',
+    'observationIsCurrent', 'stopObservation', 'scheduleObservation', 'watchFirebaseWebsocket', 'firebaseWebsocketIsBlocked', 'isSupabaseConfig', 'ztoListPageLimit'
 ];
 
 // ⛔ ថេរដែល helper ខាងលើអាន (`REF_NAMES` ៖ ឈ្មោះ ref ដែលចង `ref={…}` ពិត · `TEXT_BLANKERS` ៖ អត្ថបទ viewState)
-const REACT_CONSTS = ['appLocalStore', 'appSessionStore', 'REF_NAMES', 'TEXT_BLANKERS', 'NATIVE_QUERY_HEADER', 'NATIVE_QUERY_MAX'];
+const REACT_CONSTS = ['appLocalStore', 'appSessionStore', 'REF_NAMES', 'TEXT_BLANKERS', 'NATIVE_QUERY_HEADER', 'NATIVE_QUERY_MAX',
+    'FIREBASE_WEBSOCKET_WAIT_MS', 'FIREBASE_WEBSOCKET_RECHECK_MS', 'FIREBASE_WEBSOCKET_BLOCKED_TEXT'];
 
 function sliceConst(src, name) {
     const acorn = require('acorn');
@@ -396,6 +398,8 @@ function reactRuntime(src, options) {
     }
     parts.push(store);
     parts.push(storeDefinitions(src));
+    const websocketState = /^\s*let websocketObservation = null;/m.exec(src);
+    if (websocketState && !exclude.has('websocketObservation')) parts.push(websocketState[0].trim());
     parts.push('if (typeof window !== "undefined" && typeof localStorage !== "undefined" && typeof window.localStorage === "undefined") window.localStorage = localStorage;');
     parts.push('if (typeof window !== "undefined" && typeof sessionStorage !== "undefined" && typeof window.sessionStorage === "undefined") window.sessionStorage = sessionStorage;');
     const connectionHelpers = ['captureConnectionOperation', 'connectionFlowSnapshot', 'nativeWriteRecoveryState', 'withConnectionOwnership'];
@@ -405,7 +409,7 @@ function reactRuntime(src, options) {
             const decl = new RegExp('^\\s*(?:const|let) ' + name + ' = [^;]+;', 'm').exec(src);
             if (decl) parts.push(decl[0].trim());
         }
-        for (const name of ['auth', 'db', 'fb', 'authGeneration', 'firebaseSdkUnavailable', 'isInitializingFirebase',
+        for (const name of ['auth', 'db', 'fb', 'authGeneration', 'firebaseConfig', 'hasEverConnectedToDatabase', 'firebaseSdkUnavailable', 'isInitializingFirebase',
             'sessionExpiryCheck', 'authLoginOperation', 'isDatabaseInitialized', 'isDatabaseConnected', 'dbListenersFailed']) {
             const decl = new RegExp('^\\s*let ' + name + ' = ([^;]+);', 'm').exec(src);
             if (decl) parts.push('if (typeof ' + name + ' === "undefined") globalThis.' + name + ' = ' + decl[1] + ';');

@@ -281,6 +281,10 @@ await scenario('១. boot លើ Android native', async () => {
     // ⛔ ស្រទាប់បើកដោយ **ការចុចពិត** (build ផលិតកម្មគ្មាន `window.*`)
     await page.click('.header-more-btn');
     await page.click('[data-act="moreMenuExchangeRate"]');
+    ok('អត្រាប្រាក់ ៖ សុំកំណត់ PIN មុនបើកប្រអប់កែ', await page.locator('#pinSetupModal').isVisible());
+    await page.fill('#newSecurityPinInput', PIN + '15');
+    await page.click('#pinSetupSaveBtn');
+    await page.waitForSelector('#exchangeRateModal', { state: 'visible' });
     ok('PTR ៖ ប្រអប់បើកពិត (លក្ខខណ្ឌចាំបាច់)', await page.evaluate(() => document.getElementById('exchangeRateModal').style.display === 'flex'));
     stayed = noReload();
     await pull(page, 300);

@@ -85,13 +85,17 @@ it('a cancelled confirm discards nothing and the device stays blocked', async ()
   expect({ done, refused: after !== 'sent', rows: records().length, captures: capture.mock.calls.length }).toEqual({ done: false, refused: true, rows: 1, captures: 0 });
 });
 
-it('Supabase ៖ discard drops the undecidable rows of this account and shop only and unblocks the session', async () => {
+it.each([
+  ['ជួរកំណែចាស់', {}],
+  ['write មិនទាន់ admit', { writeProtocol: 2, awaitingRecovery: true, sentAfter: 0 }]
+])('Supabase C04 ៖ %s នៅ HOLD រហូត owner discard តែគណនីនិងហាងនេះ', async (_label, shape) => {
   const rows = new Map<string, any>();
   const journal = { put: (row: any) => { rows.set(row.opId, structuredClone(row)); return true; },
     list: (scope: string, topic: string) => [...rows.values()].filter(x => x.scope === scope && x.topic === topic),
     remove: (_s: string, _t: string, id: string) => rows.delete(id) };
-  journal.put({ v: 1, scope: 'project|user', topic: 'zoe:A', stage: 'unresolved', opId: 'operation_abcdefghijkl', sentAfter: Date.now() - 1000, ops: [{ k: 'set', p: ['zoew_settings', 'exchange_rate'], v: 4100 }] });
+  journal.put({ v: 1, scope: 'project|user', topic: 'zoe:A', stage: 'unresolved', opId: 'operation_abcdefghijkl', sentAfter: Date.now() - 1000, ops: [{ k: 'set', p: ['zoew_settings', 'exchange_rate'], v: 4100 }], ...shape });
   journal.put({ v: 1, scope: 'project|user', topic: 'zoe:B', stage: 'unresolved', opId: 'operation_othershopxyz', sentAfter: Date.now() - 1000, ops: [{ k: 'set', p: ['zoew_settings', 'exchange_rate'], v: 1 }] });
+  journal.put({ v: 1, scope: 'project|other', topic: 'zoe:A', stage: 'unresolved', opId: 'operation_otheruserxyz', sentAfter: Date.now() - 1000, ops: [{ k: 'set', p: ['zoew_settings', 'exchange_rate'], v: 2 }] });
   const writes: any[] = [];
   const db = createSupabaseDatabase({ subscribe: () => () => {}, rpc: async (fn: string, args: any) => {
     if (fn === 'zoe_write_v2') { expect.soft(args.p_expected_tenant).toBe('A'); writes.push(args); return { ok: true, docs: [], now: Date.now() }; }
@@ -99,10 +103,12 @@ it('Supabase ៖ discard drops the undecidable rows of this account and shop onl
   } }, { onListenerError: vi.fn(), onSynced: vi.fn(), onForbidden: vi.fn(), onTxOutcomeUnknown: vi.fn() }, { writeJournal: journal });
   db.setTenantTopic('zoe:A'); db.setAuthed(true, 'project|user'); await turn();
   const before = await verdictOf(db.set(db.ref('zoew_settings/exchange_rate'), 4200));
+  expect(writes).toEqual([]);
+  expect(rows.has('operation_abcdefghijkl')).toBe(true);
   const result = await db.discardPendingWrites(); await turn();
   const after = await verdictOf(db.set(db.ref('zoew_settings/exchange_rate'), 4300)); db.close('test');
   expect({ before, result, after, writes: writes.length, left: [...rows.keys()] })
-    .toEqual({ before: 'WRITE_RECOVERY_PENDING', result: { count: 1, paths: ['zoew_settings/exchange_rate'] }, after: 'sent', writes: 1, left: ['operation_othershopxyz'] });
+    .toEqual({ before: 'WRITE_RECOVERY_PENDING', result: { count: 1, paths: ['zoew_settings/exchange_rate'] }, after: 'sent', writes: 1, left: ['operation_othershopxyz', 'operation_otheruserxyz'] });
 });
 
 it('the drawer offers «លុបការសរសេររង់ចាំ» only while writes are blocked, behind the PIN', () => {

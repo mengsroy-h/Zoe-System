@@ -972,7 +972,7 @@ const FIREBASE_CERTS_MIN_TIMEOUT_MS = 1200;
 const FIREBASE_CERTS_MAX_TIMEOUT_MS = 3000;
 const ID_TOKEN_SKEW_MS = 60 * 1000;
 const PROJECT_ID_RE = /^[a-z0-9][a-z0-9-]{2,62}$/;
-const PROJECT_ID_MAX = 16;
+const PROJECT_ID_MAX = 1024;
 const PROJECT_BRANCHES_MAX = 16;
 const SITE_EMAIL_PREFIX_RE = /^[a-z0-9-]{1,32}$/;
 const SITE_EMAIL_PREFIX_DEFAULT = 'zoew';
@@ -1079,22 +1079,31 @@ function readProjectEntries(env) {
     const raw = String((env && env.FIREBASE_PROJECT_IDS) || '').trim();
     if (!raw) return none;
     const parts = raw.split(',').map((part) => part.trim().toLowerCase()).filter(Boolean);
-    if (!parts.length || parts.length > PROJECT_ID_MAX) return none;
     const ids = [];
-    const branches = {};
-    const valid = parts.every((part) => {
+    const branches = Object.create(null);
+    const denied = new Set();
+    parts.forEach((part) => {
         const cut = part.indexOf(':');
         const id = cut === -1 ? part : part.slice(0, cut);
-        if (!PROJECT_ID_RE.test(id)) return false;
-        if (ids.indexOf(id) === -1) ids.push(id);
-        if (cut === -1) return true;
-        const codes = part.slice(cut + 1).split('|').map((code) => code.trim());
-        if (!codes.length || codes.length > PROJECT_BRANCHES_MAX || codes.some((code) => !LIST_SITE_CODE_RE.test(code))) return false;
+        if (!PROJECT_ID_RE.test(id) || denied.has(id)) return;
+        const codes = cut === -1 ? [] : part.slice(cut + 1).split('|').map((code) => code.trim());
+        const merged = Array.from(new Set((branches[id] || []).concat(codes)));
+        if (codes.length > PROJECT_BRANCHES_MAX || codes.some((code) => !LIST_SITE_CODE_RE.test(code)) || merged.length > PROJECT_BRANCHES_MAX) {
+            denied.add(id);
+            const at = ids.indexOf(id);
+            if (at !== -1) ids.splice(at, 1);
+            delete branches[id];
+            return;
+        }
+        if (ids.indexOf(id) === -1) {
+            if (ids.length >= PROJECT_ID_MAX) return;
+            ids.push(id);
+        }
+        if (cut === -1) return;
         const list = branches[id] || (branches[id] = []);
-        codes.forEach((code) => { if (list.indexOf(code) === -1 && list.length < PROJECT_BRANCHES_MAX) list.push(code); });
-        return true;
+        codes.forEach((code) => { if (list.indexOf(code) === -1) list.push(code); });
     });
-    return valid ? { ids: ids, branches: branches } : none;
+    return { ids: ids, branches: branches };
 }
 
 function siteEmailPrefix(env) {
@@ -1484,6 +1493,7 @@ function listResponseBody(config, container, page, siteCode, kind) {
         list: true,
         enabled: true,
         kind: kind,
+        maxPages: config.list.maxPages,
         page: page,
         site: String(siteCode || ''),
         siteName: siteName,

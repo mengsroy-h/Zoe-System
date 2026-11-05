@@ -379,6 +379,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     const retrySteps = opt.retryStepsMs || SB_RETRY_STEPS_MS;
     const pollFallbackMs = opt.pollFallbackMs || SB_POLL_FALLBACK_MS;
     const pullPage = opt.pullPage || SB_PULL_PAGE;
+    let deltaPull = opt.deltaPull === true;
     const docsCache = opt.docsCache || null;
     const writeJournal = opt.writeJournal || null;
     const liveWriteIds = new Set<string>();
@@ -1069,7 +1070,23 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             pullStageAbove = typeof res.head === 'number' && Number.isFinite(res.head) ? Math.max(res.seq, res.head) : res.seq;
         }
         const target = pullStage || server;
-        for (const row of res.rows) putDocIn(target, row.r, row.k, row.v === undefined ? null : row.v, row.s);
+        const updates = [];
+        for (const row of res.rows) {
+            let value = row.v === undefined ? null : row.v;
+            if (Object.prototype.hasOwnProperty.call(row, 'd')) {
+                const previous = target.get(row.r)?.get(row.k);
+                if (previous && previous.s >= row.s) continue;
+                if (res.reset || !previous || previous.v === null || !Array.isArray(row.d)) throw new SbRpcError('delta basis missing', 'bad_delta', 0, '');
+                value = previous.v;
+                for (const patch of row.d) {
+                    if (!patch || !Array.isArray(patch.p) || patch.p.length > MAX_DEPTH || !patch.p.every(isValidKey) || !Object.prototype.hasOwnProperty.call(patch, 'v'))
+                        throw new SbRpcError('invalid delta', 'bad_delta', 0, '');
+                    value = setAt(value, patch.p, patch.v);
+                }
+            }
+            updates.push({ ...row, v: value });
+        }
+        for (const row of updates) putDocIn(target, row.r, row.k, row.v, row.s);
         if (pullStage && !res.more) {
             const stage = pullStage;
             const regressed = pullStageFrom > pullStageAbove;
@@ -1146,7 +1163,13 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     for (let page = 0; page < 1000; page++) {
                         const args: any = { p_since: cursor, p_limit: pullPage };
                         if (cursor > 0 && pullFullHead !== null) args.p_full_head = pullFullHead;
-                        const res = await rpc('zoe_pull', args);
+                        let res;
+                        try { res = await rpc(deltaPull ? 'zoe_pull_delta' : 'zoe_pull', args); }
+                        catch (e) {
+                            if (!deltaPull || !(e instanceof SbRpcError) || e.code !== 'PGRST202') throw e;
+                            deltaPull = false;
+                            res = await rpc('zoe_pull', args);
+                        }
                         if (closed) return;
                         if (!syncIsCurrent()) { staleSession = true; break; }
                         if (cacheTenant !== null) {
@@ -1203,6 +1226,9 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                 } catch (e) {
                     if (closed) return;
                     if (!syncIsCurrent()) { wantSync = true; continue; }
+                    if (e instanceof SbRpcError && e.code === 'bad_delta') {
+                        cursor = 0; pullFullHead = null; pullStage = null;
+                    }
                     if (e instanceof SbRpcError && (e.code === '42501' || e.status === 401 || e.status === 403)) {
                         forbidden = e;
                         setConnected(true);

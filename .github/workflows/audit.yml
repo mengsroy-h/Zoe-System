@@ -171,6 +171,13 @@ jobs:
           fi
           bash audit-tools/run-all.sh
 
+      - name: បង្ហាញការវាស់ទំហំ daily delta
+        if: always() && matrix.shard == 4 && !(github.event_name == 'workflow_dispatch' && inputs.multishop_scale)
+        run: |
+          if [ -f ZoeW/dist-audit/measure-root/supabase-daily-bytes.json ]; then
+            cat ZoeW/dist-audit/measure-root/supabase-daily-bytes.json
+          fi
+
       - name: វាស់ CPU និង RAM របស់ runner
         if: always()
         run: |

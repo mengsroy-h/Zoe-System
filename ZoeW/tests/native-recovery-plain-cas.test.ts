@@ -80,10 +80,15 @@ it('a receipt read that fails on the network defers verification instead of bloc
   expect({ verdict, dispatched: dispatched.mock.calls.length, saved: saved.length, left: records().length }).toEqual({ verdict: 'sent', dispatched: 2, saved: 1, left: 0 });
 });
 
+const realTick = () => new Promise(r => setImmediate(r));
+async function advance(ms: number, until: () => boolean = () => false) {
+  for (let spent = 0; spent < ms && !until(); spent += 50) { await vi.advanceTimersByTimeAsync(50); for (let k = 0; k < 4; k++) await realTick(); }
+  return until();
+}
+
 it('a deferred recovery with no write waiting retries by itself every gap while online and settles once the read answers (no write needed)', async () => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
   vi.stubGlobal('navigator', { onLine: true });
-  const realTick = () => new Promise(r => setImmediate(r));
   let resolve!: (v: any) => void; const first = lab(() => new Promise(r => { resolve = r; }));
   const write = first.sdk.set(first.sdk.ref(first.db, 'zoew_settings/exchange_rate'), 4200);
   await vi.waitFor(() => expect(resolve).toBeTypeOf('function'));
@@ -92,25 +97,23 @@ it('a deferred recovery with no write waiting retries by itself every gap while 
   vi.stubGlobal('fetch', async () => { reads++; if (!network) throw new TypeError('Failed to fetch'); return Response.json(null); });
   const dispatched = vi.fn(async () => {}); const second = lab(dispatched);
   second.sdk.onAuthStateChanged(second.auth, () => {});
-  let deferred = false;
-  for (let i = 0; i < 2000 && !deferred; i++) { await realTick(); await vi.advanceTimersByTimeAsync(1); deferred = nativeWriteRecoveryState(second.db).deferred; }
+  const deferred = await advance(NATIVE_RECOVERY_RETRY_GAP_MS, () => nativeWriteRecoveryState(second.db).deferred);
   const readsWhenDeferred = reads;
-  for (let i = 0; i < 2; i++) { await vi.advanceTimersByTimeAsync(NATIVE_RECOVERY_RETRY_GAP_MS); for (let k = 0; k < 20; k++) await realTick(); }
+  const retried = await advance(5 * NATIVE_RECOVERY_RETRY_GAP_MS, () => reads > readsWhenDeferred);
   const down = nativeWriteRecoveryState(second.db);
-  const whileDown = { waiting: down.deferred || down.recovering, blocked: down.blocked, retried: reads > readsWhenDeferred, rows: records().length };
+  const whileDown = { deferred, waiting: down.deferred || down.recovering, blocked: down.blocked, retried, rows: records().length };
   network = true;
-  for (let i = 0; i < 50 && records().length; i++) { await vi.advanceTimersByTimeAsync(NATIVE_RECOVERY_RETRY_GAP_MS); for (let k = 0; k < 20; k++) await realTick(); }
+  const settled = await advance(10 * NATIVE_RECOVERY_RETRY_GAP_MS, () => records().length === 0 && !nativeWriteRecoveryState(second.db).recovering);
   const state = nativeWriteRecoveryState(second.db);
   resolve(undefined); await write;
-  expect(whileDown).toEqual({ waiting: true, blocked: 0, retried: true, rows: 1 });
-  expect({ deferred: state.deferred, recovering: state.recovering, blocked: state.blocked, rows: records().length, resent: dispatched.mock.calls.length })
-    .toEqual({ deferred: false, recovering: false, blocked: 0, rows: 0, resent: 1 });
+  expect(whileDown).toEqual({ deferred: true, waiting: true, blocked: 0, retried: true, rows: 1 });
+  expect({ settled, deferred: state.deferred, recovering: state.recovering, blocked: state.blocked, rows: records().length, resent: dispatched.mock.calls.length })
+    .toEqual({ settled: true, deferred: false, recovering: false, blocked: 0, rows: 0, resent: 1 });
 });
 
 it('a deferred recovery waits while offline and retries once the device is back online; a session change stops the retries', async () => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
   const nav = { onLine: true }; vi.stubGlobal('navigator', nav);
-  const realTick = () => new Promise(r => setImmediate(r));
   let resolve!: (v: any) => void; const first = lab(() => new Promise(r => { resolve = r; }));
   const write = first.sdk.set(first.sdk.ref(first.db, 'zoew_settings/exchange_rate'), 4200);
   await vi.waitFor(() => expect(resolve).toBeTypeOf('function'));
@@ -120,20 +123,19 @@ it('a deferred recovery waits while offline and retries once the device is back 
   nav.onLine = false;
   const second = lab(vi.fn(async () => {}));
   second.sdk.onAuthStateChanged(second.auth, () => {});
-  let deferred = false;
-  for (let i = 0; i < 2000 && !deferred; i++) { await realTick(); await vi.advanceTimersByTimeAsync(1); deferred = nativeWriteRecoveryState(second.db).deferred; }
+  const deferred = await advance(NATIVE_RECOVERY_RETRY_GAP_MS, () => nativeWriteRecoveryState(second.db).deferred);
   const readsOffline = reads;
-  for (let i = 0; i < 3; i++) { await vi.advanceTimersByTimeAsync(NATIVE_RECOVERY_RETRY_GAP_MS); for (let k = 0; k < 20; k++) await realTick(); }
+  await advance(3 * NATIVE_RECOVERY_RETRY_GAP_MS);
   const offline = reads - readsOffline;
   nav.onLine = true;
-  for (let i = 0; i < 2; i++) { await vi.advanceTimersByTimeAsync(NATIVE_RECOVERY_RETRY_GAP_MS); for (let k = 0; k < 20; k++) await realTick(); }
-  const online = reads - readsOffline;
+  const retriedOnline = await advance(5 * NATIVE_RECOVERY_RETRY_GAP_MS, () => reads > readsOffline);
+  await advance(NATIVE_RECOVERY_RETRY_GAP_MS, () => !nativeWriteRecoveryState(second.db).recovering);
   firebaseState.authGeneration++;
   const afterSwitch = reads;
-  for (let i = 0; i < 3; i++) { await vi.advanceTimersByTimeAsync(NATIVE_RECOVERY_RETRY_GAP_MS); for (let k = 0; k < 20; k++) await realTick(); }
+  await advance(3 * NATIVE_RECOVERY_RETRY_GAP_MS);
   const rows = records().length;
   resolve(undefined); await write;
-  expect({ deferred, offline, retriedOnline: online > 0, afterSwitch: reads - afterSwitch, rows }).toEqual({ deferred: true, offline: 0, retriedOnline: true, afterSwitch: 0, rows: 1 });
+  expect({ deferred, offline, retriedOnline, afterSwitch: reads - afterSwitch, rows }).toEqual({ deferred: true, offline: 0, retriedOnline: true, afterSwitch: 0, rows: 1 });
 });
 
 it('⛔ rules that refuse receipts ➜ the write fails as refused (never resent through the plain SDK without its receipt) and nothing stays blocked (Phase B)', async () => {

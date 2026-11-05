@@ -782,6 +782,7 @@ const SAFE_TOP = function (px) {
         }
 
         // ថតទីតាំងកាតលើអេក្រង់ (កំពូលកាត − visualViewport.offsetTop) រាល់ស៊ុម ចាប់ពីមុនព្រឹត្តិការណ៍ ➜ ព្រឹត្តិការណ៍ (ក្នុង browser ឬពី Node) ➜ ចប់
+        //    ចលនារបស់កាតនៅរត់ពេលដល់ `ms` (runner CI យឺត ៖ keyboard បើកយឺតក្រោយចាប់ផ្តើមថត) ➜ ថតបន្តរហូតចលនាចប់ ≤ ២ វិ. ➜ `running` > 0 = ចលនាមិនចប់ពិត
         const RECORD = ({ id, ms }) => {
             const card = document.getElementById(id).querySelector('.modal-content');
             const frames = [];
@@ -789,10 +790,12 @@ const SAFE_TOP = function (px) {
             window.__glide = new Promise((done) => {
                 let stopped = false;
                 window.__stopGlide = () => { stopped = true; };
+                const runningGlides = () => card.getAnimations().filter((a) => a.playState === 'running' && !(a instanceof CSSAnimation)).length;
                 const tick = (t) => {
                     frames.push({ t: Math.round(t - t0), top: Math.round((card.getBoundingClientRect().top - visualViewport.offsetTop) * 10) / 10, pan: visualViewport.offsetTop, scroll: card.scrollTop });
-                    if (!stopped && (!ms || performance.now() - t0 < ms)) requestAnimationFrame(tick);
-                    else done({ frames, running: card.getAnimations().filter((a) => a.playState === 'running' && !(a instanceof CSSAnimation)).length });
+                    const elapsed = performance.now() - t0;
+                    if (!stopped && (!ms || elapsed < ms || (elapsed < ms + 2000 && runningGlides() > 0))) requestAnimationFrame(tick);
+                    else done({ frames, running: runningGlides() });
                 };
                 requestAnimationFrame(tick);
             });

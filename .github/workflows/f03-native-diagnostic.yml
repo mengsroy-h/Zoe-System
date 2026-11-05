@@ -122,7 +122,7 @@ jobs:
               try {
                   const directory = '/proc/' + owner.pid + '/fd';
                   const targets = fs.readdirSync(directory).map(name => { try { return fs.readlinkSync(directory + '/' + name); } catch (_) { return ''; } });
-                  return listenerMatches(['/proc/net/tcp', '/proc/net/tcp6'].map(name => fs.readFileSync(name, 'utf8')), targets, owner.port);
+                  return listenerMatches(['/proc/net/tcp', '/proc/net/tcp6'].filter(name => fs.existsSync(name)).map(name => fs.readFileSync(name, 'utf8')), targets, owner.port);
               } catch (_) { return false; }
           }
           function counters(output) {
@@ -211,8 +211,15 @@ jobs:
                   process.kill(owner.pid, 'SIGTERM');
                   for (let attempt = 0; attempt < 100 && current(owner); attempt++) await delay(100);
                   if (current(owner)) throw new Error('Owned Java process did not terminate');
-                  const server = net.createServer(); await new Promise((resolve, reject) => { server.once('error', reject); server.listen(owner.port, '127.0.0.1', resolve); });
-                  await new Promise(resolve => server.close(resolve));
+                  let portClosed = false;
+                  for (let attempt = 0; attempt < 50 && !portClosed; attempt++) {
+                      const server = net.createServer();
+                      try {
+                          await new Promise((resolve, reject) => { server.once('error', reject); server.listen(owner.port, '127.0.0.1', resolve); });
+                          portClosed = true; await new Promise(resolve => server.close(resolve));
+                      } catch (error) { if (error.code !== 'EADDRINUSE') throw error; await delay(200); }
+                  }
+                  if (!portClosed) throw new Error('Owned port did not close after the owned process ended');
                   if (observer && !samplerStopped) {
                       try {
                           for (let attempt = 0; attempt < 30 && observerCurrent(observer, directory); attempt++) await delay(100);
@@ -226,7 +233,7 @@ jobs:
               }
               throw new Error('Unknown owned JVM command');
           }
-          main().catch(() => { console.error('Owned JVM diagnostic command failed; no unverified process was adopted'); process.exitCode = 1; });
+          main().catch(error => { console.error('Owned JVM diagnostic command failed; no unverified process was adopted: ' + String(error && (error.code || error.message) || 'unknown').slice(0, 200)); process.exitCode = 1; });
           NODE
       - name: បើក JVM512 ថ្មី និងផ្ទៀង ownership
         env:

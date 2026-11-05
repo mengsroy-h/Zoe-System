@@ -156,9 +156,9 @@ async function run(label, dir, native) {
     await page.addInitScript("window.localStorage.setItem('zoe_active_locker', 'A5');");
     await page.addInitScript('(' + FAKE_SDK.toString() + ')(' + JSON.stringify(seed()) + ');');
     await page.clock.install({ time: NOW });
+    await page.clock.pauseAt(NOW + 20000);
     await page.goto(`http://127.0.0.1:${srv.port}/index.html`, { waitUntil: 'load' });
     await page.waitForTimeout(3500);
-    await page.clock.pauseAt(NOW + 20000);
     await tick(page, 3000);
     const snapshot = async name => {
         const got = await page.evaluate(() => ({ db: window.__fakeDump(), writes: window.__writeLog }));

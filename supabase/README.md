@@ -42,6 +42,7 @@ ZoeKeyGen (គ្មាន SMS · គ្មានការបង់ប្រា�
 | `zoe_write(op_id, ops)` | authenticated (client ចាស់) | Contract ចាស់ដែលមិនមាន expected tenant; មិនការពារការផ្ទេរ UID ចាស់ទៅហាងថ្មី។ កុំផ្ទេរ membership ខណៈនៅមាន client ចាស់។ |
 | `zoe_read(root, key?)` · `zoe_pull(since, limit, full_head?)` · `zoe_now()` | authenticated (សមាជិកហាងសកម្ម) | អានទិន្នន័យហាង និងម៉ោង server; មិនប្ដូរ tenant របស់ operation ក្នុង journal។ |
 | `zoe_evidence_candidates(root, before, limit)` | authenticated (សមាជិកហាងសកម្ម) | រាយកំណត់ត្រាភស្តុតាងចាស់ (`zoew_scan_operations` · `zoew_registry_releases` · `zoew_trash_consumptions`) របស់ហាងខ្លួនឯង ≤ ២០០ តាមអាយុ (អានតែប៉ុណ្ណោះ) ➜ App លុបតាម rules |
+| `zoe_evidence_candidates_page(root, before, limit, after)` | authenticated (សមាជិកហាងសកម្ម) | អានភស្តុតាងចាស់របស់ហាងខ្លួនឯង ≤ ២០០ ក្នុងមួយទំព័រ តាម key (`COLLATE "C"`)។ ទំព័រដំបូង `after = null`; ទំព័របន្ទាប់ផ្ញើ key ចុងក្រោយ ដើម្បីអាន key ធំជាង ទោះ key នោះត្រូវលុបហើយ។ ត្រូវមាន RPC នេះមុនប្រើ cleanup client ថ្មី; RPC ចាស់នៅតាមអាយុដដែល។ |
 | `note_my_device(serial, model?, platform?)` | authenticated (សមាជិកហាងសកម្ម) | កត់ឧបករណ៍បច្ចុប្បន្នក្នុងហាងខ្លួនឯង |
 | `admin_extend_tenant(tenant_id, days, expected_expires_at)` | admin | ពន្យារសុពលភាពដោយផ្ទៀងតម្លៃមុន ដើម្បីទប់ការពន្យារស្ទួនពេលសំណើជាន់គ្នា |
 | `admin_create_tenant(name, branch_code, expires_at)` | admin | បង្កើតហាង |

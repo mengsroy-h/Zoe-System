@@ -55,6 +55,8 @@ beforeEach(() => {
     dataState.scanHistory = [];
     dataState.deletedItems = [];
     firebaseState.isDatabaseInitialized = true;
+    firebaseState.serverClockTrusted = true;
+    firebaseState.serverTimeOffsetMs = 0;
 });
 
 afterEach(() => {
@@ -410,4 +412,19 @@ describe('📤 កញ្ចប់ដែលដករួច ៖ ធុងសំរ
         expect(document.getElementById('notifyDrawer')!.textContent).not.toContain(phone);
         expect((uiState as any).notifyRemovedView).toBeNull();
     });
+});
+
+
+it.each([[false, 0], [true, NaN], [true, Infinity]])('រំលឹក៖ history ស្រស់ ប៉ុន្តែម៉ោងមិនទាន់ទុកចិត្ត %s/%s មិនអះអាងថាវាស់បាន', (trusted, offset) => {
+    vi.spyOn(Date, 'now').mockReturnValue(NOW + 9 * DAY);
+    dataState.scanHistory = [item('CLOCK1', NOW - ABANDON_AGE_MS + NOTIFY_HOUR_MS, [{ code: 'CLOCK1', isClosed: false }])] as any;
+    firebaseState.serverClockTrusted = trusted as boolean;
+    firebaseState.serverTimeOffsetMs = offset as number;
+    refreshNotifyView();
+    expect(uiState.notifyView).toMatchObject({ measurable: false, packages: 0, customers: 0, rows: [], emptyText: VIEW_NOT_MEASURABLE_NOTICE });
+    firebaseState.serverClockTrusted = true;
+    firebaseState.serverTimeOffsetMs = -9 * DAY;
+    refreshNotifyView();
+    expect(uiState.notifyView).toEqual(nearExpiryView(dataState.scanHistory, NOW, false));
+    expect(uiState.notifyView!.packages).toBe(1);
 });

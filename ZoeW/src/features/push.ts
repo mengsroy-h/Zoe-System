@@ -670,7 +670,8 @@ export function syncExpirySchedule(force?: boolean): Promise<boolean> {
     }
     const saved = readSaved();
     if (!saved.on || pushRuntime.scheduleInFlight) return Promise.resolve(false);
-    if (!firebaseState.isDatabaseInitialized || dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY)) return Promise.resolve(false);
+    if (!firebaseState.serverClockTrusted || !Number.isFinite(firebaseState.serverTimeOffsetMs)
+        || !firebaseState.isDatabaseInitialized || dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY)) return Promise.resolve(false);
     if (!force && elapsedSince(pushRuntime.scheduleAttemptAt) < PUSH_SCHEDULE_MIN_GAP_MS) return Promise.resolve(false);
     if (pushIdentityMissing()) return Promise.resolve(false);
     const times = expiryScheduleTimes(dataState.scanHistory, getServerNow());

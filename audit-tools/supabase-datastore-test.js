@@ -321,6 +321,76 @@ async function body(c, rec, extra) {
     await admin(A.id, [{ k: 'set', p: [EV, evId('1')], v: null }, { k: 'set', p: [EV, evId('3')], v: null }]);
     await admin(B.id, [{ k: 'set', p: [EV, evId('4')], v: null }]);
 
+    // Key pages advance past held evidence even when every timestamp ties. The legacy age-order RPC stays available.
+    const candidatePage = async (who, root, before, limit, after = null) => {
+        const r = await as(c, who, 'select public.zoe_evidence_candidates_page($1, $2, $3, $4) as r', [root, before, limit, after]);
+        return r.rows ? r.rows[0].r : r;
+    };
+    const evKey = (n) => 'scan_' + n.toString(16).padStart(32, '0');
+    const evKeys = Array.from({ length: 51 }, (_, i) => evKey(i + 1));
+    await admin(A.id, evKeys.map((key, i) => ({ k: 'set', p: [EV, key], v: { ...evOp(key, 500), phase: i < 50 ? 'claimed' : 'committed' } })));
+    await admin(B.id, [{ k: 'set', p: [EV, evKey(1)], v: { ...evOp(evKey(1), 500), actorUid: B.who.sub } }]);
+    const evState = async () => (await c.query('select seq, bytes from public.zoe_tenant_state where tenant_id = $1', [A.id])).rows[0];
+    const evStateBefore = await evState();
+    const evPage1 = await candidatePage(A.who, EV, evNow - 1000, 50);
+    const evPage2 = await candidatePage(A.who, EV, evNow - 1000, 50, evKeys[49]);
+    const evPageEnd = await candidatePage(A.who, EV, evNow - 1000, 50, evKeys[50]);
+    rec('evidence key pages: 50 held heads with equal timestamps do not hide eligible record 51',
+        evPage1.docs.map((d) => d.k).join() === evKeys.slice(0, 50).join() && evPage1.docs.every((d) => d.v.phase === 'claimed')
+        && evPage2.docs.map((d) => d.k).join() === evKeys[50] && evPage2.docs[0].v.phase === 'committed' && evPageEnd.docs.length === 0,
+        { first: evPage1.docs.map((d) => d.k), second: evPage2.docs, end: evPageEnd.docs });
+    rec('evidence key pages: live document payload and server time remain available; listing does not advance seq/bytes',
+        Number.isFinite(evPage1.now) && evPage1.docs.every((d) => d.r === EV && d.v.birth === 500 && Number.isFinite(d.s))
+        && JSON.stringify(await evState()) === JSON.stringify(evStateBefore), evPage1.docs[0]);
+    const evPageB = await candidatePage(B.who, EV, evNow, 50);
+    const evForgedPage = await candidatePage(forged, EV, evNow, 50, evKeys[49]);
+    rec('evidence key pages: tenant RLS isolates identical keys and ignores forged tenant claims',
+        evPageB.docs.length === 1 && evPageB.docs[0].v.actorUid === B.who.sub
+        && evForgedPage.docs.map((d) => d.k).join() === evKeys[50] && evForgedPage.docs[0].v.actorUid === A.who.sub,
+        { b: evPageB.docs, forged: evForgedPage.docs });
+    await admin(A.id, [{ k: 'set', p: [EV, evKeys[49]], v: null }]);
+    const evDeletedCursor = await candidatePage(A.who, EV, evNow, 50, evKeys[49]);
+    const evAbsentCursor = await candidatePage(A.who, EV, evNow, 50, evKeys[49] + 'a');
+    rec('evidence key pages: deleted and nonexistent cursor records still advance exclusively',
+        evDeletedCursor.docs.map((d) => d.k).join() === evKeys[50] && evAbsentCursor.docs.map((d) => d.k).join() === evKeys[50],
+        { deleted: evDeletedCursor.docs, absent: evAbsentCursor.docs });
+    for (const root of ['zoew_registry_releases', 'zoew_trash_consumptions']) {
+        const rows = ['2', '10', 'A', 'a'].map((key) => ({ k: 'set', p: [root, 'retention_' + key], v: { deletedAt: key === '2' ? 100 : key === '10' ? 900 : 500 } }));
+        rows.push({ k: 'set', p: [root, 'retention_young'], v: { deletedAt: evNow } });
+        rows.push({ k: 'set', p: [root, 'retention_missing'], v: { other: 500 } });
+        rows.push({ k: 'set', p: [root, 'retention_text'], v: { deletedAt: '500' } });
+        await admin(A.id, rows);
+        const page = await candidatePage(A.who, root, evNow, 50);
+        const first = await candidatePage(A.who, root, evNow, 1);
+        const next = await candidatePage(A.who, root, evNow, 50, 'retention_2');
+        const legacy = await candidates(A.who, root, evNow, 50);
+        rec('evidence key pages: ' + root + ' uses deletedAt, strict age cutoff and C key order',
+            page.docs.map((d) => d.k).join() === 'retention_10,retention_2,retention_A,retention_a'
+            && first.docs.map((d) => d.k).join() === 'retention_10'
+            && next.docs.map((d) => d.k).join() === 'retention_A,retention_a', { docs: page.docs, first: first.docs, next: next.docs });
+        rec('legacy evidence RPC: ' + root + ' keeps age ordering after adding key pages',
+            legacy.docs.length === 4 && legacy.docs[0].k === 'retention_2' && legacy.docs[3].k === 'retention_10', legacy.docs);
+        await admin(A.id, rows.map((row) => ({ ...row, v: null })));
+    }
+    const evInvalidPages = [
+        ['root', REG, evNow, 10, null], ['null root', null, evNow, 10, null], ['null before', EV, null, 10, null],
+        ['null limit', EV, evNow, null, null], ['zero limit', EV, evNow, 0, null], ['negative limit', EV, evNow, -1, null], ['large limit', EV, evNow, 201, null],
+        ['empty cursor', EV, evNow, 10, ''], ['path cursor', EV, evNow, 10, 'bad/key'], ['dot cursor', EV, evNow, 10, 'bad.key'],
+        ['control cursor', EV, evNow, 10, 'bad\x7fkey'], ['long cursor', EV, evNow, 10, 'a'.repeat(769)], ['UTF-8 cursor bytes', EV, evNow, 10, 'é'.repeat(385)]
+    ];
+    for (const [label, root, before, limit, after] of evInvalidPages) {
+        const result = await candidatePage(A.who, root, before, limit, after);
+        rec('evidence key pages: invalid ' + label + ' is rejected', !!result.error && result.error.code === '22023' && result.error.message === 'invalid_data', result);
+    }
+    rec('evidence key pages: cursor byte bound is inclusive at 768',
+        Array.isArray((await candidatePage(A.who, EV, evNow, 200, 'z'.repeat(768))).docs)
+        && Array.isArray((await candidatePage(A.who, EV, evNow, 200, 'é'.repeat(384))).docs));
+    rec('evidence key pages: anon and members without a tenant are refused',
+        denied(await as(c, ANON, 'select public.zoe_evidence_candidates_page($1, $2, $3, $4)', [EV, evNow, 10, null]))
+        && forbiddenErr(await as(c, NOMEM, 'select public.zoe_evidence_candidates_page($1, $2, $3, $4)', [EV, evNow, 10, null])));
+    await admin(A.id, evKeys.map((key) => ({ k: 'set', p: [EV, key], v: null })));
+    await admin(B.id, [{ k: 'set', p: [EV, evKey(1)], v: null }]);
+
     const pullFull = async (who, since, limit, fullHead) => {
         const r = await as(c, who, 'select public.zoe_pull($1, $2, $3) as r', [since, limit, fullHead]);
         return r.rows ? r.rows[0].r : r;

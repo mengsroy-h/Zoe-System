@@ -2,6 +2,8 @@ import { dataState, firebaseState } from '../core/state';
 import { cleanupClockIsTrustworthy, getServerNow } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
 import { liveShopScope, shopScopePending } from '../core/shop-scope';
+import { isValidKey, nameCompare } from '../core/rtdb-key';
+import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
 import { DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY } from '../core/text';
 import { REGISTRY_RELEASES_ROOT } from '../domain/registry-purge-proof';
 import { SCAN_OPERATIONS_ROOT } from '../domain/scan-protocol';
@@ -15,15 +17,24 @@ export const EVIDENCE_RETENTION_MS = 5184000000;
 export const EVIDENCE_RETENTION_MARGIN_MS = 3600000;
 export const EVIDENCE_SWEEP_BATCH = 50;
 export const EVIDENCE_SWEEP_GAP_MS = 3600000;
+export const EVIDENCE_SWEEP_CURSOR_KEY = 'zoew_evidence_sweep_cursor_v1';
 export const EVIDENCE_ROOTS = [
     { root: SCAN_OPERATIONS_ROOT, field: 'birth' },
     { root: REGISTRY_RELEASES_ROOT, field: 'deletedAt' },
     { root: TRASH_CONSUMPTIONS_ROOT, field: 'deletedAt' }
 ];
 const EVIDENCE_KEY_RE = /^[A-Za-z0-9_-]{1,128}$/;
-export const evidenceSweep = { at: 0, running: false };
+export const evidenceSweep = { at: 0, running: false, owner: null as EvidenceOwner | null, cursors: {} as Record<string, string> };
 
 type EvidenceOwner = { db: any; sdk: any; auth: any; authGeneration: number; uid: string; scope: string };
+
+function evidenceClockCurrent() {
+    return cleanupClockIsTrustworthy() && Number.isFinite(firebaseState.serverTimeOffsetMs) && Number.isFinite(getServerNow());
+}
+
+export function evidenceCursorKey(scope: string, uid: string) {
+    return EVIDENCE_SWEEP_CURSOR_KEY + ':' + encodeURIComponent(scope) + ':' + encodeURIComponent(uid);
+}
 
 function captureEvidenceOwner(): EvidenceOwner | null {
     const owner = { db: firebaseState.db, sdk: firebaseState.fb, auth: firebaseState.auth, authGeneration: firebaseState.authGeneration,
@@ -37,6 +48,25 @@ function evidenceOwnerCurrent(owner: EvidenceOwner) {
         && owner.scope === liveShopScope() && !shopScopePending();
 }
 
+function loadEvidenceCursors(owner: EvidenceOwner) {
+    const cursors: Record<string, string> = {};
+    try {
+        const stored = JSON.parse(safeStoreGet(appLocalStore, evidenceCursorKey(owner.scope, owner.uid)) || 'null');
+        if (stored?.v === 1 && stored.scope === owner.scope && stored.uid === owner.uid && stored.roots && typeof stored.roots === 'object') {
+            for (const { root } of EVIDENCE_ROOTS) if (isValidKey(stored.roots[root])) cursors[root] = stored.roots[root];
+        }
+    } catch (e) {}
+    return cursors;
+}
+
+function checkpointEvidence(owner: EvidenceOwner, root: string, after: string | null) {
+    if (!evidenceOwnerCurrent(owner) || !evidenceClockCurrent()) return;
+    if ((evidenceSweep.cursors[root] || null) === after) return;
+    if (after) evidenceSweep.cursors[root] = after;
+    else delete evidenceSweep.cursors[root];
+    safeStoreSet(appLocalStore, evidenceCursorKey(owner.scope, owner.uid), JSON.stringify({ v: 1, scope: owner.scope, uid: owner.uid, roots: evidenceSweep.cursors }));
+}
+
 async function readEvidenceNode(owner: EvidenceOwner, path: string) {
     const ref = owner.sdk.ref(owner.db, path), url = txRestUrl(ref);
     const value = url ? await txReadServerValue(url, undefined, () => evidenceOwnerCurrent(owner)) : (await dbOp(owner.sdk.get(ref))).val();
@@ -44,25 +74,30 @@ async function readEvidenceNode(owner: EvidenceOwner, path: string) {
     return value === undefined ? null : value;
 }
 
-async function listEvidence(owner: EvidenceOwner, root: string, field: string, before: number): Promise<Array<[string, any]>> {
+async function listEvidence(owner: EvidenceOwner, root: string, field: string, before: number) {
     let entries: Array<[string, any]> = [];
+    const after = evidenceSweep.cursors[root] || null;
     if (owner.sdk.__supabase) {
-        if (typeof owner.sdk.evidenceCandidates !== 'function') return [];
-        const docs = await dbOp(owner.sdk.evidenceCandidates(owner.auth, root, before, EVIDENCE_SWEEP_BATCH));
-        if (Array.isArray(docs)) entries = docs.filter(doc => doc && doc.r === root).map(doc => [doc.k, doc.v]);
+        if (typeof owner.sdk.evidenceCandidates !== 'function') throw new Error('evidence:unavailable');
+        const docs = await dbOp(owner.sdk.evidenceCandidates(owner.auth, root, before, EVIDENCE_SWEEP_BATCH, after));
+        if (!Array.isArray(docs) || docs.length > EVIDENCE_SWEEP_BATCH || docs.some(doc => !doc || doc.r !== root || !isValidKey(doc.k))) throw new Error('evidence:page');
+        entries = docs.map(doc => [doc.k, doc.v]);
     } else {
         const url = txRestUrl(owner.sdk.ref(owner.db, root));
-        if (!url) return [];
+        if (!url) throw new Error('evidence:unavailable');
         const query = new URL(url);
-        query.searchParams.set('orderBy', JSON.stringify(field));
-        query.searchParams.set('endAt', String(before));
-        query.searchParams.set('limitToFirst', String(EVIDENCE_SWEEP_BATCH));
+        query.searchParams.set('orderBy', JSON.stringify('$key'));
+        if (after) query.searchParams.set('startAt', JSON.stringify(after));
+        query.searchParams.set('limitToFirst', String(EVIDENCE_SWEEP_BATCH + (after ? 1 : 0)));
         const value = await txReadServerValue(query.toString(), undefined, () => evidenceOwnerCurrent(owner));
-        if (value && typeof value === 'object' && !Array.isArray(value)) entries = Object.entries(value);
+        if (value && typeof value === 'object') entries = Object.entries(value).filter(([key, child]) => isValidKey(key) && child !== null
+            && (!after || nameCompare(key, after) > 0)).sort(([a], [b]) => nameCompare(a, b)).slice(0, EVIDENCE_SWEEP_BATCH);
+        else if (value !== null) throw new Error('evidence:page');
     }
     if (!evidenceOwnerCurrent(owner)) throw new Error('evidence:session');
-    return entries.filter(([key, value]) => EVIDENCE_KEY_RE.test(key) && value && typeof value === 'object' && !Array.isArray(value)
-        && Number.isFinite(value[field]) && value[field] < before).slice(0, EVIDENCE_SWEEP_BATCH);
+    return { after: entries.length === EVIDENCE_SWEEP_BATCH ? entries.at(-1)![0] : null,
+        candidates: entries.filter(([key, value]) => EVIDENCE_KEY_RE.test(key) && value && typeof value === 'object' && !Array.isArray(value)
+            && Number.isFinite(value[field]) && value[field] < before) };
 }
 
 function viewHolds(list, id: string) {
@@ -96,46 +131,66 @@ export async function evidenceRetirable(owner: EvidenceOwner, root: string, key:
 }
 
 async function retireEvidence(owner: EvidenceOwner, root: string, keys: string[]) {
-    if (!keys.length || !evidenceOwnerCurrent(owner)) return 0;
+    if (!evidenceOwnerCurrent(owner) || !evidenceClockCurrent()) throw new Error('evidence:session');
+    if (!keys.length) return 0;
     try {
         await dbOp(owner.sdk.update(owner.sdk.ref(owner.db), Object.fromEntries(keys.map(key => [root + '/' + key, null]))));
+        if (!evidenceOwnerCurrent(owner)) throw new Error('evidence:session');
         return keys.length;
     } catch (error) {
+        if (!evidenceOwnerCurrent(owner) || !evidenceDeleteRefused(error)) throw error;
         let removed = 0;
         for (const key of keys) {
-            if (!evidenceOwnerCurrent(owner)) break;
+            if (!evidenceOwnerCurrent(owner) || !evidenceClockCurrent()) throw new Error('evidence:session');
             try {
                 await dbOp(owner.sdk.update(owner.sdk.ref(owner.db), { [root + '/' + key]: null }));
+                if (!evidenceOwnerCurrent(owner)) throw new Error('evidence:session');
                 removed++;
-            } catch (one) {}
+            } catch (one) {
+                if (!evidenceOwnerCurrent(owner) || !evidenceDeleteRefused(one)) throw one;
+            }
         }
         return removed;
     }
 }
 
+function evidenceDeleteRefused(error) {
+    return error?.code === 'PERMISSION_DENIED' || (error?.code === '42501' && error?.message === 'permission_denied');
+}
+
 export async function runEvidenceRetentionSweep() {
-    if (evidenceSweep.running || elapsedSince(evidenceSweep.at) < EVIDENCE_SWEEP_GAP_MS) return 0;
-    if (!firebaseState.isDatabaseInitialized || firebaseState.dbListenersFailed || !cleanupClockIsTrustworthy() || shopScopePending()) return 0;
+    if (evidenceSweep.running) return 0;
+    if (!firebaseState.isDatabaseInitialized || firebaseState.dbListenersFailed || !evidenceClockCurrent() || shopScopePending()) return 0;
     if (dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY) || dbListenerViewIsStale(DB_LISTENER_KEY_DELETED)) return 0;
     const flow = connectionFlowSnapshot();
     if (flow.phase !== 'ready' || flow.pendingWrites > 0) return 0;
     const owner = captureEvidenceOwner();
     if (!owner) return 0;
+    if (!evidenceSweep.owner || !evidenceOwnerCurrent(evidenceSweep.owner)) {
+        evidenceSweep.owner = owner;
+        evidenceSweep.cursors = loadEvidenceCursors(owner);
+        evidenceSweep.at = 0;
+    }
+    if (elapsedSince(evidenceSweep.at) < EVIDENCE_SWEEP_GAP_MS) return 0;
     evidenceSweep.running = true;
     evidenceSweep.at = Date.now();
     let removed = 0;
     try {
         const before = getServerNow() - EVIDENCE_RETENTION_MS - EVIDENCE_RETENTION_MARGIN_MS;
         for (const { root, field } of EVIDENCE_ROOTS) {
-            if (!evidenceOwnerCurrent(owner) || !cleanupClockIsTrustworthy()) break;
-            const keys: string[] = [];
-            for (const [key, value] of await listEvidence(owner, root, field, before)) {
-                if (!evidenceOwnerCurrent(owner)) break;
-                if (await evidenceRetirable(owner, root, key, value, before)) keys.push(key);
+            if (!evidenceOwnerCurrent(owner) || !evidenceClockCurrent()) break;
+            try {
+                const page = await listEvidence(owner, root, field, before);
+                const keys: string[] = [];
+                for (const [key, value] of page.candidates) {
+                    if (!evidenceOwnerCurrent(owner) || !evidenceClockCurrent()) throw new Error('evidence:session');
+                    if (await evidenceRetirable(owner, root, key, value, before)) keys.push(key);
+                }
+                removed += await retireEvidence(owner, root, keys);
+                checkpointEvidence(owner, root, page.after);
+            } catch (error) {
             }
-            removed += await retireEvidence(owner, root, keys);
         }
-    } catch (error) {
     } finally {
         evidenceSweep.running = false;
     }

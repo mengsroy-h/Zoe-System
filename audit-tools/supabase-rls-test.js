@@ -75,6 +75,7 @@ const EXPECT_PUBLIC_EXEC = {
     zoe_pickup_reset_status_v1: ['authenticated'],
     zoe_read: ['authenticated'],
     zoe_evidence_candidates: ['authenticated'],
+    zoe_evidence_candidates_page: ['authenticated'],
     zoe_pull: ['authenticated'],
     zoe_pull_delta: ['authenticated'],
     zoe_now: ['authenticated'],

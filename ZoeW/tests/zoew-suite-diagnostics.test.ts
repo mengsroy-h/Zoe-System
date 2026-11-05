@@ -5,6 +5,7 @@ import { BaseSequencer } from 'vitest/node';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import vm from 'node:vm';
+import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { expect, it } from 'vitest';
 const requireReal = createRequire(import.meta.url);
@@ -49,7 +50,7 @@ it.each([[1, 1], [3, 2]])('zoew-suite៖ ផ្នែក %s ត្រូវរ�
     const testArgs = calls.find(call => call.args[2] === 'test')?.args || [];
     expect(testArgs.filter(arg => !arg.startsWith('--reporter=') && !arg.startsWith('--outputFile.json=')))
         .toEqual(['run', '-s', 'test', '--', '--shard=' + shard + '/2']);
-    expect(testArgs).toContain('--outputFile.json=/fixture/report/vitest.json');
+    expect(testArgs).toContain('--outputFile.json=' + path.join('/fixture/report', 'vitest.json'));
     expect(calls.every(call => call.timeout === 240000)).toBe(true);
     expect(calls.filter(call => call.args[2] !== 'test').every(call => call.args.length === 3)).toBe(true);
 });

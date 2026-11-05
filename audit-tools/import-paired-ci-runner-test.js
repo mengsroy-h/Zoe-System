@@ -211,6 +211,15 @@ function loadMutant(before,after){
  assert.equal(parts.length,2,'exactly one intentional mutant target required');const mutant=new Module(filename,module);
  mutant.filename=filename;mutant.paths=Module._nodeModulePaths(path.dirname(filename));mutant._compile(parts.join(after),filename);return mutant.exports.createSnapshotAdapters;
 }
+function loadClockedSnapshot(){
+ const filename=path.join(selectedRoot,'audit-tools','emu','import-paired-ci-runner.js'),whole=fs.readFileSync(filename,'utf8'),start=whole.indexOf('// BEGIN PRIVATE NATIVE SNAPSHOT HOOK'),end=whole.indexOf('// END PRIVATE NATIVE SNAPSHOT HOOK');assert(start>=0&&end>start);
+ let now=0,next=0;const timers=new Map(),scheduled=[],clockModule={exports:{}};
+ new vm.Script(whole.slice(start,end)+'\nmodule.exports=snapshotFeature;',{filename}).runInNewContext({module:clockModule,Buffer,process,
+  require:id=>id==='perf_hooks'?{performance:{now:()=>now}}:require(id),
+  setTimeout(callback,ms){const id=++next;timers.set(id,{at:now+ms,callback});scheduled.push(ms);return id;},clearTimeout:id=>timers.delete(id)});
+ return {factory:clockModule.exports.createSnapshotAdapters,scheduled,now:()=>now,pending:()=>timers.size,
+  fireReadDeadline(){assert.equal(timers.size,1,'only the unsettled read timer may remain');const [id,timer]=timers.entries().next().value;assert.equal(timer.at,75,'read gets 75ms of the unchanged 100ms budget');timers.delete(id);now=timer.at;timer.callback();}};
+}
 
 async function main(){
  {const c=new AbortController();c.abort();let n=0;raceSafeSignal(c.signal).addEventListener('abort',()=>n++,{once:true});assert.equal(n,1,'already-aborted signal must be delivered');}
@@ -263,9 +272,19 @@ async function main(){
  await scenario('fractional count',{root:{zoew_scan_operations:{[fakeOp]:{count:1.5}}},privateCanary:true});
  await scenario('numeric boolean',{root:{zoew_scan_operations:{[fakeOp]:{isClosed:1}}},privateCanary:true});
  await scenario('foreign scope',{root:{zoew_scan_operations:{[fakeOp]:{scope:'http://127.0.0.1:9000/?ns=paired-import-999-aaaaaaaa'}}},privateCanary:true});
- const timed=await scenario('unsettled synthetic read',{never:true,timeoutMs:100,privateCanary:true});
- assert.equal(timed.receipt.reason,'SNAPSHOT_TIMEOUT');assert.equal(timed.receipt.receipt,'PRIVATE_0600');
- const timeoutFile=JSON.parse(fs.readFileSync(timed.receiptFile,'utf8'));assert.equal(timeoutFile.state,'UNREADABLE');assert.equal(timeoutFile.reason,'SNAPSHOT_TIMEOUT');assert(!JSON.stringify(timeoutFile).includes(CANARY));
+ {
+  // Only snapshot time is virtual; private receipt I/O and the outer watchdog remain real.
+  const clock=loadClockedSnapshot();let entered,readReached=false,receiptDelay=0;const readEntered=new Promise(resolve=>entered=resolve),realNow=require('perf_hooks').performance.now.bind(require('perf_hooks').performance);
+  const io={lstat:(...args)=>fs.promises.lstat(...args),open:async(file,...args)=>{
+   if(file.endsWith('native-snapshot.json')){const began=realNow();await new Promise(resolve=>setTimeout(resolve,50));receiptDelay=realNow()-began;}
+   return fs.promises.open(file,...args);
+  }};
+  const pending=scenario('unsettled synthetic read',{factory:clock.factory,io,never:true,timeoutMs:100,privateCanary:true,beforeRead(){readReached=true;entered();}});
+  await Promise.race([readEntered,pending]);assert.equal(readReached,true,'the intended unsettled read must be reached');clock.fireReadDeadline();const timed=await pending;
+  assert.equal(timed.receipt.reason,'SNAPSHOT_TIMEOUT');assert.equal(timed.receipt.receipt,'PRIVATE_0600');
+  const timeoutFile=JSON.parse(fs.readFileSync(timed.receiptFile,'utf8'));assert.equal(timeoutFile.state,'UNREADABLE');assert.equal(timeoutFile.reason,'SNAPSHOT_TIMEOUT');assert(!JSON.stringify(timeoutFile).includes(CANARY));
+  assert.deepEqual(clock.scheduled,[75,75,75,25],'read deadline and remaining receipt budget stay unchanged');assert(receiptDelay>25,'real receipt I/O must outlast the virtual remaining budget');assert.equal(clock.now(),75);assert.equal(clock.pending(),0,'completed snapshot must clear every timer');
+ }
  {
   const inspect={},httpImpl=fakeHttp('ok',inspect);await scenario('bounded fake HTTP',{httpImpl,expectPass:true});
   assert.equal(inspect.options.hostname,'127.0.0.1');assert.equal(inspect.options.port,9000);assert.equal(inspect.options.method,'GET');assert.equal(inspect.options.agent,false);

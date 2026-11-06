@@ -1948,6 +1948,12 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-11-06 · ភ្ជាប់ helper ភស្តុតាងត្រឡប់ក្នុង checker
+
+Audit #1197 លើ `3cb5287`៖ `trash-modal-test` ខ្វះ `barcodeReturnedEvidence` ក្នុង VM។ Checker ស្រង់កូដចំនួន៦ ឥឡូវរួម helper ពិត និង `barcodeReturnBasis`; មិន mock ឬបន្ធូរលក្ខខណ្ឌផលិតកម្មទេ។ Regression ប្រើ checker-view ពិត និងបញ្ជីស្រង់របស់ checker នីមួយៗ៖ មុនកែ៦ធ្លាក់ដោយ helper បាត់ ក្រោយកែ៦ឆ្លង ដោយវាស់ពេលមកដល់ ពេលស្តារ ពេលមេ និងសញ្ញាដែលបានរក្សា។
+
+Announcement តែមួយផ្គូផ្គង `APP_VERSION` បច្ចុប្បន្ន។ Notifications មុនកែ២ធ្លាក់/៣២ឆ្លង; suite រួម៣ files/៩៥ tests ឆ្លង។ Full checker លើ measure-root និង CI ថ្មីនៅមិនទាន់ផ្ទៀង ព្រោះ Chromium local ត្រូវបានបិទ socket ដោយ EPERM។ មិនមានការកែ app logic, rules, migrations ឬសោ ZTO/gesture។
+
 ### 2026-11-06 · Meta-checker គ្របម៉ូឌុល .mjs
 
 ការរក checker ពី `run-all.sh` និងការស្កេនថតរំលង `.mjs` ទោះ `server-time-function-test.mjs` រត់ក្នុង suite ក៏ដោយ។ ឥឡូវ direct command និង loop ស្គាល់ `.js`/`.mjs` តាម extension ពិត; `.bak`, comment និង loop ដែលមិនរត់ checker មិនជំនួសការវាស់ទេ។ Exit scanner parse ESM ហើយ poison សម្រាប់ `node:test` ចាក់បរាជ័យក្រោយ callback ពិតបញ្ចប់។ ឯកសារដើមនៅដដែល។

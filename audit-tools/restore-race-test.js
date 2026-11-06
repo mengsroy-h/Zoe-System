@@ -158,7 +158,7 @@ function tabFor(app, shared, suffix) {
     ].filter(Boolean).join('\n');
     const policyHelpers = ['getZtoPickupVerdict', 'ztoVerdictCandidate', 'ztoImportLegacyValid', 'readDurableZtoImportLegacy', 'getZtoTrashMode', 'ztoTrashModeOf', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'lookupApiIsZto', 'lookupApiIsPalm', 'trashRestoreBlockOf',
         'trashZtoFinalBlock', 'barcodeZtoSigned', 'barcodeZtoReturned', 'barcodeZtoMisplaced', 'barcodeZtoSentOut',
-        'trashItemLeftBranch', 'trashReturnedEvery', 'barcodeZtoLeftKind', 'barcodeVerdictSigned',
+        'trashItemLeftBranch', 'trashReturnedEvery', 'barcodeZtoLeftKind', 'barcodeReturnedEvidence', 'barcodeReturnBasis', 'barcodeVerdictSigned',
         'pickupBarcodeKey', 'barcodeRegistryKey', 'loadZtoPickupStatusOnce', 'safeStoreGet', 'safeStoreSet', 'shopScope', 'recalcItemMoneyFromBarcodes',
         // helper ក្រៅប្លុកស្តារ ដែលមុខងារស្តារហៅ (ខ្វះ = ReferenceError ដែល catch លេបទៅជា 'pending')
         'barcodeEntriesOf', 'txRestUrl', 'txReadServerValue']

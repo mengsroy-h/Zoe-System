@@ -275,6 +275,8 @@ vm.runInContext(reactRuntime(src, { context: ctx }), ctx);
  sliceFn(src, 'barcodeZtoMisplaced'),
  sliceFn(src, 'barcodeZtoSentOut'),
  sliceFn(src, 'barcodeZtoLeftKind'),
+ sliceFn(src, 'barcodeReturnedEvidence'),
+ sliceFn(src, 'barcodeReturnBasis'),
  sliceFn(src, 'barcodeMisplacedInZto'),
  sliceFn(src, 'barcodeSentOutInZto'),
  sliceFn(src, 'trashReturnedEvery'),

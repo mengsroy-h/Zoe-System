@@ -361,3 +361,39 @@ it('SheetJS origin guard follows the real target-tree React preflight and reject
         expect(run()[0][1]).toBe(false);
     } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+it.each(['trash-modal-test.js', 'empty-state-truth-test.js', 'restore-race-test.js', 'tx-outcome-test.js', 'cleanup-interrupt-atomicity-test.js', 'emu/crud-rules-flow.js'])(
+    '%s ស្រង់ភស្តុតាងត្រឡប់ និងព្រំដែនវដ្តពិត', async (checker) => {
+        const require = createRequire(import.meta.url);
+        const { sliceFunction } = require('../../audit-tools/react-view.js');
+        const { moduleView, aliasStateFields } = await import(pathToFileURL(path.resolve('scripts/checker-view.mjs')).href);
+        const groups = JSON.parse(readFileSync('src/_generated-state.json', 'utf8'));
+        const source = ['src/domain/barcode-key.ts', 'src/domain/registry.ts', 'src/domain/pickup.ts', 'src/domain/barcode.ts', 'src/features/zto-final-marks.ts']
+            .map(name => aliasStateFields(moduleView(readFileSync(name, 'utf8'), name), groups).text).join('\n');
+        const checkerSource = readFileSync(path.resolve('../audit-tools', checker), 'utf8');
+        let names: string[] = [];
+        simple(parse(checkerSource, { ecmaVersion: 'latest', allowReturnOutsideFunction: true }), {
+            ArrayExpression(node: any) {
+                const entries = node.elements.map((entry: any) => entry?.type === 'Literal' ? entry.value
+                    : entry?.type === 'CallExpression' && entry.callee.name === 'sliceFn' ? entry.arguments[1]?.value : null);
+                if (entries.includes('barcodeZtoLeftKind')) names = entries.filter((entry: any) => typeof entry === 'string');
+            }
+        });
+        expect(names).toContain('barcodeZtoLeftKind');
+        const selected = ['barcodeZtoLeftKind', 'barcodeReturnedEvidence', 'barcodeReturnBasis', 'pickupBarcodeKey', 'barcodeRegistryKey', 'barcodeZtoSentOut', 'barcodeZtoMisplaced'];
+        const bodies = selected.filter(name => names.includes(name)).map(name => {
+            const body = sliceFunction(source, name);
+            expect(body, name).toBeTruthy();
+            return body;
+        });
+        const evidence = new Map([['KH123', { kind: 'sent', at: 200 }]]);
+        const context = vm.createContext({ ztoReturnedEvidence: evidence });
+        vm.runInContext(sliceFunction(source, 'canonicalBarcodeRegistryKey') + '\n' + bodies.join('\n'), context);
+        const call = (barcode: object, item: object) => context.barcodeZtoLeftKind(barcode, item);
+        expect(call({ code: 'KH123', createdAt: 100 }, {})).toBe('sent');
+        expect(call({ code: 'KH123', createdAt: 300 }, {})).toBe('');
+        expect(call({ code: 'KH123' }, { createdAt: 300 })).toBe('');
+        expect(call({ code: 'KH123', createdAt: 100, restoredAt: 300 }, {})).toBe('');
+        expect(call({ code: 'KH123', createdAt: 300, ztoSentOutAt: 310 }, {})).toBe('sent');
+        expect(call({ code: 'KH123', createdAt: 300, ztoMisplacedAt: 310 }, {})).toBe('misplaced');
+    });

@@ -122,6 +122,8 @@
 
 ZoeW `2.50.184` (`zoew-v448`) · ZoeKeyGen `2.24.35` (`zoekeygen-v146`)។ App ទាំងពីរអានម៉ោងពី `https://zoew.netlify.app/.netlify/functions/server-time` ដោយ GET គ្មាន credentials។ Function ផ្តល់ `{now, nonce}` ជាមួយ CORS និង no-store; client ផ្ទៀង nonce ចៃដន្យ ស្ថានភាព HTTP ប្រភេទ JSON និងលេខម៉ោង មុនបើកភាពទុកចិត្ត។ Request និង body មានពិដានរួម; បរាជ័យរក្សា offset ដែលបានទុកចិត្ត និង activation ដដែល។ មិនកែច្បាប់ហិរញ្ញវត្ថុ ឬអនុញ្ញាត cleanup តាមតែ clock response ទេ។
 
+CORS អនុញ្ញាតតែ `https://zoew.netlify.app`, `https://zoekeygen.netlify.app` និង Android `https://localhost`។ Deploy preview, custom domain, HTTP localhost និង opaque origin មិនបានអនុញ្ញាត; ត្រូវបន្ថែម origin ដែលបានផ្ទៀង និងសាកដោយឡែក ប្រសិនបើត្រូវការប្រើ។
+
 **សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ deploy function លើ ZoeW ហើយផ្ទៀង response ពិត មុនចេញ client ZoeW/Android និង ZoeKeyGen។ សាក cross-origin នៅ web, Android និង KeyGen ដោយឃើញ JSON និង offset ពិត ទោះ Date header មើលមិនឃើញ។ មិនមាន migration ឬ rules ថ្មី។ ការកែ local មិនមែនភស្តុតាង deploy ឬតេស្តឧបករណ៍ពិតទេ។
 
 ### [2.50.183] — 2026-11-06 · សមកាលកម្មម៉ោង license
@@ -4313,6 +4315,8 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `license-network-pressure-test` | — | ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `license-record-race-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ |
 | `license-seat-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៥ · ផ្នែក ៧ · ផ្នែក ៨ |
+| `license-time-cors-browser-test` | ផ្នែក ២ | — |
+| `license-time-json-test` | ផ្នែក ២ | — |
 | `listener-leak-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
 | `listener-pending-key-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `locker-claim-guard-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៩ |

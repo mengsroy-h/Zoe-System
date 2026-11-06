@@ -1,13 +1,24 @@
+const ALLOWED_ORIGINS = new Set([
+    'https://zoew.netlify.app',
+    'https://zoekeygen.netlify.app',
+    'https://localhost'
+]);
+
 export default function serverTime(request) {
+    const origin = request.headers.get('Origin');
     const headers = {
         'Content-Type': 'application/json; charset=utf-8',
         'Cache-Control': 'no-store',
         'CDN-Cache-Control': 'no-store',
         'Netlify-CDN-Cache-Control': 'no-store',
-        'Access-Control-Allow-Origin': '*',
+        Vary: 'Origin',
         'Cross-Origin-Resource-Policy': 'cross-origin',
         'X-Content-Type-Options': 'nosniff'
     };
+    if (origin !== null && !ALLOWED_ORIGINS.has(origin)) {
+        return new Response('{}', { status: 403, headers });
+    }
+    if (origin !== null) headers['Access-Control-Allow-Origin'] = origin;
     if (request.method !== 'GET') {
         return new Response('{}', { status: 405, headers: { ...headers, Allow: 'GET' } });
     }

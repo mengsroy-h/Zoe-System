@@ -2,6 +2,8 @@
 // REAL Chromium Fetch CORS filtering, local HTTP servers on separate origins.
 // Transport mapping changes only destination; never mocks Response/headers/body.
 // No live service, customer database or browser credentials are touched.
+// These local HTTP fixtures test browser/client behavior. Exact deployed-origin
+// policy and the real handler are covered by server-time-function-test.mjs.
 const { chromium } = require('playwright-core');
 const http = require('node:http');
 const fs = require('node:fs');
@@ -23,9 +25,13 @@ async function check(label, run) {
 }
 (async () => {
     for (const file of files) assert.ok(fs.readFileSync(path.join(ROOT, file), 'utf8').length > 0);
+    const allowedOrigins = new Set();
     const clockOrigin = await serve((req, res) => {
+        if (req.url === '/') { res.setHeader('Content-Type', 'text/html'); res.end('<!doctype html><title>Same-origin app</title>'); return; }
         const u = new URL(req.url, 'http://fixture');
-        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Vary', 'Origin');
+        if (req.headers.origin && !allowedOrigins.has(req.headers.origin)) { res.writeHead(403); res.end('{}'); return; }
+        if (req.headers.origin && u.pathname !== '/no-cors') res.setHeader('Access-Control-Allow-Origin', req.headers.origin);
         res.setHeader('Cache-Control', 'no-store');
         res.setHeader('Date', 'Fri, 06 Nov 2026 10:00:42 GMT');
         res.setHeader('Content-Type', 'application/json');
@@ -37,25 +43,37 @@ async function check(label, run) {
     });
     const appOrigin = await serve((req, res) => { res.setHeader('Content-Type', 'text/html'); res.end('<!doctype html><title>CORS regression app</title>'); });
     const keygenOrigin = await serve((req, res) => { res.setHeader('Content-Type', 'text/html'); res.end('<!doctype html><title>CORS regression KeyGen</title>'); });
+    const nativeOrigin = await serve((req, res) => { res.setHeader('Content-Type', 'text/html'); res.end('<!doctype html><title>Localhost WebView analogue</title>'); });
+    const hostileOrigin = await serve((req, res) => { res.setHeader('Content-Type', 'text/html'); res.end('<!doctype html><title>Unapproved origin</title>'); });
+    [clockOrigin, appOrigin, keygenOrigin, nativeOrigin].forEach(origin => allowedOrigins.add(origin));
     try { browser = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_PATH || (fs.existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : chromium.executablePath()), args: ['--no-sandbox'] }); } catch (error) {
         unavailable = true;
         console.log('SKIP browser CORS: Chromium could not launch: ' + error.message.split('\n')[0]);
         return;
     }
-    // null origin models opaque origins (file/custom WebViews); localhost models native HTTP WebViews.
-    // This is not a claim to have run Android/iOS WebViews.
-    for (const [originName, origin] of [['app', appOrigin], ['KeyGen separate origin', keygenOrigin], ['native opaque origin', 'about:blank']]) {
+    // Android uses https://localhost, not about:blank. A separate loopback HTTP
+    // origin is only a browser CORS analogue, not an Android/device/TLS test.
+    for (const [originName, origin] of [['same-origin app', clockOrigin], ['app cross-origin', appOrigin], ['KeyGen separate origin', keygenOrigin], ['localhost WebView analogue', nativeOrigin], ['unapproved origin', hostileOrigin]]) {
+        const approved = allowedOrigins.has(origin);
+        const sameOrigin = origin === clockOrigin;
         const context = await browser.newContext(); const page = await context.newPage(); await page.goto(origin);
-        await check(originName + ': HTTP 200 Date is hidden but JSON is readable', async () => {
+        page.on('console', message => { if (message.type() === 'error') console.error('BROWSER ' + originName + ': ' + message.text()); });
+        page.on('requestfailed', request => console.error('REQUEST FAILED ' + originName + ': ' + request.failure()?.errorText));
+        await check(originName + ': browser response visibility', async () => {
+            if (!approved) {
+                const blocked = await page.evaluate(base => fetch(base + '/json?nonce=' + 'b'.repeat(32)).then(() => false, () => true), clockOrigin);
+                assert.equal(blocked, true);
+                return;
+            }
             const result = await page.evaluate(async base => {
                 const old = await fetch(base + '/firebase'); const next = await fetch(base + '/json?nonce=' + 'b'.repeat(32));
                 return { oldStatus: old.status, oldDate: old.headers.get('Date'), newDate: next.headers.get('Date'), body: await next.json() };
             }, clockOrigin);
-            assert.equal(result.oldStatus, 200); assert.equal(result.oldDate, null); assert.equal(result.newDate, null);
+            assert.equal(result.oldStatus, 200); assert.equal(result.oldDate, sameOrigin ? 'Fri, 06 Nov 2026 10:00:42 GMT' : null); assert.equal(result.newDate, sameOrigin ? 'Fri, 06 Nov 2026 10:00:42 GMT' : null);
             assert.equal(result.body.nonce, 'b'.repeat(32)); assert.ok(Number.isSafeInteger(result.body.now));
         });
         for (const file of files) {
-            for (const scenario of ['json', 'wrong', 'bad', 'redirect']) await check(originName + ' / ' + file + ' / ' + scenario, async () => {
+            for (const scenario of ['json', 'wrong', 'bad', 'redirect', ...(!sameOrigin ? ['no-cors'] : [])]) await check(originName + ' / ' + file + ' / ' + scenario, async () => {
                 // Reload source in a fresh global so failed refresh cannot inherit trust.
                 await page.evaluate(() => { if (window.__nativeFetch) window.fetch = window.__nativeFetch; });
                 await page.addScriptTag({ content: fs.readFileSync(path.join(ROOT, file), 'utf8') });
@@ -70,8 +88,8 @@ async function check(label, run) {
                     };
                 }, { base: clockOrigin, scenario, endpoint: ENDPOINT });
                 const result = await page.evaluate(async () => ({ success: await window.ZoeLicense.syncServerTime(), offset: window.ZoeLicense.getServerTimeOffset(), requests: window.__requests }));
-                assert.equal(result.success, scenario === 'json');
-                if (scenario === 'json') {
+                assert.equal(result.success, approved && scenario === 'json');
+                if (approved && scenario === 'json') {
                     assert.ok(result.offset > 39000 && result.offset <= 43000);
                     assert.equal(new URL(result.requests[0].url).origin + new URL(result.requests[0].url).pathname, ENDPOINT);
                     assert.equal(result.requests[0].credentials, 'omit'); assert.equal(result.requests[0].redirect, 'error');

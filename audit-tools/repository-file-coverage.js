@@ -69,7 +69,7 @@ const baselineAt = runall.search(/if\s+\[\s+-n\s+"\$BASE"\s*\]/);
 const normal = baselineAt < 0 ? runall : runall.slice(0, baselineAt);
 const shell = normal.split('\n').filter((line) => !/^\s*#/.test(line)).join('\n');
 // ការយោងឈ្មោះក្នុង comment/echo/baseline មិនមែនជាការរត់ធម្មតាទេ។
-for (const match of shell.matchAll(/^\s*run\s+(?:"[^"]*"|'[^']*'|\S+)\s+node\s+["']?((?:audit-tools|zto-import)\/[A-Za-z0-9._/-]+\.js)["']?(?=\s|$)/gm)) scheduled.add(match[1]);
+for (const match of shell.matchAll(/^\s*run\s+(?:"[^"]*"|'[^']*'|\S+)\s+node\s+["']?((?:audit-tools|zto-import)\/[A-Za-z0-9._/-]+\.[cm]?js)["']?(?=\s|$)/gm)) scheduled.add(match[1]);
 for (const match of shell.matchAll(/for\s+([A-Za-z_]\w*)\s+in\s+([^;]+);\s*do([\s\S]*?)\bdone\b/g)) {
     const variable = match[1];
     const runner = new RegExp('^\\s*run\\s+(?:"[^"]*"|\'[^\']*\'|\\S+)\\s+node\\s+["\']?audit-tools/(?:\\$'

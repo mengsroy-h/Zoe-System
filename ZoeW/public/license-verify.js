@@ -244,11 +244,19 @@
 
     async function fetchWithBodyTimeout(url, readBody, init) {
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), NET_TIMEOUT_MS);
+        let timer;
+        const timeout = new Promise((resolve, reject) => {
+            timer = setTimeout(() => {
+                controller.abort();
+                reject(new Error('network timeout'));
+            }, NET_TIMEOUT_MS);
+        });
         try {
-            const res = await fetch(url, Object.assign({ cache: 'no-store' }, init || {}, { signal: controller.signal }));
-            const body = readBody ? await readBody(res) : undefined;
-            return { res: res, body: body };
+            return await Promise.race([timeout, (async () => {
+                const res = await fetch(url, Object.assign({ cache: 'no-store' }, init || {}, { signal: controller.signal }));
+                const body = readBody ? await readBody(res) : undefined;
+                return { res: res, body: body };
+            })()]);
         } finally {
             clearTimeout(timer);
         }
@@ -450,20 +458,26 @@
     }
 
     async function syncServerTime(opts) {
-        if (!LICENSE_DB_URL || LICENSE_DB_URL.indexOf('REPLACE_WITH') === 0) return false;
         const priority = !!(opts && opts.priority);
         if (!priority && networkLooksDown()) return false;
         try {
-            const pending = sharedRequest('time', priority,
-                () => fetchWithBodyTimeout(LICENSE_DB_URL.replace(/\/+$/, '') + '/license_announcements/ZOE.json?shallow=true', (r) => r.text()));
+            const pending = sharedRequest('time', priority, async () => {
+                const bytes = crypto.getRandomValues(new Uint8Array(16));
+                const nonce = Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('');
+                const url = 'https://zoew.netlify.app/.netlify/functions/server-time?nonce=' + nonce;
+                const out = await fetchWithBodyTimeout(url, (res) => {
+                    if (res.status !== 200 || !res.ok || res.redirected ||
+                        !/^application\/json(?:\s*;|$)/i.test(res.headers.get('Content-Type') || '')) return null;
+                    return res.json();
+                }, { method: 'GET', credentials: 'omit', redirect: 'error' });
+                const body = out.body;
+                if (!body || body.nonce !== nonce || !Number.isSafeInteger(body.now) ||
+                    body.now <= 0 || body.now > 8640000000000000) return null;
+                return body.now;
+            });
             if (!pending) return false;
-            const out = await pending;
-            const res = out.res;
-            if (!res.ok) return false;
-            const dateHeader = res.headers.get('Date');
-            if (!dateHeader) return false;
-            const serverMs = new Date(dateHeader).getTime();
-            if (isNaN(serverMs)) return false;
+            const serverMs = await pending;
+            if (serverMs === null) return false;
             serverTimeOffsetMs = serverMs - Date.now();
             serverTimeSynced = true;
             return true;

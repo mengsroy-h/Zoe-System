@@ -388,6 +388,9 @@ bash audit-tools/emu/rules.sh
 | `scan-month-orchestration-test.js` | Node 24៖ រត់ predicate និង budget helper ពិតជាមួយ save/month queue ពី TypeScript; digest និង prepared read យឺតត្រូវរង់ចាំមុនរំកិលម៉ោង។ predicate ទីបីត្រូវវាស់ដែរ; poison បួនត្រូវធ្លាក់; មិនជំនួស Vitest ឬ emulator | `SCANMONTHORCH_APP_DIR` (source root) |
 | `scan-month-fixture-date-test.js` | វាស់ថ្ងៃ fixture នៃ SDK import, ពេលប្ដូរថ្ងៃភ្នំពេញ និងព្រំដែនអាយុទិន្នន័យ | `SCANMONTHDATE_APP_DIR` |
 | `license-time-endpoint-test.js` | Server time endpoint, response, offline និង concurrent requests សម្រាប់ App ទាំងពីរ | `LICENSETIME_APP_DIR` |
+| `license-time-json-test.js` | ផ្ទៀង JSON, nonce, HTTP និងភាពទុកចិត្តក្នុង App ទាំងពីរ | `LICENSETIME_APP_DIR` |
+| `license-time-cors-browser-test.js` | វាស់ការអានម៉ោង cross-origin ក្នុង Chromium ពិត | `LICENSETIME_APP_DIR` |
+| `server-time-function-test.mjs` | វាស់ GET, nonce, CORS និង no-store របស់ function | `LICENSETIME_APP_DIR` |
 | `license-clock-rollback-test.js` | ម៉ោងមិនអាចថយក្រោយ; Activate ត្រូវការសាលក្រម server | `LICROLLBACK_APP_DIR` |
 | `license-record-race-test.js` | សាលក្រម License ចាស់មិនលុប/សរសេរជាន់ activation ថ្មី ឬស្តារ record ដែលបានលុប; ECDSA ពិត និងវគ្គពីរចែក storage | `LICRACE_APP_DIR` |
 | `license-seat-test.js` | **Key ១ ➜ ឧបករណ៍តាមពិដាន** ៖ ពិដានលំនាំដើម ១ ➜ ឧបករណ៍ទី ២ បដិសេធ · ពិដាន ២ ➜ ឧបករណ៍ទី ២ ត្រូវបាន តែទី ៣ បដិសេធ · ការប្រណាំងរំកិលទៅ slot ទំនេរ · ឧបករណ៍ដដែល Activate ម្តងទៀតបាន · អានកៅអីមិនបាន ➜ **មិនលុប** record | `LICSEAT_APP_DIR` |
@@ -597,3 +600,5 @@ mutation មួយត្រូវចាប់បាន ត្រូវសួរ�
 |---|---|
 | **[`LICENSE`](../LICENSE)** | កម្មសិទ្ធិលើ source code · ការហាមឃាត់ · ការចូលរួមរបស់អ្នកអភិវឌ្ឍ · ច្បាប់គ្រប់គ្រង |
 | **[`NOTICE`](../NOTICE)** | attribution របស់កូដភាគីទីបីដែល ship (Apache-2.0 · MIT) |
+
+Server-time JSON checks execute the source checkout when `ZOE_REPO_ROOT` is set by the audit runner; `LICENSETIME_APP_DIR` explicitly overrides that for regression/baseline checks. The browser checker reports SKIP, never PASS, when Chromium cannot launch. Set `LICENSETIME_BROWSER_STRICT=1` or `RUNALL_STRICT=1` to make this skip fail the command. Its loopback/opaque origins model CORS; they do not certify deployed routing/CSP or real Android/iOS WebViews.

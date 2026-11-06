@@ -1441,5 +1441,21 @@ function emuRunnerTargets(runAll) {
         'ផ្នែក ៨ ៖ probe ទិសទាំង ២ (កំណែស្ទួន · លេខស្ទួន · លំដាប់ខុស · 📌 វែង · ឃ្លាស្ទួន · លិបិក្រមមិនតម្រៀប ➜ ចាប់ · អត្ថបទធម្មតា ➜ មិនចាប់)');
 })();
 
+// BEGIN operational-doc-contracts
+{
+    const orphanGuide = fs.readFileSync(path.join(ROOT, 'audit-tools/README.md'), 'utf8').split('### ៨.')[1]?.split('### ៩.')[0] || '';
+    check(/REGORPHAN_APP_DIR=/.test(orphanGuide) && /ZOE_MEASURE_ONLY=1/.test(orphanGuide),
+        'registry guide requires generated measurement input');
+    check(/HOLD/.test(orphanGuide) && /nonlegacy/.test(orphanGuide) && /true/.test(orphanGuide),
+        'registry guide distinguishes legacy candidates from unresolved claims');
+    for (const rel of ['firebase-backup/README.md', 'tools/supabase-migrate/README.md']) {
+        const document = fs.readFileSync(path.join(ROOT, rel), 'utf8');
+        const guide = document.split(rel.startsWith('firebase') ? '### ការស្តារទិន្នន័យមកវិញ' : '### ស្តារហាង Supabase ពី backup')[1]?.split('\n##')[0] || '';
+        check(/zoe_docs/.test(guide) && /zoe_ops/.test(guide) && /pending\/unknown/.test(guide),
+            rel + ' states archive and recovery-proof limits');
+    }
+}
+// END operational-doc-contracts
+
 console.log('\n' + (fail ? 'FAIL ' + fail : 'PASS') + '  (' + pass + ')');
 process.exit(fail ? 1 : 0);

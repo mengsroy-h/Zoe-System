@@ -149,6 +149,7 @@ jobs:
 
       # ⛔ ទង់ STRICT ដូច Runbook ជំហានទី ០ (CLAUDE.md) ➜ runall-runner-test ផ្ទៀងថាគ្មានទង់ណាបាត់
       - name: run-all.sh (ផ្នែក ${{ matrix.shard }}/4)
+        id: audit
         env:
           RUNALL_STRICT: '1'
           RUNALL_STATE: ''
@@ -172,11 +173,22 @@ jobs:
           bash audit-tools/run-all.sh
 
       - name: បង្ហាញការវាស់ទំហំ daily delta
-        if: always() && matrix.shard == 4 && !(github.event_name == 'workflow_dispatch' && inputs.multishop_scale)
+        if: always() && steps.audit.outputs.daily_bytes == 'supabase-datastore-daily-bytes.json' && !(github.event_name == 'workflow_dispatch' && inputs.multishop_scale)
         run: |
-          if [ -f ZoeW/dist-audit/measure-root/supabase-daily-bytes.json ]; then
-            cat ZoeW/dist-audit/measure-root/supabase-daily-bytes.json
-          fi
+          set -euo pipefail
+          REPORT=ZoeW/dist-audit/measure-root/supabase-datastore-daily-bytes.json
+          test -s "$REPORT"
+          node -e 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))' "$REPORT"
+          cat "$REPORT"
+
+      - name: រក្សាទុករបាយការណ៍ទំហំ daily delta
+        if: always() && steps.audit.outputs.daily_bytes == 'supabase-datastore-daily-bytes.json' && !(github.event_name == 'workflow_dispatch' && inputs.multishop_scale)
+        uses: actions/upload-artifact@v7
+        with:
+          name: supabase-datastore-daily-bytes-${{ matrix.shard }}
+          path: ZoeW/dist-audit/measure-root/supabase-datastore-daily-bytes.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: វាស់ CPU និង RAM របស់ runner
         if: always()

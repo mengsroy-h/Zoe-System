@@ -109,6 +109,8 @@ node tools/supabase-migrate/migrate.js firebase-export.json --branch <លេខ�
 
 ### ស្តារហាង Supabase ពី backup
 
+⛔ Archive ហាង Supabase គ្របតែ record ក្នុង `zoe_docs`; វាមិនរក្សា `zoe_ops` ឬស្តារ operation receipt ទាំងនោះទេ។ `VERIFIED` មានន័យថា record ក្នុងវិសាលភាពនាំចូលស្មើ input មិនមែន Database និងភស្តុតាង recovery ទាំងមូលស្មើ backup ទេ។ រក្សា journal **pending/unknown** និងផ្ទៀង authoritative outcome ដាច់ដោយឡែក; កុំចាត់ receipt ដែលបាត់ជា NOT_APPLIED ឬ replay លុយស្វ័យប្រវត្តិ។ ផែនការ rollout/Reset និងព្រំដែន recovery នៅ [Supabase README](../../supabase/README.md)។
+
 ```
 export ZOE_BACKUP_PASSPHRASE=…        (ឯកសារ .enc ពី GitHub Actions)
 node tools/supabase-migrate/migrate.js backups/<target>/<tenant-id>/ --branch <លេខសាខា> --replace
@@ -117,7 +119,7 @@ node tools/supabase-migrate/migrate.js backups/<target>/<tenant-id>/ --branch <�
 
 ផ្ទៀង dry-run ដោយ `--replace` និងហាងគោលដៅដដែល មុនបន្ថែម `--apply`; dry-run ដែលគ្មាន `--replace` មិនរាយផែនការលុបដូចគ្នាទេ។
 
-`--replace` ធ្វើឲ្យហាងស្មើ backup បេះបិទ ➜ ទិន្នន័យដែលកើតក្រោយ backup **បាត់** ➜ ពិនិត្យ `Plan` ក្នុង dry-run មុនជានិច្ច។
+`--replace` ធ្វើឲ្យ record ក្នុងវិសាលភាព `zoe_docs` ស្មើ backup តាមលក្ខខណ្ឌនាំចូលខាងលើ ➜ ទិន្នន័យដែលកើតក្រោយ backup **បាត់** ➜ ពិនិត្យ `Plan` ក្នុង dry-run មុនជានិច្ច។
 
 ### Option ផ្សេង
 

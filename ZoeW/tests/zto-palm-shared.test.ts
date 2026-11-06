@@ -1041,3 +1041,118 @@ describe('⛔ ជុំ ៦ ៖ Login ឡើងវិញក្នុងសំណ
         expect(reads, 'container ក្តៅស្គាល់សាខាក្នុង memory រួច ➜ មិនអាន palm-sites ម្តងទៀត').toBe(0);
     });
 });
+
+it.each(['KH002', ''])('សាខាថ្មី %s ពេល Login ឡើងវិញ មិនប្រើ token ថ្មីនៅក្នុងសាខាចាស់', async (siteCode) => {
+    expect(parse(await login())).toMatchObject({ success: true, shared: true, account: { siteCode: 'KH001' } });
+    dead.add('zto-token-1');
+    loginAnswer = () => respond({ status: true, result: { token: 'moved-branch-token', countryCode: 'KH', siteCode, siteName: 'Branch B' } });
+    expect((await scan({ site: 'KH001' })).statusCode).toBe(401);
+    expect(logins).toHaveLength(2);
+    expect(entries.has('palm-session/shopa/KH002')).toBe(false);
+    expect.soft(seen, 'សាខា KH001 មិនផ្ញើសំណើដោយ token របស់ KH002').not.toContain('moved-branch-token');
+    coldContainer();
+    const status = parse(await call({ palm: 'status' }, { site: 'KH001' }));
+    expect(status, 'Blob របស់ KH001 មិនក្លាយជាសាខាផ្សេង').toMatchObject({ shared: false, rejected: true });
+    await scan({ site: 'KH001' });
+    expect(logins).toHaveLength(2);
+});
+
+it('សាខាដដែលប្រើអក្សរតូច ពេល Login ឡើងវិញ នៅតែប្រើបាន', async () => {
+    await login();
+    dead.add('zto-token-1');
+    loginAnswer = () => respond({ status: true, result: { token: 'same-branch-token', countryCode: 'KH', siteCode: 'kh001', siteName: 'Branch A' } });
+    expect((await scan({ site: 'KH001' })).statusCode).toBe(200);
+    expect(seen).toContain('same-branch-token');
+});
+
+it('Blob ដែលមានសាខាខុស មិនត្រូវប្រើក្រោយបើក container ថ្មី', async () => {
+    expect((await login()).statusCode).toBe(200);
+    loginAnswer = () => respond({ status: true, result: { token: 'branch-b-token', countryCode: 'KH', siteCode: 'KH002' } });
+    expect((await login()).statusCode).toBe(200);
+    const branchB = entries.get('palm-session/shopa/KH002')!;
+    entries.set(SLOT_A, branchB);
+    coldContainer();
+    expect((await scan({ site: 'KH001' })).statusCode).toBe(401);
+    expect(seen).not.toContain('branch-b-token');
+    expect(entries.get('palm-session/shopa/KH002')).toEqual(branchB);
+});
+
+it('CAS មានអ្នកសរសេរ Blob សាខាខុស មិនប្រើ token របស់អ្នកឈ្នះ', async () => {
+    expect((await login()).statusCode).toBe(200);
+    loginAnswer = () => respond({ status: true, result: { token: 'branch-b-token', countryCode: 'KH', siteCode: 'KH002' } });
+    expect((await login()).statusCode).toBe(200);
+    const branchB = entries.get('palm-session/shopa/KH002')!;
+    dead.add('zto-token-1');
+    let release!: () => void;
+    loginAnswer = () => new Promise<Response>((resolve) => { release = () => resolve(respond({ status: true, result: { token: 'renewed-a-token', countryCode: 'KH', siteCode: 'KH001' } })); });
+    const pending = scan({ site: 'KH001' });
+    await vi.waitFor(() => expect(logins).toHaveLength(3));
+    entries.set(SLOT_A, branchB);
+    release();
+    expect((await pending).statusCode).toBe(401);
+    expect(seen).not.toContain('branch-b-token');
+    expect(entries.get('palm-session/shopa/KH002')).toEqual(branchB);
+});
+
+it('Login ផ្ទៃក្រោយប្តូរសាខា មិនបញ្ចូល token ថ្មីក្នុង Blob ចាស់', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    expect((await login()).statusCode).toBe(200);
+    vi.setSystemTime(Date.now() + 5 * 60 * 60 * 1000);
+    loginAnswer = () => respond({ status: true, result: { token: 'moved-background-token', countryCode: 'KH', siteCode: 'KH002' } });
+    expect((await scan({ site: 'KH001' })).statusCode).toBe(200);
+    await vi.waitFor(async () => expect(parse(await call({ palm: 'status' }, { site: 'KH001' }))).toMatchObject({ rejected: true, shared: false }));
+    expect(logins).toHaveLength(2);
+    coldContainer();
+    expect((await scan({ site: 'KH001' })).statusCode).toBe(401);
+    expect(seen).not.toContain('moved-background-token');
+    expect(entries.has('palm-session/shopa/KH002')).toBe(false);
+});
+
+it('Blob សរសេរមិនបាន ពេល Login ប្តូរសាខា ក៏មិនប្រើ token ថ្មី', async () => {
+    expect((await login()).statusCode).toBe(200);
+    dead.add('zto-token-1');
+    failWrites = true;
+    loginAnswer = () => respond({ status: true, result: { token: 'moved-unwritten-token', countryCode: 'KH', siteCode: 'KH002' } });
+    expect((await scan({ site: 'KH001' })).statusCode).toBe(401);
+    expect(logins).toHaveLength(2);
+    expect(seen).not.toContain('moved-unwritten-token');
+    expect(parse(await call({ palm: 'status' }, { site: 'KH001' }))).toMatchObject({ shared: true, account: { siteCode: 'KH001' } });
+    expect((await scan({ site: 'KH001' })).statusCode).toBe(401);
+    expect(seen).not.toContain('moved-unwritten-token');
+});
+
+it.each(['12345', '67890'])('គណនី ZoeW ដែលផ្ទៀងផ្ទាត់ រក្សាសាខាដើមពេល Login ឡើងវិញទៅ %s', async (renewedSite) => {
+    vi.stubEnv('ZTO_DETAIL_IDENTITY', 'require');
+    vi.stubEnv('FIREBASE_PROJECT_IDS', TEST_PROJECT);
+    vi.stubGlobal('fetch', withCerts(vi.mocked(fetch)));
+    const headers = { 'x-zoe-proxy-key': KEY_A, 'x-zoe-palm-site': '12345', 'x-zoe-id-token': tokenForSite('12345') };
+    const request = (query: Record<string, string>, body?: unknown) => fn.handler({
+        httpMethod: body === undefined ? 'GET' : 'POST', headers, queryStringParameters: query, blobs: BLOBS,
+        body: body === undefined ? '' : JSON.stringify(body)
+    });
+    loginAnswer = () => respond({ status: true, result: { token: 'identity-a-token', countryCode: 'KH', siteCode: '12345' } });
+    const initial = await request({ palm: 'login' }, { username: USER, password: PASSWORD, deviceSn: 'zoew-owner-device' });
+    expect(initial.statusCode).toBe(200);
+    expect(parse(initial)).toMatchObject({ success: true, shared: true, account: { siteCode: '12345' } });
+    expect(parse(await request({ palm: '1', barcode: CODE }))).toMatchObject({ found: true, phone: '012345678' });
+    dead.add('identity-a-token');
+    loginAnswer = () => respond({ status: true, result: { token: 'identity-renewed-token', countryCode: 'KH', siteCode: renewedSite } });
+    const response = await request({ palm: '1', barcode: CODE });
+    expect(logins).toHaveLength(2);
+    expect(entries.has('palm-session/shopa/67890')).toBe(false);
+    if (renewedSite === '12345') {
+        expect(response.statusCode).toBe(200);
+        expect(parse(response)).toMatchObject({ found: true, phone: '012345678' });
+        expect(seen).toContain('identity-renewed-token');
+    } else {
+        expect.soft(response.statusCode).toBe(401);
+        expect(parse(response).phone).toBeUndefined();
+        expect(parse(response).found).not.toBe(true);
+        expect(seen).not.toContain('identity-renewed-token');
+    }
+    coldContainer();
+    const status = parse(await request({ palm: 'status' }));
+    expect(status).toMatchObject(renewedSite === '12345'
+        ? { shared: true, rejected: false, account: { siteCode: '12345' } }
+        : { shared: false, rejected: true, account: { siteCode: '12345' } });
+});

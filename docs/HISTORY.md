@@ -42,6 +42,8 @@
 
 ## 📌 ការងារដែលនៅសល់ — ការផ្ទៀងផ្ទាត់ដោយអ្នកប្រើ
 
+- 2026-11-06 · PR393 រួម Lookup/Palm និងឯកសារប្រតិបត្តិការ៖ browser guards និង hash ZTO មិនទាន់ផ្ទៀង; ទុក lock នៅដដែល មិន bypass។ CI ត្រូវវាស់កូដចុងក្រោយ មុន merge។ Registration race និងការលុប dead-code ដែលដកចេញ មិនបញ្ចូលក្នុងការកែនេះ។
+
 > ⛔ **ផ្នែកនេះកាន់តែការងារដែលនៅបើក** ៖ ស្ថានភាព git · អ្វីដែលអ្នកប្រើមិនទាន់បញ្ជាក់ · សកម្មភាពដោយដៃដែលមិនទាន់ធ្វើ · ការសម្រេចដែលនៅរស់។
 > អ្នកប្រើបញ្ជាក់ ឬធ្វើរួច ➜ **លុបធាតុនោះ** (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុងផ្នែក ១ · ២) ⛔ កុំបន្ថែមខ្សែ branch/PR ចាស់ (git ជាភស្តុតាង) ·
 > ⛔ ≤ ៨០ បន្ទាត់ (`doc-scope-test`)។
@@ -117,6 +119,14 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ archive ផ្នែក ៩ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.186] — 2026-11-06 · សុវត្ថិភាពវគ្គស្វែងរក និងសាខា Palm
+
+ZoeW `2.50.186` (`zoew-v450`) · ZoeKeyGen ដដែល។ ម្ចាស់គម្រោងស្នើ «ចាំអ្វីដែលរកឃើញដោយការ audit កែហើយបញ្ចូលក្នុង​ PR393 ហ្មងទៅ ហើយ merge តែមួយដងជាការស្រេច»។ Lookup ចាប់វគ្គគណនី/config/key មុនដោះសោ credential ផ្ទៀងមុនផ្ញើ និងមុនប្រើចម្លើយ; retry រក្សាម្ចាស់ដើម។ ការងារចាស់មិនសរសេរលើ status ឬ promise របស់ការងារថ្មី។ Palm ផ្ទៀង site ក្នុង Blob ជាមួយ slot និងសាខាពេល Login ឡើងវិញជាមួយសាខាដើម; site បាត់ ឬប្តូរ ត្រូវបដិសេធ មិនយក token ទៅសាខាចាស់។ Blob សរសេរមិនបានរក្សាទិន្នន័យដើម ហើយមិនអះអាងថារក្សាសញ្ញាបដិសេធបានទេ។
+
+Regression លើ `21069590` មុនកែ៖ ២៥ ធ្លាក់ និង១៣២ ជាប់ ក្នុង៤ files; ក្នុងនោះ Lookup/retry ធ្លាក់១៨ និង Palm ធ្លាក់៧។ Reminder ជាតេស្តបញ្ជាក់ឥរិយាបថបច្ចុប្បន្ន មិនប្តូរការផ្ញើឡើងវិញក្រោយ claim ទេ។ ការសាកប្រើ fixture គ្មាន credential ឬទិន្នន័យ ZTO ពិត។
+
+**សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ `auto-lookup.ts` និង `zto-palm.js` ជាតំបន់ ZTO ចាក់សោ។ Hash ក្នុង `zto-lock.test.ts` នៅដដែល ដូច្នេះ lock ត្រូវធ្លាក់រហូតដល់អ្នកយាម ZTO ទាំងអស់ជាប់។ ត្រូវរត់ browser guards រួម `zto-list-sync-test` និង `zto-sync-banner-test` លើកូដនេះក្នុង environment ដែលបើក Chromium បាន មុនធ្វើបច្ចុប្បន្នភាព hash។ បន្ទាប់មកផ្ទៀង CI ទាំង៤ shards លើ commit ចុងក្រោយ មុន merge មួយដង។ មិនមាន rules/migration ថ្មី; មិនប៉ះ journal ឬទិន្នន័យអ្នកប្រើ។
 
 ### [2.50.185] — 2026-11-06 · ភស្តុតាងត្រឡប់តាមវដ្តកញ្ចប់
 
@@ -1947,6 +1957,15 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+
+### 2026-11-06 · PR393 — ឯកសារប្រតិបត្តិការ និងរបាយការណ៍ audit
+
+ឯកសារ registry បែងចែក legacy candidate ពី nonlegacy HOLD ហើយតម្រូវ measure tree និងភស្តុតាង server ថ្មី មុនអនុញ្ញាតលុប។ ឯកសារ backup/import បញ្ជាក់ថា `zoe_docs` មិនមែន `zoe_ops`; `VERIFIED` មិនបញ្ជាក់ recovery receipt ទាំងមូល ហើយ pending/unknown ត្រូវរក្សា។ អ្នកយាមក្នុង `doc-scope-test` ទាំង៤ធ្លាក់លើ `21069590` ហើយជាប់ក្រោយកែ។
+
+របាយការណ៍ daily delta មានឈ្មោះផ្ទាល់ខ្លួន និង receipt ក្រោយសរសេរជោគជ័យ; workflow ប្រមូលតាម receipt មិនកំណត់ shard ទេ។ Poison shadow មិនអាចសរសេរជាន់ artifact ឬបញ្ចេញ receipt។ អ្នកយាម `audit-daily-report.test.ts` វាស់ការសរសេរ/receipt បរាជ័យ local/shadow និង shell ប្រមូលឯកសារបាត់/ខូច៖ មុនកែធ្លាក់៤ ជាប់២; ក្រោយកែជាប់៦។ Harness តាម poison machinery ពិតជាប់; មិនអះអាងថាវាស់ PostgreSQL daily bytes ពិតក្នុងជុំនេះទេ។ Reminder characterization បញ្ជាក់ថា claim បានប្រើរួចមិនផ្ញើក្រុមម្ដងទៀត ពេល push មួយបរាជ័យ ឬចម្លើយមិនដឹង; មិនប្តូរគោលការណ៍នោះ។
+
+ការផ្ទៀងរួមលើកូដនេះ៖ Palm/Cookie/lookup/connection ៣១ files ជាប់៩៤០ tests; focused ដំបូង៦ files ជាប់១៨៩ tests (មាន overlap មិនបូកជាចំនួនសរុបទេ)។ អ្នកប្រើ retryAsync ក្នុង cleanup/registry/trash/restore និង session fuzz ១៩ files ជាប់៣៨១ tests។ Typecheck/lint, doc-check, comment equivalence និង repository-file mapping ជាប់។ Browser build ឈប់នៅ Chromium socket `Operation not permitted`; measure-root ពេញមិនកើត ដូច្នេះ doc-scope/version/browser guards ពេញនៅមិនទាន់រត់។ ZTO lock ធ្លាក់២ឯកសារដែលបានកែ ដោយចេតនាមិនប្តូរ hash មុន guard ជាប់។ CI ទាំង៤ shards ត្រូវផ្ទៀងលើ commit ចុងក្រោយ។
 
 ### 2026-11-06 · ភ្ជាប់ helper ភស្តុតាងត្រឡប់ក្នុង checker
 
@@ -4475,6 +4494,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/apps-script-key-encrypted.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/apps-script-key-redaction.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/audit-checker-outcomes.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
+| `ZoeW/tests/audit-daily-report.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/audit-lifecycle.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/audit-poison-reachability.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/auth-flow-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |

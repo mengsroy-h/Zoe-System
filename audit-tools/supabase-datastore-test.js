@@ -1410,7 +1410,15 @@ async function dailyDeltaGuard() {
         }
         ok('៣០០ ➜ ៦០០ ៖ delta លីនេអ៊ែរ (<២.៣ដង)', sizes[1].newBytes < sizes[0].newBytes * 2.3, sizes);
         console.log('A352_DAILY_BYTES=' + JSON.stringify(sizes));
-        fs.writeFileSync(path.join(ROOT, 'supabase-daily-bytes.json'), JSON.stringify(sizes, null, 2) + '\n');
+        // Only the canonical entry point may publish workflow artifacts. Poison shadows
+        // still execute all assertions above, but cannot overwrite a report or emit receipts.
+        const canonicalProducer = require.main === module
+            && fs.realpathSync(__filename) === fs.realpathSync(path.join(__dirname, 'supabase-datastore-test.js'))
+            && fs.realpathSync(ROOT) === fs.realpathSync(path.join(__dirname, '..'));
+        if (canonicalProducer) {
+            fs.writeFileSync(path.join(ROOT, 'supabase-datastore-daily-bytes.json'), JSON.stringify(sizes, null, 2) + '\n');
+            if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, 'daily_bytes=supabase-datastore-daily-bytes.json\n');
+        }
     } finally { await c.end().catch(() => {}); }
 }
 

@@ -8,12 +8,15 @@ import { CUSTOMER_TABLE_CACHE_MS, CUSTOMER_TABLE_FAIL_COOLDOWN_MS, CUSTOMER_TABL
 import { buildCustomerListApiUrl, clearZtoWarmSoon, lookupApiSendsHeader, lookupApiSupportsList, scheduleZtoWarmSoon } from './lookup-api';
 import { getLookupApiConfig, lookupKeyedUrl, lookupSecretLocked } from './lookup-config';
 import { sheetImportCellToText, sheetImportToMoney } from './sheet-import';
+import { captureLookupOperation } from '../services/lookup-operation';
 import { decryptLookupSecret } from '../services/crypto';
 import { fetchWithTimeout, preconnectToLookupHost, retryAsync, retryTransientLookupResponse } from '../services/network';
 
 export const lookupsSupersededByImport = new Map();
 
 export async function fetchCustomerDataTableRows(force?, wantFresh?) {
+    getLookupApiConfig();
+    const operation = captureLookupOperation();
     const cfg = getLookupApiConfig();
     if (!lookupApiSupportsList(cfg)) return;
     if (lookupSecretLocked(cfg)) {
@@ -42,9 +45,10 @@ export async function fetchCustomerDataTableRows(force?, wantFresh?) {
 
     viewState.customerTableStatus = "កំពុងទាញយកទិន្នន័យ...";
 
+    const loadingStatus = viewState.customerTableStatus;
     const myGeneration = lookupState.customerDataTableFetchGeneration;
     const startedAt = Date.now();
-    lookupState.customerDataTableFetchPromise = (async () => {
+    const running = Promise.resolve().then(async () => {
         try {
             const headers = {};
             if (lookupApiSendsHeader(cfg) && cfg.headerValueEnc) {
@@ -53,10 +57,14 @@ export async function fetchCustomerDataTableRows(force?, wantFresh?) {
             }
             const keyedUrl = cfg.urlKeyEnc ? await lookupKeyedUrl(cfg, listUrl) : listUrl;
             const out = await retryAsync(
-                () => fetchWithTimeout(keyedUrl, { headers }, 20000, 'Customer table fetch timed out',
-                    (r) => (r.ok ? r.json() : null)).then(retryTransientLookupResponse),
+                () => {
+                    operation.assertCurrent();
+                    return fetchWithTimeout(keyedUrl, { headers }, 20000, 'Customer table fetch timed out',
+                        (r) => (r.ok ? r.json() : null)).then((out) => { operation.assertCurrent(); return retryTransientLookupResponse(out); });
+                },
                 2, 2000
             );
+            operation.assertCurrent();
             if (!out.res.ok) throw new Error('HTTP ' + out.res.status);
             const data = out.body;
             if (data && data.error) throw new Error(data.error);
@@ -71,6 +79,11 @@ export async function fetchCustomerDataTableRows(force?, wantFresh?) {
             renderCustomerDataTableStatus(rows);
             filterCustomerDataTable();
         } catch (e) {
+            if (!operation.current()) {
+                if (lookupState.customerDataTableFetchPromise === running && viewState.customerTableStatus === loadingStatus)
+                    viewState.customerTableStatus = 'ការកំណត់បានប្តូរ — សូមទាញតារាងម្ដងទៀត';
+                return;
+            }
             if (myGeneration !== lookupState.customerDataTableFetchGeneration) return;
             lookupState.customerDataTableLastFailedAt = Date.now();
             scheduleCustomerTableRetry();
@@ -78,11 +91,12 @@ export async function fetchCustomerDataTableRows(force?, wantFresh?) {
             viewState.customerTableStatus = "❌ ទាញយកទិន្នន័យបរាជ័យ៖ " + (e && e.message === 'Customer table fetch timed out' ? "អស់ពេល (Timeout)" : (e && e.message ? e.message : ''));
             if (lookupState.customerDataTableRows) filterCustomerDataTable();
         } finally {
-            if (myGeneration === lookupState.customerDataTableFetchGeneration) lookupState.customerDataTableFetchPromise = null;
+            if (lookupState.customerDataTableFetchPromise === running) lookupState.customerDataTableFetchPromise = null;
         }
-    })();
+    });
 
-    return lookupState.customerDataTableFetchPromise;
+    lookupState.customerDataTableFetchPromise = running;
+    return running;
 }
 
 export function renderCustomerDataTableStatus(rows) {

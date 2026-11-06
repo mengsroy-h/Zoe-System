@@ -264,6 +264,8 @@ paste Firebase Config **របស់ខ្លួន** ➜ ទិន្នន័�
 
 ### ការស្តារទិន្នន័យមកវិញ (Restore) — ធ្វើដោយដៃ
 
+⛔ Archive ហាង Supabase គ្របតែ record ក្នុង `zoe_docs`; វាមិនរក្សា `zoe_ops` ឬស្តារ operation receipt ទាំងនោះទេ។ `VERIFIED` មានន័យថា record ក្នុងវិសាលភាពនាំចូលស្មើ input មិនមែន Database និងភស្តុតាង recovery ទាំងមូលស្មើ backup ទេ។ រក្សា journal **pending/unknown** និងផ្ទៀង authoritative outcome ដាច់ដោយឡែក; កុំចាត់ receipt ដែលបាត់ជា NOT_APPLIED ឬ replay លុយស្វ័យប្រវត្តិ។ ផែនការ rollout/Reset និងព្រំដែន recovery នៅ [Supabase README](../supabase/README.md)។
+
 Script នេះមិនរួមបញ្ចូល Auto-restore ទេ ដោយចេតនា (Restore គឺជាសកម្មភាពគ្រោះថ្នាក់ — អាចសរសេរជាន់ពីលើ
 ទិន្នន័យផ្ទាល់ដែលកំពុងប្រើ) ។ បើត្រូវការស្តារជាក់ស្តែង៖
 

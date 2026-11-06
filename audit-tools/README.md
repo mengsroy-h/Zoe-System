@@ -474,8 +474,7 @@ bash audit-tools/emu/rules.sh
 ### ៨. 🔑 លុបកូនសោ `zoew_barcode_registry` **កំព្រា** (ជំហានពេញលេញ)
 
 > **រោគសញ្ញា** ៖ ស្កេន barcode មួយ ➜ «⚠️ ត្រូវបានបញ្ចូលរួចហើយ» ខណៈកញ្ចប់នោះ
-> **គ្មានក្នុងប្រវត្តិ និងគ្មានក្នុងធុងសំរាមសោះ**។ កូនសោនោះជា **កូនសោកំព្រា**
-> (គ្មានម្ចាស់) ➜ barcode ជាប់អន្ទាក់ជារៀងរហូត។
+> **គ្មានក្នុងប្រវត្តិ និងគ្មានក្នុងធុងសំរាមសោះ**។ នេះជាបេក្ខភាពត្រូវស៊ើបអង្កេត មិនមែនភស្តុតាងថាអាចលុបកូនសោបានទេ។
 
 ⛔ **គ្មានផ្លូវស្វ័យប្រវត្តិទេ ហើយនោះជាចេតនា** ៖ registry ជា **ជាន់ការពារខាង
 server តែមួយគត់** ប្រឆាំង barcode ស្ទួន (ជាន់ ១–៣ អានសតិរបស់ទូរស័ព្ទនោះ)។
@@ -493,11 +492,16 @@ Firebase Console ➜ Realtime Database ➜ ⋮ (ខាងស្តាំ) ➜ **
 **ជំហានទី ២ — បញ្ចេញបញ្ជី**
 
 ```bash
-node audit-tools/registry-orphan-list.js dump.json orphans.json
+M=$(ZOE_MEASURE_ONLY=1 bash audit-tools/run-all.sh | tail -1)
+test -f "$M/ZoeW/app.js" || exit 1
+REGORPHAN_APP_DIR="$M" node audit-tools/registry-orphan-list.js dump.json orphans.json
 ```
 
 ឧបករណ៍ **មិនភ្ជាប់បណ្តាញ · មិនលុបអ្វី · មិនបោះពុម្ព barcode លើអេក្រង់**
-(មានតែចំនួន)។ វាបញ្ចេញ `{"KEY": null, …}` ចូល `orphans.json`។
+(មានតែចំនួន)។ វាបញ្ចេញ `{"KEY": null, …}` ចូល `orphans.json` សម្រាប់តែ legacy claim ដែលតម្លៃជា `true` និងគ្មានម្ចាស់ក្នុង dump។
+Claim ប្រភេទ nonlegacy ដែលគ្មាន lifecycle/operation proof នៅ **HOLD**; កុំបម្លែងវាទៅ `true` ឬលុបដោយដៃដើម្បីឱ្យបញ្ជីចេញ។
+បើគ្មាន candidate ថ្មី CLI មិនសរសេរឯកសារទេ; កុំយក `orphans.json` ពីការរត់មុនមកផ្ញើ។
+មុនលុប ត្រូវមានការអនុញ្ញាតជាក់លាក់ ផ្អាក writer ទាំងអស់ និងផ្ទៀង server evidence ថ្មីរបស់កូនសោនីមួយៗ; dump ចាស់មិនបញ្ជាក់ស្ថានភាពបច្ចុប្បន្នទេ។
 បើកំព្រាច្រើន វាបំបែកជា `orphans.1.json` · `orphans.2.json` … (៥,០០០/ឯកសារ)។
 
 ⛔ **ការបដិសេធជាលទ្ធផលត្រឹមត្រូវ មិនមែនកំហុសទេ** ៖

@@ -1967,6 +1967,10 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 
 `repository-contract-test` ធ្លាប់លាយ steps របស់ job បន្ថែមជាមួយ `audit-shard` ដូច្នេះ cache/runtime/Chromium ធ្លាក់ខុស។ ឥឡូវវាស់កិច្ចសន្យាតាម job ទាំងអស់ ដោយរក្សាលក្ខខណ្ឌដើម និង shard តែមួយគត់; negative controls បដិសេធ shard បាត់/ស្ទួន និងការខូច cache, Node, Java, Chromium និង offline install ទាំងក្នុង shard និង job បន្ថែម។ មិនកែ workflow ឬបន្ថយ gate ទេ; full built-tree និង CI ចុងក្រោយនៅត្រូវផ្ទៀង។
 
+### 2026-11-06 · F03 រង់ចាំ ordinary admission ស្ងប់
+
+Native ordinary admission រង់ចាំ `settle()` និង `quiesce()` មុនថត snapshot ក្រោយសរសេរ ដើម្បីមិនវាស់ពេល SDK task នៅ pending។ រក្សា gate ១៥ វិនាទី និង HOLD ពេល owner ប្តូរ ឬ timeout; `f03-admission-quiescence.test.ts` មាន regression ៩ ផ្ទៀង pending/denial/ownership។ មិនប្តូរ App ឬកំណត់ថា F03 ជាប់រួចទេ; real emulator CI នៅត្រូវផ្ទៀង។
+
 ### 2026-11-06 · F03 ប្រៀបធៀប heap ក្នុង diagnostic ប៉ុណ្ណោះ
 
 Workflow diagnostic រក្សា JVM512 ទាំងពីរលំដាប់ `249,250,251` និង `251,249,250` ហើយបន្ថែម JVM1024 ទាំងពីរលំដាប់ដូចគ្នា។ Heap ត្រូវចងនឹង ownership និង artifact ដាច់ដោយឡែក; whitelist បដិសេធតម្លៃផ្សេង។ Ordinary runner នៅ 512 MiB; deadline, STRICT, failure propagation និង gate មិនប្តូរ។ រក្សាលទ្ធផល JVM512 ដើម មិនជំនួសដោយ JVM1024 ឬអះអាងថាបានកែផលិតផលទេ។ `f03-heap-diagnostic.test.ts` ផ្ទៀង matrix/ownership/deadline និងការរក្សាភស្តុតាង; real JVM/CI លើការរួមនេះនៅមិនទាន់រត់។
@@ -4575,6 +4579,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/expiry-return-policy.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/expiry-schedule-cap.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/export-request-snapshot.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/f03-admission-quiescence.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/f03-heap-diagnostic.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/firebase-auth-write-ownership.test.ts` | — | ផ្នែក ៨ · ផ្នែក ៩ |
 | `ZoeW/tests/firebase-loader-gate.test.ts` | — | ផ្នែក ៧ |

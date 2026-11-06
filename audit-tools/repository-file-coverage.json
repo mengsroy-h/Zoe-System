@@ -3426,6 +3426,9 @@
     "ZoeW/tests/audit-lookup-retry-session.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/f03-admission-quiescence.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/f03-heap-diagnostic.test.ts": {
       "policy": "zoew-self-verification"
     },

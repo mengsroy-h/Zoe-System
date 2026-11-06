@@ -1432,7 +1432,10 @@ async function runOrdinaryCountAdmission(provider, changed) {
         if (!current()) throw held('owner-changed-after-write');
         const typedDenial = !fulfilled && (provider.kind === 'native' ? /permission[_-]denied/i.test(record.backendCode) : ['22023', '42501', 'PT409'].includes(record.backendCode));
         if (!fulfilled && !typedDenial) throw held('unclassified-rejection');
-        await bounded(provider.settle(), 'ordinary admission SDK quiescence');
+        await bounded((async () => {
+            await provider.settle();
+            if (provider.kind === 'native') await provider.quiesce();
+        })(), 'ordinary admission SDK quiescence');
         const after = await bounded(provider.snapshot(), 'ordinary admission after snapshot');
         provider.ordinaryAdmissionPhysical.after = after;
         record.afterPhysicalHash = digest(JSON.stringify(after.physical)); record.fullSnapshotUnchanged = equal(after, before);

@@ -375,6 +375,69 @@ fs.writeFileSync(path.join(hashRepo, 'tracked'), 'guard');
 cp.spawnSync('git', ['add', 'tracked'], { cwd: hashRepo });
 const hashReady = cp.spawnSync('bash', ['-c', hashFunction + '\nrunall_tree_hash \"$1\"', '_', hashRepo], { encoding: 'utf8' });
 ok('ទិសផ្ទុយ ៖ hash tree ដែលអានបាន ចេញ 0 និង hash', hashReady.status === 0 && /^[a-f0-9]{16}\s*$/.test(hashReady.stdout), hashReady);
+// ⛔ seed និងទំហំ matrix ប្តូរ ភស្តុតាងចាស់មិនអាចជំនួសការរត់ថ្មី។
+const coverageKeys = ['FUZZ_RUN0', 'FUZZ_RUNS', 'FUZZ_OPS', 'FUZZ_APPS', 'CFUZZ_RUN0', 'CONNFUZZ_OPS',
+    'MFUZZ_RUNS', 'APPWRITES_RUNS', 'MONEYMD_RUN0', 'SBMONEY_SHOPS', 'SBPARITY_SEED', 'ZTOBANNER_FUZZ_RUNS',
+    'FBPROVISION_MUTATIONS', 'SBDATA_MUTATIONS', 'SCANREMOVE_STATIC_ONLY', 'SCANSDK_MONTH_WIRE',
+    'KHMERTZ_PROBE', 'EXITCODE_CHILD', 'CI', 'NODE_ENV',
+    'CHECKER_TIMEOUT', 'EXITCODE_TIMEOUT_MS', 'ZOEWSUITE_STEP_TIMEOUT_MS'];
+const externalKeys = ['FUZZ_APP_DIR', 'ZOE_REPO_ROOT', 'VERSIONSCOPE_BASE', 'SCANRULES_RULES_FILE', 'LICENSE_JS',
+    'CHROMIUM_PATH', 'PLAYWRIGHT_BROWSERS_PATH', 'SUPABASE_MIGRATION_BASE', 'KEYLIST_APP_JS', 'PURITY_SRC',
+    'SLOTCHECK_SRC', 'NOTICE_FILE', 'DIST_DIR', 'ANDROIDCHECK_ROOT', 'ZOEW_HISTORY_TEST_DIST',
+    'SUPABASE_ADMIN_SESSION_BASELINE', 'SUPABASE_RESET_BASELINE', 'FBPROVISION_DEPS_DIR', 'SUPABASE_DEPS_DIR',
+    'SUPABASE_PG_BIN', 'ZOEW_TEST_BROWSER', 'ZOE_RTDB_JAR', 'NODE_OPTIONS', 'VERSIONSCOPE_GIT_DIR',
+    'NODE_PATH', 'ZOE_NODE_MODULES', 'F03_NATIVE_EMULATOR_URL', 'SCANRULES_EMU_PORT',
+    'FIREBASE_DATABASE_EMULATOR_HOST', 'LEDGEREMU_PORT', 'IMPORTPAIRED_BASE_SOURCE'];
+function coverageHash(extra) {
+    const env = { ...process.env };
+    for (const key of Object.keys(env)) {
+        if (coverageKeys.includes(key) || externalKeys.includes(key) || /(?:_APP_DIR|_CHROME|_PORT)$/.test(key)) delete env[key];
+    }
+    const result = cp.spawnSync('bash', ['-c', hashFunction + '\nrunall_tree_hash "$1"', '_', hashRepo],
+        { encoding: 'utf8', env: { ...env, ...extra } });
+    return result.status === 0 ? result.stdout.trim() : null;
+}
+const defaultCoverageHash = coverageHash({});
+for (const key of coverageKeys) {
+    const first = coverageHash({ [key]: '1' }), changed = coverageHash({ [key]: '2' });
+    ok('⛔ RESUME hash ត្រូវស្គាល់ការប្តូរ ' + key,
+        first !== null && changed !== null && first !== changed && first !== defaultCoverageHash
+            && coverageHash({ [key]: '' }) !== defaultCoverageHash, { first, changed });
+}
+for (const key of externalKeys) {
+    const first = coverageHash({ [key]: 'same-input' }), second = coverageHash({ [key]: 'same-input' });
+    ok('⛔ input ខាងក្រៅមិនអាចយក PASS ចាស់ដោយ path ដដែល ៖ ' + key,
+        first !== null && second !== null && first !== second && first !== defaultCoverageHash);
+}
+const runtimeBin = fs.mkdtempSync(path.join(TMP, 'runtime-bin-'));
+const runtimeNode = path.join(runtimeBin, 'node');
+fs.writeFileSync(runtimeNode, '#!/bin/sh\nprintf "v24.0.0\\n"\n', { mode: 0o755 });
+const runtimeEnv = { PATH: runtimeBin + path.delimiter + process.env.PATH };
+const runtimeFirst = coverageHash(runtimeEnv);
+fs.writeFileSync(runtimeNode, '#!/bin/sh\nprintf "v25.0.0\\n"\n', { mode: 0o755 });
+const runtimeChanged = coverageHash(runtimeEnv);
+ok('⛔ runtime version ថ្មីមិនអាចប្រើ PASS ចាស់',
+    runtimeFirst !== null && runtimeChanged !== null && runtimeFirst !== runtimeChanged);
+ok('ទិសផ្ទុយ ៖ dependency path ដែល runner បង្កើត មិនបិទ resume',
+    coverageHash({ ZOE_NODE_MODULES: path.join(hashRepo, 'ZoeW', 'node_modules') }) === defaultCoverageHash);
+ok('ទិសផ្ទុយ ៖ secret មិនត្រូវអាន ឬបញ្ចូលក្នុង hash',
+    coverageHash({ ZTO_COOKIE: 'private-control' }) === defaultCoverageHash);
+ok('ទិសផ្ទុយ ៖ lane និងការជ្រើសបន្តមិនប្តូរ hash',
+    coverageHash({ RUNALL_JOBS: '1', RUNALL_RESUME: '1' }) === defaultCoverageHash);
+const coverageCase = newCase([['audit-tools/fx-coverage.js', {}]]);
+const coverageState = path.join(coverageCase, 'state.tsv');
+const coverageBody = 'run "fx-coverage" node audit-tools/fx-coverage.js';
+const seedZeroHash = coverageHash({ FUZZ_RUN0: '0' });
+const coverageFirst = runHarness(coverageCase, coverageBody, { RUNALL_STATE: coverageState, RUNALL_TREE_HASH: seedZeroHash });
+const coverageSame = runHarness(coverageCase, coverageBody,
+    { RUNALL_STATE: coverageState, RUNALL_TREE_HASH: seedZeroHash, RUNALL_RESUME: '1' });
+const coverageChanged = runHarness(coverageCase, coverageBody,
+    { RUNALL_STATE: coverageState, RUNALL_TREE_HASH: coverageHash({ FUZZ_RUN0: '100' }), RUNALL_RESUME: '1' });
+ok('ទិសផ្ទុយ ៖ seed ដដែលអាចយក PASS ពី state',
+    coverageFirst.rc === 0 && coverageFirst.events.length === 2 && coverageSame.rc === 0 && coverageSame.events.length === 0);
+ok('⛔ seed ថ្មីមិនអាចរាយ PASS ចាស់ ដោយគ្មានការវាស់ថ្មី',
+    coverageChanged.rc === 2 && coverageChanged.events.length === 0
+        && /ការកំណត់|input ខាងក្រៅ/.test(coverageChanged.out), coverageChanged.out);
 fs.rmSync(path.join(hashRepo, 'tracked'));
 const hashMissing = cp.spawnSync('bash', ['-c', hashFunction + '\nrunall_tree_hash "$1"', '_', hashRepo], { encoding: 'utf8' });
 ok('⛔ hash អាន tracked file មិនបាន ត្រូវបដិសេធ មិនអាច RESUME លើភស្តុតាងខ្វះ', hashMissing.status === 1, hashMissing);

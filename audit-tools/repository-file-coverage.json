@@ -4746,6 +4746,12 @@
     },
     "ZoeW/tests/return-notice-mode-matrix.test.tsx": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/meta-checker-modules.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-returned-projection-lifecycle.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

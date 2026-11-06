@@ -95,16 +95,17 @@ const runall = fs.readFileSync(RUNALL, 'utf8');
 
 // ឈ្មោះ checker ដែល `run-all.sh` រត់ — ទាំងក្នុងរង្វិលជុំ `for t in …`
 // និងទាំងជាបន្ទាត់ `run "…" node audit-tools/x.js` ដាច់ដោយឡែក
-function runnableNames(source) {
+function runnableNames(source, withExtensions = false) {
     const text = source.replace(/^\s*#.*$/gm, '');
     const names = new Set();
     for (const m of text.matchAll(/for t in ([\s\S]*?); do([\s\S]*?)\bdone\b/g)) {
-        if (!/^\s*run\s+"\$t"\s+node\s+"audit-tools\/\$t\.js"/m.test(m[2])) continue;
+        const command = /^\s*run\s+"\$t"\s+node\s+"audit-tools\/\$t\.(m?js)"(?=\s|$)/m.exec(m[2]);
+        if (!command) continue;
         for (const name of m[1].split(/\s+/)) {
-            if (/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(name)) names.add(name);
+            if (/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(name)) names.add(name + (withExtensions ? '.' + command[1] : ''));
         }
     }
-    for (const m of text.matchAll(/^\s*(?:run\s+"[^"]*"\s+|(?:[A-Z0-9_]+="[^"]*"\s+)*)(?:runall_owned\s+)?node\s+audit-tools\/([A-Za-z0-9._/-]+)\.js(?=\s|$)/gm)) names.add(m[1]);
+    for (const m of text.matchAll(/^\s*(?:run\s+"[^"]*"\s+|(?:[A-Z0-9_]+="[^"]*"\s+)*)(?:runall_owned\s+)?node\s+audit-tools\/([A-Za-z0-9._/-]+)\.(m?js)(?=\s|$)/gm)) names.add(m[1] + (withExtensions ? '.' + m[2] : ''));
     return names;
 }
 const baselineAt = runall.search(/if \[ -n "\$BASE" \]/);
@@ -122,14 +123,13 @@ function externalWiringFailures(normal, baseline) {
 // ការរត់ធម្មតា ៖ checker SDK emu ដែល build `ZoeW/src`) ត្រូវចង្អុលទៅប្រភព baseline `$IMPORTPAIRED_BASE_SOURCE` វិញ — បើមិនដូច្នោះ BASE
 // ធ្លាក់ព្រោះ «រកប្រភពមិនឃើញ» មិនមែនព្រោះកំហុស។ ការទទួល `$IMPORTPAIRED_BASE_SOURCE` ដេរីវេពីប្រភព checker មិនមែនបញ្ជីដៃ។
 function wiringFailures(entries, normal, baseline, sourceRooted = new Set()) {
-    const names = runnableNames(normal);
+    const names = runnableNames(normal, true);
     const activeBaseline = baseline.replace(/^\s*#.*$/gm, '');
     const failures = [];
     for (const [file, env] of entries) {
-        const name = file.replace(/\.js$/, '');
         const escaped = file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const root = sourceRooted.has(file) ? '\\$(?:BASE|IMPORTPAIRED_BASE_SOURCE)' : '\\$BASE';
-        if (!names.has(name)) failures.push(file + ' (normal)');
+        if (!names.has(file)) failures.push(file + ' (normal)');
         if (!new RegExp('^\\s*(?:[A-Z0-9_]+="[^"\\n]*"\\s+)*' + env + '="' + root + '"\\s+(?:runall_owned\\s+)?node\\s+audit-tools/' + escaped + '(?=\\s|$)', 'm').test(activeBaseline)) failures.push(file + ' (baseline)');
     }
     return failures;
@@ -138,7 +138,7 @@ function wiringFailures(entries, normal, baseline, sourceRooted = new Set()) {
 // ⛔ ឯកសារស្រមោលរបស់ `exit-code-integrity.js` (`.tmp-poison-*`) មិនមែនជា
 // checker ទេ — បើវាត្រូវរាប់ នោះការរត់ស្របគ្នា ២ នឹងរាយការធ្លាក់ក្លែងក្លាយ។
 const topCheckers = fs.readdirSync(TOOLS)
-    .filter((f) => f.endsWith('.js') && !NOT_CHECKERS.has(f) && !f.startsWith('.tmp-poison-'))
+    .filter((f) => /\.m?js$/.test(f) && !NOT_CHECKERS.has(f) && !f.startsWith('.tmp-poison-'))
     .sort();
 
 // ⛔ checker `emu/*` ក៏ជា checker ដែល `run-all.sh` រត់ដែរ (ផ្នែក emulator · lane `emu`) ➜ ផ្នែក ១ · ២ · ៣ · ៤ · ៨ ត្រូវវាស់វា
@@ -156,8 +156,8 @@ const EMU_CHILDREN = new Map([
     ['import-paired-sdk-test.js', 'import-paired-ci-runner.js']
 ]);
 let emuFiles = [];
-try { emuFiles = fs.readdirSync(EMU).filter((f) => f.endsWith('.js') && !f.startsWith('.tmp-poison-')).sort(); } catch (e) {}
-const emuRun = emuFiles.filter((f) => runNames.has('emu/' + f.replace(/\.js$/, '')));
+try { emuFiles = fs.readdirSync(EMU).filter((f) => /\.m?js$/.test(f) && !f.startsWith('.tmp-poison-')).sort(); } catch (e) {}
+const emuRun = emuFiles.filter((f) => runNames.has('emu/' + f.replace(/\.m?js$/, '')));
 const emuChildren = emuFiles.filter((f) => EMU_CHILDREN.has(f) && !emuRun.includes(f));
 const emuCheckers = emuRun.concat(emuChildren).map((f) => 'emu/' + f);
 const isEmu = (f) => f.startsWith('emu/');
@@ -178,7 +178,11 @@ else ok('checker ទាំង ' + checkers.length + ' មាន `*_APP_DIR` over
 
 console.log('\n=== ១ខ. checker `emu/*` ៖ បញ្ជីដេរីវេពី run-all.sh (គ្មានឯកសារណារំលងស្ងាត់ៗ) ===');
 {
-    const named = [...runNames].filter(isEmu).map((name) => name.slice(4) + '.js');
+    const named = [...runNames].filter(isEmu).flatMap((name) => {
+        const base = name.slice(4);
+        const matches = emuFiles.filter(file => file.replace(/\.m?js$/, '') === base);
+        return matches.length ? matches : [base + '.js'];
+    });
     const ghost = named.filter((f) => !emuFiles.includes(f)).map((f) => 'emu/' + f);
     const orphan = emuFiles.filter((f) => !emuRun.includes(f) && !EMU_HELPERS.has(f) && !EMU_CHILDREN.has(f)).map((f) => 'emu/' + f);
     const sources = new Map();
@@ -311,7 +315,7 @@ console.log('\n=== ២ខ. CI មិនត្រូវរត់ checker ដែ�
     } else {
         const ciText = fs.readFileSync(wf, 'utf8');
         const ciCheckers = new Set();
-        for (const m of ciText.matchAll(/node\s+audit-tools\/([A-Za-z0-9._\/-]+)\.js/g)) ciCheckers.add(m[1]);
+        for (const m of ciText.matchAll(/node\s+audit-tools\/([A-Za-z0-9._\/-]+)\.m?js(?=\s|$)/g)) ciCheckers.add(m[1]);
         // ជាន់អប្បបរមា — CI ដែលមិនរត់អ្វីសោះ មិនត្រូវបៃតងស្ងាត់ៗ ៖ `bash audit-tools/run-all.sh` (បញ្ជីពេញ · ផ្នែកនៃ matrix
         // ផ្ទៀងដោយ runall-runner-test) ឬ checker ផ្ទាល់ >= ៣
         const ciRunsAll = workflowRunsAll(ciText);
@@ -482,7 +486,7 @@ if (process.env.EXITCODE_CHILD) {
                 // ⛔ ឯកសារស្រមោលជាវត្ថុបណ្តោះអាសន្នដោយការរចនា — ការរាប់វា
                 // ធ្វើឲ្យការបោសសំណល់របស់ការរត់មុន មើលទៅដូច «SIGKILL កែឯកសារ»
                 // ➜ ការធ្លាក់ក្លែងក្លាយ (វាស់បានក្នុងជុំនេះ)។
-                if (!n.endsWith('.js') || n.startsWith('.tmp-poison-')) continue;
+                if (!/\.m?js$/.test(n) || n.startsWith('.tmp-poison-')) continue;
                 const f = path.join(dir, n);
                 try { out.set(f, crypto.createHash('sha1').update(fs.readFileSync(f)).digest('hex')); } catch (e) {}
             }
@@ -745,7 +749,7 @@ function listenSourceAudit(file, source) {
         let names = [];
         try { names = fs.readdirSync(dir); } catch (e) { continue; }
         for (const n of names) {
-            if (!n.endsWith('.js') || n.startsWith('.tmp-poison-')) continue;
+            if (!/\.m?js$/.test(n) || n.startsWith('.tmp-poison-')) continue;
             files.push(path.join(dir, n));
         }
     }
@@ -839,7 +843,7 @@ function listenSourceAudit(file, source) {
     const nsAssigns = [];
     const literalNs = [];
     for (const n of names) {
-        if (!n.endsWith('.js') || n === 'ns.js' || n.startsWith('.tmp-poison-')) continue;
+        if (!/\.m?js$/.test(n) || n === 'ns.js' || n.startsWith('.tmp-poison-')) continue;
         let src = '';
         try { src = fs.readFileSync(path.join(EMU, n), 'utf8'); } catch (e) { continue; }
         const re = /const\s+NS\s*=\s*([^;]+);/g;
@@ -928,7 +932,7 @@ console.log('\n=== ៦ខ. ការអះអាងត្រូវ *អាចធ
             let names = [];
             try { names = fs.readdirSync(dir); } catch (e) { continue; }
             for (const n of names) {
-                if (!n.endsWith('.js') || n.startsWith('.tmp-poison-')) continue;
+                if (!/\.m?js$/.test(n) || n.startsWith('.tmp-poison-')) continue;
                 files.push(path.join(dir, n));
             }
         }
@@ -1004,7 +1008,7 @@ console.log('\n=== ៧. គ្មាន checker ណានៅផ្ទុកស�
         let names = [];
         try { names = fs.readdirSync(dir); } catch (e) { continue; }
         for (const n of names) {
-            if (!n.endsWith('.js') || n.startsWith('.tmp-poison-')) continue;
+            if (!/\.m?js$/.test(n) || n.startsWith('.tmp-poison-')) continue;
             let code = '';
             try { code = stripLiterals(fs.readFileSync(path.join(dir, n), 'utf8')); } catch (e) { continue; }
             scanned++;
@@ -1046,7 +1050,7 @@ console.log('\n=== ៨. checker ដែលមើល pageerror ត្រូវម�
     const lateInstall = [];
     let watched = 0;
     for (const n of names) {
-        if (!n.endsWith('.js') || n.startsWith('.tmp-poison-')) continue;
+        if (!/\.m?js$/.test(n) || n.startsWith('.tmp-poison-')) continue;
         let raw = '';
         try { raw = fs.readFileSync(path.join(dir, n), 'utf8'); } catch (e) { continue; }
         if (raw.indexOf("page.on('pageerror'") === -1 && raw.indexOf('page.on("pageerror"') === -1) continue;
@@ -1079,7 +1083,7 @@ console.log('\n=== ៨. checker ដែលមើល pageerror ត្រូវម�
     const midLine = [];
     let skipLogs = 0;
     for (const f of fs.readdirSync(TOOLS).concat(emuFiles.map((n) => 'emu/' + n))) {
-        if (!f.endsWith('.js') || f.indexOf('.tmp-poison-') === 0 || EXPLAINS.has(f)) continue;
+        if (!/\.m?js$/.test(f) || f.indexOf('.tmp-poison-') === 0 || EXPLAINS.has(f)) continue;
         const raw = fs.readFileSync(path.join(TOOLS, f), 'utf8');
         const re = /console\.log\(\s*(['"`])((?:\\n)*)([^'"`\n]*?)\1/g;
         let m;

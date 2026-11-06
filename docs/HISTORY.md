@@ -118,6 +118,14 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.185] — 2026-11-06 · ភស្តុតាងត្រឡប់តាមវដ្តកញ្ចប់
+
+ZoeW `2.50.185` (`zoew-v449`) · ZoeKeyGen ដដែល។ ភស្តុតាង ZTO ក្នុង memory ត្រូវផ្ទៀងពេលមកដល់ ឬពេលស្តាររបស់កញ្ចប់ មុនបង្ហាញស្ថានភាព បិទការស្តារ ឬជ្រើសគោលដៅសរសេរ។ ភស្តុតាងវដ្តចាស់មិនបិទវដ្តថ្មី និងមិនលុបអំណាចសញ្ញាត្រឡប់បច្ចុប្បន្ន។ Signed, restoreBlocked និងគោលការណ៍ Palm នៅដដែល; មិនកែឯកសារ ZTO ដែលមាន LOCK ទេ។
+
+តេស្ត regression លើប្រភពមុនកែ៖ ១៨ ធ្លាក់ / ៥៨ ឆ្លង ក្នុង ២ files; ឯកសារណែនាំ preview/rollback ធ្លាក់តាម assertion មុនកែ។ ការផ្ទៀងរួមបន្ទាប់កែ៖ ១៨ files / ៤៣០ tests ឆ្លង; typecheck, lint, doc-check, Android និង repository-file coverage ឆ្លង។ Build វាស់ជាប់គាំងដោយ Chromium socket EPERM; version/doc-scope និង meta suite ពេញលើ measure-root ព្រមទាំង CI នៅមិនទាន់ផ្ទៀង។ ការវាស់ synthetic មិនបញ្ជាក់ Firebase rules, Supabase RLS, browser ឬឧបករណ៍ពិតទេ។
+
+**សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ មុនចេញប្រើ ត្រូវផ្ទៀង CI លើកូដចុងក្រោយ និងសាកស្តារកញ្ចប់លើឧបករណ៍ពិត ដោយរក្សា journal និង pending/unknown។ មិនមាន rules ឬ migration ថ្មី។ មិនមានការបោះពុម្ព ឬ deploy ក្នុងការរួម local នេះទេ។
+
 ### [2.50.184] · ZoeKeyGen [2.24.35] — 2026-11-06 · ម៉ោង Server តាម JSON
 
 ZoeW `2.50.184` (`zoew-v448`) · ZoeKeyGen `2.24.35` (`zoekeygen-v146`)។ App ទាំងពីរអានម៉ោងពី `https://zoew.netlify.app/.netlify/functions/server-time` ដោយ GET គ្មាន credentials។ Function ផ្តល់ `{now, nonce}` ជាមួយ CORS និង no-store; client ផ្ទៀង nonce ចៃដន្យ ស្ថានភាព HTTP ប្រភេទ JSON និងលេខម៉ោង មុនបើកភាពទុកចិត្ត។ Request និង body មានពិដានរួម; បរាជ័យរក្សា offset ដែលបានទុកចិត្ត និង activation ដដែល។ មិនកែច្បាប់ហិរញ្ញវត្ថុ ឬអនុញ្ញាត cleanup តាមតែ clock response ទេ។
@@ -1939,6 +1947,18 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-11-06 · Meta-checker គ្របម៉ូឌុល .mjs
+
+ការរក checker ពី `run-all.sh` និងការស្កេនថតរំលង `.mjs` ទោះ `server-time-function-test.mjs` រត់ក្នុង suite ក៏ដោយ។ ឥឡូវ direct command និង loop ស្គាល់ `.js`/`.mjs` តាម extension ពិត; `.bak`, comment និង loop ដែលមិនរត់ checker មិនជំនួសការវាស់ទេ។ Exit scanner parse ESM ហើយ poison សម្រាប់ `node:test` ចាក់បរាជ័យក្រោយ callback ពិតបញ្ចប់។ ឯកសារដើមនៅដដែល។
+
+Regression មុនកែ ៥ ធ្លាក់ / ២ ឆ្លង; loop controls បន្ថែមរកឃើញ ២ ករណីទៀត។ ក្រោយកែ guard suites ៤ files / ៥៨ tests ឆ្លង។ Checker ពិត baseline ៣៤ ឆ្លង; poison បញ្ចប់ ៣៤ ធ្លាក់ គ្មាន cancellation។ ការ suppress exit code នៅតែជា fake-green; syntax/import failure ជា unverified មិនមែន mutation detection។ Metadata prefix ៤៤ assertions និង exit AST prefix ៨ assertions ឆ្លង ប៉ុន្តែមិនជំនួស meta suite ពេញដែលត្រូវការ build វាស់/browser/emulator ទេ។ CI លើការកែថ្មីនៅមិនទាន់ផ្ទៀង។
+
+### 2026-11-06 · ភស្តុតាង RUNALL_RESUME តាមករណីវាស់
+
+`RUNALL_RESUME=1` អាចយក PASS ពី seed ចាស់ ទោះប្តូរ `FUZZ_RUN0` ព្រោះ hash ចាស់រាប់តែ source និងទង់ STRICT។ ឥឡូវ fingerprint v2 រាប់ជម្រើស fuzz/money/parity, mutation និងការជ្រើសករណីតាមបញ្ជីច្បាស់; unset និង empty ខុសគ្នា។ Input ខាងក្រៅតាម path/ref មិនអាចប្រើ PASS ចាស់ឡើងវិញ ព្រោះ path ដដែលមិនបញ្ជាក់មាតិកាដដែល។ ជម្រើស lane/display និង secret មិនត្រូវចូល hash។ Node executable/version ចូល fingerprint; dependency path ខាងក្រៅបិទការប្រើ PASS ចាស់។ ការប្តូរ installed dependencies ក្នុង checkout ដដែលដោយមិនប្តូរ lockfile មិនត្រូវបាន hash មាតិកាទេ៖ ត្រូវរត់ថ្មីដោយគ្មាន RESUME ក្រោយដំឡើង dependency ឡើងវិញ។
+
+Regression គោលដៅលើ runner មុនកែ៖ ៩ ឆ្លង / ៥៦ ធ្លាក់; ក្រោយកែ៖ ៦៥ ឆ្លង គ្មានធ្លាក់។ Mutation ដក seed ចេញចាប់បាន ២ assertions; ដក external guard ចេញចាប់បាន ៣០ assertions ដោយគ្មាន startup failure។ Runner meta suite ពេញលេញឆ្លង ២២៩ assertions។ Seed ដដែលនៅអាច resume; seed ថ្មីត្រូវបដិសេធជំនួស PASS ចាស់។ ការកែនេះប៉ះតែឧបករណ៍ មិនប្តូរកំណែ app។ Build វាស់ក្នុង session នៅត្រូវបានរារាំងដោយ Chromium IPC socket; មិនរាប់ browser/backend ឬ CI លើ tree ថ្មីថាបានផ្ទៀងទេ។
 
 ### 2026-11-06 · Server time JSON និង CORS
 

@@ -53,7 +53,38 @@ runall_tree_hash() (  # <root>
             find . \( -name node_modules -o -name .git -o -name dist-audit \) -prune -o -type f -print0 | sed -z 's|^\./||'
         fi | LC_ALL=C sort -zu | xargs -0r sha1sum 2>/dev/null || exit 1
         [ -f audit-tools/emu/real.rules.json ] && sha1sum audit-tools/emu/real.rules.json
-        env | LC_ALL=C sort | sed -n '/^[A-Z0-9_]*_STRICT=/p'
+        # ⛔ v2 ៖ ភស្តុតាងរួមមានជម្រើសដែលប្តូរករណីវាស់ មិនមែនតែ source និង STRICT។
+        printf 'zoe-runall-evidence-v2\0'
+        command -v node || exit 1
+        node --version || exit 1
+        local key external=0
+        while IFS= read -r key; do
+            case "$key" in
+                *_STRICT|APPWRITES_OPS|APPWRITES_RUNS|CFUZZ_RUN0|CFUZZ_RUNS|CONNFUZZ_OPS|CONNFUZZ_RUN0|CONNFUZZ_RUNS|\
+                FUZZ_APPS|FUZZ_OPS|FUZZ_RUN0|FUZZ_RUNS|MFUZZ_OPS|MFUZZ_RUN0|MFUZZ_RUNS|ZTOBANNER_FUZZ_RUNS|\
+                MONEYMD_DEVICES|MONEYMD_OPS|MONEYMD_RUN0|MONEYMD_RUNS|SBMONEY_DEVICES|SBMONEY_OPS|SBMONEY_RUN0|SBMONEY_SHOPS|\
+                SBPARITY_OPS|SBPARITY_RUNS|SBPARITY_SEED|SBPARITY_POLICY_ONLY|SBPARITY_PROBE_ONLY|\
+                FBPROVISION_MUTATIONS|SBDATA_MUTATIONS|SCANREMOVE_STATIC_ONLY|SCANSDK_MONTH_WIRE|SCANRULES_BACKEND|\
+                MONEYGUARD_NO_EMU|CRUD_FLOW_MIN_ASSERTS|IMPORTPAIRED_CI_CASE|IMPORTPAIRED_CI_PROVIDER|\
+                F03_RUN_NATIVE_ENGINE|F03_TIMING_ORDER|F09_RUN_NATIVE_ENGINE|SUPABASE_RESET_PAIRED_CASE|\
+                PANELMOTION_ORDERS|PERF_ORDERS|KHMERTZ_PROBE|EXITCODE_CHILD|CI|NODE_ENV|\
+                CHECKER_TIMEOUT|EXITCODE_TIMEOUT_MS|ZOEWSUITE_STEP_TIMEOUT_MS)
+                    printf '%s\0%s\0' "$key" "${!key}" ;;
+                *_APP_DIR|*_CHROME|*_PORT|ZOE_REPO_ROOT|VERSIONSCOPE_BASE|VERSIONSCOPE_GIT_DIR|SUPABASE_MIGRATION_BASE|\
+                KEYLIST_APP_JS|LICENSE_JS|SCANRULES_RULES_FILE|PURITY_SRC|SLOTCHECK_SRC|NOTICE_FILE|DIST_DIR|\
+                ANDROIDCHECK_ROOT|ZOEW_HISTORY_TEST_DIST|SUPABASE_ADMIN_SESSION_BASELINE|SUPABASE_RESET_BASELINE|\
+                NODE_OPTIONS|NODE_PATH|FBPROVISION_DEPS_DIR|SUPABASE_DEPS_DIR|SUPABASE_PG_BIN|\
+                ZOEW_TEST_BROWSER|CHROMIUM_PATH|PLAYWRIGHT_BROWSERS_PATH|ZOE_RTDB_JAR|\
+                F03_NATIVE_EMULATOR_URL|FIREBASE_DATABASE_EMULATOR_HOST|IMPORTPAIRED_BASE_SOURCE)
+                    external=1 ;;
+                ZOE_NODE_MODULES)
+                    [ "${!key}" = "$PWD/ZoeW/node_modules" ] || external=1 ;;
+            esac
+        done < <(compgen -e | LC_ALL=C sort)
+        # ⛔ path/ref ដដែលអាចមានមាតិកាថ្មី៖ មិនរក្សា PASS ពីការរត់មុន ហើយមិនអាន secret។
+        if [ "$external" = 1 ]; then
+            printf 'external-input-no-reuse\0%s\0' "$BASHPID:$RANDOM:$RANDOM"
+        fi
     ) | sha1sum | cut -c1-16
 )
 zoe_build_audit() {  # <src root>
@@ -414,7 +445,7 @@ runall_select() {  # RUNALL_ONLY · RUNALL_RESUME ➜ J_ST[i] = hdr | queue | do
         fi
         if [ "$RS_HASHES" != "$RUNALL_TREE_HASH" ]; then
             echo "*** FAIL *** RUNALL_RESUME=1 បដិសេធ ៖ state ជារបស់ tree ${RS_HASHES:-?} តែ tree ឥឡូវជា $RUNALL_TREE_HASH"
-            echo "      (កូដ · ឯកសារ · ឬទង់ *_STRICT ប្រែ ➜ លទ្ធផលចាស់មិនមែនភស្តុតាងរបស់ tree នេះ ➜ រត់ពេញម្តងទៀត)"
+            echo "      (កូដ · ការកំណត់ · runtime ប្រែ ឬមាន input ខាងក្រៅដែលមិនអាចប្រើឡើងវិញ ➜ លទ្ធផលចាស់មិនមែនភស្តុតាងថ្មី ➜ រត់ម្តងទៀតដោយគ្មាន RUNALL_RESUME)"
             return 2
         fi
         append=1

@@ -72,31 +72,36 @@ export function trashRestoreBlockOf(item, evidenceOnly?) {
     if (stamped) return stamped;
     if (!barcodes.length) return '';
     if (item.trashReason === 'returned' && barcodes.some((b) => {
-        const evidence = ztoReturnedEvidence.get(pickupBarcodeKey(b.code));
+        const evidence = barcodeReturnedEvidence(b, item);
         return !!evidence && evidence.kind === 'returned';
     })) return 'returned';
     return '';
 }
 
-export function barcodeZtoLeftKind(barcode) {
+function barcodeReturnedEvidence(barcode, item?) {
+    const evidence = barcode?.code ? ztoReturnedEvidence.get(pickupBarcodeKey(barcode.code)) : null;
+    return evidence && evidence.at >= barcodeReturnBasis(barcode, item?.createdAt) ? evidence : null;
+}
+
+export function barcodeZtoLeftKind(barcode, item?) {
     if (!barcode) return '';
-    const evidence = barcode.code ? ztoReturnedEvidence.get(pickupBarcodeKey(barcode.code)) : null;
+    const evidence = barcodeReturnedEvidence(barcode, item);
     if (evidence && evidence.kind !== 'returned') return evidence.kind;
     if (barcodeZtoSentOut(barcode)) return 'sent';
     return barcodeZtoMisplaced(barcode) ? 'misplaced' : '';
 }
 
-export function barcodeMisplacedInZto(barcode) {
-    return barcodeZtoLeftKind(barcode) === 'misplaced';
+export function barcodeMisplacedInZto(barcode, item?) {
+    return barcodeZtoLeftKind(barcode, item) === 'misplaced';
 }
 
-export function barcodeSentOutInZto(barcode) {
-    return barcodeZtoLeftKind(barcode) === 'sent';
+export function barcodeSentOutInZto(barcode, item?) {
+    return barcodeZtoLeftKind(barcode, item) === 'sent';
 }
 
 function trashReturnedEvery(item, test) {
     const barcodes = item && item.trashReason === 'returned' && Array.isArray(item.barcodes) ? item.barcodes.filter(Boolean) : [];
-    return barcodes.length > 0 && barcodes.every(test);
+    return barcodes.length > 0 && barcodes.every((barcode) => test(barcode, item));
 }
 
 export function trashItemMisplaced(item) {
@@ -108,7 +113,7 @@ export function trashItemSentOut(item) {
 }
 
 export function trashItemLeftBranch(item) {
-    return trashReturnedEvery(item, (b) => !!barcodeZtoLeftKind(b));
+    return trashReturnedEvery(item, (b, parent) => !!barcodeZtoLeftKind(b, parent));
 }
 
 export function explainZtoRestoreBlock(reason) {
@@ -200,7 +205,7 @@ export function collectZtoFinalTargets() {
                     want.signed = Number.isFinite(actual) && actual > 0 && actual <= signedAt ? actual : signedAt;
                     if (verdict?.signedAtExact === true && want.signed === actual) want.signedExact = true;
                 }
-                const evidence = trash && item.trashReason === 'returned' ? ztoReturnedEvidence.get(key) : null;
+                const evidence = trash && item.trashReason === 'returned' ? barcodeReturnedEvidence(b, item) : null;
                 if (evidence && evidence.kind === 'sent') {
                     if (!barcodeZtoSentOut(b)) want.sentOut = evidence.at;
                 } else if (evidence && evidence.kind !== 'left') {

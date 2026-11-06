@@ -68,6 +68,22 @@ const missingScripts = scripts.filter((s) => !devDoc.includes('npm run ' + s) &&
 if (missingScripts.length) fails.push('docs/DEVELOPMENT.md ខ្វះពាក្យបញ្ជា ៖ ' + missingScripts.join(' · '));
 else oks.push(`ពាក្យបញ្ជា ${scripts.length} មានឈ្មោះក្នុង docs/DEVELOPMENT.md`);
 
+/* Deployment guidance is a bounded documentation contract, not proof of backend compatibility. */
+const deployment = devDoc.match(/### Deploy preview[^\n]*\n([\s\S]*?)(?=\n### |$)/)?.[1] || '';
+const deployContracts = [
+    ['preview isolation', /backend សាកល្បងដាច់ដោយឡែក/.test(deployment)
+        && /មិនអនុញ្ញាត[^\n]*កំណែខុសគ្នា/.test(deployment)
+        && !/ស្របគ្នាបានដោយសុវត្ថិភាព/.test(deployment)],
+    ['rollback compatibility', /មុន rollback[^\n]*client[^\n]*rules[^\n]*migrations/.test(deployment)
+        && /pending\/unknown/.test(deployment)
+        && /មិនត្រូវ[^\n]*migration/.test(deployment)],
+    ['preview trusted time', /server-time/.test(deployment) && /preview[^\n]*HTTP localhost[^\n]*403/.test(deployment)]
+];
+for (const [name, valid] of deployContracts) {
+    if (!valid) fails.push(`docs/DEVELOPMENT.md deployment contract: ${name}`);
+    else oks.push(`deployment contract: ${name}`);
+}
+
 /* ── ៣ខ. README ត្រូវរាយកំណែជា «កំណែបច្ចុប្បន្ន» (ទម្រង់ដែល doc-scope-test អាន) ── */
 const claimed = (read('README.md').match(/កំណែបច្ចុប្បន្ន[^0-9]*`([0-9]+\.[0-9]+\.[0-9]+)`/) || [])[1];
 if (claimed !== version) fails.push(`README.md «កំណែបច្ចុប្បន្ន» (${claimed}) ខុសពី APP_VERSION (${version})`);

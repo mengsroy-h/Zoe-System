@@ -121,10 +121,11 @@ npm run verify           # ការពិនិត្យ ZoeW រួម; មិ
    ពិត** មុន merge (`CLAUDE.md` ច្បាប់ ១១) ៖ checker ក្នុង `audit-tools/` វាស់ក្នុង Chromium ដែល **ធ្វើត្រាប់តាម** iOS មិនមែន
    WebKit ពិត។
 3. ⚠️ Deploy preview មាន **origin ផ្សេង** ➜ storage ទទេ ៖ បញ្ចូល Config ហើយ **Activate** ម្តងទៀត។ ⛔ ការ Activate នោះស៊ីកៅអី
-   ឧបករណ៍ (`maxDevices`) ដូចឧបករណ៍ថ្មីមួយ ➜ ប្រើ Key សាកល្បង ឬដោះកៅអីក្នុង ZoeKeyGen ក្រោយសាករួច។ preview និងផលិតកម្មប្រើ
-   ស្របគ្នាបានដោយសុវត្ថិភាព ៖ ទាំង ២ សរសេរតាមច្បាប់ដដែល (transaction · registry · ledger) ដូចឧបករណ៍ ២។
-4. **ការថយក្រោយ** ៖ Netlify UI ➜ **Deploys** ➜ ជ្រើស deploy មុនដែលដើរល្អ ➜ **Publish deploy** (ភ្លាម · គ្មាន build) ឬ
-   `git revert` commit ដែលមានបញ្ហា ➜ build ថ្មី។
+   ឧបករណ៍ (`maxDevices`) ដូចឧបករណ៍ថ្មីមួយ ➜ ប្រើ Key សាកល្បង ឬដោះកៅអីក្នុង ZoeKeyGen ក្រោយសាករួច។ ប្រើ **backend សាកល្បងដាច់ដោយឡែក** ជាមួយទិន្នន័យសំយោគ។
+   ⛔ មិនអនុញ្ញាតឱ្យ preview និងផលិតកម្ម ឬ tab/ឧបករណ៍កំណែខុសគ្នា សរសេរចូល backend ដូចគ្នា ដោយសន្មតថាច្បាប់នៅស៊ីគ្នាទេ។ ផ្ទៀង client/rules/migrations និងផែនការ rollout ក្នុង [HISTORY](../../docs/HISTORY.md) មុនការសាកដែលប្រើ backend រួម; បិទ tab/ឧបករណ៍ចាស់មុនផ្លាស់កំណែ។
+   `server-time` អនុញ្ញាត origin ផលិតកម្មទាំង ២ និង Android `https://localhost` ប៉ុណ្ណោះ; preview និង HTTP localhost ទទួល **403**។ កុំសន្មតថា activation/trusted time លើ preview ដំណើរការរួច។ Origin សាកត្រូវមានការអនុញ្ញាតជាក់លាក់ និងការផ្ទៀងដោយឡែក មុនបន្ថែមទៅ allowlist; កុំបើក origin ទាំងអស់។
+4. **ការថយក្រោយ** ៖ មុន rollback ត្រូវផ្ទៀងថា **client** គោលដៅស៊ីនឹង **rules** និង **migrations** ដែលបានដាក់ប្រើ ហើយរក្សា journal/receipt និង **pending/unknown** ទាំងអស់។ មិនត្រូវលុប ឬបញ្ច្រាស migration ដែល merge រួច ដើម្បីឱ្យ client ចាស់ដើរទេ។
+   បើភាពស៊ីគ្នាមិនទាន់បញ្ជាក់ ត្រូវផ្អាក rollback និងរៀបផែនការស្តារដែលរក្សាទិន្នន័យ។ ក្រោយបញ្ជាក់ និងម្ចាស់អនុញ្ញាត ទើប Netlify UI ➜ **Deploys** ➜ deploy ដែលបានផ្ទៀង ➜ **Publish deploy** ឬ `git revert` ➜ build ថ្មី; បិទ tab/ឧបករណ៍ចាស់តាមផែនការ rollout។
 5. **Service Worker** ៖ SW លុប cache `zoew-` ទាំងអស់ដែលមិនមែន `CACHE_VERSION` បច្ចុប្បន្ន (`src/sw/cache-version.ts`) ហើយ SW
    ថ្មីជំនួសខ្លួនពេលដំឡើងរួច (`skipWaiting` + `clients.claim`) ➜ អ្នកប្រើនៅឃើញ App ចាស់ ៖ បិទបើក App ២ ដង។
 6. ⛔ ការ deploy មិនកែ Firebase rules ទេ — កំណែដែលបន្ថែម path ថ្មីប្រាប់ «Publish rules» ក្នុងសកម្មភាពដោយដៃរបស់វា

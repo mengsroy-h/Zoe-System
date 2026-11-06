@@ -42,7 +42,7 @@
 
 ## 📌 ការងារដែលនៅសល់ — ការផ្ទៀងផ្ទាត់ដោយអ្នកប្រើ
 
-- 2026-11-06 · PR393 រួម Lookup/Palm និងឯកសារប្រតិបត្តិការ៖ browser guards និង hash ZTO មិនទាន់ផ្ទៀង; ទុក lock នៅដដែល មិន bypass។ CI ត្រូវវាស់កូដចុងក្រោយ មុន merge។ Registration race និងការលុប dead-code ដែលដកចេញ មិនបញ្ចូលក្នុងការកែនេះ។
+- 2026-11-06 · PR393៖ ភស្តុតាង ZTO និងការចាក់សោឡើងវិញកត់នៅកំណែ 2.50.186។ F03 និង repository contract នៅជាបញ្ហាដាច់ដោយឡែក; ត្រូវផ្ទៀង CI ទាំង៤ shards លើ commit ចុងក្រោយ មុន merge។ Registration race និងការលុប dead-code ដែលដកចេញ មិនបញ្ចូលក្នុងការកែនេះ។
 
 > ⛔ **ផ្នែកនេះកាន់តែការងារដែលនៅបើក** ៖ ស្ថានភាព git · អ្វីដែលអ្នកប្រើមិនទាន់បញ្ជាក់ · សកម្មភាពដោយដៃដែលមិនទាន់ធ្វើ · ការសម្រេចដែលនៅរស់។
 > អ្នកប្រើបញ្ជាក់ ឬធ្វើរួច ➜ **លុបធាតុនោះ** (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុងផ្នែក ១ · ២) ⛔ កុំបន្ថែមខ្សែ branch/PR ចាស់ (git ជាភស្តុតាង) ·
@@ -126,7 +126,11 @@ ZoeW `2.50.186` (`zoew-v450`) · ZoeKeyGen `2.24.36` (`zoekeygen-v147`)។ Retry
 
 Regression លើ `21069590` មុនកែ៖ ២៥ ធ្លាក់ និង១៣២ ជាប់ ក្នុង៤ files; ក្នុងនោះ Lookup/retry ធ្លាក់១៨ និង Palm ធ្លាក់៧។ Reminder ជាតេស្តបញ្ជាក់ឥរិយាបថបច្ចុប្បន្ន មិនប្តូរការផ្ញើឡើងវិញក្រោយ claim ទេ។ ការសាកប្រើ fixture គ្មាន credential ឬទិន្នន័យ ZTO ពិត។
 
-**សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ `auto-lookup.ts` និង `zto-palm.js` ជាតំបន់ ZTO ចាក់សោ។ Hash ក្នុង `zto-lock.test.ts` នៅដដែល ដូច្នេះ lock ត្រូវធ្លាក់រហូតដល់អ្នកយាម ZTO ទាំងអស់ជាប់។ ត្រូវរត់ browser guards រួម `zto-list-sync-test` និង `zto-sync-banner-test` លើកូដនេះក្នុង environment ដែលបើក Chromium បាន មុនធ្វើបច្ចុប្បន្នភាព hash។ បន្ទាប់មកផ្ទៀង CI ទាំង៤ shards លើ commit ចុងក្រោយ មុន merge មួយដង។ មិនមាន rules/migration ថ្មី; មិនប៉ះ journal ឬទិន្នន័យអ្នកប្រើ។
+ការចាក់សោ ZTO ឡើងវិញតាមសំណើ audit ខាងលើ៖ [ភស្តុតាងបន្ថែម](https://github.com/mengsroy-h/Zoe-System/actions/runs/42217192578/artifacts/13501263969) លើ PR head `67347f4b66c96f1346cdab133e967b9b72c91bbf` មាន 122 files / 2784 tests ជាប់ គ្មាន skip/todo រួម `zto-signed-sync` 27។ [Audit CI](https://github.com/mengsroy-h/Zoe-System/actions/runs/42217192578) ប្រើ PR merge checkout `8f5680c7e676a0039b79a1716d69e96fd3992b7d`៖ shard 3 `zto-list-sync-test` 633 និង shard 4 `zto-sync-banner-test` 209 ជាប់ ព្រមទាំងអ្នកយាម ZTO ផ្សេងៗ។ ឯកសារ `zto-palm.js` និង `auto-lookup.ts` ក្នុង merge checkout មាន Git blob ដូចប្រភពដែលពិនិត្យ; local `f0d60cfd` មាន tree `ad5e88be893ad81a4831b0ae69a53936826886ac` ដូច PR head។
+
+`zto-lock.test.ts` មុនចាក់សោឡើងវិញ៖ ២ ធ្លាក់ និង១៤ ជាប់ តែលើឯកសារទាំង២នេះ។ ប្តូរតែ SHA-256 ដែល normalize LF៖ `zto-palm.js` ➜ `cb69a84673967af3ba4ebbc22b4d9d24b2cd7bf1f51d1f057f7c6cb24c89fed3`; `auto-lookup.ts` ➜ `74927a7e13e8dc1803445d596dd769d0071657e74eb61e31d61c473a3461efb4`។ រក្សា entry ទាំង១៣ និង assertion ទាំងអស់; ក្រោយកែ lock ១៦/១៦ ជាប់។ មិនកែប្រភព App ក្នុងការចាក់សោឡើងវិញនេះ និងមិនរាប់ជាភស្តុតាងលើឧបករណ៍ពិតទេ។
+
+**សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ ផ្ទៀង CI ទាំង៤ shards លើ commit ចុងក្រោយ មុន merge មួយដង។ F03 និង repository contract នៅជាបញ្ហាដាច់ដោយឡែក មិនត្រូវរាប់ថាបានបញ្ចប់ដោយសារ ZTO ជាប់ទេ។ មិនមាន rules/migration ថ្មី; មិនប៉ះ journal ឬទិន្នន័យអ្នកប្រើ។
 
 ### [2.50.185] — 2026-11-06 · ភស្តុតាងត្រឡប់តាមវដ្តកញ្ចប់
 
@@ -1958,6 +1962,21 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+
+### 2026-11-06 · Repository contract តាម job ដែលវាស់
+
+`repository-contract-test` ធ្លាប់លាយ steps របស់ job បន្ថែមជាមួយ `audit-shard` ដូច្នេះ cache/runtime/Chromium ធ្លាក់ខុស។ ឥឡូវវាស់កិច្ចសន្យាតាម job ទាំងអស់ ដោយរក្សាលក្ខខណ្ឌដើម និង shard តែមួយគត់; negative controls បដិសេធ shard បាត់/ស្ទួន និងការខូច cache, Node, Java, Chromium និង offline install ទាំងក្នុង shard និង job បន្ថែម។ មិនកែ workflow ឬបន្ថយ gate ទេ; full built-tree និង CI ចុងក្រោយនៅត្រូវផ្ទៀង។
+
+### 2026-11-06 · F03 ប្រៀបធៀប heap ក្នុង diagnostic ប៉ុណ្ណោះ
+
+Workflow diagnostic រក្សា JVM512 ទាំងពីរលំដាប់ `249,250,251` និង `251,249,250` ហើយបន្ថែម JVM1024 ទាំងពីរលំដាប់ដូចគ្នា។ Heap ត្រូវចងនឹង ownership និង artifact ដាច់ដោយឡែក; whitelist បដិសេធតម្លៃផ្សេង។ Ordinary runner នៅ 512 MiB; deadline, STRICT, failure propagation និង gate មិនប្តូរ។ រក្សាលទ្ធផល JVM512 ដើម មិនជំនួសដោយ JVM1024 ឬអះអាងថាបានកែផលិតផលទេ។ `f03-heap-diagnostic.test.ts` ផ្ទៀង matrix/ownership/deadline និងការរក្សាភស្តុតាង; real JVM/CI លើការរួមនេះនៅមិនទាន់រត់។
+
+
+### 2026-11-06 · របាយការណ៍ reachability ពី source ដើម
+
+`moduleView` ដក import/export identity៖ exported API និង helper ដែល raw-module graph រក្សាទុក ត្រូវបាន candidate ដែលដកវិញរាយជា orphan។ បន្ថែម `source-function-reachability.mjs` ជារបាយការណ៍ដាច់ដោយឡែកលើ TypeScript Program ពិត; មិនជំនួស gate `function-surface-test`។ Symbol identity តាម module/declaration ការពារឈ្មោះស្ទួន និង parameter shadow; public exports និង module evaluation ជា roots; type-only references មិនមែន runtime evidence។ Unknown dynamic/compile scope បិទ candidate classification និង CLI ចេញ 2។ មិនអះអាងថាមានកូដណាអាចលុបបានទេ។
+
+Independent review រកឃើញ runtime class heritage/instantiation ដែល TypeScript ចាត់ជា TypeNode និង reflective glob forms; regression មុនកែ ២១ ឆ្លង / ៥ ធ្លាក់ រួចក្រោយកែ ២៦ ឆ្លង។ Ambient declarations ត្រូវបានរក្សាក្នុង compiler input ក្រោយ regression មួយធ្លាក់។ Mutation controls ចាប់ export-root loss, name conflation និង runtime-expression omission។ Source profile បច្ចុប្បន្ននៅ incomplete ដោយ reflection/globs ក្នុង audit exposure; គ្មានការលុប ឬ app runtime edit។ Browser/aggregate និង CI លើ tree ថ្មីនៅមិនទាន់ផ្ទៀង។
 
 ### 2026-11-06 · កែ harness ក្រោយ CI audit PR393
 
@@ -4556,6 +4575,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/expiry-return-policy.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/expiry-schedule-cap.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/export-request-snapshot.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/f03-heap-diagnostic.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/firebase-auth-write-ownership.test.ts` | — | ផ្នែក ៨ · ផ្នែក ៩ |
 | `ZoeW/tests/firebase-loader-gate.test.ts` | — | ផ្នែក ៧ |
 | `ZoeW/tests/forbidden-zone-lock.test.ts` | ផ្នែក ១ | ផ្នែក ៨ · ផ្នែក ៩ |

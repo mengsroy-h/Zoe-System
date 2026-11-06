@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/f03-native-diagnostic.yml'
+      - 'ZoeW/tests/f03-heap-diagnostic.test.ts'
       - 'audit-tools/emu/registry-purge-atomic-sdk-test.js'
       - 'audit-tools/emu/ns.js'
       - 'audit-tools/supabase-pg.js'
@@ -32,7 +33,7 @@ permissions:
 
 jobs:
   native-order:
-    name: F03 JVM512 ${{ matrix.order }}
+    name: F03 JVM${{ matrix.heap_mib }} ${{ matrix.order }}
     if: (vars.ZOE_RUNNER_MODE == 'github' || github.event.repository.private == true) && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ${{ fromJSON(vars.ZOE_RUNNER_MODE == 'github' && '["ubuntu-latest"]' || '["self-hosted","Linux","X64","wsl-zoe-audit"]') }}
     timeout-minutes: 20
@@ -41,6 +42,7 @@ jobs:
       max-parallel: 1
       matrix:
         order: ['249,250,251', '251,249,250']
+        heap_mib: [512, 1024]
     steps:
       - uses: actions/checkout@v7
         with:
@@ -86,8 +88,12 @@ jobs:
               if (end < 0 || fields.length < 22 || !/^\d+$/.test(fields[19])) throw new Error('Invalid owned process identity');
               return { state: fields[0], start: fields[19], userTicks: Number(fields[11]), systemTicks: Number(fields[12]), rssPages: Number(fields[21]) };
           }
+          function diagnosticHeap(value) {
+              if (!['512', '1024'].includes(String(value))) throw new Error('Unsupported diagnostic heap');
+              return Number(value);
+          }
           function javaArguments(owner) {
-              return ['-Xmx512m', '-Xlog:gc*:file=' + owner.gcLog + ':utctime,uptimemillis,level,tags:filecount=1,filesize=8M',
+              return ['-Xmx' + diagnosticHeap(owner.maxHeapMiB) + 'm', '-Xlog:gc*:file=' + owner.gcLog + ':utctime,uptimemillis,level,tags:filecount=1,filesize=8M',
                   '-jar', owner.jar, '--port', String(owner.port), '--host', '127.0.0.1'];
           }
           function identityMatches(owner, stat, args) {
@@ -134,8 +140,16 @@ jobs:
               return Object.fromEntries(names.map((name, index) => [name, values[index] === '-' ? null : Number(values[index])]));
           }
           function verifyConstruction() {
-              const owner = { start: '100', jar: '/owned/emulator.jar', gcLog: '/owned/jvm-gc.log', port: 19001 };
+              const owner = { start: '100', jar: '/owned/emulator.jar', gcLog: '/owned/jvm-gc.log', port: 19001, maxHeapMiB: 512 };
               const args = ['java', ...javaArguments(owner)];
+              const larger = { ...owner, maxHeapMiB: 1024 }, largerArgs = ['java', ...javaArguments(larger)];
+              if (!identityMatches(larger, { start: '100' }, largerArgs) || identityMatches(owner, { start: '100' }, largerArgs)
+                  || identityMatches(larger, { start: '100' }, args)) throw new Error('Owned JVM heap binding failed');
+              for (const heap of [undefined, null, 0, 513, 2048, '512m', '512 -Xmx2g']) {
+                  let rejected = false;
+                  try { javaArguments({ ...owner, maxHeapMiB: heap }); } catch (_) { rejected = true; }
+                  if (!rejected) throw new Error('Invalid diagnostic heap accepted');
+              }
               const listener = 'header\n 0: 0100007F:4A39 00000000:0000 0A 0 0 0 0 0 777 0\n';
               if (!identityMatches(owner, { start: '100' }, args) || identityMatches(owner, { start: '101' }, args)
                   || identityMatches(owner, { start: '100' }, [...args, '-Xmx1g'])
@@ -154,17 +168,18 @@ jobs:
                   const port = server.address().port; await new Promise(resolve => server.close(resolve)); console.log(port); return;
               }
               if (mode === 'launch') {
+                  const maxHeapMiB = diagnosticHeap(jarArg);
                   const port = Number(pidArg), jar = fs.realpathSync(portArg);
                   if (!Number.isSafeInteger(port) || port <= 0 || port > 65535) throw new Error('Invalid owned port');
                   fs.writeFileSync(path.join(directory, 'launch-attempt.json'), JSON.stringify({ attempted: true, startedUtc: new Date().toISOString() }) + '\n', { flag: 'wx' });
                   const log = fs.openSync(path.join(directory, 'emulator.log'), 'wx');
                   const gcLog = path.join(directory, 'jvm-gc.log');
-                  const child = cp.spawn('java', javaArguments({ jar, port, gcLog }), { stdio: ['ignore', log, log] });
+                  const child = cp.spawn('java', javaArguments({ jar, port, gcLog, maxHeapMiB }), { stdio: ['ignore', log, log] });
                   fs.closeSync(log);
                   let ownerCommitted = false;
                   try {
                       await new Promise((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject); });
-                      const pid = child.pid, seen = observation(pid), owner = { pid, port, jar, gcLog, start: seen.stat.start, jarSHA256: sha(fs.readFileSync(jar)), maxHeapMiB: 512,
+                      const pid = child.pid, seen = observation(pid), owner = { pid, port, jar, gcLog, start: seen.stat.start, jarSHA256: sha(fs.readFileSync(jar)), maxHeapMiB,
                           jstat: path.join(path.dirname(fs.realpathSync('/proc/' + pid + '/exe')), 'jstat'), capturedUtc: new Date().toISOString() };
                       if (!identityMatches(owner, seen.stat, seen.args)) throw new Error('New Java process ownership not established');
                       fs.writeFileSync(ownerFile, JSON.stringify(owner) + '\n', { flag: 'wx' }); ownerCommitted = true;
@@ -235,18 +250,19 @@ jobs:
           }
           main().catch(error => { console.error('Owned JVM diagnostic command failed; no unverified process was adopted: ' + String(error && (error.code || error.message) || 'unknown').slice(0, 200)); process.exitCode = 1; });
           NODE
-      - name: បើក JVM512 ថ្មី និងផ្ទៀង ownership
+      - name: បើក JVM តាម matrix និងផ្ទៀង ownership
         env:
           F03_DIAGNOSTIC_ORDER: ${{ matrix.order }}
+          F03_DIAGNOSTIC_HEAP_MIB: ${{ matrix.heap_mib }}
           F03_EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$F03_EXPECTED_HEAD"
-          printf 'F03 diagnostic checkout=%s; order=%s\n' "$F03_EXPECTED_HEAD" "$F03_DIAGNOSTIC_ORDER"
+          printf 'F03 capacity hypothesis only; checkout=%s; order=%s; heapMiB=%s; ordinary JVM512 gate unchanged\n' "$F03_EXPECTED_HEAD" "$F03_DIAGNOSTIC_ORDER" "$F03_DIAGNOSTIC_HEAP_MIB"
           sha256sum audit-tools/emu/registry-purge-atomic-sdk-test.js firebase-database.rules.json
           PORT=$(node "$F03_DIAG_DIR/owned-jvm.cjs" port "$F03_DIAG_DIR")
           JAR=$(realpath "${ZOE_RTDB_JAR:?RTDB JAR unavailable}")
-          env -u JAVA_TOOL_OPTIONS -u JDK_JAVA_OPTIONS -u _JAVA_OPTIONS node "$F03_DIAG_DIR/owned-jvm.cjs" launch "$F03_DIAG_DIR" "$PORT" "$JAR"
+          env -u JAVA_TOOL_OPTIONS -u JDK_JAVA_OPTIONS -u _JAVA_OPTIONS node "$F03_DIAG_DIR/owned-jvm.cjs" launch "$F03_DIAG_DIR" "$PORT" "$JAR" "$F03_DIAGNOSTIC_HEAP_MIB"
           echo "F03_NATIVE_EMULATOR_URL=http://127.0.0.1:$PORT" >> "$GITHUB_ENV"
           for attempt in $(seq 1 60); do
             if node "$F03_DIAG_DIR/owned-jvm.cjs" ready "$F03_DIAG_DIR" 2>/dev/null &&
@@ -289,3 +305,18 @@ jobs:
               fi
             done
           fi
+      - name: រក្សាភស្តុតាង heap ទាំងអស់ដោយមិនប្តូរលទ្ធផល
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: f03-heap-${{ matrix.heap_mib }}-order-${{ matrix.order }}-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            ${{ env.F03_DIAG_DIR }}/owner.json
+            ${{ env.F03_DIAG_DIR }}/sampler-owner.json
+            ${{ env.F03_DIAG_DIR }}/jvm-samples.jsonl
+            ${{ env.F03_DIAG_DIR }}/sampler-result.json
+            ${{ env.F03_DIAG_DIR }}/jvm-gc.log
+            ${{ env.F03_DIAG_DIR }}/jvm-gc.log.0
+            ${{ env.F03_DIAG_DIR }}/parity.json

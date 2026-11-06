@@ -744,6 +744,14 @@
       ],
       "evidence": "ពិនិត្យ SHA-256 នៃ runner ភស្តុតាង ZTO/native និង controls; កែ bytes ត្រូវ review hash ដោយចេតនា។",
       "limitation": "Hash មិនបញ្ជាក់ថាតេស្តរត់បៃតងទេ; job ដាច់ក្នុង Audit រត់ controls និង Vitest ពិត ហើយរក្សា JSON។"
+    },
+    "source-function-report": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/zoew-suite-test.js"
+      ],
+      "evidence": "zoew-suite រត់ source-function-reachability.test.ts ដែលវាស់ graph និង CLI ពិតលើ TypeScript fixtures; ផ្ទៀង binding, root, unknown និង source hash។",
+      "limitation": "Report-only សម្រាប់ private top-level named functions; មិនជំនួស function-surface gate ហើយមិនបញ្ជាក់សិទ្ធិលុប។"
     }
   },
   "files": {
@@ -3418,6 +3426,9 @@
     "ZoeW/tests/audit-lookup-retry-session.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/f03-heap-diagnostic.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/retry-shared-contract.test.ts": {
       "policy": "zoew-self-verification"
     },
@@ -4785,6 +4796,12 @@
       "policy": "zto-ci-evidence-integrity",
       "encoding": "lf-text",
       "sha256": "23e49f3fd5ba842a2def3e0cec347c474028610343f9d4e910566685ab1d8ca8"
+    },
+    "ZoeW/scripts/source-function-reachability.mjs": {
+      "policy": "source-function-report"
+    },
+    "ZoeW/tests/source-function-reachability.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

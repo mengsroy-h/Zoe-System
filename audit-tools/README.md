@@ -37,6 +37,8 @@
 
 ## របៀបប្រើប្រាស់
 
+សម្រាប់របាយការណ៍ function ពី TypeScript source ដើម រត់ `node ZoeW/scripts/source-function-reachability.mjs [tsconfig.app.json] [source-root]` ពី root repo។ លំនាំដើមវាស់ `ZoeW/src` ជាមួយ config របស់ app; មិនរត់ជា gate ក្នុង `run-all.sh` ទេ។ JSON បែងចែក `retained`, `candidate`, `unknown`; `candidate` មិនមែនជាសិទ្ធិលុប។ Public exports ត្រូវរក្សាទុកដោយប្រុងប្រយ័ត្ន។ Input មិនពេញលេញ ឬ dynamic scope ដែលមិនគាំទ្រ ចេញ code 2; source hashes ជា snapshot មិនមែនជំនួស backend/browser ឬ generated audit consumer verification ទេ។
+
 ### ១. ដំឡើង dependency (ម្តងក្នុងមួយ session)
 
 ```bash

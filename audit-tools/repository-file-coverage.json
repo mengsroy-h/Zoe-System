@@ -736,6 +736,14 @@
       ],
       "evidence": "Runs the server-time handler with GET, invalid nonce/methods and web/native origin inputs.",
       "limitation": "Local handler execution does not prove deployed Netlify routing, CSP, or native WebViews."
+    },
+    "zto-ci-evidence-integrity": {
+      "category": "integrity",
+      "guards": [
+        "audit-tools/repository-file-coverage.js"
+      ],
+      "evidence": "ពិនិត្យ SHA-256 នៃ runner ភស្តុតាង ZTO/native និង controls; កែ bytes ត្រូវ review hash ដោយចេតនា។",
+      "limitation": "Hash មិនបញ្ជាក់ថាតេស្តរត់បៃតងទេ; job ដាច់ក្នុង Audit រត់ controls និង Vitest ពិត ហើយរក្សា JSON។"
     }
   },
   "files": {
@@ -3410,6 +3418,9 @@
     "ZoeW/tests/audit-lookup-retry-session.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/retry-shared-contract.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/retry-operation-owner.test.ts": {
       "policy": "zoew-self-verification"
     },
@@ -4764,6 +4775,16 @@
     },
     "ZoeW/tests/zto-returned-projection-lifecycle.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/zto-ci-evidence.mjs": {
+      "policy": "zto-ci-evidence-integrity",
+      "encoding": "lf-text",
+      "sha256": "fbf2b22f412cb79a7b0f78c9593cda5f9ca421fcf5cd6fd2ac0a9c4f89893cc9"
+    },
+    "ZoeW/scripts/tests/zto-ci-evidence.test.mjs": {
+      "policy": "zto-ci-evidence-integrity",
+      "encoding": "lf-text",
+      "sha256": "23e49f3fd5ba842a2def3e0cec347c474028610343f9d4e910566685ab1d8ca8"
     }
   }
 }

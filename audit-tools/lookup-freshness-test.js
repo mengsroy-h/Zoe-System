@@ -399,12 +399,13 @@ scenario('ប៊ូតុង 🔄 ក្នុងតារាងអតិថិ�
 });
 
 // === ឃ. ការទាញឡើងវិញពេលខកខាន — អះអាង ២ ខាង ===
-scenario('ខកខាន ➜ តាំងម៉ោងទាញឡើងវិញ (ខាងវិជ្ជមាន)', () => {
+scenario('ខកខាន ➜ តាំងម៉ោងទាញឡើងវិញ (ខាងវិជ្ជមាន)', async () => {
     const ctx = build({});
     ok('តារាងទទេ ➜ ត្រូវការទាញឡើងវិញ', vm.runInContext('customerTableNeedsRefresh() === true', ctx));
     vm.runInContext('scheduleCustomerTableSoonRefresh();', ctx);
     ok('តាំងម៉ោងរួច', vm.runInContext('customerTableSoonTimer !== null', ctx));
     ctx.__clock.advance(vm.runInContext('CUSTOMER_TABLE_SOON_MS', ctx) + 1);
+    await vm.runInContext('customerDataTableFetchPromise', ctx);
     ok('ទំនេរ ➜ ការទាញបាញ់ពិត', ctx.__net.urls.length === 1, ctx.__net.urls);
     ok('ការទាញនោះស្នើទិន្នន័យស្រស់', ctx.__net.urls.length === 1 && ctx.__net.urls[0].indexOf('fresh=1') !== -1, ctx.__net.urls);
 });
@@ -419,7 +420,7 @@ scenario('ទិសផ្ទុយ ៖ តារាងស្រស់ និង�
     ok('តារាងមិនពេញលេញ ➜ តាំងម៉ោងវិញ', vm.runInContext('customerTableSoonTimer !== null', ctx));
 });
 
-scenario('រវល់ ➜ ពន្យារ មិនមែនបោះបង់', () => {
+scenario('រវល់ ➜ ពន្យារ មិនមែនបោះបង់', async () => {
     const ctx = build({ isModalOpen: true });
     vm.runInContext('scheduleCustomerTableSoonRefresh();', ctx);
     ctx.__clock.advance(vm.runInContext('CUSTOMER_TABLE_SOON_MS', ctx) + 1);
@@ -427,6 +428,7 @@ scenario('រវល់ ➜ ពន្យារ មិនមែនបោះបង�
     ok('នៅតែមាននាឡិកាពន្យារ', vm.runInContext('customerTableSoonTimer !== null', ctx));
     vm.runInContext('isModalOpen = false;', ctx);
     ctx.__clock.advance(vm.runInContext('CUSTOMER_TABLE_SOON_BUSY_MS', ctx) + 1);
+    await vm.runInContext('customerDataTableFetchPromise', ctx);
     ok('ប្រអប់បិទ ➜ បាញ់ភ្លាម', ctx.__net.urls.length === 1, ctx.__net.urls);
 });
 
@@ -443,7 +445,7 @@ scenario('ការពន្យារមានពិដាន — មិនភ�
 // ⛔ ការទាញឡើងវិញមិនត្រូវរំលង cooldown ក្រោយបរាជ័យ — បើរំលង នោះការស្កេន
 // ជាបន្តបន្ទាប់លើ server ដែលធ្លាក់ បង្កើតការទាញពេញ ២០ វិនាទីម្តងហើយម្តងទៀត
 // ➜ **យឺតជាងមុន** ហើយជណ្តើរព្យាយាមវិញក្លាយជាគ្មានប្រយោជន៍។
-scenario('ទើបធ្លាក់ ➜ ទុកឲ្យជណ្តើរធ្វើ មិនវាយម្តងទៀតភ្លាម', () => {
+scenario('ទើបធ្លាក់ ➜ ទុកឲ្យជណ្តើរធ្វើ មិនវាយម្តងទៀតភ្លាម', async () => {
     const hot = build({});
     vm.runInContext('customerDataTableLastFailedAt = Date.now(); scheduleCustomerTableSoonRefresh(true);', hot);
     hot.__clock.advance(vm.runInContext('CUSTOMER_TABLE_SOON_MS', hot) + 1);
@@ -451,6 +453,7 @@ scenario('ទើបធ្លាក់ ➜ ទុកឲ្យជណ្តើរ�
     const cool = build({});
     vm.runInContext('customerDataTableLastFailedAt = Date.now() - (CUSTOMER_TABLE_FAIL_COOLDOWN_MS + 1000); scheduleCustomerTableSoonRefresh(true);', cool);
     cool.__clock.advance(vm.runInContext('CUSTOMER_TABLE_SOON_MS', cool) + 1);
+    await vm.runInContext('customerDataTableFetchPromise', cool);
     ok('ទិសផ្ទុយ ៖ ហួស cooldown ➜ ទាញវិញធម្មតា', cool.__net.urls.length === 1, cool.__net.urls);
 });
 

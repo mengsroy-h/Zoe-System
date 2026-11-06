@@ -24,6 +24,82 @@ permissions:
   contents: read
 
 jobs:
+  # ភស្តុតាងដាច់ពី run-all៖ មិនជំនួសសោ ឬអ្នកយាម browser ក្នុង Audit ទេ។
+  zto-native-evidence:
+    name: ភស្តុតាង ZTO/native
+    if: (vars.ZOE_RUNNER_MODE == 'github' || github.event.repository.private == true) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && !(github.event_name == 'workflow_dispatch' && inputs.multishop_scale)
+    runs-on: ${{ fromJSON(vars.ZOE_RUNNER_MODE == 'github' && '["ubuntu-latest"]' || '["self-hosted","Linux","X64","wsl-zoe-audit"]') }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v7
+        if: vars.ZOE_RUNNER_MODE == 'github'
+        with:
+          node-version: '24'
+          package-manager-cache: false
+          cache: npm
+          cache-dependency-path: ZoeW/package-lock.json
+      - uses: actions/setup-java@v6
+        if: vars.ZOE_RUNNER_MODE == 'github'
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: ផ្ទៀង Node
+        run: node -e 'if (Number(process.versions.node.split(".")[0]) !== 24) process.exit(1)'
+      - name: ត្រៀម browser និង emulator cache រួមសម្រាប់ Linux runners
+        if: vars.ZOE_RUNNER_MODE != 'github'
+        run: bash tools/actions-runners/prepare-audit-cache.sh init
+
+      - name: ដំឡើង dependency
+        run: |
+          PW_VERSION=$(node -p "require('./ZoeW/package-lock.json').packages['node_modules/playwright-core'].version")
+          npm install --prefer-offline --no-save --no-audit --no-fund acorn "playwright-core@$PW_VERSION" "playwright@$PW_VERSION"
+
+      - name: ទាញ Chromium លើម៉ាស៊ីនអ្នក
+        if: vars.ZOE_RUNNER_MODE != 'github'
+        run: bash tools/actions-runners/prepare-audit-cache.sh chromium
+
+      - name: ត្រៀម Chromium លើម៉ាស៊ីន GitHub
+        if: vars.ZOE_RUNNER_MODE == 'github'
+        run: |
+          npx --no-install playwright install --with-deps chromium
+          sudo mkdir -p /opt/pw-browsers/chromium-1194
+          sudo chown -R "$(id -u):$(id -g)" /opt/pw-browsers
+
+      # តេស្ត browser រកមើល Chromium នៅផ្លូវថេរមួយ (ដូចបរិស្ថាន audit ដើម)។
+      # ដូច្នេះ symlink វាទៅផ្លូវនោះ ជំនួសការកែឯកសារ ២០។
+      - name: ភ្ជាប់ Chromium ទៅផ្លូវដែលតេស្តរំពឹងទុក
+        run: |
+          set -euo pipefail
+          SRC=$(node -e "process.stdout.write(require('playwright-core').chromium.executablePath())")
+          if [ ! -x "$SRC" ]; then echo "❌ រក Chromium មិនឃើញ"; exit 1; fi
+          echo "chromium: $SRC"
+          mkdir -p /opt/pw-browsers/chromium-1194
+          ln -sfn "$(dirname "$SRC")" /opt/pw-browsers/chromium-1194/chrome-linux
+          test -x /opt/pw-browsers/chromium-1194/chrome-linux/chrome
+          # ZoeW React (`ZoeW/scripts/*.mjs` ៖ smoke · sw-check · native-check) ប្រើផ្លូវ `/opt/pw-browsers/chromium`
+          ln -sfn /opt/pw-browsers/chromium-1194/chrome-linux/chrome /opt/pw-browsers/chromium
+          test -x /opt/pw-browsers/chromium
+
+      - name: ដំឡើង dependency របស់ ZoeW
+        run: npm ci --prefix ZoeW --prefer-offline --no-audit --no-fund
+      - name: ផ្ទៀងការទទួល និងបដិសេធរបាយការណ៍
+        run: node --test ZoeW/scripts/tests/zto-ci-evidence.test.mjs
+      - name: វាស់ ZTO/native ដោយមិនប៉ះសោ
+        env:
+          ZTO_EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: node ZoeW/scripts/zto-ci-evidence.mjs
+      - name: រក្សាភស្តុតាង ZTO/native
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: zto-native-evidence-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ZoeW/test-results/zto-ci-evidence/
+          if-no-files-found: error
+          retention-days: 14
+
   # ⛔ runner GitHub (repo ឯកជន) មាន CPU ២ ➜ run-all.sh ពេញមួយ job ចំណាយ ~២៣ នាទី (lane 2 · meta រត់ម្នាក់ឯង) ខណៈ session
   #    (CPU ៤) ~១០ នាទី។ ការកែ ៖ បែងចែកបញ្ជីទៅ job ស្របគ្នា `RUNALL_SHARD=k/N` (`run-all.sh` ៖ LPT តាម RUNALL_HINTS ➜ ផ្នែក
   #    ទាំង N មិនជាន់ · មិនខ្វះ តាមរចនាសម្ព័ន្ធ · runall-runner-test ផ្ទៀង matrix ខាងក្រោម ↔ N)។

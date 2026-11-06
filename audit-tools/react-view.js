@@ -402,7 +402,7 @@ function reactRuntime(src, options) {
     if (websocketState && !exclude.has('websocketObservation')) parts.push(websocketState[0].trim());
     parts.push('if (typeof window !== "undefined" && typeof localStorage !== "undefined" && typeof window.localStorage === "undefined") window.localStorage = localStorage;');
     parts.push('if (typeof window !== "undefined" && typeof sessionStorage !== "undefined" && typeof window.sessionStorage === "undefined") window.sessionStorage = sessionStorage;');
-    const connectionHelpers = ['captureConnectionOperation', 'connectionFlowSnapshot', 'nativeWriteRecoveryState', 'withConnectionOwnership'];
+    const connectionHelpers = ['captureConnectionOperation', 'captureLookupOperation', 'connectionFlowSnapshot', 'nativeWriteRecoveryState', 'withConnectionOwnership'];
     if (connectionHelpers.some(name => sliceFunction(src, name))) {
         for (const name of ['nativeRecoveryStates', 'connectionLeases', 'stopConnectionLeaseObserver']) {
             if (exclude.has(name)) continue;
@@ -410,7 +410,7 @@ function reactRuntime(src, options) {
             if (decl) parts.push(decl[0].trim());
         }
         for (const name of ['auth', 'db', 'fb', 'authGeneration', 'firebaseConfig', 'hasEverConnectedToDatabase', 'firebaseSdkUnavailable', 'isInitializingFirebase',
-            'sessionExpiryCheck', 'authLoginOperation', 'isDatabaseInitialized', 'isDatabaseConnected', 'dbListenersFailed']) {
+            'sessionExpiryCheck', 'authLoginOperation', 'lookupSecretKey', 'isDatabaseInitialized', 'isDatabaseConnected', 'dbListenersFailed']) {
             const decl = new RegExp('^\\s*let ' + name + ' = ([^;]+);', 'm').exec(src);
             if (decl) parts.push('if (typeof ' + name + ' === "undefined") globalThis.' + name + ' = ' + decl[1] + ';');
         }

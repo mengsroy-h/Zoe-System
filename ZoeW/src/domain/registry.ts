@@ -1,3 +1,4 @@
+import { captureConnectionOperation } from '../services/connection-flow';
 import { createScratchCanvas, loadScratchImage } from '../platform/document-io';
 import { dataState, firebaseState, scanState } from '../core/state';
 import { REGISTRY_RELEASE_QUEUE_MAX, REGISTRY_RELEASE_RETRY_MAX, pendingRegistryReleases } from '../core/clock';
@@ -132,7 +133,7 @@ export function releaseBarcodesInRegistry(codes) {
             if (!done) throw new Error('REGISTRY_RELEASE_FAILED');
             return true;
         });
-    }, 3, 1200).then((done) => {
+    }, 3, 1200, captureConnectionOperation()).then((done) => {
         if (!current() || done !== true) return false;
         keys.forEach((key) => pendingRegistryReleases.delete(key));
         return true;

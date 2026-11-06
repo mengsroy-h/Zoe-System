@@ -1,3 +1,4 @@
+import { captureConnectionOperation } from '../services/connection-flow';
 import { trashConsumptionSame, trashConsumptionValid, trashGenerationOf, trashSourceUnconsumed } from './trash-generation';
 import { allocateTrashGeneration, captureTrashGenerationOwner, readTrashConsumption, trashGenerationOwnerCurrent } from '../services/trash-generation';
 import { purgeTrashWithRegistry } from '../services/registry-purge';
@@ -458,7 +459,7 @@ export async function settleCleanupDeduction(itemId, trashItem, rev, decideGone,
     const settleIsCurrent = () => firebaseState.db === settleDb && firebaseState.authGeneration === settleGeneration;
     let verdict;
     try {
-        verdict = await retryAsync(() => (settleIsCurrent() ? dbOp(markCleanupTrashDeducted(trashItem)) : Promise.reject(Object.assign(new Error('Cleanup session changed'), { noRetry: true }))), 3, 1500);
+        verdict = await retryAsync(() => (settleIsCurrent() ? dbOp(markCleanupTrashDeducted(trashItem)) : Promise.reject(Object.assign(new Error('Cleanup session changed'), { noRetry: true }))), 3, 1500, captureConnectionOperation());
     } catch (flipErr) {
         return false;
     }
@@ -595,7 +596,7 @@ export async function resolveCleanupSlot(trashItem, sourceId?, owner = captureTr
     if (back === null) return 'wait';
     if (back) return 'elsewhere';
     try {
-        const claimed = await retryAsync(() => (slotIsCurrent() ? claimCleanupTrashSlot(trashItem, undefined, undefined, owner) : Promise.reject(Object.assign(new Error('Cleanup session changed'), { noRetry: true }))), 3, 1500);
+        const claimed = await retryAsync(() => (slotIsCurrent() ? claimCleanupTrashSlot(trashItem, undefined, undefined, owner) : Promise.reject(Object.assign(new Error('Cleanup session changed'), { noRetry: true }))), 3, 1500, captureConnectionOperation());
         if (!slotIsCurrent()) return 'wait';
         return claimed ? 'claimed' : 'elsewhere';
     } catch (claimErr) {
@@ -1001,7 +1002,7 @@ export async function resumeCleanupJournalEntry(trashId) {
             return '';
         }
         try {
-            await notifyIfSlow(retryAsync(() => (resumeIsCurrent() ? dbOp(saveSingleDeletedItemToFirebase(trashItem)) : Promise.reject(Object.assign(new Error('Cleanup session changed'), { noRetry: true }))), 3, 1500),
+            await notifyIfSlow(retryAsync(() => (resumeIsCurrent() ? dbOp(saveSingleDeletedItemToFirebase(trashItem)) : Promise.reject(Object.assign(new Error('Cleanup session changed'), { noRetry: true }))), 3, 1500, captureConnectionOperation()),
                 TRASH_WRITE_SLOW_NOTICE_MS,
                 "⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងបញ្ចប់ការសម្អាតដែលត្រូវរំខានពីមុន… សូមកុំបិទ App។");
             outcome = 'restored';
@@ -1125,7 +1126,7 @@ export async function restoreClaimedItemToScanHistory(id, claimedWhole, claimedP
             delete updated.closedAt;
         }
         return updated;
-    }))), 3, 1500).then((result) => {
+    }))), 3, 1500, captureConnectionOperation()).then((result) => {
         if (clearClaimBlocked || !result || !result.committed) throw new Error('CLEAR_HISTORY_IN_PROGRESS');
         return result;
     });
@@ -1516,7 +1517,7 @@ export async function claimAndCleanupItem(id, reason, opts?) {
             let trashElsewhere = false;
             const writeTrash = () => (cleanupIsCurrent() ? claimCleanupTrashSlot(trashItem, false, operation, generationOwner) : Promise.reject(Object.assign(new Error('Cleanup session changed'), { noRetry: true })))
                 .then((claimed) => { trashElsewhere = !claimed; });
-            await notifyIfSlow(retryAsync(writeTrash, 4, 1500),
+            await notifyIfSlow(retryAsync(writeTrash, 4, 1500, captureConnectionOperation()),
                 TRASH_WRITE_SLOW_NOTICE_MS,
                 "⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងរក្សាទុកការសម្អាតស្វ័យប្រវត្តិ… សូមកុំបិទ App។").then(() => {
                 trashSaved = true;

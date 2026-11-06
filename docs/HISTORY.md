@@ -120,9 +120,9 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.50.186] — 2026-11-06 · សុវត្ថិភាពវគ្គស្វែងរក និងសាខា Palm
+### [2.50.186] · ZoeKeyGen [2.24.36] — 2026-11-06 · សុវត្ថិភាពវគ្គស្វែងរក និងសាខា Palm
 
-ZoeW `2.50.186` (`zoew-v450`) · ZoeKeyGen ដដែល។ ម្ចាស់គម្រោងស្នើ «ចាំអ្វីដែលរកឃើញដោយការ audit កែហើយបញ្ចូលក្នុង​ PR393 ហ្មងទៅ ហើយ merge តែមួយដងជាការស្រេច»។ Lookup ចាប់វគ្គគណនី/config/key មុនដោះសោ credential ផ្ទៀងមុនផ្ញើ និងមុនប្រើចម្លើយ; retry រក្សាម្ចាស់ដើម។ ការងារចាស់មិនសរសេរលើ status ឬ promise របស់ការងារថ្មី។ Palm ផ្ទៀង site ក្នុង Blob ជាមួយ slot និងសាខាពេល Login ឡើងវិញជាមួយសាខាដើម; site បាត់ ឬប្តូរ ត្រូវបដិសេធ មិនយក token ទៅសាខាចាស់។ Blob សរសេរមិនបានរក្សាទិន្នន័យដើម ហើយមិនអះអាងថារក្សាសញ្ញាបដិសេធបានទេ។
+ZoeW `2.50.186` (`zoew-v450`) · ZoeKeyGen `2.24.36` (`zoekeygen-v147`)។ Retry រួមទទួល lease ជាជម្រើស; caller ZoeW ទាំង១០ផ្ដល់ម្ចាស់វគ្គច្បាស់លាស់ ហើយ caller ZoeKeyGen រក្សា API បីប៉ារ៉ាម៉ែត្រ និងឥរិយាបថ retry ដដែល។ ម្ចាស់គម្រោងស្នើ «ចាំអ្វីដែលរកឃើញដោយការ audit កែហើយបញ្ចូលក្នុង​ PR393 ហ្មងទៅ ហើយ merge តែមួយដងជាការស្រេច»។ Lookup ចាប់វគ្គគណនី/config/key មុនដោះសោ credential ផ្ទៀងមុនផ្ញើ និងមុនប្រើចម្លើយ; retry រក្សាម្ចាស់ដើម។ ការងារចាស់មិនសរសេរលើ status ឬ promise របស់ការងារថ្មី។ Palm ផ្ទៀង site ក្នុង Blob ជាមួយ slot និងសាខាពេល Login ឡើងវិញជាមួយសាខាដើម; site បាត់ ឬប្តូរ ត្រូវបដិសេធ មិនយក token ទៅសាខាចាស់។ Blob សរសេរមិនបានរក្សាទិន្នន័យដើម ហើយមិនអះអាងថារក្សាសញ្ញាបដិសេធបានទេ។
 
 Regression លើ `21069590` មុនកែ៖ ២៥ ធ្លាក់ និង១៣២ ជាប់ ក្នុង៤ files; ក្នុងនោះ Lookup/retry ធ្លាក់១៨ និង Palm ធ្លាក់៧។ Reminder ជាតេស្តបញ្ជាក់ឥរិយាបថបច្ចុប្បន្ន មិនប្តូរការផ្ញើឡើងវិញក្រោយ claim ទេ។ ការសាកប្រើ fixture គ្មាន credential ឬទិន្នន័យ ZTO ពិត។
 
@@ -1957,6 +1957,13 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+
+### 2026-11-06 · កែ harness ក្រោយ CI audit PR393
+
+CI លើ `b8730810` រកឃើញ fixture ដែលមិនផ្ទុក helper វគ្គ Lookup/connection និង restore-resume ពិត; ការបរាជ័យមុន assertions មិនមែនភស្តុតាង mutation ទេ។ Runtime ផ្ទុក helper ពិត និង fixture state ហើយអ្នកយាមរក្សា assertions ដដែល។ ការសាកតារាងដែលចាប់ផ្តើមតាម microtask រង់ចាំ promise របស់ការងារនោះ មិនបន្ថែម timeout ឬបន្ថយកម្រិតទេ។ `audit-module-runtime-scope.test.ts` ប្រើប្រភពពិតវាស់ config/key/session៖ មុនកែធ្លាក់ missing helper; ក្រោយកែជាប់។ `retry-shared-contract.test.ts` ផ្ទៀង caller ZoeW ទាំង១០ និង API បីប៉ារ៉ាម៉ែត្ររបស់ ZoeKeyGen រួមចន្លោះ retry, noRetry និង lease ផុត។
+
+ការវាស់ local ប្រើ source view និង SSR stage ពិតដោយឡែក; មិនមែន browser build ពេញ។ Lock ZTO នៅដដែល ហើយ CI និង browser/emulator ដែលខ្វះត្រូវផ្ទៀងលើ commit ចុងក្រោយ; មិនយក baseline crash ជាលទ្ធផល mutation ជោគជ័យទេ។
 
 
 ### 2026-11-06 · PR393 — ឯកសារប្រតិបត្តិការ និងរបាយការណ៍ audit
@@ -4496,6 +4503,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/audit-checker-outcomes.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/audit-daily-report.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/audit-lifecycle.test.ts` | — | ផ្នែក ៨ |
+| `ZoeW/tests/audit-module-runtime-scope.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/audit-poison-reachability.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/auth-flow-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/backend-modal-ownership.test.ts` | ផ្នែក ២ | — |
@@ -4680,6 +4688,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/restore-prepared-retry.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/restore-resync-read-gate.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/restore-terminal-cancel.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/retry-shared-contract.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/rtdb-websocket-only.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/scan-camera-session.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/scan-engine-recovery.test.ts` | — | ផ្នែក ៨ |

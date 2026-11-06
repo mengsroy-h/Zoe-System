@@ -1,3 +1,4 @@
+import { captureConnectionOperation } from '../services/connection-flow';
 import { captureTrashGenerationOwner, trashGenerationOwnerCurrent } from '../services/trash-generation';
 import { rowOperationActive } from '../services/row-operation-lock';
 import { fieldValue, focusField, setFieldValue } from '../app/refs';
@@ -503,7 +504,7 @@ export async function deleteSingleItem(id, opts?) {
         updateRecentPhonesList();
 
         let trashSaved = false;
-        await notifyIfSlow(retryAsync(() => (deleteIsCurrent() ? claimCleanupTrashSlot(removed, false, operation, generationOwner) : Promise.reject(Object.assign(new Error('Delete session changed'), { noRetry: true }))), 4, 1500),
+        await notifyIfSlow(retryAsync(() => (deleteIsCurrent() ? claimCleanupTrashSlot(removed, false, operation, generationOwner) : Promise.reject(Object.assign(new Error('Delete session changed'), { noRetry: true }))), 4, 1500, captureConnectionOperation()),
             TRASH_WRITE_SLOW_NOTICE_MS,
             "⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងរក្សាទុកការលុប… សូមកុំបិទ App។").then(() => {
             trashSaved = true;

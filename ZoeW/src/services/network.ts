@@ -258,10 +258,9 @@ export function fetchWithTimeout(url, options, ms, timeoutMsg, readBody?): Promi
     });
 }
 
-export function retryAsync(fn, attempts, delayMs) {
-    const lease = captureConnectionOperation();
+export function retryAsync(fn, attempts, delayMs, lease = null) {
     const run = (remaining, delay) => {
-        if (!lease.current()) return Promise.reject(Object.assign(new Error('Connection session changed'), { code: 'CONNECTION_SCOPE_CHANGED', noRetry: true }));
+        if (lease && !lease.current()) return Promise.reject(Object.assign(new Error('Connection session changed'), { code: 'CONNECTION_SCOPE_CHANGED', noRetry: true }));
         return fn().catch((err) => {
             if (remaining <= 1 || (err && err.noRetry)) throw err;
             return new Promise((resolve) => setTimeout(resolve, delay)).then(() => run(remaining - 1, delay * 2));

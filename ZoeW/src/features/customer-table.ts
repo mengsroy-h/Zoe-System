@@ -1,3 +1,4 @@
+import { captureConnectionOperation } from '../services/connection-flow';
 import { fieldValue } from '../app/refs';
 import { viewState } from '../core/view-state';
 import { lookupState } from '../core/state';
@@ -62,7 +63,7 @@ export async function fetchCustomerDataTableRows(force?, wantFresh?) {
                     return fetchWithTimeout(keyedUrl, { headers }, 20000, 'Customer table fetch timed out',
                         (r) => (r.ok ? r.json() : null)).then((out) => { operation.assertCurrent(); return retryTransientLookupResponse(out); });
                 },
-                2, 2000
+                2, 2000, captureConnectionOperation()
             );
             operation.assertCurrent();
             if (!out.res.ok) throw new Error('HTTP ' + out.res.status);

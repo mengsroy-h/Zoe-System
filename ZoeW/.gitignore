@@ -9,3 +9,6 @@ tools/_*
 .native-check-dist
 .rules-check-dist
 .history-window-check-dist
+
+# ភស្តុតាង CI ដែល upload ជា artifact
+/test-results/zto-ci-evidence/

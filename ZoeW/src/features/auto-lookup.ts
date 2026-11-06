@@ -1,3 +1,4 @@
+import { captureConnectionOperation } from '../services/connection-flow';
 import { activeElementIsInModal, activeElementIsTextField, fieldValue, focusField, setFieldValue } from '../app/refs';
 import { viewState } from '../core/view-state';
 import { lookupState, scanState, uiState } from '../core/state';
@@ -404,7 +405,7 @@ export async function attemptAutoLookup(barcode) {
                     return o;
                 });
             },
-            2, isZtoLookup ? 350 : 1500
+            2, isZtoLookup ? 350 : 1500, captureConnectionOperation()
         );
         operation.assertCurrent();
         const data = out.body;

@@ -455,10 +455,11 @@
         if (!priority && networkLooksDown()) return false;
         try {
             const pending = sharedRequest('time', priority,
-                () => fetchWithBodyTimeout(LICENSE_DB_URL.replace(/\/+$/, '') + '/.json?shallow=true', (r) => r.text()));
+                () => fetchWithBodyTimeout(LICENSE_DB_URL.replace(/\/+$/, '') + '/license_announcements/ZOE.json?shallow=true', (r) => r.text()));
             if (!pending) return false;
             const out = await pending;
             const res = out.res;
+            if (!res.ok) return false;
             const dateHeader = res.headers.get('Date');
             if (!dateHeader) return false;
             const serverMs = new Date(dateHeader).getTime();

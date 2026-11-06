@@ -216,13 +216,19 @@ it('one bounded budget removes queued work but retains a genuinely live native e
     const first=await admitted('MONTH_HUNG_FIRST');const second=await admitted('MONTH_HUNG_WAIT');
     let release!:()=>void;monthGate=new Promise<void>(resolve=>release=resolve);
     vi.useFakeTimers();
+    const timers = vi.spyOn(globalThis, 'setTimeout');
+    const budgetsStarted = () => timers.mock.calls.filter(([, delay]) => delay === DB_OP_TIMEOUT_MS).length;
     const a=saveScanOperation(first,'0910000001','N/A',0);const b=saveScanOperation(second,'0910000002','N/A',0);
-    await waitForRealCondition(()=>monthStarts===1,'hung native reserve');
+    await waitForRealCondition(()=>monthStarts===1 && budgetsStarted()===2
+        && get('zoew_scan_operations/'+first.record.id)?.phase==='prepared'
+        && get('zoew_scan_operations/'+second.record.id)?.phase==='prepared','hung native reserve');
     await vi.advanceTimersByTimeAsync(DB_OP_TIMEOUT_MS);
     expect(await Promise.all([a,b])).toEqual(['unknown','unknown']);
     expect(monthStarts).toBe(1);expect(money()).toEqual([[10,0,1],[10,0,1]]);
-    const third=await admitted('MONTH_HUNG_LATER');const c=saveScanOperation(third,'0910000003','N/A',0);
-    await waitForRealCondition(()=>get('zoew_scan_operations/'+third.record.id)?.phase==='prepared','third prepared');
+    const third=await admitted('MONTH_HUNG_LATER');
+    const priorBudgets=budgetsStarted();const c=saveScanOperation(third,'0910000003','N/A',0);
+    await waitForRealCondition(()=>budgetsStarted()===priorBudgets+1
+        && get('zoew_scan_operations/'+third.record.id)?.phase==='prepared','third prepared');
     await vi.advanceTimersByTimeAsync(DB_OP_TIMEOUT_MS);
     expect(await c).toBe('unknown');expect(monthStarts).toBe(1);
     monthGate=null;release();await vi.advanceTimersByTimeAsync(1);

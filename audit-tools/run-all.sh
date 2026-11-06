@@ -215,7 +215,7 @@ RUNALL_OWNED_DIR=''
 runall_needs_rtdb() {
     case "$(runall_script_of "$@")" in
         audit-tools/emu/import-paired-ci-runner.js) return 1 ;; # runner owns an RTDB scope per profile
-        audit-tools/emu/*|audit-tools/money-guardian-test.js|audit-tools/supabase-scan-rules-test.js|audit-tools/money-checker-truthfulness-test.js|audit-tools/checker-coverage.js|audit-tools/exit-code-integrity.js) return 0 ;;
+        audit-tools/emu/*|audit-tools/scan-month-fixture-date-test.js|audit-tools/money-guardian-test.js|audit-tools/supabase-scan-rules-test.js|audit-tools/money-checker-truthfulness-test.js|audit-tools/checker-coverage.js|audit-tools/exit-code-integrity.js) return 0 ;;
         *) return 1 ;;
     esac
 }
@@ -260,7 +260,7 @@ runall_lane() {
     local s; s="$(runall_script_of "$@")"
     case "$s" in
         audit-tools/checker-coverage.js|audit-tools/exit-code-integrity.js|audit-tools/emu/registry-purge-atomic-sdk-test.js|audit-tools/zoew-suite-test.js|audit-tools/money-guardian-test.js) printf excl ;;
-        audit-tools/import-paired-ci-runner-test.js|audit-tools/emu/*|audit-tools/supabase-scan-rules-test.js|audit-tools/money-checker-truthfulness-test.js) printf emu ;;
+        audit-tools/import-paired-ci-runner-test.js|audit-tools/scan-month-fixture-date-test.js|audit-tools/emu/*|audit-tools/supabase-scan-rules-test.js|audit-tools/money-checker-truthfulness-test.js) printf emu ;;
         *) if [ -n "$s" ] && grep -q 'chromium\.launch(' "$s" 2>/dev/null; then printf browser; else printf any; fi ;;
     esac
 }
@@ -483,7 +483,7 @@ RUNALL_HINTS="emu/money-multidevice-emu-test:244 money-guardian-test:242 zoew-su
     emu/license-seat-rules-test:1 emu/restore-deadlock-test:1 export-cells-test:1 firebase-config-paste-test:1 google-sheets-cache-test:1
     html-sink-escaping:1 keygen-biometric-test:1 keygen-notice-test:1 keygen-pin-flow-test:1 keygen-session-security-test:1
     keylist-consistency-test:1 khmer-timezone-test:1 ledger-failed-apply-revert-test:1 license-app-code-test:1 license-clock-rollback-test:1
-    license-clock-trust-test:1 license-grace-test:1 license-network-pressure-test:1 license-record-race-test:1 listener-pending-key-test:1
+    license-clock-trust-test:1 license-time-endpoint-test:1 scan-month-fixture-date-test:1 scan-month-orchestration-test:1 license-grace-test:1 license-network-pressure-test:1 license-record-race-test:1 listener-pending-key-test:1
     locker-claim-guard-test:1 lookup-config-secret-test:1 monotonic-gate-test:1 monthly-ledger-agreement-test:1 monthly-report-test:1
     netlify-config-scope-test:1 partial-pickup-cleanup-test:1 payload-schema:1 phone-suggest-test:1 pickup-ledger-test:1
     pickup-reset-test:1 pin-prompt-test:1 policy-test:1 reconnect-ladder-test:1
@@ -940,7 +940,7 @@ runall_summary() {  # សេចក្តីសង្ខេប ៖ ពេល · F
 
 section "== តេស្តឥរិយាបថ (រត់កូដពិត ៖ ZoeW/src តាម audit build · ZoeKeyGen/app.js) =="
 for t in policy-test auth-recovery-test keylist-consistency-test \
-         license-grace-test license-clock-trust-test \
+         license-grace-test license-clock-trust-test license-time-endpoint-test scan-month-fixture-date-test scan-month-orchestration-test \
          license-clock-rollback-test license-record-race-test license-seat-test \
          cleanup-clock-guard-test returned-trash-retention-test khmer-timezone-test monotonic-gate-test \
          phone-suggest-test phone-search-swipe-test \
@@ -1225,6 +1225,9 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     CONNRECOVERY_APP_DIR="$BASE" node audit-tools/connection-recovery-test.js 2>&1 | tail -1 | sed 's/^/   conn-recovery:   /'
     LADDER_APP_DIR="$BASE" node audit-tools/reconnect-ladder-test.js 2>&1 | tail -1 | sed 's/^/   reconnect-ladder:/'
     LICENSECLOCK_APP_DIR="$BASE" node audit-tools/license-clock-trust-test.js 2>&1 | tail -1 | sed 's/^/   license-clock:   /'
+    SCANMONTHORCH_APP_DIR="$IMPORTPAIRED_BASE_SOURCE" node audit-tools/scan-month-orchestration-test.js 2>&1 | tail -1 | sed 's/^/   scan-month-orch: /'
+    SCANMONTHDATE_APP_DIR="$BASE" node audit-tools/scan-month-fixture-date-test.js 2>&1 | tail -1 | sed 's/^/   scan-month-date: /'
+    LICENSETIME_APP_DIR="$BASE" node audit-tools/license-time-endpoint-test.js 2>&1 | tail -1 | sed 's/^/   license-time:    /'
     CLEANUPCLOCK_APP_DIR="$BASE" node audit-tools/cleanup-clock-guard-test.js 2>&1 | tail -1 | sed 's/^/   cleanup-clock:   /'
     RETURNEDTRASH_APP_DIR="$BASE" node audit-tools/returned-trash-retention-test.js 2>&1 | tail -1 | sed 's/^/   returned-trash:  /'
     MONOGATE_APP_DIR="$BASE" node audit-tools/monotonic-gate-test.js 2>&1 | tail -1 | sed 's/^/   monotonic-gate:  /'

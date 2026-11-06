@@ -12,9 +12,7 @@ const { server, port } = await serveDir(DIST);
 
 const browser = await chromium.launch({ executablePath: process.env.ZOEW_TEST_BROWSER || '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
 const page = await browser.newPage();
-/* ⛔ smoke វាស់ boot របស់ build ⛔ មិនមែនបណ្តាញ ៖ ការហៅទៅក្រៅ (Sentry · SDK Firebase · License · fonts) ត្រូវផ្តាច់ ➜ ក្នុងស្រុក និង CI វាស់រឿងដដែល។
- *    បើអត់ លទ្ធផលអាស្រ័យលើបរិស្ថាន ៖ proxy ក្នុងស្រុកទប់ (`ERR_…` ➜ តម្រង) ចំណែក GitHub ទៅដល់ License Project ➜ `syncServerTime()` អាន root
- *    (`/.json?shallow=true` · rules default-deny ➜ 401 ដោយចេតនា ៖ វាត្រូវការតែ header `Date`) ➜ Chrome កត់ «Failed to load resource 401» ➜ smoke ក្រហម */
+/* smoke វាស់ boot ក្នុងស្រុក មិនវាស់បណ្ដាញខាងក្រៅ។ ផ្ដាច់សំណើខាងក្រៅឱ្យដូចគ្នាក្នុងស្រុក និង CI។ */
 await page.route((u) => !/^http:\/\/127\.0\.0\.1:/.test(u.href), (route) => route.abort('internetdisconnected'));
 const errors = [];
 function isExpectedConsoleNetworkError(message, resourceUrl) {

@@ -169,7 +169,8 @@
       "category": "behavior",
       "guards": [
         "audit-tools/license-network-pressure-test.js",
-        "audit-tools/license-clock-trust-test.js"
+        "audit-tools/license-clock-trust-test.js",
+        "audit-tools/license-time-endpoint-test.js"
       ],
       "evidence": "audit-tools/license-network-pressure-test.js និង license-clock-trust-test.js; byte-identical ទាំង 2 App",
       "limitation": "គ្របតែសេណារីយ៉ូ license/network/clock ដែលបានសាក។ មិនបញ្ជាក់ License Project ផលិតកម្ម។"
@@ -3819,6 +3820,9 @@
       "policy": "guard-1"
     },
     "audit-tools/license-clock-trust-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/license-time-endpoint-test.js": {
       "policy": "guard-1"
     },
     "audit-tools/license-grace-test.js": {

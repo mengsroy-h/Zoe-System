@@ -385,6 +385,7 @@ bash audit-tools/emu/rules.sh
 | `health-check-test.js` | 🩺 ពិនិត្យសុខភាពប្រព័ន្ធ ៖ **អានសុទ្ធសាធ** · មិនបង្ខំ PIN · «ពិនិត្យមិនបាន» ជា ⚠️ មិនមែន ❌ **និងទិសផ្ទុយ ៖ ✅ ក៏ត្រូវវាស់ដែរ** · secret មិនឡើងដល់ DOM · ផ្លូវ Apps Script មិនផ្ញើ header · `fetchWithTimeout` ពិត មិន stub · ចំនួនជួរដែលគូរពិត | `HEALTH_APP_DIR` |
 | `license-grace-test.js` | «ផ្ទៀងផ្ទាត់មិនបាន» ≠ «ហត្ថលេខាខុស» — កុំលុប record · Server ឆ្លើយ 5xx/429 · ការកក់ seat បាត់ដោយបណ្តាញ ➜ `ok: null` (មិនលុប · មិនមែន `seat-taken`) | `LICGRACE_APP_DIR` |
 | `license-clock-trust-test.js` | ទង់ «sync រួច» បើកតែដោយតម្លៃពី server ពិត | `LICENSECLOCK_APP_DIR` |
+| `license-time-endpoint-test.js` | Server time endpoint, response, offline និង concurrent requests សម្រាប់ App ទាំងពីរ | `LICENSETIME_APP_DIR` |
 | `license-clock-rollback-test.js` | ម៉ោងមិនអាចថយក្រោយ; Activate ត្រូវការសាលក្រម server | `LICROLLBACK_APP_DIR` |
 | `license-record-race-test.js` | សាលក្រម License ចាស់មិនលុប/សរសេរជាន់ activation ថ្មី ឬស្តារ record ដែលបានលុប; ECDSA ពិត និងវគ្គពីរចែក storage | `LICRACE_APP_DIR` |
 | `license-seat-test.js` | **Key ១ ➜ ឧបករណ៍តាមពិដាន** ៖ ពិដានលំនាំដើម ១ ➜ ឧបករណ៍ទី ២ បដិសេធ · ពិដាន ២ ➜ ឧបករណ៍ទី ២ ត្រូវបាន តែទី ៣ បដិសេធ · ការប្រណាំងរំកិលទៅ slot ទំនេរ · ឧបករណ៍ដដែល Activate ម្តងទៀតបាន · អានកៅអីមិនបាន ➜ **មិនលុប** record | `LICSEAT_APP_DIR` |

@@ -28,7 +28,14 @@ const { initializeApp, deleteApp, getApps } = require(path.join(deps, 'firebase/
 const database = require(path.join(deps, 'firebase/database'));
 const { createMockUserToken } = require(path.join(deps, '@firebase/util'));
 const H = 'zoew_scan_history_cod_dod', D = 'zoew_daily_revenue_cod_dod', M = 'zoew_monthly_revenue_cod_dod', R = 'zoew_barcode_registry';
-const day = '2026-10-30', month = '2026-10', stamp = Date.UTC(2026, 9, 30, 2), uid = 'scan-owner';
+function scanMonthFixtureDates(now) {
+    const at = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Phnom_Penh', year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).format(new Date(now - 4 * 3600000));
+    const day = at.slice(0, 10);
+    return { at, day, month: day.slice(0, 7), from: day, to: day };
+}
+const fixtureDates = scanMonthFixtureDates(Date.now());
+const { day, month } = fixtureDates, uid = 'scan-owner';
 const copy = value => JSON.parse(JSON.stringify(value));
 const apps=[];
 const modes=process.argv.slice(2);
@@ -157,13 +164,13 @@ export { ztoState, firebaseState, dataState, uiState } from './ZoeW/src/core/sta
         console.log('PASS scan-month-coordination-sdk --pickup-cleanup authoritative mirror gate, no cleanup money writes');
         await sdk.deleteApp(app);await window.happyDOM.close();return;
     }
-    const rows=Array.from({length:100},(_,index)=>({barcode:'SYNTHETIC'+index,phone:'09'+String(10000000+index%8),cod:[0.1,0.2,1.35,4.99,0,10][index%6],dod:0,at:'2026-10-30 09:00:00',ztoClosed:modes[0]==='--mixed'&&index%2===0,skip:'',from:'cn'}));
-    api.ztoState.ztoListSyncResult={verifiedAt:Date.now(),verifiedServerAt:Date.now(),rows,signedRows:[],from:'2026-10-25',to:'2026-10-31',total:rows.length};
+    const rows=Array.from({length:100},(_,index)=>({barcode:'SYNTHETIC'+index,phone:'09'+String(10000000+index%8),cod:[0.1,0.2,1.35,4.99,0,10][index%6],dod:0,at:fixtureDates.at,ztoClosed:modes[0]==='--mixed'&&index%2===0,skip:'',from:'cn'}));
+    api.ztoState.ztoListSyncResult={verifiedAt:Date.now(),verifiedServerAt:Date.now(),rows,signedRows:[],from:fixtureDates.from,to:fixtureDates.to,total:rows.length};
     api.initDatabaseListeners();
     await bounded((async()=>{while(api.anyDbListenerViewIsStale(['history','deleted']))await pause(10);})(),'history-trash-ready');
     console.log('PRODUCTION_ADMISSION',JSON.stringify({pending:[...api.dbListenerPendingPaths],failed:[...api.dbListenerFailedPaths],importGuard:api.anyDbListenerViewIsStale(['history','deleted'])}));
     const outcomes=[];const start=Date.now();await bounded(api.importZtoListRows(),'actual100ZTOimport');
-    const after=await owner();const summary={offOrigin,roots:after,ms:Date.now()-start,outcomes,errors,daily:after[D],monthly:after[M],pending:api.createScanEvidenceJournal(localStorage,2).list(api.pendingScanScope()),operations:Object.values(after.zoew_scan_operations||{}).map(o=>({id:o.id,code:o.code,phase:o.phase,monthToken:o.monthToken,targetId:o.targetId})),history:after[H]};
+    const after=await owner();assert.ok(after, '100-row import must write a nonempty database');const summary={offOrigin,roots:after,ms:Date.now()-start,outcomes,errors,daily:after[D],monthly:after[M],pending:api.createScanEvidenceJournal(localStorage,2).list(api.pendingScanScope()),operations:Object.values(after.zoew_scan_operations||{}).map(o=>({id:o.id,code:o.code,phase:o.phase,monthToken:o.monthToken,targetId:o.targetId})),history:after[H]};
     if(summary.pending.length) console.error('SCAN_PENDING_DIAGNOSTIC',JSON.stringify(summary.pending.map(record=>({
         id:record.id,code:record.barcode,phase:record.phase,itemId:record.itemId,
         operation:summary.operations.find(operation=>operation.id===record.id),

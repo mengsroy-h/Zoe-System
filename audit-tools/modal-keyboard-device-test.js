@@ -826,6 +826,14 @@ const SAFE_TOP = function (px) {
         //    គ្មានការត្រឡប់ក្រោយ (back) · គ្មានហួស (over) · ចលនាថ្មីមិនចាប់ផ្តើមក្រោយមកដល់ (moves = ១)
         const smooth = (g) => g.dist >= 8 && g.ahead <= 0.1 && g.mid >= 2 && g.back === 0 && g.over === 0 &&
             g.span >= GLIDE_MS * (g.dist >= 40 ? 0.6 : 0.3) && g.span <= GLIDE_MS + 200 && g.running === 0;
+        // Failure-only output: reuse the existing rAF samples, without extra browser work
+        // during the measured glide. Raw gaps help distinguish missing samples from bad motion.
+        const reportGlideFailure = (device, id, phase, record) => {
+            const frameGapsMs = record.frames.slice(1).map((frame, i) => frame.t - record.frames[i].t);
+            console.log('  GLIDE_DIAGNOSTIC ' + JSON.stringify({
+                device, id, phase, frames: record.frames, frameGapsMs, running: record.running
+            }));
+        };
         if (inPart('ឋ')) {
             console.log('\n=== (ឋ) APK · Sign ZTO ៖ keyboard បើករួច · visual viewport រំកិលខណៈ inset ចាស់ ➜ កាតនៅនឹងលើអេក្រង់ ===');
             let revealedSign = 0;
@@ -1025,12 +1033,16 @@ const SAFE_TOP = function (px) {
                     await page.evaluate(RECORD, { id, ms: GLIDE_MS + 300 });
                     await waitFrame(page);
                     await page.evaluate((kb) => window.__kb.open(kb), dev.kb);
-                    const up = glideOf(await page.evaluate(() => window.__glide));
+                    const upRecord = await page.evaluate(() => window.__glide);
+                    const up = glideOf(upRecord);
                     const fitted = await page.evaluate(RECT, { id, index, sel: FIELD_SELECTOR });
                     if (up.dist < 8) { if (fitted.card[1] > dev.h - dev.kb + 1) problems.push(id + ' ៖ មិនផ្លាស់ទី ហើយបាំងដោយ keyboard ' + JSON.stringify(fitted.card)); continue; }
                     moved++;
                     if (!firstMoved) firstMoved = { id, index };
-                    if (smooth(up)) glidedUp++; else problems.push(id + ' ៖ keyboard បើក ' + JSON.stringify(up));
+                    if (smooth(up)) glidedUp++; else {
+                        problems.push(id + ' ៖ keyboard បើក ' + JSON.stringify(up));
+                        reportGlideFailure(dev.label, id, 'open', upRecord);
+                    }
                     if (Math.abs(up.end - fitted.card[0]) > 1 || fitted.card[1] > dev.h - dev.kb + 1 || fitted.card[0] < 0) problems.push(id + ' ៖ ចុងចលនា ' + up.end + ' ≠ ទីតាំងត្រូវ ' + JSON.stringify(fitted.card));
                     if (dev.apk) {
                         await page.evaluate(RECORD, { id, ms: 260 });
@@ -1052,8 +1064,12 @@ const SAFE_TOP = function (px) {
                     await waitFrame(page);
                     if (dev.apk) await page.setViewportSize({ width: dev.w, height: dev.h });
                     await page.evaluate(() => window.__kb.open(0));
-                    const down = glideOf(await page.evaluate(() => window.__glide));
-                    if (smooth(down) && Math.abs(down.start - up.end) <= 1 && Math.abs(down.end - up.start) <= 1) glidedBack++; else problems.push(id + ' ៖ keyboard បិទ ' + JSON.stringify(down) + ' (ពី ' + up.end + ' ទៅ ' + up.start + ')');
+                    const downRecord = await page.evaluate(() => window.__glide);
+                    const down = glideOf(downRecord);
+                    if (smooth(down) && Math.abs(down.start - up.end) <= 1 && Math.abs(down.end - up.start) <= 1) glidedBack++; else {
+                        problems.push(id + ' ៖ keyboard បិទ ' + JSON.stringify(down) + ' (ពី ' + up.end + ' ទៅ ' + up.start + ')');
+                        reportGlideFailure(dev.label, id, 'close', downRecord);
+                    }
                 }
                 // ប្រអប់ដែលនៅពីលើ keyboard រួចហើយ មិនផ្លាស់ទី (ច្បាប់ ៖ «untouched») ➜ ពិនិត្យតែកុំឲ្យ keyboard បាំង · ប្រអប់ដែលផ្លាស់ទីទាំងអស់ត្រូវរអិល
                 check(measured >= 12 && moved >= 4 && glidedUp === moved && glidedBack === moved && problems.length === 0 && (!dev.apk || still === moved) && (!dev.ios || panned >= 3),

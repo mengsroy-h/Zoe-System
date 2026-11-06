@@ -385,6 +385,7 @@ bash audit-tools/emu/rules.sh
 | `health-check-test.js` | 🩺 ពិនិត្យសុខភាពប្រព័ន្ធ ៖ **អានសុទ្ធសាធ** · មិនបង្ខំ PIN · «ពិនិត្យមិនបាន» ជា ⚠️ មិនមែន ❌ **និងទិសផ្ទុយ ៖ ✅ ក៏ត្រូវវាស់ដែរ** · secret មិនឡើងដល់ DOM · ផ្លូវ Apps Script មិនផ្ញើ header · `fetchWithTimeout` ពិត មិន stub · ចំនួនជួរដែលគូរពិត | `HEALTH_APP_DIR` |
 | `license-grace-test.js` | «ផ្ទៀងផ្ទាត់មិនបាន» ≠ «ហត្ថលេខាខុស» — កុំលុប record · Server ឆ្លើយ 5xx/429 · ការកក់ seat បាត់ដោយបណ្តាញ ➜ `ok: null` (មិនលុប · មិនមែន `seat-taken`) | `LICGRACE_APP_DIR` |
 | `license-clock-trust-test.js` | ទង់ «sync រួច» បើកតែដោយតម្លៃពី server ពិត | `LICENSECLOCK_APP_DIR` |
+| `scan-month-orchestration-test.js` | Node 24៖ រត់ predicate និង budget helper ពិតជាមួយ save/month queue ពី TypeScript; digest និង prepared read យឺតត្រូវរង់ចាំមុនរំកិលម៉ោង។ predicate ទីបីត្រូវវាស់ដែរ; poison បួនត្រូវធ្លាក់; មិនជំនួស Vitest ឬ emulator | `SCANMONTHORCH_APP_DIR` (source root) |
 | `scan-month-fixture-date-test.js` | វាស់ថ្ងៃ fixture នៃ SDK import, ពេលប្ដូរថ្ងៃភ្នំពេញ និងព្រំដែនអាយុទិន្នន័យ | `SCANMONTHDATE_APP_DIR` |
 | `license-time-endpoint-test.js` | Server time endpoint, response, offline និង concurrent requests សម្រាប់ App ទាំងពីរ | `LICENSETIME_APP_DIR` |
 | `license-clock-rollback-test.js` | ម៉ោងមិនអាចថយក្រោយ; Activate ត្រូវការសាលក្រម server | `LICROLLBACK_APP_DIR` |

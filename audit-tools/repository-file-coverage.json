@@ -3822,6 +3822,9 @@
     "audit-tools/license-clock-trust-test.js": {
       "policy": "guard-1"
     },
+    "audit-tools/scan-month-orchestration-test.js": {
+      "policy": "guard-1"
+    },
     "audit-tools/scan-month-fixture-date-test.js": {
       "policy": "guard-1"
     },

@@ -215,7 +215,7 @@ RUNALL_OWNED_DIR=''
 runall_needs_rtdb() {
     case "$(runall_script_of "$@")" in
         audit-tools/emu/import-paired-ci-runner.js) return 1 ;; # runner owns an RTDB scope per profile
-        audit-tools/emu/*|audit-tools/money-guardian-test.js|audit-tools/supabase-scan-rules-test.js|audit-tools/money-checker-truthfulness-test.js|audit-tools/checker-coverage.js|audit-tools/exit-code-integrity.js) return 0 ;;
+        audit-tools/emu/*|audit-tools/scan-month-fixture-date-test.js|audit-tools/money-guardian-test.js|audit-tools/supabase-scan-rules-test.js|audit-tools/money-checker-truthfulness-test.js|audit-tools/checker-coverage.js|audit-tools/exit-code-integrity.js) return 0 ;;
         *) return 1 ;;
     esac
 }
@@ -260,7 +260,7 @@ runall_lane() {
     local s; s="$(runall_script_of "$@")"
     case "$s" in
         audit-tools/checker-coverage.js|audit-tools/exit-code-integrity.js|audit-tools/emu/registry-purge-atomic-sdk-test.js|audit-tools/zoew-suite-test.js|audit-tools/money-guardian-test.js) printf excl ;;
-        audit-tools/import-paired-ci-runner-test.js|audit-tools/emu/*|audit-tools/supabase-scan-rules-test.js|audit-tools/money-checker-truthfulness-test.js) printf emu ;;
+        audit-tools/import-paired-ci-runner-test.js|audit-tools/scan-month-fixture-date-test.js|audit-tools/emu/*|audit-tools/supabase-scan-rules-test.js|audit-tools/money-checker-truthfulness-test.js) printf emu ;;
         *) if [ -n "$s" ] && grep -q 'chromium\.launch(' "$s" 2>/dev/null; then printf browser; else printf any; fi ;;
     esac
 }

@@ -15,6 +15,7 @@
 RUNALL_CALLER_PWD="$PWD"
 cd "$(dirname "$0")/.." || exit 1
 BASE="$1"
+IMPORTPAIRED_BASE_SOURCE="${IMPORTPAIRED_BASE_SOURCE:-$BASE}"
 
 # ── ZoeW React ៖ checker វាស់ «root វាស់» មិនមែនប្រភព ─────────────────────────
 # ZoeW ជា React (`ZoeW/src/**` ➜ Vite)។ checker ស្រង់ function ពី `ZoeW/app.js` · អាន markup ពី
@@ -969,6 +970,11 @@ for t in policy-test auth-recovery-test keylist-consistency-test \
     run "$t" node "audit-tools/$t.js"
 done
 
+# JSON endpoint tests target the source checkout, including Netlify function sources.
+run "license-time-json-test" node audit-tools/license-time-json-test.js
+run "server-time-function-test" node audit-tools/server-time-function-test.mjs
+run "license-time-cors-browser-test (browser CORS)" node audit-tools/license-time-cors-browser-test.js
+
 section "== ការត្រួតពិនិត្យរចនាសម្ព័ន្ធ =="
 for t in shared-fns wiring action-binding-test function-surface-test code-duplication-test dom-hygiene state-hygiene comments payload-schema compensation-order stale-write storage-guard secret-hygiene html-sink-escaping clock-hygiene clock-basis-test doc-scope-test adaptive-link-test version-check; do
     [ -n "$NO_ACORN" ] && { skipm "$t"; continue; }
@@ -1228,6 +1234,10 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     SCANMONTHORCH_APP_DIR="$IMPORTPAIRED_BASE_SOURCE" node audit-tools/scan-month-orchestration-test.js 2>&1 | tail -1 | sed 's/^/   scan-month-orch: /'
     SCANMONTHDATE_APP_DIR="$BASE" node audit-tools/scan-month-fixture-date-test.js 2>&1 | tail -1 | sed 's/^/   scan-month-date: /'
     LICENSETIME_APP_DIR="$BASE" node audit-tools/license-time-endpoint-test.js 2>&1 | tail -1 | sed 's/^/   license-time:    /'
+    LICENSETIME_APP_DIR="$IMPORTPAIRED_BASE_SOURCE" node audit-tools/license-time-json-test.js 2>&1 | tail -10 | sed 's/^/   license-json:    /'
+    LICENSETIME_APP_DIR="$IMPORTPAIRED_BASE_SOURCE" node audit-tools/server-time-function-test.mjs 2>&1 | tail -10 | sed 's/^/   server-function: /'
+    LICENSETIME_APP_DIR="$IMPORTPAIRED_BASE_SOURCE" node audit-tools/license-time-cors-browser-test.js 2>&1 | tail -1 | sed 's/^/   license-cors:    /'
+
     CLEANUPCLOCK_APP_DIR="$BASE" node audit-tools/cleanup-clock-guard-test.js 2>&1 | tail -1 | sed 's/^/   cleanup-clock:   /'
     RETURNEDTRASH_APP_DIR="$BASE" node audit-tools/returned-trash-retention-test.js 2>&1 | tail -1 | sed 's/^/   returned-trash:  /'
     MONOGATE_APP_DIR="$BASE" node audit-tools/monotonic-gate-test.js 2>&1 | tail -1 | sed 's/^/   monotonic-gate:  /'

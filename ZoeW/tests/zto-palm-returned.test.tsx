@@ -27,8 +27,8 @@ const at = (day: string, time: string) => '2026-10-' + day + ' ' + time;
 const scan = (action: string, siteCode: string, time: string, problemReason = '') => ({ action, siteCode, time, problemReason });
 
 describe('↩️ ZTO Palm ៖ track `-710` នៃសាខាខ្លួនក្រោយមកដល់', () => {
-    it('ត្រឡប់ ➜ ក្រុម «↩️ ត្រឡប់ទៅវិញ» មិនបញ្ចូល · សាខាផ្សេង ឬមកដល់ម្តងទៀត ➜ ថ្មីធម្មតា', async () => {
-        await setupWorld('firebase', 'off');
+    it.each([['firebase', 'off'], ['firebase', 'require'], ['supabase', 'require']] as const)('%s/%s: ត្រឡប់ ➜ ក្រុម «↩️ ត្រឡប់ទៅវិញ» មិនបញ្ចូល · សាខាផ្សេង ឬមកដល់ម្តងទៀត ➜ ថ្មីធម្មតា', async (backend, identity) => {
+        await setupWorld(backend, identity);
         world.parcels = {
             KH5000000001: { tab: '1', isSign: 0, scans: [
                 scan('3', SITE, at('04', '15:29:45')), scan('4', SITE, at('04', '15:30:16')),

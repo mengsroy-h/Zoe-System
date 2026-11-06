@@ -170,7 +170,9 @@
       "guards": [
         "audit-tools/license-network-pressure-test.js",
         "audit-tools/license-clock-trust-test.js",
-        "audit-tools/license-time-endpoint-test.js"
+        "audit-tools/license-time-endpoint-test.js",
+        "audit-tools/license-time-json-test.js",
+        "audit-tools/license-time-cors-browser-test.js"
       ],
       "evidence": "audit-tools/license-network-pressure-test.js និង license-clock-trust-test.js; byte-identical ទាំង 2 App",
       "limitation": "គ្របតែសេណារីយ៉ូ license/network/clock ដែលបានសាក។ មិនបញ្ជាក់ License Project ផលិតកម្ម។"
@@ -726,6 +728,14 @@
       ],
       "evidence": "runall-runner-test រត់ម៉ាស៊ីនរត់ពិតជាមួយ checker ក្លែង ៖ await មិនដែល settle · ចប់ដោយគ្មានការសម្រេច ➜ FAIL · សេចក្តីសង្ខេបបន្ថយ exit code ➜ PASS · កូន spawn/fork មិនទទួលកិច្ចសន្យា · ឯកសារបាត់ ➜ FAIL; exit-code-integrity ពុល checker កូនក្រោម preload ដដែល ហើយស្កេន AST ការបន្ថយ exit code ក្នុង listener exit ឬ top-level ក្រោយ async។",
       "limitation": "បញ្ជាក់តែកិច្ចសន្យា exit (សេចក្តីសង្ខេបត្រូវរត់ទើប exit 0); មិនបញ្ជាក់ថាការអះអាងរបស់ checker នីមួយៗគ្រប regression ទាំងអស់ ឬថាការបន្ថយក្នុង function async ឈរក្រោយ await ចុងក្រោយទេ។"
+    },
+    "server-time-json": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/server-time-function-test.mjs"
+      ],
+      "evidence": "Runs the server-time handler with GET, invalid nonce/methods and web/native origin inputs.",
+      "limitation": "Local handler execution does not prove deployed Netlify routing, CSP, or native WebViews."
     }
   },
   "files": {
@@ -4717,6 +4727,24 @@
       "policy": "zoew-app"
     },
     "ZoeW/tests/edit-pin-gates.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/netlify/functions/server-time.mjs": {
+      "policy": "server-time-json"
+    },
+    "audit-tools/license-time-json-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/license-time-cors-browser-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/server-time-function-test.mjs": {
+      "policy": "guard-1"
+    },
+    "ZoeW/tests/helpers/return-memory-backend.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/return-notice-mode-matrix.test.tsx": {
       "policy": "zoew-self-verification"
     }
   }

@@ -1,6 +1,6 @@
 // វាស់ `syncServerTime()` ពិតក្នុង App ទាំងពីរ ដោយគ្មានបណ្តាញ និងគ្មាន dependency។
 // ផ្លូវសាធារណៈតូចមួយត្រូវជំនួសការអាន root ដែល rules បដិសេធ។
-// HTTP បរាជ័យ ឬ Date ដែលអានមិនបាន មិនមែនភស្តុតាងថានាឡិកា sync រួចទេ។
+// Nonce-bound JSON is readable cross-origin; Date is intentionally absent from fixtures.
 'use strict';
 
 process.exitCode = 1;
@@ -16,7 +16,7 @@ const ROOT = process.env.LICENSETIME_APP_DIR
 const NOW = Date.parse('2026-11-06T10:00:00Z');
 const SERVER_DATE = 'Fri, 06 Nov 2026 10:00:42 GMT';
 const OFFSET = Date.parse(SERVER_DATE) - NOW;
-const EXPECTED_PATH = '/license_announcements/ZOE.json?shallow=true';
+const EXPECTED_PATH = '/.netlify/functions/server-time';
 let pass = 0;
 let fail = 0;
 
@@ -47,10 +47,9 @@ class FixedDate extends Date {
 
 function response(status = 200, date = SERVER_DATE) {
     return {
-        ok: status >= 200 && status < 300,
-        status,
-        headers: { get: (name) => String(name).toLowerCase() === 'date' ? date : null },
-        text: async () => status >= 200 && status < 300 ? 'null' : '{"error":"Permission denied"}'
+        ok: status >= 200 && status < 300, status, redirected: false,
+        headers: { get: name => String(name).toLowerCase() === 'content-type' ? 'application/json' : null },
+        json: async () => ({ now: date === null || date === '' ? null : Date.parse(date) })
     };
 }
 
@@ -115,6 +114,7 @@ function build(source, options = {}) {
         navigator: { onLine: options.online !== false },
         Date: FixedDate,
         AbortController,
+        crypto: require("node:crypto").webcrypto,
         console,
         setTimeout: options.clock ? options.clock.setTimeout : (callback, delay) => {
             const timer = setTimeout(callback, delay);
@@ -124,7 +124,9 @@ function build(source, options = {}) {
         clearTimeout: options.clock ? options.clock.clearTimeout : (timer) => { timers.delete(timer); clearTimeout(timer); },
         fetch: async (url, init) => {
             calls.push({ url: String(url), init });
-            return options.fetch ? options.fetch(url, init) : response();
+            const res = await (options.fetch ? options.fetch(url, init) : response());
+            const read = res.json;
+            return { ...res, json: async () => ({ ...await read(), nonce: new URL(url).searchParams.get('nonce') }) };
         }
     };
     vm.runInNewContext(source, context, { timeout: 1000 });
@@ -156,10 +158,11 @@ async function testCopy(name, source) {
             assert.equal(calls.length, 1);
             const request = calls[0];
             const url = new URL(request.url);
-            assert.equal(url.pathname + url.search, EXPECTED_PATH);
-            const configuredUrl = (source.match(/const LICENSE_DB_URL = '([^']+)'/) || [])[1];
-            assert.ok(configuredUrl, 'រកមិនឃើញ License Project ក្នុងកូដពិត');
-            assert.equal(url.origin, new URL(configuredUrl).origin);
+            assert.equal(url.pathname, EXPECTED_PATH);
+            assert.match(url.searchParams.get("nonce"), /^[a-f0-9]{32}$/);
+            assert.equal(url.origin, 'https://zoew.netlify.app');
+            assert.equal(request.init.credentials, 'omit');
+            assert.equal(request.init.redirect, 'error');
             assert.equal(request.init.method || 'GET', 'GET');
             assert.equal(request.init.cache, 'no-store');
             assert.ok(request.init.signal instanceof AbortSignal);
@@ -168,7 +171,7 @@ async function testCopy(name, source) {
             assert.equal(Object.keys(request.init.headers || {}).some((key) => key.toLowerCase() === 'authorization'), false);
         }));
 
-    await scenario(name + ' ៖ HTTP 200 + Date ពិត កែម៉ោង និងទុកចិត្តបាន', () =>
+    await scenario(name + ' ៖ HTTP 200 + JSON ពិត កែម៉ោង និងទុកចិត្តបាន', () =>
         withEnv(source, {}, async ({ api }) => {
             assert.equal(api.getServerTimeOffset(), null);
             assert.equal(await api.syncServerTime(), true);
@@ -199,7 +202,7 @@ async function testCopy(name, source) {
     });
 
     for (const date of [null, '', 'not-a-date']) {
-        await scenario(name + ' ៖ Date ' + JSON.stringify(date) + ' មិនបង្កើតភាពទុកចិត្ត', () =>
+        await scenario(name + ' ៖ JSON now ' + JSON.stringify(date) + ' មិនបង្កើតភាពទុកចិត្ត', () =>
             withEnv(source, { fetch: async () => response(200, date) }, async ({ api }) => {
                 assert.equal(await api.syncServerTime(), false);
                 assert.equal(api.getServerTimeOffset(), null);
@@ -207,7 +210,7 @@ async function testCopy(name, source) {
     }
 
     for (const status of [401, 403, 404, 500]) {
-        await scenario(name + ' ៖ HTTP ' + status + ' មាន Date ក៏មិនបង្កើតភាពទុកចិត្ត', () =>
+        await scenario(name + ' ៖ HTTP ' + status + ' មាន JSON ក៏មិនបង្កើតភាពទុកចិត្ត', () =>
             withEnv(source, { fetch: async () => response(status) }, async ({ api }) => {
                 assert.equal(await api.syncServerTime(), false);
                 assert.equal(api.getServerTimeOffset(), null);
@@ -216,10 +219,10 @@ async function testCopy(name, source) {
 
     const failedRefreshes = [
         ['HTTP 403', async () => response(403)],
-        ['Date អវត្តមាន', async () => response(200, null)],
-        ['Date មិនត្រឹមត្រូវ', async () => response(200, 'invalid')],
+        ['JSON now អវត្តមាន', async () => response(200, null)],
+        ['JSON now មិនត្រឹមត្រូវ', async () => response(200, 'invalid')],
         ['fetch បដិសេធ', async () => { throw new Error('network unavailable'); }],
-        ['text បដិសេធ', async () => ({ ...response(), text: async () => { throw new Error('body unavailable'); } })]
+        ['JSON បដិសេធ', async () => ({ ...response(), json: async () => { throw new Error('body unavailable'); } })]
     ];
     for (const [failureName, failed] of failedRefreshes) {
         await scenario(name + ' ៖ refresh ' + failureName + ' រក្សា offset ពី sync ពិត និងអាចសាកឡើងវិញ', async () => {
@@ -243,7 +246,7 @@ async function testCopy(name, source) {
         let attempt = 0;
         let bodyRead = false;
         await withEnv(source, { clock, fetch: async () => ++attempt === 1 ? {
-            ...response(), text: async () => { bodyRead = true; throw new Error('body unavailable'); }
+            ...response(), json: async () => { bodyRead = true; throw new Error('body unavailable'); }
         } : response() }, async ({ api, calls }) => {
             assert.equal(await api.syncServerTime(), false);
             assert.equal(bodyRead, true);
@@ -272,7 +275,7 @@ async function testCopy(name, source) {
                     requestSignal = init.signal;
                     fetchEntered = true;
                     if (stage === 'fetch') return rejectOnAbort(init.signal);
-                    return { ...response(), text: () => { bodyEntered = true; return rejectOnAbort(init.signal); } };
+                    return { ...response(), json: () => { bodyEntered = true; return rejectOnAbort(init.signal); } };
                 } }, async ({ api, calls }) => {
                     if (previouslySynced) {
                         assert.equal(await api.syncServerTime(), true);

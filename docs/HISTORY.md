@@ -118,6 +118,12 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.184] · ZoeKeyGen [2.24.35] — 2026-11-06 · ម៉ោង Server តាម JSON
+
+ZoeW `2.50.184` (`zoew-v448`) · ZoeKeyGen `2.24.35` (`zoekeygen-v146`)។ App ទាំងពីរអានម៉ោងពី `https://zoew.netlify.app/.netlify/functions/server-time` ដោយ GET គ្មាន credentials។ Function ផ្តល់ `{now, nonce}` ជាមួយ CORS និង no-store; client ផ្ទៀង nonce ចៃដន្យ ស្ថានភាព HTTP ប្រភេទ JSON និងលេខម៉ោង មុនបើកភាពទុកចិត្ត។ Request និង body មានពិដានរួម; បរាជ័យរក្សា offset ដែលបានទុកចិត្ត និង activation ដដែល។ មិនកែច្បាប់ហិរញ្ញវត្ថុ ឬអនុញ្ញាត cleanup តាមតែ clock response ទេ។
+
+**សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ deploy function លើ ZoeW ហើយផ្ទៀង response ពិត មុនចេញ client ZoeW/Android និង ZoeKeyGen។ សាក cross-origin នៅ web, Android និង KeyGen ដោយឃើញ JSON និង offset ពិត ទោះ Date header មើលមិនឃើញ។ មិនមាន migration ឬ rules ថ្មី។ ការកែ local មិនមែនភស្តុតាង deploy ឬតេស្តឧបករណ៍ពិតទេ។
+
 ### [2.50.183] — 2026-11-06 · សមកាលកម្មម៉ោង license
 
 ZoeW `2.50.183` (`zoew-v447`) · ZoeKeyGen `2.24.34` (`zoekeygen-v145`)។ `syncServerTime()` អាន path សេចក្តីជូនដំណឹងដែល rules អនុញ្ញាត ជំនួស database root ដែលឆ្លើយ 401; HTTP មិនជោគជ័យមិនត្រូវសម្គាល់ថា sync រួច។ មិនបើក root read។
@@ -1931,6 +1937,11 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-11-06 · Server time JSON និង CORS
+
+ភស្តុតាង browser របស់ម្ចាស់បង្ហាញ Firebase HTTP 200 ប៉ុន្តែ `Date: null`។ Checker ចាស់ជាប់ 55/55 ព្រោះ fixture បង្ហាញ Date ដោយមិនគោរព CORS។ មុនកែ regression JSON ថ្មីជាប់ 41/55 និងធ្លាក់ 14; function test ធ្លាក់ព្រោះ endpoint មិនទាន់មាន។ ក្រោយកែ client/function tests ដំបូងជាប់ 71/71។ `license-time-json-test.js`, `license-time-cors-browser-test.js` និង `server-time-function-test.mjs` វាស់កិច្ចសន្យាថ្មី; checker ចាស់រក្សាការវាស់ offline, priority, timeout និង concurrency តាម JSON។ Browser runner មិនទាន់វាស់បាននៅ environment នេះ ព្រោះ Chromium បើក socket មិនបាន; មិនអះអាងថា browser ឬ production ជាប់ទេ។ `typecheck`, `lint`, production build, `doc:check` និង Android guard 135/135 ជាប់។ តេស្ត clock/license ដែលរងផលប៉ះពាល់ 60/60 ជាប់។ Vitest ពេញលេញ៖ 419 files ជាប់ និង 10 ធ្លាក់; 7673 tests ជាប់, 12 ធ្លាក់, 89 រំលង ដោយ browser/pg/artifact environment មិនគ្រប់។ ក្រោយចម្លង dependencies ក្នុង checkout ជំនួស symlink, artifact suite សាកឡើងវិញជាប់ 9/9។ Audit build/SW check មិនអាចបញ្ចប់ដោយ Chromium socket EPERM; guards ដែលត្រូវការ measure-root នៅមិនទាន់រត់។ Clock នៅប្រើ offset ពី Date.now ដូចមុន; nonce ការពារ response cache ខុសសំណើ មិនមែនការពារការកែ client ដោយអ្នកប្រើទេ។
+
 
 ### 2026-11-05 — ផ្ទៀង Deep audit ចុងក្រោយ មុន commit/push
 

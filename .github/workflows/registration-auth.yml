@@ -20,6 +20,8 @@ jobs:
           node-version: '24'
           package-manager-cache: false
       - run: npm ci --prefix supabase --ignore-scripts
+      - name: ផ្ទៀង preflight របស់ project ថ្មី
+        run: node --test audit-tools/registration-onboarding.test.mjs
       - name: ត្រៀម GoTrue ដែល pin ដោយ digest
         shell: bash
         run: |

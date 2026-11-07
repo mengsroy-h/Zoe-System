@@ -932,6 +932,16 @@ async function main() {
     ok('Edge Function >= ២ (ឃើញ ' + fnDirs.join(', ') + ')', fnDirs.length >= 2);
     if (missing.length || fnDirs.length < 2) { finish(); return; }
 
+    const onboarding = cp.spawnSync(process.execPath, ['--test', '--test-reporter=tap', path.join(__dirname, 'registration-onboarding.test.mjs')], {
+        env: { ...process.env, SUPABASE_ONBOARDING_APP_DIR: ROOT }, encoding: 'utf8', timeout: 30000
+    });
+    const onboardingCounts = Object.fromEntries([...(onboarding.stdout || '').matchAll(/^# (tests|pass|fail|cancelled|skipped|todo) (\d+)$/gm)]
+        .map((match) => [match[1], Number(match[2])]));
+    ok('Project ថ្មី៖ preflight និង protocol probe ពិត (គ្មានការសរសេរ)', onboarding.status === 0
+        && onboardingCounts.tests >= 9 && onboardingCounts.pass === onboardingCounts.tests
+        && ['fail', 'cancelled', 'skipped', 'todo'].every((key) => onboardingCounts[key] === 0),
+        (onboarding.stdout + onboarding.stderr).slice(-4000));
+
     console.log('\n── ១. wiring ស្តាទិច ──');
     const pkg = JSON.parse(read(path.join(SB, 'package.json')) || '{}');
     const sdkVersion = pkg.devDependencies && pkg.devDependencies['@supabase/supabase-js'];

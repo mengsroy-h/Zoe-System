@@ -1977,6 +1977,13 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 - [Audit1221](https://github.com/mengsroy-h/Zoe-System/actions/runs/42394868533) លើ `29885a4a` ឆ្លង ៤ shards និង ZTO/native; raw logs មាន Firebase money 279.8s/17 top-level assertions, Supabase money 322.8s/14 និង truthfulness220។ នេះជាភស្តុតាងមុន operation-model/clock/ACK correction; មិនប្រើជា CI របស់កំណែបន្ទាប់។ កំណែចុងក្រោយត្រូវ exact-head CI មុនសម្រេច; App/rules/version មិនប្រែ។
 
 
+- [Audit1222](https://github.com/mengsroy-h/Zoe-System/actions/runs/42397186061) លើ `a12ba234` ក្រហម៖ Supabase checker មាន `closedClock is not defined` ព្រោះ local ឈ្មោះ `closeClock`; ឥឡូវបញ្ជូន field ជាក់លាក់។ Regression ថ្មី execute exact close checkpoint និង scope-analysis/negative mutation ទាំងពីរធ្លាក់មុនកែ។ Unit មុនមិន execute browser harness block នេះ; local green មិនធ្លាប់ជំនួស CI។
+- Firebase ក្នុង run ដដែលក្រហមដោយករណីផ្សេង៖ Sheet `remove/offline-online/move` barcode `900000000001211` នៅ history មិនទាន់ដក ខណៈ devices ទាំងបី return failed និង journals ទទេ។ Totals នៅ consistent; មូលហេតុមិនទាន់បញ្ជាក់ ហើយមិនចាត់ថាបានកែដោយ typo ខាងលើទេ។ Local branch probes បង្ហាញ admission/read/claim failures ច្រើនអាចឱ្យ shape ដូចគ្នា។ បន្ថែម diagnostic ដែលរក្សា caught console error, connection/clock state និង toast; location mismatch នៅបង្ហាញព័ត៌មានលម្អិតមុន monetary assertions ដោយមិនរំលង assertion ណាមួយ។ Regression diagnostic ធ្លាក់មុនកែ។ រត់ថ្មីគឺការវាស់បន្ថែម មិនលុបភស្តុតាងក្រហមដើម។
+
+
+- Audit1222 shard២ ក៏មាន modal-keyboard-device3/4 ក្រហម៖ APK1280×800, keyboard360, customerDataTableModal បិទkeyboard glidedBack16/17 (`start33,end60,maxStep20,mid1,span217ms`)។ មិនប្ដូរកូដ modal និងមិនអះអាងមូលហេតុ។ Shard៣/ZTO/native/RegistrationAuth19 ឆ្លង។ Diagnostic collection ត្រូវ best-effort និង bounded; throwing serializer/state-reader controls២ធ្លាក់មុនការពារ។ Local ចុងក្រោយ focused៥files/៤១២tests និង truthfulness២២០ឆ្លង; CI ថ្មីនៅមិនទាន់បញ្ចប់។
+
+
 ### 2026-11-07 — អ្នកវាស់ callback ចាស់របស់ ios-panel-glide
 
 - Audit #1216 លើ PR merge `816cc14d` ឆ្លង 56/56; Audit #1217 លើ main `162917a9` ធ្លាក់ ១ ករណី cleanup។ Tree ទាំងពីរដូចគ្នា `40e6f7ad1d5cd4978d7dbeb0ef23c268a4d0bedc`; runner image, Node, Chromium និង lane/STRICT flags ដូចគ្នា។ Log ដែលធ្លាក់ឃើញចលនាថ្មីចប់ `currentTime=duration=220`, snap ស្តារ `y`; វាមិនវាស់ callback ខណៈចលនានៅរស់ទេ។ មិនមានភស្តុតាងថា merge ប្ដូរកូដចលនា ឬថា host ជាក់លាក់មានបញ្ហាទេ។

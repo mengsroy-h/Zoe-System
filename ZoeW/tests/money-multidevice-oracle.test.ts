@@ -720,3 +720,63 @@ it('clock evidence ឆ្លង devices និង reopen រក្សា envelop
     await expect(lab.captureClock()).rejects.toThrow('clock witness');
     expect(source).toContain('await captureClock(actionClock, [dev]);\n                    await dev.page.close().finally(() => gates[0].release(true))');
 });
+
+it('browser matrix close checkpoint បញ្ជូន clock witness ដែលចាប់បានពិត', async () => {
+    const source = readFileSync(require.resolve('../../audit-tools/money-cookie-blob.js'), 'utf8');
+    const first = source.indexOf("            if (movement === 'pickup2h' || signedTrash) {"), last = source.indexOf('\n            await Promise.all(devices.map', first);
+    expect(first).toBeGreaterThan(0); expect(last).toBeGreaterThan(first);
+    const clock = { min: 1000, max: 1001 }, calls: any[] = [], starts: any[] = [];
+    const run = runInNewContext('(async () => {' + source.slice(first, last) + '})', {
+        movement: 'pickup2h', signedTrash: false, flow: 'pickup2h', mode: 'duplicate', code: 'PARCEL', target: { code: 'PARCEL' },
+        beginClock: async () => clock, window: { __startOp: (args: any) => starts.push(args) },
+        devices: [{ page: { evaluate: (fn: any, args: any) => fn(args) } }], verify: async (...args: any[]) => calls.push(args)
+    });
+    await run();
+    expect(starts).toEqual([{ wanted: 'closeOrder', pick: 0, target: { code: 'PARCEL' } }]);
+    expect(calls).toEqual([['pickup2h/duplicate/closed', 'PARCEL', 'history', false, { closed: true, closedClock: clock }]]);
+});
+it('shared browser harness មិនមាន identifier ដែលមិនបានប្រកាស', () => {
+    const source = readFileSync(require.resolve('../../audit-tools/money-cookie-blob.js'), 'utf8');
+    const { parse } = require('acorn'), { analyze } = require('eslint-scope'), globals = require('globals');
+    const allowed = new Set([...Object.keys({ ...globals.es2021, ...globals.node, ...globals.browser }),
+        'fb', 'db', 'lookupSecretKey', 'deriveLookupSecretKey', 'rememberLookupSecretKey', 'openLookupApiConfigModal',
+        'connectSharedZtoPalm', 'submitZtoPalmLogin', 'closeModal', 'encryptLookupSecret']);
+    const unknown = (text: string) => [...new Set(analyze(parse(text, { ecmaVersion: 2022, ranges: true }), { ecmaVersion: 2022, sourceType: 'script' })
+        .globalScope.through.map((ref: any) => ref.identifier.name).filter((name: string) => !allowed.has(name)))];
+    expect(unknown(source)).toEqual([]);
+    const poison = source.replace('closedClock: closeClock', 'closedClock: missingClock');
+    expect(poison).not.toBe(source);
+    expect(unknown(poison)).toEqual(['missingClock']);
+});
+
+it('failed browser operation រក្សា console cause និង connection state ដោយមិនប្ដូរលទ្ធផល', async () => {
+    const { PAGE_OPS } = require('../../audit-tools/money-multidevice-core.js');
+    const errorLog = vi.fn(), browserConsole = { error: errorLog };
+    const win: any = { scanHistory: [{ id: 'row', barcodes: [{ code: 'PARCEL' }] }], deletedItems: [], navigator: { onLine: true },
+        document: { querySelectorAll: () => [{ textContent: 'synthetic claim held' }] },
+        isDatabaseConnected: false, serverClockTrusted: true, serverTimeOffsetMs: 7, connectionFlowSnapshot: () => ({ phase: 'warming' }) };
+    win.removeSingleBarcode = async () => { browserConsole.error(new Error('synthetic admission refused')); return 'failed'; };
+    runInNewContext('(' + PAGE_OPS.toString() + ')()', { window: win, console: browserConsole, setTimeout });
+    expect(win.__startOp({ wanted: 'removeBarcode', target: { code: 'PARCEL' }, pick: 0 })).toBe('removeBarcode');
+    await Promise.all(win.__ops);
+    expect(errorLog).toHaveBeenCalledTimes(1);
+    expect(win.__consoleErrors()[0]).toContain('synthetic admission refused');
+    expect(win.__operationHistory()[0]).toMatchObject({ wanted: 'removeBarcode', r: 'failed', diagnostic: { online: true, connected: false, phase: 'warming', clockTrusted: true, offset: 7, toasts: ['synthetic claim held'] } });
+});
+
+it.each(['serializer', 'state'])('audit diagnostic %s បោះកំហុស មិនអាចប្ដូរលទ្ធផល operation ឬរារាំង console ដើម', async fault => {
+    const { PAGE_OPS } = require('../../audit-tools/money-multidevice-core.js');
+    const originalError = vi.fn(), browserConsole = { error: originalError };
+    const win: any = { scanHistory: [{ id: 'row', barcodes: [{ code: 'PARCEL' }] }], deletedItems: [],
+        connectionFlowSnapshot: () => { if (fault === 'state') throw new Error('diagnostic reader failed'); return { phase: 'ready' }; } };
+    win.removeSingleBarcode = async () => {
+        if (fault === 'serializer') browserConsole.error(Object.defineProperty({}, 'stack', { get() { throw new Error('diagnostic getter failed'); } }));
+        return 'failed';
+    };
+    runInNewContext('(' + PAGE_OPS.toString() + ')()', { window: win, console: browserConsole, setTimeout });
+    win.__startOp({ wanted: 'removeBarcode', target: { code: 'PARCEL' }, pick: 0 });
+    await expect(Promise.all(win.__ops)).resolves.toBeDefined();
+    expect(win.__operationHistory()).toHaveLength(1);
+    expect(win.__operationHistory()[0]).toMatchObject({ wanted: 'removeBarcode', r: 'failed' });
+    expect(originalError).toHaveBeenCalledTimes(fault === 'serializer' ? 1 : 0);
+});

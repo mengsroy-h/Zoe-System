@@ -229,8 +229,23 @@ const PAGE_OPS = function () {
     const w = window;
     w.__ops = [];
     w.__opResults = [];
-    const operationHistory = [];
-    const recordOperation = (result) => { w.__opResults.push(result); operationHistory.push(result); };
+    const operationHistory = [], consoleErrors = [];
+    const originalError = console.error;
+    console.error = function (...args) {
+        try { consoleErrors.push(args.map(value => value?.stack || String(value)).join(' ').slice(0, 8192)); }
+        catch (_) { consoleErrors.push('diagnostic serialization unavailable'); }
+        if (consoleErrors.length > 12) consoleErrors.splice(0, consoleErrors.length - 12);
+        return originalError.apply(this, args);
+    };
+    w.__consoleErrors = () => consoleErrors.slice(-12);
+    const recordOperation = (result) => {
+        try {
+            if (result.r === 'failed') result.diagnostic = { online: w.navigator?.onLine, connected: w.isDatabaseConnected,
+                phase: w.connectionFlowSnapshot?.().phase, clockTrusted: w.serverClockTrusted, offset: w.serverTimeOffsetMs,
+                toasts: [...(w.document?.querySelectorAll?.('#toastContainer .toast') || [])].map(node => node.textContent).slice(-4) };
+        } catch (_) { result.diagnosticUnavailable = true; }
+        w.__opResults.push(result); operationHistory.push(result);
+    };
     w.__operationHistory = () => operationHistory.map((result) => ({ ...result }));
     const bcOf = (it, pick) => (it && Array.isArray(it.barcodes) && it.barcodes.length) ? it.barcodes[Math.floor(pick * it.barcodes.length) % it.barcodes.length] : null;
     const at = (arr, pick) => arr.length ? arr[Math.floor(pick * arr.length) % arr.length] : null;
@@ -345,7 +360,8 @@ async function recoveryEvidence(devices) {
         gate: device.gate?.evidence(),
         state: await Promise.race([
             device.page.evaluate(() => ({
-                journals: window.__journals(), operations: window.__operationHistory(),
+                journals: window.__journals(), operations: window.__operationHistory(), consoleErrors: window.__consoleErrors?.(),
+                toasts: [...(window.document?.querySelectorAll?.('#toastContainer .toast') || [])].map(node => node.textContent).slice(-4),
                 claims: window.pendingTrashClaims?.(window.liveShopScope?.()),
                 liveClaims: window.liveTrashClaims ? [...window.liveTrashClaims] : null,
                 cleanupLive: window.cleanupJournalLive ? [...window.cleanupJournalLive.keys()] : null,

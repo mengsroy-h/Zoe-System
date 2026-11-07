@@ -409,7 +409,6 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
         const clockNow = clockSeen.max;
         revenue.expectParcel(code, { root: where, deducted, ...intent });
         const t = await read();
-        revenue.verify(t, knownCodes, label, clockNow);
         const day = scanDays.get(code) || dateKey;
         const inv = invariant(t, day, day.slice(0, 7), knownCodes, undefined, clockNow);
         const matches = [];
@@ -446,6 +445,7 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
                 calls: fixture.world.calls.slice(-8).map(({ barcode, list, palm, signed, exact, restore }) => ({ barcode, list, palm, signed, exact, restore })) });
         }
         assert.deepEqual(matches, [{ root: where, deducted, day }], label + ': barcode' + diagnostic);
+        revenue.verify(t, knownCodes, label, clockNow);
         if (onCheckpoint) await onCheckpoint(labelMode + '/' + label);
         steps++;
         console.log('    ' + labelMode + ' ' + tag + ' ' + label + ' · ' + day + ' · COD=' + inv.gotCod + ' DOD=' + inv.gotDod + ' count=' + inv.gotCount + ' · ' + where + (deducted ? ' deducted' : ' counted'));
@@ -640,7 +640,7 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
             if (movement === 'pickup2h' || signedTrash) {
                 const closeClock = await beginClock();
                 await devices[0].page.evaluate((target) => window.__startOp({ wanted: 'closeOrder', pick: 0, target }), target);
-                await verify(flow + '/' + mode + '/closed', code, 'history', false, { closed: true, closedClock });
+                await verify(flow + '/' + mode + '/closed', code, 'history', false, { closed: true, closedClock: closeClock });
             }
             await Promise.all(devices.map((d) => d.page.evaluate(() => window.runZtoStatusSweep(true))));
             await sync();

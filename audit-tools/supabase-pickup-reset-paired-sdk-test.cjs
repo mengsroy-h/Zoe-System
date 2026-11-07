@@ -182,12 +182,12 @@ async function bootstrap() {
     finally { cp.spawn = originalSpawn; }
     const database = await H.freshDb('no-default-grants'); c = database.c;
     const migrations = migrationFiles();
-    if (migrations.length !== 61) throw new Error('ចំនួន migration ពិតមិនស្មើ ៦១');
+    if (migrations.length !== 62) throw new Error('ចំនួន migration ពិតមិនស្មើ ៦២');
     for (const name of migrations) await c.query(fs.readFileSync(path.join(ROOT, 'supabase/migrations', name), 'utf8'));
     pool = new H.PG.Pool({ host: '127.0.0.1', port: c.connectionParameters.port, user: 'postgres', database: database.name, max: 4 });
     fake = await require(path.join(ROOT, 'audit-tools/supabase-fake-server.js')).startFakeSupabase({ pool });
     fake.setRpcHook(event => active?.hook?.(event));
-    console.log('READY owned HTTP PostgreSQL ' + H.pgBin.version + ' migrations61; two independent VM production-source evaluations');
+    console.log('READY owned HTTP PostgreSQL ' + H.pgBin.version + ' migrations62; two independent VM production-source evaluations');
 }
 async function snapshot(tenant) { return (await c.query(`select jsonb_build_object('state',(select to_jsonb(s) from public.zoe_tenant_state s where tenant_id=$1),
     'docs',(select coalesce(jsonb_agg(to_jsonb(d) order by root,key),'[]') from public.zoe_docs d where tenant_id=$1),

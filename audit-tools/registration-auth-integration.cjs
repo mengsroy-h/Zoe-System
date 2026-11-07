@@ -7,11 +7,13 @@ const FIXTURE_MODE = process.env.ZOE_AUTH_PG_MODE || 'docker';
 if (!['docker', 'embedded'].includes(FIXTURE_MODE))
     throw Error('unknown isolated PG mode');
 const { createClient } = require(DEPS + '/@supabase/supabase-js'), ts = require(DEPS + '/typescript');
-const harness = new Module(ROOT + '/audit-tools/.tmp-registration-pg.cjs');
-harness.filename = ROOT + '/audit-tools/.tmp-registration-pg.cjs';
-harness.paths = module.paths;
-harness._compile(fs.readFileSync(ROOT + '/audit-tools/supabase-pg.js', 'utf8').replace("'-k', sock,", "'-k', '',"), harness.filename);
-const embedded = harness.exports.createPgHarness({ depsDirs: [DEPS], shimDir: ROOT + '/audit-tools/supabase-shim', wantMajor: 17 });
+function createEmbeddedPgHarness() {
+    const harness = new Module(ROOT + '/audit-tools/.tmp-registration-pg.cjs');
+    harness.filename = ROOT + '/audit-tools/.tmp-registration-pg.cjs';
+    harness.paths = module.paths;
+    harness._compile(fs.readFileSync(ROOT + '/audit-tools/supabase-pg.js', 'utf8').replace("'-k', sock,", "'-k', '',"), harness.filename);
+    return harness.exports.createPgHarness({ depsDirs: [DEPS], shimDir: ROOT + '/audit-tools/supabase-shim', wantMajor: 17 });
+}
 function dockerPgHarness() {
     const PG = require(DEPS + '/pg'), pins = require('./registration-auth-pins.json');
     const suffix = crypto.randomBytes(8).toString('hex'), container = 'zoe-registration-pg-' + suffix, network = 'zoe-registration-net-' + suffix;
@@ -96,7 +98,7 @@ function dockerPgHarness() {
         } }
     };
 }
-const H = FIXTURE_MODE === 'docker' ? dockerPgHarness() : embedded;
+const H = FIXTURE_MODE === 'docker' ? dockerPgHarness() : createEmbeddedPgHarness();
 const AUTH = path.resolve(process.env.ZOE_AUTH_FIXTURE_DIR || 'missing-auth-fixture');
 const AUTH_BINARY_SHA256 = crypto.createHash('sha256').update(fs.readFileSync(AUTH + '/auth')).digest('hex');
 if (AUTH_BINARY_SHA256 !== 'f2aa147268461f74784ddc8b2240aa446ee71ceb9633bac41c30e7b852a860aa')

@@ -715,12 +715,17 @@ it('C04 SQL៖ v2 RPC ACL បិទ anon និង service_role ហើយ public
     expect(flags).toEqual([{ nspname: 'private', prosecdef: true }, { nspname: 'public', prosecdef: false }]);
 });
 
-it('C04 minimum៖ schema និង receipt/quota/retention contract ដដែល គ្មាន persistence table ថ្មី', async () => {
+it('C04 minimum៖ schema និង receipt/quota/retention contract ដដែល គ្មាន persistence table ថ្មី (registration protocol reviewed)', async () => {
     expect(contractBefore).not.toBeNull(); expect(contractAfter).toEqual(contractBefore);
     const deltaRelations = new Set(['zoe_daily_delta_heads', 'zoe_daily_delta_heads_pkey', 'zoe_daily_deltas', 'zoe_daily_deltas_pkey']);
+    const registrationRelations = new Set(['registration_protocol', 'registration_protocol_pkey']);
     const isDailyDelta = (row: any) => row.schema === 'private' && deltaRelations.has(row.name);
-    expect(contractRuntime.relations.filter((row: any) => !isDailyDelta(row))).toEqual(contractAfter.relations);
+    const isRegistration = (row: any) => row.schema === 'private' && registrationRelations.has(row.name);
+    const runtimeC04Relations = contractRuntime.relations.filter((row: any) => !isDailyDelta(row) && !isRegistration(row));
+    expect(runtimeC04Relations).toEqual(contractAfter.relations);
     expect(contractRuntime.relations.filter(isDailyDelta).map((row: any) => row.name)).toEqual([...deltaRelations]);
+    expect(contractRuntime.relations.filter(isRegistration).map((row: any) => row.schema + '.' + row.name + ':' + row.kind).sort())
+        .toEqual(['private.registration_protocol:r', 'private.registration_protocol_pkey:i']);
     expect(contractRuntime.receiptConstraints).toEqual(contractAfter.receiptConstraints);
     const housekeepingSelfMark = ["    prior_raw text := current_setting('zoe.raw_docs', true);\n", "    perform set_config('zoe.raw_docs', 'on', true);\n",
         "    perform set_config('zoe.raw_docs', coalesce(prior_raw, ''), true);\n"];

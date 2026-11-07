@@ -31,7 +31,7 @@ it('Supabase SDK ៖ paired Reset19 ប្រើ native seed ដូចគ្ន�
         expect(output).not.toMatch(/^\s*(?:FAIL|SKIP|SKIPPED)\b/m);
         const result = JSON.parse(fs.readFileSync(resultFile, 'utf8'));
         expect(result).toMatchObject({ status: 'PASS_ACTUAL_SDK_HTTP_PG_19_SCENARIOS_18_COMPARABLE_1_SDK_SPECIFIC', full: true, fail: 0, errors: [], cleanupErrors: [], outboundViolations: [], inputDrift: [],
-            driverHash: hash(driver), nativeSourceHash: hash(native), sharedFixtureHash: hash(path.join(root, 'audit-tools/fixtures/pickup-reset-parity-fixture.cjs')), nativeEngine: 'UNRUN_BY_THIS_CHECKER', migrationCount: 61, authPasswordOrRevocationMutation: false });
+            driverHash: hash(driver), nativeSourceHash: hash(native), sharedFixtureHash: hash(path.join(root, 'audit-tools/fixtures/pickup-reset-parity-fixture.cjs')), nativeEngine: 'UNRUN_BY_THIS_CHECKER', migrationCount: 62, authPasswordOrRevocationMutation: false });
         expect(result.comparison).toEqual({ comparableScenarios: 18, providerSpecificScenarios: ['native-strict-cas-cold'], identicalOutcomeClaim: false });
         expect(result.cases.filter((row: { sharedFixture: { profile: string } }) => row.sharedFixture.profile === 'imported-native-day').map((row: { id: string }) => row.id))
             .toEqual(['native-drop-proof-rejected', 'native-malformed-proof-rejected', 'old-client-failclosed-after-proof']);

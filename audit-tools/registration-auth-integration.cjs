@@ -1,4 +1,5 @@
 'use strict';
+process.exitCode = 1;
 // Actual GoTrue HTTP + SDK and actual PostgreSQL. RPC transport is direct SQL,
 // not PostgREST. Only disposable fixture accounts are created/deleted.
 const fs = require('fs'), path = require('path'), Module = require('module'), cp = require('child_process'), net = require('net'), crypto = require('crypto'), { pathToFileURL } = require('url');
@@ -129,7 +130,7 @@ async function stopAuth(server) {
         clearTimeout(timer);
     }
 }
-async function world(mode, adminDeps) {
+async function world(mode, adminDeps, options = {}) {
     const { c, name } = await H.freshDb();
     let server;
     const clients = [];
@@ -166,10 +167,13 @@ async function world(mode, adminDeps) {
             await c.query(fs.readFileSync(ROOT + '/supabase/migrations/' + file, 'utf8'));
         if (mode === 'atomic') {
             await c.query(fs.readFileSync(ROOT + '/supabase/migrations/20261106143034_zoe_atomic_registration.sql', 'utf8'));
-            await c.query('update private.registration_protocol set accepting=true');
+            if (!options.newProject) await c.query('update private.registration_protocol set accepting=true');
         }
-        await c.query("insert into public.tenants(id,name,branch_code,expires_at) values('11111111-1111-4111-8111-111111111111','One','ONE',now()+interval '1 day'),('22222222-2222-4222-8222-222222222222','Two','TWO',now()+interval '1 day')");
-        await c.query("insert into public.tenant_invites(code_hash,tenant_id,expires_at) values($1,'11111111-1111-4111-8111-111111111111',now()+interval '1 day'),($2,'22222222-2222-4222-8222-222222222222',now()+interval '1 day')", [ha, hb]);
+        async function seed() {
+            await c.query("insert into public.tenants(id,name,branch_code,expires_at) values('11111111-1111-4111-8111-111111111111','One','ONE',now()+interval '1 day'),('22222222-2222-4222-8222-222222222222','Two','TWO',now()+interval '1 day')");
+            await c.query("insert into public.tenant_invites(code_hash,tenant_id,expires_at) values($1,'11111111-1111-4111-8111-111111111111',now()+interval '1 day'),($2,'22222222-2222-4222-8222-222222222222',now()+interval '1 day')", [ha, hb]);
+        }
+        if (!options.newProject) await seed();
         let deletes = 0;
         function client(code, opts = {}) {
             const sdk = createClient(url, token, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }, global: { fetch: async (input, init) => { const u = new URL(typeof input === 'string' ? input : input.url); if (u.origin !== url)
@@ -207,7 +211,7 @@ async function world(mode, adminDeps) {
             d.createUser = async (...args) => { await f(...args); return { ok: false, reason: 'unavailable' }; };
         } return d; }
         async function snapshot() { return { users: Number((await c.query('select count(*) from auth.users')).rows[0].count), identities: Number((await c.query('select count(*) from auth.identities')).rows[0].count), members: (await c.query('select user_id,tenant_id,username from public.tenant_members')).rows, uses: (await c.query('select used_count from public.tenant_invites order by code_hash')).rows.map(r => r.used_count), deletes }; }
-        return { c, name, deps, client, snapshot, version: health.version, close: async () => { for (const sdk of clients)
+        return { c, name, deps, client, snapshot, seed, version: health.version, close: async () => { for (const sdk of clients)
                 sdk.auth.stopAutoRefresh(); await stopAuth(server); await c.end(); } };
     }
     catch (e) {
@@ -221,6 +225,91 @@ async function world(mode, adminDeps) {
     const { adminDeps } = await compile('admin-deps.ts');
     try {
         await H.start();
+        const { activationSql } = await import(pathToFileURL(ROOT + '/supabase/scripts/registration-onboarding.mjs'));
+        const activation = () => activationSql('abcdefghijklmnopqrst', Date.now());
+        {
+            const w = await world('atomic', adminDeps, { newProject: true });
+            try {
+                const before = await w.snapshot();
+                const readiness = await w.deps(ha).registrationReady();
+                const refused = await w.deps(ha).createUser('fresh_user@users.zoew.invalid', pw, { username: 'fresh_user', codeHash: ha });
+                check('onboarding', 'migration ថ្មីនៅបិទ និង Auth មិនប្រែ', readiness === false && !refused.ok && JSON.stringify(await w.snapshot()) === JSON.stringify(before));
+                const admin = await w.client(ha).auth.admin.createUser({ email: 'admin@admin.zoew.invalid', password: pw, email_confirm: true });
+                if (admin.error || !admin.data.user) throw Error('platform admin fixture failed');
+                await w.c.query('insert into public.platform_admins(user_id) values($1)', [admin.data.user.id]);
+                await w.c.query(activation());
+                check('onboarding', 'ការបើក project ថ្មីទទួល platform admin ដែលមានរួច', await w.deps(ha).registrationReady() === true && (await w.snapshot()).users === 1);
+                await w.seed();
+                const registered = await handle({ invite: ia, username: 'fresh_user', password: pw }, w.deps(ha));
+                const loggedIn = await w.deps(ha).passwordUserId('fresh_user@users.zoew.invalid', pw);
+                const after = await w.snapshot();
+                check('onboarding', 'project បើករួចចុះឈ្មោះតាម Auth ពិត និង first login ឆ្លង', registered.status === 200 && after.users === 2 && after.identities === 2 && after.members.length === 1 && after.members[0].user_id === loggedIn && after.uses.reduce((a, b) => a + b, 0) === 1 && after.deletes === 0, { registered, after });
+                await w.c.query(activation());
+                check('onboarding', 'project ដែលបើករួចមិនត្រូវបិទ ឬសរសេរឡើងវិញ', await w.deps(ha).registrationReady() === true && JSON.stringify(await w.snapshot()) === JSON.stringify(after));
+            } finally { await w.close(); }
+        }
+        for (const [label, setup] of [
+            ['មានហាងរួច', w => w.seed()],
+            ['Auth user មិនមែន admin', async w => { await w.client(ha).auth.admin.createUser({ email: 'other@users.zoew.invalid', password: pw, email_confirm: true }); }],
+            ['protocol មិនត្រូវគ្នា', w => w.c.query('update private.registration_protocol set protocol=2')],
+            ['enrollment trigger បិទ', w => w.c.query('alter table auth.users disable trigger zoe_enroll_registration_at_commit')],
+            ['column gate បើកសិទ្ធិដល់ client', w => w.c.query('grant update(accepting) on private.registration_protocol to authenticated')],
+            ['service ខ្វះសិទ្ធិ capability', w => w.c.query('revoke execute on function public.registration_capability_v1() from service_role')]
+        ]) {
+            const w = await world('atomic', adminDeps, { newProject: true });
+            try {
+                await setup(w);
+                const before = await w.snapshot();
+                let refused = false;
+                try { await w.c.query(activation()); } catch { refused = true; await w.c.query('rollback'); }
+                check('onboarding', label + ' បដិសេធការបើក ដោយគ្មានការប្ដូរគណនី/សមាជិក/កូដ', refused && (await w.c.query('select accepting from private.registration_protocol')).rows[0].accepting === false && JSON.stringify(await w.snapshot()) === JSON.stringify(before));
+            } finally { await w.close(); }
+        }
+        {
+            const w = await world('atomic', adminDeps, { newProject: true });
+            try {
+                let refused = false;
+                try { await w.c.query(activationSql('abcdefghijklmnopqrst', Date.now() - 10 * 60 * 1000)); } catch { refused = true; await w.c.query('rollback'); }
+                check('onboarding', 'preflight ផុតសុពលភាពមិនអាចបើក gate', refused && (await w.c.query('select accepting from private.registration_protocol')).rows[0].accepting === false);
+            } finally { await w.close(); }
+        }
+        for (const [label, breakGate] of [
+            ['protocol របស់ gate ដែលបើករួចមិនត្រូវគ្នា', w => w.c.query('update private.registration_protocol set protocol=2')],
+            ['trigger របស់ gate ដែលបើករួចខូច', w => w.c.query('alter table auth.users disable trigger zoe_enroll_registration_at_commit')]
+        ]) {
+            const w = await world('atomic', adminDeps);
+            try {
+                await breakGate(w);
+                const before = await w.snapshot();
+                let refused = false;
+                try { await w.c.query(activation()); } catch { refused = true; await w.c.query('rollback'); }
+                check('onboarding', label + ' បដិសេធច្បាស់ ដោយមិនប្ដូរ gate', refused && (await w.c.query('select accepting from private.registration_protocol')).rows[0].accepting === true && JSON.stringify(await w.snapshot()) === JSON.stringify(before));
+            } finally { await w.close(); }
+        }
+        for (const [label, insert] of [
+            ['tenant', "insert into public.tenants(name,branch_code,expires_at) values('Concurrent','CONCURRENT',now()+interval '1 day')"],
+            ['Auth user', "insert into auth.users(id,email) values('33333333-3333-4333-8333-333333333333','concurrent@users.zoew.invalid')"]
+        ]) {
+            const w = await world('atomic', adminDeps, { newProject: true });
+            const writer = await H.connect('postgres', w.name), activator = await H.connect('postgres', w.name);
+            try {
+                await writer.query('begin');
+                await writer.query(insert);
+                const pid = Number((await activator.query('select pg_backend_pid() pid')).rows[0].pid);
+                let settled = false;
+                const activationResult = activator.query(activation()).then(() => { settled = true; return false; }, () => { settled = true; return true; });
+                let blocked = false;
+                for (let i = 0; i < 100; i++) {
+                    if ((await w.c.query('select wait_event_type from pg_stat_activity where pid=$1', [pid])).rows[0]?.wait_event_type === 'Lock') { blocked = true; break; }
+                    await new Promise(r => setTimeout(r, 10));
+                }
+                const waiting = blocked && !settled;
+                await writer.query('commit');
+                const refused = await activationResult;
+                await activator.query('rollback');
+                check('onboarding-lock', 'ដំណាលគ្នា ' + label + ' មិនអាចឆ្លងកាត់ការផ្ទៀង project ទទេ', waiting && refused && (await w.c.query('select accepting from private.registration_protocol')).rows[0].accepting === false && (await w.snapshot()).members.length === 0);
+            } finally { await writer.query('rollback'); await writer.end(); await activator.end(); await w.close(); }
+        }
         for (const mode of ['atomic']) {
             {
                 const w = await world(mode, adminDeps), entered = pause(), release = pause();
@@ -370,6 +459,7 @@ async function world(mode, adminDeps) {
         if (result.some(r => !r.pass))
             throw Error('candidate actual Auth test failure');
         console.log('ACTUAL AUTH CANDIDATE VERIFIED ' + result.length + ' checks.');
+        process.exitCode = 0;
     }
     finally {
         H.stop();

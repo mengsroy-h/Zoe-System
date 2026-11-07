@@ -117,20 +117,24 @@ select version, name from supabase_migrations.schema_migrations order by version
 version ដែលអនុវត្តរួច តែមិនលេច (ឬ `relation … does not exist`) ➜ កត់វាថាអនុវត្តរួច (**មិនរត់ SQL ម្តងទៀត**) ៖
 
 ```bash
-npx supabase@latest login
-npx supabase@latest link --project-ref <project-ref>
-npx supabase@latest migration repair --status applied <version> <version> …
+npx supabase@3.0.0 login
+npx supabase@3.0.0 link --project-ref <project-ref>
+npx supabase@3.0.0 migration repair --status applied <version> <version> … --remote=<project-ref>
 ```
 
 ⛔ **migration ដែលមានក្នុង `main` រួច កុំកែ កុំលុប កុំប្តូរឈ្មោះ** ៖ ការ deploy អនុវត្តតែ version ថ្មី ➜ ការកែឯកសារចាស់ **មិនទៅដល់ Database ទេ (ស្ងាត់)**។
 ការប្តូរ schema = ឯកសារ `YYYYMMDDHHMMSS_<ឈ្មោះ>.sql` **ថ្មី** ដែល version ក្រោយគេ (`supabase-datastore-test` ធ្លាក់ពេលឯកសារក្នុង `origin/main` ប្រែ ឬ version ថ្មីនៅមុន)។
 
-ផ្លូវដោយដៃ ៖
+ផ្លូវដោយដៃ ៖ ពាក្យបញ្ជាខាងក្រោម pin CLI `3.0.0`។ មុនប្រើ ពិនិត្យ `npx supabase@3.0.0 --version` និង `--help` របស់ command នោះ។
+Hosted target ត្រូវច្បាស់ជា `--remote=<project-ref>`; កុំយកជោគជ័យរបស់ local stack ជា deployment។ CLI សួរបញ្ជាក់មុន hosted change;
+automation ប្រើ `--yes` តែក្រោយអនុម័ត project និងសកម្មភាពនោះ។ មិនត្រូវ upgrade/install ឧបករណ៍ដោយស្ងាត់ទេ។
+ឯកសារផ្លូវការ៖ [CLI v3 និងការជ្រើស target](https://supabase.com/docs/guides/local-development/cli/migrating-to-v3)។
+
 
 ```bash
-npx supabase@latest login
-npx supabase@latest link --project-ref <project-ref>
-npx supabase@latest db push
+npx supabase@3.0.0 login
+npx supabase@3.0.0 link --project-ref <project-ref>
+npx supabase@3.0.0 db push --remote=<project-ref>
 ```
 
 ឬ SQL Editor ➜ paste [`migrations/`](migrations) **តាមលំដាប់ឈ្មោះ** ➜ Run ម្តងមួយឯកសារ (ផ្លូវនេះមិនកត់ `schema_migrations` ➜ `migration repair` មុនប្រើ Deploy ពី GitHub)។
@@ -185,12 +189,12 @@ embedded field តែមួយមិនបញ្ជាក់ APPLIED ក្រ�
 ⛔ វាយ secret ក្នុង terminal របស់អ្នកផ្ទាល់ — កុំ paste ក្នុង chat ឬ commit ចូល repo។
 
 ```bash
-npx supabase@latest secrets set \
+npx supabase@3.0.0 secrets set --remote=<project-ref> \
   ZOE_SECRET_KEY=<sb_secret_…> \
   ZOE_LOGIN_DOMAIN=users.zoew.invalid \
   ZOE_ALLOWED_ORIGINS=https://<site-zoew>.netlify.app,https://localhost
-npx supabase@latest functions deploy register --no-verify-jwt
-npx supabase@latest functions deploy reset-password --no-verify-jwt
+npx supabase@3.0.0 functions deploy register --no-verify-jwt --remote=<project-ref>
+npx supabase@3.0.0 functions deploy reset-password --no-verify-jwt --remote=<project-ref>
 ```
 
 | Secret | ចាំបាច់ | ច្បាប់ |
@@ -205,6 +209,47 @@ Deploy ពី GitHub deploy `register` · `reset-password` (ប្រកាស�
 Secret ខ្វះ/ខុស ➜ function ឆ្លើយ `503 server-unconfigured` (fail closed)។ `--no-verify-jwt` ចាំបាច់ ៖ key ប្រភេទថ្មី (`sb_publishable_…`) មិនមែន JWT ហើយ
 អ្នកចុះឈ្មោះមិនទាន់មានគណនី ➜ function ផ្ទៀងកូដអញ្ជើញដោយខ្លួនឯង។
 
+### ជំហានទី ៣ក — បើកការចុះឈ្មោះលើ Project ថ្មី
+
+Migration រក្សា `private.registration_protocol.accepting = false` រហូតដល់ operator បើកដោយចេតនា។ Deploy ជោគជ័យមិនមានន័យថា
+registration បើកទេ។ Merge បន្ទាប់មិនបិទឬបើក gate ឡើងវិញ ហើយកុំកែ migration ដែលអនុវត្តរួច។
+ធ្វើជំហាននេះ **មុនបង្កើតហាង/កូដអញ្ជើញដំបូងក្នុង ZoeKeyGen**។ Admin ដំបូងដែលមានក្នុង `platform_admins` អាចមានរួច។
+
+1. ផ្ទៀង migrations ទាំងអស់ និង `register` deployment លើ project-ref ដដែល។ រក្សា Auth settings នៅជំហានទី១។
+   បញ្ជាក់ថាគ្មាន deployment ចាស់/legacy registration request នៅសល់; សម្រាប់ project ដែលធ្លាប់ប្រើរួច កុំប្រើផ្លូវ new-project នេះ។
+   Probe ខាងក្រោមបញ្ជាក់តែ worker ដែលបានឆ្លើយ មិនបញ្ជាក់ថា worker ចាស់ទាំងអស់បានបញ្ចប់ទេ។ កុំផ្ញើ Setup Link មុនបញ្ចប់។
+2. ប្រើ Node ដែលដំឡើងស្រាប់ (ត្រូវគាំទ្រ `fetch`) នៅ root repo។ កំណត់ environment variable `SUPABASE_PUBLISHABLE_KEY`
+   ជា publishable key របស់ project នោះ។ ឧ. PowerShell៖ `$env:SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_…'` ឬ Bash៖
+   `export SUPABASE_PUBLISHABLE_KEY='sb_publishable_…'`។ ឧបករណ៍បដិសេធ secret/service-role key; មិនត្រូវដាក់ key ក្នុង argument ឬ chat។
+3. ពិនិត្យតែអាន៖
+
+```bash
+node supabase/scripts/registration-onboarding.mjs --project-ref <project-ref> --origin https://<site-zoew>.netlify.app
+```
+
+ឧបករណ៍អាន public Auth settings (`disable_signup=true`) និងហៅ POST `register` ជាមួយ `registrationProtocol` ប៉ុណ្ណោះ។
+វាផ្ទៀង protocol, response shape និង CORS origin; មិនបង្កើតគណនី មិនស៊ីកូដ និងមិនសរសេរ Database។ `ready=false` មានន័យថា gate/schema
+មិនទាន់បញ្ជាក់ថាអាចចុះឈ្មោះបាន; មិនមែន error របស់ពាក្យសម្ងាត់ទេ។ មិនអាចអាន ឬ response ចាស់/មិនស្គាល់ ➜ ឈប់។
+
+4. ក្រោយម្ចាស់អនុម័តឱ្យបើក **project-ref នេះ** និងផ្ទៀង prerequisites រួច ត្រៀម SQL៖
+
+```bash
+node supabase/scripts/registration-onboarding.mjs --project-ref <project-ref> --origin https://<site-zoew>.netlify.app --prepare-sql --confirm-project <project-ref> --confirm-auth-settings --confirm-no-legacy-requests
+```
+
+Flags `--confirm-*` ជា **ការបញ្ជាក់របស់ operator** មិនមែនការផ្ទៀងដោយម៉ាស៊ីន។ Output ជា SQL ពី
+[`activate-new-project-registration.sql`](scripts/activate-new-project-registration.sql); **មិនទាន់បានអនុវត្ត**។ វាមានសុពលភាព៥នាទី;
+ផ្ទៀង URL និង project-ref ក្នុង Dashboard SQL Editor ឱ្យស្មើ output មុន Run (SQL មិនអាចដឹង project-ref របស់ Dashboard ដោយខ្លួនឯងទេ)។
+កុំរត់ template ដោយផ្ទាល់ ឬយក SQL របស់ project មួយទៅប្រើលើ project ផ្សេង។
+
+Transaction ចាក់សោ gate/Auth/tenants/invites/members/admins, បដិសេធ project ដែលមានហាង/កូដ/សមាជិក ឬ Auth user ដែលមិនមែន platform admin,
+ផ្ទៀង protocol និងសិទ្ធិ, បើក gate ហើយពិនិត្យ `registration_capability_v1().ready=true` មុន commit។ កំហុស ➜ rollback គ្មានការលុបឬជួសជុលទិន្នន័យ។
+Lock រង់ចាំអតិបរមា៥វិនាទី និង statement១៥វិនាទី។ Gate ដែលបើករួចមិនត្រូវបិទ/បើកឡើងវិញ។ មិនអនុញ្ញាតឱ្យ client role កែ gate ឬហៅ capability RPC ទេ។
+
+5. រត់ពាក្យបញ្ជា read-only ម្តងទៀត៖ ត្រូវ `ready=true`។ ទើបបន្តទៅហាងដំបូង និងសាក invite registration + first login លើ project នោះ។
+   `ready=true` មិនជំនួសការសាកគណនីពិត ឬ backup/restore ទេ។ បើ fail កុំប្ដូរ gate ដោយ `UPDATE` ផ្ទាល់ដើម្បីរំលងការផ្ទៀង;
+   កត់ project/ref និង failure ដែលគ្មាន secret ហើយពិនិត្យ deployment/schema/permissions។
+
 ### ជំហានទី ៤ — Netlify (site ZoeW)
 
 Environment variables ៖ `SUPABASE_URL` · `SUPABASE_PUBLISHABLE_KEY` ➜ «ទាញបញ្ជីកញ្ចប់ពី ZTO» ស្គាល់សាខារបស់ហាងពី token Supabase (`my_account()`) ·
@@ -213,6 +258,8 @@ Environment variables ៖ `SUPABASE_URL` · `SUPABASE_PUBLISHABLE_KEY` ➜ «ទ
 ព្រំដែន ZTO proxy, cache សិទ្ធិ និងការសាកច្រើនហាង ➜ [ការរៀបចំ ZTO](../ZoeW/ZTO-SETUP-KH.md#ព្រំដែនពេលបន្ថែមហាង-និងឧបករណ៍)។
 
 ### ជំហានទី ៥ — ហាងដំបូង (ZoeKeyGen)
+
+ត្រូវបញ្ចប់ជំហានទី៣ក និងឃើញ `ready=true` មុនចេញ Setup Link។
 
 1. ZoeKeyGen ➜ កាត «🔗 បង្កើត Setup Link» ➜ បំពេញ **Base URL របស់ ZoeW** (Link កូដអញ្ជើញប្រើវា)។
 2. កាត «🏪 ហាង Supabase» ➜ Supabase URL · Publishable key · អ៊ីមែល/ពាក្យសម្ងាត់ Admin ➜ **🔐 ចូល Supabase ជា Admin**។
@@ -229,7 +276,7 @@ Environment variables ៖ `SUPABASE_URL` · `SUPABASE_PUBLISHABLE_KEY` ➜ «ទ
    `supabase/`) · Branch limit តូច (ឧ. ២)។ branch នីមួយៗ ៖ Database ទទេដែលរត់ migration ទាំងអស់ពីសូន្យ (អ្នកយាមវាស់ផ្លូវនេះលើ Postgres ពិតរាល់ការរត់) ·
    Edge Function deploy ដោយខ្លួនឯង · ការកំណត់ Auth ក្នុង `config.toml` អនុវត្តលើ branch (sign-up បិទ ដូចផលិតកម្ម) · គ្មានទិន្នន័យហាង។
    ⛔ secret ជារបស់ **branch នីមួយៗ** ៖ ដើម្បីសាកការចុះឈ្មោះលើ branch ៖
-   `npx supabase@latest secrets set --project-ref <branch-project-ref> ZOE_LOGIN_DOMAIN=users.zoew.invalid ZOE_ALLOWED_ORIGINS=<origin សាកល្បង>`
+   `npx supabase@3.0.0 secrets set --remote=<branch-project-ref> ZOE_LOGIN_DOMAIN=users.zoew.invalid ZOE_ALLOWED_ORIGINS=<origin សាកល្បង>`
    (`ZOE_SECRET_KEY` ៖ Function ប្រើ `SUPABASE_SERVICE_ROLE_KEY` របស់ branch ពេលគ្មាន ➜ បើ legacy key បិទ ➜ កំណត់ secret key **របស់ branch**) · គ្មាន secret ➜
    `503 server-unconfigured` (មិនប៉ះផលិតកម្ម) · admin សាកល្បង ៖ insert `platform_admins` ក្នុង SQL Editor **របស់ branch**។
 3. **ការពារ `main`** ៖ GitHub ➜ Settings ➜ Branches ➜ `main` ➜ **Require status checks to pass** ➜ ជ្រើស **Supabase Preview** ➜ PR ដែល migration ធ្លាក់លើ

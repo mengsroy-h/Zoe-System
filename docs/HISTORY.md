@@ -1962,6 +1962,15 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-11-07 · លំហូរបើក registration លើ Supabase Project ថ្មី
+
+- តាមសំណើម្ចាស់សម្រាប់ការបន្ថែម project ថ្មី៖ បន្ថែម preflight ដែលអាន public Auth settings និង protocol probe របស់ `register`; CLI ប្រើតែ publishable key និង HTTPS project-ref ត្រឹមត្រូវ។ Test ថ្មីរត់មុនកែ handler លើ `0db0bb7` បានក្រហម៖ response `400 invite-invalid` ជំនួស protocol response។
+- SQL activation ដាច់ពី migration និង merge៖ lock gate/Auth/ហាង/កូដ/សមាជិក/admin ក្នុង transaction មានពិដាន; ទទួលតែ project ទទេ (អាចមាន platform admin), ផ្ទៀង protocol/ACL និង capability មុន commit។ កំហុស rollback; gate បើករួចរក្សាដដែល ប៉ុន្តែ gate ខូចបដិសេធច្បាស់។ SQL ត្រូវប្រើក្នុង៥នាទី និង operator ត្រូវផ្ទៀង SQL Editor project-ref; comment មិនមែនការផ្ទៀង DB identity។
+- `--confirm-*` កត់ការបញ្ជាក់របស់ operator លើ project/Auth settings/legacy-request drain។ Probe បញ្ជាក់តែ worker ដែលឆ្លើយ មិនបញ្ជាក់ worker ចាស់ទាំងអស់។ គ្មាន Management API token, permission ថ្មី, account creation, hosted DB write ឬ deploy ក្នុងការកែនេះ។ Migration ចាស់ និង gate របស់ project ដែលកំពុងប្រើមិនប្ដូរ។
+- Local៖ Node behavioral groups ៩ ឆ្លង; `supabase-functions-test` មាន 182 assertions ឆ្លង ប៉ុន្តែ SDK seam/CORS SDK/typecheck/admin-deps mutations រំលងព្រោះ dependency មិនដំឡើង។ PostgreSQL/GoTrue មិនមាន runtime ដែលអាចប្រើសម្រាប់ការផ្ទៀង local នេះ។ Actual Auth/SQL cases សម្រាប់ fresh activation, first login, invalid preconditions, already-open broken gate និង concurrent writes បន្ថែមក្នុង workflow; មិនទាន់រត់ local។ ត្រូវយក CI លើ commit ថ្មីជាភស្តុតាងចុងក្រោយ។
+- CI លើ `039845f3`៖ Registration Auth 28/28 និង Node groups 9/9 ឆ្លង; ZTO/native 122 files/2784 tests ឆ្លង។ Audit1215 ឆ្លង shard 1/2/4 តែ shard3 ធ្លាក់ checker-coverage ព្រោះ Node child suite នៅថតកំពូល មិនមែន direct run-all entry។ ផ្នែក static នៃ meta-checker ដើម reproduce 28 ឆ្លង/1 ធ្លាក់ មុនកែ។ ផ្លាស់ child suite ទៅ `audit-tools/tests/` និងកែ caller/root path ដោយរក្សា assertions និង normal/baseline តាម supabase-functions ដដែល; មិនកែ meta-checker ឬបង្កើត exception។ ត្រូវផ្ទៀង CI លើ commit ថ្មីម្តងទៀត។
+- ឯកសារដំឡើង pin CLI `3.0.0` ជាមួយ `--remote=<project-ref>` និងពន្យល់ confirmation សម្រាប់ hosted changes; មិនដំឡើង CLI នេះក្នុង session។ ការចុះឈ្មោះជាក់ស្ដែងលើ project ថ្មី និង backup/restore នៅត្រូវផ្ទៀងពេលដាក់ប្រើ។
+
 ### 2026-11-07 · កែការរង់ចាំក្នុង tests និងរក្សាកំហុស F03 ដើម
 
 Windows focused baseline រកឃើញ fixed sleeps មិនរង់ចាំប្រតិបត្តិការ mock ទៅដល់ចំណុចដែលតេស្តចង់វាស់៖ mirror ធ្លាក់22/114 និង pickup/remove ធ្លាក់11/43។ ប្ដូរទៅការបញ្ជាក់ថា mock backend បានព្យួរពិត, requests មុនបានបញ្ចប់, intent បានលែង និង cleanup barrier បានសម្រេច។ រក្សា assertions លើប្រាក់, journal, stale view, Reset និង multi-device ដដែល។ Microtask scan 80 ទីតាំងប្រើ fake timer ដើម្បីបញ្ចប់ការងារដែលបានកំណត់ ដោយមិនបង្កើន deadline របស់ test។

@@ -20,6 +20,15 @@ function errorMessage(error: unknown): string {
 
 export function adminDeps(client: SupabaseClient, timeoutMs = ADMIN_CALL_TIMEOUT_MS, openProbe?: () => SupabaseClient) {
     return {
+        async registrationReady(): Promise<boolean | null> {
+            try {
+                const { data, error } = await withTimeout(Promise.resolve(client.rpc('registration_capability_v1')), timeoutMs, 'timeout');
+                if (error || !data || Array.isArray(data) || data.protocol !== 'zoe-registration-v1' || typeof data.ready !== 'boolean') return null;
+                return data.ready;
+            } catch {
+                return null;
+            }
+        },
         async inviteIsUsable(codeHash: string): Promise<boolean | null> {
             try {
                 const { data, error } = await withTimeout(Promise.resolve(client.rpc('invite_is_usable', { p_code_hash: codeHash })), timeoutMs, 'timeout');

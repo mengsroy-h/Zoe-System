@@ -760,6 +760,22 @@
       ],
       "evidence": "zoew-suite រត់ source-function-reachability.test.ts ដែលវាស់ graph និង CLI ពិតលើ TypeScript fixtures; ផ្ទៀង binding, root, unknown និង source hash។",
       "limitation": "Report-only សម្រាប់ private top-level named functions; មិនជំនួស function-surface gate ហើយមិនបញ្ជាក់សិទ្ធិលុប។"
+    },
+    "registration-onboarding": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/supabase-functions-test.js"
+      ],
+      "evidence": "រត់ CLI core និង handler ពិតលើ fetch/RPC fixture; បដិសេធ target/key/response មិនត្រឹមត្រូវ, ខ្វះការបញ្ជាក់ និងការរៀបចំ SQL លើ gate ដែលបើករួច។",
+      "limitation": "Mock transport មិនមែន Edge gateway ឬ Auth settings របស់ project ពិត; integration workflow ផ្ទៀង SQL និង GoTrue ដោយឡែក។"
+    },
+    "registration-onboarding-sql": {
+      "category": "static",
+      "guards": [
+        "audit-tools/supabase-functions-test.js"
+      ],
+      "evidence": "អាន SQL template ពិតតាម CLI និងផ្ទៀង lock, timeout, លំដាប់ freshness/readiness និងគ្មាន cleanup/grant។",
+      "limitation": "Static contract មិនបញ្ជាក់ transaction behavior ទេ; registration-auth integration រត់ SQL ពិតជាមួយ GoTrue/Postgres បណ្ដោះអាសន្ន។"
     }
   },
   "files": {
@@ -4814,12 +4830,12 @@
     ".github/workflows/registration-auth.yml": {
       "policy": "registration-auth-reviewed-fixture",
       "encoding": "lf-text",
-      "sha256": "c9bee41b8efe83208350306f21b6331768168e509c251168cfb10399b4a9ca7a"
+      "sha256": "a1598dcb067601efe6879e2a4f9175392ba653a996bdbfc02ba33d49f9dffdcd"
     },
     "audit-tools/registration-auth-integration.cjs": {
       "policy": "registration-auth-reviewed-fixture",
       "encoding": "lf-text",
-      "sha256": "7a54d0df4ae99003000b4cccfb9c6139014979f7255821d4863890ea16aebb4c"
+      "sha256": "18c22c4e7c04bfb8cc1e3b59f95a6a1fd235d855eda9a31d8dcd773c66d03c1b"
     },
     "audit-tools/registration-auth-pins.json": {
       "policy": "registration-auth-reviewed-fixture",
@@ -4837,6 +4853,17 @@
     },
     "ZoeW/tests/source-function-reachability.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "supabase/scripts/registration-onboarding.mjs": {
+      "policy": "registration-onboarding"
+    },
+    "supabase/scripts/activate-new-project-registration.sql": {
+      "policy": "registration-onboarding-sql"
+    },
+    "audit-tools/tests/registration-onboarding.test.mjs": {
+      "policy": "registration-auth-reviewed-fixture",
+      "encoding": "lf-text",
+      "sha256": "c8c14a79fa6f74a0d358366e73445d2853c53fa5741a87f521412d83ebe5cc95"
     }
   }
 }

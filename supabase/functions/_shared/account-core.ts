@@ -15,10 +15,11 @@ export type SpentInviteMember = { userId: string; tenantId: string; role: string
 
 export interface HandlerResult {
     status: number;
-    body: { ok: boolean; code: string; tenantId?: string; role?: string };
+    body: { ok: boolean; code: string; tenantId?: string; role?: string; protocol?: string; ready?: boolean };
 }
 
 export interface RegisterDeps {
+    registrationReady?(): Promise<boolean | null>;
     inviteIsUsable(codeHash: string): Promise<boolean | null>;
     spentInviteMember(codeHash: string, username: string): Promise<SpentInviteMember | null | undefined>;
     createUser(email: string, password: string, registration: RegistrationContext): Promise<CreateUserResult>;
@@ -118,6 +119,16 @@ async function diagnoseCreateFailure(deps: RegisterDeps, email: string, password
 export async function handleRegister(input: unknown, deps: RegisterDeps): Promise<HandlerResult> {
     const body = fields(input);
     if (!body) return reply(400, 'bad-request');
+    if ('registrationProtocol' in body) {
+        if (body.registrationProtocol !== 'zoe-registration-v1' || Object.keys(body).length !== 1) return reply(400, 'bad-request');
+        try {
+            const ready = await deps.registrationReady?.();
+            if (typeof ready !== 'boolean') return reply(503, 'db-unavailable');
+            return { status: 200, body: { ok: true, code: 'registration-protocol', protocol: 'zoe-registration-v1', ready } };
+        } catch {
+            return reply(503, 'db-unavailable');
+        }
+    }
     const invite = normalizeInviteCode(body.invite);
     if (!invite) return reply(400, 'invite-invalid');
     if (body.check === true) {

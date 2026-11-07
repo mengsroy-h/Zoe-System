@@ -251,6 +251,7 @@ const MEASURE = async () => {
 
 // ចុចដងអូសពិត និងប្រើ WAAPI ពិត។ ផ្អាកចលនាចាស់ដោយចេតនាដើម្បីគ្រប់គ្រង
 // លំដាប់ callback ក្រោយ watchdog/cleanup; នេះមិនមែនការវាស់ទូរស័ព្ទពិតទេ។
+// ផ្អាកចលនាថ្មីក្នុង task ដដែល ហើយរង់ចាំ promise ចាស់ មិនពឹង rAF មកមុន 220ms។
 const MEASURE_OWNERSHIP = async () => {
     const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
     const frame = () => new Promise(requestAnimationFrame);
@@ -275,18 +276,29 @@ const MEASURE_OWNERSHIP = async () => {
         if (action === 'cleanup') endPanelGlideSnapPause();
         else await wait(PANEL_GLIDE_MS + PANEL_GLIDE_SNAP_GRACE_MS + 30);
         const reset = state(old);
+        let oldOutcome = null;
+        const oldSettled = old.finished.then(
+            () => { oldOutcome = 'finished'; },
+            () => { oldOutcome = 'cancelled'; }
+        );
+        // បញ្ចប់ចាស់មុន click ក្នុង task ដដែល៖ callback នៅ microtask មកក្រោយម្ចាស់ថ្មី។
+        // បើចុចសិន stopPanelGlide បោះបង់ promise ចាស់ ហើយ finish លែងវាស់ផ្លូវជោគជ័យ។
+        if (action === 'finish') old.finish();
+        else old.cancel();
         handle.click();
         const current = main.getAnimations().find(a => a !== old);
         if (!current) throw new Error('ចុចលើកទី២មិនបង្កើតចលនា');
-        await frame();
+        current.pause();
+        current.currentTime = current.effect.getTiming().duration / 2;
         const before = state(current);
-        if (action === 'finish') old.finish();
-        else old.cancel();
-        await frame();
+        const outcomeBefore = oldOutcome;
+        await oldSettled;
+        commitNow();
         const after = state(current);
+        current.finish();
         await current.finished;
-        await wait(50);
-        observations.push({ action, snapBefore, reset, before, after, ended: state(current) });
+        commitNow();
+        observations.push({ action, snapBefore, reset, before, after, outcomeBefore, oldOutcome, ended: state(current) });
         await wait(350);
     }
     return observations;
@@ -522,10 +534,13 @@ const MEASURE_OWNERSHIP = async () => {
         ok(tag + ': #appPages មិនជាប់ offset ក្រោយហូតចុះ', r.pagesScrollTop <= 1, 'scrollTop=' + r.pagesScrollTop);
         for (const sample of r.ownership) {
             ok(tag + ': callback ចាស់មិនដក pause របស់ចលនាថ្មី (' + sample.action + ')',
-                sample.snapBefore !== 'none' && !sample.reset.paused &&
-                sample.before.snap === 'none' && sample.after.snap === 'none' &&
-                sample.after.playState === 'running' && sample.after.currentTime < sample.after.duration &&
-                sample.ended.snap === sample.snapBefore && !sample.ended.paused,
+                sample.snapBefore !== 'none' && sample.reset.snap === sample.snapBefore && !sample.reset.paused &&
+                sample.outcomeBefore === null && sample.oldOutcome === (sample.action === 'finish' ? 'finished' : 'cancelled') &&
+                sample.before.snap === 'none' && sample.before.paused && sample.before.playState === 'paused' &&
+                sample.after.snap === 'none' && sample.after.paused && sample.after.playState === 'paused' &&
+                sample.after.currentTime === sample.before.currentTime && sample.after.currentTime > 0 &&
+                sample.after.currentTime < sample.after.duration &&
+                sample.ended.playState === 'finished' && sample.ended.snap === sample.snapBefore && !sample.ended.paused,
                 JSON.stringify(sample));
         }
     }

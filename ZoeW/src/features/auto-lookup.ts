@@ -1,3 +1,4 @@
+import { captureConnectionOperation } from '../services/connection-flow';
 import { activeElementIsInModal, activeElementIsTextField, fieldValue, focusField, setFieldValue } from '../app/refs';
 import { viewState } from '../core/view-state';
 import { lookupState, scanState, uiState } from '../core/state';
@@ -11,6 +12,7 @@ import { noteZtoPalmSessionRejected, palmSessionLostText } from './zto-palm-logi
 import { getLookupApiConfig, lookupKeyedUrl, lookupSecretLocked } from './lookup-config';
 import { requestPinBeforeConfig } from './pin';
 import { confirmPhone } from './scan-action';
+import { captureLookupOperation } from '../services/lookup-operation';
 import { decryptLookupSecret } from '../services/crypto';
 import { fetchWithTimeout, lookupFailureCooldownMs, lookupFailureIsDefinitive, lookupResponseError, markLookupTimeoutNoRetry, retryAsync, retryTransientLookupResponse } from '../services/network';
 import { showToast } from '../ui/toast';
@@ -288,6 +290,8 @@ export function armLookupFocus(phoneInputName, barcode, lookupPromise) {
 
 export async function attemptAutoLookup(barcode) {
     const lookupKey = String(barcode || '').trim().toUpperCase();
+    getLookupApiConfig();
+    const operation = captureLookupOperation();
     const cfg = getLookupApiConfig();
     if (!cfg || !cfg.enabled || !cfg.url) { dropAutoLookupQueueEntry(lookupKey); return; }
     const isZtoLookup = lookupApiIsZto(cfg);
@@ -369,10 +373,12 @@ export async function attemptAutoLookup(barcode) {
 
     const myGeneration = lookupState.customerDataTableSessionGeneration;
     const settleStaleLookup = () => {
-        if (!autoLookupInFlight.has(lookupKey)) setLookupStatus(barcode, 'warn', '⚠️ ' + lookupSource + ' ត្រូវបានកំណត់ឡើងវិញ — សូមស្កេនម្ដងទៀត');
+        if ((autoLookupInFlight.get(lookupKey) === lookupRunToken && viewState.lookupStatus?.kind === 'lookup-status-loading')
+            || (!autoLookupInFlight.has(lookupKey) && viewState.lookupStatus === loadingStatus)) setLookupStatus(barcode, 'warn', '⚠️ ' + lookupSource + ' ត្រូវបានកំណត់ឡើងវិញ — សូមស្កេនម្ដងទៀត');
     };
     const startedAt = Date.now();
     setLookupStatus(barcode, 'loading', isZtoLookup ? '🔎 កំពុងស្វែងរកពី ZTO...' : '🔎 កំពុងស្វែងរកព័ត៌មានអតិថិជន...');
+    const loadingStatus = viewState.lookupStatus;
     let identity = 'none';
     try {
         const targetUrl = await lookupKeyedUrl(cfg, cfg.url.replace('{barcode}', encodeURIComponent(barcode)));
@@ -381,21 +387,27 @@ export async function attemptAutoLookup(barcode) {
             const decrypted = await decryptLookupSecret(cfg.headerValueEnc);
             if (decrypted) headers[cfg.headerName] = decrypted;
         }
+        operation.assertCurrent();
         await addPalmSessionHeader(cfg, headers);
+        operation.assertCurrent();
         identity = await addZtoIdentityHeader(cfg, headers);
 
         const unreadable = {};
         const out = await retryAsync(
-            () => fetchWithTimeout(targetUrl, { headers }, isZtoLookup ? ZTO_AUTO_LOOKUP_TIMEOUT_MS : AUTO_LOOKUP_TIMEOUT_MS, 'Auto lookup timed out',
+            () => {
+                operation.assertCurrent();
+                return fetchWithTimeout(targetUrl, { headers }, isZtoLookup ? ZTO_AUTO_LOOKUP_TIMEOUT_MS : AUTO_LOOKUP_TIMEOUT_MS, 'Auto lookup timed out',
                 (r) => r.json().catch(() => unreadable))
                 .catch(markLookupTimeoutNoRetry)
-                .then(retryTransientLookupResponse)
+                .then((out) => { operation.assertCurrent(); return retryTransientLookupResponse(out); })
                 .then((o) => {
                     if (o.res.ok && o.body === unreadable) throw lookupResponseError(o.res.status, { code: 'LOOKUP_BAD_BODY' }, true);
                     return o;
-                }),
-            2, isZtoLookup ? 350 : 1500
+                });
+            },
+            2, isZtoLookup ? 350 : 1500, captureConnectionOperation()
         );
+        operation.assertCurrent();
         const data = out.body;
         if (!out.res.ok) throw lookupResponseError(out.res.status, data, false);
         if (myGeneration !== lookupState.customerDataTableSessionGeneration) { settleStaleLookup(); return; }
@@ -428,6 +440,7 @@ export async function attemptAutoLookup(barcode) {
         rememberCustomerTableRow(barcode, phoneVal, codVal, dodVal);
         applyLookupFillToModal(barcode, phoneVal, codVal, dodVal, cfg);
     } catch (e) {
+        if (!operation.current()) { settleStaleLookup(); return; }
         if (myGeneration !== lookupState.customerDataTableSessionGeneration) { settleStaleLookup(); return; }
         autoLookupFailureAt.delete(lookupKey);
         const identityRetry = !!(e && e.lookupCode === 'ZTO_IDENTITY_REQUIRED' && ztoIdentityRefusalIsTransient(e.lookupReason, identity));

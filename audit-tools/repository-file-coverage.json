@@ -736,6 +736,30 @@
       ],
       "evidence": "Runs the server-time handler with GET, invalid nonce/methods and web/native origin inputs.",
       "limitation": "Local handler execution does not prove deployed Netlify routing, CSP, or native WebViews."
+    },
+    "zto-ci-evidence-integrity": {
+      "category": "integrity",
+      "guards": [
+        "audit-tools/repository-file-coverage.js"
+      ],
+      "evidence": "ពិនិត្យ SHA-256 នៃ runner ភស្តុតាង ZTO/native និង controls; កែ bytes ត្រូវ review hash ដោយចេតនា។",
+      "limitation": "Hash មិនបញ្ជាក់ថាតេស្តរត់បៃតងទេ; job ដាច់ក្នុង Audit រត់ controls និង Vitest ពិត ហើយរក្សា JSON។"
+    },
+    "registration-auth-reviewed-fixture": {
+      "category": "integrity",
+      "guards": [
+        "audit-tools/repository-file-coverage.js"
+      ],
+      "evidence": "SHA-256 ចាក់សោ workflow, pin និង fixture Auth ដែលបានពិនិត្យប្រភព។",
+      "limitation": "ការរត់ Docker CI និង PostgREST ពិតមិនទាន់ផ្ទៀងផ្ទាត់; hash មិនមែន behavioral coverage ទេ។"
+    },
+    "source-function-report": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/zoew-suite-test.js"
+      ],
+      "evidence": "zoew-suite រត់ source-function-reachability.test.ts ដែលវាស់ graph និង CLI ពិតលើ TypeScript fixtures; ផ្ទៀង binding, root, unknown និង source hash។",
+      "limitation": "Report-only សម្រាប់ private top-level named functions; មិនជំនួស function-surface gate ហើយមិនបញ្ជាក់សិទ្ធិលុប។"
     }
   },
   "files": {
@@ -2018,6 +2042,9 @@
     "ZoeW/src/services/native-write-recovery.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/src/services/lookup-operation.ts": {
+      "policy": "zoew-app"
+    },
     "ZoeW/src/services/network.ts": {
       "policy": "zoew-app"
     },
@@ -2352,6 +2379,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/export-request-snapshot.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/f03-provider-reporting.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/firebase-auth-write-ownership.test.ts": {
@@ -3399,6 +3429,24 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-returned.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/audit-daily-report.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/audit-lookup-retry-session.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/f03-admission-quiescence.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/f03-heap-diagnostic.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/retry-shared-contract.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/retry-operation-owner.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-session-race.test.ts": {
@@ -4745,6 +4793,49 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/return-notice-mode-matrix.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/meta-checker-modules.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-returned-projection-lifecycle.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/zto-ci-evidence.mjs": {
+      "policy": "zto-ci-evidence-integrity",
+      "encoding": "lf-text",
+      "sha256": "fbf2b22f412cb79a7b0f78c9593cda5f9ca421fcf5cd6fd2ac0a9c4f89893cc9"
+    },
+    "ZoeW/scripts/tests/zto-ci-evidence.test.mjs": {
+      "policy": "zto-ci-evidence-integrity",
+      "encoding": "lf-text",
+      "sha256": "23e49f3fd5ba842a2def3e0cec347c474028610343f9d4e910566685ab1d8ca8"
+    },
+    ".github/workflows/registration-auth.yml": {
+      "policy": "registration-auth-reviewed-fixture",
+      "encoding": "lf-text",
+      "sha256": "c9bee41b8efe83208350306f21b6331768168e509c251168cfb10399b4a9ca7a"
+    },
+    "audit-tools/registration-auth-integration.cjs": {
+      "policy": "registration-auth-reviewed-fixture",
+      "encoding": "lf-text",
+      "sha256": "7a54d0df4ae99003000b4cccfb9c6139014979f7255821d4863890ea16aebb4c"
+    },
+    "audit-tools/registration-auth-pins.json": {
+      "policy": "registration-auth-reviewed-fixture",
+      "encoding": "lf-text",
+      "sha256": "c8ef4d3f7d65aa12407d84c6b8aeeb08efa302e62deb9d2c08975c30bbd66a54"
+    },
+    "supabase/migrations/20261106143034_zoe_atomic_registration.sql": {
+      "policy": "supabase-db"
+    },
+    "ZoeW/tests/registration-atomic-contract.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/source-function-reachability.mjs": {
+      "policy": "source-function-report"
+    },
+    "ZoeW/tests/source-function-reachability.test.ts": {
       "policy": "zoew-self-verification"
     }
   }

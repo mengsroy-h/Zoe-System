@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.35';
+const APP_VERSION = '2.24.36';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -768,11 +768,15 @@ function withTimeout(promise, ms, timeoutMsg) {
     ]);
 }
 
-function retryAsync(fn, attempts, delayMs) {
-    return fn().catch((err) => {
-        if (attempts <= 1 || (err && err.noRetry)) throw err;
-        return new Promise((resolve) => setTimeout(resolve, delayMs)).then(() => retryAsync(fn, attempts - 1, delayMs * 2));
-    });
+function retryAsync(fn, attempts, delayMs, lease = null) {
+    const run = (remaining, delay) => {
+        if (lease && !lease.current()) return Promise.reject(Object.assign(new Error('Connection session changed'), { code: 'CONNECTION_SCOPE_CHANGED', noRetry: true }));
+        return fn().catch((err) => {
+            if (remaining <= 1 || (err && err.noRetry)) throw err;
+            return new Promise((resolve) => setTimeout(resolve, delay)).then(() => run(remaining - 1, delay * 2));
+        });
+    };
+    return run(attempts, delayMs);
 }
 
 function waitForFirebaseSDK(timeoutMs = 15000) {

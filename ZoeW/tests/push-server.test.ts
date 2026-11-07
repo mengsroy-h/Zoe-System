@@ -1126,3 +1126,45 @@ it.each([301, 302, 303, 307, 308])('Push ៖ HTTP redirect %s មិនផ្ទ
         await Promise.all([new Promise<void>(resolve => source.close(() => resolve())), new Promise<void>(resolve => destination.close(() => resolve()))]);
     }
 });
+
+it('រំលឹកប្រចាំថ្ងៃ៖ push បរាជ័យក្រោយ claim មិនផ្ញើម្ដងទៀតនៅថ្ងៃដដែល', async () => {
+    const at8 = Date.UTC(2026, 8, 29, PUSH_EXPIRY_HOUR - 7, 2, 0);
+    const h = harness();
+    h.clock.now = at8 - 3600e3;
+    await h.service.subscribe(GOOD, webSub().sub);
+    await h.service.saveSchedule(GOOD, [at8 + 3600e3]);
+    let attempts = 0;
+    h.push = () => { attempts++; return { status: 503 }; };
+    h.clock.now = at8;
+    expect(await h.service.dispatchExpiry()).toMatchObject({ keys: 1, sent: 0, fail: 1 });
+    expect(attempts).toBe(1);
+    h.clock.now = at8 + 5 * 60e3;
+    h.push = () => { attempts++; return { status: 201 }; };
+    expect(await h.service.dispatchExpiry()).toMatchObject({ keys: 0, sent: 0 });
+    expect(attempts).toBe(1);
+});
+
+it.each(['rejected', 'unknown'])('រំលឹក៖ ជោគជ័យមួយ និងបរាជ័យ %s មួយ មិនផ្ញើម្ដងទៀតទាំងក្រុម', async kind => {
+    const at8 = Date.UTC(2026, 8, 29, PUSH_EXPIRY_HOUR - 7, 2, 0);
+    const h = harness();
+    h.clock.now = at8 - 3600e3;
+    const accepted = webSub();
+    const failed = webSub();
+    await h.service.subscribe(GOOD, accepted.sub);
+    await h.service.subscribe(GOOD, failed.sub);
+    await h.service.saveSchedule(GOOD, [at8 + 3600e3]);
+    const attempts: string[] = [];
+    h.push = url => {
+        attempts.push(url);
+        if (url === accepted.sub.endpoint) return { status: 201 };
+        if (kind === 'unknown') throw new TypeError('Simulated response lost after request');
+        return { status: 503 };
+    };
+    h.clock.now = at8;
+    expect(await h.service.dispatchExpiry()).toMatchObject({ keys: 1, sent: 1, fail: 1 });
+    expect(attempts.sort()).toEqual([accepted.sub.endpoint, failed.sub.endpoint].sort());
+    h.clock.now = at8 + 5 * 60e3;
+    h.push = url => { attempts.push(url); return { status: 201 }; };
+    expect(await h.service.dispatchExpiry()).toMatchObject({ keys: 0, sent: 0 });
+    expect(attempts).toHaveLength(2);
+});

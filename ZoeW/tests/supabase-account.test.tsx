@@ -208,6 +208,42 @@ describe('Modal ចូល/ចុះឈ្មោះ/ប្តូរពាក្�
         expect(alerts).toEqual([ACCOUNT_REPLY_TEXT['registration-unknown']]);
     });
 
+    it('Supabase ៖ Server ឆ្លើយ username-taken ➜ សារជ្រើសឈ្មោះផ្សេង · មិនចូល · ទម្រង់នៅដដែល', async () => {
+        const { fb, calls } = fakeSupabaseFb();
+        fb.registerReply = { status: 409, body: { ok: false, code: 'username-taken' } };
+        firebaseState.fb = fb;
+        firebaseState.auth = { app: {}, currentUser: null };
+        mount(<LoginModal />);
+        step(() => { viewState.backendKind = 'supabase'; openRegisterForm(); });
+        setFieldValue('registerInviteInput', 'abcd-efgh-jkmn-pqrs-tvwx');
+        setFieldValue('registerUsernameInput', 'dara');
+        setFieldValue('registerPasswordInput', 'pass1234');
+        setFieldValue('registerPasswordConfirmInput', 'pass1234');
+        await submitRegisterForm();
+        await settle();
+        expect(alerts).toEqual(['ការចុះឈ្មោះមិនជោគជ័យ៖ ' + ACCOUNT_REPLY_TEXT['username-taken']]);
+        expect(calls.some((c) => c[0] === 'signIn')).toBe(false);
+        expect(viewState.loginMode).toBe('register');
+    });
+
+    it('Supabase ៖ Server ឆ្លើយ invite-invalid ➜ សារសុំកូដថ្មី · មិនចូល · ទម្រង់នៅដដែល', async () => {
+        const { fb, calls } = fakeSupabaseFb();
+        fb.registerReply = { status: 403, body: { ok: false, code: 'invite-invalid' } };
+        firebaseState.fb = fb;
+        firebaseState.auth = { app: {}, currentUser: null };
+        mount(<LoginModal />);
+        step(() => { viewState.backendKind = 'supabase'; openRegisterForm(); });
+        setFieldValue('registerInviteInput', 'abcd-efgh-jkmn-pqrs-tvwx');
+        setFieldValue('registerUsernameInput', 'dara');
+        setFieldValue('registerPasswordInput', 'pass1234');
+        setFieldValue('registerPasswordConfirmInput', 'pass1234');
+        await submitRegisterForm();
+        await settle();
+        expect(alerts).toEqual(['ការចុះឈ្មោះមិនជោគជ័យ៖ ' + ACCOUNT_REPLY_TEXT['invite-invalid']]);
+        expect(calls.some((c) => c[0] === 'signIn')).toBe(false);
+        expect(viewState.loginMode).toBe('register');
+    });
+
     it('Supabase ៖ App អស់ពេលរង់ចាំការប្តូរពាក្យសម្ងាត់ (ពិដាន transport ពិត) ➜ password-reset-unknown (សាកចូលដោយពាក្យសម្ងាត់ថ្មីមុន) · មិនមែន «ភ្ជាប់មិនបាន»', async () => {
         const { fb } = fakeSupabaseFb();
         fb.resetPassword.mockImplementationOnce(async () => {

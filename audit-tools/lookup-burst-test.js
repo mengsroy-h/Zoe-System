@@ -34,6 +34,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { reactRuntime } = require('./react-view');
 
 const ROOT = process.env.LOOKUPBURST_APP_DIR ? path.resolve(process.env.LOOKUPBURST_APP_DIR) : path.resolve(__dirname, '..');
 const APP_JS = path.join(ROOT, 'ZoeW', 'app.js');
@@ -162,6 +163,7 @@ function buildRuntime(opts) {
         }), o.netDelayMs === undefined ? 300 : o.netDelayMs));
     };
     vm.createContext(ctx);
+    vm.runInContext(reactRuntime(SRC, { context: ctx }), ctx);
     const body = CONSTS.concat(NEEDED.concat(OPTIONAL).map((n) => src[n]).filter(Boolean)).join('\n');
     vm.runInContext(body, ctx);
     return ctx;

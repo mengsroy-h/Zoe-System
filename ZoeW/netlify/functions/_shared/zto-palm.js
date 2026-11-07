@@ -55,7 +55,7 @@ const SHARED_LOGIN_TIMEOUT_MS = 6000;
 const SHARED_RETRY_MIN_MS = 2500;
 const SHARED_RENEW_MIN_WAIT_MS = 2500;
 const SHARED_LEASE_MS = 30000;
-const PALM_FINAL_LOGIN_CODES = ['ZTO_PALM_LOGIN_REJECTED', 'ZTO_PALM_VERIFICATION_REQUIRED', 'ZTO_PALM_COUNTRY_UNSUPPORTED'];
+const PALM_FINAL_LOGIN_CODES = ['ZTO_OTHER_BRANCH', 'ZTO_PALM_LOGIN_REJECTED', 'ZTO_PALM_VERIFICATION_REQUIRED', 'ZTO_PALM_COUNTRY_UNSUPPORTED'];
 const sharedSessions = new Map();
 const sharedRenewals = new Map();
 const sharedRenewFailedAt = new Map();
@@ -400,7 +400,9 @@ async function readShared(label, store, proxyKey, env, timeoutMs) {
     if ((current ? current.version : 0) !== version) return { ok: true, entry: current };
     const raw = read.value;
     const text = raw && typeof raw.data === 'string' ? raw.data : '';
-    return { ok: true, entry: rememberShared(label, text ? openShared(text, proxyKey, env) : null, raw && raw.etag, !raw) };
+    const data = text ? openShared(text, proxyKey, env) : null;
+    const bound = data && slotSite(data.site) === label.slice(label.lastIndexOf('/') + 1) ? data : null;
+    return { ok: true, entry: rememberShared(label, bound, raw && raw.etag, !raw) };
 }
 
 function refreshSharedInBackground(label, store, proxyKey, env) {
@@ -463,7 +465,8 @@ async function runRenewShared(label, failedToken, store, proxyKey, keys, env, le
         if (await writeShared(label, lease, store, proxyKey, env, { etag: entry.etag }) !== 'ok') return { transient: 'palm:renew-leased' };
         entry = sharedSessions.get(label);
     }
-    const login = await palmUpstreamLogin({ username: data.u, cipher: data.p, deviceSn: data.d }, keys, SHARED_LOGIN_TIMEOUT_MS);
+    let login = await palmUpstreamLogin({ username: data.u, cipher: data.p, deviceSn: data.d }, keys, SHARED_LOGIN_TIMEOUT_MS);
+    if (login.ok && (!slotSite(login.site) || slotSite(login.site) !== slotSite(data.site))) login = { final: 'ZTO_OTHER_BRANCH', status: 403 };
     const next = login.ok
         ? { kind: 'shared', token: login.token, site: login.site || data.site, siteName: login.siteName || data.siteName, loginAt: Date.now(), u: data.u, p: data.p, d: data.d }
         : { kind: 'rejected', code: login.final, site: data.site, at: Date.now() };

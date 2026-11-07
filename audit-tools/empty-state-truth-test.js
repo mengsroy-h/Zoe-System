@@ -88,7 +88,7 @@ const WANT = ['sanitizeInput', 'ledgerNumber', 'statsMonthOf', 'statsPositive', 
     'barcodeRegistryKey', 'pickupBarcodeKey', 'loadZtoPickupStatusOnce',
     // ⛔ ស្លាក «ខុសទីតាំង» ៖ `buildTrashGroups()` ដាក់ក្រុមតាម `trashDisplayReasonOf()` (ពិត · មិន stub)
     'trashDisplayReasonOf', 'trashItemMisplaced', 'barcodeMisplacedInZto', 'barcodeZtoMisplaced',
-    'trashItemSentOut', 'barcodeSentOutInZto', 'barcodeZtoSentOut', 'barcodeZtoLeftKind', 'trashReturnedEvery',
+    'trashItemSentOut', 'barcodeSentOutInZto', 'barcodeZtoSentOut', 'barcodeZtoLeftKind', 'barcodeReturnedEvidence', 'barcodeReturnBasis', 'trashReturnedEvery',
     'ztoStatusTrashItemCounts', 'barcodeZtoSigned', 'barcodeSignBasis', 'ztoVerdictCandidate', 'getZtoPickupVerdict', 'ztoImportLegacyValid', 'readDurableZtoImportLegacy', 'collectClosedBarcodesForZtoStatus',
     'ztoStatusPendingList', 'ztoStatusPendingCodes', 'ztoStatusUnmeasuredCount',
     'ztoStatusFeatureConfig', 'ztoSyncModalIsOpen',

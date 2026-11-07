@@ -1,0 +1,41 @@
+# GoTrue ពិត និង PostgreSQL ពិត ក្នុង fixture បណ្ដោះអាសន្ន។ គ្មាន secret របស់ project។
+name: Registration Auth integration
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  actual-auth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - run: npm ci --prefix supabase --ignore-scripts
+      - name: ត្រៀម GoTrue ដែល pin ដោយ digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          image=$(node -p "require('./audit-tools/registration-auth-pins.json').auth.image")
+          fixture="$RUNNER_TEMP/zoe-auth-fixture"
+          mkdir -p "$fixture"
+          name="zoe-auth-extract-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          trap 'docker rm -f "$name" >/dev/null 2>&1 || true' EXIT
+          docker pull --platform linux/amd64 "$image"
+          docker create --platform linux/amd64 --name "$name" "$image"
+          docker cp "$name:/usr/local/bin/auth" "$fixture/auth"
+          docker cp "$name:/usr/local/etc/auth/migrations" "$fixture/migrations"
+          chmod 700 "$fixture/auth"
+      - name: សាកការចុះឈ្មោះជាមួយ Auth ពិត
+        env:
+          ZOE_AUTH_FIXTURE_DIR: ${{ runner.temp }}/zoe-auth-fixture
+          ZOE_AUTH_REPORT: ${{ runner.temp }}/registration-auth-results.json
+        run: node audit-tools/registration-auth-integration.cjs

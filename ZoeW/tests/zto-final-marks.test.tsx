@@ -529,3 +529,29 @@ describe('ស្តារពីធុងសំរាម', () => {
         expect(toasts()).toContain(ZTO_RESTORE_FINAL_TEXT);
     });
 });
+
+describe('ស្តារ៖ ភស្តុតាងត្រឡប់ចាស់មិនឆ្លងវគ្គកញ្ចប់', () => {
+    it.each(['restored', 'arrival', 'parent-arrival'])('%s ៖ transaction ស្តារទទួលយកវគ្គថ្មី ទោះឧបករណ៍ចាំត្រឡប់ចាស់', async (kind) => {
+        const extra = kind === 'restored' ? { restoredAt: 300 } : { createdAt: kind === 'arrival' ? 300 : undefined };
+        seedTrash([item('new_lifecycle', [bc('LIFECYCLE', extra)], { createdAt: 300, trashReason: 'returned', deletedAt: 400 })]);
+        noteZtoReturnedEvidence('LIFECYCLE', 200);
+        const result = await claimDeletedItemForRestore('new_lifecycle', 'token', 'target');
+        expect(result.targetId).toBe('target');
+        expect(server[T + 'new_lifecycle'].restoreClaim.token).toBe('token');
+        expect(server[T + 'new_lifecycle'].barcodes[0].ztoReturnedAt).toBeUndefined();
+    });
+    it.each(['sent', 'misplaced', 'left'])('%s ចាស់៖ transaction ស្តារមិនអាចរំលងត្រាត្រឡប់នៃវគ្គថ្មី', async (kind) => {
+        seedTrash([item('new_return', [bc('LIFECYCLE', { restoredAt: 300, ztoReturnedAt: 400 })], { trashReason: 'returned', deletedAt: 500 })]);
+        const before = structuredClone(server[T + 'new_return']);
+        noteZtoReturnedEvidence('LIFECYCLE', 200, kind);
+        await expect(claimDeletedItemForRestore('new_return', 'token', 'target')).rejects.toThrow('RESTORE_ZTO_FINAL');
+        expect(server[T + 'new_return']).toEqual(before);
+    });
+    it('ធាតុហាមស្តាររួចមិនត្រូវបន្ធូរឬផ្លាស់ទិន្នន័យ', async () => {
+        seedTrash([item('frozen', [bc('LIFECYCLE', { restoredAt: 300 })], { trashReason: 'returned', deletedAt: 400, restoreBlocked: true })]);
+        const before = structuredClone(server[T + 'frozen']);
+        noteZtoReturnedEvidence('LIFECYCLE', 200);
+        await expect(claimDeletedItemForRestore('frozen', 'token', 'target')).rejects.toThrow('RESTORE_ZTO_FINAL');
+        expect(server[T + 'frozen']).toEqual(before);
+    });
+});

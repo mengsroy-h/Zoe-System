@@ -86,6 +86,7 @@ function fakeDeps(over) {
             return queue || { ok: true, tenantId: 't-1', role: 'member' };
         },
         deleteUser: async (id) => { log.push(['delete', id]); return over && 'deleted' in over ? over.deleted : true; },
+        diagnoseRegistration: async (h, u) => { log.push(['diagnose', h, u]); return over && 'diagnosis' in over ? over.diagnosis : 'unknown'; },
         passwordUserId: async (email, pw) => { log.push(['signin', email, pw]); return over && 'owner' in over ? over.owner : null; },
         spentInviteMember: async (h, u) => { log.push(['spent', h, u]); return over && 'spent' in over ? over.spent : null; },
         claimResetCode: async (u, h, id) => { log.push(['check', u, h, id]); return over && Array.isArray(over.members) ? over.members.shift() : over && 'member' in over ? over.member : 'user-9'; },
@@ -162,7 +163,7 @@ async function groupAccount(m, rec) {
         r.status === 200 && r.body.code === 'registered' && r.body.tenantId === 't-old' && r.body.role === 'owner' && f.kinds() === 'usable,spent,signin'
         && !!spentSignin && spentSignin[1] === 'sokha@u.zoew.invalid' && spentSignin[2] === 'secret-pass', { r, log: f.log });
     for (const [label, owner, status, code] of [['ពាក្យសម្ងាត់ខុស', null, 403, 'invite-invalid'], ['ពាក្យសម្ងាត់ជារបស់គណនីផ្សេង', 'user-other', 403, 'invite-invalid'],
-        ['Auth មិនឆ្លើយ', undefined, 502, 'auth-unavailable']]) {
+        ['Auth មិនឆ្លើយ', undefined, 502, 'registration-unknown']]) {
         f = fakeDeps({ usable: false, spent: SPENT, owner });
         r = await A.handleRegister(REG, f.deps);
         rec('ចុះឈ្មោះ ៖ កូដប្រើរួច + ' + label + ' ➜ ' + status + ' ' + code + ' · tenant មិនលេច · មិន create/finish/delete',
@@ -176,12 +177,41 @@ async function groupAccount(m, rec) {
     r = await A.handleRegister(REG, f.deps);
     rec('ចុះឈ្មោះ ៖ DB មិនឆ្លើយពេលពិនិត្យកូដ ➜ 502 · មិនបង្កើតគណនី', r.status === 502 && r.body.code === 'db-unavailable' && f.kinds() === 'usable', { r, log: f.kinds() });
     const createCases = [['exists', 409, 'username-taken', 'usable,create,signin'], ['weak', 400, 'password-weak', 'usable,create'],
-        ['unavailable', 502, 'auth-unavailable', 'usable,create']];
+        ['unavailable', 502, 'registration-unknown', 'usable,create,signin,diagnose']];
     for (const [reason, status, code, kinds] of createCases) {
         f = fakeDeps({ created: { ok: false, reason } });
         r = await A.handleRegister(REG, f.deps);
         rec('ចុះឈ្មោះ ៖ createUser ' + reason + ' ➜ ' + status + ' ' + code + ' (' + kinds + ')', r.status === status && r.body.code === code && f.kinds() === kinds, { r, log: f.kinds() });
     }
+    const UNAVAIL = { ok: false, reason: 'unavailable' };
+    for (const [diagnosis, status, code] of [['username-taken', 409, 'username-taken'], ['invite-invalid', 403, 'invite-invalid'],
+        ['unknown', 502, 'registration-unknown'], [null, 502, 'registration-unknown']]) {
+        f = fakeDeps({ created: UNAVAIL, diagnosis });
+        r = await A.handleRegister(REG, f.deps);
+        const d = f.log.find((x) => x[0] === 'diagnose');
+        rec('ចុះឈ្មោះ ៖ create មិនដឹង + ពិនិត្យ DB ➜ ' + diagnosis + ' ➜ ' + status + ' ' + code + ' · hash + username តូច',
+            r.status === status && r.body.code === code && f.kinds() === 'usable,create,signin,diagnose' && !!d && d[1] === wantHash && d[2] === 'sokha', { r, log: f.log });
+    }
+    f = fakeDeps({ created: UNAVAIL, owner: 'user-old' });
+    r = await A.handleRegister(REG, f.deps);
+    rec('ចុះឈ្មោះ ៖ create មិនដឹង + sign-in បញ្ជាក់គណនី ➜ finish លើ user id នោះ ➜ 200 registered',
+        r.status === 200 && r.body.code === 'registered' && f.kinds() === 'usable,create,signin,finish', { r, log: f.kinds() });
+    f = fakeDeps({ created: UNAVAIL, owner: 'user-old', finish: { ok: false, reason: 'username-taken' } });
+    r = await A.handleRegister(REG, f.deps);
+    rec('ចុះឈ្មោះ ៖ create មិនដឹង + sign-in បញ្ជាក់គណនី + finish username-taken ➜ 409 · មិនលុប',
+        r.status === 409 && r.body.code === 'username-taken' && f.kinds() === 'usable,create,signin,finish', { r, log: f.kinds() });
+    f = fakeDeps({ created: UNAVAIL, owner: 'user-old', finish: [{ ok: false, reason: 'unavailable' }, { ok: false, reason: 'unavailable' }] });
+    r = await A.handleRegister(REG, f.deps);
+    rec('ចុះឈ្មោះ ៖ create មិនដឹង + sign-in បញ្ជាក់គណនី + finish មិនដឹង ២ ដង ➜ 502 registration-unknown',
+        r.status === 502 && r.body.code === 'registration-unknown' && f.kinds() === 'usable,create,signin,finish,finish', { r, log: f.kinds() });
+    f = fakeDeps({ created: UNAVAIL, owner: 'user-old', finish: { ok: false, reason: 'invite-invalid' }, spent: { userId: 'user-old', tenantId: 't-old', role: 'member' } });
+    r = await A.handleRegister(REG, f.deps);
+    rec('ចុះឈ្មោះ ៖ create មិនដឹង + sign-in បញ្ជាក់គណនី + finish invite-invalid + កូដនេះចុះឈ្មោះ user នោះ ➜ 200',
+        r.status === 200 && r.body.code === 'registered' && r.body.tenantId === 't-old' && f.kinds() === 'usable,create,signin,finish,spent', { r, log: f.kinds() });
+    f = fakeDeps({ created: UNAVAIL, owner: 'user-old', finish: { ok: false, reason: 'invite-invalid' }, spent: { userId: 'user-x', tenantId: 't-x', role: 'member' } });
+    r = await A.handleRegister(REG, f.deps);
+    rec('ចុះឈ្មោះ ៖ create មិនដឹង + finish invite-invalid តែកូដចុះឈ្មោះ user ផ្សេង ➜ 403 · tenant មិនលេច',
+        r.status === 403 && r.body.code === 'invite-invalid' && r.body.tenantId === undefined && f.kinds() === 'usable,create,signin,finish,spent', { r, log: f.kinds() });
     const EXISTS = { ok: false, reason: 'exists' };
     f = fakeDeps({ created: EXISTS, owner: 'user-old' });
     r = await A.handleRegister(REG, f.deps);
@@ -192,8 +222,8 @@ async function groupAccount(m, rec) {
         && !!signin && signin[1] === 'sokha@u.zoew.invalid' && signin[2] === 'secret-pass' && !!resumed && resumed[1].userId === 'user-old', { r, log: f.log });
     f = fakeDeps({ created: EXISTS, owner: undefined });
     r = await A.handleRegister(REG, f.deps);
-    rec('បន្តចុះឈ្មោះ ៖ Auth មិនឆ្លើយពេលផ្ទៀងពាក្យសម្ងាត់ ➜ 502 auth-unavailable · មិន finish · មិនលុប',
-        r.status === 502 && r.body.code === 'auth-unavailable' && f.kinds() === 'usable,create,signin', { r, log: f.kinds() });
+    rec('បន្តចុះឈ្មោះ ៖ Auth មិនឆ្លើយពេលផ្ទៀងពាក្យសម្ងាត់ ➜ 502 registration-unknown · មិន finish · មិនលុប',
+        r.status === 502 && r.body.code === 'registration-unknown' && f.kinds() === 'usable,create,signin', { r, log: f.kinds() });
     for (const [reason, status, code] of [['invite-invalid', 403, 'invite-invalid'], ['username-taken', 409, 'username-taken'], ['account-invalid', 400, 'account-invalid']]) {
         f = fakeDeps({ created: EXISTS, owner: 'user-old', finish: { ok: false, reason } });
         r = await A.handleRegister(REG, f.deps);
@@ -217,9 +247,9 @@ async function groupAccount(m, rec) {
     rec('បន្តចុះឈ្មោះ ៖ finish មិនដឹង ២ ដង ➜ 502 registration-unknown · មិនលុប',
         r.status === 502 && r.body.code === 'registration-unknown' && f.kinds() === 'usable,create,signin,finish,finish', { r, log: f.kinds() });
     const finishCases = [
-        ['invite-invalid', 403, 'invite-invalid', true],
-        ['username-taken', 409, 'username-taken', true],
-        ['account-invalid', 400, 'account-invalid', true],
+        ['invite-invalid', 403, 'invite-invalid', false],
+        ['username-taken', 409, 'username-taken', false],
+        ['account-invalid', 400, 'account-invalid', false],
         ['account-exists', 500, 'internal', false],
         ['user-mismatch', 500, 'internal', false]
     ];
@@ -238,8 +268,8 @@ async function groupAccount(m, rec) {
         r.status === 502 && r.body.code === 'registration-unknown' && f.kinds() === 'usable,create,finish,finish', { r, log: f.kinds() });
     f = fakeDeps({ finish: { ok: false, reason: 'username-taken' }, deleted: false });
     r = await A.handleRegister(REG, f.deps);
-    rec('ចុះឈ្មោះ ៖ លុបគណនីវិញមិនបាន ➜ សាក ២ ដង ➜ 500 registration-incomplete',
-        r.status === 500 && r.body.code === 'registration-incomplete' && f.kinds() === 'usable,create,finish,delete,delete', { r, log: f.kinds() });
+    rec('ចុះឈ្មោះ ៖ finish បដិសេធ ➜ 409 · មិនលុបគណនី',
+        r.status === 409 && r.body.code === 'username-taken' && f.kinds() === 'usable,create,finish', { r, log: f.kinds() });
 
     const RESET = { username: 'Sokha', resetCode: 'zzzz-yyyy-xxxx-wwww-vvvv', password: 'new-secret' };
     const wantReset = nodeCrypto.createHash('sha256').update('zoe-reset:ZZZZYYYYXXXXWWWWVVVV').digest('hex');
@@ -348,7 +378,7 @@ async function groupRegisterResume(m, rec) {
     const world = (maxUses) => {
         const users = new Map();
         const members = new Map();
-        const w = { users, members, uses: 0, deletes: [], creates: 0, replyLost: 0, signins: 0 };
+        const w = { users, members, uses: 0, deletes: [], creates: 0, replyLost: 0, signinDown: 0, signins: 0 };
         w.deps = {
             inviteIsUsable: async () => w.uses < maxUses,
             createUser: async (email, password) => {
@@ -361,8 +391,15 @@ async function groupRegisterResume(m, rec) {
             },
             passwordUserId: async (email, password) => {
                 w.signins++;
+                if (w.signinDown > 0) { w.signinDown--; return undefined; }
                 const u = users.get(email);
                 return u && u.password === password ? u.id : null;
+            },
+            diagnoseRegistration: async (codeHash, username) => {
+                const mine = [...members.values()].filter((x) => x.username === username);
+                if (mine.some((x) => x.inviteHash === codeHash)) return 'unknown';
+                if (mine.length > 0) return 'username-taken';
+                return w.uses < maxUses ? 'unknown' : 'invite-invalid';
             },
             spentInviteMember: async (codeHash, username) => {
                 if (w.uses < maxUses) return null;
@@ -392,16 +429,25 @@ async function groupRegisterResume(m, rec) {
     const body = { invite: INVITE, username: 'sokha', password: 'secret-pass' };
     let w = world(1);
     w.replyLost = 1;
+    w.signinDown = 1;
     const lost = await m.account.handleRegister(body, w.deps);
     const orphanBefore = w.users.size === 1 && w.members.size === 0 && w.uses === 0;
     const retry = await m.account.handleRegister(body, w.deps);
-    rec('createUser ឆ្លើយបាត់ (Auth បង្កើតរួច · គ្មានសមាជិកភាព) ➜ សាកម្តងទៀតដោយព័ត៌មានដដែល ➜ 200 registered · គណនីតែ ១ · កូដប្រើ ១ · មិនលុប',
-        lost.status === 502 && lost.body.code === 'auth-unavailable' && orphanBefore
+    rec('createUser ឆ្លើយបាត់ + Auth មិនអាចផ្ទៀងពាក្យសម្ងាត់ ➜ 502 registration-unknown · គណនីមួយកំពុងរង់ចាំ · សាកម្តងទៀត ➜ 200 registered · គណនីតែ ១ · កូដប្រើ ១ · មិនលុប',
+        lost.status === 502 && lost.body.code === 'registration-unknown' && orphanBefore
         && retry.status === 200 && retry.body.code === 'registered' && retry.body.tenantId === 't-shop'
         && w.users.size === 1 && w.members.size === 1 && w.members.has('auth-1') && w.uses === 1 && w.deletes.length === 0,
         { lost, retry, users: w.users.size, members: w.members.size, uses: w.uses, deletes: w.deletes });
     w = world(1);
     w.replyLost = 1;
+    const recovered = await m.account.handleRegister(body, w.deps);
+    rec('createUser ឆ្លើយបាត់ (Auth នៅដំណើរការ) ➜ sign-in បញ្ជាក់គណនី + finish ➜ 200 registered ភ្លាម · គណនី ១ · កូដប្រើ ១ · មិនលុប',
+        recovered.status === 200 && recovered.body.code === 'registered' && recovered.body.tenantId === 't-shop'
+        && w.users.size === 1 && w.members.size === 1 && w.members.has('auth-1') && w.uses === 1 && w.deletes.length === 0,
+        { recovered, users: w.users.size, members: w.members.size, uses: w.uses, deletes: w.deletes });
+    w = world(1);
+    w.replyLost = 1;
+    w.signinDown = 1;
     await m.account.handleRegister(body, w.deps);
     const stranger = await m.account.handleRegister({ ...body, password: 'other-pass-9' }, w.deps);
     rec('គណនីពាក់កណ្តាល + ពាក្យសម្ងាត់ផ្សេង ➜ 409 username-taken · មិនចងសមាជិកភាព · មិនលុបគណនីអ្នកដទៃ',
@@ -583,6 +629,16 @@ async function startMock() {
                 if (body && body.password === 'weakpass1') return send(422, { code: 'weak_password', message: 'weak', weak_password: { reasons: ['length'] } }, v2024);
                 return send(200, { id: u.split('/').pop(), aud: 'authenticated', email: 'x@u.zoe.test' });
             }
+            if (req.method === 'POST' && u === '/rest/v1/rpc/registration_capability_v1') return send(200, { protocol: 'zoe-registration-v1', ready: true });
+            if (req.method === 'POST' && u === '/rest/v1/rpc/registration_diagnose_v1') {
+                const h = body && body.p_code_hash;
+                if (h === 'd'.repeat(64)) return send(500, { code: 'XX000', message: 'x', details: null, hint: null });
+                if (h === 'e'.repeat(64)) return;
+                if (h === 'f'.repeat(64)) return send(200, 'something-else');
+                if (h === 'b'.repeat(64)) return send(200, 'username-taken');
+                if (h === 'c'.repeat(64)) return send(200, 'invite-invalid');
+                return send(200, 'unknown');
+            }
             if (req.method === 'POST' && u === '/rest/v1/rpc/finish_registration') {
                 const name = body && body.p_username;
                 if (name === 'hang') return;
@@ -633,16 +689,36 @@ async function groupAdapter(m, rec, env) {
     const D = m.admin.adminDeps(client, 400);
     const last = (pred) => mock.requests.filter(pred).pop();
     mock.requests.length = 0;
-    const created = await D.createUser('sokha@u.zoe.test', 'secret-pass');
+    const created = await D.createUser('sokha@u.zoe.test', 'secret-pass', { username: 'sokha', codeHash: 'a'.repeat(64) });
     const cr = last((x) => x.url.startsWith('/auth/v1/admin/users') && x.method === 'POST');
     rec('adapter ៖ createUser ➜ POST /auth/v1/admin/users ➜ userId', created.ok === true && created.userId === USER_ID && !!cr, created);
-    rec('adapter ៖ body = {email, password, email_confirm: true} តែប៉ុណ្ណោះ (គ្មាន metadata)',
-        !!cr && JSON.stringify(Object.keys(cr.body).sort()) === '["email","email_confirm","password"]' && cr.body.email_confirm === true, cr && cr.body);
+    rec('adapter ៖ body មាន app_metadata ដែល Server កំណត់',
+        !!cr && JSON.stringify(Object.keys(cr.body).sort()) === '["app_metadata","email","email_confirm","password"]' && cr.body.email_confirm === true && JSON.stringify(cr.body.app_metadata) === JSON.stringify({ zoe_registration: { version: 1, username: 'sokha', invite_code_hash: 'a'.repeat(64) } }), cr && cr.body);
     rec('adapter ៖ header apikey = secret key', !!cr && cr.headers.apikey === KEY, cr && Object.keys(cr.headers));
-    rec('adapter ៖ email មានរួច (API 2024) ➜ exists', ((x) => !x.ok && x.reason === 'exists')(await D.createUser('taken@u.zoe.test', 'secret-pass')));
-    rec('adapter ៖ email មានរួច (API ចាស់ error_code) ➜ exists', ((x) => !x.ok && x.reason === 'exists')(await D.createUser('legacy@u.zoe.test', 'secret-pass')));
-    rec('adapter ៖ weak_password ➜ weak', ((x) => !x.ok && x.reason === 'weak')(await D.createUser('w@u.zoe.test', 'weakpass1')));
-    rec('adapter ៖ GoTrue 500 ➜ unavailable', ((x) => !x.ok && x.reason === 'unavailable')(await D.createUser('boom@u.zoe.test', 'secret-pass')));
+    rec('adapter ៖ email មានរួច (API 2024) ➜ exists', ((x) => !x.ok && x.reason === 'exists')(await D.createUser('taken@u.zoe.test', 'secret-pass', { username: 'taken', codeHash: 'a'.repeat(64) })));
+    rec('adapter ៖ email មានរួច (API ចាស់ error_code) ➜ exists', ((x) => !x.ok && x.reason === 'exists')(await D.createUser('legacy@u.zoe.test', 'secret-pass', { username: 'legacy', codeHash: 'a'.repeat(64) })));
+    rec('adapter ៖ weak_password ➜ weak', ((x) => !x.ok && x.reason === 'weak')(await D.createUser('weak@u.zoe.test', 'weakpass1', { username: 'weak', codeHash: 'a'.repeat(64) })));
+    rec('adapter ៖ GoTrue 500 ➜ unavailable', ((x) => !x.ok && x.reason === 'unavailable')(await D.createUser('boom@u.zoe.test', 'secret-pass', { username: 'boom', codeHash: 'a'.repeat(64) })));
+
+    const hashA = 'a'.repeat(64);
+    mock.requests.length = 0;
+    rec('adapter ៖ registration_diagnose_v1 ➜ unknown', (await D.diagnoseRegistration(hashA, 'sokha')) === 'unknown');
+    const dg = last((x) => x.url === '/rest/v1/rpc/registration_diagnose_v1');
+    const wantD = sqlArgs(env.migrationSql, 'registration_diagnose_v1');
+    rec('ស្នាមភ្ជាប់ ៖ argument RPC registration_diagnose_v1 ស្មើ SQL ពិត (' + (wantD || []).join(',') + ') · ផ្ញើ hash + username ដដែល',
+        !!dg && !!wantD && JSON.stringify(Object.keys(dg.body).sort()) === JSON.stringify(wantD) && dg.body.p_code_hash === hashA && dg.body.p_username === 'sokha'
+        && dg.headers.apikey === KEY, { sent: dg && dg.body, wantD });
+    rec('adapter ៖ registration_diagnose_v1 ➜ username-taken / invite-invalid',
+        (await D.diagnoseRegistration('b'.repeat(64), 'sokha')) === 'username-taken' && (await D.diagnoseRegistration('c'.repeat(64), 'sokha')) === 'invite-invalid');
+    rec('adapter ៖ registration_diagnose_v1 កំហុស ឬចម្លើយមិនស្គាល់ ➜ null', (await D.diagnoseRegistration('d'.repeat(64), 'sokha')) === null
+        && (await D.diagnoseRegistration('f'.repeat(64), 'sokha')) === null);
+    const beforeInvalid = mock.requests.length;
+    rec('adapter ៖ registration_diagnose_v1 បដិសេធ input ខុសទម្រង់មុនហៅ DB',
+        (await D.diagnoseRegistration('bad', 'sokha')) === null && (await D.diagnoseRegistration(hashA, 'Bad Name')) === null
+        && mock.requests.length === beforeInvalid);
+    const t4 = Date.now();
+    const hungDiag = await m.timeout.withTimeout(D.diagnoseRegistration('e'.repeat(64), 'sokha'), 3000, 'diag-hung').catch(() => 'hung');
+    rec('adapter ៖ registration_diagnose_v1 ព្យួរ ➜ null ក្នុងពិដាន (' + (Date.now() - t4) + 'ms)', hungDiag === null && Date.now() - t4 < 2000, hungDiag);
 
     const finOk = await D.finishRegistration({ userId: USER_ID, codeHash: 'h', username: 'sokha' });
     const fr = last((x) => x.url === '/rest/v1/rpc/finish_registration');
@@ -787,8 +863,8 @@ const MUTATIONS = [
     ['account-core.ts', 'កូដប្រើរួច ៖ sign-in មុនសួរ DB (sign-in លើកូដមិនធ្លាប់មាន)', "    if (member === null) return reply(403, 'invite-invalid');",
         "    if (member === null) { await deps.passwordUserId(email, password); return reply(403, 'invite-invalid'); }"],
     ['account-core.ts', 'កូដប្រើរួច ៖ DB មិនដឹង ➜ 403', "    if (member === undefined) return reply(502, 'db-unavailable');", "    if (member === undefined) return reply(403, 'invite-invalid');"],
-    ['account-core.ts', 'កូដប្រើរួច ៖ Auth មិនដឹង ➜ 403', "    if (proven === undefined) return reply(502, 'auth-unavailable');", "    if (proven === undefined) return reply(403, 'invite-invalid');"],
-    ['account-core.ts', 'បន្ត ៖ finish invite-invalid មិនពិនិត្យកូដប្រើរួច', "    if (finished.reason === 'invite-invalid') return registeredBySpentInvite(deps, email, password, codeHash, username, userId);\n", ''],
+    ['account-core.ts', 'កូដប្រើរួច ៖ Auth មិនដឹង ➜ 403', "    if (proven === undefined) return reply(502, 'registration-unknown');", "    if (proven === undefined) return reply(403, 'invite-invalid');"],
+    ['account-core.ts', 'បន្ត ៖ finish invite-invalid មិនពិនិត្យកូដប្រើរួច', "    if (reason === 'invite-invalid') return registeredBySpentInvite(deps, email, password, codeHash, username, userId);\n", ''],
     ['account-core.ts', 'បន្ត ៖ ពិនិត្យកូដប្រើរួចដោយ sign-in ម្តងទៀត', 'return registeredBySpentInvite(deps, email, password, codeHash, username, userId);',
         'return registeredBySpentInvite(deps, email, password, codeHash, username);'],
     ['admin-deps.ts', 'spent_invite_member កំហុស ➜ null', "                if (error || !Array.isArray(data)) return undefined;", "                if (error || !Array.isArray(data)) return null;"],
@@ -799,14 +875,27 @@ const MUTATIONS = [
     ['account-core.ts', 'DB មិនឆ្លើយ ➜ ចាត់ទុកកូដត្រឹមត្រូវ', "    if (usable === null) return reply(502, 'db-unavailable');\n", ''],
     ['account-core.ts', 'check DB មិនឆ្លើយ ➜ «ប្រើរួច»', "        if (usableNow === null) return reply(502, 'db-unavailable');\n", ''],
     ['account-core.ts', 'check ធ្លាក់ចូលការចុះឈ្មោះ', '    if (body.check === true) {', '    if (body.check === false) {'],
-    ['account-core.ts', 'លុបគណនីលើលទ្ធផលមិនដឹង', '    if (!ROLLBACK_REASONS.has(finished.reason)) return reply(...FINISH_REPLY[finished.reason]);\n', ''],
-    ['account-core.ts', 'មិនសាក finish ម្តងទៀត', "    if (!first.ok && first.reason === 'unavailable') return deps.finishRegistration(request);\n", ''],
-    ['account-core.ts', 'គណនីមានរួច ➜ username-taken ភ្លាម (មិនបន្ត)', "        if (created.reason === 'exists') return resumeRegistration(deps, email, password, codeHash, username);",
-        "        if (created.reason === 'exists') return reply(409, 'username-taken');"],
+    ['account-core.ts', 'លុបគណនីលើលទ្ធផលមិនដឹង', '    const finished = await finishWithRetry(deps, { userId: created.userId, codeHash, username });', '    const finished = await finishWithRetry(deps, { userId: created.userId, codeHash, username }); await deps.deleteUser(created.userId);'],
+    ['account-core.ts', 'មិនសាក finish ម្តងទៀត', "    if (failureOf(first)?.reason === 'unavailable') return deps.finishRegistration(request);\n", ''],
+    ['account-core.ts', 'គណនីមានរួច ➜ username-taken ភ្លាម (មិនបន្ត)', "        if (createFailure === 'exists') return resumeRegistration(deps, email, password, codeHash, username);",
+        "        if (createFailure === 'exists') return reply(409, 'username-taken');"],
+    ['account-core.ts', 'កែថយ ៖ create មិនដឹង ➜ 502 auth-unavailable (ឥរិយាបថចាស់)', '        return diagnoseCreateFailure(deps, email, password, codeHash, username);',
+        "        return reply(502, 'auth-unavailable');"],
+    ['account-core.ts', 'create មិនដឹង ៖ មិនវិនិច្ឆ័យ username', "    if (diagnosis === 'username-taken') return reply(409, 'username-taken');\n", ''],
+    ['account-core.ts', 'create មិនដឹង ៖ មិនវិនិច្ឆ័យ invite', "    if (diagnosis === 'invite-invalid') return reply(403, 'invite-invalid');\n", ''],
+    ['account-core.ts', 'create មិនដឹង ៖ មិនសាក finish លើគណនីដែលបញ្ជាក់', '    if (userId) return finishProvenRegistration(deps, email, password, codeHash, username, userId);',
+        '    if (false) return finishProvenRegistration(deps, email, password, codeHash, username, userId);'],
+    ['admin-deps.ts', 'registration_diagnose_v1 កំហុស ➜ unknown', '                if (error) return null;\n                return data === \'username-taken\'',
+        '                if (error) return \'unknown\';\n                return data === \'username-taken\''],
+    ['admin-deps.ts', 'registration_diagnose_v1 ឈ្មោះ argument ខុស', '                    p_code_hash: codeHash,\n                    p_username: username',
+        '                    p_invite_hash: codeHash,\n                    p_username: username'],
+    ['admin-deps.ts', 'registration_diagnose_v1 គ្មានពិដាន', "withTimeout(Promise.resolve(client.rpc('registration_diagnose_v1', {\n                    p_code_hash: codeHash,\n                    p_username: username\n                })), timeoutMs, 'timeout')",
+        "Promise.resolve(client.rpc('registration_diagnose_v1', {\n                    p_code_hash: codeHash,\n                    p_username: username\n                }))"],
+    ['admin-deps.ts', 'registration_diagnose_v1 មិនពិនិត្យ input', "                if (!USERNAME_RE.test(username) || !/^[0-9a-f]{64}$/.test(codeHash)) return null;\n", ''],
     ['account-core.ts', 'បន្តដោយមិនផ្ទៀងពាក្យសម្ងាត់', "    if (userId === null) return reply(409, 'username-taken');\n", ''],
-    ['account-core.ts', 'Auth មិនដឹង ➜ username-taken', "    if (userId === undefined) return reply(502, 'auth-unavailable');", "    if (userId === undefined) return reply(409, 'username-taken');"],
-    ['account-core.ts', 'បន្តរួចលុបគណនីពេល finish បដិសេធ', "    return reply(...FINISH_REPLY[finished.reason]);\n}\n\nexport async function handleRegister",
-        "    await deps.deleteUser(userId);\n    return reply(...FINISH_REPLY[finished.reason]);\n}\n\nexport async function handleRegister"],
+    ['account-core.ts', 'Auth មិនដឹង ➜ username-taken', "    if (userId === undefined) return reply(502, 'registration-unknown');", "    if (userId === undefined) return reply(409, 'username-taken');"],
+    ['account-core.ts', 'បន្តរួចលុបគណនីពេល finish បដិសេធ', "    return reply(...FINISH_REPLY[reason]);\n}\n\nasync function resumeRegistration",
+        "    await deps.deleteUser(userId);\n    return reply(...FINISH_REPLY[reason]);\n}\n\nasync function resumeRegistration"],
     ['admin-deps.ts', 'ផ្ទៀងពាក្យសម្ងាត់លើ admin client រួម', 'await withTimeout(probe.auth.signInWithPassword({ email, password })', 'await withTimeout(client.auth.signInWithPassword({ email, password })'],
     ['admin-deps.ts', 'មិនរាំង probe ជា admin client', '                if (probe === client) return undefined;\n', ''],
     ['admin-deps.ts', 'កំហុស sign-in ទាំងអស់ ➜ null', 'if (error) return SIGN_IN_REFUSED_CODES.has(errorCode(error)) ? null : undefined;', 'if (error) return null;'],

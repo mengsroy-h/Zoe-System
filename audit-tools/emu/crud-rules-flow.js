@@ -70,7 +70,7 @@ const FNS = ['getZtoPickupVerdict', 'ztoVerdictCandidate', 'ztoImportLegacyValid
     'resumeInterruptedCleanups', 'resumeCleanupJournalEntry', 'cleanupCollectedKept', 'cleanupDropsMirror', 'dropCleanupCollected', 'remarkCleanupCollectedKept', 'finishCleanupCollected', 'cleanupStoredOutcome', 'trashReasonOf', 'collectedRetentionCutoffKey', 'withCleanupEntryOwnership',
     'buildClearHistoryTrashItem', 'trashEntryIsFinal', 'serverClockOffsetIsFromServer', 'holdCollectedSettle', 'toggleIndividualBarcodeClose', 'applyBarcodeCloseChange', 'barcodeSignIdentity',
     'toggleCloseStatus', 'executePermanentDelete',
-    'restoreAwaitsCancellation', 'resumeBlockedRestoreCancellations', 'cancelBlockedRestore', 'readRestoreServerNode', 'restoreRowWithout', 'restoreAddedCodesOf', 'storedRestoreClaims', 'saveRestoreClaim', 'trashRestoreBlockOf', 'trashZtoFinalBlock', 'barcodeZtoReturned', 'barcodeZtoMisplaced', 'barcodeZtoSentOut', 'trashItemLeftBranch', 'trashReturnedEvery', 'barcodeZtoLeftKind', 'barcodeVerdictSigned', 'loadZtoPickupStatusOnce', 'saveZtoPickupStatus', 'ztoSignedTimeMillis', 'ztoScanStampMillis', 'appZoneWallClockToMillis', 'elapsedSince'];
+    'restoreAwaitsCancellation', 'resumeBlockedRestoreCancellations', 'cancelBlockedRestore', 'readRestoreServerNode', 'restoreRowWithout', 'restoreAddedCodesOf', 'storedRestoreClaims', 'saveRestoreClaim', 'trashRestoreBlockOf', 'trashZtoFinalBlock', 'barcodeZtoReturned', 'barcodeZtoMisplaced', 'barcodeZtoSentOut', 'trashItemLeftBranch', 'trashReturnedEvery', 'barcodeZtoLeftKind', 'barcodeReturnedEvidence', 'barcodeVerdictSigned', 'loadZtoPickupStatusOnce', 'saveZtoPickupStatus', 'ztoSignedTimeMillis', 'ztoScanStampMillis', 'appZoneWallClockToMillis', 'elapsedSince', 'captureConnectionOperation'];
 
 // ⛔ 2.50.49 ៖ ការដកប្រាក់កញ្ចប់ត្រឡប់ជាព្រឹត្តិការណ៍មានសោ (ខែ ➜ ថ្ងៃ · `ded/<trashId>` ក្នុង transaction ថ្ងៃ) ➜ ផ្ទុក function ពិត
 //    ដើម្បីឲ្យ payload `ded` ពិតទៅដល់ rules ពិត (ផ្នែក ៥)។ tree មុនកែ ➜ stub (ផ្លូវចាស់មិនហៅវា)។
@@ -234,7 +234,7 @@ function makeSandbox(store, now) {
         'const pendingRegistryReleases = new Map();',
         extractConst(src, 'RESTORE_INTENTS_KEY'), extractConst(src, 'restoreCancellationInFlight'), extractConst(src, 'restoreRecoveryHolds'), extractConst(src, 'RESTORE_RECOVERY_REQUIRED_TEXT'),
         extractConst(src, 'ZTO_STATUS_STORE_KEY'), extractConst(src, 'ZTO_STATUS_TTL_MS'),
-        "let restoreRecoveryHoldScope = '', ztoStatusLoaded = true; const ztoPickupStatus = new Map(), ztoReturnedEvidence = new Map();",
+        "let restoreRecoveryHoldScope = '', ztoStatusLoaded = true; const firebaseState = {}; const connectionLeases = new Set(); let stopConnectionLeaseObserver = null; const ztoPickupStatus = new Map(), ztoReturnedEvidence = new Map();",
         extractConst(src, 'ZTO_SIGNED_REOPEN_TEXT'), extractConst(src, 'TRASH_FINAL_CONFIRM_NOTE'), extractConst(src, 'RESTORE_IN_PROGRESS_CLOSE_TEXT'), extractConst(src, 'COLLECTED_SETTLE_HOLD_MS'), extractConst(src, 'TWO_HOURS_MS'), extractConst(src, 'ABANDON_AGE_MS'), extractConst(src, 'RESTORE_CLAIM_LEASE_MS'), extractConst(src, 'RESTORE_CLAIM_FUTURE_MS'),
         extractConst(src, 'APP_TIME_ZONE'), extractConst(src, 'APP_TIME_ZONE_OFFSET_MINUTES'),
         extractConst(src, 'PICKUP_DATE_KEY_PATTERN'), extractConst(src, 'DAILY_COLLECTED_KEEP_DAYS'),

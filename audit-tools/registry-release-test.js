@@ -27,6 +27,7 @@
 // (ព្យាយាមឡើងវិញ + ជួរ) បិទប្រភពនៃការលេច ដោយមិនបង្កើតហានិភ័យលុយថ្មី។
 const path = require('path');
 const vm = require('vm');
+const { moduleRuntime, memoryStorage } = require('./react-view');
 
 const ROOT = process.env.REGISTRY_APP_DIR || path.join(__dirname, '..');
 
@@ -111,7 +112,10 @@ function makeCtx(behaviour) {
     };
     ctx.window = ctx;
     ctx.authGeneration = 0;
+    ctx.localStorage = memoryStorage();
     vm.createContext(ctx);
+    const ownership = moduleRuntime(ROOT, SRC, ['src/core/storage.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }]);
+    vm.runInContext(ownership.code, ctx);
     // `dbOp` ពិតរុំដោយ withTimeout; ទីនេះយើងគ្រាន់តែបញ្ជូនបន្ត
     vm.runInContext('function dbOp(p) { return Promise.resolve(p); }', ctx);
     vm.runInContext('function dbListenerViewIsStale(k) { return staleKeys.has(k); }', ctx);

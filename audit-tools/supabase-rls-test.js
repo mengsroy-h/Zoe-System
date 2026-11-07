@@ -61,6 +61,8 @@ const EXPECT_PUBLIC_EXEC = {
     admin_issue_invite: ['authenticated'],
     admin_revoke_invite: ['authenticated'],
     finish_registration: ['service_role'],
+    registration_capability_v1: ['service_role'],
+    registration_diagnose_v1: ['service_role'],
     invite_is_usable: ['service_role'],
     spent_invite_member: ['service_role'],
     revoke_user_sessions: ['service_role'],
@@ -85,6 +87,7 @@ const EXPECT_PUBLIC_EXEC = {
     note_my_device: ['authenticated']
 };
 const EXPECT_PRIVATE_EXEC = {
+    enroll_registration_at_commit: [],
     is_platform_admin: ['authenticated'],
     current_tenant_id: ['authenticated'],
     tenant_row_active: [],
@@ -174,6 +177,28 @@ ok('migration មិនអាន user_metadata/raw_user_meta_data (អ្នក�
     migrationSql.length > 0 && !/user_meta_data|user_metadata/i.test(migrationSql));
 // ករណីលើកលែងតែមួយ ៖ `session_id` (GoTrue ចេញ · អ្នកប្រើកែមិនបាន) អានតែដើម្បីបដិសេធ session ដែល Server ដក ➜ មិនដែលផ្តល់សិទ្ធិ
 // (ហាងនៅតែមកពី auth.uid() + tenant_members · ផ្ទៀងតាមឥរិយាបថក្នុងផ្នែក session)
+const registrationMigration = '20261106143034_zoe_atomic_registration.sql';
+const registrationRead = "select u.raw_app_meta_data -> 'zoe_registration', u.email\n      into intent, email from auth.users u where u.id = new.id;";
+const migrationSources = migrationFiles.map(name => ({ name, sql: fs.readFileSync(path.join(MIGRATIONS_DIR, name), 'utf8') }));
+function trustedRegistrationMetadataOnly(sources) {
+    const target = sources.filter(f => f.name === registrationMigration);
+    if (target.length !== 1) return false;
+    const declaration = target[0].sql.match(/create function private\.enroll_registration_at_commit\(\) returns trigger\s+language plpgsql security definer set search_path = ''\s+as \$\$([\s\S]*?)\$\$;/g) || [];
+    if (declaration.length !== 1 || declaration[0].split(registrationRead).length !== 2) return false;
+    return sources.every(f => !/raw_app_meta_data|app_metadata|user_meta_data|user_metadata/i.test(
+        f.name === registrationMigration ? f.sql.replace(registrationRead, '') : f.sql));
+}
+ok('metadata ៖ អានតែ intent ដែល Server កំណត់ ក្នុង trigger របស់ user ថ្មី', trustedRegistrationMetadataOnly(migrationSources));
+for (const [label, mutate] of [
+    ['key', sql => sql.replace("-> 'zoe_registration'", "-> 'role'")],
+    ['user binding', sql => sql.replace('where u.id = new.id;', 'where u.id = old.id;')],
+    ['extra read', sql => sql + '\nselect raw_app_meta_data from auth.users;'],
+    ['user editable', sql => sql.replace('raw_app_meta_data', 'raw_user_meta_data')],
+    ['outside trigger', sql => sql.replace(registrationRead, '') + '\n' + registrationRead]
+]) {
+    ok('probe metadata ៖ ' + label + ' ត្រូវបដិសេធ', !trustedRegistrationMetadataOnly(migrationSources.map(f => f.name === registrationMigration ? { ...f, sql: mutate(f.sql) } : f)));
+}
+ok('probe metadata ៖ migration ផ្សេងអាន metadata ត្រូវបដិសេធ', !trustedRegistrationMetadataOnly([...migrationSources, { name: 'other.sql', sql: 'select app_metadata from example;' }]));
 const jwtReads = migrationSql.match(/auth\.jwt\s*\(\s*\)[^\n]*/gi) || [];
 function sessionJwtReadsOnly(sql) {
     const reads = [...sql.matchAll(/\bauth\.jwt\s*\(\s*\)/gi)];
@@ -183,7 +208,7 @@ function sessionJwtReadsOnly(sql) {
     });
 }
 ok('migration មិនសម្រេចសិទ្ធិពី claim របស់ JWT (auth.jwt()) ➜ តែ auth.uid() + តារាងសមាជិក · លើកលែងតែ `session_id` ដើម្បីបដិសេធ session ដែលដក',
-    migrationSql.length > 0 && !/raw_app_meta_data|app_metadata/i.test(migrationSql) && sessionJwtReadsOnly(migrationSql), jwtReads);
+    migrationSql.length > 0 && trustedRegistrationMetadataOnly(migrationSources) && sessionJwtReadsOnly(migrationSql), jwtReads);
 for (const read of ["auth.jwt() ->> 'session_id', '');", "auth.jwt() ->> 'session_id';"]) {
     ok('probe JWT ៖ ទម្រង់ session_id ដែលមានស្រាប់អានបាន (' + read + ')', sessionJwtReadsOnly(read));
     for (const claim of ['role', 'user_metadata', 'app_metadata', 'SESSION_ID']) {
@@ -253,6 +278,48 @@ let inviteTs = null;
 
 async function body(c, rec, extra, mode) {
     const one = async (q, p) => (await c.query(q, p)).rows;
+
+    // Protocol admission is private, so the public-table scan below cannot protect it.
+    const protocolTable = await one(`select c.relrowsecurity, pg_get_userbyid(c.relowner) as owner,
+        (select count(*)::int from pg_policy p where p.polrelid = c.oid) as policies
+        from pg_class c where c.oid = 'private.registration_protocol'::regclass and c.relkind = 'r'`);
+    rec('protocol ACL ៖ private table មាន RLS, owner postgres និងគ្មាន policy API',
+        protocolTable.length === 1 && protocolTable[0].relrowsecurity && protocolTable[0].owner === 'postgres' && protocolTable[0].policies === 0, protocolTable);
+    const protocolGrants = await one(`select r.rolname, p.priv,
+        has_table_privilege(r.rolname, 'private.registration_protocol', p.priv) as table_grant,
+        case when p.priv in ('SELECT', 'INSERT', 'UPDATE', 'REFERENCES')
+            then has_any_column_privilege(r.rolname, 'private.registration_protocol', p.priv) else false end as column_grant
+        from pg_roles r cross join unnest($2::text[]) p(priv) where r.rolname = any($1)`,
+        [API_ROLES, TABLE_PRIVS.concat(['MAINTAIN'])]);
+    rec('protocol ACL ៖ API roles គ្មានសិទ្ធិតារាងឬជួរឈរ ទោះ grant តាម PUBLIC',
+        protocolGrants.length === API_ROLES.length * (TABLE_PRIVS.length + 1) && protocolGrants.every(r => !r.table_grant && !r.column_grant),
+        protocolGrants.filter(r => r.table_grant || r.column_grant));
+    const protocolRows = await one('select singleton, protocol, accepting from private.registration_protocol');
+    rec('protocol ACL ៖ migration ចាប់ផ្ដើមដោយ singleton protocol 1 បិទ admission',
+        protocolRows.length === 1 && protocolRows[0].singleton === true && protocolRows[0].protocol === 1 && protocolRows[0].accepting === false, protocolRows);
+    const protocolDefault = await one(`select pg_get_expr(d.adbin, d.adrelid) as value from pg_attribute a
+        join pg_attrdef d on d.adrelid = a.attrelid and d.adnum = a.attnum
+        where a.attrelid = 'private.registration_protocol'::regclass and a.attname = 'accepting' and a.attnotnull`);
+    rec('protocol ACL ៖ accepting DEFAULT false NOT NULL', protocolDefault.length === 1 && protocolDefault[0].value === 'false', protocolDefault);
+    for (const role of API_ROLES) {
+        for (const [operation, query] of [
+            ['SELECT', 'select accepting from private.registration_protocol'],
+            ['UPDATE', 'update private.registration_protocol set accepting=true where singleton'],
+            ['INSERT', 'insert into private.registration_protocol(singleton,protocol,accepting) values(true,1,true)'],
+            ['DELETE', 'delete from private.registration_protocol where singleton'],
+            ['TRUNCATE', 'truncate private.registration_protocol']
+        ]) {
+            const attempt = await as(c, { role }, query);
+            rec('protocol ACL ៖ ' + role + ' ' + operation + ' ត្រូវបដិសេធ 42501', denied(attempt), attempt);
+        }
+    }
+    const pausedCapability = await as(c, { role: 'service_role' }, 'select public.registration_capability_v1() as capability');
+    rec('protocol ACL ៖ service RPC ឃើញ protocol ប៉ុន្តែ admission បិទ',
+        !pausedCapability.error && pausedCapability.rows[0].capability.protocol === 'zoe-registration-v1' && pausedCapability.rows[0].capability.ready === false, pausedCapability);
+    for (const role of ['anon', 'authenticated']) {
+        const attempt = await as(c, { role }, 'select public.registration_capability_v1()');
+        rec('protocol ACL ៖ ' + role + ' មិនអាចហៅ capability', denied(attempt), attempt);
+    }
 
     const tables = await one(`select c.relname, c.relrowsecurity from pg_class c join pg_namespace n on n.oid = c.relnamespace
         where n.nspname = 'public' and c.relkind in ('r', 'p') order by 1`);
@@ -528,6 +595,29 @@ async function body(c, rec, extra, mode) {
         { whileRevoked, whileExpired });
     rec('spent_invite_member អានតែប៉ុណ្ណោះ ៖ used_count មិនប្រែ', JSON.stringify([await usedOf(h1), await usedOf(h2), await usedOf(hB)]) === JSON.stringify(usedSpentBefore)
         && JSON.stringify(usedSpentBefore) === JSON.stringify([1, 2, 1]), usedSpentBefore);
+
+    const diag = async (hash, username) => {
+        const r = await as(c, SERVICE, 'select public.registration_diagnose_v1($1, $2) as d', [hash, username]);
+        return r.rows ? r.rows[0].d : r;
+    };
+    const invDiag = await issue(ADMIN, A, 'member', 4, 24);
+    const hDiag = await hashOf(invDiag.rows[0].code);
+    const diagReads = [await usedOf(hDiag), await usedOf(h1)];
+    rec('registration_diagnose_v1 ៖ username មានរួច ➜ username-taken (មិនថាកូដប្រើបានឬអត់)',
+        (await diag(hDiag, 'sokha')) === 'username-taken' && (await diag('0'.repeat(64), 'sokha')) === 'username-taken');
+    rec('registration_diagnose_v1 ៖ username + កូដដែលចុះឈ្មោះគណនីនោះ ➜ unknown (មិនប្រកាសថា username ត្រូវគេយក)',
+        (await diag(h1, 'sokha')) === 'unknown');
+    rec('registration_diagnose_v1 ៖ កូដប្រើបាន + username ទំនេរ ➜ unknown', (await diag(hDiag, 'diag_free')) === 'unknown');
+    rec('registration_diagnose_v1 ៖ កូដប្រើអស់ · ផុតកំណត់ · revoke · មិនស្គាល់ ➜ invite-invalid',
+        (await diag(h1, 'diag_free')) === 'invite-invalid' && (await diag(h3, 'diag_free')) === 'invite-invalid'
+        && (await diag(h4, 'diag_free')) === 'invite-invalid' && (await diag('0'.repeat(64), 'diag_free')) === 'invite-invalid');
+    rec('registration_diagnose_v1 ៖ input ខុសទម្រង់ ➜ unknown (មិនទាយមូលហេតុ)',
+        (await diag(null, 'diag_free')) === 'unknown' && (await diag(hDiag, null)) === 'unknown'
+        && (await diag(hDiag, 'Bad Name')) === 'unknown' && (await diag('bad', 'diag_free')) === 'unknown');
+    rec('registration_diagnose_v1 ៖ anon/authenticated ➜ permission denied',
+        denied(await as(c, ANON, 'select public.registration_diagnose_v1($1, $2)', [hDiag, 'sokha']))
+        && denied(await as(c, { role: 'authenticated', sub: uA1 }, 'select public.registration_diagnose_v1($1, $2)', [hDiag, 'sokha'])));
+    rec('registration_diagnose_v1 អានតែប៉ុណ្ណោះ ៖ used_count មិនប្រែ', JSON.stringify([await usedOf(hDiag), await usedOf(h1)]) === JSON.stringify(diagReads));
 
     const invA2 = await issue(ADMIN, A, 'owner', 1, 24);
     const hA2 = await hashOf(invA2.rows[0].code);
@@ -947,6 +1037,22 @@ const PURGE_EXEC_GRANT = 'grant execute on function private.zoe_purge_execute_v1
 const PICKUP_RESET_EXEC_GRANT = 'grant execute on function private.zoe_pickup_reset_execute_v1(uuid, text, jsonb, text), private.zoe_pickup_reset_status_v1(uuid, text, jsonb, text),\n'
     + '    public.zoe_pickup_reset_execute_v1(uuid, text, jsonb, text), public.zoe_pickup_reset_status_v1(uuid, text, jsonb, text)\n    to authenticated;';
 const MUTATIONS = [
+    ['protocol ACL column-only grant', 'revoke all on private.registration_protocol from public, anon, authenticated, service_role;',
+        'revoke all on private.registration_protocol from public, anon, authenticated, service_role; grant update (accepting) on private.registration_protocol to authenticated;'],
+    ['protocol ACL service-role grant', 'revoke all on private.registration_protocol from public, anon, authenticated, service_role;',
+        'revoke all on private.registration_protocol from public, anon, authenticated, service_role; grant update on private.registration_protocol to service_role;'],
+    ['protocol ACL column default enabled', 'accepting boolean not null default false', 'accepting boolean not null default true'],
+
+    ['protocol ACL combined regression', 'revoke all on private.registration_protocol from public, anon, authenticated, service_role;',
+        'revoke all on private.registration_protocol from public, anon, authenticated, service_role; grant select, update (accepting) on private.registration_protocol to authenticated; create policy protocol_read on private.registration_protocol for select to authenticated using(true); create policy protocol_write on private.registration_protocol for update to authenticated using(true) with check(true);'],
+    ['protocol ACL public grant', 'revoke all on private.registration_protocol from public, anon, authenticated, service_role;',
+        'revoke all on private.registration_protocol from public, anon, authenticated, service_role; grant select on private.registration_protocol to public;'],
+    ['protocol ACL permissive policy', 'alter table private.registration_protocol enable row level security;',
+        'alter table private.registration_protocol enable row level security; create policy protocol_read on private.registration_protocol for select to authenticated using(true);'],
+    ['protocol ACL disabled RLS', 'alter table private.registration_protocol enable row level security;',
+        'alter table private.registration_protocol disable row level security;'],
+    ['protocol ACL enabled by default', 'values(true, 1, false);', 'values(true, 1, true);'],
+
     ['F09 Reset RPC អាចហៅដោយ anon', PICKUP_RESET_EXEC_GRANT, PICKUP_RESET_EXEC_GRANT.replace('to authenticated;', 'to authenticated, anon;')],
     ['F09 Reset RPC អាចហៅដោយ service_role', PICKUP_RESET_EXEC_GRANT, PICKUP_RESET_EXEC_GRANT.replace('to authenticated;', 'to authenticated, service_role;')],
     ['F09 text helper អាចហៅដោយ authenticated', PICKUP_RESET_EXEC_GRANT,
@@ -1001,6 +1107,15 @@ const MUTATIONS = [
         '        and (i.used_count >= i.max_uses or i.expires_at <= now())\n$$;'],
     ['spent_invite_member ឲ្យ authenticated ហៅបាន', 'grant execute on function public.spent_invite_member(text, text) to service_role;',
         'grant execute on function public.spent_invite_member(text, text) to service_role, authenticated;'],
+    ['registration_diagnose_v1 មិនពិនិត្យ username', "        when exists (select 1 from public.tenant_members m where m.username = p_username) then 'username-taken'\n", ''],
+    ['registration_diagnose_v1 ចាត់ទុកគណនីដែលបង្កើតដោយកូដដដែលជា username-taken',
+        "        when exists (\n            select 1 from public.tenant_members m\n            where m.username = p_username and m.invite_code_hash is not distinct from p_code_hash\n        ) then 'unknown'\n", ''],
+    ['registration_diagnose_v1 មិនពិនិត្យកូដ', "        when not exists (\n            select 1 from public.tenant_invites i\n            join public.tenants t on t.id = i.tenant_id\n            where i.code_hash = p_code_hash and private.invite_row_usable(i, t)\n        ) then 'invite-invalid'\n", ''],
+    ['registration_diagnose_v1 ទទួល input ខុសទម្រង់', "        when p_code_hash is null or p_code_hash !~ '^[0-9a-f]{64}$'\n            or p_username is null or p_username !~ '^[a-z0-9_.]{3,32}$' then 'unknown'\n", ''],
+    ['registration_diagnose_v1 ឲ្យ authenticated ហៅបាន', 'grant execute on function public.registration_diagnose_v1(text, text) to service_role;',
+        'grant execute on function public.registration_diagnose_v1(text, text) to service_role, authenticated;'],
+    ['registration_diagnose_v1 មិនមែន security definer', "language sql stable security definer set search_path = ''\nas $$\n    select case",
+        "language sql stable set search_path = ''\nas $$\n    select case"],
     ['revoke_user_sessions លុប session ទាំងអស់', 'delete from auth.sessions s where s.user_id = p_user_id;\n    get diagnostics removed = row_count;\n    if removed > 0 then', 'delete from auth.sessions s;\n    get diagnostics removed = row_count;\n    if removed > 0 then'],
     ['invite_is_usable មិនហៅ invite_row_usable', 'where i.code_hash = p_code_hash and private.invite_row_usable(i, t)\n    )',
         'where i.code_hash = p_code_hash\n    )'],

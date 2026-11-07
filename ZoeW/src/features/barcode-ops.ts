@@ -1,3 +1,4 @@
+import { captureConnectionOperation } from '../services/connection-flow';
 import { captureTrashGenerationOwner, trashGenerationOwnerCurrent } from '../services/trash-generation';
 import { rowOperationActive } from '../services/row-operation-lock';
 import { modalIsOpen, setModalDisplay } from '../core/modals';
@@ -235,7 +236,7 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
 
         let trashSaved = false;
         let trashElsewhere = false;
-        await notifyIfSlow(retryAsync(() => (removeIsCurrent() ? claimCleanupTrashSlot(itemToTrash, false, operation, generationOwner).then((owned) => { trashElsewhere = !owned; }) : Promise.reject(Object.assign(new Error('Remove session changed'), { noRetry: true }))), 4, 1500),
+        await notifyIfSlow(retryAsync(() => (removeIsCurrent() ? claimCleanupTrashSlot(itemToTrash, false, operation, generationOwner).then((owned) => { trashElsewhere = !owned; }) : Promise.reject(Object.assign(new Error('Remove session changed'), { noRetry: true }))), 4, 1500, captureConnectionOperation()),
             TRASH_WRITE_SLOW_NOTICE_MS,
             `⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងរក្សាទុកការដក (${barcodeCode})… សូមកុំបិទ App។`).then(() => {
             trashSaved = true;

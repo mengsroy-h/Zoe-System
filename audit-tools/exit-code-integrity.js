@@ -23,11 +23,15 @@ const SKIP_LOG = /console\.log\([^)]*SKIP/;
 
 function checkersFromRunAll() {
     if (!fs.existsSync(RUNALL)) return [];
-    const sh = fs.readFileSync(RUNALL, 'utf8');
+    const sh = fs.readFileSync(RUNALL, 'utf8').replace(/^\s*#.*$/gm, '');
     const found = new Set();
-    for (const m of sh.matchAll(/audit-tools\/([A-Za-z0-9_\-/]+\.js)/g)) found.add(m[1]);
-    for (const m of sh.matchAll(/for\s+\w+\s+in\s+([^;]+);\s*do/g)) {
-        for (const w of m[1].split(/\s+/)) if (/^[A-Za-z0-9_\-/]+$/.test(w) && fs.existsSync(path.join(TOOLS, w + '.js'))) found.add(w + '.js');
+    for (const m of sh.matchAll(/^\s*(?:run\s+"[^"]*"\s+|(?:[A-Z0-9_]+="[^"\n]*"\s+)*)(?:runall_owned\s+)?node\s+audit-tools\/([A-Za-z0-9_./-]+\.m?js)(?=\s|$)/gm)) found.add(m[1]);
+    for (const m of sh.matchAll(/for t in ([\s\S]*?); do([\s\S]*?)\bdone\b/g)) {
+        const command = /^\s*run\s+"\$t"\s+node\s+"audit-tools\/\$t\.(m?js)"(?=\s|$)/m.exec(m[2]);
+        if (!command) continue;
+        for (const name of m[1].split(/\s+/)) {
+            if (/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(name)) found.add(name + '.' + command[1]);
+        }
     }
     const normal = sh.replace(/^\s*#.*$/gm, '').split(/if \[ -n "\$BASE" \]/)[0];
     if (/^\s*run\s+"[^"]*"\s+node\s+zto-import\/test\.js(?=\s|$)/m.test(normal)) found.add(ZTO_IMPORT_TEST);
@@ -83,7 +87,11 @@ for (const rel of checkers) {
     let src;
     try { src = fs.readFileSync(file, 'utf8'); } catch (e) { continue; }
     let ast;
-    try { ast = acorn.parse(src, { ecmaVersion: 'latest', locations: true, allowHashBang: true, allowReturnOutsideFunction: true }); } catch (e) { continue; }
+    try { ast = acorn.parse(src, { ecmaVersion: 'latest', locations: true, allowHashBang: true, allowReturnOutsideFunction: true }); }
+    catch (e) {
+        try { ast = acorn.parse(src, { ecmaVersion: 'latest', locations: true, sourceType: 'module', allowHashBang: true }); }
+        catch (moduleError) { offenders.push(rel + ' (parse មិនបាន)'); continue; }
+    }
     scannedStatic++;
 
     const ENV_FLAGS = [...src.matchAll(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*process\.env\b/g)].map((m) => m[1]);
@@ -268,6 +276,38 @@ function poisonSource(src) {
         const instrumented = rep.includes(' {') ? rep.replace(' {', ' { ' + reached)
             : rep.replace('=> ', '=> { ' + reached).replace(/;$/, '; };');
         return src.replace(declaration, () => instrumented);
+    }
+    // ⛔ node:test៖ ចាក់បរាជ័យក្រោយ callback ពិតបញ្ចប់ មិនមែនជំនួស test body ឬគាំងពេល import។
+    if (/from\s*['"]node:test['"]/.test(src)) {
+        let tree;
+        try { tree = acorn.parse(src, { ecmaVersion: 'latest', sourceType: 'module' }); } catch (_) { return null; }
+        const testNames = new Set(tree.body.filter(node => node.type === 'ImportDeclaration' && node.source.value === 'node:test')
+            .flatMap(node => node.specifiers).filter(node => node.type === 'ImportSpecifier' && node.imported.name === 'test').map(node => node.local.name));
+        const walk = (node, visit) => {
+            if (!node || typeof node !== 'object') return;
+            if (node.type) visit(node);
+            for (const value of Object.values(node)) {
+                if (Array.isArray(value)) value.forEach(child => walk(child, visit));
+                else if (value && typeof value === 'object') walk(value, visit);
+            }
+        };
+        const candidates = [];
+        for (const wrapper of tree.body.filter(node => node.type === 'FunctionDeclaration' && node.params[1]?.type === 'Identifier')) {
+            walk(wrapper.body, call => {
+                if (call.type !== 'CallExpression' || call.callee.type !== 'Identifier' || !testNames.has(call.callee.name)) return;
+                const callback = call.arguments[1];
+                if (!callback || !['ArrowFunctionExpression', 'FunctionExpression'].includes(callback.type) || !callback.async) return;
+                walk(callback.body, node => {
+                    if (node.type === 'AwaitExpression' && node.argument.type === 'CallExpression'
+                        && node.argument.callee.type === 'Identifier' && node.argument.callee.name === wrapper.params[1].name
+                        && node.argument.arguments.length === 0) candidates.push(node);
+                });
+            });
+        }
+        if (candidates.length !== 1) return null;
+        const target = candidates[0];
+        return src.slice(0, target.start) + '(' + src.slice(target.start, target.end)
+            + ', (() => { ' + reached + "throw new Error('ZOE_NODE_TEST_POISON'); })())" + src.slice(target.end);
     }
     // ថយក្រោយ ៖ បង្កើនអថេររាប់ការធ្លាក់ដែល `process.exit(<ident>...)` យោងដល់។
     // ⛔ ២ ច្បាប់ដែលធ្វើឲ្យការថយក្រោយនេះ **ស្មោះ**៖

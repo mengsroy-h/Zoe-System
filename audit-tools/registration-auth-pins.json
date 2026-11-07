@@ -1,0 +1,21 @@
+{
+  "auth": {
+    "version": "v2.197.0",
+    "image": "supabase/gotrue@sha256:1736a63078f5922b198c4cbe50f80ab9a2d3b54fe8b7b6cfb2e9dc5dbbc12c6b",
+    "linuxAmd64Manifest": "sha256:839f529492d116b4e8b7777c953a27c381d34c15a744b1bcefde5eefaa1f9f9f",
+    "binarySha256": "f2aa147268461f74784ddc8b2240aa446ee71ceb9633bac41c30e7b852a860aa",
+    "authMigrationCount": 75
+  },
+  "postgres": {
+    "version": "17.10",
+    "image": "postgres@sha256:7958605b474b3d264a969cb3a123d6aa00ad1e1fe9da8a69984dabb704d93317"
+  },
+  "provenance": {
+    "registry": "https://registry-1.docker.io/v2/",
+    "authTag": "supabase/gotrue:v2.197.0",
+    "postgresTag": "postgres:17.10",
+    "resolvedOn": "2026-11-06",
+    "selectionSource": "https://github.com/supabase/supabase/blob/master/docker/docker-compose.yml",
+    "scope": "Official registry digests verified directly. This is a reproducible test target, not proof of the hosted project's Auth version."
+  }
+}

@@ -698,6 +698,55 @@ scenario('comments ៖ XML Android ដែល ship មានតែ comment templa
     } finally { fs.rmSync(temp, { recursive: true, force: true }); }
 });
 
+function auditWorkflowJobs(workflow) {
+    const sections = workflow.split(/^jobs:[ \t]*(?:#[^\r\n]*)?\r?$/m);
+    if (sections.length !== 2) return { jobs: [], valid: false };
+    const section = sections[1].split(/^(?=[A-Za-z0-9_-]+:)/m)[0];
+    const jobs = []; let valid = true, current = null;
+    for (const line of section.match(/[^\n]*\n|[^\n]+$/g) || []) {
+        if (/^[ \t]*(?:#[^\r\n]*)?\r?\n?$/.test(line)) { if (current) current.text += line; continue; }
+        const header = /^  ([A-Za-z0-9_-]+):[ \t]*(?:#[^\r\n]*)?\r?\n?$/.exec(line);
+        if (header) { current = { name: header[1], text: line }; jobs.push(current); continue; }
+        if (!current || !/^ {4,}\S/.test(line)) valid = false;
+        if (current) current.text += line;
+    }
+    const names = jobs.map(job => job.name);
+    return { jobs, valid: valid && names.filter(name => name === 'audit-shard').length === 1 && new Set(names).size === names.length };
+}
+
+function auditShardRuntimeContract(workflow, image, apk) {
+    const { jobs, valid } = auditWorkflowJobs(workflow);
+    const contracts = jobs.map(({ name, text }) => {
+        const shard = name === 'audit-shard';
+        const steps = text.match(/^      -[^\n]*(?:\n(?!      -)[^\n]*)*/gm) || [];
+        const privileged = steps.filter((step) => /\bsudo\b|--with-deps/.test(step));
+        const setupRuntime = steps.filter((step) => /uses: actions\/setup-(node|java)@/.test(step));
+        const nodeStep = setupRuntime.find((step) => step.includes('setup-node@')) || '';
+        const installs = steps.flatMap(step => step.split('\n').filter(line => /\bnpm (?:ci|install)\b/.test(line)));
+        const installLocks = steps.flatMap(step => [...step.matchAll(/npm ci --prefix (\S+)/g)].map(match => match[1] + '/package-lock.json'));
+        const block = (nodeStep.match(/cache-dependency-path: \|\n((?:            [^\n]+\n?)+)/) || ['', ''])[1];
+        const scalar = (nodeStep.match(/^          cache-dependency-path: ([^|\n]+)$/m) || ['', ''])[1];
+        const cacheLocks = (block || scalar).trim().split(/\s+/).filter(Boolean);
+        return {
+            cache: nodeStep.includes("if: vars.ZOE_RUNNER_MODE == 'github'") && /^          cache: npm$/m.test(nodeStep)
+                && installLocks.length >= (shard ? 3 : 1) && same(installLocks.slice().sort(), cacheLocks.slice().sort())
+                && cacheLocks.every((file) => fs.existsSync(path.join(ROOT, file))),
+            offline: installLocks.length >= (shard ? 3 : 1) && installs.length > 0 && installs.every(line => line.includes('--prefer-offline')),
+            runtime: setupRuntime.length === 2 && setupRuntime.every((step) => step.includes("if: vars.ZOE_RUNNER_MODE == 'github'"))
+                && image.includes('FROM node:24-') && image.includes('openjdk-21-jdk-headless')
+                && (!shard || steps.some((step) => step.includes("if: vars.ZOE_RUNNER_MODE != 'github'")
+                    && step.includes('java -version') && step.includes('process.versions.node') && step.includes('$GITHUB_ENV'))),
+            chromium: image.includes('install-deps chromium') && privileged.length === 1
+                && privileged.every((step) => step.includes("if: vars.ZOE_RUNNER_MODE == 'github'"))
+                && steps.some((step) => step.includes("if: vars.ZOE_RUNNER_MODE != 'github'")
+                    && step.includes('prepare-audit-cache.sh chromium') && !/\bsudo\b|--with-deps/.test(step))
+        };
+    });
+    return Object.fromEntries(['cache', 'offline', 'runtime', 'chromium'].map(key => [key,
+        valid && contracts.length > 0 && contracts.every(contract => contract[key])
+        && (key !== 'offline' || /npm ci --prefix ZoeW --prefer-offline/.test(apk))]));
+}
+
 scenario('runner ៖ Linux audit និង Windows APK មាន mode ទាំងពីរ', () => {
     const audit = read('.github/workflows/audit.yml');
     const apk = read('.github/workflows/android-release.yml');
@@ -776,31 +825,49 @@ scenario('runner ៖ Linux audit និង Windows APK មាន mode ទាំ�
     check('Linux container មាន home ដាច់ពីគ្នា និងគ្មាន host port/socket',
         [1, 2, 3, 4].every((n) => compose.includes('audit-' + n + '-home:/home/runner'))
         && !/network_mode\s*:|\bports\s*:|docker\.sock|privileged\s*:\s*true/.test(compose));
-    const steps = audit.match(/^      -[^\n]*(?:\n(?!      -)[^\n]*)*/gm) || [];
-    const privileged = steps.filter((step) => /\bsudo\b|--with-deps/.test(step));
-    const setupRuntime = steps.filter((step) => /uses: actions\/setup-(node|java)@/.test(step));
-    const nodeStep = setupRuntime.find((step) => step.includes('setup-node@')) || '';
-    const installSteps = steps.filter((step) => /npm ci --prefix/.test(step));
-    const installLocks = installSteps.map((step) => step.match(/npm ci --prefix (\S+)/)[1] + '/package-lock.json');
-    const cacheLocks = (nodeStep.match(/cache-dependency-path: \|\n((?:            [^\n]+\n?)+)/) || ['', ''])[1]
-        .trim().split(/\s+/).filter(Boolean);
-    check('GitHub npm cache យោង lockfiles ដែល audit ដំឡើងពិតទាំងអស់',
-        nodeStep.includes("if: vars.ZOE_RUNNER_MODE == 'github'") && /^          cache: npm$/m.test(nodeStep)
-        && installLocks.length >= 3 && same(installLocks.slice().sort(), cacheLocks.slice().sort())
-        && cacheLocks.every((file) => fs.existsSync(path.join(ROOT, file))));
-    check('Audit និង APK ប្រើ npm ci + prefer-offline ដោយរក្សា lockfile validation',
-        installSteps.length >= 3 && installSteps.every((step) => step.includes('--prefer-offline'))
-        && /npm ci --prefix ZoeW --prefer-offline/.test(apk));
-    check('self-hosted ប្រើ Node/Java ក្នុង image; setup downloads សម្រាប់ GitHub តែប៉ុណ្ណោះ',
-        setupRuntime.length === 2 && setupRuntime.every((step) => step.includes("if: vars.ZOE_RUNNER_MODE == 'github'"))
-        && image.includes('FROM node:24-') && image.includes('openjdk-21-jdk-headless')
-        && steps.some((step) => step.includes("if: vars.ZOE_RUNNER_MODE != 'github'")
-            && step.includes('java -version') && step.includes('process.versions.node') && step.includes('$GITHUB_ENV')));
-    check('Chromium ៖ system dependencies ក្នុង image ឬ GitHub step តែប៉ុណ្ណោះ',
-        image.includes('install-deps chromium') && privileged.length === 1
-        && privileged.every((step) => step.includes("if: vars.ZOE_RUNNER_MODE == 'github'"))
-        && steps.some((step) => step.includes("if: vars.ZOE_RUNNER_MODE != 'github'")
-            && step.includes('prepare-audit-cache.sh chromium') && !/\bsudo\b|--with-deps/.test(step)));
+    const contract = auditShardRuntimeContract(audit, image, apk);
+    check('GitHub npm cache យោង lockfiles ដែល audit ដំឡើងពិតទាំងអស់', contract.cache);
+    check('Audit និង APK ប្រើ npm ci + prefer-offline ដោយរក្សា lockfile validation', contract.offline);
+    check('self-hosted ប្រើ Node/Java ក្នុង image; setup downloads សម្រាប់ GitHub តែប៉ុណ្ណោះ', contract.runtime);
+    check('Chromium ៖ system dependencies ក្នុង image ឬ GitHub step តែប៉ុណ្ណោះ', contract.chromium);
+    // job ផ្សេងមិនត្រូវបាំង shard ខូច ឬធ្វើឲ្យ shard ត្រឹមត្រូវធ្លាក់ទេ។
+    const shard = auditWorkflowJobs(audit).jobs.find(job => job.name === 'audit-shard')?.text || '';
+    const sibling = audit.replace(shard, '');
+    check('runtime contract ៖ sibling job មិនលាយ cache/runtime/Chromium របស់ shard',
+        Object.values(contract).every(Boolean));
+    check('runtime contract ៖ shard បាត់ ឬស្ទួន ត្រូវបដិសេធ',
+        Object.values(auditShardRuntimeContract(sibling, image, apk)).every(value => !value)
+        && Object.values(auditShardRuntimeContract(audit + '\n' + shard, image, apk)).every(value => !value));
+    check('runtime contract ៖ sibling job នៅក្រោយ shard មិនប៉ះលទ្ធផល',
+        same(contract, auditShardRuntimeContract(audit + '\n' + shard.replace('  audit-shard:', '  extra-audit:'), image, apk)));
+    const future = shard.replace('  audit-shard:', '  future-audit: # fixture');
+    check('runtime contract ៖ job ក្រោយមាន comment ក៏ត្រូវវាស់ gate',
+        !auditShardRuntimeContract(audit + '\n' + future.replace("      - name: ត្រៀម Chromium លើម៉ាស៊ីន GitHub\n        if: vars.ZOE_RUNNER_MODE == 'github'", "      - name: ត្រៀម Chromium លើម៉ាស៊ីន GitHub\n        if: always()"), image, apk).chromium);
+    for (const header of ['  "quoted-job":', '   malformed-job:', '  future-audit: { unexpected: true }']) {
+        check('runtime contract ៖ job header មិនស្គាល់ ត្រូវបដិសេធ ' + header,
+            Object.values(auditShardRuntimeContract(audit + '\n' + shard.replace('  audit-shard:', header), image, apk)).every(value => !value));
+    }
+    for (const [name, key, mutated] of [
+        ['cache lock', 'cache', sibling.replace('cache-dependency-path: ZoeW/package-lock.json', 'cache-dependency-path: supabase/package-lock.json')],
+        ['Node gate', 'runtime', sibling.replace("      - uses: actions/setup-node@v7\n        if: vars.ZOE_RUNNER_MODE == 'github'", "      - uses: actions/setup-node@v7\n        if: always()")],
+        ['Java gate', 'runtime', sibling.replace("      - uses: actions/setup-java@v6\n        if: vars.ZOE_RUNNER_MODE == 'github'", "      - uses: actions/setup-java@v6\n        if: always()")],
+        ['Chromium gate', 'chromium', sibling.replace("      - name: ត្រៀម Chromium លើម៉ាស៊ីន GitHub\n        if: vars.ZOE_RUNNER_MODE == 'github'", "      - name: ត្រៀម Chromium លើម៉ាស៊ីន GitHub\n        if: always()")],
+        ['offline ci', 'offline', sibling.replace('npm ci --prefix ZoeW --prefer-offline', 'npm ci --prefix ZoeW')],
+        ['offline install', 'offline', sibling.replace('npm install --prefer-offline', 'npm install')]
+    ]) {
+        check('runtime contract ៖ job បន្ថែមខូច ' + name + ' មិនត្រូវ shard បាំង',
+            mutated !== sibling && !auditShardRuntimeContract(mutated + shard, image, apk)[key]);
+    }
+    for (const [name, key, mutated] of [
+        ['cache lock', 'cache', shard.replace('            supabase/package-lock.json\n', '')],
+        ['Node gate', 'runtime', shard.replace("if: vars.ZOE_RUNNER_MODE == 'github'", "if: always()")],
+        ['Java gate', 'runtime', shard.replace("      - uses: actions/setup-java@v6\n        if: vars.ZOE_RUNNER_MODE == 'github'", "      - uses: actions/setup-java@v6\n        if: always()")],
+        ['Chromium gate', 'chromium', shard.replace("      - name: ត្រៀម Chromium លើម៉ាស៊ីន GitHub\n        if: vars.ZOE_RUNNER_MODE == 'github'", "      - name: ត្រៀម Chromium លើម៉ាស៊ីន GitHub\n        if: always()")],
+        ['offline install', 'offline', shard.replace('npm ci --prefix ZoeW --prefer-offline', 'npm ci --prefix ZoeW')]
+    ]) {
+        check('runtime contract ៖ shard ខូច ' + name + ' មិនត្រូវ sibling job បាំង',
+            mutated !== shard && !auditShardRuntimeContract(sibling + mutated, image, apk)[key]);
+    }
 });
 
 scenario('APK សាក ៖ branch ផ្សេងពី main ➜ Pre-release តែមួយក្នុងមួយ commit · main ➜ Release ផ្លូវការ (script ពិតរបស់ workflow)', () => {

@@ -650,3 +650,30 @@ it.each(['firebase', 'supabase'] as const)('%s Cookie៖ ផ្ទៀង ZTO យ
     await restore(removed); expectMoney(10, 2, 1); expectIdentities([CODE], []);
     expectRegistryOwner();
 });
+
+it.each((['firebase', 'supabase'] as const).flatMap(backend =>
+    (['absent', 'disabled'] as const).map(lookup => ({ backend, lookup }))))(
+    '$backend lookup $lookup៖ local ដក/ស្តារ/លុប និងបាត់ ACK មិនស្ទួនប្រាក់',
+    async ({ backend, lookup }) => {
+        useSyntheticBackend(backend);
+        if (lookup === 'disabled') appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: false }));
+        else appLocalStore.removeItem('zoew_lookup_api_config');
+        noteZtoTrashMode(null);
+        const id = await scan(CODE, 1.25, 0.5, false);
+        expectMoney(1.25, 0.5, 1); expectIdentities([CODE], []); expectRegistryOwner();
+        await Promise.all([removeSingleBarcode(id, CODE), removeSingleBarcode(id, CODE)]); sync();
+        expectMoney(0, 0, 0); expectIdentities([], [CODE]);
+        const removed = trashId();
+        lab.rootAckLost = true;
+        await restore(removed); await restore(removed);
+        expectMoney(1.25, 0.5, 1); expectIdentities([CODE], []); expectRegistryOwner();
+        expect(lab.rootAckLostCount).toBe(1);
+        await deleteSingleItem(currentItem().id, { confirmed: true, quiet: true }); sync();
+        expectMoney(1.25, 0.5, 1); expectIdentities([], [CODE]);
+        const deleted = trashId();
+        await restore(deleted); await restore(deleted);
+        expectMoney(1.25, 0.5, 1); expectIdentities([CODE], []); expectRegistryOwner();
+        expect(requests.filter(request => request.url.searchParams.get('restore') === '1')).toEqual([]);
+        expect(readCleanupJournal()).toEqual([]);
+    }
+);

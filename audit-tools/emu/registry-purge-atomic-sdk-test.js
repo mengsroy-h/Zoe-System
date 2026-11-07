@@ -23,7 +23,7 @@ const digest = value => createHash('sha256').update(value).digest('hex');
 const equal = (left, right) => isDeepStrictEqual(left, right);
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const sourceHashes = {}, results = [], activeChecks = [], timingResults = [];
-const nativeRulesDiagnostics = [];
+const nativeRulesDiagnostics = [], providerComparisons = [];
 const ordinarySourceAdmissions = [];
 let ordinaryAdmissionHeldProvider = null;
 let infrastructurePrimaryFailure = null, infrastructureCleanupFailures = [];
@@ -326,7 +326,7 @@ function verifyConstruction() {
 function report(status, extra = {}) {
     const summary = { status, pass, fail, engineStarted, cases: results, checks: activeChecks, expected: EXPECTED,
         manifestHash, expectedBehaviorAssertions: EXPECTED.reduce((sum, entry) => sum + entry.assertions.length, 0), sourceHashes, bundleHash, nativeResources, timingResults,
-        nativeRulesDiagnostics, infrastructurePrimaryFailure, infrastructureCleanupFailures,
+        nativeRulesDiagnostics, providerComparisons, infrastructurePrimaryFailure, infrastructureCleanupFailures,
         nativePredicateComponents, ordinarySourceAdmissions,
         guardVectors: { status: guardResults.length === GUARD_EXPECTED.length && guardResults.every(row => row.pass)
                 && guardChecks.length === GUARD_EXPECTED.reduce((sum, row) => sum + row.assertions.length, 0)
@@ -1432,7 +1432,10 @@ async function runOrdinaryCountAdmission(provider, changed) {
         if (!current()) throw held('owner-changed-after-write');
         const typedDenial = !fulfilled && (provider.kind === 'native' ? /permission[_-]denied/i.test(record.backendCode) : ['22023', '42501', 'PT409'].includes(record.backendCode));
         if (!fulfilled && !typedDenial) throw held('unclassified-rejection');
-        await bounded(provider.settle(), 'ordinary admission SDK quiescence');
+        await bounded((async () => {
+            await provider.settle();
+            if (provider.kind === 'native') await provider.quiesce();
+        })(), 'ordinary admission SDK quiescence');
         const after = await bounded(provider.snapshot(), 'ordinary admission after snapshot');
         provider.ordinaryAdmissionPhysical.after = after;
         record.afterPhysicalHash = digest(JSON.stringify(after.physical)); record.fullSnapshotUnchanged = equal(after, before);
@@ -2415,7 +2418,8 @@ async function main() {
         await runControlledTimings(runtime, native);
         await runEarlyGuardVectors(runtime, sql, origin, native);
         for (const scenario of CASES) {
-            const comparisons = [];
+            const comparisons = [], unavailableProviders = [];
+            let providerFailure, providerFailed = false;
             for (const providerName of ['native', 'supabase']) {
                 window.localStorage.clear(); window.sessionStorage.clear(); runtime.api.firebaseState.authGeneration++;
                 const row = source(scenario.count, scenario.family === 'positive' ? 'matched_' + scenario.count : 'f03_' + scenario.id.replace(/-/g, '_'), scenario);
@@ -2427,6 +2431,8 @@ async function main() {
                 try { await provider.setup(seedOf(scenario, row)); value = await runCase(runtime, provider, scenario); }
                 catch (failure) {
                     if (providerName === 'native') provider.trace.note('case-failed', { timedOut: String(failure?.message).startsWith('Timed out:') });
+                    if (!providerFailed) providerFailure = failure;
+                    providerFailed = true;
                     error = String(failure?.stack || failure); console.error(error);
                     if (providerName === 'native') failureReadback = await provider.failureEvidence();
                 }
@@ -2448,8 +2454,16 @@ async function main() {
                 if (!cleaned) throw new Error('Client cleanup failed; aborting before another provider can reuse globals');
                 if (failureReadback?.attempted) throw new Error('Original native pending-write failure retained; aborting after read-only evidence');
                 comparisons.push(value?.logical ?? null);
+                if (error || !value?.logical) unavailableProviders.push(providerName);
                 activeCase = null;
             }
+            if (unavailableProviders.length) {
+                providerComparisons.push({ id: scenario.id, status: 'UNAVAILABLE', unavailableProviders });
+                if (providerFailed) throw providerFailure;
+                throw new Error('Provider comparison unavailable: ' + scenario.id);
+            }
+            const matches = scenario.providersDiffer ? !equal(comparisons[0], comparisons[1]) : equal(comparisons[0], comparisons[1]);
+            providerComparisons.push({ id: scenario.id, status: matches ? 'MATCH' : 'MISMATCH' });
             if (scenario.providersDiffer) requireCheck('provider-specific logical state ' + scenario.id, comparisons.every(Boolean) && !equal(comparisons[0], comparisons[1]));
             else requireCheck('matched logical state ' + scenario.id, comparisons.every(Boolean) && equal(comparisons[0], comparisons[1]));
         }

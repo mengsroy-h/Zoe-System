@@ -42,6 +42,8 @@
 
 ## 📌 ការងារដែលនៅសល់ — ការផ្ទៀងផ្ទាត់ដោយអ្នកប្រើ
 
+- 2026-11-07 · PR393៖ Registration atomic បានបញ្ចូលក្នុង branch រួច។ Audit និង Registration Auth លើ head `a711893b4f3b0d3b48dcdb1801937f4fd8baa732` បានផ្ទៀង; F03 ជាប់ក្រោយរត់ឡើងវិញ ប៉ុន្តែមូលហេតុបរាជ័យដំបូងមិនទាន់បញ្ជាក់។ Hosted migration/backup/restore និងការរង់ចាំ handler ចាស់ឱ្យចប់ នៅមិនទាន់ផ្ទៀង; ការកែ test និងឯកសារថ្មីត្រូវការ CI លើ commit ថ្មី មុន merge។ Dead-code ដែលបានដកចេញពីការកែ នៅមិនទាន់បញ្ចប់។
+
 > ⛔ **ផ្នែកនេះកាន់តែការងារដែលនៅបើក** ៖ ស្ថានភាព git · អ្វីដែលអ្នកប្រើមិនទាន់បញ្ជាក់ · សកម្មភាពដោយដៃដែលមិនទាន់ធ្វើ · ការសម្រេចដែលនៅរស់។
 > អ្នកប្រើបញ្ជាក់ ឬធ្វើរួច ➜ **លុបធាតុនោះ** (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុងផ្នែក ១ · ២) ⛔ កុំបន្ថែមខ្សែ branch/PR ចាស់ (git ជាភស្តុតាង) ·
 > ⛔ ≤ ៨០ បន្ទាត់ (`doc-scope-test`)។
@@ -117,6 +119,26 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ archive ផ្នែក ៩ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.186] · ZoeKeyGen [2.24.36] — 2026-11-06 · សុវត្ថិភាពវគ្គស្វែងរក និងសាខា Palm
+
+ZoeW `2.50.186` (`zoew-v450`) · ZoeKeyGen `2.24.36` (`zoekeygen-v147`)។ Retry រួមទទួល lease ជាជម្រើស; caller ZoeW ទាំង១០ផ្ដល់ម្ចាស់វគ្គច្បាស់លាស់ ហើយ caller ZoeKeyGen រក្សា API បីប៉ារ៉ាម៉ែត្រ និងឥរិយាបថ retry ដដែល។ ម្ចាស់គម្រោងស្នើ «ចាំអ្វីដែលរកឃើញដោយការ audit កែហើយបញ្ចូលក្នុង​ PR393 ហ្មងទៅ ហើយ merge តែមួយដងជាការស្រេច»។ Lookup ចាប់វគ្គគណនី/config/key មុនដោះសោ credential ផ្ទៀងមុនផ្ញើ និងមុនប្រើចម្លើយ; retry រក្សាម្ចាស់ដើម។ ការងារចាស់មិនសរសេរលើ status ឬ promise របស់ការងារថ្មី។ Palm ផ្ទៀង site ក្នុង Blob ជាមួយ slot និងសាខាពេល Login ឡើងវិញជាមួយសាខាដើម; site បាត់ ឬប្តូរ ត្រូវបដិសេធ មិនយក token ទៅសាខាចាស់។ Blob សរសេរមិនបានរក្សាទិន្នន័យដើម ហើយមិនអះអាងថារក្សាសញ្ញាបដិសេធបានទេ។
+
+Regression លើ `21069590` មុនកែ៖ ២៥ ធ្លាក់ និង១៣២ ជាប់ ក្នុង៤ files; ក្នុងនោះ Lookup/retry ធ្លាក់១៨ និង Palm ធ្លាក់៧។ Reminder ជាតេស្តបញ្ជាក់ឥរិយាបថបច្ចុប្បន្ន មិនប្តូរការផ្ញើឡើងវិញក្រោយ claim ទេ។ ការសាកប្រើ fixture គ្មាន credential ឬទិន្នន័យ ZTO ពិត។
+
+ការចាក់សោ ZTO ឡើងវិញតាមសំណើ audit ខាងលើ៖ [ភស្តុតាងបន្ថែម](https://github.com/mengsroy-h/Zoe-System/actions/runs/42217192578/artifacts/13501263969) លើ PR head `67347f4b66c96f1346cdab133e967b9b72c91bbf` មាន 122 files / 2784 tests ជាប់ គ្មាន skip/todo រួម `zto-signed-sync` 27។ [Audit CI](https://github.com/mengsroy-h/Zoe-System/actions/runs/42217192578) ប្រើ PR merge checkout `8f5680c7e676a0039b79a1716d69e96fd3992b7d`៖ shard 3 `zto-list-sync-test` 633 និង shard 4 `zto-sync-banner-test` 209 ជាប់ ព្រមទាំងអ្នកយាម ZTO ផ្សេងៗ។ ឯកសារ `zto-palm.js` និង `auto-lookup.ts` ក្នុង merge checkout មាន Git blob ដូចប្រភពដែលពិនិត្យ; local `f0d60cfd` មាន tree `ad5e88be893ad81a4831b0ae69a53936826886ac` ដូច PR head។
+
+`zto-lock.test.ts` មុនចាក់សោឡើងវិញ៖ ២ ធ្លាក់ និង១៤ ជាប់ តែលើឯកសារទាំង២នេះ។ ប្តូរតែ SHA-256 ដែល normalize LF៖ `zto-palm.js` ➜ `cb69a84673967af3ba4ebbc22b4d9d24b2cd7bf1f51d1f057f7c6cb24c89fed3`; `auto-lookup.ts` ➜ `74927a7e13e8dc1803445d596dd769d0071657e74eb61e31d61c473a3461efb4`។ រក្សា entry ទាំង១៣ និង assertion ទាំងអស់; ក្រោយកែ lock ១៦/១៦ ជាប់។ មិនកែប្រភព App ក្នុងការចាក់សោឡើងវិញនេះ និងមិនរាប់ជាភស្តុតាងលើឧបករណ៍ពិតទេ។
+
+**សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ ផ្ទៀង CI ទាំង៤ shards លើ commit ចុងក្រោយ មុន merge មួយដង។ F03 និង repository contract នៅជាបញ្ហាដាច់ដោយឡែក មិនត្រូវរាប់ថាបានបញ្ចប់ដោយសារ ZTO ជាប់ទេ។ មិនមាន rules/migration ថ្មី; មិនប៉ះ journal ឬទិន្នន័យអ្នកប្រើ។
+
+### [2.50.185] — 2026-11-06 · ភស្តុតាងត្រឡប់តាមវដ្តកញ្ចប់
+
+ZoeW `2.50.185` (`zoew-v449`) · ZoeKeyGen ដដែល។ ភស្តុតាង ZTO ក្នុង memory ត្រូវផ្ទៀងពេលមកដល់ ឬពេលស្តាររបស់កញ្ចប់ មុនបង្ហាញស្ថានភាព បិទការស្តារ ឬជ្រើសគោលដៅសរសេរ។ ភស្តុតាងវដ្តចាស់មិនបិទវដ្តថ្មី និងមិនលុបអំណាចសញ្ញាត្រឡប់បច្ចុប្បន្ន។ Signed, restoreBlocked និងគោលការណ៍ Palm នៅដដែល; មិនកែឯកសារ ZTO ដែលមាន LOCK ទេ។
+
+តេស្ត regression លើប្រភពមុនកែ៖ ១៨ ធ្លាក់ / ៥៨ ឆ្លង ក្នុង ២ files; ឯកសារណែនាំ preview/rollback ធ្លាក់តាម assertion មុនកែ។ ការផ្ទៀងរួមបន្ទាប់កែ៖ ១៨ files / ៤៣០ tests ឆ្លង; typecheck, lint, doc-check, Android និង repository-file coverage ឆ្លង។ Build វាស់ជាប់គាំងដោយ Chromium socket EPERM; version/doc-scope និង meta suite ពេញលើ measure-root ព្រមទាំង CI នៅមិនទាន់ផ្ទៀង។ ការវាស់ synthetic មិនបញ្ជាក់ Firebase rules, Supabase RLS, browser ឬឧបករណ៍ពិតទេ។
+
+**សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ មុនចេញប្រើ ត្រូវផ្ទៀង CI លើកូដចុងក្រោយ និងសាកស្តារកញ្ចប់លើឧបករណ៍ពិត ដោយរក្សា journal និង pending/unknown។ មិនមាន rules ឬ migration ថ្មី។ មិនមានការបោះពុម្ព ឬ deploy ក្នុងការរួម local នេះទេ។
 
 ### [2.50.184] · ZoeKeyGen [2.24.35] — 2026-11-06 · ម៉ោង Server តាម JSON
 
@@ -1939,6 +1961,86 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-11-07 · កែការរង់ចាំក្នុង tests និងរក្សាកំហុស F03 ដើម
+
+Windows focused baseline រកឃើញ fixed sleeps មិនរង់ចាំប្រតិបត្តិការ mock ទៅដល់ចំណុចដែលតេស្តចង់វាស់៖ mirror ធ្លាក់22/114 និង pickup/remove ធ្លាក់11/43។ ប្ដូរទៅការបញ្ជាក់ថា mock backend បានព្យួរពិត, requests មុនបានបញ្ចប់, intent បានលែង និង cleanup barrier បានសម្រេច។ រក្សា assertions លើប្រាក់, journal, stale view, Reset និង multi-device ដដែល។ Microtask scan 80 ទីតាំងប្រើ fake timer ដើម្បីបញ្ចប់ការងារដែលបានកំណត់ ដោយមិនបង្កើន deadline របស់ test។
+
+Vitest `vi.waitFor` រំកិល Date-only fake clock ដោយស្វ័យប្រវត្តិ។ Pickup/remove ប្រើ real-time polling ដែលមិនប្ដូរម៉ោងអាជីវកម្ម និង assert `Date.now() === NOW` ក្រោយរាល់ test; 43 tests ជាប់ 3 ជុំ។ Daily-report assertion ប្រើ path separator របស់ host; មុនកែ 1 ធ្លាក់/5 ជាប់ និងក្រោយកែ 6/6។ Git Bash ដែលដំឡើងស្រាប់ត្រូវនៅក្នុង PATH សម្រាប់ shell fixture។
+
+F03 រក្សា exception របស់ provider ដើម និងរាយ `providerComparisons: UNAVAILABLE` បើ provider មិនបញ្ចប់។ លទ្ធផលពេញលេញដែលខុសគ្នានៅតែបរាជ័យ parity assertion ដើម។ Regression ថ្មី extract តែ provider loop ពិត និងប្រើ synthetic stubs៖ មុនកែ 9 ធ្លាក់; ក្រោយកែ 9/9 ជាប់។ មិនកែ App, backend, deadline, hash pin ឬ assertion count; មិនអះអាងថាដោះស្រាយមូលហេតុ `postgc-partial` ហើយទេ។
+
+Combined focused run មាន6 files/**439 tests ជាប់, 0 ធ្លាក់/skip/todo** រួម Palm outbox 267 tests ដែលមិនបានកែ។ Typecheck, lint, syntax, comment check និង file coverage ជាប់។ នេះជាតេស្តផ្ដោតប្រើ mocks មិនមែន full-suite, backend ឬឧបករណ៍ពិត។ ត្រូវផ្ទៀង Audit/F03 លើ commit ថ្មីមុនអះអាងថា CI ជាប់; hosted rollout និង backup/restore នៅមិនទាន់ផ្ទៀង។
+
+
+### 2026-11-07 · Registration atomic និងភស្តុតាងនៃការបញ្ចូលក្នុង PR393
+
+- Commit `87e2b6c4` មាន **13 files, +1007/−52** តាម `git show --stat`; លេខមុន 12 files, +999/−52 មិនរាប់ឯកសារ HISTORY ដែលបន្ថែម 8 បន្ទាត់។ វាបញ្ចូល enrollment ក្នុង transaction តែមួយតាម deferred trigger លើ `auth.users`, capability/diagnosis RPCs និង handler ដែលមិនប្រើ delete-compensation។ កំហុសដឹងច្បាស់ជា `409 username-taken` ឬ `403 invite-invalid`; លទ្ធផលមិនច្បាស់ជា `502 registration-unknown` ហើយណែនាំឱ្យចូលជាមួយ username/password ដដែលមុនចុះឈ្មោះម្ដងទៀត។ `failureOf<T>()` និង `npm:` paths កែ typecheck ដោយមិនដក checker ឬ assertion។
+- **របាយការណ៍ local វគ្គមុន**៖ typecheck exit 0, functions 260/260, RLS 601/601, coverage 10/10, Vitest ផ្ដោត 45/45 និង negative controls 17/17 បរាជ័យតាមរំពឹងលើ baseline។ GoTrue v2.197.0 ដែល build ពី source សម្រាប់ Windows (`b4e196…`, មិនមែន binary Linux `f2aa…`) ជាមួយ PG17.10 ត្រូវបានរាយការណ៍ 16/16 និង PostgREST16.5 ជាមួយ DB បណ្ដោះអាសន្ន 18/18។ ទាំងនេះជាភស្តុតាងវគ្គមុន មិនមែន hosted verification ឬការរត់ឡើងវិញក្នុងជុំនេះទេ។
+- **Log full-suite Windows វគ្គមុន**៖ ក្រោយកែ 440 files មាន 422 ជាប់/18 ធ្លាក់; tests 7816 ជាប់/41 ធ្លាក់/**98 រំលង**។ Baseline មាន 439 files, 422 ជាប់/17 ធ្លាក់ និង tests 7796 ជាប់/42 ធ្លាក់/98 រំលង។ មាន Chromium/Postgres ខ្វះ, symlink permission, shell/path assumptions និង assertions ក្នុង pickup/mirror; `palm-sign-outbox` ជាប់ពេលរត់ដោយឡែក មិនទាន់បញ្ជាក់មូលហេតុពេលរត់រួមទេ។ មិនអាចសន្និដ្ឋានថា registration គ្មានពាក់ព័ន្ធ ឬរាប់ skipped ជា pass តាមលេខទាំងនេះ។ Baseline `f0d60cf…` នៅមិនទាន់ reproduce។
+
+### 2026-11-07 · កែ CI registration និងផ្ទៀងភស្តុតាងពី GitHub
+
+- `actual-auth` បង្កើត embedded-PG harness តែក្នុង `ZOE_AUTH_PG_MODE=embedded`; Docker mode មិនចូលផ្លូវ binary ដែលខ្វះ `libicui18n.so.60`។ ការកែ harness បន្តរួម port allocation/readiness, diagnostics ដែលមិនបង្ហាញ secrets និង assertion សម្រាប់ចម្លើយ create បាត់ក្រោយ enrollment commit។ រក្សា binary/hash pins និង safety assertions។
+- Migration `20261106143034_zoe_atomic_registration.sql` បន្ថែមចំនួន migration ពី61ទៅ62។ Pickup/reset/C04 guards ទទួលតែ relations ដែលបានពិនិត្យ `private.registration_protocol` និង `private.registration_protocol_pkey`; នៅបដិសេធ reset persistence/lifetime quota namespace ថ្មី និងរក្សា receipt/quota/retention assertions។
+- **ភស្តុតាងបានអានពី raw logs**៖ [Audit1212](https://github.com/mengsroy-h/Zoe-System/actions/runs/42343716725) សាក merge `6330d6deba046f98129e07166a9b80ce6f16392a` នៃ head `a711893b4f3b0d3b48dcdb1801937f4fd8baa732` ជាមួយ base `b57f2fea84325d409de4bcdfb1fdd6b0ae244c3d`។ Shards មាន118+32+38+55 = **243 checker ជាប់, 0 partial/skip**។ ZTO/native ផ្ដោតមាន122 files/2784 tests, pending0/todo0; នេះមិនមែនចំនួន full-suite ទេ។ Wrapper ផ្ទៀង Vitest JSON និងបដិសេធ skipped/todo ក្នុង STRICT; log មិនបង្ហាញចំនួន tests ខាងក្នុងទាំងអស់។ CI Ubuntu ដែលមាន prerequisites និង sharding មិនលុបលទ្ធផល Windows ខាងលើទេ។
+- [Registration Auth9](https://github.com/mengsroy-h/Zoe-System/actions/runs/42343716724/job/128316791503) ប្រើ official pinned Linux Auth binary ហើយ log បញ្ជាក់ **13 checks ជាប់** លើ merge ដដែល។ មិនរាប់ថាបានផ្ទៀង hosted HTTP/PostgREST/Auth ឬ rollout ទេ។
+- [F0348](https://github.com/mengsroy-h/Zoe-System/actions/runs/42343716858) ជាប់ក្រោយ retry លើ head ដដែល។ Run ដំបូងមាន324 ជាប់/2 ធ្លាក់៖ native `postgc-partial` ជាប់7 assertions; Supabase `retainedAfterLostAck` បរាជ័យមុន execute request (`executeRequests=0, commits=0, journalRetained=false`) ហើយ comparison ជាមួយ result បាត់បង្កើតសារ `matched logical state postgc-partial` បន្ថែម។ N249/250/251 timing ជាប់។ មូលហេតុដំបូងនៅមិនទាន់បញ្ជាក់; retry មិនមែនការកែកំហុស ហើយមិនមានភស្តុតាងថាជាបញ្ហា JVM deadline ឬ backend divergence ទេ។
+- **នៅមិនទាន់ផ្ទៀង**៖ hosted migration/trigger owner/grants/capability និង HTTP/Auth end-to-end, backup/restore/PITR, old→new handler drain/switch/rollback និង timeout/load។ កុំ merge ឬ deploy រហូតលក្ខខណ្ឌទាំងនេះបានផ្ទៀង។ កុំ restore delete-compensation ចាស់ ឬបើក accepting ខណៈ handler ចាស់អាចរត់។
+
+
+
+### 2026-11-06 · Repository contract តាម job ដែលវាស់
+
+`repository-contract-test` ធ្លាប់លាយ steps របស់ job បន្ថែមជាមួយ `audit-shard` ដូច្នេះ cache/runtime/Chromium ធ្លាក់ខុស។ ឥឡូវវាស់កិច្ចសន្យាតាម job ទាំងអស់ ដោយរក្សាលក្ខខណ្ឌដើម និង shard តែមួយគត់; negative controls បដិសេធ shard បាត់/ស្ទួន និងការខូច cache, Node, Java, Chromium និង offline install ទាំងក្នុង shard និង job បន្ថែម។ មិនកែ workflow ឬបន្ថយ gate ទេ; full built-tree និង CI ចុងក្រោយនៅត្រូវផ្ទៀង។
+
+### 2026-11-06 · F03 រង់ចាំ ordinary admission ស្ងប់
+
+Native ordinary admission រង់ចាំ `settle()` និង `quiesce()` មុនថត snapshot ក្រោយសរសេរ ដើម្បីមិនវាស់ពេល SDK task នៅ pending។ រក្សា gate ១៥ វិនាទី និង HOLD ពេល owner ប្តូរ ឬ timeout; `f03-admission-quiescence.test.ts` មាន regression ៩ ផ្ទៀង pending/denial/ownership។ មិនប្តូរ App ឬកំណត់ថា F03 ជាប់រួចទេ; real emulator CI នៅត្រូវផ្ទៀង។
+
+### 2026-11-06 · F03 ប្រៀបធៀប heap ក្នុង diagnostic ប៉ុណ្ណោះ
+
+Workflow diagnostic រក្សា JVM512 ទាំងពីរលំដាប់ `249,250,251` និង `251,249,250` ហើយបន្ថែម JVM1024 ទាំងពីរលំដាប់ដូចគ្នា។ Heap ត្រូវចងនឹង ownership និង artifact ដាច់ដោយឡែក; whitelist បដិសេធតម្លៃផ្សេង។ Ordinary runner នៅ 512 MiB; deadline, STRICT, failure propagation និង gate មិនប្តូរ។ រក្សាលទ្ធផល JVM512 ដើម មិនជំនួសដោយ JVM1024 ឬអះអាងថាបានកែផលិតផលទេ។ `f03-heap-diagnostic.test.ts` ផ្ទៀង matrix/ownership/deadline និងការរក្សាភស្តុតាង; real JVM/CI លើការរួមនេះនៅមិនទាន់រត់។
+
+
+### 2026-11-06 · របាយការណ៍ reachability ពី source ដើម
+
+`moduleView` ដក import/export identity៖ exported API និង helper ដែល raw-module graph រក្សាទុក ត្រូវបាន candidate ដែលដកវិញរាយជា orphan។ បន្ថែម `source-function-reachability.mjs` ជារបាយការណ៍ដាច់ដោយឡែកលើ TypeScript Program ពិត; មិនជំនួស gate `function-surface-test`។ Symbol identity តាម module/declaration ការពារឈ្មោះស្ទួន និង parameter shadow; public exports និង module evaluation ជា roots; type-only references មិនមែន runtime evidence។ Unknown dynamic/compile scope បិទ candidate classification និង CLI ចេញ 2។ មិនអះអាងថាមានកូដណាអាចលុបបានទេ។
+
+Independent review រកឃើញ runtime class heritage/instantiation ដែល TypeScript ចាត់ជា TypeNode និង reflective glob forms; regression មុនកែ ២១ ឆ្លង / ៥ ធ្លាក់ រួចក្រោយកែ ២៦ ឆ្លង។ Ambient declarations ត្រូវបានរក្សាក្នុង compiler input ក្រោយ regression មួយធ្លាក់។ Mutation controls ចាប់ export-root loss, name conflation និង runtime-expression omission។ Source profile បច្ចុប្បន្ននៅ incomplete ដោយ reflection/globs ក្នុង audit exposure; គ្មានការលុប ឬ app runtime edit។ Browser/aggregate និង CI លើ tree ថ្មីនៅមិនទាន់ផ្ទៀង។
+
+### 2026-11-06 · កែ harness ក្រោយ CI audit PR393
+
+CI លើ `b8730810` រកឃើញ fixture ដែលមិនផ្ទុក helper វគ្គ Lookup/connection និង restore-resume ពិត; ការបរាជ័យមុន assertions មិនមែនភស្តុតាង mutation ទេ។ Runtime ផ្ទុក helper ពិត និង fixture state ហើយអ្នកយាមរក្សា assertions ដដែល។ ការសាកតារាងដែលចាប់ផ្តើមតាម microtask រង់ចាំ promise របស់ការងារនោះ មិនបន្ថែម timeout ឬបន្ថយកម្រិតទេ។ `audit-module-runtime-scope.test.ts` ប្រើប្រភពពិតវាស់ config/key/session៖ មុនកែធ្លាក់ missing helper; ក្រោយកែជាប់។ `retry-shared-contract.test.ts` ផ្ទៀង caller ZoeW ទាំង១០ និង API បីប៉ារ៉ាម៉ែត្ររបស់ ZoeKeyGen រួមចន្លោះ retry, noRetry និង lease ផុត។
+
+ការវាស់ local ប្រើ source view និង SSR stage ពិតដោយឡែក; មិនមែន browser build ពេញ។ Lock ZTO នៅដដែល ហើយ CI និង browser/emulator ដែលខ្វះត្រូវផ្ទៀងលើ commit ចុងក្រោយ; មិនយក baseline crash ជាលទ្ធផល mutation ជោគជ័យទេ។
+
+
+### 2026-11-06 · PR393 — ឯកសារប្រតិបត្តិការ និងរបាយការណ៍ audit
+
+ឯកសារ registry បែងចែក legacy candidate ពី nonlegacy HOLD ហើយតម្រូវ measure tree និងភស្តុតាង server ថ្មី មុនអនុញ្ញាតលុប។ ឯកសារ backup/import បញ្ជាក់ថា `zoe_docs` មិនមែន `zoe_ops`; `VERIFIED` មិនបញ្ជាក់ recovery receipt ទាំងមូល ហើយ pending/unknown ត្រូវរក្សា។ អ្នកយាមក្នុង `doc-scope-test` ទាំង៤ធ្លាក់លើ `21069590` ហើយជាប់ក្រោយកែ។
+
+របាយការណ៍ daily delta មានឈ្មោះផ្ទាល់ខ្លួន និង receipt ក្រោយសរសេរជោគជ័យ; workflow ប្រមូលតាម receipt មិនកំណត់ shard ទេ។ Poison shadow មិនអាចសរសេរជាន់ artifact ឬបញ្ចេញ receipt។ អ្នកយាម `audit-daily-report.test.ts` វាស់ការសរសេរ/receipt បរាជ័យ local/shadow និង shell ប្រមូលឯកសារបាត់/ខូច៖ មុនកែធ្លាក់៤ ជាប់២; ក្រោយកែជាប់៦។ Harness តាម poison machinery ពិតជាប់; មិនអះអាងថាវាស់ PostgreSQL daily bytes ពិតក្នុងជុំនេះទេ។ Reminder characterization បញ្ជាក់ថា claim បានប្រើរួចមិនផ្ញើក្រុមម្ដងទៀត ពេល push មួយបរាជ័យ ឬចម្លើយមិនដឹង; មិនប្តូរគោលការណ៍នោះ។
+
+ការផ្ទៀងរួមលើកូដនេះ៖ Palm/Cookie/lookup/connection ៣១ files ជាប់៩៤០ tests; focused ដំបូង៦ files ជាប់១៨៩ tests (មាន overlap មិនបូកជាចំនួនសរុបទេ)។ អ្នកប្រើ retryAsync ក្នុង cleanup/registry/trash/restore និង session fuzz ១៩ files ជាប់៣៨១ tests។ Typecheck/lint, doc-check, comment equivalence និង repository-file mapping ជាប់។ Browser build ឈប់នៅ Chromium socket `Operation not permitted`; measure-root ពេញមិនកើត ដូច្នេះ doc-scope/version/browser guards ពេញនៅមិនទាន់រត់។ ZTO lock ធ្លាក់២ឯកសារដែលបានកែ ដោយចេតនាមិនប្តូរ hash មុន guard ជាប់។ CI ទាំង៤ shards ត្រូវផ្ទៀងលើ commit ចុងក្រោយ។
+
+### 2026-11-06 · ភ្ជាប់ helper ភស្តុតាងត្រឡប់ក្នុង checker
+
+Audit #1197 លើ `3cb5287`៖ `trash-modal-test` ខ្វះ `barcodeReturnedEvidence` ក្នុង VM។ Checker ស្រង់កូដចំនួន៦ ឥឡូវរួម helper ពិត និង `barcodeReturnBasis`; មិន mock ឬបន្ធូរលក្ខខណ្ឌផលិតកម្មទេ។ Regression ប្រើ checker-view ពិត និងបញ្ជីស្រង់របស់ checker នីមួយៗ៖ មុនកែ៦ធ្លាក់ដោយ helper បាត់ ក្រោយកែ៦ឆ្លង ដោយវាស់ពេលមកដល់ ពេលស្តារ ពេលមេ និងសញ្ញាដែលបានរក្សា។
+
+Announcement តែមួយផ្គូផ្គង `APP_VERSION` បច្ចុប្បន្ន។ Notifications មុនកែ២ធ្លាក់/៣២ឆ្លង; suite រួម៣ files/៩៥ tests ឆ្លង។ Full checker លើ measure-root និង CI ថ្មីនៅមិនទាន់ផ្ទៀង ព្រោះ Chromium local ត្រូវបានបិទ socket ដោយ EPERM។ មិនមានការកែ app logic, rules, migrations ឬសោ ZTO/gesture។
+
+### 2026-11-06 · Meta-checker គ្របម៉ូឌុល .mjs
+
+ការរក checker ពី `run-all.sh` និងការស្កេនថតរំលង `.mjs` ទោះ `server-time-function-test.mjs` រត់ក្នុង suite ក៏ដោយ។ ឥឡូវ direct command និង loop ស្គាល់ `.js`/`.mjs` តាម extension ពិត; `.bak`, comment និង loop ដែលមិនរត់ checker មិនជំនួសការវាស់ទេ។ Exit scanner parse ESM ហើយ poison សម្រាប់ `node:test` ចាក់បរាជ័យក្រោយ callback ពិតបញ្ចប់។ ឯកសារដើមនៅដដែល។
+
+Regression មុនកែ ៥ ធ្លាក់ / ២ ឆ្លង; loop controls បន្ថែមរកឃើញ ២ ករណីទៀត។ ក្រោយកែ guard suites ៤ files / ៥៨ tests ឆ្លង។ Checker ពិត baseline ៣៤ ឆ្លង; poison បញ្ចប់ ៣៤ ធ្លាក់ គ្មាន cancellation។ ការ suppress exit code នៅតែជា fake-green; syntax/import failure ជា unverified មិនមែន mutation detection។ Metadata prefix ៤៤ assertions និង exit AST prefix ៨ assertions ឆ្លង ប៉ុន្តែមិនជំនួស meta suite ពេញដែលត្រូវការ build វាស់/browser/emulator ទេ។ CI លើការកែថ្មីនៅមិនទាន់ផ្ទៀង។
+
+### 2026-11-06 · ភស្តុតាង RUNALL_RESUME តាមករណីវាស់
+
+`RUNALL_RESUME=1` អាចយក PASS ពី seed ចាស់ ទោះប្តូរ `FUZZ_RUN0` ព្រោះ hash ចាស់រាប់តែ source និងទង់ STRICT។ ឥឡូវ fingerprint v2 រាប់ជម្រើស fuzz/money/parity, mutation និងការជ្រើសករណីតាមបញ្ជីច្បាស់; unset និង empty ខុសគ្នា។ Input ខាងក្រៅតាម path/ref មិនអាចប្រើ PASS ចាស់ឡើងវិញ ព្រោះ path ដដែលមិនបញ្ជាក់មាតិកាដដែល។ ជម្រើស lane/display និង secret មិនត្រូវចូល hash។ Node executable/version ចូល fingerprint; dependency path ខាងក្រៅបិទការប្រើ PASS ចាស់។ ការប្តូរ installed dependencies ក្នុង checkout ដដែលដោយមិនប្តូរ lockfile មិនត្រូវបាន hash មាតិកាទេ៖ ត្រូវរត់ថ្មីដោយគ្មាន RESUME ក្រោយដំឡើង dependency ឡើងវិញ។
+
+Regression គោលដៅលើ runner មុនកែ៖ ៩ ឆ្លង / ៥៦ ធ្លាក់; ក្រោយកែ៖ ៦៥ ឆ្លង គ្មានធ្លាក់។ Mutation ដក seed ចេញចាប់បាន ២ assertions; ដក external guard ចេញចាប់បាន ៣០ assertions ដោយគ្មាន startup failure។ Runner meta suite ពេញលេញឆ្លង ២២៩ assertions។ Seed ដដែលនៅអាច resume; seed ថ្មីត្រូវបដិសេធជំនួស PASS ចាស់។ ការកែនេះប៉ះតែឧបករណ៍ មិនប្តូរកំណែ app។ Build វាស់ក្នុង session នៅត្រូវបានរារាំងដោយ Chromium IPC socket; មិនរាប់ browser/backend ឬ CI លើ tree ថ្មីថាបានផ្ទៀងទេ។
 
 ### 2026-11-06 · Server time JSON និង CORS
 
@@ -4449,7 +4551,9 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/apps-script-key-encrypted.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/apps-script-key-redaction.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/audit-checker-outcomes.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
+| `ZoeW/tests/audit-daily-report.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/audit-lifecycle.test.ts` | — | ផ្នែក ៨ |
+| `ZoeW/tests/audit-module-runtime-scope.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/audit-poison-reachability.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/auth-flow-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/backend-modal-ownership.test.ts` | ផ្នែក ២ | — |
@@ -4502,6 +4606,8 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/expiry-return-policy.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/expiry-schedule-cap.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/export-request-snapshot.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/f03-admission-quiescence.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/f03-heap-diagnostic.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/firebase-auth-write-ownership.test.ts` | — | ផ្នែក ៨ · ផ្នែក ៩ |
 | `ZoeW/tests/firebase-loader-gate.test.ts` | — | ផ្នែក ៧ |
 | `ZoeW/tests/forbidden-zone-lock.test.ts` | ផ្នែក ១ | ផ្នែក ៨ · ផ្នែក ៩ |
@@ -4634,6 +4740,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/restore-prepared-retry.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/restore-resync-read-gate.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/restore-terminal-cancel.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/retry-shared-contract.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/rtdb-websocket-only.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/scan-camera-session.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/scan-engine-recovery.test.ts` | — | ផ្នែក ៨ |

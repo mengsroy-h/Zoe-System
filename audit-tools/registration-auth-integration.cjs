@@ -16,9 +16,9 @@ function createEmbeddedPgHarness() {
 }
 function dockerPgHarness() {
     const PG = require(DEPS + '/pg'), pins = require('./registration-auth-pins.json');
-    const suffix = crypto.randomBytes(8).toString('hex'), container = 'zoe-registration-pg-' + suffix, network = 'zoe-registration-net-' + suffix;
+    const suffix = crypto.randomBytes(8).toString('hex'), container = 'zoe-registration-pg-' + suffix;
     const password = crypto.randomBytes(32).toString('hex');
-    let mappedPort = 0, dbSeq = 0, ownsContainer = false, ownsNetwork = false;
+    let mappedPort = 0, dbSeq = 0, ownsContainer = false;
     const redactArg = a => /^POSTGRES_PASSWORD=/.test(String(a)) ? 'POSTGRES_PASSWORD=[REDACTED]' : String(a);
     const docker = args => { try {
         return cp.execFileSync('docker', args, { encoding: 'utf8', timeout: 120000, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -32,10 +32,8 @@ function dockerPgHarness() {
         async start() {
             docker(['version', '--format', '{{.Server.Version}}']);
             docker(['pull', pins.postgres.image]);
-            ownsNetwork = true;
-            docker(['network', 'create', '--internal', network]);
+            docker(['run', '--detach', '--name', container, '--read-only', '--tmpfs', '/tmp:rw,nosuid', '--tmpfs', '/var/lib/postgresql/data:rw,nosuid', '--tmpfs', '/var/run/postgresql:rw,nosuid', '--publish', '127.0.0.1::5432', '--env', 'POSTGRES_USER=supabase_admin', '--env', 'POSTGRES_DB=postgres', '--env', 'POSTGRES_PASSWORD=' + password, pins.postgres.image]);
             ownsContainer = true;
-            docker(['run', '--detach', '--name', container, '--network', network, '--read-only', '--tmpfs', '/tmp:rw,nosuid', '--tmpfs', '/var/lib/postgresql/data:rw,nosuid', '--tmpfs', '/var/run/postgresql:rw,nosuid', '--publish', '127.0.0.1::5432', '--env', 'POSTGRES_USER=supabase_admin', '--env', 'POSTGRES_DB=postgres', '--env', 'POSTGRES_PASSWORD=' + password, pins.postgres.image]);
             let binding = '';
             for (let i = 0; i < 150 && !/^127\.0\.0\.1:\d+$/.test(binding); i++) {
                 try {
@@ -100,19 +98,8 @@ function dockerPgHarness() {
             return { error: { code: e.code, message: e.message } };
         } },
         stop() { if (ownsContainer) {
-            try {
-                docker(['rm', '-f', container]);
-            }
-            finally {
-                ownsContainer = false;
-            }
-        } if (ownsNetwork) {
-            try {
-                docker(['network', 'rm', network]);
-            }
-            finally {
-                ownsNetwork = false;
-            }
+            try { docker(['rm', '-f', container]); }
+            finally { ownsContainer = false; }
         } }
     };
 }

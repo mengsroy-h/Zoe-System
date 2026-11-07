@@ -5,6 +5,7 @@
  *    «ស្តារ» Barcode បិទពីធុងសំរាមនោះដាក់ key វិញ · ទាំងពីររស់រានពេលទំព័រស្លាប់ (journal ការសម្អាត · journal ស្ថិតិយក) និង
  *    ការប្រណាំងឧបករណ៍ ២ (ការលុប key ចុះយឺតក្រោយការស្តារ ➜ ដាក់វិញ)។ ទិសផ្ទុយ ៖ «លុប» · Barcode បើក · Reset មិនកើតវិញ។
  */
+import { performance } from 'node:perf_hooks';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../src/core/state';
 import { appLocalStore } from '../src/core/storage';
@@ -31,6 +32,17 @@ const PHONE = '0960007345';
 const DB = { name: 'm5-shop' };
 const SHOP_CONFIG = JSON.stringify({ apiKey: 'k', databaseURL: 'https://m5-pickup-default-rtdb.firebaseio.com', projectId: 'p' });
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+async function waitForState(check: () => void, { timeout = 1000 } = {}) {
+    const deadline = performance.now() + timeout;
+    while (true) {
+        try { check(); return; }
+        catch (error) {
+            const remaining = deadline - performance.now();
+            if (remaining <= 0) throw error;
+            await sleep(Math.min(50, remaining));
+        }
+    }
+}
 const key = (code: string) => barcodeRegistryKey(code);
 
 const lab = { store: {} as Record<string, any>, hang: [] as string[], txGate: null as null | ((path: string) => Promise<void> | null) };
@@ -137,7 +149,7 @@ function crashAndReload() {
 async function resumeDoors() {
     await pickup.resumePickupIntents();
     await cleanup.resumeInterruptedCleanups();
-    await sleep(20);
+    await cleanup.cleanupResumeBarrier.settled;
 }
 async function restore(trashId: string) {
     loadViewsFromServer();
@@ -206,6 +218,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    expect(Date.now()).toBe(NOW);
     vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
@@ -252,7 +265,7 @@ it('⛔ ដក ៖ claim កញ្ចប់រួច · ធុងសំរាម
     loadViewsFromServer();
     lab.hang = [TRASH];
     void removeSingleBarcode('p3', 'M5P0031');
-    await sleep(40);
+    await waitForState(() => expect(serverBarcode('p3', 'M5P0031')).toBeNull());
     expect(serverBarcode('p3', 'M5P0031'), 'លក្ខខណ្ឌមុន ៖ Barcode ចេញពីកញ្ចប់លើ server').toBeNull();
     expect(pickupKeys(), 'លក្ខខណ្ឌមុន ៖ key មិនទាន់ប៉ះ').toEqual([key('M5P0031')]);
     crashAndReload();
@@ -311,7 +324,7 @@ it('⛔ ស្តារ ៖ ការដាក់ key ព្យួរ ➜ ទំ
     const trash = trashItems()[0];
     lab.hang = [PICKUP];
     void restore(trash.id);
-    await vi.waitFor(() => expect(getAt(TRASH + '/' + trash.id), 'លក្ខខណ្ឌមុន ៖ ការស្តារបញ្ចប់លើ server').toBeNull(), { timeout: 3000 });
+    await waitForState(() => expect(getAt(TRASH + '/' + trash.id), 'លក្ខខណ្ឌមុន ៖ ការស្តារបញ្ចប់លើ server').toBeNull(), { timeout: 3000 });
     await sleep(20);
     expect(pickupKeys(), 'លក្ខខណ្ឌមុន ៖ key មិនទាន់ចុះ').toEqual([]);
     expect(pickupJournal().length, 'journal ស្ថិតិយកនៅ').toBe(1);
@@ -391,7 +404,7 @@ it.each(['exact', 'missing', 'generation', 'birth', 'time', 'scope', 'duplicate'
     release();
     expect((await delayedResult).committed, 'stale Remove cannot commit over the newer Restore revision').toBe(false);
     expect(pickupKeys(), 'stale Remove refuses the newer restore revision').toEqual([key('M5P0071')]);
-    await vi.waitFor(() => expect(cleanup.cleanupJournalLive.has(trash.id)).toBe(false));
+    await waitForState(() => expect(cleanup.cleanupJournalLive.has(trash.id)).toBe(false));
     await resumeDoors();
     if (proof === 'target-changed-after-proof' || proof.endsWith('-at-holder')) expect(roots, 'mutation boundary was entered').toBeGreaterThan(0);
     expect(cleanupJournal()).toHaveLength(proof === 'exact' || proof === 'different-target-stale-view' ? 0 : 1);
@@ -412,7 +425,7 @@ it('⛔ ឧបករណ៍ ២ ៖ ឧបករណ៍ផ្សេង «ដក» 
     expect(memoryKeys(), 'លក្ខខណ្ឌមុន ៖ ទិដ្ឋភាពឧបករណ៍នេះចាស់ (key ទាំងពីរ)').toEqual([key('M5P0091'), key('M5P0092')].sort());
     expect(await toggleCloseStatus('p9')).toBe(false);
     expect(pickupKeys(), 'បដិសេធ membership ចាស់៖ key ដែលដកមិនរស់ឡើងវិញ ហើយ kept barcode នៅបិទ').toEqual([key('M5P0092')]);
-    await vi.waitFor(() => expect(pickup.pickupIntentsLive.size).toBe(0));
+    await waitForState(() => expect(pickup.pickupIntentsLive.size).toBe(0));
     await pickup.resumePickupIntents();
     expect(pickupJournal()).toEqual([]);
     expect(serverBarcode('p9', 'M5P0092').isClosed).toBe(true);

@@ -42,7 +42,7 @@
 
 ## 📌 ការងារដែលនៅសល់ — ការផ្ទៀងផ្ទាត់ដោយអ្នកប្រើ
 
-- 2026-11-06 · PR393៖ ភស្តុតាង ZTO និងការចាក់សោឡើងវិញកត់នៅកំណែ 2.50.186។ F03 និង repository contract នៅជាបញ្ហាដាច់ដោយឡែក; ត្រូវផ្ទៀង CI ទាំង៤ shards លើ commit ចុងក្រោយ មុន merge។ Registration race និងការលុប dead-code ដែលដកចេញ មិនបញ្ចូលក្នុងការកែនេះ។
+- 2026-11-07 · PR393៖ Registration atomic បានបញ្ចូលក្នុង branch រួច។ Audit និង Registration Auth លើ head `a711893b4f3b0d3b48dcdb1801937f4fd8baa732` បានផ្ទៀង; F03 ជាប់ក្រោយរត់ឡើងវិញ ប៉ុន្តែមូលហេតុបរាជ័យដំបូងមិនទាន់បញ្ជាក់។ Hosted migration/backup/restore និងការរង់ចាំ handler ចាស់ឱ្យចប់ នៅមិនទាន់ផ្ទៀង; ការកែ test និងឯកសារថ្មីត្រូវការ CI លើ commit ថ្មី មុន merge។ Dead-code ដែលបានដកចេញពីការកែ នៅមិនទាន់បញ្ចប់។
 
 > ⛔ **ផ្នែកនេះកាន់តែការងារដែលនៅបើក** ៖ ស្ថានភាព git · អ្វីដែលអ្នកប្រើមិនទាន់បញ្ជាក់ · សកម្មភាពដោយដៃដែលមិនទាន់ធ្វើ · ការសម្រេចដែលនៅរស់។
 > អ្នកប្រើបញ្ជាក់ ឬធ្វើរួច ➜ **លុបធាតុនោះ** (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុងផ្នែក ១ · ២) ⛔ កុំបន្ថែមខ្សែ branch/PR ចាស់ (git ជាភស្តុតាង) ·
@@ -1961,6 +1961,33 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-11-07 · កែការរង់ចាំក្នុង tests និងរក្សាកំហុស F03 ដើម
+
+Windows focused baseline រកឃើញ fixed sleeps មិនរង់ចាំប្រតិបត្តិការ mock ទៅដល់ចំណុចដែលតេស្តចង់វាស់៖ mirror ធ្លាក់22/114 និង pickup/remove ធ្លាក់11/43។ ប្ដូរទៅការបញ្ជាក់ថា mock backend បានព្យួរពិត, requests មុនបានបញ្ចប់, intent បានលែង និង cleanup barrier បានសម្រេច។ រក្សា assertions លើប្រាក់, journal, stale view, Reset និង multi-device ដដែល។ Microtask scan 80 ទីតាំងប្រើ fake timer ដើម្បីបញ្ចប់ការងារដែលបានកំណត់ ដោយមិនបង្កើន deadline របស់ test។
+
+Vitest `vi.waitFor` រំកិល Date-only fake clock ដោយស្វ័យប្រវត្តិ។ Pickup/remove ប្រើ real-time polling ដែលមិនប្ដូរម៉ោងអាជីវកម្ម និង assert `Date.now() === NOW` ក្រោយរាល់ test; 43 tests ជាប់ 3 ជុំ។ Daily-report assertion ប្រើ path separator របស់ host; មុនកែ 1 ធ្លាក់/5 ជាប់ និងក្រោយកែ 6/6។ Git Bash ដែលដំឡើងស្រាប់ត្រូវនៅក្នុង PATH សម្រាប់ shell fixture។
+
+F03 រក្សា exception របស់ provider ដើម និងរាយ `providerComparisons: UNAVAILABLE` បើ provider មិនបញ្ចប់។ លទ្ធផលពេញលេញដែលខុសគ្នានៅតែបរាជ័យ parity assertion ដើម។ Regression ថ្មី extract តែ provider loop ពិត និងប្រើ synthetic stubs៖ មុនកែ 9 ធ្លាក់; ក្រោយកែ 9/9 ជាប់។ មិនកែ App, backend, deadline, hash pin ឬ assertion count; មិនអះអាងថាដោះស្រាយមូលហេតុ `postgc-partial` ហើយទេ។
+
+Combined focused run មាន6 files/**439 tests ជាប់, 0 ធ្លាក់/skip/todo** រួម Palm outbox 267 tests ដែលមិនបានកែ។ Typecheck, lint, syntax, comment check និង file coverage ជាប់។ នេះជាតេស្តផ្ដោតប្រើ mocks មិនមែន full-suite, backend ឬឧបករណ៍ពិត។ ត្រូវផ្ទៀង Audit/F03 លើ commit ថ្មីមុនអះអាងថា CI ជាប់; hosted rollout និង backup/restore នៅមិនទាន់ផ្ទៀង។
+
+
+### 2026-11-07 · Registration atomic និងភស្តុតាងនៃការបញ្ចូលក្នុង PR393
+
+- Commit `87e2b6c4` មាន **13 files, +1007/−52** តាម `git show --stat`; លេខមុន 12 files, +999/−52 មិនរាប់ឯកសារ HISTORY ដែលបន្ថែម 8 បន្ទាត់។ វាបញ្ចូល enrollment ក្នុង transaction តែមួយតាម deferred trigger លើ `auth.users`, capability/diagnosis RPCs និង handler ដែលមិនប្រើ delete-compensation។ កំហុសដឹងច្បាស់ជា `409 username-taken` ឬ `403 invite-invalid`; លទ្ធផលមិនច្បាស់ជា `502 registration-unknown` ហើយណែនាំឱ្យចូលជាមួយ username/password ដដែលមុនចុះឈ្មោះម្ដងទៀត។ `failureOf<T>()` និង `npm:` paths កែ typecheck ដោយមិនដក checker ឬ assertion។
+- **របាយការណ៍ local វគ្គមុន**៖ typecheck exit 0, functions 260/260, RLS 601/601, coverage 10/10, Vitest ផ្ដោត 45/45 និង negative controls 17/17 បរាជ័យតាមរំពឹងលើ baseline។ GoTrue v2.197.0 ដែល build ពី source សម្រាប់ Windows (`b4e196…`, មិនមែន binary Linux `f2aa…`) ជាមួយ PG17.10 ត្រូវបានរាយការណ៍ 16/16 និង PostgREST16.5 ជាមួយ DB បណ្ដោះអាសន្ន 18/18។ ទាំងនេះជាភស្តុតាងវគ្គមុន មិនមែន hosted verification ឬការរត់ឡើងវិញក្នុងជុំនេះទេ។
+- **Log full-suite Windows វគ្គមុន**៖ ក្រោយកែ 440 files មាន 422 ជាប់/18 ធ្លាក់; tests 7816 ជាប់/41 ធ្លាក់/**98 រំលង**។ Baseline មាន 439 files, 422 ជាប់/17 ធ្លាក់ និង tests 7796 ជាប់/42 ធ្លាក់/98 រំលង។ មាន Chromium/Postgres ខ្វះ, symlink permission, shell/path assumptions និង assertions ក្នុង pickup/mirror; `palm-sign-outbox` ជាប់ពេលរត់ដោយឡែក មិនទាន់បញ្ជាក់មូលហេតុពេលរត់រួមទេ។ មិនអាចសន្និដ្ឋានថា registration គ្មានពាក់ព័ន្ធ ឬរាប់ skipped ជា pass តាមលេខទាំងនេះ។ Baseline `f0d60cf…` នៅមិនទាន់ reproduce។
+
+### 2026-11-07 · កែ CI registration និងផ្ទៀងភស្តុតាងពី GitHub
+
+- `actual-auth` បង្កើត embedded-PG harness តែក្នុង `ZOE_AUTH_PG_MODE=embedded`; Docker mode មិនចូលផ្លូវ binary ដែលខ្វះ `libicui18n.so.60`។ ការកែ harness បន្តរួម port allocation/readiness, diagnostics ដែលមិនបង្ហាញ secrets និង assertion សម្រាប់ចម្លើយ create បាត់ក្រោយ enrollment commit។ រក្សា binary/hash pins និង safety assertions។
+- Migration `20261106143034_zoe_atomic_registration.sql` បន្ថែមចំនួន migration ពី61ទៅ62។ Pickup/reset/C04 guards ទទួលតែ relations ដែលបានពិនិត្យ `private.registration_protocol` និង `private.registration_protocol_pkey`; នៅបដិសេធ reset persistence/lifetime quota namespace ថ្មី និងរក្សា receipt/quota/retention assertions។
+- **ភស្តុតាងបានអានពី raw logs**៖ [Audit1212](https://github.com/mengsroy-h/Zoe-System/actions/runs/42343716725) សាក merge `6330d6deba046f98129e07166a9b80ce6f16392a` នៃ head `a711893b4f3b0d3b48dcdb1801937f4fd8baa732` ជាមួយ base `b57f2fea84325d409de4bcdfb1fdd6b0ae244c3d`។ Shards មាន118+32+38+55 = **243 checker ជាប់, 0 partial/skip**។ ZTO/native ផ្ដោតមាន122 files/2784 tests, pending0/todo0; នេះមិនមែនចំនួន full-suite ទេ។ Wrapper ផ្ទៀង Vitest JSON និងបដិសេធ skipped/todo ក្នុង STRICT; log មិនបង្ហាញចំនួន tests ខាងក្នុងទាំងអស់។ CI Ubuntu ដែលមាន prerequisites និង sharding មិនលុបលទ្ធផល Windows ខាងលើទេ។
+- [Registration Auth9](https://github.com/mengsroy-h/Zoe-System/actions/runs/42343716724/job/128316791503) ប្រើ official pinned Linux Auth binary ហើយ log បញ្ជាក់ **13 checks ជាប់** លើ merge ដដែល។ មិនរាប់ថាបានផ្ទៀង hosted HTTP/PostgREST/Auth ឬ rollout ទេ។
+- [F0348](https://github.com/mengsroy-h/Zoe-System/actions/runs/42343716858) ជាប់ក្រោយ retry លើ head ដដែល។ Run ដំបូងមាន324 ជាប់/2 ធ្លាក់៖ native `postgc-partial` ជាប់7 assertions; Supabase `retainedAfterLostAck` បរាជ័យមុន execute request (`executeRequests=0, commits=0, journalRetained=false`) ហើយ comparison ជាមួយ result បាត់បង្កើតសារ `matched logical state postgc-partial` បន្ថែម។ N249/250/251 timing ជាប់។ មូលហេតុដំបូងនៅមិនទាន់បញ្ជាក់; retry មិនមែនការកែកំហុស ហើយមិនមានភស្តុតាងថាជាបញ្ហា JVM deadline ឬ backend divergence ទេ។
+- **នៅមិនទាន់ផ្ទៀង**៖ hosted migration/trigger owner/grants/capability និង HTTP/Auth end-to-end, backup/restore/PITR, old→new handler drain/switch/rollback និង timeout/load។ កុំ merge ឬ deploy រហូតលក្ខខណ្ឌទាំងនេះបានផ្ទៀង។ កុំ restore delete-compensation ចាស់ ឬបើក accepting ខណៈ handler ចាស់អាចរត់។
+
 
 
 ### 2026-11-06 · Repository contract តាម job ដែលវាស់
@@ -4870,18 +4897,3 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/zto-trash-mode-devices.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-trash-mode-shop.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-upstream-timing.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
-
-## 2026-11-07 — Registration atomic patch (worktree verification, PR #393 candidate changes)
-
-- **Scope (local worktree, review-authored fixes included):** atomic registration enrollment path (deferred trigger on `auth.users` + capability/diagnosis RPCs), fail-closed handler behavior (no delete-compensation), definitive error mapping (`409 username-taken`, `403 invite-invalid`, unclear `502 registration-unknown` with “log in before retry”), and local checkers/tests/harness/workflow artifacts. Typecheck fix: `failureOf<T>()` narrowing helper in `account-core.ts` + `npm:` specifier `paths` in `ZoeW/tsconfig.app.json` (no checker disabled, no tests removed).
-- **Diff (uncommitted → this commit):** tracked 7 files = 368 insertions / 52 deletions; untracked 5 files = 631 insertions (workflow, contract test, auth harness, pins, migration). **Total 12 files, 999 insertions / 52 deletions** (does not include external report file).
-- **Verified PASS (local/disposable, modified worktree):** `tsc -b --noEmit --force` exit 0; functions checker `260/260`; RLS `601/601`; coverage `10 ok, 0 FAIL`; targeted Vitest `45/45` (3 files); negative control `17/17` fail vs baseline `_shared` (expected). Adapted local runs: GoTrue v2.197.0 source-built Windows `auth.exe` (`b4e196…`, **not** pinned Linux `f2aa…`) + PG 17.10 = `16/16`; PostgREST 16.5 + disposable PG = `18/18`.
-- **Full ZoeW suite (evidence):** fixed tree 440 files → **422 pass / 18 fail**; tests **7,816 pass / 41 fail / 98 skipped**. Baseline `HEAD` 439 → **422 / 17**; **7,796 / 42 / 98**. Failing-file set matches baseline except `palm-sign-outbox.test.tsx` (1 flaky in fixed full run; **267/267 standalone** in both trees; files byte-identical to `HEAD`; registration patch does not touch it) and `collected-mirror-durable` (16 vs 18 baseline). **98 skipped reported separately — not pass/fail.** Full suite **not green**; failures classified pre-existing/env/flaky, **not a registration regression**.
-- **NOT TESTED / blockers (not pass):** candidate baseline `f0d60cf…` not reproducible; hosted Supabase staging with real deployment role (migration, trigger on `auth.users`, `proowner='postgres'`, capability `ready:true` after flip, RPC grants for service_role vs anon/authenticated, hosted HTTP/PostgREST/Auth path, timeouts/load); GitHub Actions `registration-auth.yml` / official pinned Linux binary `f2aa…` (verify CI after push); mixed-generation old→new handler switch/drain/rollback (zero in-flight old requests unproven). **No merge/deploy while blockers remain.** Supabase project ref from PR check details: `igqmfpmhrkvclzjafdov` (verify correct project before any hosted change; use test data).
-
-## 2026-11-07 — CI fixes for PR #393 registration commit (evidence-backed)
-
-- **`actual-auth` (Registration Auth integration, ubuntu-latest):** fixed `audit-tools/registration-auth-integration.cjs` to initialize the embedded-PG harness only in `ZOE_AUTH_PG_MODE=embedded`. In docker mode (CI/workflow default) the unconditional `createPgHarness()` path touched `@embedded-postgres` Linux binaries requiring `libicui18n.so.60` on Ubuntu 24.04, causing "error while loading shared libraries" before the owned Docker fixture ran. Docker-mode behavior and pinned Auth binary hash check (`f2aa…`) unchanged.
-- **`run-all.sh` part 3/4 & 4/4 zoew-suite pg tests (caused by migration `20261106143034_zoe_atomic_registration.sql` in this commit):** updated migration count expectations 61→62 and added explicit, reviewed allowlists for registration schema relations (`private.registration_protocol`, `private.registration_protocol_pkey`) in: `audit-tools/supabase-pickup-reset-applied-test.cjs`, `ZoeW/tests/supabase-pickup-reset-applied.pg.test.ts`, `audit-tools/supabase-pickup-reset-paired-sdk-test.cjs`, `ZoeW/tests/supabase-pickup-reset-paired-sdk.pg.test.ts`, `ZoeW/tests/supabase-original-tenant.pg.test.ts` (C04). Intent preserved: reset tests still forbid new reset persistence/lifetime quota namespace; C04 still compares non-registration/delta relations and receipt/quota/retention contracts, and asserts the exact registration relations added.
-- **Verification (local):** JS syntax checks pass for modified harnesses. Full CI re-verification required after push (not a local pass claim).
-- **Remaining blockers unchanged:** hosted Supabase staging/privileges/trigger-owner/grants/end-to-end, mixed-generation drain/switch, provenance baseline `f0d60cf…` not reproducible, full suite not green (pre-existing/flaky per evidence), no merge/deploy.

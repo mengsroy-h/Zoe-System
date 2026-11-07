@@ -2381,6 +2381,9 @@
     "ZoeW/tests/export-request-snapshot.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/f03-provider-reporting.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/firebase-auth-write-ownership.test.ts": {
       "policy": "zoew-self-verification"
     },

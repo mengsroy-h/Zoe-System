@@ -6,6 +6,7 @@
  *    បាត់ ACK/បិទ app មុន permission រក្សាទុក ➜ HOLD មាន evidence; permission ចុះរួច ➜ recovery CAS តាម truth ថ្មី។
  *    ទិសផ្ទុយ ៖ Reset (`{ packagesPickedUp: 0 }`) មិនកើតឡើងវិញ · ប្រតិបត្តិការដែលនៅរស់មិនត្រូវប៉ះ · ហាងផ្សេង / ទិដ្ឋភាពមិនទាន់ស្រស់ ➜ មិនសរសេរ។
  */
+import { performance } from 'node:perf_hooks';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../src/core/state';
 import { appLocalStore } from '../src/core/storage';
@@ -23,7 +24,18 @@ const HISTORY = 'zoew_scan_history_cod_dod';
 const PICKUP = 'zoew_daily_pickup_cod_dod';
 const H = 60 * 60 * 1000;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const lab = { store: {} as Record<string, any>, hang: '' as string, writes: [] as string[] };
+async function waitForState(check: () => void, { timeout = 1000 } = {}) {
+    const deadline = performance.now() + timeout;
+    while (true) {
+        try { check(); return; }
+        catch (error) {
+            const remaining = deadline - performance.now();
+            if (remaining <= 0) throw error;
+            await sleep(Math.min(50, remaining));
+        }
+    }
+}
+const lab = { store: {} as Record<string, any>, hang: '' as string, writes: [] as string[], blocked: [] as string[], pendingRequests: new Set<Promise<unknown>>() };
 
 function getPath(path: string) {
     let cur: any = lab.store;
@@ -51,11 +63,15 @@ function setPath(path: string, value: any) {
     cur[parts[parts.length - 1]] = JSON.parse(JSON.stringify(value));
 }
 const hangs = (path: string) => !!lab.hang && path.indexOf(lab.hang) === 0;
+function trackRequest<T>(pending: Promise<T>): Promise<T> {
+    lab.pendingRequests.add(pending);
+    return pending.finally(() => lab.pendingRequests.delete(pending));
+}
 function makeFb() {
     return {
         getIdTokenResult: async () => ({ token: 't' }),
         ref: (_db: unknown, path: string) => ({ path }),
-        get: async (ref: any) => { await sleep(2); const v = getPath(ref.path); return { val: () => v, exists: () => v !== null }; },
+        get: (ref: any) => trackRequest(sleep(2).then(() => { const v = getPath(ref.path); return { val: () => v, exists: () => v !== null }; })),
         update: async (ref: any, payload: any) => {
             await sleep(2);
             for (const k of Object.keys(payload)) setPath(ref.path + '/' + k, payload[k]);
@@ -63,8 +79,8 @@ function makeFb() {
         },
         set: async (ref: any, value: any) => { await sleep(2); setPath(ref.path, value); return true; },
         runTransaction: (ref: any, fn: any) => {
-            if (hangs(ref.path)) return new Promise(() => {});
-            return sleep(2).then(() => {
+            if (hangs(ref.path)) { lab.blocked.push(ref.path); return new Promise(() => {}); }
+            const pending = sleep(2).then(() => {
                 const cur = getPath(ref.path);
                 const next = fn(cur);
                 if (next === undefined) return { committed: false, snapshot: { val: () => cur } };
@@ -73,6 +89,7 @@ function makeFb() {
                 const v = getPath(ref.path);
                 return { committed: true, snapshot: { val: () => v } };
             });
+            return trackRequest(pending);
         },
         onValue: () => () => {},
         off: () => {},
@@ -131,13 +148,16 @@ const recorded = () => { const r = getPath(PICKUP + '/' + DAY); return r ? r.pac
 async function doors() {
     runScheduledCleanup();
     await resumeInterruptedCleanups();
-    await sleep(60);
+    await cleanup.cleanupResumeBarrier.settled;
+    await waitForState(() => expect(dataState.pickupResumeInFlight).toBe(false));
 }
 
 beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date(NOW));
     lab.store = {};
+    lab.blocked = [];
+    lab.pendingRequests.clear();
     lab.hang = '';
     lab.writes = [];
     appLocalStore.clear();
@@ -177,6 +197,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    expect(Date.now()).toBe(NOW);
     vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
@@ -244,7 +265,7 @@ it('rollback read បរាជ័យរក្សា journal ហើយស្ត�
     const broken = vi.spyOn(firebaseState.fb as any, 'get').mockRejectedValue(new Error('offline'));
     const reverted = revertPickupMarks(applied, null, true);
     pickup.endPickupIntent(id, reverted.commit);
-    await sleep(15);
+    await waitForState(() => expect(pickup.pickupIntentsLive.has(id)).toBe(false));
     expect(journal()).toHaveLength(1);
     expect(recorded()).toBe(0);
     broken.mockRestore();
@@ -343,7 +364,8 @@ describe('A225 ៖ ការបិទ/បើកដែលទំព័រស្ល
         loadViewsFromServer();
         lab.hang = HISTORY;
         void toggleCloseStatus('it1');
-        await sleep(40);
+        await waitForState(() => expect(lab.blocked).toContain(HISTORY + '/it1'));
+        await waitForState(() => expect(lab.pendingRequests.size).toBe(0));
         expect(recorded(), 'no new pickup addition before final history transition ACK').toBe(0);
         expect(closedOnServer(), 'លក្ខខណ្ឌមុន ៖ កញ្ចប់នៅបើក').toBe(0);
         newPage();
@@ -357,7 +379,7 @@ describe('A225 ៖ ការបិទ/បើកដែលទំព័រស្ល
         loadViewsFromServer();
         lab.hang = PICKUP;
         void applyBarcodeCloseChange('it2', 'A2250011', true, { silent: true, showModal: false });
-        await sleep(40);
+        await waitForState(() => expect(lab.blocked).toContain(PICKUP + '/' + DAY));
         expect(closedOnServer(), 'លក្ខខណ្ឌមុន ៖ barcode បិទលើ server').toBe(1);
         expect(recorded(), 'លក្ខខណ្ឌមុន ៖ ស្ថិតិមិនទាន់សរសេរ').toBe(0);
         newPage();
@@ -371,7 +393,8 @@ describe('A225 ៖ ការបិទ/បើកដែលទំព័រស្ល
         loadViewsFromServer();
         lab.hang = HISTORY;
         void applyBarcodeCloseChange('it3', 'A2250021', false, { silent: true, showModal: false });
-        await sleep(40);
+        await waitForState(() => expect(lab.blocked).toContain(HISTORY + '/it3'));
+        await waitForState(() => expect(lab.pendingRequests.size).toBe(0));
         expect(recorded(), 'លក្ខខណ្ឌមុន ៖ ស្ថិតិលុបរួច').toBe(0);
         newPage();
         await doors();
@@ -385,7 +408,8 @@ describe('A225 ៖ ការបិទ/បើកដែលទំព័រស្ល
         loadViewsFromServer();
         lab.hang = HISTORY;
         void toggleCloseStatus('it4');
-        await sleep(40);
+        await waitForState(() => expect(lab.blocked).toContain(HISTORY + '/it4'));
+        await waitForState(() => expect(lab.pendingRequests.size).toBe(0));
         lab.writes = [];
         await doors();
         expect(lab.writes.filter((p) => p.indexOf(PICKUP) === 0), 'ប្រតិបត្តិការរស់ ➜ គ្មានការសរសេរស្ថិតិ').toEqual([]);
@@ -410,7 +434,8 @@ describe('A225 ៖ ការបិទ/បើកដែលទំព័រស្ល
         loadViewsFromServer();
         lab.hang = HISTORY;
         void toggleCloseStatus('it6');
-        await sleep(40);
+        await waitForState(() => expect(lab.blocked).toContain(HISTORY + '/it6'));
+        await waitForState(() => expect(lab.pendingRequests.size).toBe(0));
         newPage();
         dbListenerPendingPaths.add('history');
         lab.writes = [];
@@ -424,7 +449,7 @@ describe('A225 ៖ ការបិទ/បើកដែលទំព័រស្ល
         expect(journal().length).toBe(1);
         appLocalStore.setItem('zoew_firebase_config', SHOP_CONFIG);
         await doors();
-        await vi.waitFor(() => {
+        await waitForState(() => {
             expect(recorded()).toBe(closedOnServer());
             expect(recorded()).toBe(1);
             expect(journal()).toEqual([]);
@@ -447,7 +472,8 @@ describe('A225 ៖ ការបិទ/បើកដែលទំព័រស្ល
             loadViewsFromServer();
             lab.hang = HISTORY;
             void toggleCloseStatus('it7');
-            await sleep(40);
+            await waitForState(() => expect(lab.blocked).toContain(HISTORY + '/it7'));
+            await waitForState(() => expect(lab.pendingRequests.size).toBe(0));
             const id = journal()[0] && journal()[0].id;
             expect(held.has('zoew-pickup-live:' + id), 'tab ដើមកាន់ lock').toBe(true);
             (pickup as any).pickupIntentsLive.clear();
@@ -460,7 +486,7 @@ describe('A225 ៖ ការបិទ/បើកដែលទំព័រស្ល
             expect(journal().length).toBe(1);
             held.clear();
             await doors();
-            await vi.waitFor(() => {
+            await waitForState(() => {
                 expect(recorded()).toBe(closedOnServer());
                 expect(recorded()).toBe(1);
                 expect(journal()).toEqual([]);

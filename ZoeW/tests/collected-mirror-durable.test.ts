@@ -33,7 +33,7 @@ const NOW = Date.UTC(2026, 9, 5, 9, 30, 0);
 const DAY = getZoneDateKey(NOW - 2 * H, 0);
 const SHOP_CONFIG = JSON.stringify({ apiKey: 'k', databaseURL: 'https://mx1-durable-default-rtdb.firebaseio.com', projectId: 'p' });
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const lab = { store: {} as Record<string, any>, hang: [] as string[], fail: null as null | ((path: string, kind: string) => any), mirrorWrites: 0,
+const lab = { blocked: new Set<string>(), store: {} as Record<string, any>, hang: [] as string[], fail: null as null | ((path: string, kind: string) => any), mirrorWrites: 0,
     hangTx: null as null | ((path: string, next: any) => boolean), mirrorGate: null as null | Promise<void>, captures: [] as any[],
     txGate: null as null | ((path: string) => Promise<void> | null) };
 
@@ -62,7 +62,17 @@ function setPath(path: string, value: any) {
     }
     cur[parts[parts.length - 1]] = JSON.parse(JSON.stringify(value));
 }
-const hangs = (path: string) => lab.hang.some((prefix) => path.indexOf(prefix) === 0);
+const hangs = (path: string) => {
+    const prefix = lab.hang.find((candidate) => path.indexOf(candidate) === 0);
+    if (prefix) lab.blocked.add(prefix);
+    return prefix !== undefined;
+};
+async function waitForMockEffect(ready: () => boolean) {
+    const deadline = performance.now() + 3000;
+    while (!ready() && performance.now() < deadline) await sleep(5);
+    expect(ready()).toBe(true);
+}
+const waitForBlocked = (path: string) => waitForMockEffect(() => lab.blocked.has(path));
 function makeFb() {
     return {
         getIdTokenResult: async () => ({ token: 't' }),
@@ -70,7 +80,7 @@ function makeFb() {
         get: async (ref: any) => { await sleep(1); const v = getPath(ref.path); return { val: () => v, exists: () => v !== null }; },
         update: async (ref: any, payload: any) => {
             if (hangs(ref.path)) return new Promise(() => {});
-            if (ref.path.indexOf(MIRROR) === 0 && lab.mirrorGate) await lab.mirrorGate;
+            if (ref.path.indexOf(MIRROR) === 0 && lab.mirrorGate) { lab.blocked.add(MIRROR); await lab.mirrorGate; }
             await sleep(1);
             const failed = lab.fail && lab.fail(ref.path, 'update');
             if (failed) throw failed;
@@ -158,7 +168,7 @@ function crashAndReload() {
 async function resumeDoors() {
     await pickup.resumePickupIntents();
     await resumeInterruptedCleanups();
-    await sleep(20);
+    await cleanup.cleanupResumeBarrier.settled;
 }
 function expectedMirror() {
     const out: Record<string, any> = {};
@@ -269,6 +279,7 @@ beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date(NOW));
     lab.store = {};
+    lab.blocked.clear();
     lab.hang = [];
     lab.fail = null;
     lab.mirrorWrites = 0;
@@ -332,7 +343,7 @@ it.each(['barcode', 'whole'])('⛔ បិទ (%s) ៖ កញ្ចប់ + ស�
     loadViewsFromServer();
     lab.hang = [MIRROR];
     void (kind === 'whole' ? toggleCloseStatus('c1') : applyBarcodeCloseChange('c1', 'MX1C0001', true, { silent: true, showModal: false }));
-    await sleep(40);
+    await waitForBlocked(MIRROR);
     expect(serverBarcode('c1', 'MX1C0001').isClosed, 'លក្ខខណ្ឌមុន ៖ កញ្ចប់បិទលើ server').toBe(true);
     expect(getPath(PICKUP + '/' + DAY).packagesPickedUp, 'លក្ខខណ្ឌមុន ៖ ស្ថិតិយក commit រួច').toBe(kind === 'whole' ? 2 : 1);
     expect(actualMirror(), 'លក្ខខណ្ឌមុន ៖ mirror មិនទាន់សរសេរ').toEqual({});
@@ -349,7 +360,7 @@ it.each(['barcode', 'whole'])('⛔ បើកវិញ (%s) ៖ កញ្ចប�
     expect(Object.keys(actualMirror()), 'លក្ខខណ្ឌមុន ៖ mirror មាន barcode បិទ').toHaveLength(1);
     lab.hang = [MIRROR];
     void (kind === 'whole' ? toggleCloseStatus('r1') : applyBarcodeCloseChange('r1', 'MX1R0001', false, { silent: true, showModal: false }));
-    await sleep(40);
+    await waitForBlocked(MIRROR);
     expect(serverBarcode('r1', 'MX1R0001').isClosed, 'លក្ខខណ្ឌមុន ៖ កញ្ចប់បើកលើ server').toBe(false);
     crashAndReload();
     await resumeDoors();
@@ -365,7 +376,7 @@ it('⛔ ដក barcode បិទ ៖ claim កញ្ចប់រួច · ធុ
     expect(Object.keys(actualMirror()), 'លក្ខខណ្ឌមុន ៖ mirror មាន barcode បិទ').toHaveLength(1);
     lab.hang = [TRASH];
     void removeSingleBarcode('d1', 'MX1D0001');
-    await sleep(40);
+    await waitForBlocked(TRASH);
     expect(serverBarcode('d1', 'MX1D0001'), 'លក្ខខណ្ឌមុន ៖ barcode ចេញពីកញ្ចប់លើ server').toBeNull();
     expect(cleanupJournal(), 'លក្ខខណ្ឌមុន ៖ journal ការសម្អាតនៅ').toHaveLength(1);
     crashAndReload();
@@ -384,7 +395,7 @@ it('⛔ ដក barcode បិទ ៖ ការស្តារឃើញ mirror �
     loadViewsFromServer();
     lab.hang = [TRASH];
     void removeSingleBarcode('d2', 'MX1D0011');
-    await sleep(40);
+    await waitForBlocked(TRASH);
     crashAndReload();
     refuseMirror();
     uiState.toasts = [];
@@ -411,7 +422,7 @@ it('⛔ mirror បដិសេធជាប់រហូត ➜ ប្រាក់
     loadViewsFromServer();
     lab.hang = [TRASH];
     void removeSingleBarcode('d3', 'MX1D0021');
-    await sleep(40);
+    await waitForBlocked(TRASH);
     crashAndReload();
     refuseMirror();
     for (let round = 1; round < cleanup.CLEANUP_LEDGER_RETRY_MAX; round++) {
@@ -491,7 +502,7 @@ it('⛔ ការស្តារ journal បិទ ៦ ថ្ងៃចាស់ 
     loadViewsFromServer();
     lab.hang = [MIRROR];
     void applyBarcodeCloseChange('e1', 'MX1E0001', true, { silent: true, showModal: false });
-    await sleep(40);
+    await waitForBlocked(MIRROR);
     expect(serverBarcode('e1', 'MX1E0001').isClosed, 'លក្ខខណ្ឌមុន ៖ បិទលើ server').toBe(true);
     const later = t0 + 6 * 24 * H + 20 * H;
     vi.setSystemTime(new Date(later));
@@ -509,7 +520,7 @@ it('⛔ ការស្តារ journal បិទ ៖ mirror បដិសេធ
     loadViewsFromServer();
     lab.hang = [MIRROR];
     void applyBarcodeCloseChange('q1', 'MX1Q0001', true, { silent: true, showModal: false });
-    await sleep(40);
+    await waitForBlocked(MIRROR);
     crashAndReload();
     refuseMirror();
     uiState.toasts = [];
@@ -780,7 +791,7 @@ it.each(['barcode', 'whole'].flatMap(kind => ['present', 'missing', 'overwritten
     lab.fail = (path, k) => (k === 'transaction' && path === HISTORY + '/f2' ? { error: new Error('disconnect') } : null);
     lab.hang = [MIRROR];
     void (kind === 'whole' ? toggleCloseStatus('f2') : applyBarcodeCloseChange('f2', 'MX1F0011', true, { silent: true, showModal: false }));
-    await sleep(40);
+    await waitForBlocked(MIRROR);
     const entry = pickupJournal()[0];
     expect(entry.transitionKnown).not.toBe(true);
     expect(serverBarcode('f2', 'MX1F0011').isClosed, 'លក្ខខណ្ឌមុន ៖ ការបិទ landed').toBe(true);
@@ -1469,7 +1480,7 @@ it('⛔ barcode ក្នុង history មាន isDeducted ចាស់ ៖ �
     loadViewsFromServer();
     lab.hang = [TRASH];
     void removeSingleBarcode('ld1', 'MX1L0101');
-    await sleep(40);
+    await waitForBlocked(TRASH);
     expect(serverBarcode('ld1', 'MX1L0101'), 'លក្ខខណ្ឌមុន ៖ barcode ចេញពីកញ្ចប់លើ server').toBeNull();
     expect(cleanupJournal().map((e: any) => [e.stage, e.revenue]), 'barcode ដករួច ➜ journal គ្មានប្រាក់ត្រូវដក').toEqual([['slot', null]]);
     crashAndReload();
@@ -1833,7 +1844,7 @@ it('MX-1 ពិនិត្យ ៦ · 4b legacy isDeducted closed barcode · pag
     loadViewsFromServer();
     lab.hang = [TRASH];
     void removeSingleBarcode('lz2', 'MX1Z0211');
-    await sleep(40);
+    await waitForBlocked(TRASH);
     crashAndReload();
     await resumeDoors();
     expect(actualMirror()).toEqual(expectedMirror());
@@ -1922,10 +1933,12 @@ it('MX-1 ពិនិត្យ ៦ · 6 drop keeps a mark only an unfinished res
 });
 
 it('MX-1 ពិនិត្យ ៦ · 7 microtask scan: shop switch right after the last session check ➜ does a mirror write reach the new shop?', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
     const hits: number[] = [];
     const okWrites: number[] = [];
     for (let k = 0; k < 80; k++) {
         lab.store = {};
+        lab.blocked.clear();
         appLocalStore.clear();
         appLocalStore.setItem('zoew_firebase_config', SHOP_CONFIG);
         firebaseState.authGeneration++;
@@ -1961,8 +1974,10 @@ it('MX-1 ពិនិត្យ ៦ · 7 microtask scan: shop switch right after 
             }
             return p;
         };
-        await resumeInterruptedCleanups();
-        await sleep(5);
+        const resuming = resumeInterruptedCleanups();
+        await vi.advanceTimersByTimeAsync(200);
+        await resuming;
+        await cleanup.cleanupResumeBarrier.settled;
         if (crossShop) hits.push(k);
         if (lab.mirrorWrites > sameShopBefore && !crossShop) okWrites.push(k);
     }
@@ -1978,7 +1993,7 @@ it.each(['barcode', 'whole'])('⛔ MX1-PJ-1 បិទ (%s) ៖ ស្ថិត�
     loadViewsFromServer();
     lab.hang = [MIRROR];
     void (kind === 'whole' ? toggleCloseStatus('pj1') : applyBarcodeCloseChange('pj1', 'MX1J0001', true, { silent: true, showModal: false }));
-    await sleep(40);
+    await waitForBlocked(MIRROR);
     expect(pickupDay().packagesPickedUp, 'លក្ខខណ្ឌមុន ៖ ស្ថិតិយក commit រួច').toBe(kind === 'whole' ? 2 : 1);
     expect(actualMirror(), 'លក្ខខណ្ឌមុន ៖ mirror មិនទាន់សរសេរ').toEqual({});
     expect(pickupJournal(), 'លក្ខខណ្ឌមុន ៖ journal នៅ (mirror មិនទាន់ឆ្លើយ true)').toHaveLength(1);
@@ -2227,7 +2242,7 @@ it('⛔ MX1-PJ-1 tab ពីរ ៖ ជុំស្តារកំពុងធ្
     let release: () => void = () => {};
     lab.mirrorGate = new Promise<void>((r) => { release = r; });
     const pass = pickup.resumePickupIntents();
-    await sleep(40);
+    await waitForBlocked(MIRROR);
     expect(pickupJournal().map((e: any) => [e.id, !!e.pickupDone]), 'លក្ខខណ្ឌមុន ៖ ជុំឈប់នៅ mirror របស់ entry មុន · entry ក្រោយមិនទាន់មានទង់').toEqual([[w, true], [x, false]]);
     expect(pickupDay().packagesPickedUp, 'លក្ខខណ្ឌមុន ៖ ស្ថិតិយកមិនទាន់ Reset').toBe(2);
     flagPickupDoneFromOtherTab(x);
@@ -2249,7 +2264,7 @@ it.each(['barcode', 'whole'])('⛔ MX1-PJ-1 បិទ (%s) ៖ ស្ថិត�
     await pickup.capturePickupContext(DAY);
     loadViewsFromServer();
     lab.fail = (path, k) => (k === 'transaction' && path.indexOf(PICKUP) === 0 ? { notApplied: true, error: new Error('network') } : null);
-    void (kind === 'whole' ? toggleCloseStatus('pj8') : applyBarcodeCloseChange('pj8', 'MX1J0091', true, { silent: true, showModal: false }));
+    await (kind === 'whole' ? toggleCloseStatus('pj8') : applyBarcodeCloseChange('pj8', 'MX1J0091', true, { silent: true, showModal: false }));
     await sleep(40);
     expect(serverBarcode('pj8', 'MX1J0091').isClosed, 'លក្ខខណ្ឌមុន ៖ កញ្ចប់បិទលើ server').toBe(true);
     expect(pickupDay(), 'fence exists but pickup effect did not commit').toMatchObject({ packagesPickedUp: 0 });
@@ -2283,7 +2298,7 @@ it('⛔ A444 ជុំស្តារ ៖ entry មុនរង់ចាំ mirr
     let release: () => void = () => {};
     lab.mirrorGate = new Promise<void>((r) => { release = r; });
     const pass = pickup.resumePickupIntents();
-    await sleep(40);
+    await waitForBlocked(MIRROR);
     expect({ journal: pickupJournal().map((e: any) => e.id), keys: Object.keys(pickupDay().pickedUpBarcodes || {}) },
         'លក្ខខណ្ឌមុន ៖ ជុំឈប់នៅ mirror របស់ entry មុន · key X មិនទាន់មាន').toEqual({ journal: [w, x], keys: [kw] });
     const item = getPath(HISTORY + '/pjx');
@@ -2445,7 +2460,7 @@ it.each(['barcode', 'whole'])('pickup protocol: stale local open + server alread
     local.isClosed = false; local.barcodes[0].isClosed = false; delete local.barcodes[0].closedAt;
     const before = getPath(HISTORY + '/protocolnoop');
     await (kind === 'whole' ? toggleCloseStatus('protocolnoop') : applyBarcodeCloseChange('protocolnoop', 'PROTOALREADYCLOSED', true, { silent: true, showModal: false }));
-    await sleep(25);
+    await waitForMockEffect(() => pickup.pickupIntentsLive.size === 0);
     expect(getPath(HISTORY + '/protocolnoop').barcodes[0].closedAt).toBe(before.barcodes[0].closedAt);
     expect(pickupDay().packagesPickedUp).toBe(0);
     expect(Object.keys(pickupDay().pickedUpBarcodes || {})).toEqual([]);
@@ -2516,7 +2531,7 @@ it.each([true, false])('pickup protocol: cached-open proposal ដែល original
         update(getPath(ref.path)); originalResult = { committed: false, snapshot: { val: () => getPath(ref.path) } }; return Promise.resolve(originalResult);
     }) as any;
     await applyBarcodeCloseChange('cachedRetry', 'PROTOCACHED', true, { silent: true, showModal: false });
-    await sleep(25); expect(tentative).toBe(true); expect(tentativeProof).toEqual({ keys: [], confirmed: false }); expect(pickupDay().packagesPickedUp).toBe(0);
+    await waitForMockEffect(() => pickup.pickupIntentsLive.size === 0); expect(tentative).toBe(true); expect(tentativeProof).toEqual({ keys: [], confirmed: false }); expect(pickupDay().packagesPickedUp).toBe(0);
     expect(Object.keys(pickupDay().pickedUpBarcodes || {})).toEqual([]); await resumeDoors();
     expect(originalResult?.committed).toBe(false);
     expect(getPath(HISTORY + '/cachedRetry')).toEqual(historyBefore);

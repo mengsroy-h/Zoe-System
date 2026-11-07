@@ -39,7 +39,7 @@ describe('របាយការណ៍ daily delta របស់អ្នករត
         expect(start).toBeGreaterThan(-1);
         const h = emit(); h.run();
         expect(h.events.map(x => x[0])).toEqual(['write', 'output']);
-        expect(h.events[0][1]).toBe('/measure/supabase-datastore-daily-bytes.json');
+        expect(h.events[0][1]).toBe(path.join('/measure', 'supabase-datastore-daily-bytes.json'));
         expect(h.events[1][2]).toBe('daily_bytes=supabase-datastore-daily-bytes.json\n');
     });
     it('សរសេរបរាជ័យមិនប្រកាសជោគជ័យ ហើយ receipt បរាជ័យមិនបាត់កំហុស', () => {

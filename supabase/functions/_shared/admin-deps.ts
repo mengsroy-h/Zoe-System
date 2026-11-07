@@ -1,6 +1,6 @@
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.117.2';
-import { FINISH_REASONS } from './account-core.ts';
-import type { CreateUserResult, FinishReason, FinishResult, SpentInviteMember, UpdatePasswordResult } from './account-core.ts';
+import { FINISH_REASONS, USERNAME_RE } from './account-core.ts';
+import type { CreateUserResult, RegistrationContext, RegistrationDiagnosis, FinishReason, FinishResult, SpentInviteMember, UpdatePasswordResult } from './account-core.ts';
 import { withTimeout } from './timeout.ts';
 
 export const ADMIN_CALL_TIMEOUT_MS = 8000;
@@ -41,9 +41,20 @@ export function adminDeps(client: SupabaseClient, timeoutMs = ADMIN_CALL_TIMEOUT
                 return undefined;
             }
         },
-        async createUser(email: string, password: string): Promise<CreateUserResult> {
+        async createUser(email: string, password: string, registration: RegistrationContext): Promise<CreateUserResult> {
             try {
-                const { data, error } = await withTimeout(client.auth.admin.createUser({ email, password, email_confirm: true }), timeoutMs, 'timeout');
+                if (!registration || !USERNAME_RE.test(registration.username)
+                    || email.split('@')[0] !== registration.username || !/^[0-9a-f]{64}$/.test(registration.codeHash)) {
+                    return { ok: false, reason: 'unavailable' };
+                }
+                const capability = await withTimeout(Promise.resolve(client.rpc('registration_capability_v1')), timeoutMs, 'timeout');
+                if (capability.error || !capability.data || Array.isArray(capability.data)
+                    || capability.data.protocol !== 'zoe-registration-v1' || capability.data.ready !== true) {
+                    return { ok: false, reason: 'unavailable' };
+                }
+                const { data, error } = await withTimeout(client.auth.admin.createUser({ email, password, email_confirm: true,
+                    app_metadata: { zoe_registration: { version: 1, username: registration.username, invite_code_hash: registration.codeHash } }
+                }), timeoutMs, 'timeout');
                 if (error) {
                     const code = errorCode(error);
                     if (EXISTS_CODES.has(code)) return { ok: false, reason: 'exists' };
@@ -81,6 +92,19 @@ export function adminDeps(client: SupabaseClient, timeoutMs = ADMIN_CALL_TIMEOUT
                 return !error;
             } catch {
                 return false;
+            }
+        },
+        async diagnoseRegistration(codeHash: string, username: string): Promise<RegistrationDiagnosis | null> {
+            try {
+                if (!USERNAME_RE.test(username) || !/^[0-9a-f]{64}$/.test(codeHash)) return null;
+                const { data, error } = await withTimeout(Promise.resolve(client.rpc('registration_diagnose_v1', {
+                    p_code_hash: codeHash,
+                    p_username: username
+                })), timeoutMs, 'timeout');
+                if (error) return null;
+                return data === 'username-taken' || data === 'invite-invalid' || data === 'unknown' ? data : null;
+            } catch {
+                return null;
             }
         },
         async passwordUserId(email: string, password: string): Promise<string | null | undefined> {

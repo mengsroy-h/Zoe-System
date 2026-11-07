@@ -5,9 +5,9 @@ export const PASSWORD_MIN_CHARS = 8;
 export const PASSWORD_MAX_BYTES = 72;
 export const FINISH_REASONS = ['invite-invalid', 'username-taken', 'account-exists', 'account-invalid', 'user-mismatch'] as const;
 
-const ROLLBACK_REASONS: ReadonlySet<FinishReason> = new Set<FinishReason>(['invite-invalid', 'username-taken', 'account-invalid']);
-
 export type FinishReason = typeof FINISH_REASONS[number] | 'unavailable';
+export type RegistrationDiagnosis = 'username-taken' | 'invite-invalid' | 'unknown';
+export type RegistrationContext = { username: string; codeHash: string };
 export type CreateUserResult = { ok: true; userId: string } | { ok: false; reason: 'exists' | 'weak' | 'unavailable' };
 export type FinishResult = { ok: true; tenantId: string; role: string } | { ok: false; reason: FinishReason };
 export type UpdatePasswordResult = 'ok' | 'weak' | 'unavailable';
@@ -21,9 +21,10 @@ export interface HandlerResult {
 export interface RegisterDeps {
     inviteIsUsable(codeHash: string): Promise<boolean | null>;
     spentInviteMember(codeHash: string, username: string): Promise<SpentInviteMember | null | undefined>;
-    createUser(email: string, password: string): Promise<CreateUserResult>;
+    createUser(email: string, password: string, registration: RegistrationContext): Promise<CreateUserResult>;
     finishRegistration(input: { userId: string; codeHash: string; username: string }): Promise<FinishResult>;
     deleteUser(userId: string): Promise<boolean>;
+    diagnoseRegistration(codeHash: string, username: string): Promise<RegistrationDiagnosis | null>;
     passwordUserId(email: string, password: string): Promise<string | null | undefined>;
     loginDomain: string;
 }
@@ -68,9 +69,15 @@ function fields(input: unknown): Record<string, unknown> | null {
     return input !== null && typeof input === 'object' && !Array.isArray(input) ? input as Record<string, unknown> : null;
 }
 
+type Failed<T extends { ok: boolean }> = Extract<T, { ok: false }>;
+
+function failureOf<T extends { ok: boolean }>(result: T): Failed<T> | null {
+    return result.ok ? null : result as Failed<T>;
+}
+
 async function finishWithRetry(deps: RegisterDeps, request: { userId: string; codeHash: string; username: string }): Promise<FinishResult> {
     const first = await deps.finishRegistration(request);
-    if (!first.ok && first.reason === 'unavailable') return deps.finishRegistration(request);
+    if (failureOf(first)?.reason === 'unavailable') return deps.finishRegistration(request);
     return first;
 }
 
@@ -79,19 +86,33 @@ async function registeredBySpentInvite(deps: RegisterDeps, email: string, passwo
     if (member === undefined) return reply(502, 'db-unavailable');
     if (member === null) return reply(403, 'invite-invalid');
     const proven = provenUserId ?? await deps.passwordUserId(email, password);
-    if (proven === undefined) return reply(502, 'auth-unavailable');
+    if (proven === undefined) return reply(502, 'registration-unknown');
     if (proven !== member.userId) return reply(403, 'invite-invalid');
     return reply(200, 'registered', { tenantId: member.tenantId, role: member.role });
 }
 
-async function resumeRegistration(deps: RegisterDeps, email: string, password: string, codeHash: string, username: string): Promise<HandlerResult> {
-    const userId = await deps.passwordUserId(email, password);
-    if (userId === undefined) return reply(502, 'auth-unavailable');
-    if (userId === null) return reply(409, 'username-taken');
+async function finishProvenRegistration(deps: RegisterDeps, email: string, password: string, codeHash: string, username: string, userId: string): Promise<HandlerResult> {
     const finished = await finishWithRetry(deps, { userId, codeHash, username });
     if (finished.ok) return reply(200, 'registered', { tenantId: finished.tenantId, role: finished.role });
-    if (finished.reason === 'invite-invalid') return registeredBySpentInvite(deps, email, password, codeHash, username, userId);
-    return reply(...FINISH_REPLY[finished.reason]);
+    const reason = failureOf(finished)?.reason ?? 'unavailable';
+    if (reason === 'invite-invalid') return registeredBySpentInvite(deps, email, password, codeHash, username, userId);
+    return reply(...FINISH_REPLY[reason]);
+}
+
+async function resumeRegistration(deps: RegisterDeps, email: string, password: string, codeHash: string, username: string): Promise<HandlerResult> {
+    const userId = await deps.passwordUserId(email, password);
+    if (userId === undefined) return reply(502, 'registration-unknown');
+    if (userId === null) return reply(409, 'username-taken');
+    return finishProvenRegistration(deps, email, password, codeHash, username, userId);
+}
+
+async function diagnoseCreateFailure(deps: RegisterDeps, email: string, password: string, codeHash: string, username: string): Promise<HandlerResult> {
+    const userId = await deps.passwordUserId(email, password);
+    if (userId) return finishProvenRegistration(deps, email, password, codeHash, username, userId);
+    const diagnosis = await deps.diagnoseRegistration(codeHash, username);
+    if (diagnosis === 'username-taken') return reply(409, 'username-taken');
+    if (diagnosis === 'invite-invalid') return reply(403, 'invite-invalid');
+    return reply(502, 'registration-unknown');
 }
 
 export async function handleRegister(input: unknown, deps: RegisterDeps): Promise<HandlerResult> {
@@ -114,18 +135,16 @@ export async function handleRegister(input: unknown, deps: RegisterDeps): Promis
     if (usable === null) return reply(502, 'db-unavailable');
     const email = loginEmail(username, deps.loginDomain);
     if (!usable) return registeredBySpentInvite(deps, email, password, codeHash, username);
-    const created = await deps.createUser(email, password);
+    const created = await deps.createUser(email, password, { username, codeHash });
     if (!created.ok) {
-        if (created.reason === 'exists') return resumeRegistration(deps, email, password, codeHash, username);
-        if (created.reason === 'weak') return reply(400, 'password-weak');
-        return reply(502, 'auth-unavailable');
+        const createFailure = failureOf(created)?.reason ?? 'unavailable';
+        if (createFailure === 'exists') return resumeRegistration(deps, email, password, codeHash, username);
+        if (createFailure === 'weak') return reply(400, 'password-weak');
+        return diagnoseCreateFailure(deps, email, password, codeHash, username);
     }
     const finished = await finishWithRetry(deps, { userId: created.userId, codeHash, username });
     if (finished.ok) return reply(200, 'registered', { tenantId: finished.tenantId, role: finished.role });
-    if (!ROLLBACK_REASONS.has(finished.reason)) return reply(...FINISH_REPLY[finished.reason]);
-    const removed = (await deps.deleteUser(created.userId)) || (await deps.deleteUser(created.userId));
-    if (!removed) return reply(500, 'registration-incomplete');
-    return reply(...FINISH_REPLY[finished.reason]);
+    return reply(...FINISH_REPLY[failureOf(finished)?.reason ?? 'unavailable']);
 }
 
 export async function handleResetPassword(input: unknown, deps: ResetDeps): Promise<HandlerResult> {

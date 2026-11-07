@@ -26,7 +26,11 @@
     "noFallthroughCasesInSwitch": false,
     "forceConsistentCasingInFileNames": true,
 
-    "paths": { "@/*": ["./src/*"] },
+    "paths": {
+      "@/*": ["./src/*"],
+      "npm:@supabase/supabase-js@2.117.2": ["./node_modules/@supabase/supabase-js/dist/index.d.mts"],
+      "npm:@supabase/supabase-js@2.117.2/cors": ["./node_modules/@supabase/supabase-js/dist/cors.d.mts"]
+    },
     "types": ["vite/client"]
   },
   "include": ["src", "tests", "vite.config.mts", "scripts"]

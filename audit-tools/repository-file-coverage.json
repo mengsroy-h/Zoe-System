@@ -745,6 +745,14 @@
       "evidence": "ពិនិត្យ SHA-256 នៃ runner ភស្តុតាង ZTO/native និង controls; កែ bytes ត្រូវ review hash ដោយចេតនា។",
       "limitation": "Hash មិនបញ្ជាក់ថាតេស្តរត់បៃតងទេ; job ដាច់ក្នុង Audit រត់ controls និង Vitest ពិត ហើយរក្សា JSON។"
     },
+    "registration-auth-reviewed-fixture": {
+      "category": "integrity",
+      "guards": [
+        "audit-tools/repository-file-coverage.js"
+      ],
+      "evidence": "SHA-256 ចាក់សោ workflow, pin និង fixture Auth ដែលបានពិនិត្យប្រភព។",
+      "limitation": "ការរត់ Docker CI និង PostgREST ពិតមិនទាន់ផ្ទៀងផ្ទាត់; hash មិនមែន behavioral coverage ទេ។"
+    },
     "source-function-report": {
       "category": "behavior",
       "guards": [
@@ -4799,6 +4807,27 @@
       "policy": "zto-ci-evidence-integrity",
       "encoding": "lf-text",
       "sha256": "23e49f3fd5ba842a2def3e0cec347c474028610343f9d4e910566685ab1d8ca8"
+    },
+    ".github/workflows/registration-auth.yml": {
+      "policy": "registration-auth-reviewed-fixture",
+      "encoding": "lf-text",
+      "sha256": "c9bee41b8efe83208350306f21b6331768168e509c251168cfb10399b4a9ca7a"
+    },
+    "audit-tools/registration-auth-integration.cjs": {
+      "policy": "registration-auth-reviewed-fixture",
+      "encoding": "lf-text",
+      "sha256": "8aa19cb3fc2c0d40b958bac0a6bd7152f94af1abbeedb5c11b6d1284561b736e"
+    },
+    "audit-tools/registration-auth-pins.json": {
+      "policy": "registration-auth-reviewed-fixture",
+      "encoding": "lf-text",
+      "sha256": "c8ef4d3f7d65aa12407d84c6b8aeeb08efa302e62deb9d2c08975c30bbd66a54"
+    },
+    "supabase/migrations/20261106143034_zoe_atomic_registration.sql": {
+      "policy": "supabase-db"
+    },
+    "ZoeW/tests/registration-atomic-contract.test.ts": {
+      "policy": "zoew-self-verification"
     },
     "ZoeW/scripts/source-function-reachability.mjs": {
       "policy": "source-function-report"

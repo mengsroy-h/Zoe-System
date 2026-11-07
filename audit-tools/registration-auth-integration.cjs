@@ -37,8 +37,15 @@ function dockerPgHarness() {
             ownsContainer = true;
             docker(['run', '--detach', '--name', container, '--network', network, '--read-only', '--tmpfs', '/tmp:rw,nosuid', '--tmpfs', '/var/lib/postgresql/data:rw,nosuid', '--tmpfs', '/var/run/postgresql:rw,nosuid', '--publish', '127.0.0.1::5432', '--env', 'POSTGRES_USER=supabase_admin', '--env', 'POSTGRES_DB=postgres', '--env', 'POSTGRES_PASSWORD=' + password, pins.postgres.image]);
             let binding = '';
-            for (let i = 0; i < 50 && !/^127\.0\.0\.1:\d+$/.test(binding); i++) {
-                try { binding = docker(['port', container, '5432/tcp']); } catch { binding = ''; }
+            for (let i = 0; i < 150 && !/^127\.0\.0\.1:\d+$/.test(binding); i++) {
+                try {
+                    const ports = JSON.parse(docker(['inspect', '--format', '{{json .NetworkSettings.Ports}}', container]) || '{}');
+                    const mapped = Array.isArray(ports['5432/tcp']) ? ports['5432/tcp'].find(x => x && x.HostIp === '127.0.0.1' && /^\d+$/.test(String(x.HostPort))) : null;
+                    if (mapped) binding = '127.0.0.1:' + mapped.HostPort;
+                } catch {}
+                if (!/^127\.0\.0\.1:\d+$/.test(binding)) {
+                    try { binding = docker(['port', container, '5432/tcp']); } catch { binding = ''; }
+                }
                 if (!/^127\.0\.0\.1:\d+$/.test(binding)) await new Promise(r => setTimeout(r, 100));
             }
             if (!/^127\.0\.0\.1:\d+$/.test(binding)) {

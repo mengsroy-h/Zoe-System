@@ -23,7 +23,87 @@ function barcodesOf(it) {
     return null;
 }
 
-function invariant(dump, dateKey, monthKey, knownCodes, expectedScope) {
+// Scope នេះសម្រាប់ fresh browser fixtures ដែលគ្មាន purge/legacy៖ now មកពីនាឡិកា lab,
+// មិនយកកូនសោកញ្ចក់ដែលនៅសល់ធ្វើជាព្រំដែន activation។ Real-dump CLI មាន scope ផ្សេង។
+function collectedMirror(dump, now) {
+    const errors = [], expected = new Map(), actual = new Map();
+    const object = value => !!value && typeof value === 'object' && !Array.isArray(value);
+    const money = value => typeof value === 'number' && Number.isFinite(value) && value >= 0 && r2(value) === value;
+    const keyOf = code => String(code || '').trim().toUpperCase().replace(/[%.#$\[\]\/\x00-\x1F\x7F]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
+    const calendar = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Phnom_Penh', year: 'numeric', month: '2-digit', day: '2-digit' });
+    const dayOf = stamp => typeof stamp === 'number' && Number.isFinite(stamp) && stamp > 0 && stamp <= 8640000000000000
+        ? calendar.format(stamp) : '';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dayOf(now))) return { errors: ['collected-clock-unmeasured'], expected: 0, actual: 0 };
+    const today = dayOf(now), cutoff = dayOf(now - 6 * 86400000);
+    const addError = value => { if (errors.length < 12) errors.push(value); };
+    for (const [where, bag] of [['history', dump.zoew_scan_history_cod_dod], ['trash', dump.zoew_recently_deleted_cod_dod]]) {
+        for (const item of Object.values(bag || {})) {
+            if (!object(item) || !item.barcodes || typeof item.barcodes !== 'object') { addError('collected-legacy-row:' + where); continue; }
+            if (where === 'history' && (item.restoreClaimId !== undefined || item.restoreClaimToken !== undefined)) {
+                addError('collected-restore-unsettled:' + item.id); continue;
+            }
+            const reason = typeof item.trashReason === 'string' ? item.trashReason : item.isFromDeletion ? 'kept' : 'remove';
+            const removed = where === 'trash' && ['remove', 'returned', 'misplaced', 'sent'].includes(reason);
+            for (const barcode of barcodesOf(item) || []) {
+                if (!barcode || !barcode.code || barcode.isClosed !== true || barcode.isDeducted === true || removed) continue;
+                const key = keyOf(barcode.code), day = dayOf(barcode.closedAt);
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || day > today || !money(barcode.cod) || !money(barcode.dod)) { addError('collected-source-invalid:' + key); continue; }
+                if (expected.has(key)) addError('collected-source-duplicate:' + key);
+                expected.set(key, { day, c: barcode.cod, d: barcode.dod });
+            }
+        }
+    }
+    const mirror = dump.zoew_daily_collected_cod_dod;
+    if (mirror != null && !object(mirror)) addError('collected-root-invalid');
+    for (const [day, entries] of Object.entries(object(mirror) ? mirror : {})) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || dayOf(Date.parse(day + 'T00:00:00+07:00')) !== day || day > today || !object(entries)) { addError('collected-day-invalid:' + day); continue; }
+        for (const [key, value] of Object.entries(entries)) {
+            if (!object(value) || Object.keys(value).sort().join(',') !== 'c,d' || !money(value.c) || !money(value.d)) addError('collected-value-invalid:' + day + '/' + key);
+            const hits = actual.get(key) || [];
+            hits.push({ day, c: value?.c, d: value?.d }); actual.set(key, hits);
+        }
+    }
+    for (const [key, want] of expected) {
+        const hits = actual.get(key) || [];
+        if (!hits.length && want.day < cutoff) continue;
+        if (hits.length !== 1) addError('collected-' + (hits.length ? 'duplicate:' : 'missing:') + key);
+        else if (hits[0].day !== want.day) addError('collected-wrong-day:' + key);
+        else if (hits[0].c !== want.c || hits[0].d !== want.d) addError('collected-wrong-value:' + key);
+    }
+    for (const [key, hits] of actual) if (!expected.has(key)) addError('collected-unexpected:' + key + ':' + hits.map(hit => hit.day).join(','));
+    return { errors, expected: expected.size, actual: actual.size, cutoff, today };
+}
+
+// Fixture aging តែប៉ុណ្ណោះ៖ validate មុនផ្លាស់ថ្ងៃ និងចម្លងតែ leaf ដែលបានផ្ទៀង។
+// Caller ត្រូវសរសេរ ops នេះជាមួយ timestamp edit ក្នុង atomic fixture write ដដែល។
+function collectedFixtureAgeOps(dump, before, after, now) {
+    const canonical = value => JSON.stringify(value, function (key, entry) {
+        return entry && typeof entry === 'object' && !Array.isArray(entry)
+            ? Object.fromEntries(Object.keys(entry).sort().map(name => [name, entry[name]])) : entry;
+    });
+    if (!before?.id || canonical(dump.zoew_scan_history_cod_dod?.[before.id]) !== canonical(before)) throw new Error('collected fixture age snapshot ខុស');
+    const withoutStamps = row => JSON.parse(JSON.stringify(row, (key, value) => ['closedAt', 'createdAt'].includes(key) ? undefined : value));
+    if (canonical(withoutStamps(before)) !== canonical(withoutStamps(after))) throw new Error('collected fixture age ប្ដូរ identity/value');
+    const checked = collectedMirror(dump, now);
+    if (checked.errors.length) throw new Error('collected fixture មុន age: ' + checked.errors.join(','));
+    const keyOf = code => String(code || '').trim().toUpperCase().replace(/[%.#$\[\]\/\x00-\x1F\x7F]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
+    const dayOf = stamp => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Phnom_Penh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(stamp);
+    const ops = [];
+    for (const barcode of barcodesOf(before) || []) {
+        if (!barcode.isClosed || barcode.isDeducted === true) continue;
+        const next = (barcodesOf(after) || []).find(row => row.code === barcode.code);
+        if (!next || !next.isClosed || next.cod !== barcode.cod || next.dod !== barcode.dod || next.isDeducted !== barcode.isDeducted) throw new Error('collected fixture age ប្ដូរ identity/value');
+        const oldDay = dayOf(barcode.closedAt), newDay = dayOf(next.closedAt), key = keyOf(barcode.code);
+        if (oldDay === newDay) continue;
+        const value = dump.zoew_daily_collected_cod_dod?.[oldDay]?.[key];
+        if (!value || newDay < checked.cutoff || newDay > checked.today) throw new Error('collected fixture age គ្មាន leaf ដែលផ្លាស់បាន');
+        ops.push({ k: 'set', p: ['zoew_daily_collected_cod_dod', oldDay, key], v: null },
+            { k: 'set', p: ['zoew_daily_collected_cod_dod', newDay, key], v: { c: value.c, d: value.d } });
+    }
+    return ops;
+}
+
+function invariant(dump, dateKey, monthKey, knownCodes, expectedScope, collectedNow) {
     const hist = dump.zoew_scan_history_cod_dod || {};
     const trash = dump.zoew_recently_deleted_cod_dod || {};
     let cod = 0, dod = 0, count = 0, closed = 0;
@@ -112,11 +192,13 @@ function invariant(dump, dateKey, monthKey, knownCodes, expectedScope) {
         monthCod: r2(parseFloat(month.codDollar) || 0), monthDod: r2(parseFloat(month.dodDollar) || 0), monthCount: parseFloat(month.totalCount) || 0,
         expectMonthCod: r2(mCod), expectMonthDod: r2(mDod), expectMonthCount: mCount,
         pkg: parseFloat(pick.packagesPickedUp) || 0, expectPkg: closed, pickExtra, pickMissing, pickWrongOwner, phoneMismatch,
-        phoneSum, zeroRef, dup, orphans, registryMissing, lost, receipts, seenCodes: seen
+        phoneSum, zeroRef, dup, orphans, registryMissing, lost, receipts, seenCodes: seen,
+        collected: collectedNow === undefined ? null : collectedMirror(dump, collectedNow)
     };
 }
 
 function invariantBroken(inv) {
+    if (inv.collected?.errors.length) return inv.collected.errors.join('; ');
     if (inv.expectCod !== inv.gotCod || inv.expectDod !== inv.gotDod || inv.expectCount !== inv.gotCount) return 'ledger ថ្ងៃ ≠ ផលបូក barcode មិនទាន់ដក';
     if (inv.monthCod !== inv.expectMonthCod || inv.monthDod !== inv.expectMonthDod || inv.monthCount !== inv.expectMonthCount) return 'ledger ខែ ≠ ផលបូក ledger ថ្ងៃ';
     if (inv.pkg !== inv.expectPkg) return 'packagesPickedUp ≠ barcode បិទ';
@@ -275,4 +357,4 @@ async function recoveryEvidence(devices) {
     })));
 }
 
-module.exports = { r2, rng, LICENSE_STUB, invariant, invariantBroken, openBarcodeTargets, PAGE_OPS, recoveryEvidence, devicesSettled };
+module.exports = { collectedMirror, collectedFixtureAgeOps, r2, rng, LICENSE_STUB, invariant, invariantBroken, openBarcodeTargets, PAGE_OPS, recoveryEvidence, devicesSettled };

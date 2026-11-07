@@ -437,3 +437,166 @@ describe('independent v2 registry ownership oracle', () => {
         expect(invariant(tree, day, month, ['AA', 'BB', 'CC', 'DD']).orphans).toContain('GHOST');
     });
 });
+
+const MIRROR_NOW = Date.parse('2026-11-07T01:00:00+07:00');
+function mirrorFixture() {
+    const scanDay = '2026-11-01', closedAt = Date.parse('2026-11-07T00:30:00+07:00');
+    return {
+        zoew_scan_history_cod_dod: { row: { id: 'row', phone: '012000111', scanDate: scanDay,
+            barcodes: [{ code: 'MIRROR', cod: 10, dod: 2, isClosed: true, isDeducted: false, closedAt }] } },
+        zoew_recently_deleted_cod_dod: {}, zoew_barcode_registry: { MIRROR: true },
+        zoew_daily_revenue_cod_dod: { [scanDay]: { codDollar: 10, dodDollar: 2, totalCount: 1 } },
+        zoew_monthly_revenue_cod_dod: { '2026-11': { codDollar: 10, dodDollar: 2, totalCount: 1 } },
+        zoew_daily_pickup_cod_dod: { [scanDay]: { packagesPickedUp: 1, pickedUpBarcodes: { MIRROR: '012000111' }, pickedUpPhones: { '012000111': 1 } } },
+        zoew_daily_collected_cod_dod: { '2026-11-07': { MIRROR: { c: 10, d: 2 } } }
+    } as any;
+}
+const mirrorVerdict = (tree: any, now = MIRROR_NOW) => invariantBroken(invariant(tree, '2026-11-01', '2026-11', ['MIRROR'], undefined, now));
+
+describe('កញ្ចក់ collected ក្នុង browser matrix៖ scope សំយោគច្បាស់ មិនអាស្រ័យលើកូនសោកញ្ចក់ដែលសល់', () => {
+    it('ថ្ងៃបិទ Cambodia ខុសថ្ងៃស្កេន និងថ្ងៃ UTC នៅតែត្រឹមត្រូវ', () => {
+        expect(mirrorVerdict(mirrorFixture())).toBeNull();
+    });
+    it.each(['whole-root', 'whole-day', 'only-key', 'cod', 'dod', 'duplicate', 'wrong-day', 'open', 'invalid-stamp', 'invalid-value', 'extra-key'])('បដិសេធ %s ដោយគ្មាន surviving anchor', kind => {
+        const tree = mirrorFixture(), mirror = tree.zoew_daily_collected_cod_dod;
+        if (kind === 'whole-root') delete tree.zoew_daily_collected_cod_dod;
+        if (kind === 'whole-day') delete mirror['2026-11-07'];
+        if (kind === 'only-key') delete mirror['2026-11-07'].MIRROR;
+        if (kind === 'cod') mirror['2026-11-07'].MIRROR.c = 999;
+        if (kind === 'dod') mirror['2026-11-07'].MIRROR.d = 888;
+        if (kind === 'duplicate') mirror['2026-11-06'] = { MIRROR: { c: 10, d: 2 } };
+        if (kind === 'wrong-day') { mirror['2026-11-06'] = mirror['2026-11-07']; delete mirror['2026-11-07']; }
+        if (kind === 'open') { tree.zoew_scan_history_cod_dod.row.barcodes[0].isClosed = false; tree.zoew_daily_pickup_cod_dod = {}; }
+        if (kind === 'invalid-stamp') delete tree.zoew_scan_history_cod_dod.row.barcodes[0].closedAt;
+        if (kind === 'invalid-value') mirror['2026-11-07'].MIRROR.c = '10';
+        if (kind === 'extra-key') mirror['2026-11-07'].GHOST = { c: 10, d: 2 };
+        expect(mirrorVerdict(tree)).not.toBeNull();
+    });
+    it('checkpoint expected ក៏បដិសេធ node កញ្ចក់បាត់ទាំងមូល', () => {
+        const tree = mirrorFixture(), expected = createRevenueExpectation(tree);
+        delete tree.zoew_daily_collected_cod_dod;
+        expect(() => expected.verify(tree, ['MIRROR'], 'missing-first-close', MIRROR_NOW)).toThrow();
+    });
+    it.each(['kept', 'pickup'])('ធុងសំរាម %s រក្សា collected', reason => {
+        const tree = mirrorFixture(); tree.zoew_recently_deleted_cod_dod.row = { ...tree.zoew_scan_history_cod_dod.row, trashReason: reason };
+        delete tree.zoew_scan_history_cod_dod.row;
+        expect(mirrorVerdict(tree)).toBeNull();
+    });
+    it.each(['remove', 'returned', 'misplaced', 'sent'])('ធុងសំរាម %s ដក collected ហើយមិនអនុញ្ញាតកូនសោសល់', reason => {
+        const tree = mirrorFixture(); tree.zoew_recently_deleted_cod_dod.row = { ...tree.zoew_scan_history_cod_dod.row, trashReason: reason };
+        delete tree.zoew_scan_history_cod_dod.row; tree.zoew_daily_pickup_cod_dod = {};
+        tree.zoew_recently_deleted_cod_dod.row.barcodes[0].isDeducted = true;
+        tree.zoew_daily_revenue_cod_dod['2026-11-01'] = { codDollar: 0, dodDollar: 0, totalCount: 0 };
+        tree.zoew_monthly_revenue_cod_dod['2026-11'] = { codDollar: 0, dodDollar: 0, totalCount: 0 };
+        expect(mirrorVerdict(tree)).not.toBeNull();
+        tree.zoew_daily_collected_cod_dod = {};
+        expect(mirrorVerdict(tree)).toBeNull();
+    });
+    it('closedAt មុន window ៧ថ្ងៃមិនត្រូវបានប្រកាសថាបាត់', () => {
+        const tree = mirrorFixture(); tree.zoew_scan_history_cod_dod.row.barcodes[0].closedAt = Date.parse('2026-10-31T23:59:59+07:00');
+        tree.zoew_daily_collected_cod_dod = {};
+        expect(mirrorVerdict(tree)).toBeNull();
+        tree.zoew_scan_history_cod_dod.row.barcodes[0].closedAt = Date.parse('2026-11-01T00:00:00+07:00');
+        expect(mirrorVerdict(tree)).not.toBeNull();
+    });
+    it('fixture age ត្រូវ validate មុនផ្លាស់ថ្ងៃ collected ដោយ atomic ops', () => {
+        const { collectedFixtureAgeOps } = require('../../audit-tools/money-multidevice-core.js');
+        const tree = mirrorFixture(), before = tree.zoew_scan_history_cod_dod.row, aged = structuredClone(before);
+        aged.barcodes[0].closedAt = MIRROR_NOW - 3 * 3600000;
+        const ops = collectedFixtureAgeOps(tree, before, aged, MIRROR_NOW);
+        expect(ops).toEqual([
+            { k: 'set', p: ['zoew_daily_collected_cod_dod', '2026-11-07', 'MIRROR'], v: null },
+            { k: 'set', p: ['zoew_daily_collected_cod_dod', '2026-11-06', 'MIRROR'], v: { c: 10, d: 2 } }
+        ]);
+        delete tree.zoew_daily_collected_cod_dod['2026-11-07'].MIRROR;
+        expect(() => collectedFixtureAgeOps(tree, before, aged, MIRROR_NOW)).toThrow();
+    });
+});
+
+it('collected COD/DOD ប្រែទិសទោះសរុបដដែល និងថ្ងៃឆ្លងខែត្រូវផ្ទៀងដាច់', () => {
+    const tree = mirrorFixture(); tree.zoew_daily_collected_cod_dod['2026-11-07'].MIRROR = { c: 9, d: 3 };
+    expect(mirrorVerdict(tree)).not.toBeNull();
+    tree.zoew_scan_history_cod_dod.row.barcodes[0].closedAt = Date.parse('2026-10-31T23:30:00+07:00');
+    tree.zoew_daily_collected_cod_dod = { '2026-10-31': { MIRROR: { c: 10, d: 2 } } };
+    expect(mirrorVerdict(tree, Date.parse('2026-11-01T01:00:00+07:00'))).toBeNull();
+});
+it('encoded identity មិន encode % ពីរដង ហើយបដិសេធសំណុំ collected ខុស', () => {
+    const tree = mirrorFixture(), key = 'MIRROR%2F01';
+    tree.zoew_scan_history_cod_dod.row.barcodes[0].code = ' mirror/01 ';
+    tree.zoew_barcode_registry = { [key]: true };
+    tree.zoew_daily_pickup_cod_dod['2026-11-01'].pickedUpBarcodes = { [key]: '012000111' };
+    tree.zoew_daily_collected_cod_dod['2026-11-07'] = { [key]: { c: 10, d: 2 } };
+    const verdict = () => invariantBroken(invariant(tree, '2026-11-01', '2026-11', ['MIRROR/01'], undefined, MIRROR_NOW));
+    expect(verdict()).toBeNull();
+    tree.zoew_daily_collected_cod_dod['2026-11-07'] = { 'MIRROR%252F01': { c: 10, d: 2 } };
+    expect(verdict()).not.toBeNull();
+});
+it.each(['["MIRROR"]', '["MIRROR","MIRROR"]', '[""]', '{bad'])('restore មិនស្ងប់ %s ត្រូវ unmeasured មិនមែន PASS ឬប្រកាសត្រាលុយខុស', provenance => {
+    const tree = mirrorFixture(); Object.assign(tree.zoew_scan_history_cod_dod.row, { restoreClaimToken: 'pending', restoreAddedCodes: provenance });
+    expect(mirrorVerdict(tree)).toContain('collected-restore-unsettled');
+});
+it('កូនសោកញ្ចក់មុន retention មិនមែន failure និងគ្មានថ្ងៃ ledger មិនរំលង ghost', () => {
+    const tree = mirrorFixture(); tree.zoew_scan_history_cod_dod.row.barcodes[0].closedAt = Date.parse('2026-10-31T09:00:00+07:00');
+    tree.zoew_daily_collected_cod_dod = { '2026-10-31': { MIRROR: { c: 10, d: 2 } } };
+    expect(mirrorVerdict(tree)).toBeNull();
+    tree.zoew_daily_collected_cod_dod = {};
+    expect(mirrorVerdict(tree)).toBeNull();
+    const ghost = { zoew_daily_collected_cod_dod: { '2026-11-07': { GHOST: { c: 10, d: 2 } } } };
+    expect(() => createRevenueExpectation({}).verify(ghost, [], 'ghost-only', MIRROR_NOW)).toThrow();
+    expect(() => createRevenueExpectation({}).verify({}, [], 'empty', MIRROR_NOW)).not.toThrow();
+});
+it.each(['value', 'duplicate'])('fixture aging មិនជួសជុលភស្តុតាងខូច %s', kind => {
+    const { collectedFixtureAgeOps } = require('../../audit-tools/money-multidevice-core.js');
+    const tree = mirrorFixture(), row = tree.zoew_scan_history_cod_dod.row, aged = structuredClone(row);
+    aged.barcodes[0].closedAt = MIRROR_NOW - 3 * 3600000;
+    if (kind === 'value') tree.zoew_daily_collected_cod_dod['2026-11-07'].MIRROR = { c: 9, d: 3 };
+    else tree.zoew_daily_collected_cod_dod['2026-11-06'] = { MIRROR: { c: 10, d: 2 } };
+    expect(() => collectedFixtureAgeOps(tree, row, aged, MIRROR_NOW)).toThrow();
+});
+it('browser checkpoints ទាំងពីរ backend និង matrix ទាមទារ clock scope ជាក់លាក់', () => {
+    const { parse } = require('acorn'), { simple } = require('acorn-walk');
+    for (const [file, count] of [['emu/money-multidevice-emu-test.js', 3], ['supabase-money-multishop-test.js', 2], ['money-cookie-blob.js', 2]] as const) {
+        const source = readFileSync(require.resolve('../../audit-tools/' + file), 'utf8'), calls: any[] = [];
+        simple(parse(source, { ecmaVersion: 'latest' }), { CallExpression(node: any) { if (node.callee.name === 'invariant') calls.push(node); } });
+        expect(calls).toHaveLength(count);
+        for (const call of calls) {
+            expect(call.arguments).toHaveLength(6);
+            expect(['Date.now()', 'now']).toContain(source.slice(call.arguments[5].start, call.arguments[5].end));
+        }
+    }
+});
+it('retention លើកលែងតែ missing មិនលើកលែង barcode ស្ទួននៅថ្ងៃចាស់', () => {
+    const tree = mirrorFixture(); tree.zoew_daily_collected_cod_dod['2026-10-31'] = { MIRROR: { c: 10, d: 2 } };
+    expect(mirrorVerdict(tree)).not.toBeNull();
+});
+it.each([Number.MAX_VALUE, Date.parse('+010000-01-01T00:00:00Z'), NaN, Infinity, undefined])('timestamp ខូច %s ជា evidence failure មិនបោះ RangeError', stamp => {
+    const tree = mirrorFixture(); tree.zoew_scan_history_cod_dod.row.barcodes[0].closedAt = stamp;
+    expect(mirrorVerdict(tree)).toContain('collected-source-invalid');
+});
+it('fixture age មិនទទួល barcode បន្ថែម ឬការប្ដូរលុយលើ barcode បើក', () => {
+    const { collectedFixtureAgeOps } = require('../../audit-tools/money-multidevice-core.js');
+    const tree = mirrorFixture(), row = tree.zoew_scan_history_cod_dod.row, changed = structuredClone(row);
+    changed.barcodes.push({ code: 'EXTRA', cod: 99, dod: 1, isClosed: false });
+    expect(() => collectedFixtureAgeOps(tree, row, changed, MIRROR_NOW)).toThrow();
+});
+it.each(['wrong-money', 'malformed'])('កូនសោកញ្ចក់ចាស់ដែលនៅសល់ %s ត្រូវផ្ទៀងដដែល', kind => {
+    const tree = mirrorFixture(); tree.zoew_scan_history_cod_dod.row.barcodes[0].closedAt = Date.parse('2026-10-31T09:00:00+07:00');
+    tree.zoew_daily_collected_cod_dod = { '2026-10-31': { MIRROR: kind === 'wrong-money' ? { c: 9, d: 3 } : 'bad' } };
+    expect(mirrorVerdict(tree)).not.toBeNull();
+});
+it('fixture age ត្រូវប្រើ source row ដូច dump ដែលបាន validate', () => {
+    const { collectedFixtureAgeOps } = require('../../audit-tools/money-multidevice-core.js');
+    const tree = mirrorFixture(), before = structuredClone(tree.zoew_scan_history_cod_dod.row), aged = structuredClone(before);
+    before.barcodes[0].closedAt -= 1000; aged.barcodes[0].closedAt -= 3600000;
+    expect(() => collectedFixtureAgeOps(tree, before, aged, MIRROR_NOW)).toThrow('snapshot');
+});
+it.each(['open-price', 'deleted', 'closed'])('fixture age បដិសេធប្ដូរ %s', kind => {
+    const { collectedFixtureAgeOps } = require('../../audit-tools/money-multidevice-core.js');
+    const tree = mirrorFixture(), row = tree.zoew_scan_history_cod_dod.row;
+    row.barcodes.push({ code: 'OPEN', cod: 5, dod: 1, isClosed: false });
+    const changed = structuredClone(row);
+    if (kind === 'open-price') changed.barcodes[1].cod = 55;
+    if (kind === 'deleted') changed.barcodes.pop();
+    if (kind === 'closed') changed.barcodes[1].isClosed = true;
+    expect(() => collectedFixtureAgeOps(tree, row, changed, MIRROR_NOW)).toThrow();
+});

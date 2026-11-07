@@ -81,20 +81,26 @@ const day = '2026-10-01', month = '2026-10';
 function fixture() {
     return {
         zoew_scan_history_cod_dod: { item: { id: 'item', phone: '012345678', scanDate: day,
-            barcodes: [{ code: 'ONE', cod: 12.25, dod: 1.5, isClosed: true }, { code: 'TWO', cod: 3, dod: 0, isClosed: false }] } },
+            barcodes: [{ code: 'ONE', cod: 12.25, dod: 1.5, isClosed: true, closedAt: Date.parse('2026-10-01T09:00:00+07:00') }, { code: 'TWO', cod: 3, dod: 0, isClosed: false }] } },
         zoew_daily_revenue_cod_dod: { [day]: { codDollar: 15.25, dodDollar: 1.5, totalCount: 2 } },
         zoew_monthly_revenue_cod_dod: { [month]: { codDollar: 15.25, dodDollar: 1.5, totalCount: 2 } },
         zoew_daily_pickup_cod_dod: { [day]: { packagesPickedUp: 1, pickedUpPhones: { '012345678': 1 }, pickedUpBarcodes: { ONE: '012345678' } } },
-        zoew_barcode_registry: { ONE: true, TWO: true }
+        zoew_barcode_registry: { ONE: true, TWO: true },
+        zoew_daily_collected_cod_dod: { [day]: { ONE: { c: 12.25, d: 1.5 } } }
     };
 }
 scenario('អថេរលុយរួមពិត', () => {
     const module = { exports: {} };
     vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'audit-tools/money-multidevice-core.js'), 'utf8'), { module });
     const { invariant, invariantBroken } = module.exports;
-    const verdict = (dump, known = ['ONE', 'TWO']) => invariantBroken(invariant(dump, day, month, known));
+    const verdict = (dump, known = ['ONE', 'TWO']) => invariantBroken(invariant(dump, day, month, known, undefined, Date.parse('2026-10-01T12:00:00+07:00')));
     check('ទិន្នន័យត្រឹមត្រូវមិនក្រហម', verdict(fixture()) === null);
     const poisons = [
+        ['collected root បាត់ទាំងមូល', d => { delete d.zoew_daily_collected_cod_dod; }],
+        ['collected កូនសោដំបូងបាត់', d => { delete d.zoew_daily_collected_cod_dod[day].ONE; }],
+        ['collected COD/DOD ប្រែទិស សរុបដដែល', d => { d.zoew_daily_collected_cod_dod[day].ONE = { c: 11.25, d: 2.5 }; }],
+        ['collected ថ្ងៃស្ទួន', d => { d.zoew_daily_collected_cod_dod['2026-09-30'] = { ONE: { c: 12.25, d: 1.5 } }; }],
+        ['collected ខុសថ្ងៃបិទ', d => { d.zoew_daily_collected_cod_dod['2026-09-30'] = d.zoew_daily_collected_cod_dod[day]; delete d.zoew_daily_collected_cod_dod[day]; }],
         ['ledger ថ្ងៃបូកស្ទួន', (d) => { d.zoew_daily_revenue_cod_dod[day].codDollar += 12.25; }],
         ['ledger ខែបូកស្ទួន', (d) => { d.zoew_monthly_revenue_cod_dod[month].dodDollar += 1.5; }],
         ['ចំនួនយកស្ទួន', (d) => { d.zoew_daily_pickup_cod_dod[day].packagesPickedUp++; }],

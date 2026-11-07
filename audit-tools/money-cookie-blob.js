@@ -5,7 +5,7 @@
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { invariant, invariantBroken, r2, devicesSettled } = require('./money-multidevice-core.js');
+const { invariant, invariantBroken, r2, devicesSettled, collectedMirror, collectedFixtureAgeOps } = require('./money-multidevice-core.js');
 const fx = require('./idtoken-fixture.js');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -251,14 +251,15 @@ function createRevenueExpectation(initial) {
             assert.ok(Number.isFinite(cod) && Number.isFinite(dod) && Number.isInteger(count));
             change(daily, day, cod, dod, count); change(monthly, day.slice(0, 7), cod, dod, count);
         },
-        verify(tree, knownCodes, label) {
+        verify(tree, knownCodes, label, now = Date.now()) {
+            assert.deepEqual(collectedMirror(tree, now).errors, [], label + ': collected');
             const days = new Set([...daily.keys(), ...Object.keys(tree.zoew_daily_revenue_cod_dod || {}),
                 ...Object.values(tree.zoew_scan_history_cod_dod || {}).map(item => item.scanDate),
                 ...Object.values(tree.zoew_recently_deleted_cod_dod || {}).map(item => item.scanDate)]);
             const months = new Set([...monthly.keys(), ...Object.keys(tree.zoew_monthly_revenue_cod_dod || {})]);
             for (const day of days) {
                 assert.match(day, /^\d{4}-\d{2}-\d{2}$/); months.add(day.slice(0, 7));
-                const inv = invariant(tree, day, day.slice(0, 7), knownCodes), expected = get(daily, day);
+                const inv = invariant(tree, day, day.slice(0, 7), knownCodes, undefined, now), expected = get(daily, day);
                 assert.equal(invariantBroken(inv), null, label + '/' + day + ': ' + JSON.stringify(inv));
                 assert.equal(inv.gotCod, expected.codDollar, label + '/' + day + ': COD');
                 assert.equal(inv.gotDod, expected.dodDollar, label + '/' + day + ': DOD');
@@ -334,7 +335,7 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
         const t = await read();
         revenue.verify(t, knownCodes, label);
         const day = scanDays.get(code) || dateKey;
-        const inv = invariant(t, day, day.slice(0, 7), knownCodes);
+        const inv = invariant(t, day, day.slice(0, 7), knownCodes, undefined, Date.now());
         const matches = [];
         for (const [root, bag] of [['history', t.zoew_scan_history_cod_dod], ['trash', t.zoew_recently_deleted_cod_dod]]) {
             for (const item of Object.values(bag || {})) for (const b of Object.values(item.barcodes || {})) if (b.code === code) matches.push({ root, deducted: b.isDeducted === true, day: item.scanDate });
@@ -568,7 +569,8 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
                     const old = structuredClone(t.zoew_scan_history_cod_dod[id]);
                     old.closedAt = Date.now() - 3600000;
                     Object.values(old.barcodes).forEach((b) => { b.closedAt = old.closedAt; });
-                    await write([{ k: 'set', p: ['zoew_scan_history_cod_dod', id], v: old }]);
+                    await write([{ k: 'set', p: ['zoew_scan_history_cod_dod', id], v: old },
+                        ...collectedFixtureAgeOps(t, t.zoew_scan_history_cod_dod[id], old, Date.now())]);
                 }
                 await sync();
                 await Promise.all(devices.map((d) => d.page.evaluate(() => window.runAutomaticCleanupRules())));
@@ -610,7 +612,8 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
                         const old = structuredClone(beforeStage.zoew_scan_history_cod_dod[id]);
                         old.closedAt = Date.now() - 3 * 3600000;
                         Object.values(old.barcodes).forEach((b) => { b.closedAt = old.closedAt; });
-                        await write([{ k: 'set', p: ['zoew_scan_history_cod_dod', id], v: old }]);
+                        await write([{ k: 'set', p: ['zoew_scan_history_cod_dod', id], v: old },
+                            ...collectedFixtureAgeOps(beforeStage, beforeStage.zoew_scan_history_cod_dod[id], old, Date.now())]);
                         if (mode !== 'offline-online') await dev.page.evaluate(() => fb.goOnline(db));
                     }
                 }

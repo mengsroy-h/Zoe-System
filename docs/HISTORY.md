@@ -1962,6 +1962,14 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-11-07 — កញ្ចក់ចំណូលប្រចាំថ្ងៃក្នុងអ្នកវាស់លុយពហុឧបករណ៍
+
+- លើ main `264f8ade` អ្នកវាស់ `money-multidevice-core` និង `createRevenueExpectation` មិនអាន `zoew_daily_collected_cod_dod`។ Fixture សំយោគដែលលុបកូនសោ collected, ប្ដូរ COD/DOD ឬចម្លងទៅថ្ងៃទីពីរ នៅតែបៃតង។ នេះជាចន្លោះក្នុងអ្នកវាស់ មិនមែនជាភស្តុតាងថា App បង្កទិន្នន័យខូចទេ។
+- បន្ថែមការផ្ទៀងអត្តសញ្ញាណ និង COD/DOD ដាច់គ្នាលើថ្ងៃបិទតាម Cambodia ក្នុង browser matrix ទាំង Firebase/Supabase និង Sheet/Cookie/Palm។ Scope គឺ fixture ថ្មី គ្មាន purge/legacy ហើយនាឡិកា lab ច្បាស់; កូនសោកញ្ចក់ដែលសល់មិនកំណត់ activation។ Missing ក្នុង window ៧ថ្ងៃត្រូវក្រហម ទោះ node បាត់ទាំងមូល; missing មុន window អនុញ្ញាត តែ leaf ដែលនៅសល់នៅត្រូវផ្ទៀងថ្ងៃ/តម្លៃ/ស្ទួន។ Restore មិនស្ងប់ ឬ timestamp មិនអាចវាស់បាន គឺ failure មិនមែន PASS។ Real-dump CLI មានព្រំដែនប្រុងប្រយ័ត្នផ្សេង ហើយមិនប្រែ។
+- Fixture ដែលប្ដូរពេលបិទសម្រាប់សាក cleanup ឥឡូវផ្ទៀង source/mirror មុន រួចផ្លាស់ leaf ដែលត្រឹមត្រូវប៉ុណ្ណោះជាមួយ timestamp ក្នុង atomic write ដដែល។ ការឆ្លងអធ្រាត្រមិនបង្ក false failure ហើយ helper មិនបង្កើតកូនសោបាត់ ឬជួសជុលតម្លៃខូចទេ។
+- Tests-first លើ baseline៖ ១៨/៩០ ករណីធ្លាក់ មុនបន្ថែម oracle។ Independent review បន្ថែមករណី stale-day duplicate, timestamp ឆ្ងាយ, fixture identity និង snapshot mismatch។ Focused unit ២៤៩/២៤៩ និង checker-truthfulness ២២០/២២០ ឆ្លង; full browser/DB matrix ត្រូវការ CI លើ commit ថ្មី មុនអះអាងថាបិទចន្លោះនេះ។ Local audit build ឈប់នៅ Chromium `socket()` EPERM មុន measure-root; មិនរាប់ជា browser pass ហើយមិនប្ដូរព្រំដែន sandbox។ App source, rules និងកំណែមិនប្រែ។
+
+
 ### 2026-11-07 — អ្នកវាស់ callback ចាស់របស់ ios-panel-glide
 
 - Audit #1216 លើ PR merge `816cc14d` ឆ្លង 56/56; Audit #1217 លើ main `162917a9` ធ្លាក់ ១ ករណី cleanup។ Tree ទាំងពីរដូចគ្នា `40e6f7ad1d5cd4978d7dbeb0ef23c268a4d0bedc`; runner image, Node, Chromium និង lane/STRICT flags ដូចគ្នា។ Log ដែលធ្លាក់ឃើញចលនាថ្មីចប់ `currentTime=duration=220`, snap ស្តារ `y`; វាមិនវាស់ callback ខណៈចលនានៅរស់ទេ។ មិនមានភស្តុតាងថា merge ប្ដូរកូដចលនា ឬថា host ជាក់លាក់មានបញ្ហាទេ។

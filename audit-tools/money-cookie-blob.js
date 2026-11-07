@@ -170,7 +170,7 @@ async function networkGate(ctx, backend, expectedTenant) {
             if (closedBeforeWrite || state.closed) return route.abort().catch(() => {});
             if (state.mode === 'after') {
                 const out = await route.fetch();
-                if ((await out.json()).ok === true) { record('after', operations); state.hits++; await hold(); }
+                if ((await out.json()).ok === true) { record('after', operations); state.hits++; if (await hold()) return route.abort().catch(() => {}); }
                 return route.fulfill({ response: out }).catch(() => {});
             }
             return route.continue().catch(() => {});
@@ -194,7 +194,7 @@ async function networkGate(ctx, backend, expectedTenant) {
                 let data; try { data = JSON.parse(String(message)); } catch (_) {}
                 const operations = data && data.d && state.responseIds.get(data.d.r);
                 if (data && data.d) state.responseIds.delete(data.d.r);
-                if (operations && data.d.b && data.d.b.s === 'ok') { record('after', operations); state.hits++; await hold(); }
+                if (operations && data.d.b && data.d.b.s === 'ok') { record('after', operations); state.hits++; if (await hold()) return; }
                 try { socket.send(message); } catch (_) {}
             });
         });
@@ -205,6 +205,21 @@ async function networkGate(ctx, backend, expectedTenant) {
         release(closed = false) { state.closed = closed; state.mode = ''; state.match = null; state.responseIds.clear(); state.releases.splice(0).forEach((r) => r(closed)); },
         get hits() { return state.hits; },
         evidence() { return JSON.parse(JSON.stringify({ backend, expectedTenant: backend === 'supabase' ? expectedTenant : undefined, mode: state.mode, hits: state.hits, boundaries: state.boundaries })); }
+    };
+}
+
+// នេះសាកច្បាប់ timestamp ទល់នឹង clock input របស់ App មិនសាក clock estimator ខ្លួនវា។
+function installMoneyClockWitness() {
+    if (window.__moneyClockWitness) return;
+    const wallNow = Date.now;
+    const witness = window.__moneyClockWitness = { min: Infinity, max: -Infinity };
+    Date.now = () => {
+        const now = wallNow(), offset = window.serverTimeOffsetMs;
+        if (Number.isFinite(offset)) {
+            witness.min = Math.min(witness.min, now + offset);
+            witness.max = Math.max(witness.max, now + offset);
+        }
+        return now;
     };
 }
 
@@ -234,7 +249,39 @@ function scanDayForCheckpoint(item, bounds) {
 }
 
 // Baseline អានម្តង; delta ទាំងអស់មកពីសកម្មភាពដែលសាក មិនយកលុយ actual មកធ្វើ expected។
-function createRevenueExpectation(initial) {
+function createRevenueExpectation(initial, { requireParcelIntents = false } = {}) {
+    const parcels = new Map();
+    const baselineCodes = new Set([initial.zoew_scan_history_cod_dod, initial.zoew_recently_deleted_cod_dod]
+        .flatMap(bag => Object.values(bag || {}).flatMap(item => Object.values(item.barcodes || {}).map(b => b.code))));
+    const expectParcel = (code, change) => {
+        const want = { ...parcels.get(code), ...structuredClone(change) };
+        assert.ok(['history', 'trash'].includes(want.root) && typeof want.closed === 'boolean' && typeof want.deducted === 'boolean', 'parcel intent ស្ថានភាពខ្វះ');
+        assert.match(want.day, /^\d{4}-\d{2}-\d{2}$/);
+        for (const key of ['cod', 'dod']) assert.ok(Number.isFinite(want[key]) && want[key] >= 0, 'parcel intent តម្លៃខ្វះ');
+        if (!want.closed) delete want.closedAt;
+        if (want.closed) assert.ok(Array.isArray(want.closedAt), 'parcel intent ពេលបិទខ្វះ');
+        for (const key of ['closedAt', 'restoredAt']) if (want[key] !== undefined) {
+            assert.ok(want[key].length === 2 && want[key].every(stamp => Number.isFinite(stamp) && stamp > 0) && want[key][0] <= want[key][1], 'parcel intent បង្អួចពេលខូច');
+        }
+        parcels.set(code, want);
+    };
+    const verifyParcels = (tree, knownCodes, label) => {
+        const actualCodes = [tree.zoew_scan_history_cod_dod, tree.zoew_recently_deleted_cod_dod]
+            .flatMap(bag => Object.values(bag || {}).flatMap(item => Object.values(item.barcodes || {}).map(b => b.code)));
+        if (requireParcelIntents) for (const code of new Set([...knownCodes, ...actualCodes])) assert.ok(baselineCodes.has(code) || parcels.has(code), label + ': parcel intent ខ្វះ ' + code);
+        for (const [code, want] of parcels) {
+            const found = [];
+            for (const [root, bag] of [['history', tree.zoew_scan_history_cod_dod], ['trash', tree.zoew_recently_deleted_cod_dod]]) {
+                for (const item of Object.values(bag || {})) for (const b of Object.values(item.barcodes || {})) if (b.code === code) found.push({ root, item, b });
+            }
+            assert.equal(found.length, 1, label + ': parcel identity ' + code);
+            const { root, item, b } = found[0], actual = { root, day: item.scanDate, cod: b.cod, dod: b.dod, closed: b.isClosed === true, deducted: b.isDeducted === true };
+            assert.deepEqual(actual, Object.fromEntries(Object.keys(actual).map(key => [key, want[key]])), label + ': parcel intent ' + code);
+            if (want.phone !== undefined) assert.equal(item.phone, want.phone, label + ': parcel phone ' + code);
+            if (!want.closed) assert.ok(b.closedAt == null, label + ': open closedAt ' + code);
+            for (const key of ['closedAt', 'restoredAt']) if (want[key] !== undefined) assert.ok(typeof b[key] === 'number' && b[key] >= want[key][0] && b[key] <= want[key][1], label + ': parcel ' + key + ' ' + code + ' ' + JSON.stringify({ actual: b[key], expected: want[key] }));
+        }
+    };
     const amounts = row => ({ codDollar: r2(Number(row?.codDollar) || 0), dodDollar: r2(Number(row?.dodDollar) || 0), totalCount: Number(row?.totalCount) || 0 });
     const daily = new Map(Object.entries(initial.zoew_daily_revenue_cod_dod || {}).map(([day, row]) => [day, amounts(row)]));
     const monthly = new Map(Object.entries(initial.zoew_monthly_revenue_cod_dod || {}).map(([month, row]) => [month, amounts(row)]));
@@ -244,6 +291,7 @@ function createRevenueExpectation(initial) {
         map.set(key, { codDollar: r2(old.codDollar + cod), dodDollar: r2(old.dodDollar + dod), totalCount: old.totalCount + count });
     };
     return {
+        expectParcel,
         day: key => get(daily, key),
         month: key => get(monthly, key),
         adjust(day, cod, dod, count) {
@@ -252,6 +300,7 @@ function createRevenueExpectation(initial) {
             change(daily, day, cod, dod, count); change(monthly, day.slice(0, 7), cod, dod, count);
         },
         verify(tree, knownCodes, label, now = Date.now()) {
+            verifyParcels(tree, knownCodes, label);
             assert.deepEqual(collectedMirror(tree, now).errors, [], label + ': collected');
             const days = new Set([...daily.keys(), ...Object.keys(tree.zoew_daily_revenue_cod_dod || {}),
                 ...Object.values(tree.zoew_scan_history_cod_dod || {}).map(item => item.scanDate),
@@ -290,14 +339,35 @@ async function lookupOff(devices, read) {
     }
 }
 
-async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCodes, fixture, origin, site, tag, backend, authMode = 'cookie', onCheckpoint }) {
+async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCodes, fixture, origin, site, tag, backend, authMode = 'cookie', onCheckpoint, expectation }) {
     assert.ok(devices.length >= 2, 'flow នេះត្រូវការ devices យ៉ាងតិច ២');
     assert.ok(['sheet', 'cookie', 'palm'].includes(authMode));
     const labelMode = authMode === 'sheet' ? 'Sheet' : authMode === 'palm' ? 'Palm' : 'Cookie';
     const gates = devices.map((d) => d.gate);
     const initial = await read();
-    const revenue = createRevenueExpectation(initial);
+    const revenue = expectation || createRevenueExpectation(initial, { requireParcelIntents: true });
     const scanDays = new Map();
+    const clockSeen = { min: Infinity, max: -Infinity };
+    for (const d of devices) {
+        await d.ctx.addInitScript(installMoneyClockWitness);
+        await d.page.evaluate(installMoneyClockWitness);
+    }
+    const captureClock = async (bounds = { min: Infinity, max: -Infinity }, subset = devices) => {
+        for (const d of subset) {
+            const sample = await d.page.evaluate(() => { Date.now(); return { ...window.__moneyClockWitness }; });
+            assert.ok(Number.isFinite(sample.min) && Number.isFinite(sample.max), 'clock witness គ្មានភស្តុតាង');
+            bounds.min = Math.min(bounds.min, sample.min); bounds.max = Math.max(bounds.max, sample.max);
+            clockSeen.min = Math.min(clockSeen.min, sample.min); clockSeen.max = Math.max(clockSeen.max, sample.max);
+        }
+        return bounds;
+    };
+    const beginClock = async () => {
+        await captureClock();
+        await Promise.all(devices.map(d => d.page.evaluate(() => { window.__moneyClockWitness.min = Infinity; window.__moneyClockWitness.max = -Infinity; Date.now(); })));
+        return captureClock();
+    };
+    await captureClock();
+    if (expectation) revenue.verify(initial, knownCodes, authMode + '/before-mode', clockSeen.max);
     let steps = 0, duplicateCalls = 0, interruptions = 0;
     const flowNames = ['delete', 'remove', 'pickup2h', 'abandon8d', 'delete-signed', 'remove-signed', 'pickup2h-signed'];
     const modes = ['duplicate', 'offline-online', 'slow', 'close-before-write', 'close-after-commit'];
@@ -330,12 +400,18 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
             await Promise.all(devices.map((d) => d.page.evaluate(() => fb.goOnline(db)))); await sleep(100);
         }
     };
-    const verify = async (label, code, where, deducted) => {
+    const verify = async (label, code, where, deducted, change = {}) => {
         await sync();
+        const { closedClock, restoredClock, ...intent } = change;
+        const bounds = await captureClock(closedClock || restoredClock);
+        if (closedClock !== undefined) intent.closedAt = [bounds.min, bounds.max];
+        if (restoredClock !== undefined) intent.restoredAt = [bounds.min, bounds.max];
+        const clockNow = clockSeen.max;
+        revenue.expectParcel(code, { root: where, deducted, ...intent });
         const t = await read();
-        revenue.verify(t, knownCodes, label);
+        revenue.verify(t, knownCodes, label, clockNow);
         const day = scanDays.get(code) || dateKey;
-        const inv = invariant(t, day, day.slice(0, 7), knownCodes, undefined, Date.now());
+        const inv = invariant(t, day, day.slice(0, 7), knownCodes, undefined, clockNow);
         const matches = [];
         for (const [root, bag] of [['history', t.zoew_scan_history_cod_dod], ['trash', t.zoew_recently_deleted_cod_dod]]) {
             for (const item of Object.values(bag || {})) for (const b of Object.values(item.barcodes || {})) if (b.code === code) matches.push({ root, deducted: b.isDeducted === true, day: item.scanDate });
@@ -491,6 +567,7 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
         const scanDay = scanDayForCheckpoint(scannedItem, scanBounds);
         assert.equal(Object.values(scannedItem.barcodes).length, 1, label + ': លំដាប់នេះត្រូវមានតែមួយ barcode ក្នុងជួរ ដើម្បី Remove/Delete មិនប៉ះកញ្ចប់ផ្សេង');
         scanDays.set(code, scanDay); knownCodes.push(code); revenue.adjust(scanDay, 10, 2, 1);
+        revenue.expectParcel(code, { root: 'history', day: scanDay, cod: 10, dod: 2, closed: false, deducted: false, phone: fixture.world.parcels.get(code).phone });
         await verify(label + '/scan', code, 'history', false);
         await dev.page.evaluate((code) => { window.triggerScanAction(code); window.triggerScanAction(code); }, code);
         duplicateCalls += 2;
@@ -507,6 +584,8 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
         for (let a = 0; a < actions.length; a++) {
             const wanted = actions[a];
             const beforeAction = await read();
+            const restoreExpected = wanted === 'restore' && !blocked && where === 'trash';
+            const actionClock = await beginClock();
             if (wanted === 'removeBarcode') { where = 'trash'; deducted = true; revenue.adjust(scanDay, -10, -2, -1); }
             else if (wanted === 'deleteItem' && where === 'history') where = 'trash';
             else if (wanted === 'restore' && !blocked) {
@@ -518,7 +597,7 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
                     window.__startOp(args); window.__startOp(args);
                 }, { wanted, pick: 0, target: { code } })));
                 duplicateCalls += devices.length * 2;
-                await verify(label + '/' + a + '-' + wanted + '/' + repeat, code, where, deducted);
+                await verify(label + '/' + a + '-' + wanted + '/' + repeat, code, where, deducted, restoreExpected && repeat === 0 ? { restoredClock: actionClock } : {});
             }
             if (wanted === 'restore' && blocked) {
                 const after = await read();
@@ -553,24 +632,29 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
                 time: '09:00:00 (' + dateKey + ')', count: 1, barcode: code, cod: 10, dod: 2, price: 12,
                 barcodes: [{ code, cod: 10, dod: 2, locker: 'A1', createdAt: now, isClosed: false, isDeducted: false }] };
             revenue.adjust(dateKey, 10, 2, 1);
+            revenue.expectParcel(code, { root: 'history', day: dateKey, cod: 10, dod: 2, closed: false, deducted: false, phone: phoneBase + f });
             await write([{ k: 'set', p: ['zoew_scan_history_cod_dod', id], v: item }, { k: 'set', p: ['zoew_barcode_registry', code], v: true },
                 { k: 'set', p: ['zoew_daily_revenue_cod_dod', dateKey], v: revenue.day(dateKey) },
                 { k: 'set', p: ['zoew_monthly_revenue_cod_dod', monthKey], v: revenue.month(monthKey) }]);
             await verify(flow + '/' + mode + '/seed', code, 'history', false);
             if (movement === 'pickup2h' || signedTrash) {
+                const closeClock = await beginClock();
                 await devices[0].page.evaluate((target) => window.__startOp({ wanted: 'closeOrder', pick: 0, target }), target);
-                await sync();
+                await verify(flow + '/' + mode + '/closed', code, 'history', false, { closed: true, closedClock });
             }
             await Promise.all(devices.map((d) => d.page.evaluate(() => window.runZtoStatusSweep(true))));
             await sync();
             if (movement === 'pickup2h') {
                 if (authMode !== 'palm') {
                     const t = await read();
+                    await captureClock();
+                    revenue.verify(t, knownCodes, flow + '/' + mode + '/before-fixture-age', clockSeen.max);
                     const old = structuredClone(t.zoew_scan_history_cod_dod[id]);
                     old.closedAt = Date.now() - 3600000;
                     Object.values(old.barcodes).forEach((b) => { b.closedAt = old.closedAt; });
                     await write([{ k: 'set', p: ['zoew_scan_history_cod_dod', id], v: old },
-                        ...collectedFixtureAgeOps(t, t.zoew_scan_history_cod_dod[id], old, Date.now())]);
+                        ...collectedFixtureAgeOps(t, t.zoew_scan_history_cod_dod[id], old, clockSeen.max)]);
+                    revenue.expectParcel(code, { closedAt: [old.closedAt, old.closedAt] });
                 }
                 await sync();
                 await Promise.all(devices.map((d) => d.page.evaluate(() => window.runAutomaticCleanupRules())));
@@ -609,11 +693,14 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
                     await Promise.all(devices.slice(1).map((d) => d.page.evaluate(() => fb.goOffline(db))));
                     if (authMode === 'palm' || signedTrash) fixture.world.parcels.get(code).signedAt = upstreamStamp(Date.now() - (authMode === 'palm' ? 3 * 3600000 : 10000));
                     if (authMode !== 'palm') {
+                        await captureClock();
+                        revenue.verify(beforeStage, knownCodes, flow + '/' + mode + '/before-fixture-age', clockSeen.max);
                         const old = structuredClone(beforeStage.zoew_scan_history_cod_dod[id]);
                         old.closedAt = Date.now() - 3 * 3600000;
                         Object.values(old.barcodes).forEach((b) => { b.closedAt = old.closedAt; });
                         await write([{ k: 'set', p: ['zoew_scan_history_cod_dod', id], v: old },
-                            ...collectedFixtureAgeOps(beforeStage, beforeStage.zoew_scan_history_cod_dod[id], old, Date.now())]);
+                            ...collectedFixtureAgeOps(beforeStage, beforeStage.zoew_scan_history_cod_dod[id], old, clockSeen.max)]);
+                        revenue.expectParcel(code, { closedAt: [old.closedAt, old.closedAt] });
                         if (mode !== 'offline-online') await dev.page.evaluate(() => fb.goOnline(db));
                     }
                 }
@@ -629,6 +716,7 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
                 const expectedSignedAt = stage === 'move' && movement === 'pickup2h' && authMode === 'palm'
                     ? Date.parse(fixture.world.parcels.get(code).signedAt.replace(' ', 'T') + '+07:00') : 0;
                 if (stage === 'move' && movement === 'pickup2h' && authMode === 'palm') assert.ok(Number.isFinite(expectedSignedAt) && expectedSignedAt > 0, 'fixture ត្រូវមានពេល Sign ពិត');
+                const actionClock = await beginClock();
                 const start = (d) => d.page.evaluate((args) => {
                     if (args.wanted === 'sweep') window.__ops.push((async () => {
                         const started = Date.now();
@@ -674,7 +762,8 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
                     await dev.ctx.setOffline(false); await dev.page.evaluate(() => fb.goOnline(db));
                 } else if (mode.startsWith('close-')) {
                     if (!blocked) { await waitForGate(); expectedInterruptions++; }
-                    const closing = dev.page.close(); gates[0].release(true); await closing; gates[0].release();
+                    await captureClock(actionClock, [dev]);
+                    await dev.page.close().finally(() => gates[0].release(true)); gates[0].release();
                     if (!blocked) interruptions++;
                     await dev.reopen();
                     await dev.page.evaluate(async () => { await window.resumeInterruptedCleanups(); await window.runZtoStatusSweep(true); });
@@ -692,7 +781,8 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
                 const removed = movement === 'remove' || movement === 'abandon8d';
                 const deducted = removed && (stage === 'move' || blocked);
                 if (removed && !blocked) { const sign = stage === 'move' ? -1 : 1; revenue.adjust(dateKey, sign * 10, sign * 2, sign); }
-                await verify(flow + '/' + mode + '/' + (blocked ? 'restore-blocked' : stage), code, stage === 'move' || blocked ? 'trash' : 'history', deducted);
+                await verify(flow + '/' + mode + '/' + (blocked ? 'restore-blocked' : stage), code, stage === 'move' || blocked ? 'trash' : 'history', deducted,
+                    stage === 'restore' && !blocked ? (movement === 'pickup2h' || signedTrash ? { closedClock: actionClock } : { restoredClock: actionClock }) : {});
                 if (blocked) {
                     const after = await read();
                     assert.deepEqual(after.zoew_restore_finalizations || {}, beforeStage.zoew_restore_finalizations || {}, 'restore បដិសេធមិនសរសេរ finalization');
@@ -721,7 +811,7 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
         for (const d of devices) await d.ctx.unroute(sheetUrl + '**', sheetRoute);
         console.log('  ok Sheet ' + backend + ' ' + tag + ': ' + steps + ' server checkpoints · ' + duplicateCalls + ' repeated calls · ' + interruptions
             + ' page closes mid-write · Remove→Restore→Delete→Restore · ' + runFlowNames.join('/') + ' ➜ restore');
-        return { steps, duplicateCalls, interruptions };
+        return { steps, duplicateCalls, interruptions, expectation: revenue };
     }
     if (authMode === 'cookie') {
         for (const [index, phase] of ['claim', 'prepared'].entries()) {
@@ -741,6 +831,8 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
                 fixture.world.parcels.set(parcel, { site, arrivedAt: upstreamStamp(now - 4 * 3600000) });
             }
             revenue.adjust(dateKey, 13, 3, 2);
+            revenue.expectParcel(code, { root: 'history', day: dateKey, cod: 10, dod: 2, closed: false, deducted: false, phone });
+            revenue.expectParcel(neighborCode, { root: 'history', day: dateKey, cod: 3, dod: 1, closed: false, deducted: false, phone });
             await write([{ k: 'set', p: ['zoew_scan_history_cod_dod', sourceId], v: source },
                 { k: 'set', p: ['zoew_scan_history_cod_dod', targetId], v: neighbor },
                 ...[code, neighborCode].map((parcel) => ({ k: 'set', p: ['zoew_barcode_registry', parcel], v: true })),
@@ -806,7 +898,7 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
     deniedRestores++;
     await leaveRestoreDialogs();
     console.log('  ok ' + labelMode + ' ' + backend + ' ' + tag + ': ' + steps + ' server checkpoints · ' + duplicateCalls + ' repeated calls · ' + interruptions + ' page closes mid-write · ' + deniedRestores + ' denied restores · ' + labelMode + ' Blob/list/detail verified');
-    return { steps, duplicateCalls, interruptions };
+    return { steps, duplicateCalls, interruptions, expectation: revenue };
 }
 
-module.exports = { cookieFixture, networkGate, restoreFlows, createRevenueExpectation, scanDayForCheckpoint, confirmWithClockWindow };
+module.exports = { cookieFixture, networkGate, restoreFlows, createRevenueExpectation, scanDayForCheckpoint, confirmWithClockWindow, installMoneyClockWitness };

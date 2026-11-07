@@ -122,3 +122,23 @@ it('malformed recognized write stays a rejected failure rather than silent zero 
     await expect(f.client(JSON.stringify({ t: 'd', d: { r: 12, a: 'm' } }))).rejects.toThrow();
     expect(f.toServer).toEqual([]);
 });
+
+it('close-after-commit បាត់ ACK ពិត មិនផ្ញើ ACK ប្រជែងនឹង page.close', async () => {
+    const f = await fixture(); f.gate.arm('after'); await f.client(merge);
+    const response = f.server(ack(9)); expect(f.gate.hits).toBe(1);
+    f.gate.release(true); await response;
+    expect(f.toServer).toEqual([merge]); expect(f.toClient).toEqual([]);
+});
+it.each([false, true])('Supabase after-commit ត្រូវរក្សា ACK/drop តាម close=%s', async close => {
+    let handler: any, fetched = 0, fulfilled = 0, aborted = 0;
+    const tenant = '11111111-1111-4111-8111-111111111111';
+    const gate = await networkGate({ route: async (_pattern: any, fn: any) => { handler = fn; } }, 'supabase', tenant);
+    fixtures.push({ gate }); gate.arm('after');
+    const response = { json: async () => ({ ok: true }) };
+    const operation = track(handler({ request: () => ({ url: () => 'https://fixture.supabase.invalid/rest/v1/rpc/zoe_write_v2',
+        postDataJSON: () => ({ p_expected_tenant: tenant, p_ops: [{ p: ['zoew_scan_history_cod_dod', 'row'], v: { id: 'row' } }] }) }),
+    fetch: async () => { fetched++; return response; }, fulfill: async (actual: any) => { expect(actual.response).toBe(response); fulfilled++; }, abort: async () => { aborted++; } }));
+    await gate.hit(); expect(fetched).toBe(1); expect(fulfilled).toBe(0);
+    gate.release(close); await operation;
+    expect(fulfilled).toBe(close ? 0 : 1); expect(aborted).toBe(close ? 1 : 0);
+});

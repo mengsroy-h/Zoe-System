@@ -265,16 +265,17 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
             const shop = shops[0];
             const neighbors = shops.slice(1);
             const snapshots = await Promise.all(neighbors.map((neighbor) => tree(neighbor.tenant)));
-            let isolationChecks = 0, matrixSteps = 0;
+            let isolationChecks = 0, matrixSteps = 0, expectation;
             const onCheckpoint = async (label) => {
                 const current = await Promise.all(neighbors.map((neighbor) => tree(neighbor.tenant)));
                 neighbors.forEach((neighbor, i) => assert.deepEqual(current[i], snapshots[i], label + ': ហាងជិតខាង ' + neighbor.index + ' ត្រូវនៅដដែល'));
                 isolationChecks++;
             };
             for (const authMode of ['sheet', 'cookie', 'palm']) {
-                const result = await restoreFlows({ devices: shop.devices, read: () => tree(shop.tenant),
+                const result = await restoreFlows({ expectation, devices: shop.devices, read: () => tree(shop.tenant),
                     write: (ops) => serverWrite(shop.tenant, ops), dateKey, monthKey, knownCodes: shop.knownCodes,
                     fixture: cookie, origin, site: String(200101 + shop.index), tag: 's' + shop.index, backend: 'supabase', authMode, onCheckpoint });
+                expectation = result.expectation;
                 matrixSteps += result.steps;
             }
             check(matrixSteps > 0 && isolationChecks === matrixSteps,

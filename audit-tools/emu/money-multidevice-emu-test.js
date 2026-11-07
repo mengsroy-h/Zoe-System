@@ -261,11 +261,15 @@ async function waitForHistoricalSettlement(devices, read, accepts, limitMs = 450
                 check(inspectHistorical(negative).registryMissing.includes(code), 'historical v2 ៖ wrong-birth ក្នុង copy ត្រូវបដិសេធ');
                 trail.push('historicalV2:admit>abandon>restore:' + code);
             }
-            if (!broke && run === RUN0) for (const authMode of ['sheet', 'cookie', 'palm']) await restoreFlows({ devices, read: async () => (await (await owner('.json')).json()) || {},
+            let expectation;
+            if (!broke && run === RUN0) for (const authMode of ['sheet', 'cookie', 'palm']) {
+                const result = await restoreFlows({ expectation, devices, read: async () => (await (await owner('.json')).json()) || {},
                 write: async (ops) => {
                     const patch = Object.fromEntries(ops.map((o) => [o.p.join('/'), o.v]));
                     const out = await owner('.json', 'PATCH', patch); if (!out.ok) throw new Error('Cookie seed: ' + out.status);
                 }, dateKey, monthKey, knownCodes, fixture: cookie, origin, site: '1', tag: 'firebase', backend: 'firebase', authMode });
+                expectation = result.expectation;
+            }
             for (let i = 0; i < OPS && !broke; i++) {
                 const plan = devices.map((dev) => {
                     const pick = r();

@@ -561,7 +561,7 @@ it('browser checkpoints ទាំងពីរ backend និង matrix ទាម
         expect(calls).toHaveLength(count);
         for (const call of calls) {
             expect(call.arguments).toHaveLength(6);
-            expect(['Date.now()', 'now']).toContain(source.slice(call.arguments[5].start, call.arguments[5].end));
+            expect(['Date.now()', 'now', 'clockNow']).toContain(source.slice(call.arguments[5].start, call.arguments[5].end));
         }
     }
 });
@@ -599,4 +599,124 @@ it.each(['open-price', 'deleted', 'closed'])('fixture age បដិសេធប�
     if (kind === 'deleted') changed.barcodes.pop();
     if (kind === 'closed') changed.barcodes[1].isClosed = true;
     expect(() => collectedFixtureAgeOps(tree, row, changed, MIRROR_NOW)).toThrow();
+});
+
+describe('parcel intent ឯករាជ្យ មិនឱ្យ source និង mirror ខុសជាមួយគ្នា', () => {
+    const closedAt = Date.parse('2026-11-07T00:30:00+07:00');
+    const expectedFor = (tree: any) => {
+        const model = createRevenueExpectation(tree, { requireParcelIntents: true });
+        model.expectParcel?.('MIRROR', { root: 'history', day: '2026-11-01', cod: 10, dod: 2,
+            closed: true, deducted: false, phone: '012000111', closedAt: [closedAt - 100, closedAt + 100] });
+        return model;
+    };
+    it('control ត្រឹមត្រូវ និង duplicate មិនទាមទារ timestamp ថ្មី', () => {
+        const tree = mirrorFixture(), model = expectedFor(tree);
+        expect(() => model.verify(tree, ['MIRROR'], 'control', MIRROR_NOW)).not.toThrow();
+        expect(() => model.verify(tree, ['MIRROR'], 'repeat', MIRROR_NOW + 300000)).not.toThrow();
+    });
+    it.each(['yesterday', 'outside-retention', 'future', 'reopened', 'phone', 'swapped-value'])('បដិសេធ coherent %s', fault => {
+        const tree = mirrorFixture(), model = expectedFor(tree), b = tree.zoew_scan_history_cod_dod.row.barcodes[0];
+        if (fault === 'yesterday' || fault === 'outside-retention') {
+            b.closedAt -= (fault === 'yesterday' ? 1 : 8) * 86400000;
+            tree.zoew_daily_collected_cod_dod = fault === 'yesterday' ? { '2026-11-06': { MIRROR: { c: 10, d: 2 } } } : {};
+        }
+        if (fault === 'future') b.closedAt = MIRROR_NOW + 1000;
+        if (fault === 'reopened') { b.isClosed = false; delete b.closedAt; tree.zoew_daily_collected_cod_dod = {}; tree.zoew_daily_pickup_cod_dod = {}; }
+        if (fault === 'phone') {
+            tree.zoew_scan_history_cod_dod.row.phone = '099000111';
+            const p = tree.zoew_daily_pickup_cod_dod['2026-11-01']; p.pickedUpBarcodes.MIRROR = '099000111'; p.pickedUpPhones = { '099000111': 1 };
+        }
+        if (fault === 'swapped-value') {
+            const other = structuredClone(tree.zoew_scan_history_cod_dod.row); other.id = 'other'; other.barcodes[0].code = 'OTHER';
+            other.barcodes[0].cod = 20; other.barcodes[0].dod = 3; tree.zoew_scan_history_cod_dod.other = other;
+            tree.zoew_barcode_registry.OTHER = true;
+            tree.zoew_daily_revenue_cod_dod['2026-11-01'] = { codDollar: 30, dodDollar: 5, totalCount: 2 };
+            tree.zoew_monthly_revenue_cod_dod['2026-11'] = { codDollar: 30, dodDollar: 5, totalCount: 2 };
+            model.adjust('2026-11-01', 20, 3, 1);
+            model.expectParcel?.('OTHER', { root: 'history', day: '2026-11-01', cod: 20, dod: 3, closed: true, deducted: false, closedAt: [closedAt - 100, closedAt + 100] });
+            tree.zoew_daily_pickup_cod_dod['2026-11-01'] = { packagesPickedUp: 2, pickedUpBarcodes: { MIRROR: '012000111', OTHER: '012000111' }, pickedUpPhones: { '012000111': 2 } };
+            [b.cod, other.barcodes[0].cod] = [20, 10]; [b.dod, other.barcodes[0].dod] = [3, 2];
+            tree.zoew_daily_collected_cod_dod = { '2026-11-07': { MIRROR: { c: 20, d: 3 }, OTHER: { c: 10, d: 2 } } };
+        }
+        expect(() => model.verify(tree, fault === 'swapped-value' ? ['MIRROR', 'OTHER'] : ['MIRROR'], fault, MIRROR_NOW)).toThrow();
+    });
+    it('server trash claim នៅសល់មិនជា settled green', () => {
+        const tree = mirrorFixture(); tree.zoew_recently_deleted_cod_dod.row = { ...tree.zoew_scan_history_cod_dod.row, trashReason: 'kept', restoreClaim: { token: 'lost-local' } };
+        delete tree.zoew_scan_history_cod_dod.row;
+        expect(mirrorVerdict(tree)).toContain('collected-restore-unsettled');
+    });
+    it('parcel ថ្មីដែលមិនបាន register intent ត្រូវ fail closed', () => {
+        const tree = mirrorFixture(), model = createRevenueExpectation({}, { requireParcelIntents: true });
+        model.adjust('2026-11-01', 10, 2, 1);
+        expect(() => model.verify(tree, ['MIRROR'], 'untracked', MIRROR_NOW)).toThrow();
+    });
+});
+
+it('parcel intent ទាមទារ barcode ថ្មីទោះ caller ភ្លេច knownCodes', () => {
+    const tree = mirrorFixture(), model = createRevenueExpectation({}, { requireParcelIntents: true });
+    model.adjust('2026-11-01', 10, 2, 1);
+    expect(() => model.verify(tree, [], 'unlisted', MIRROR_NOW)).toThrow('intent');
+});
+it('parcel intent ពេលបិទឆ្លងអធ្រាត្រ និង duplicate រក្សាត្រាដើម', () => {
+    const tree = mirrorFixture(), model = createRevenueExpectation(tree);
+    const start = Date.parse('2026-11-06T23:59:59+07:00'), end = Date.parse('2026-11-07T00:00:01+07:00');
+    tree.zoew_scan_history_cod_dod.row.barcodes[0].closedAt = end;
+    model.expectParcel('MIRROR', { root: 'history', day: '2026-11-01', cod: 10, dod: 2, closed: true, deducted: false, closedAt: [start, end] });
+    expect(() => model.verify(tree, ['MIRROR'], 'midnight', MIRROR_NOW)).not.toThrow();
+    tree.zoew_scan_history_cod_dod.row.barcodes[0].closedAt = end + 5000;
+    expect(() => model.verify(tree, ['MIRROR'], 'repeat-retimed', MIRROR_NOW)).toThrow('closedAt');
+});
+it('parcel intent ថ្មីត្រូវប្រើក្នុង restore matrix និងមិនយក actual តម្លៃជំនួស input', () => {
+    const source = readFileSync(require.resolve('../../audit-tools/money-cookie-blob.js'), 'utf8');
+    expect(source).toContain('createRevenueExpectation(initial, { requireParcelIntents: true })');
+    const { parse } = require('acorn'), { simple } = require('acorn-walk');
+    const calls: any[] = [];
+    simple(parse(source, { ecmaVersion: 'latest' }), { CallExpression(node: any) {
+        if (node.callee.type === 'MemberExpression' && node.callee.object.name === 'revenue' && node.callee.property.name === 'expectParcel') calls.push(node);
+    } });
+    expect(calls).toHaveLength(7);
+    const seeds = calls.filter(node => node.arguments[1].properties.some((p: any) => p.key?.name === 'cod'));
+    expect(seeds).toHaveLength(4);
+    for (const node of seeds) for (const p of node.arguments[1].properties.filter((p: any) => ['cod', 'dod', 'closed'].includes(p.key.name))) expect(p.value.type).toBe('Literal');
+});
+
+it('clock witness កត់ supplied server clock ពេល offset ប្ដូរ ដោយមិនប្ដូរ Date.now', () => {
+    const { installMoneyClockWitness } = require('../../audit-tools/money-cookie-blob.js');
+    let raw = 10000;
+    const date = { now: () => raw }, win: any = { serverTimeOffsetMs: -500 };
+    runInNewContext('(' + installMoneyClockWitness.toString() + ')()', { window: win, Date: date });
+    expect(date.now()).toBe(10000);
+    raw = 11000; win.serverTimeOffsetMs = 1500;
+    expect(date.now()).toBe(11000);
+    expect(win.__moneyClockWitness).toEqual({ min: 9500, max: 12500 });
+    // Idempotent install សម្រាប់ context ដែលតេស្ត mode ច្រើន។
+    const wrapped = date.now;
+    runInNewContext('(' + installMoneyClockWitness.toString() + ')()', { window: win, Date: date });
+    expect(date.now).toBe(wrapped);
+});
+
+it('clock evidence ឆ្លង devices និង reopen រក្សា envelope ចាស់ ហើយបាត់ witness ត្រូវ fail', async () => {
+    const source = readFileSync(require.resolve('../../audit-tools/money-cookie-blob.js'), 'utf8');
+    const { installMoneyClockWitness } = require('../../audit-tools/money-cookie-blob.js');
+    const first = source.indexOf('    const clockSeen ='), last = source.indexOf('    let steps =', first);
+    expect(first).toBeGreaterThan(0); expect(last).toBeGreaterThan(first);
+    const devices = [10, -20].map(offset => {
+        let script: any, raw = 1000, win: any = { serverTimeOffsetMs: offset }, date: any = { now: () => raw };
+        const page = { evaluate: (fn: any) => runInNewContext('(' + fn.toString() + ')()', { window: win, Date: date }) };
+        return { page, ctx: { addInitScript: (fn: any) => { script = fn; } },
+            tick(value: number, nextOffset: number) { raw = value; win.serverTimeOffsetMs = nextOffset; date.now(); },
+            reopen() { win = { serverTimeOffsetMs: -50 }; date = { now: () => raw }; return page.evaluate(script); },
+            loseWitness() { delete win.__moneyClockWitness; } };
+    });
+    const code = '(async () => {' + source.slice(first, last) + '; return { beginClock, captureClock, clockSeen }; })()';
+    const lab = await runInNewContext(code, { devices, installMoneyClockWitness, expectation: undefined, assert: require('node:assert/strict') });
+    const bounds = await lab.beginClock();
+    devices[0].tick(1100, 100);
+    await lab.captureClock(bounds, [devices[0]]); // មុន page.close ខណៈ write gate នៅចាំ។
+    await devices[0].reopen(); devices[0].tick(1150, -50); devices[1].tick(1100, -100);
+    expect(await lab.captureClock(bounds)).toEqual({ min: 980, max: 1200 });
+    expect(lab.clockSeen.max).toBe(1200);
+    devices[1].loseWitness();
+    await expect(lab.captureClock()).rejects.toThrow('clock witness');
+    expect(source).toContain('await captureClock(actionClock, [dev]);\n                    await dev.page.close().finally(() => gates[0].release(true))');
 });

@@ -39,7 +39,7 @@ function collectedMirror(dump, now) {
     for (const [where, bag] of [['history', dump.zoew_scan_history_cod_dod], ['trash', dump.zoew_recently_deleted_cod_dod]]) {
         for (const item of Object.values(bag || {})) {
             if (!object(item) || !item.barcodes || typeof item.barcodes !== 'object') { addError('collected-legacy-row:' + where); continue; }
-            if (where === 'history' && (item.restoreClaimId !== undefined || item.restoreClaimToken !== undefined)) {
+            if (item.restoreClaimId !== undefined || item.restoreClaimToken !== undefined || item.restoreClaim !== undefined) {
                 addError('collected-restore-unsettled:' + item.id); continue;
             }
             const reason = typeof item.trashReason === 'string' ? item.trashReason : item.isFromDeletion ? 'kept' : 'remove';

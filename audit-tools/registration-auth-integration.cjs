@@ -35,9 +35,17 @@ function dockerPgHarness() {
             ownsNetwork = true;
             docker(['network', 'create', '--internal', network]);
             ownsContainer = true;
-            docker(['run', '--detach', '--name', container, '--network', network, '--read-only', '--tmpfs', '/var/lib/postgresql/data:rw,nosuid', '--tmpfs', '/var/run/postgresql:rw,nosuid', '--publish', '127.0.0.1::5432', '--env', 'POSTGRES_USER=supabase_admin', '--env', 'POSTGRES_DB=postgres', '--env', 'POSTGRES_PASSWORD=' + password, pins.postgres.image]);
-            ownsContainer = true;
-            const binding = docker(['port', container, '5432/tcp']);
+            docker(['run', '--detach', '--name', container, '--network', network, '--read-only', '--tmpfs', '/tmp:rw,nosuid', '--tmpfs', '/var/lib/postgresql/data:rw,nosuid', '--tmpfs', '/var/run/postgresql:rw,nosuid', '--publish', '127.0.0.1::5432', '--env', 'POSTGRES_USER=supabase_admin', '--env', 'POSTGRES_DB=postgres', '--env', 'POSTGRES_PASSWORD=' + password, pins.postgres.image]);
+            let binding;
+            try {
+                binding = docker(['port', container, '5432/tcp']);
+            }
+            catch (e) {
+                let diag = '';
+                try { diag += '\nstate=' + docker(['inspect', '--format', '{{.State.Status}} exit={{.State.ExitCode}}', container]); } catch {}
+                try { diag += '\nlogs=' + docker(['logs', '--tail', '80', container]).replace(/POSTGRES_PASSWORD=[^\s'"]+/g, 'POSTGRES_PASSWORD=[REDACTED]').slice(0, 1200); } catch {}
+                throw Error(String(e.message || e) + diag);
+            }
             if (!/^127\.0\.0\.1:\d+$/.test(binding))
                 throw Error('fixture PG is not loopback-only');
             mappedPort = Number(binding.split(':')[1]);

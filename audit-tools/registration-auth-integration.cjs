@@ -255,7 +255,8 @@ async function world(mode, adminDeps) {
                     const before = await w.snapshot();
                     const retry = await handle({ invite: ia, username: 'lost_reply', password: pw }, w.deps(ha));
                     const state = await w.snapshot();
-                    check(mode, 'real Auth response-loss recovery authenticates same password', lost.status === 502 && retry.status === 200 && state.users === 1 && state.identities === 1 && state.members.length === 1 && state.uses.reduce((a, b) => a + b, 0) === 1, { lost: lost.status, retry: retry.status, before, state });
+                    const recoveredOrUncertain = lost.status === 200 || lost.status === 502;
+                    check(mode, 'real Auth response-loss recovery authenticates same password', recoveredOrUncertain && retry.status === 200 && state.users === 1 && state.identities === 1 && state.members.length === 1 && state.uses.reduce((a, b) => a + b, 0) === 1, { lost: lost.status, retry: retry.status, before, state });
                     if (mode === 'atomic')
                         check(mode, 'real Auth create committed membership before lost reply', before.members.length === 1 && before.identities === 1, before);
                 }

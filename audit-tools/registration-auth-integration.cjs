@@ -36,18 +36,19 @@ function dockerPgHarness() {
             docker(['network', 'create', '--internal', network]);
             ownsContainer = true;
             docker(['run', '--detach', '--name', container, '--network', network, '--read-only', '--tmpfs', '/tmp:rw,nosuid', '--tmpfs', '/var/lib/postgresql/data:rw,nosuid', '--tmpfs', '/var/run/postgresql:rw,nosuid', '--publish', '127.0.0.1::5432', '--env', 'POSTGRES_USER=supabase_admin', '--env', 'POSTGRES_DB=postgres', '--env', 'POSTGRES_PASSWORD=' + password, pins.postgres.image]);
-            let binding;
-            try {
-                binding = docker(['port', container, '5432/tcp']);
+            let binding = '';
+            for (let i = 0; i < 50 && !/^127\.0\.0\.1:\d+$/.test(binding); i++) {
+                try { binding = docker(['port', container, '5432/tcp']); } catch { binding = ''; }
+                if (!/^127\.0\.0\.1:\d+$/.test(binding)) await new Promise(r => setTimeout(r, 100));
             }
-            catch (e) {
+            if (!/^127\.0\.0\.1:\d+$/.test(binding)) {
                 let diag = '';
                 try { diag += '\nstate=' + docker(['inspect', '--format', '{{.State.Status}} exit={{.State.ExitCode}}', container]); } catch {}
+                try { diag += '\nports=' + docker(['inspect', '--format', '{{json .NetworkSettings.Ports}} {{json .HostConfig.PortBindings}}', container]); } catch {}
+                try { diag += '\nallPorts=' + docker(['port', container]); } catch {}
                 try { diag += '\nlogs=' + docker(['logs', '--tail', '80', container]).replace(/POSTGRES_PASSWORD=[^\s'"]+/g, 'POSTGRES_PASSWORD=[REDACTED]').slice(0, 1200); } catch {}
-                throw Error(String(e.message || e) + diag);
+                throw Error('fixture PG port mapping unavailable: ' + JSON.stringify(binding) + diag);
             }
-            if (!/^127\.0\.0\.1:\d+$/.test(binding))
-                throw Error('fixture PG is not loopback-only');
             mappedPort = Number(binding.split(':')[1]);
             let admin;
             for (let i = 0; i < 200; i++) {

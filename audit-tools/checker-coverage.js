@@ -64,10 +64,11 @@ const EXTERNAL_CHECKERS = [{ f: '../zto-import/test.js', env: 'ZTO_IMPORT_APP_DI
 // `money-multidevice-core.js` ជា **harness រួម** (អថេរលុយលើ server · PAGE_OPS) ៖ មិនអះអាងអ្វីទេ ➜ អ្នកយាមរបស់វាគឺ checker ដែល require វា
 // (`emu/money-multidevice-emu-test` · `supabase-money-multishop-test` ៖ មាន `*_APP_DIR`)។
 // `audit-module-ast.js` ជា helper គ្មាន assertion ផ្ទាល់៖ អ្នកយាម `audit-module-ast.test.ts` និង AST checkers ដែលប្រើវា។
+// `money-operation-trace.js` ជា helper សង្កេតគ្មាន assertion ផ្ទាល់៖ ប្រើដោយ `money-cookie-blob.js`; អ្នកយាម `money-operation-trace.test.ts` និង checker ពហុឧបករណ៍។
 const NOT_CHECKERS = new Set(['trimws.js', 'strip-comments.js', 'checker-coverage.js',
     'owned-rtdb-command.js', 'redact-dump.js', 'money-reality-check.js', 'registry-orphan-list.js',
     'idtoken-fixture.js', 'react-view.js', 'audit-module-ast.js', 'money-core.js', 'ts-comments.js', 'rules-shape.js',
-    'supabase-pg.js', 'supabase-fake-server.js', 'money-multidevice-core.js', 'money-cookie-blob.js']);
+    'supabase-pg.js', 'supabase-fake-server.js', 'money-multidevice-core.js', 'money-cookie-blob.js', 'money-operation-trace.js']);
 const CLI_GUARDS = new Map([
     ['owned-rtdb-command.js', 'runall-runner-test.js'],
     ['money-reality-check.js', 'money-reality-test.js'],

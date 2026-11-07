@@ -4830,7 +4830,7 @@
     ".github/workflows/registration-auth.yml": {
       "policy": "registration-auth-reviewed-fixture",
       "encoding": "lf-text",
-      "sha256": "de15bc07ad458e1f09ff1968d6278352d2ec7370594c3bedb841aa2716b334e1"
+      "sha256": "a1598dcb067601efe6879e2a4f9175392ba653a996bdbfc02ba33d49f9dffdcd"
     },
     "audit-tools/registration-auth-integration.cjs": {
       "policy": "registration-auth-reviewed-fixture",
@@ -4860,10 +4860,10 @@
     "supabase/scripts/activate-new-project-registration.sql": {
       "policy": "registration-onboarding-sql"
     },
-    "audit-tools/registration-onboarding.test.mjs": {
+    "audit-tools/tests/registration-onboarding.test.mjs": {
       "policy": "registration-auth-reviewed-fixture",
       "encoding": "lf-text",
-      "sha256": "e5ba1199fe6c28f5b5230c7385b1209fec57a438be5e8b10cf5f64b1d4296474"
+      "sha256": "c8c14a79fa6f74a0d358366e73445d2853c53fa5741a87f521412d83ebe5cc95"
     }
   }
 }

@@ -932,7 +932,7 @@ async function main() {
     ok('Edge Function >= ២ (ឃើញ ' + fnDirs.join(', ') + ')', fnDirs.length >= 2);
     if (missing.length || fnDirs.length < 2) { finish(); return; }
 
-    const onboarding = cp.spawnSync(process.execPath, ['--test', '--test-reporter=tap', path.join(__dirname, 'registration-onboarding.test.mjs')], {
+    const onboarding = cp.spawnSync(process.execPath, ['--test', '--test-reporter=tap', path.join(__dirname, 'tests', 'registration-onboarding.test.mjs')], {
         env: { ...process.env, SUPABASE_ONBOARDING_APP_DIR: ROOT }, encoding: 'utf8', timeout: 30000
     });
     const onboardingCounts = Object.fromEntries([...(onboarding.stdout || '').matchAll(/^# (tests|pass|fail|cancelled|skipped|todo) (\d+)$/gm)]

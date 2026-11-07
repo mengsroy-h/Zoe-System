@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const root = path.resolve(process.env.SUPABASE_ONBOARDING_APP_DIR || fileURLToPath(new URL('..', import.meta.url)));
+const root = path.resolve(process.env.SUPABASE_ONBOARDING_APP_DIR || fileURLToPath(new URL('../..', import.meta.url)));
 const source = relative => import(pathToFileURL(path.join(root, relative)));
 const { handleRegister } = await source('supabase/functions/_shared/account-core.ts');
 const { adminDeps } = await source('supabase/functions/_shared/admin-deps.ts');

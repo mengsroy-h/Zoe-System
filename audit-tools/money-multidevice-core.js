@@ -229,7 +229,30 @@ const PAGE_OPS = function () {
     const w = window;
     w.__ops = [];
     w.__opResults = [];
-    const operationHistory = [], consoleErrors = [];
+    const operationHistory = [], consoleErrors = [], attemptEvents = [];
+    let attemptSequence = 0, droppedAttemptEvents = 0;
+    const traceTarget = value => {
+        const out = {};
+        try { for (const key of ['id', 'code']) if (typeof value?.[key] === 'string') out[key] = value[key].slice(0, 256); } catch (_) {}
+        return out;
+    };
+    const traceState = selected => {
+        try {
+            const online = w.navigator?.onLine, connected = w.isDatabaseConnected,
+                phase = w.connectionFlowSnapshot?.().phase, cleanupHeld = selected?.id ? w.cleanupInFlight?.has(selected.id) : undefined;
+            return { online: typeof online === 'boolean' ? online : undefined, connected: typeof connected === 'boolean' ? connected : undefined,
+                phase: typeof phase === 'string' && /^[a-z-]{1,40}$/.test(phase) ? phase : undefined,
+                cleanupHeld: typeof cleanupHeld === 'boolean' ? cleanupHeld : undefined };
+        }
+        catch (_) { return { diagnosticUnavailable: true }; }
+    };
+    const traceEvent = value => {
+        try {
+            attemptEvents.push({ at: Date.now(), ...value });
+            if (attemptEvents.length > 128) { droppedAttemptEvents += attemptEvents.length - 128; attemptEvents.splice(0, attemptEvents.length - 128); }
+        } catch (_) {}
+    };
+    w.__operationTrace = () => JSON.parse(JSON.stringify({ limit: 128, droppedEvents: droppedAttemptEvents, events: attemptEvents }));
     const originalError = console.error;
     console.error = function (...args) {
         try { consoleErrors.push(args.map(value => value?.stack || String(value)).join(' ').slice(0, 8192)); }
@@ -254,6 +277,22 @@ const PAGE_OPS = function () {
         const matches = (it) => it && (!target || (target.code ? (it.barcodes || []).some((b) => b && b.code === target.code) : !target.id || it.id === target.id));
         const live = (w.scanHistory || []).filter(matches);
         const trash = (w.deletedItems || []).filter(matches);
+        const attempt = ++attemptSequence, requested = traceTarget(target);
+        let selected = {};
+        const traceWanted = ['scan', 'closeOrder', 'closeBarcode', 'removeBarcode', 'deleteItem', 'restore', 'editPrice', 'sweep', 'zreturn'].includes(wanted) ? wanted : 'unsupported';
+        const opening = { phase: 'start', attempt, wanted: traceWanted, requested, selected, state: traceState(requested) };
+        traceEvent(opening);
+        const select = value => {
+            try {
+                selected = traceTarget(value); Object.assign(opening.selected, selected);
+                Object.assign(opening.state, traceState(selected));
+            } catch (_) {}
+        };
+        const invoke = (fn, args, item) => { select(item); return fn.apply(w, args); };
+        const finishTrace = result => traceEvent({ phase: 'end', attempt, wanted: traceWanted, requested, selected,
+            result: ['done', 'failed', 'missing', 'pending', 'late', 'stale', 'cancelled', 'blocked', 'deleted', 'undefined', 'true', 'false', 'object', 'threw', 'rejected', 'not-selected'].includes(result) ? result : 'other',
+            state: traceState(selected) });
+        const skipped = () => { finishTrace('not-selected'); return null; };
         let started = null;
         try {
             if (wanted === 'scan') {
@@ -261,30 +300,34 @@ const PAGE_OPS = function () {
                 const bcText = document.getElementById('modalBarcodeText');
                 const modal = document.getElementById('phoneModal');
                 const open = modal && getComputedStyle(modal).display !== 'none';
-                if (!open || !bcText || bcText.innerText !== code) return null;
+                if (!open || !bcText || bcText.innerText !== code) return skipped();
                 const p = document.getElementById('modalPhoneInput'); if (p) p.value = phone;
                 const c = document.getElementById('modalCodInput'); if (c) c.value = String(amt);
                 const d2 = document.getElementById('modalDodInput'); if (d2) d2.value = String(Math.round(amt / 4 * 100) / 100);
                 started = Promise.resolve(w.confirmPhone());
-            } else if (wanted === 'closeOrder') { const it = at(live, pick); if (!it) return null; started = Promise.resolve(w.toggleCloseStatus(it.id)); }
-            else if (wanted === 'closeBarcode') { const it = at(live, pick); const b = bcOf(it, pick); if (!it || !b) return null; started = Promise.resolve(w.toggleIndividualBarcodeClose(it.id, b.code)); }
-            else if (wanted === 'removeBarcode') { const it = at(live, pick); const b = bcOf(it, pick); if (!it || !b) return null; started = Promise.resolve(w.removeSingleBarcode(it.id, b.code)); }
-            else if (wanted === 'deleteItem') { const it = at(live, pick); if (!it) return null; started = Promise.resolve(w.deleteSingleItem(it.id)); }
-            else if (wanted === 'restore') { const it = at(trash, pick); if (!it) return null; w.promptRestoreDeletedItem(it.id); started = Promise.resolve(w.executeRestoreItem()); }
+            } else if (wanted === 'closeOrder') { const it = at(live, pick); if (!it) return skipped(); started = Promise.resolve(w.toggleCloseStatus(it.id)); }
+            else if (wanted === 'closeBarcode') { const it = at(live, pick); const b = bcOf(it, pick); if (!it || !b) return skipped(); started = Promise.resolve(w.toggleIndividualBarcodeClose(it.id, b.code)); }
+            else if (wanted === 'removeBarcode') {
+                const it = at(live, pick), b = bcOf(it, pick); if (!it || !b) return skipped();
+                const fn = w.removeSingleBarcode, id = it.id, barcode = b.code;
+                started = Promise.resolve(invoke(fn, [id, barcode], { id, code: barcode }));
+            }
+            else if (wanted === 'deleteItem') { const it = at(live, pick); if (!it) return skipped(); started = Promise.resolve(w.deleteSingleItem(it.id)); }
+            else if (wanted === 'restore') { const it = at(trash, pick); if (!it) return skipped(); w.promptRestoreDeletedItem(it.id); started = Promise.resolve(w.executeRestoreItem()); }
             else if (wanted === 'editPrice') {
-                const it = at(live, pick); const b = bcOf(it, pick); if (!it || !b) return null;
+                const it = at(live, pick); const b = bcOf(it, pick); if (!it || !b) return skipped();
                 w.openEditBarcodePriceModal(it.id, b.code);
                 const c = document.getElementById('editBcCodInput'); if (c) c.value = String(amt);
                 const d2 = document.getElementById('editBcDodInput'); if (d2) d2.value = '0';
                 started = Promise.resolve(w.saveEditedBarcodePrice());
             } else if (wanted === 'sweep') { started = Promise.resolve(w.runAutomaticCleanupRules()); }
             else if (wanted === 'zreturn') {
-                if (!target || !target.id || !target.code || !(target.at > 0)) return null;
+                if (!target || !target.id || !target.code || !(target.at > 0)) return skipped();
                 started = Promise.resolve(w.claimAndCleanupItem(target.id, 'abandon', { codes: [target.code], returnedAt: new Map([[target.code, target.at]]) }));
             }
-            else return null;
-        } catch (e) { recordOperation({ wanted, threw: String(e && e.message) }); return 'threw:' + wanted + ':' + (e && e.message); }
-        const p = started.then((r) => { recordOperation({ wanted, r: typeof r === 'object' ? 'object' : String(r) }); }, (e) => { recordOperation({ wanted, e: String(e && e.message) }); });
+            else return skipped();
+        } catch (e) { finishTrace('threw'); recordOperation({ wanted, threw: String(e && e.message) }); return 'threw:' + wanted + ':' + (e && e.message); }
+        const p = started.then((r) => { const result = typeof r === 'object' ? 'object' : String(r); finishTrace(result); recordOperation({ wanted, r: result }); }, (e) => { finishTrace('rejected'); recordOperation({ wanted, e: String(e && e.message) }); });
         w.__ops.push(p);
         return wanted;
     };
@@ -360,7 +403,7 @@ async function recoveryEvidence(devices) {
         gate: device.gate?.evidence(),
         state: await Promise.race([
             device.page.evaluate(() => ({
-                journals: window.__journals(), operations: window.__operationHistory(), consoleErrors: window.__consoleErrors?.(),
+                journals: window.__journals(), operations: window.__operationHistory(), operationTrace: window.__operationTrace?.(), consoleErrors: window.__consoleErrors?.(),
                 toasts: [...(window.document?.querySelectorAll?.('#toastContainer .toast') || [])].map(node => node.textContent).slice(-4),
                 claims: window.pendingTrashClaims?.(window.liveShopScope?.()),
                 liveClaims: window.liveTrashClaims ? [...window.liveTrashClaims] : null,

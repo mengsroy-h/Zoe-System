@@ -7,6 +7,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { invariant, invariantBroken, r2, devicesSettled, collectedMirror, collectedFixtureAgeOps } = require('./money-multidevice-core.js');
 const fx = require('./idtoken-fixture.js');
+const { installMoneyTransportTrace } = require('./money-operation-trace.js');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function cookieFixture(root, { project, supabaseUrl, supabaseKey } = {}) {
@@ -149,6 +150,7 @@ function cookieFixture(root, { project, supabaseUrl, supabaseKey } = {}) {
 
 // បង្អាក់ write មុនទៅដល់ server ឬបង្អាក់ ACK ក្រោយ server commit។ មិនជំនួស DB/transaction/លុយឡើយ។
 async function networkGate(ctx, backend, expectedTenant) {
+    const transport = installMoneyTransportTrace(ctx);
     const state = { mode: '', hits: 0, releases: [], responseIds: new Map(), closed: false, match: null, boundaries: [] };
     const record = (stage, operations) => state.boundaries.push({ stage, operations: JSON.parse(JSON.stringify(operations)) });
     const hold = () => new Promise((resolve) => state.releases.push(resolve));
@@ -204,7 +206,7 @@ async function networkGate(ctx, backend, expectedTenant) {
         async hit() { const until = Date.now() + 8000; while (!state.hits && Date.now() < until) await sleep(30); assert.ok(state.hits, 'ការចាក់បណ្តាញត្រូវបាញ់ write ពិត (' + state.mode + ')'); },
         release(closed = false) { state.closed = closed; state.mode = ''; state.match = null; state.responseIds.clear(); state.releases.splice(0).forEach((r) => r(closed)); },
         get hits() { return state.hits; },
-        evidence() { return JSON.parse(JSON.stringify({ backend, expectedTenant: backend === 'supabase' ? expectedTenant : undefined, mode: state.mode, hits: state.hits, boundaries: state.boundaries })); }
+        evidence() { return JSON.parse(JSON.stringify({ backend, expectedTenant: backend === 'supabase' ? expectedTenant : undefined, mode: state.mode, hits: state.hits, boundaries: state.boundaries, transport: transport.snapshot() })); }
     };
 }
 
@@ -433,7 +435,7 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
                             marksBusy: window.ztoFinalInFlight, marksRefusedAt: window.ztoFinalRefusedAt, lookupBusy: window.autoLookupInFlight?.size },
                         verdict: verdict && { closed: verdict.closed, signedAt: verdict.signedAt, signedAtExact: verdict.signedAtExact, at: verdict.at },
                         history: targetRows(window.scanHistory), trash: targetRows(window.deletedItems),
-                        journals: window.__journals(), operations: window.__operationHistory(), claims: window.pendingTrashClaims?.(window.liveShopScope?.()),
+                        journals: window.__journals(), operations: window.__operationHistory(), operationTrace: window.__operationTrace?.(), claims: window.pendingTrashClaims?.(window.liveShopScope?.()),
                         sweeps: (window.__moneySweepResults || []).filter((row) => row.code === code).slice(-4) };
                 }, code).catch((error) => ({ error: String(error.message).slice(0, 300) })),
                 sleep(2000).then(() => ({ diagnosticTimeout: true }))

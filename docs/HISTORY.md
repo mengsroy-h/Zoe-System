@@ -4704,6 +4704,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/manual-adjust-number-browser.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/manual-adjust-single-flight.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/merge-into-deleted-item.test.ts` | — | ផ្នែក ៨ · ផ្នែក ៩ |
+| `ZoeW/tests/meta-checker-modules.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/modal-backdrop-keep.test.tsx` | — | ផ្នែក ៨ |
 | `ZoeW/tests/modal-chrome-state.test.tsx` | — | ផ្នែក ៨ · ផ្នែក ៩ |
 | `ZoeW/tests/modal-focus-trap.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |

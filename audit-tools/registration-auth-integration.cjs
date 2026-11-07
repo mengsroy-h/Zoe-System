@@ -19,11 +19,13 @@ function dockerPgHarness() {
     const suffix = crypto.randomBytes(8).toString('hex'), container = 'zoe-registration-pg-' + suffix, network = 'zoe-registration-net-' + suffix;
     const password = crypto.randomBytes(32).toString('hex');
     let mappedPort = 0, dbSeq = 0, ownsContainer = false, ownsNetwork = false;
+    const redactArg = a => /^POSTGRES_PASSWORD=/.test(String(a)) ? 'POSTGRES_PASSWORD=[REDACTED]' : String(a);
     const docker = args => { try {
         return cp.execFileSync('docker', args, { encoding: 'utf8', timeout: 120000, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
     }
-    catch {
-        throw Error('owned Docker fixture command failed');
+    catch (e) {
+        const detail = String(e.stderr || e.stdout || e.message || '').replace(/POSTGRES_PASSWORD=[^\s'"]+/g, 'POSTGRES_PASSWORD=[REDACTED]').slice(0, 800);
+        throw Error('owned Docker fixture command failed: docker ' + args.map(redactArg).join(' ') + (detail ? '\n' + detail : ''));
     } };
     const connect = async (user, database) => { const c = new PG.Client({ host: '127.0.0.1', port: mappedPort, user, password, database }); await c.connect(); return c; };
     return { PG, denied: r => r.error?.code === '42501',

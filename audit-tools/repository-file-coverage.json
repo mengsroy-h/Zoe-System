@@ -2502,6 +2502,9 @@
     "ZoeW/tests/ios-page-field-raise.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/ios-panel-glide-checker.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/ios-search-pulldown.test.ts": {
       "policy": "zoew-self-verification"
     },

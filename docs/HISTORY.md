@@ -1962,6 +1962,13 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-11-07 — អ្នកវាស់ callback ចាស់របស់ ios-panel-glide
+
+- Audit #1216 លើ PR merge `816cc14d` ឆ្លង 56/56; Audit #1217 លើ main `162917a9` ធ្លាក់ ១ ករណី cleanup។ Tree ទាំងពីរដូចគ្នា `40e6f7ad1d5cd4978d7dbeb0ef23c268a4d0bedc`; runner image, Node, Chromium និង lane/STRICT flags ដូចគ្នា។ Log ដែលធ្លាក់ឃើញចលនាថ្មីចប់ `currentTime=duration=220`, snap ស្តារ `y`; វាមិនវាស់ callback ខណៈចលនានៅរស់ទេ។ មិនមានភស្តុតាងថា merge ប្ដូរកូដចលនា ឬថា host ជាក់លាក់មានបញ្ហាទេ។
+- Tests-first `tests/ios-panel-glide-checker.test.ts` រត់អ្នកវាស់ និងម្ចាស់ snap ពិតក្នុង VM ជាមួយ DOM/WAAPI scaffold៖ ស៊ុមធម្មតាឆ្លង; ពន្យារ rAF 250ms និង 1000ms បង្កើត failure shape ដូច CI មុនកែ។ Checker ឥឡូវផ្អាកចលនាថ្មីក្នុង task ដដែល ហើយរង់ចាំ promise ចាស់ មុនពិនិត្យ snap; វាស់ការស្តារវិញក្រោយបញ្ចប់ម្ចាស់ថ្មី។ ករណី finish បញ្ចប់ចាស់មុន click ក្នុង task ដដែល ដើម្បីកុំឱ្យ stopPanelGlide ប្រែក្លាយវាទៅ cancel។ ផ្ទៀង outcome មុន/ក្រោយជាក់លាក់។
+- Regression និង negative controls ដក epoch fence, finished release, watchdog ឆ្លង ៧/៧ ក្រោយកែ; មុនកែ ៣/៧ ធ្លាក់។ Focused unit ៥៨, typecheck, lint, repository coverage ១០/១០ និង comment check ឆ្លង។ មិនប្ដូរ app source, CSS, lock hashes, watchdog ឬពិដាន checker។ ចលនាធម្មតា និង swipe នៅវាស់ដោយផ្នែក browser ដើម។
+- ព្រំដែន local៖ Chromium មិនអាចបើក Unix socket (`EPERM`); audit build មិនទាន់បញ្ចប់ measure-root។ VM មិនជំនួស browser/ឧបករណ៍ពិតទេ; ត្រូវរង់ចាំ CI លើ commit ដែលមានការកែនេះ មុនអះអាងបិទបញ្ហា។
+
 ### 2026-11-07 · លំហូរបើក registration លើ Supabase Project ថ្មី
 
 - តាមសំណើម្ចាស់សម្រាប់ការបន្ថែម project ថ្មី៖ បន្ថែម preflight ដែលអាន public Auth settings និង protocol probe របស់ `register`; CLI ប្រើតែ publishable key និង HTTPS project-ref ត្រឹមត្រូវ។ Test ថ្មីរត់មុនកែ handler លើ `0db0bb7` បានក្រហម៖ response `400 invite-invalid` ជំនួស protocol response។

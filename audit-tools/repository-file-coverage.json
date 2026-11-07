@@ -4816,7 +4816,7 @@
     "audit-tools/registration-auth-integration.cjs": {
       "policy": "registration-auth-reviewed-fixture",
       "encoding": "lf-text",
-      "sha256": "8aa19cb3fc2c0d40b958bac0a6bd7152f94af1abbeedb5c11b6d1284561b736e"
+      "sha256": "7a54d0df4ae99003000b4cccfb9c6139014979f7255821d4863890ea16aebb4c"
     },
     "audit-tools/registration-auth-pins.json": {
       "policy": "registration-auth-reviewed-fixture",

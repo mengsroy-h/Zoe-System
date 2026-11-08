@@ -4,6 +4,7 @@ import { viewState } from '../src/core/view-state';
 import { appLocalStore } from '../src/core/storage';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { ABANDON_AGE_MS, clearSensitiveModalFields } from '../src/features/session';
+import { expiryScheduleTimes, nearExpiryView, NOTIFY_SCHEDULE_MAX } from '../src/features/notifications';
 import { PUSH_SCHEDULE_MIN_GAP_MS, PUSH_STATE_KEY, pushRuntime, scheduleSignature, syncExpirySchedule } from '../src/features/push';
 
 const BASE = 'https://audit.supabase.co';
@@ -49,6 +50,79 @@ afterEach(() => {
     vi.unstubAllGlobals();
     appLocalStore.clear();
     pushRuntime.scheduleInFlight = false;
+});
+
+describe('កាលវិភាគ Push ៖ ភាពច្បាស់នៃពេល និង cache កំណែចាស់', () => {
+    it('cache នាទីមុនឡើងកំណែ ➜ ផ្ញើពេលពិតដោយមិនរង់ចាំ ៦ ម៉ោង', async () => {
+        vi.setSystemTime(new Date('2026-09-29T00:02:00Z'));
+        const at8 = Date.now() + 3600e3;
+        dataState.scanHistory = [
+            { id: 'inside', createdAt: at8 + 3600e3 - ABANDON_AGE_MS, barcodes: [{ code: 'INSIDE', isClosed: false }] },
+            { id: 'cutoff', createdAt: at8 + 24 * 3600e3 - ABANDON_AGE_MS - 1, barcodes: [{ code: 'CUTOFF', isClosed: false }] }
+        ] as any;
+        // Fixture ពី 578ca5be៖ times [1790647334062,1790730148125] មាន schedSig '2:fsl8ys'។
+        appLocalStore.setItem(PUSH_STATE_KEY, JSON.stringify({ ...saved(), schedSig: '2:fsl8ys', schedAt: Date.now() }));
+        const expected = [1790647320001, 1790730120000];
+        expect(expiryScheduleTimes(dataState.scanHistory, Date.now())).toEqual(expected);
+        const posts: any[] = [];
+        vi.stubGlobal('fetch', vi.fn(async (_url, options) => { posts.push(JSON.parse(options.body)); return reply(); }));
+        expect(await syncExpirySchedule()).toBe(true);
+        expect(posts.map(post => post.times)).toEqual([expected]);
+        expect(saved().schedSig).toBe(scheduleSignature(expected));
+        expect(saved().schedSig).not.toBe('2:fsl8ys');
+        vi.setSystemTime(Date.now() + PUSH_SCHEDULE_MIN_GAP_MS + 1);
+        expect(await syncExpirySchedule()).toBe(false);
+        expect(posts).toHaveLength(1);
+    });
+
+    it('ពេលពីរផ្លាស់ +១/−៣១ ms ➜ ចំនួនក្នុង ២៤ ម៉ោងប្រែ ហើយ cache មិនបាំងការផ្ញើ', async () => {
+        vi.setSystemTime(new Date('2026-09-29T00:02:00Z'));
+        const at8 = Date.now() + 3600e3;
+        const first = [1790647320000, 1790730120001];
+        const second = [1790647320001, 1790730119970];
+        dataState.scanHistory = first.map((at, i) => ({ id: 'collision-' + i, createdAt: at - ABANDON_AGE_MS - 1,
+            barcodes: [{ code: 'COLLISION-' + i, isClosed: false }] })) as any;
+        expect(nearExpiryView(dataState.scanHistory, at8, false).packages).toBe(1);
+        const posts: any[] = [];
+        vi.stubGlobal('fetch', vi.fn(async (_url, options) => { posts.push(JSON.parse(options.body)); return reply(); }));
+        expect(await syncExpirySchedule()).toBe(true);
+        expect(posts.map(post => post.times)).toEqual([first]);
+        dataState.scanHistory.forEach((item, i) => { item.createdAt = second[i] - ABANDON_AGE_MS - 1; });
+        expect(nearExpiryView(dataState.scanHistory, at8, false).packages).toBe(2);
+        vi.setSystemTime(Date.now() + PUSH_SCHEDULE_MIN_GAP_MS + 1);
+        expect(expiryScheduleTimes(dataState.scanHistory, Date.now())).toEqual(second);
+        expect(await syncExpirySchedule()).toBe(true);
+        expect(posts.map(post => post.times)).toEqual([first, second]);
+        expect(scheduleSignature(first)).not.toBe(scheduleSignature(second));
+    });
+
+    it('cache ពេញពិដាន ២០០០ ពេល មានទំហំកំណត់ក្នុង record តែមួយ', async () => {
+        const times = Array.from({ length: NOTIFY_SCHEDULE_MAX }, (_, i) => Date.now() + 3600e3 + i);
+        dataState.scanHistory = times.map((at, i) => ({ id: 'bounded-' + i, createdAt: at - ABANDON_AGE_MS - 1,
+            barcodes: [{ code: 'BOUNDED-' + i, isClosed: false }] })) as any;
+        const posts: any[] = [];
+        vi.stubGlobal('fetch', vi.fn(async (_url, options) => { posts.push(JSON.parse(options.body)); return reply(); }));
+        expect(await syncExpirySchedule()).toBe(true);
+        expect(posts.map(post => post.times)).toEqual([times]);
+        expect(saved().schedSig).toBe(scheduleSignature(times));
+        expect(saved().schedSig.length).toBeLessThanOrEqual(NOTIFY_SCHEDULE_MAX * 14 + 16);
+        expect(appLocalStore.getItem(PUSH_STATE_KEY)!.length).toBeLessThan(NOTIFY_SCHEDULE_MAX * 14 + 1024);
+    });
+
+    it('កែពេលដល់កំណត់ ១០ វិនាទីក្នុងនាទីដដែល ➜ វដ្តបន្ទាប់ផ្ញើកាលវិភាគថ្មី', async () => {
+        const posts: any[] = [];
+        vi.stubGlobal('fetch', vi.fn(async (_url, options) => { posts.push(JSON.parse(options.body)); return reply(); }));
+        expect(await syncExpirySchedule()).toBe(true);
+        expect(posts).toHaveLength(1);
+        const before = posts[0].times[0];
+        const firstSignature = saved().schedSig;
+        dataState.scanHistory[0].createdAt += 10000;
+        vi.setSystemTime(Date.now() + PUSH_SCHEDULE_MIN_GAP_MS + 1);
+        expect(Math.floor((before + 10000) / 60000)).toBe(Math.floor(before / 60000));
+        expect(await syncExpirySchedule()).toBe(true);
+        expect(posts.map(post => post.times)).toEqual([[before], [before + 10000]]);
+        expect(saved().schedSig).not.toBe(firstSignature);
+    });
 });
 
 describe('កាលវិភាគ Push ៖ ចម្លើយយឺតមិនចូលហាងថ្មី', () => {

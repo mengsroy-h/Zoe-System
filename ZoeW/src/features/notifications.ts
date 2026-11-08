@@ -102,7 +102,7 @@ export function hoursUntilAbandon(barcode, parentAt, now) {
 }
 
 export const NOTIFY_SCHEDULE_HORIZON_MS = 8 * 24 * NOTIFY_HOUR_MS;
-export const NOTIFY_SCHEDULE_STEP_MS = 60 * 1000;
+export const NOTIFY_SCHEDULE_STEP_MS = 1;
 export const NOTIFY_SCHEDULE_MAX = 2000;
 
 export const NOTIFY_SCHEDULE_SEARCH_MAX = 64;

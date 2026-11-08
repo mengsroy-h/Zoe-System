@@ -656,12 +656,7 @@ export function resyncPush(): Promise<boolean> {
 }
 
 export function scheduleSignature(times: number[]): string {
-    let h = 0;
-    for (let i = 0; i < times.length; i++) {
-        const t = Math.floor(times[i] / 60000);
-        h = (Math.imul(h, 31) + t) | 0;
-    }
-    return times.length + ':' + (h >>> 0).toString(36);
+    return 'ms:' + times.map((at) => Math.floor(at)).join(',');
 }
 
 export function syncExpirySchedule(force?: boolean): Promise<boolean> {

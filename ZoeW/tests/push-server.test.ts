@@ -21,6 +21,8 @@ import {
 } from '../netlify/lib/push-core.mjs';
 import { LICENSE_APP_CODE as CLIENT_APP_CODE } from '../src/features/license';
 import { FCM_CHANNEL_ID as CLIENT_FCM_CHANNEL, PUSH_OPEN_PARAM } from '../src/features/push';
+import { expiryScheduleTimes, nearExpiryView } from '../src/features/notifications';
+import { ABANDON_AGE_MS } from '../src/features/session';
 
 const LICENSE_SRC = readFileSync(path.resolve(__dirname, '..', 'public', 'license-verify.js'), 'utf8');
 const ANDROID_MANIFEST = readFileSync(path.resolve(__dirname, '..', 'android', 'app', 'src', 'main', 'AndroidManifest.xml'), 'utf8');
@@ -661,6 +663,37 @@ describe('ការរំលឹកកញ្ចប់ជិតដល់ពេល�
         h.clock.now = at8 + 5 * 60e3;
         expect(await h.service.dispatchExpiry()).toMatchObject({ sent: 0 });
     });
+
+    it.each(['scan', 'restore'].flatMap(kind => [-20000, -10000, -1, 0, 1, 20000].map(offset => [kind, offset] as const)))(
+        '%s · ព្រំដែន ២៤ ម៉ោង %i ms ៖ កាលវិភាគ App ពិត និង Push រាប់កញ្ចប់ដូចគ្នា', async (kind, offset) => {
+            const h = harness();
+            h.clock.now = at8 - 3600e3;
+            const mine = webSub();
+            expect(await h.service.subscribe(GOOD, mine.sub)).toMatchObject({ ok: true });
+            const ripeAt = at8 + 24 * 3600e3 + offset;
+            const basis = ripeAt - ABANDON_AGE_MS - 1;
+            const barcode = { code: 'BOUNDARY-RETURN', isClosed: false, ...(kind === 'restore' ? { restoredAt: basis } : {}) };
+            const history = [
+                { id: 'boundary-return', createdAt: kind === 'restore' ? basis - ABANDON_AGE_MS : basis, barcodes: [barcode] },
+                { id: 'inside-window', createdAt: at8 + 3600e3 - ABANDON_AGE_MS, barcodes: [{ code: 'INSIDE-RETURN', isClosed: false }] }
+            ];
+            const before = JSON.stringify(history);
+            const expected = offset <= 0 ? 2 : 1;
+            expect(nearExpiryView(history, at8, false).packages).toBe(expected);
+            const times = expiryScheduleTimes(history, h.clock.now);
+            expect(times).toHaveLength(2);
+            expect(await h.service.saveSchedule(GOOD, times)).toMatchObject({ ok: true, count: 2 });
+            expect(JSON.stringify(history)).toBe(before);
+            h.clock.now = at8;
+            const sent: Buffer[] = [];
+            h.push = (_url, init) => { sent.push(init.body); return { status: 201 }; };
+            expect(await h.service.dispatchExpiry()).toMatchObject({ sent: 1, keys: 1 });
+            expect(sent).toHaveLength(1);
+            expect(decryptWebPush(sent[0], mine.ua).title).toBe('📦 ' + expected + ' កញ្ចប់ជិតដល់ពេលត្រឡប់ទៅសាខាកណ្តាលវិញ');
+            h.clock.now += 5 * 60e3;
+            expect(await h.service.dispatchExpiry()).toMatchObject({ sent: 0, keys: 0 });
+            expect(sent).toHaveLength(1);
+        });
 
     it('ក្រៅម៉ោង ៨ ➜ គ្មាន · កាលវិភាគចាស់ជាង ៤៨ ម៉ោង ➜ គ្មាន (មិនអះអាងលើទិន្នន័យចាស់) · ចំនួន ០ ➜ គ្មាន', async () => {
         const h = harness();

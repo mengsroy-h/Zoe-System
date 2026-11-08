@@ -248,6 +248,15 @@ jobs:
           fi
           bash audit-tools/run-all.sh
 
+      - name: រក្សាភស្តុតាង ZoeW suite ពេលធ្លាក់
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: zoew-suite-failures-${{ matrix.shard }}
+          path: ZoeW/dist-audit/zoew-suite-failures/
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: បង្ហាញការវាស់ទំហំ daily delta
         if: always() && steps.audit.outputs.daily_bytes == 'supabase-datastore-daily-bytes.json' && !(github.event_name == 'workflow_dispatch' && inputs.multishop_scale)
         run: |

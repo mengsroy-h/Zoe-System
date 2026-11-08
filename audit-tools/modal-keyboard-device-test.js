@@ -783,9 +783,25 @@ const SAFE_TOP = function (px) {
 
         // ថតទីតាំងកាតលើអេក្រង់ (កំពូលកាត − visualViewport.offsetTop) រាល់ស៊ុម ចាប់ពីមុនព្រឹត្តិការណ៍ ➜ ព្រឹត្តិការណ៍ (ក្នុង browser ឬពី Node) ➜ ចប់
         //    ចលនារបស់កាតនៅរត់ពេលដល់ `ms` (runner CI យឺត ៖ keyboard បើកយឺតក្រោយចាប់ផ្តើមថត) ➜ ថតបន្តរហូតចលនាចប់ ≤ ២ វិ. ➜ `running` > 0 = ចលនាមិនចប់ពិត
-        const RECORD = ({ id, ms }) => {
+        const RECORD = ({ id, ms, effects = false }) => {
             const card = document.getElementById(id).querySelector('.modal-content');
             const frames = [];
+            const captured = [];
+            const ownAnimate = Object.getOwnPropertyDescriptor(card, 'animate');
+            const animate = card.animate;
+            if (effects) {
+                window.__glideAnimations = { id, captured };
+                card.animate = function (...args) {
+                    const animation = animate.apply(this, args);
+                    const entry = { animation, finished: false, cancelled: false };
+                    entry.finish = () => { entry.finished = true; };
+                    entry.cancel = () => { entry.cancelled = true; };
+                    animation.addEventListener('finish', entry.finish);
+                    animation.addEventListener('cancel', entry.cancel);
+                    captured.push(entry);
+                    return animation;
+                };
+            }
             const t0 = performance.now();
             window.__glide = new Promise((done) => {
                 let stopped = false;
@@ -795,7 +811,13 @@ const SAFE_TOP = function (px) {
                     frames.push({ t: Math.round(t - t0), top: Math.round((card.getBoundingClientRect().top - visualViewport.offsetTop) * 10) / 10, pan: visualViewport.offsetTop, scroll: card.scrollTop });
                     const elapsed = performance.now() - t0;
                     if (!stopped && (!ms || elapsed < ms || (elapsed < ms + 2000 && runningGlides() > 0))) requestAnimationFrame(tick);
-                    else done({ frames, running: runningGlides() });
+                    else {
+                        if (effects) {
+                            if (ownAnimate) Object.defineProperty(card, 'animate', ownAnimate);
+                            else delete card.animate;
+                        }
+                        done({ frames, running: runningGlides() });
+                    }
                 };
                 requestAnimationFrame(tick);
             });
@@ -826,12 +848,67 @@ const SAFE_TOP = function (px) {
         //    គ្មានការត្រឡប់ក្រោយ (back) · គ្មានហួស (over) · ចលនាថ្មីមិនចាប់ផ្តើមក្រោយមកដល់ (moves = ១)
         const smooth = (g) => g.dist >= 8 && g.ahead <= 0.1 && g.mid >= 2 && g.back === 0 && g.over === 0 &&
             g.span >= GLIDE_MS * (g.dist >= 40 ? 0.6 : 0.3) && g.span <= GLIDE_MS + 200 && g.running === 0;
+        // ចាប់ Animation ពិតក្នុង RECORD ដោយមិន pause/seek។ វាស់ geometry នៅពេលកំណត់តែក្រោយ live record ចប់;
+        // លទ្ធផលនេះមិនអាចជំនួសស៊ុម live ដែលខ្វះបានទេ។ មិនបង្កើត Animation ឬចម្លង keyframes ថ្មី។
+        const PROBE_CREATED_GLIDE = ({ id }) => {
+            const card = document.getElementById(id).querySelector('.modal-content');
+            const saved = window.__glideAnimations;
+            window.__glideAnimations = null;
+            const captured = saved && saved.id === id ? saved.captured : [];
+            const before = { top: card.getBoundingClientRect().top, scroll: card.scrollTop, pan: visualViewport.offsetTop };
+            const animations = captured.map(({ animation: a, finished, cancelled }) => ({
+                target: !!a.effect && a.effect.target === card, pseudo: a.effect && a.effect.pseudoElement || '',
+                state: a.playState, replacement: a.replaceState, finished, cancelled, rate: a.playbackRate,
+                composite: a.effect && a.effect.composite, timing: a.effect && a.effect.getTiming(), keys: a.effect && a.effect.getKeyframes()
+            }));
+            captured.forEach(({ animation, finish, cancel }) => {
+                animation.removeEventListener('finish', finish);
+                animation.removeEventListener('cancel', cancel);
+            });
+            const samples = [];
+            let error = '';
+            // មិន seek ចលនាដែលមិនទាន់ចប់ ឬ cancel; lifecycle ខូចនៅតែជាកំហុស។
+            if (captured.length === 1 && animations[0].target && animations[0].state === 'finished' && animations[0].replacement === 'active' && animations[0].finished && !animations[0].cancelled) {
+                const a = captured[0].animation;
+                try {
+                    a.pause();
+                    for (const f of [0, 0.05, 0.1, 0.2, 0.35, 0.5, 0.65, 0.8, 0.9, 0.99, 1]) {
+                        a.currentTime = f * Number(a.effect.getTiming().duration);
+                        samples.push({ f, top: card.getBoundingClientRect().top - visualViewport.offsetTop, progress: a.effect.getComputedTiming().progress });
+                    }
+                } catch (e) { error = String(e); }
+                finally { try { a.cancel(); } catch (e) { error = String(e); } }
+            }
+            return { animations, samples, error, released: captured.length === 1 && captured[0].animation.playState === 'idle' && !card.getAnimations().includes(captured[0].animation), restored: Math.abs(card.getBoundingClientRect().top - before.top) <= 1 && card.scrollTop === before.scroll && visualViewport.offsetTop === before.pan };
+        };
+        const createdGlideOk = (probe, start, end, ms, easing) => {
+            if (!probe || probe.error || !probe.released || !probe.restored || probe.animations.length !== 1) return false;
+            const a = probe.animations[0], t = a.timing, k = a.keys;
+            if (!a.target || a.pseudo || a.state !== 'finished' || a.replacement !== 'active' || !a.finished || a.cancelled || a.rate !== 1 || a.composite !== 'replace' || !t || !k ||
+                t.duration !== ms || t.easing !== easing || t.delay !== 0 || t.endDelay !== 0 || t.iterations !== 1 || t.iterationStart !== 0 || t.direction !== 'normal' ||
+                !['none', 'auto'].includes(t.fill) || k.length !== 2 || k[0].computedOffset !== 0 || k[1].computedOffset !== 1 ||
+                k.some((key) => key.easing !== 'linear' || !['auto', undefined].includes(key.composite) || typeof key.transform !== 'string' ||
+                    Object.keys(key).some((name) => !['offset', 'computedOffset', 'easing', 'composite', 'transform'].includes(name)))) return false;
+            const shift = (key) => { const m = /translate3d\(\s*0(?:px)?,\s*(-?[\d.]+)(?:px)?\s*,/.exec(key.transform); return m ? Number(m[1]) : NaN; };
+            if (!(Math.abs(shift(k[0]) - (start - end)) <= 1) || shift(k[1]) !== 0) return false;
+            const fractions = [0, 0.05, 0.1, 0.2, 0.35, 0.5, 0.65, 0.8, 0.9, 0.99, 1];
+            if (probe.samples.length !== fractions.length) return false;
+            const dir = Math.sign(end - start);
+            return probe.samples.every((sample, i) => {
+                const progress = sample.f === 1 && sample.progress === null ? 1 : sample.progress;
+                return sample.f === fractions[i] && Number.isFinite(progress) && progress >= 0 && progress <= 1 && Number.isFinite(sample.top) &&
+                    Math.abs(sample.top - (start + (end - start) * progress)) <= 1 &&
+                    sample.top >= Math.min(start, end) - 1 && sample.top <= Math.max(start, end) + 1 &&
+                    (!i || (sample.top - probe.samples[i - 1].top) * dir >= -1) &&
+                    (i !== 0 || Math.abs(sample.top - start) <= 1) && (i !== fractions.length - 1 || Math.abs(sample.top - end) <= 1);
+            });
+        };
         // Failure-only output: reuse the existing rAF samples, without extra browser work
         // during the measured glide. Raw gaps help distinguish missing samples from bad motion.
         const reportGlideFailure = (device, id, phase, record) => {
             const frameGapsMs = record.frames.slice(1).map((frame, i) => frame.t - record.frames[i].t);
             console.log('  GLIDE_DIAGNOSTIC ' + JSON.stringify({
-                device, id, phase, frames: record.frames, frameGapsMs, running: record.running
+                device, id, phase, frames: record.frames, frameGapsMs, running: record.running, effectProbe: record.effectProbe
             }));
         };
         if (inPart('ឋ')) {
@@ -1018,6 +1095,8 @@ const SAFE_TOP = function (px) {
                 if (!ready) { bad('(ឆ) ' + dev.label + ' ៖ audit bridge'); await ctx.close(); continue; }
                 const ids = await modalIdsWithFields(page);
                 const problems = [];
+                const wantMs = dev.ios ? GLIDE_MS : GLIDE_ANDROID_MS;
+                const wantEasing = curveText(dev.ios ? GLIDE_CURVE : GLIDE_ANDROID_CURVE);
                 let measured = 0, moved = 0, glidedUp = 0, glidedBack = 0, still = 0, panned = 0, firstMoved = null;
                 for (const id of ids) {
                     await page.setViewportSize({ width: dev.w, height: dev.h });
@@ -1030,16 +1109,17 @@ const SAFE_TOP = function (px) {
                     await page.evaluate(({ id, index, sel }) => { const f = Array.from(document.getElementById(id).querySelectorAll(sel))[index]; f.dispatchEvent(new Event('pointerdown', { bubbles: true })); f.focus({ preventScroll: true }); }, { id, index, sel: FIELD_SELECTOR });
                     await settle(page, 60);
                     measured++;
-                    await page.evaluate(RECORD, { id, ms: GLIDE_MS + 300 });
+                    await page.evaluate(RECORD, { id, ms: GLIDE_MS + 300, effects: true });
                     await waitFrame(page);
                     await page.evaluate((kb) => window.__kb.open(kb), dev.kb);
                     const upRecord = await page.evaluate(() => window.__glide);
+                    upRecord.effectProbe = await page.evaluate(PROBE_CREATED_GLIDE, { id });
                     const up = glideOf(upRecord);
                     const fitted = await page.evaluate(RECT, { id, index, sel: FIELD_SELECTOR });
                     if (up.dist < 8) { if (fitted.card[1] > dev.h - dev.kb + 1) problems.push(id + ' ៖ មិនផ្លាស់ទី ហើយបាំងដោយ keyboard ' + JSON.stringify(fitted.card)); continue; }
                     moved++;
                     if (!firstMoved) firstMoved = { id, index };
-                    if (smooth(up)) glidedUp++; else {
+                    if (smooth(up) && createdGlideOk(upRecord.effectProbe, up.start, up.end, wantMs, wantEasing)) glidedUp++; else {
                         problems.push(id + ' ៖ keyboard បើក ' + JSON.stringify(up));
                         reportGlideFailure(dev.label, id, 'open', upRecord);
                     }
@@ -1060,13 +1140,14 @@ const SAFE_TOP = function (px) {
                         await page.evaluate(() => window.__kb.pan(0));
                         await settle(page, 60);
                     }
-                    await page.evaluate(RECORD, { id, ms: GLIDE_MS + 300 });
+                    await page.evaluate(RECORD, { id, ms: GLIDE_MS + 300, effects: true });
                     await waitFrame(page);
                     if (dev.apk) await page.setViewportSize({ width: dev.w, height: dev.h });
                     await page.evaluate(() => window.__kb.open(0));
                     const downRecord = await page.evaluate(() => window.__glide);
+                    downRecord.effectProbe = await page.evaluate(PROBE_CREATED_GLIDE, { id });
                     const down = glideOf(downRecord);
-                    if (smooth(down) && Math.abs(down.start - up.end) <= 1 && Math.abs(down.end - up.start) <= 1) glidedBack++; else {
+                    if (smooth(down) && createdGlideOk(downRecord.effectProbe, down.start, down.end, wantMs, wantEasing) && Math.abs(down.start - up.end) <= 1 && Math.abs(down.end - up.start) <= 1) glidedBack++; else {
                         problems.push(id + ' ៖ keyboard បិទ ' + JSON.stringify(down) + ' (ពី ' + up.end + ' ទៅ ' + up.start + ')');
                         reportGlideFailure(dev.label, id, 'close', downRecord);
                     }

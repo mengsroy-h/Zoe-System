@@ -120,6 +120,14 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.187] — 2026-11-07 · ព្រំដែនពេលរំលឹកកញ្ចប់ជិតត្រឡប់
+
+**ZoeW** (`zoew-v450` ➜ `zoew-v451`)។ **ZoeKeyGen មិនប្រែ**។
+
+កាលវិភាគ Push រកពេលដំបូងដែលកញ្ចប់ដល់ច្បាប់ត្រឡប់ដោយភាពច្បាស់ ១ ms ជំនួសពិដាន ១ នាទី។ ស្នាមសម្គាល់ cache ប្រើ ms និងកំណែថ្មី ដើម្បីបញ្ជូនកាលវិភាគចាស់ឡើងវិញពេល App ដំណើរការ។ កញ្ចប់ជិតព្រំដែន ២៤ ម៉ោងមិនត្រូវរំលងពីចំនួនក្នុងសារម៉ោង ៨ ព្រឹកដោយការបង្គត់។ `barcodeAbandonIsRipe` នៅជាអ្នកសម្រេចដដែល; អាយុកញ្ចប់ ច្បាប់ស្តារ លុយ និង ZTO មិនប្រែ។ អ្នកយាម៖ `ZoeW/tests/push-server.test.ts` ផ្ទៀងកាលវិភាគ App ពិតជាមួយ push service ពិត និងឌិគ្រីបសារនៅ transport សំយោគ។
+
+**សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ មុនផ្សាយ ត្រូវផ្ទៀង CI លើ commit ចុងក្រោយ និងការរំលឹកលើឧបករណ៍ពិត។ គ្មាន rules ឬ migration ថ្មី។ ការកែនេះនៅ branch ដាច់ដោយឡែក មិនទាន់ merge ឬ deploy។
+
 ### [2.50.186] · ZoeKeyGen [2.24.36] — 2026-11-06 · សុវត្ថិភាពវគ្គស្វែងរក និងសាខា Palm
 
 ZoeW `2.50.186` (`zoew-v450`) · ZoeKeyGen `2.24.36` (`zoekeygen-v147`)។ Retry រួមទទួល lease ជាជម្រើស; caller ZoeW ទាំង១០ផ្ដល់ម្ចាស់វគ្គច្បាស់លាស់ ហើយ caller ZoeKeyGen រក្សា API បីប៉ារ៉ាម៉ែត្រ និងឥរិយាបថ retry ដដែល។ ម្ចាស់គម្រោងស្នើ «ចាំអ្វីដែលរកឃើញដោយការ audit កែហើយបញ្ចូលក្នុង​ PR393 ហ្មងទៅ ហើយ merge តែមួយដងជាការស្រេច»។ Lookup ចាប់វគ្គគណនី/config/key មុនដោះសោ credential ផ្ទៀងមុនផ្ញើ និងមុនប្រើចម្លើយ; retry រក្សាម្ចាស់ដើម។ ការងារចាស់មិនសរសេរលើ status ឬ promise របស់ការងារថ្មី។ Palm ផ្ទៀង site ក្នុង Blob ជាមួយ slot និងសាខាពេល Login ឡើងវិញជាមួយសាខាដើម; site បាត់ ឬប្តូរ ត្រូវបដិសេធ មិនយក token ទៅសាខាចាស់។ Blob សរសេរមិនបានរក្សាទិន្នន័យដើម ហើយមិនអះអាងថារក្សាសញ្ញាបដិសេធបានទេ។
@@ -1961,6 +1969,28 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-11-08 — ផ្ទៀង Animation ពិតដោយមិនជំនួសស៊ុម live
+
+- Audit ១២២៨ លើ `09ec3b97`៖ paired PostgreSQL និងផ្នែក ៤ ឆ្លង។ ផ្នែក ២ ធ្លាក់នៅ `configModal` បិទ keyboard លើ APK tablet 1280×800៖ ១១ ស៊ុម មានស៊ុមកណ្តាលតែ ១ និងចន្លោះធំបំផុត ១៥០ ms។ ខ្សែកោង Android ពិតអាចផ្គូផ្គងគ្រប់ sample ប៉ុន្តែ staircase ខូចក៏អាចផ្គូផ្គងបាន; នេះជាភស្តុតាងមិនគ្រប់ មិនមែនការបញ្ជាក់ថា app ខូច ឬរលូនទេ។ ផ្នែក ៣ ធ្លាក់ដោយ HISTORY ខ្វះលិបិក្រម paired SDK test; បន្ថែមជួរត្រឹមត្រូវ មិនបន្ធូរ doc-scope។
+- Checker-first៖ `ZoeW/tests/modal-keyboard-device-checker.test.ts` ក្រហម ២៦/៣៣ មុនកែ។ `modal-keyboard-device-test` ចាប់ Animation object ដែល app បង្កើតពិត ហើយក្រោយការថត live និង natural finish ទើបផ្ទៀង duration, easing, keyframes, lifecycle និង geometry នៅ ១១ ពេលកំណត់ សម្រាប់គ្រប់កាតដែលផ្លាស់ទី និងទិសបើក/បិទ។ មិនបង្កើត Animation ជំនួស មិន seek ពេល live និងមិនបន្ថែមការរង់ចាំ ឬពិដានពេល។
+- Focused ៤៦/៤៦ ឆ្លង រួម missing/instant/staircase/wrong endpoint/overshoot/reversal និង lifecycle/cleanup controls។ Independent review រត់ ៤៦ ករណី និង ៨ lifecycle combinations ដាច់ដោយឡែក គ្មាន blocker សម្រាប់ CI។ Live predicate ដើម រួមជាន់ស៊ុមកណ្តាល ២ និង endpoint checks នៅដដែល; trace Audit ១២២៨ នៅតែធ្លាក់ ទោះ controlled probe ល្អ។ App motion/PTR/gesture source និងកំណែមិនប្រែ។ Local Chromium ជាប់ socket EPERM ដដែល; នេះមិនមែន live-browser pass ឬការបិទ failure ចាស់ទេ ហើយត្រូវផ្ទៀង CI លើ commit ថ្មី។
+
+### 2026-11-08 — រក្សាភស្តុតាងពេល ZoeW suite ធ្លាក់
+
+- Audit ១២២៧ លើ `5746a869`៖ ផ្នែក ១–៣, ZTO/native, F03 និង Registration Auth ឆ្លង; ផ្នែក ៤ ធ្លាក់នៅ `supabase-pickup-reset-paired-sdk.pg.test.ts` ព្រោះ child checker ចេញមិនស្មើសូន្យ។ សេចក្តីសង្ខេបរក្សា object dump ប៉ុន្តែលាក់ error ដើម ហើយ Vitest JSON និង scratch ត្រូវលុបក្រោយរត់។ មូលហេតុ PostgreSQL ក្នុងការរត់នោះមិនទាន់បញ្ជាក់; baseline `578ca5be` ឆ្លងមិនអាចលុបចោល failure នេះបាន។
+- Checker-first៖ regression ថ្មី ៨ ករណីក្រហមមុនកែ។ `zoew-suite-test.js` ឥឡូវបង្ហាញ error ជាមួយបរិបទមានព្រំដែន និងរក្សា stdout/stderr ឆៅ និង Vitest JSON ដែលមាន ក្នុងថត failure ដាច់ពីគ្នា។ បើការរក្សាបដិសេធ មិនលុប report ដើម។ Audit upload តែថតភស្តុតាងនេះពេលធ្លាក់។ Exit code, ចំនួនជំហាន, ពិដានពេល, assertions និងទង់ STRICT មិនប្រែ។
+- តេស្ត `zoew-suite-diagnostics.test.ts` ១៥ ករណីឆ្លង រួម timeout, report បាត់/ខូច, storage បដិសេធ, success cleanup និង workflow artifact។ នេះកែការរក្សាភស្តុតាង មិនអះអាងថាបានកែមូលហេតុ PostgreSQL ឬថា CI ពេញឆ្លងទេ។ Local PostgreSQL ១៧.១០ ជាប់ Unix socket EPERM មុនរត់សេណារីយ៉ូ; ត្រូវផ្ទៀង CI លើ tree ថ្មី។ គ្មានការកែ app, rules, migration ឬកំណែ។
+
+### 2026-11-07 — ពេលរំលឹកត្រឡប់ឆ្លងព្រំដែន ២៤ ម៉ោង
+
+- Baseline `578ca5be`៖ `abandonAtOf` បញ្ឈប់ការរកពេលនៅពិដាន ៦០០០០ ms។ កាលវិភាគដែលគណនាម៉ោង ៧:០២ អាចដាក់កញ្ចប់ដែលដល់កំណត់មុនម៉ោង ៨:០២ ថ្ងៃបន្ទាប់ ១០ វិនាទី ទៅក្រៅព្រំដែន Push ម៉ោង ៨:០២។ ផ្ទាំងជិតត្រឡប់រាប់កញ្ចប់នោះ ប៉ុន្តែសារ Push រាប់ខ្វះ; បើមានកញ្ចប់ផ្សេងធ្វើឱ្យផ្ញើសាររួច ledger ប្រចាំថ្ងៃមិនផ្ញើកែចំនួននៅជុំបន្ទាប់។
+- Checker-first៖ ករណីស្កេនថ្មី និងស្តារបើក × ព្រំដែន −២០ វិនាទី/−១០ វិនាទី/−១ ms/០/+១ ms/+២០ វិនាទី។ តេស្តប្រើ input ជាអ្នកកំណត់ចំនួនរំពឹង ហើយរត់ `expiryScheduleTimes` ➜ `saveSchedule` ➜ `dispatchExpiry` ពិត រួចឌិគ្រីបសារ។ កញ្ចប់ក្នុងបង្អួចមួយទៀតជាភស្តុតាងថាការផ្ញើដំណើរការពិត។ លើ baseline ៦/១២ ករណីក្រហម; ការកែពិដានទៅ ១ ms ឆ្លង ១២/១២ ដោយមិនចម្លងរូបមន្តអាយុកញ្ចប់។
+- Independent review រកឃើញថា `scheduleSignature` បង្គត់ទៅនាទី ហើយ cache ៦ ម៉ោងអាចរាំងការបញ្ជូនពេលដែលបានកែ។ `ZoeW/tests/push-schedule-session.test.ts` បន្ថែម ២ ករណីក្រហមមុនកែ៖ cache `2:fsl8ys` ពី baseline និងការកែពេល ១០ វិនាទីក្នុងនាទីដដែល។ ស្នាមសម្គាល់ឥឡូវរក្សាលំដាប់ ms ពេញ និង prefix `ms:`; ការបញ្ជូនធម្មតាធ្វើឱ្យ cache ចាស់ស្រស់ ហើយកាលវិភាគមិនប្រែមិនផ្ញើស្ទួន។ ពិដានអាន ៦៤ ជំហាន កំណត់ចំនួនកញ្ចប់ និងចន្លោះ retry ១០ នាទីនៅដដែល។
+- Independent collision control៖ deadline ពីរផ្លាស់ +១/−៣១ ms ធ្វើឱ្យ rolling hash ដូចគ្នា ទោះចំនួនកញ្ចប់ក្នុងបង្អួចប្រែពី ១ ទៅ ២។ តេស្ត sync ពិតក្រហមមុនកែ; ជំនួស hash ដោយលំដាប់ ms ពេញ។ ទំហំ cache មានព្រំដែនប្រហែល ២៨០០០ តួ ASCII (ប្រហែល ៥៦ KB ក្នុង UTF-16) តាមពិដាន ២០០០ ពេលក្នុង record ដដែល; តេស្តផ្ទៀងទំហំ និងការផ្ញើចំនួនពេញ។ នេះជាការបង្កើត counterexample សំយោគ មិនមែនរបាយការណ៍កំហុសពីអ្នកប្រើពិត។
+- Final focused៖ ១៣ files / ៣២៥ tests ឆ្លង; typecheck/lint និង comment equivalence ៣៣៣ files ឆ្លង។ `doc:check`, `android:check` ១៣០ និង Vite build ឆ្លង។ Audit measure build ជាប់ Chromium `socket()` EPERM មុន prerender; version/doc-scope guards លើ measure-root មិនទាន់រត់។
+- Independent final review៖ ៥ files / ១៧៣ tests ឆ្លង និងគ្មាន blocker។ ចាក់ storage quota failure នៅ `setItem` លើ helper ពិត៖ record មុននៅដដែល, in-flight ដោះសោ, ផ្ញើឡើងវិញបានក្រោយចន្លោះ ១០ នាទី។ ការវាស់នេះជាសំយោគ មិនជំនួស quota លើឧបករណ៍ពិត។
+- ព្រំដែន៖ storage និង transport ជាសំយោគ។ មិនមែនភស្តុតាង Web Push/FCM ទៅឧបករណ៍ពិត ឬ ZTO ពិត; browser/DB CI លើ branch ថ្មីនៅមិនទាន់រត់។
 
 ### 2026-11-07 — ដានសង្កេតលុយ Firebase ដែលមានកំណត់
 
@@ -4708,6 +4738,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/modal-backdrop-keep.test.tsx` | — | ផ្នែក ៨ |
 | `ZoeW/tests/modal-chrome-state.test.tsx` | — | ផ្នែក ៨ · ផ្នែក ៩ |
 | `ZoeW/tests/modal-focus-trap.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
+| `ZoeW/tests/modal-keyboard-device-checker.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/modal-keyboard.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/money-multidevice-oracle.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/more-menu-scroll.test.ts` | — | ផ្នែក ៨ |
@@ -4843,6 +4874,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/supabase-original-tenant.pg.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-overlay-increment.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-own-keys.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/supabase-pickup-reset-paired-sdk.pg.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-poll-starvation.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-pull-paging.test.ts` | — | ផ្នែក ៧ |
 | `ZoeW/tests/supabase-realtime-race.test.ts` | — | ផ្នែក ៨ |

@@ -79,16 +79,40 @@ function tail(text, n) {
 // ⛔ tail តែម្យ៉ាងលាក់ **ជំហានណា** ដែលធ្លាក់ ៖ ឧបករណ៍ browser (`rules:check` · `native:check`) រាយលទ្ធផលតាមសេណារីយ៉ូ ហើយ
 //    tail ១០ បន្ទាត់ឃើញតែសេណារីយ៉ូចុងក្រោយ ➜ ដាក់បន្ទាត់ ❌ · ភាពខុសគ្នា · កំហុស ពីគ្រប់ទីកន្លែង មុន tail
 function failureDetail(text, n) {
-    const lines = String(text || '').split('\n').filter((l) => l.trim());
+    const lines = String(text || '').replace(/\x1b\[[0-9;]*m/g, '').split('\n').filter((l) => l.trim());
     const failedFiles = [...new Set(lines.map((line) => {
         const clean = line.replace(/\x1b\[[0-9;]*m/g, '');
         const match = /^\s*(?:FAIL\s+(\S+\.[cm]?[jt]sx?)(?=\s|$)|❯\s+(\S+\.[cm]?[jt]sx?)\s+\([^)]*\bfailed\b)/.exec(clean);
         return match && (match[1] || match[2]);
     }).filter(Boolean))];
     const files = failedFiles.length ? ['ឯកសារតេស្តដែលធ្លាក់ទាំងអស់៖', ...failedFiles.map((file) => '  - ' + file)] : [];
-    const flagged = lines.filter((l) => /❌|FAIL|💥|^\s+\[[^\]]+\]\s|ចុច ៖/.test(l)).slice(0, 40);
-    const last = lines.slice(-n);
-    return files.concat(flagged.filter((l) => last.indexOf(l) === -1), flagged.length ? ['…'] : [], last).join('\n');
+    const errors = lines.map((line, i) => /\b(?:\w*Error|error):|\b(?:Expected|Received|Caused by):/.test(line) ? i : -1).filter((i) => i >= 0);
+    const flagged = lines.map((line, i) => /❌|FAIL|💥|^\s+\[(?!Function\b)[^\]]+\]\s|ចុច ៖/.test(line) ? i : -1).filter((i) => i >= 0);
+    const context = new Set();
+    for (const i of errors.concat(flagged)) {
+        for (let j = Math.max(0, i - 1); j < Math.min(lines.length, i + 7) && context.size < 80; j++) {
+            if (!/^\s*\[Function\b/.test(lines[j])) context.add(j);
+        }
+    }
+    const selected = [...context].sort((a, b) => a - b).filter((i) => i < lines.length - n).map((i) => lines[i]);
+    const last = lines.slice(-n).filter((line) => !/^\s*\[Function\b/.test(line));
+    return files.concat(selected, selected.length ? ['…'] : [], last).map((line) => line.length > 1000 ? line.slice(0, 1000) + '…' : line).join('\n');
+}
+
+function preserveFailure(step, result, reportFile) {
+    try {
+        const root = path.join(APP, 'dist-audit', 'zoew-suite-failures');
+        fs.mkdirSync(root, { recursive: true });
+        const dir = fs.mkdtempSync(path.join(root, 'part-' + PART.k + '-of-' + PART.n + '-' + step.replace(/:/g, '-') + '-'));
+        fs.writeFileSync(path.join(dir, 'stdout.log'), result.stdout || '');
+        fs.writeFileSync(path.join(dir, 'stderr.log'), result.stderr || '');
+        if (reportFile && fs.existsSync(reportFile)) fs.copyFileSync(reportFile, path.join(dir, 'vitest.json'));
+        console.log('  ភស្តុតាងពេលធ្លាក់៖ ' + dir);
+        return true;
+    } catch (error) {
+        console.log('  រក្សាភស្តុតាងពេលធ្លាក់មិនបាន៖ ' + error.message + (reportFile ? '\n  report ដើម៖ ' + reportFile : ''));
+        return false;
+    }
 }
 
 function vitestReport(file, started) {
@@ -129,6 +153,7 @@ if (isReactSource && !hasModules) bad('dependency របស់ ZoeW ត្រូ
 
 if (isReactSource && hasModules && !missing.length) {
     for (const step of MY_STEPS) {
+        const failuresBefore = fail;
         const started = Date.now();
         const args = ['run', '-s', step];
         const reportDir = step === 'test' ? fs.mkdtempSync(path.join(os.tmpdir(), 'zoew-suite-report-')) : null;
@@ -149,7 +174,7 @@ if (isReactSource && hasModules && !missing.length) {
         });
         const secs = ((Date.now() - started) / 1000).toFixed(1);
         if (r.error && r.error.code === 'ETIMEDOUT') bad('npm run ' + step + ' (ព្យួរ លើស ' + STEP_TIMEOUT_MS / 1000 + 's)', 'stdout៖\n' + tail(r.stdout, 20) + '\nstderr៖\n' + tail(r.stderr, 10));
-        else if (r.status !== 0) bad('npm run ' + step + ' (exit ' + r.status + ')', failureDetail(r.stdout + r.stderr, 10));
+        else if (r.status !== 0) bad('npm run ' + step + ' (exit ' + r.status + ')', failureDetail(String(r.stdout || '') + '\n' + String(r.stderr || ''), 10));
         else if (step === 'test') {
             try {
                 const report = vitestReport(reportFile, started);
@@ -160,7 +185,8 @@ if (isReactSource && hasModules && !missing.length) {
                 }
             } catch (error) { bad('npm run test ៖ គ្មានភស្តុតាង report ពេញលេញ', error.message); }
         } else ok('npm run ' + step + ' · ' + secs + 's');
-        if (reportDir) fs.rmSync(reportDir, { recursive: true, force: true });
+        const retained = fail > failuresBefore ? preserveFailure(step, r, reportFile) : true;
+        if (reportDir && retained) fs.rmSync(reportDir, { recursive: true, force: true });
     }
 }
 

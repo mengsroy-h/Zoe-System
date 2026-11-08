@@ -1970,6 +1970,12 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-11-08 — រក្សាភស្តុតាងពេល ZoeW suite ធ្លាក់
+
+- Audit ១២២៧ លើ `5746a869`៖ ផ្នែក ១–៣, ZTO/native, F03 និង Registration Auth ឆ្លង; ផ្នែក ៤ ធ្លាក់នៅ `supabase-pickup-reset-paired-sdk.pg.test.ts` ព្រោះ child checker ចេញមិនស្មើសូន្យ។ សេចក្តីសង្ខេបរក្សា object dump ប៉ុន្តែលាក់ error ដើម ហើយ Vitest JSON និង scratch ត្រូវលុបក្រោយរត់។ មូលហេតុ PostgreSQL ក្នុងការរត់នោះមិនទាន់បញ្ជាក់; baseline `578ca5be` ឆ្លងមិនអាចលុបចោល failure នេះបាន។
+- Checker-first៖ regression ថ្មី ៨ ករណីក្រហមមុនកែ។ `zoew-suite-test.js` ឥឡូវបង្ហាញ error ជាមួយបរិបទមានព្រំដែន និងរក្សា stdout/stderr ឆៅ និង Vitest JSON ដែលមាន ក្នុងថត failure ដាច់ពីគ្នា។ បើការរក្សាបដិសេធ មិនលុប report ដើម។ Audit upload តែថតភស្តុតាងនេះពេលធ្លាក់។ Exit code, ចំនួនជំហាន, ពិដានពេល, assertions និងទង់ STRICT មិនប្រែ។
+- តេស្ត `zoew-suite-diagnostics.test.ts` ១៥ ករណីឆ្លង រួម timeout, report បាត់/ខូច, storage បដិសេធ, success cleanup និង workflow artifact។ នេះកែការរក្សាភស្តុតាង មិនអះអាងថាបានកែមូលហេតុ PostgreSQL ឬថា CI ពេញឆ្លងទេ។ Local PostgreSQL ១៧.១០ ជាប់ Unix socket EPERM មុនរត់សេណារីយ៉ូ; ត្រូវផ្ទៀង CI លើ tree ថ្មី។ គ្មានការកែ app, rules, migration ឬកំណែ។
+
 ### 2026-11-07 — ពេលរំលឹកត្រឡប់ឆ្លងព្រំដែន ២៤ ម៉ោង
 
 - Baseline `578ca5be`៖ `abandonAtOf` បញ្ឈប់ការរកពេលនៅពិដាន ៦០០០០ ms។ កាលវិភាគដែលគណនាម៉ោង ៧:០២ អាចដាក់កញ្ចប់ដែលដល់កំណត់មុនម៉ោង ៨:០២ ថ្ងៃបន្ទាប់ ១០ វិនាទី ទៅក្រៅព្រំដែន Push ម៉ោង ៨:០២។ ផ្ទាំងជិតត្រឡប់រាប់កញ្ចប់នោះ ប៉ុន្តែសារ Push រាប់ខ្វះ; បើមានកញ្ចប់ផ្សេងធ្វើឱ្យផ្ញើសាររួច ledger ប្រចាំថ្ងៃមិនផ្ញើកែចំនួននៅជុំបន្ទាប់។

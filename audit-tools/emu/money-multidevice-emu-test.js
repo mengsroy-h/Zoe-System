@@ -24,7 +24,7 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const { emuNamespace } = require('./ns.js');
-const { r2, rng, LICENSE_STUB, invariant, invariantBroken, openBarcodeTargets, PAGE_OPS, recoveryEvidence, devicesSettled } = require('../money-multidevice-core.js');
+const { r2, rng, LICENSE_STUB, invariant, invariantBroken, collectedFixtureAgeOps, openBarcodeTargets, PAGE_OPS, recoveryEvidence, devicesSettled } = require('../money-multidevice-core.js');
 const { cookieFixture, networkGate, restoreFlows } = require('../money-cookie-blob.js');
 const fx = require('../idtoken-fixture.js');
 
@@ -238,7 +238,7 @@ async function waitForHistoricalSettlement(devices, read, accepts, limitMs = 450
                 const receipt = registryOwner && (dump.zoew_scan_operations || {})[registryOwner.intent];
                 if (admitted !== true || !receipt || receipt.phase !== 'committed' || receipt.birth !== birth) throw new Error('Historical v2 admission missing immutable receipt');
                 const originalReceipt = JSON.stringify(receipt), originalOwner = JSON.stringify(registryOwner);
-                const inspectHistorical = (value) => invariant(value, receipt.scanDate, receipt.month, [code], 'http://127.0.0.1:' + EMU_PORT + '?ns=' + NS);
+                const inspectHistorical = (value) => invariant(value, receipt.scanDate, receipt.month, [code], 'http://127.0.0.1:' + EMU_PORT + '?ns=' + NS, Date.now());
                 check(!invariantBroken(inspectHistorical(dump)), 'historical v2 ៖ admission strict oracle', inspectHistorical(dump));
                 knownCodes.push(code);
                 await devices[0].page.evaluate(async id => window.claimAndCleanupItem(id, 'abandon'), receipt.targetId);
@@ -261,11 +261,15 @@ async function waitForHistoricalSettlement(devices, read, accepts, limitMs = 450
                 check(inspectHistorical(negative).registryMissing.includes(code), 'historical v2 ៖ wrong-birth ក្នុង copy ត្រូវបដិសេធ');
                 trail.push('historicalV2:admit>abandon>restore:' + code);
             }
-            if (!broke && run === RUN0) for (const authMode of ['sheet', 'cookie', 'palm']) await restoreFlows({ devices, read: async () => (await (await owner('.json')).json()) || {},
+            let expectation;
+            if (!broke && run === RUN0) for (const authMode of ['sheet', 'cookie', 'palm']) {
+                const result = await restoreFlows({ expectation, devices, read: async () => (await (await owner('.json')).json()) || {},
                 write: async (ops) => {
                     const patch = Object.fromEntries(ops.map((o) => [o.p.join('/'), o.v]));
                     const out = await owner('.json', 'PATCH', patch); if (!out.ok) throw new Error('Cookie seed: ' + out.status);
                 }, dateKey, monthKey, knownCodes, fixture: cookie, origin, site: '1', tag: 'firebase', backend: 'firebase', authMode });
+                expectation = result.expectation;
+            }
             for (let i = 0; i < OPS && !broke; i++) {
                 const plan = devices.map((dev) => {
                     const pick = r();
@@ -289,7 +293,17 @@ async function waitForHistoricalSettlement(devices, read, accepts, limitMs = 450
                             const patch = sweepAgePatch(item, ageRegistry, Date.now());
                             if (!patch) throw new Error('Age fixture eligibility changed');
                             trail.push((patch.createdAt ? 'age:abandon:' : 'age:pickup:') + id);
-                            await owner('zoew_scan_history_cod_dod/' + id + '.json', 'PATCH', patch);
+                            const aged = JSON.parse(JSON.stringify(item));
+                            for (const [path, value] of Object.entries(patch)) {
+                                const parts = path.split('/'); let target = aged;
+                                for (const key of parts.slice(0, -1)) target = target[key];
+                                target[parts.at(-1)] = value;
+                            }
+                            const mirrorOps = collectedFixtureAgeOps(ageDump, item, aged, Date.now());
+                            const atomicPatch = Object.fromEntries(Object.entries(patch).map(([key, value]) => ['zoew_scan_history_cod_dod/' + id + '/' + key, value]));
+                            for (const op of mirrorOps) atomicPatch[op.p.join('/')] = op.v;
+                            const agedResult = await owner('.json', 'PATCH', atomicPatch);
+                            if (!agedResult.ok) throw new Error('Age fixture write: ' + agedResult.status);
                             await sleep(700);
                             plan.forEach((p) => { p.wanted = 'sweep'; p.mode = p.mode === 'offline-reload' ? 'online' : p.mode; });
                         }
@@ -346,7 +360,7 @@ async function waitForHistoricalSettlement(devices, read, accepts, limitMs = 450
                 }
                 if (stuck) { stuckDevices++; broke = 'ឧបករណ៍មិនស្ងប់ក្នុង ៤៥ វិ. (pending · journal · blocked · cleanup journal) ក្រោយ [' + trail.join(' > ') + ']\n        ' + JSON.stringify(stuck.map((s) => ({ status: s.status, phase: s.phase, pending: s.pending, blocked: s.blocked, rows: s.rows, cleanupJournal: s.cleanupJournal, pickupJournal: s.pickupJournal, trashClaims: s.trashClaims }))); break; }
                 const dump = await (await owner('.json')).json();
-                const inv = invariant(dump || {}, dateKey, monthKey, knownCodes);
+                const inv = invariant(dump || {}, dateKey, monthKey, knownCodes, undefined, Date.now());
                 // ⛔ barcode ដែលធ្លាប់ដល់ server (ស្កេនរួចចុះ) មិនត្រូវបាត់ទៀត; ស្កេនដែល queue បាត់ដោយ reload មុនចុះ មិនរាប់
                 Object.keys(inv.seenCodes).forEach((c) => { if (knownCodes.indexOf(c) === -1) knownCodes.push(c); });
                 const why = invariantBroken(inv);
@@ -368,7 +382,7 @@ async function waitForHistoricalSettlement(devices, read, accepts, limitMs = 450
         } finally {
             if (broke) {
                 const server = await Promise.race([owner('.json').then((response) => response.json()).catch((error) => ({ error: String(error.message) })), sleep(2000).then(() => ({ diagnosticTimeout: true }))]);
-                console.log('    EVIDENCE ' + JSON.stringify({ run, failure: broke, devices: await recoveryEvidence(devices), server, invariant: invariant(server || {}, dateKey, monthKey, knownCodes) }));
+                console.log('    EVIDENCE ' + JSON.stringify({ run, failure: broke, devices: await recoveryEvidence(devices), server, invariant: invariant(server || {}, dateKey, monthKey, knownCodes, undefined, Date.now()) }));
             }
             for (const dev of devices) await dev.ctx.close().catch(() => {});
         }

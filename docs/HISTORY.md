@@ -1962,6 +1962,34 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-11-07 — ដានសង្កេតលុយ Firebase ដែលមានកំណត់
+
+បន្ថែម `money-operation-trace` និងដានចាប់ផ្តើម/បញ្ចប់ប្រតិបត្តិការក្នុងអ្នកវាស់ពហុឧបករណ៍៖ កត់គោលដៅ Remove ស្ថានភាពភ្ជាប់ និង HTTP/WebSocket របស់ emulator ដោយកំណត់ទំហំ កាត់ព័ត៌មានសម្ងាត់ និងរាយការណ៍ភស្តុតាងបាត់។ មិនប្តូរលំដាប់ការប្រកួតពេល reconnect ចំនួន retry ឬការផ្ទៀងលទ្ធផលលុយ។ ព្រំដែន `server-wire-not-app-settlement` បញ្ជាក់ថា ACK ដែលសង្កេតបានមិនបញ្ជាក់ថាកម្មវិធីបានបញ្ចប់ប្រតិបត្តិការ; frame បែកមិនទាន់ត្រូវបានផ្គុំវិញ។ ការផ្ទៀងក្នុង browser ពិតនៅរង់ចាំ។
+
+ចុះឈ្មោះម៉ូឌុលដានជាអ្នកជំនួយក្នុង `checker-coverage` ព្រោះវាគ្មានការអះអាងផ្ទាល់។ តេស្តក្នុង `ZoeW/tests/meta-checker-modules.test.ts` រត់អ្នកស្កេនពិត៖ helper ត្រូវរំលង ប៉ុន្តែ checker ពិត និងឈ្មោះស្រដៀងដែលមិនចុះបញ្ជីនៅតែទទួលការផ្ទៀង override; ដកការចុះឈ្មោះវិញត្រូវធ្លាក់។ មុនកែ ២ ករណីធ្លាក់; មិនប្តូរច្បាប់របស់អ្នកវាស់ទេ។
+
+### 2026-11-07 — កញ្ចក់ចំណូលប្រចាំថ្ងៃក្នុងអ្នកវាស់លុយពហុឧបករណ៍
+
+- លើ main `264f8ade` អ្នកវាស់ `money-multidevice-core` និង `createRevenueExpectation` មិនអាន `zoew_daily_collected_cod_dod`។ Fixture សំយោគដែលលុបកូនសោ collected, ប្ដូរ COD/DOD ឬចម្លងទៅថ្ងៃទីពីរ នៅតែបៃតង។ នេះជាចន្លោះក្នុងអ្នកវាស់ មិនមែនជាភស្តុតាងថា App បង្កទិន្នន័យខូចទេ។
+- បន្ថែមការផ្ទៀងអត្តសញ្ញាណ និង COD/DOD ដាច់គ្នាលើថ្ងៃបិទតាម Cambodia ក្នុង browser matrix ទាំង Firebase/Supabase និង Sheet/Cookie/Palm។ Scope គឺ fixture ថ្មី គ្មាន purge/legacy ហើយនាឡិកា lab ច្បាស់; កូនសោកញ្ចក់ដែលសល់មិនកំណត់ activation។ Missing ក្នុង window ៧ថ្ងៃត្រូវក្រហម ទោះ node បាត់ទាំងមូល; missing មុន window អនុញ្ញាត តែ leaf ដែលនៅសល់នៅត្រូវផ្ទៀងថ្ងៃ/តម្លៃ/ស្ទួន។ Restore មិនស្ងប់ ឬ timestamp មិនអាចវាស់បាន គឺ failure មិនមែន PASS។ Real-dump CLI មានព្រំដែនប្រុងប្រយ័ត្នផ្សេង ហើយមិនប្រែ។
+- Fixture ដែលប្ដូរពេលបិទសម្រាប់សាក cleanup ឥឡូវផ្ទៀង source/mirror មុន រួចផ្លាស់ leaf ដែលត្រឹមត្រូវប៉ុណ្ណោះជាមួយ timestamp ក្នុង atomic write ដដែល។ ការឆ្លងអធ្រាត្រមិនបង្ក false failure ហើយ helper មិនបង្កើតកូនសោបាត់ ឬជួសជុលតម្លៃខូចទេ។
+- Tests-first លើ baseline៖ ១៨/៩០ ករណីធ្លាក់ មុនបន្ថែម oracle។ Independent review បន្ថែមករណី stale-day duplicate, timestamp ឆ្ងាយ, fixture identity និង snapshot mismatch។ Focused unit ២៤៩/២៤៩ និង checker-truthfulness ២២០/២២០ ឆ្លង; full browser/DB matrix ត្រូវការ CI លើ commit ថ្មី មុនអះអាងថាបិទចន្លោះនេះ។ Local audit build ឈប់នៅ Chromium `socket()` EPERM មុន measure-root; មិនរាប់ជា browser pass ហើយមិនប្ដូរព្រំដែន sandbox។ App source, rules និងកំណែមិនប្រែ។
+
+
+- Independent challenge លើ head `29885a4a` រកឃើញ coherent faults ដែលនៅបៃតង៖ source និង collected ផ្លាស់ថ្ងៃជាមួយគ្នា, ប្ដូរតម្លៃរវាង barcode ដោយ total ដដែល, ឬស្តារបិទក្លាយជាបើកហើយលុប pickup/collected។ បន្ថែម model ដែលកត់ COD/DOD, phone, scan day, history/trash, closed/deducted និងបង្អួចពេលពី input/សកម្មភាព មិនយក actual ក្រោយសកម្មភាពធ្វើ expected។ គោរព `restore.ts`៖ barcode បិទរក្សាបិទហើយ renew `closedAt`; barcode បើកលុប `closedAt` ហើយ renew `restoredAt`; retry/no-op រក្សាពេលដើម។ Intents និង revenue model បន្តឆ្លង Sheet→Cookie→Palm; barcode ថ្មីដែលមិនបានកត់ intent ត្រូវ failure។ Baseline មុន matrix និង random conflicting-operation loop នៅវាស់ consistency មិនមែន requested outcome ទាំងអស់។
+- Clock witness កត់ clock input ដែល App អាចអាន ដោយមិនប្ដូរ `Date.now` return; រួម devices ទាំងអស់ និងឯកសារចាស់/ថ្មីពេល reopen។ នេះផ្ទៀងច្បាប់ timestamp របស់សកម្មភាព មិនផ្ទៀងភាពត្រឹមត្រូវ clock estimator។ កូនសោមុន retention នៅសល់ ឬត្រូវ trim មិនត្រូវបានចាត់ទុកជាភស្តុតាងថា retention sweep បានរត់ទេ។ Fresh no-purge scope ដដែល; legacy holding-day repair មិននៅក្នុង scope នេះ។
+- Tests-first បន្ថែម ៨ negative controls ធ្លាក់មុន operation model។ Real app functions ជាមួយ synthetic SDK/HTTP មាន ១៤១ ករណីថ្មី៖ missing/wrong/duplicate mirror, correlated day/state/value faults, open/closed restore, Palm/Sign refusal និង duplicate timestamp preservation។ Fault ត្រូវបាញ់ write ពិតក្នុង harness ហើយមាន hit assertions; មិនរាប់ជា hosted backend ឬ browser mutation proof។ Review រកឃើញ held ACK អាចប្រជែងនឹង page.close; ២/១៥ network-gate controls ធ្លាក់មុនកែ។ ឥឡូវ page បិទរួចទើប release ហើយ release(true) ទម្លាក់ held ACK នៅ backend ទាំងពីរ; normal release នៅដដែល។
+- Local ចុងក្រោយ៖ focused ៥ files / ៤០៧ tests ឆ្លង, checker-truthfulness ២២០/២២០, TypeScript/lint/syntax/diff check ឆ្លង, repository mapping ១០/១០ និង shipped comments ៣៣៣ files ស្អាត។ ការផ្ទៀង model មុន fixture age ធានាថាការកែពេលសំយោគមិនលាក់ coherent fault ថ្មី។
+- [Audit1221](https://github.com/mengsroy-h/Zoe-System/actions/runs/42394868533) លើ `29885a4a` ឆ្លង ៤ shards និង ZTO/native; raw logs មាន Firebase money 279.8s/17 top-level assertions, Supabase money 322.8s/14 និង truthfulness220។ នេះជាភស្តុតាងមុន operation-model/clock/ACK correction; មិនប្រើជា CI របស់កំណែបន្ទាប់។ កំណែចុងក្រោយត្រូវ exact-head CI មុនសម្រេច; App/rules/version មិនប្រែ។
+
+
+- [Audit1222](https://github.com/mengsroy-h/Zoe-System/actions/runs/42397186061) លើ `a12ba234` ក្រហម៖ Supabase checker មាន `closedClock is not defined` ព្រោះ local ឈ្មោះ `closeClock`; ឥឡូវបញ្ជូន field ជាក់លាក់។ Regression ថ្មី execute exact close checkpoint និង scope-analysis/negative mutation ទាំងពីរធ្លាក់មុនកែ។ Unit មុនមិន execute browser harness block នេះ; local green មិនធ្លាប់ជំនួស CI។
+- Firebase ក្នុង run ដដែលក្រហមដោយករណីផ្សេង៖ Sheet `remove/offline-online/move` barcode `900000000001211` នៅ history មិនទាន់ដក ខណៈ devices ទាំងបី return failed និង journals ទទេ។ Totals នៅ consistent; មូលហេតុមិនទាន់បញ្ជាក់ ហើយមិនចាត់ថាបានកែដោយ typo ខាងលើទេ។ Local branch probes បង្ហាញ admission/read/claim failures ច្រើនអាចឱ្យ shape ដូចគ្នា។ បន្ថែម diagnostic ដែលរក្សា caught console error, connection/clock state និង toast; location mismatch នៅបង្ហាញព័ត៌មានលម្អិតមុន monetary assertions ដោយមិនរំលង assertion ណាមួយ។ Regression diagnostic ធ្លាក់មុនកែ។ រត់ថ្មីគឺការវាស់បន្ថែម មិនលុបភស្តុតាងក្រហមដើម។
+
+
+- Audit1222 shard២ ក៏មាន modal-keyboard-device3/4 ក្រហម៖ APK1280×800, keyboard360, customerDataTableModal បិទkeyboard glidedBack16/17 (`start33,end60,maxStep20,mid1,span217ms`)។ មិនប្ដូរកូដ modal និងមិនអះអាងមូលហេតុ។ Shard៣/ZTO/native/RegistrationAuth19 ឆ្លង។ Diagnostic collection ត្រូវ best-effort និង bounded; throwing serializer/state-reader controls២ធ្លាក់មុនការពារ។ Local ចុងក្រោយ focused៥files/៤១២tests និង truthfulness២២០ឆ្លង; CI ថ្មីនៅមិនទាន់បញ្ចប់។
+
+
 ### 2026-11-07 — អ្នកវាស់ callback ចាស់របស់ ios-panel-glide
 
 - Audit #1216 លើ PR merge `816cc14d` ឆ្លង 56/56; Audit #1217 លើ main `162917a9` ធ្លាក់ ១ ករណី cleanup។ Tree ទាំងពីរដូចគ្នា `40e6f7ad1d5cd4978d7dbeb0ef23c268a4d0bedc`; runner image, Node, Chromium និង lane/STRICT flags ដូចគ្នា។ Log ដែលធ្លាក់ឃើញចលនាថ្មីចប់ `currentTime=duration=220`, snap ស្តារ `y`; វាមិនវាស់ callback ខណៈចលនានៅរស់ទេ។ មិនមានភស្តុតាងថា merge ប្ដូរកូដចលនា ឬថា host ជាក់លាក់មានបញ្ហាទេ។
@@ -4453,6 +4481,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `money-core` | ផ្នែក ២ | ផ្នែក ៦ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `money-guardian-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៦ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `money-multidevice-core` | ផ្នែក ២ | — |
+| `money-operation-trace` | ផ្នែក ២ | — |
 | `money-reality-check` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៦ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `money-reality-test` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `monotonic-gate-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៧ · ផ្នែក ៩ |
@@ -4675,6 +4704,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/manual-adjust-number-browser.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/manual-adjust-single-flight.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/merge-into-deleted-item.test.ts` | — | ផ្នែក ៨ · ផ្នែក ៩ |
+| `ZoeW/tests/meta-checker-modules.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/modal-backdrop-keep.test.tsx` | — | ផ្នែក ៨ |
 | `ZoeW/tests/modal-chrome-state.test.tsx` | — | ផ្នែក ៨ · ផ្នែក ៩ |
 | `ZoeW/tests/modal-focus-trap.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |

@@ -437,3 +437,346 @@ describe('independent v2 registry ownership oracle', () => {
         expect(invariant(tree, day, month, ['AA', 'BB', 'CC', 'DD']).orphans).toContain('GHOST');
     });
 });
+
+const MIRROR_NOW = Date.parse('2026-11-07T01:00:00+07:00');
+function mirrorFixture() {
+    const scanDay = '2026-11-01', closedAt = Date.parse('2026-11-07T00:30:00+07:00');
+    return {
+        zoew_scan_history_cod_dod: { row: { id: 'row', phone: '012000111', scanDate: scanDay,
+            barcodes: [{ code: 'MIRROR', cod: 10, dod: 2, isClosed: true, isDeducted: false, closedAt }] } },
+        zoew_recently_deleted_cod_dod: {}, zoew_barcode_registry: { MIRROR: true },
+        zoew_daily_revenue_cod_dod: { [scanDay]: { codDollar: 10, dodDollar: 2, totalCount: 1 } },
+        zoew_monthly_revenue_cod_dod: { '2026-11': { codDollar: 10, dodDollar: 2, totalCount: 1 } },
+        zoew_daily_pickup_cod_dod: { [scanDay]: { packagesPickedUp: 1, pickedUpBarcodes: { MIRROR: '012000111' }, pickedUpPhones: { '012000111': 1 } } },
+        zoew_daily_collected_cod_dod: { '2026-11-07': { MIRROR: { c: 10, d: 2 } } }
+    } as any;
+}
+const mirrorVerdict = (tree: any, now = MIRROR_NOW) => invariantBroken(invariant(tree, '2026-11-01', '2026-11', ['MIRROR'], undefined, now));
+
+describe('កញ្ចក់ collected ក្នុង browser matrix៖ scope សំយោគច្បាស់ មិនអាស្រ័យលើកូនសោកញ្ចក់ដែលសល់', () => {
+    it('ថ្ងៃបិទ Cambodia ខុសថ្ងៃស្កេន និងថ្ងៃ UTC នៅតែត្រឹមត្រូវ', () => {
+        expect(mirrorVerdict(mirrorFixture())).toBeNull();
+    });
+    it.each(['whole-root', 'whole-day', 'only-key', 'cod', 'dod', 'duplicate', 'wrong-day', 'open', 'invalid-stamp', 'invalid-value', 'extra-key'])('បដិសេធ %s ដោយគ្មាន surviving anchor', kind => {
+        const tree = mirrorFixture(), mirror = tree.zoew_daily_collected_cod_dod;
+        if (kind === 'whole-root') delete tree.zoew_daily_collected_cod_dod;
+        if (kind === 'whole-day') delete mirror['2026-11-07'];
+        if (kind === 'only-key') delete mirror['2026-11-07'].MIRROR;
+        if (kind === 'cod') mirror['2026-11-07'].MIRROR.c = 999;
+        if (kind === 'dod') mirror['2026-11-07'].MIRROR.d = 888;
+        if (kind === 'duplicate') mirror['2026-11-06'] = { MIRROR: { c: 10, d: 2 } };
+        if (kind === 'wrong-day') { mirror['2026-11-06'] = mirror['2026-11-07']; delete mirror['2026-11-07']; }
+        if (kind === 'open') { tree.zoew_scan_history_cod_dod.row.barcodes[0].isClosed = false; tree.zoew_daily_pickup_cod_dod = {}; }
+        if (kind === 'invalid-stamp') delete tree.zoew_scan_history_cod_dod.row.barcodes[0].closedAt;
+        if (kind === 'invalid-value') mirror['2026-11-07'].MIRROR.c = '10';
+        if (kind === 'extra-key') mirror['2026-11-07'].GHOST = { c: 10, d: 2 };
+        expect(mirrorVerdict(tree)).not.toBeNull();
+    });
+    it('checkpoint expected ក៏បដិសេធ node កញ្ចក់បាត់ទាំងមូល', () => {
+        const tree = mirrorFixture(), expected = createRevenueExpectation(tree);
+        delete tree.zoew_daily_collected_cod_dod;
+        expect(() => expected.verify(tree, ['MIRROR'], 'missing-first-close', MIRROR_NOW)).toThrow();
+    });
+    it.each(['kept', 'pickup'])('ធុងសំរាម %s រក្សា collected', reason => {
+        const tree = mirrorFixture(); tree.zoew_recently_deleted_cod_dod.row = { ...tree.zoew_scan_history_cod_dod.row, trashReason: reason };
+        delete tree.zoew_scan_history_cod_dod.row;
+        expect(mirrorVerdict(tree)).toBeNull();
+    });
+    it.each(['remove', 'returned', 'misplaced', 'sent'])('ធុងសំរាម %s ដក collected ហើយមិនអនុញ្ញាតកូនសោសល់', reason => {
+        const tree = mirrorFixture(); tree.zoew_recently_deleted_cod_dod.row = { ...tree.zoew_scan_history_cod_dod.row, trashReason: reason };
+        delete tree.zoew_scan_history_cod_dod.row; tree.zoew_daily_pickup_cod_dod = {};
+        tree.zoew_recently_deleted_cod_dod.row.barcodes[0].isDeducted = true;
+        tree.zoew_daily_revenue_cod_dod['2026-11-01'] = { codDollar: 0, dodDollar: 0, totalCount: 0 };
+        tree.zoew_monthly_revenue_cod_dod['2026-11'] = { codDollar: 0, dodDollar: 0, totalCount: 0 };
+        expect(mirrorVerdict(tree)).not.toBeNull();
+        tree.zoew_daily_collected_cod_dod = {};
+        expect(mirrorVerdict(tree)).toBeNull();
+    });
+    it('closedAt មុន window ៧ថ្ងៃមិនត្រូវបានប្រកាសថាបាត់', () => {
+        const tree = mirrorFixture(); tree.zoew_scan_history_cod_dod.row.barcodes[0].closedAt = Date.parse('2026-10-31T23:59:59+07:00');
+        tree.zoew_daily_collected_cod_dod = {};
+        expect(mirrorVerdict(tree)).toBeNull();
+        tree.zoew_scan_history_cod_dod.row.barcodes[0].closedAt = Date.parse('2026-11-01T00:00:00+07:00');
+        expect(mirrorVerdict(tree)).not.toBeNull();
+    });
+    it('fixture age ត្រូវ validate មុនផ្លាស់ថ្ងៃ collected ដោយ atomic ops', () => {
+        const { collectedFixtureAgeOps } = require('../../audit-tools/money-multidevice-core.js');
+        const tree = mirrorFixture(), before = tree.zoew_scan_history_cod_dod.row, aged = structuredClone(before);
+        aged.barcodes[0].closedAt = MIRROR_NOW - 3 * 3600000;
+        const ops = collectedFixtureAgeOps(tree, before, aged, MIRROR_NOW);
+        expect(ops).toEqual([
+            { k: 'set', p: ['zoew_daily_collected_cod_dod', '2026-11-07', 'MIRROR'], v: null },
+            { k: 'set', p: ['zoew_daily_collected_cod_dod', '2026-11-06', 'MIRROR'], v: { c: 10, d: 2 } }
+        ]);
+        delete tree.zoew_daily_collected_cod_dod['2026-11-07'].MIRROR;
+        expect(() => collectedFixtureAgeOps(tree, before, aged, MIRROR_NOW)).toThrow();
+    });
+});
+
+it('collected COD/DOD ប្រែទិសទោះសរុបដដែល និងថ្ងៃឆ្លងខែត្រូវផ្ទៀងដាច់', () => {
+    const tree = mirrorFixture(); tree.zoew_daily_collected_cod_dod['2026-11-07'].MIRROR = { c: 9, d: 3 };
+    expect(mirrorVerdict(tree)).not.toBeNull();
+    tree.zoew_scan_history_cod_dod.row.barcodes[0].closedAt = Date.parse('2026-10-31T23:30:00+07:00');
+    tree.zoew_daily_collected_cod_dod = { '2026-10-31': { MIRROR: { c: 10, d: 2 } } };
+    expect(mirrorVerdict(tree, Date.parse('2026-11-01T01:00:00+07:00'))).toBeNull();
+});
+it('encoded identity មិន encode % ពីរដង ហើយបដិសេធសំណុំ collected ខុស', () => {
+    const tree = mirrorFixture(), key = 'MIRROR%2F01';
+    tree.zoew_scan_history_cod_dod.row.barcodes[0].code = ' mirror/01 ';
+    tree.zoew_barcode_registry = { [key]: true };
+    tree.zoew_daily_pickup_cod_dod['2026-11-01'].pickedUpBarcodes = { [key]: '012000111' };
+    tree.zoew_daily_collected_cod_dod['2026-11-07'] = { [key]: { c: 10, d: 2 } };
+    const verdict = () => invariantBroken(invariant(tree, '2026-11-01', '2026-11', ['MIRROR/01'], undefined, MIRROR_NOW));
+    expect(verdict()).toBeNull();
+    tree.zoew_daily_collected_cod_dod['2026-11-07'] = { 'MIRROR%252F01': { c: 10, d: 2 } };
+    expect(verdict()).not.toBeNull();
+});
+it.each(['["MIRROR"]', '["MIRROR","MIRROR"]', '[""]', '{bad'])('restore មិនស្ងប់ %s ត្រូវ unmeasured មិនមែន PASS ឬប្រកាសត្រាលុយខុស', provenance => {
+    const tree = mirrorFixture(); Object.assign(tree.zoew_scan_history_cod_dod.row, { restoreClaimToken: 'pending', restoreAddedCodes: provenance });
+    expect(mirrorVerdict(tree)).toContain('collected-restore-unsettled');
+});
+it('កូនសោកញ្ចក់មុន retention មិនមែន failure និងគ្មានថ្ងៃ ledger មិនរំលង ghost', () => {
+    const tree = mirrorFixture(); tree.zoew_scan_history_cod_dod.row.barcodes[0].closedAt = Date.parse('2026-10-31T09:00:00+07:00');
+    tree.zoew_daily_collected_cod_dod = { '2026-10-31': { MIRROR: { c: 10, d: 2 } } };
+    expect(mirrorVerdict(tree)).toBeNull();
+    tree.zoew_daily_collected_cod_dod = {};
+    expect(mirrorVerdict(tree)).toBeNull();
+    const ghost = { zoew_daily_collected_cod_dod: { '2026-11-07': { GHOST: { c: 10, d: 2 } } } };
+    expect(() => createRevenueExpectation({}).verify(ghost, [], 'ghost-only', MIRROR_NOW)).toThrow();
+    expect(() => createRevenueExpectation({}).verify({}, [], 'empty', MIRROR_NOW)).not.toThrow();
+});
+it.each(['value', 'duplicate'])('fixture aging មិនជួសជុលភស្តុតាងខូច %s', kind => {
+    const { collectedFixtureAgeOps } = require('../../audit-tools/money-multidevice-core.js');
+    const tree = mirrorFixture(), row = tree.zoew_scan_history_cod_dod.row, aged = structuredClone(row);
+    aged.barcodes[0].closedAt = MIRROR_NOW - 3 * 3600000;
+    if (kind === 'value') tree.zoew_daily_collected_cod_dod['2026-11-07'].MIRROR = { c: 9, d: 3 };
+    else tree.zoew_daily_collected_cod_dod['2026-11-06'] = { MIRROR: { c: 10, d: 2 } };
+    expect(() => collectedFixtureAgeOps(tree, row, aged, MIRROR_NOW)).toThrow();
+});
+it('browser checkpoints ទាំងពីរ backend និង matrix ទាមទារ clock scope ជាក់លាក់', () => {
+    const { parse } = require('acorn'), { simple } = require('acorn-walk');
+    for (const [file, count] of [['emu/money-multidevice-emu-test.js', 3], ['supabase-money-multishop-test.js', 2], ['money-cookie-blob.js', 2]] as const) {
+        const source = readFileSync(require.resolve('../../audit-tools/' + file), 'utf8'), calls: any[] = [];
+        simple(parse(source, { ecmaVersion: 'latest' }), { CallExpression(node: any) { if (node.callee.name === 'invariant') calls.push(node); } });
+        expect(calls).toHaveLength(count);
+        for (const call of calls) {
+            expect(call.arguments).toHaveLength(6);
+            expect(['Date.now()', 'now', 'clockNow']).toContain(source.slice(call.arguments[5].start, call.arguments[5].end));
+        }
+    }
+});
+it('retention លើកលែងតែ missing មិនលើកលែង barcode ស្ទួននៅថ្ងៃចាស់', () => {
+    const tree = mirrorFixture(); tree.zoew_daily_collected_cod_dod['2026-10-31'] = { MIRROR: { c: 10, d: 2 } };
+    expect(mirrorVerdict(tree)).not.toBeNull();
+});
+it.each([Number.MAX_VALUE, Date.parse('+010000-01-01T00:00:00Z'), NaN, Infinity, undefined])('timestamp ខូច %s ជា evidence failure មិនបោះ RangeError', stamp => {
+    const tree = mirrorFixture(); tree.zoew_scan_history_cod_dod.row.barcodes[0].closedAt = stamp;
+    expect(mirrorVerdict(tree)).toContain('collected-source-invalid');
+});
+it('fixture age មិនទទួល barcode បន្ថែម ឬការប្ដូរលុយលើ barcode បើក', () => {
+    const { collectedFixtureAgeOps } = require('../../audit-tools/money-multidevice-core.js');
+    const tree = mirrorFixture(), row = tree.zoew_scan_history_cod_dod.row, changed = structuredClone(row);
+    changed.barcodes.push({ code: 'EXTRA', cod: 99, dod: 1, isClosed: false });
+    expect(() => collectedFixtureAgeOps(tree, row, changed, MIRROR_NOW)).toThrow();
+});
+it.each(['wrong-money', 'malformed'])('កូនសោកញ្ចក់ចាស់ដែលនៅសល់ %s ត្រូវផ្ទៀងដដែល', kind => {
+    const tree = mirrorFixture(); tree.zoew_scan_history_cod_dod.row.barcodes[0].closedAt = Date.parse('2026-10-31T09:00:00+07:00');
+    tree.zoew_daily_collected_cod_dod = { '2026-10-31': { MIRROR: kind === 'wrong-money' ? { c: 9, d: 3 } : 'bad' } };
+    expect(mirrorVerdict(tree)).not.toBeNull();
+});
+it('fixture age ត្រូវប្រើ source row ដូច dump ដែលបាន validate', () => {
+    const { collectedFixtureAgeOps } = require('../../audit-tools/money-multidevice-core.js');
+    const tree = mirrorFixture(), before = structuredClone(tree.zoew_scan_history_cod_dod.row), aged = structuredClone(before);
+    before.barcodes[0].closedAt -= 1000; aged.barcodes[0].closedAt -= 3600000;
+    expect(() => collectedFixtureAgeOps(tree, before, aged, MIRROR_NOW)).toThrow('snapshot');
+});
+it.each(['open-price', 'deleted', 'closed'])('fixture age បដិសេធប្ដូរ %s', kind => {
+    const { collectedFixtureAgeOps } = require('../../audit-tools/money-multidevice-core.js');
+    const tree = mirrorFixture(), row = tree.zoew_scan_history_cod_dod.row;
+    row.barcodes.push({ code: 'OPEN', cod: 5, dod: 1, isClosed: false });
+    const changed = structuredClone(row);
+    if (kind === 'open-price') changed.barcodes[1].cod = 55;
+    if (kind === 'deleted') changed.barcodes.pop();
+    if (kind === 'closed') changed.barcodes[1].isClosed = true;
+    expect(() => collectedFixtureAgeOps(tree, row, changed, MIRROR_NOW)).toThrow();
+});
+
+describe('parcel intent ឯករាជ្យ មិនឱ្យ source និង mirror ខុសជាមួយគ្នា', () => {
+    const closedAt = Date.parse('2026-11-07T00:30:00+07:00');
+    const expectedFor = (tree: any) => {
+        const model = createRevenueExpectation(tree, { requireParcelIntents: true });
+        model.expectParcel?.('MIRROR', { root: 'history', day: '2026-11-01', cod: 10, dod: 2,
+            closed: true, deducted: false, phone: '012000111', closedAt: [closedAt - 100, closedAt + 100] });
+        return model;
+    };
+    it('control ត្រឹមត្រូវ និង duplicate មិនទាមទារ timestamp ថ្មី', () => {
+        const tree = mirrorFixture(), model = expectedFor(tree);
+        expect(() => model.verify(tree, ['MIRROR'], 'control', MIRROR_NOW)).not.toThrow();
+        expect(() => model.verify(tree, ['MIRROR'], 'repeat', MIRROR_NOW + 300000)).not.toThrow();
+    });
+    it.each(['yesterday', 'outside-retention', 'future', 'reopened', 'phone', 'swapped-value'])('បដិសេធ coherent %s', fault => {
+        const tree = mirrorFixture(), model = expectedFor(tree), b = tree.zoew_scan_history_cod_dod.row.barcodes[0];
+        if (fault === 'yesterday' || fault === 'outside-retention') {
+            b.closedAt -= (fault === 'yesterday' ? 1 : 8) * 86400000;
+            tree.zoew_daily_collected_cod_dod = fault === 'yesterday' ? { '2026-11-06': { MIRROR: { c: 10, d: 2 } } } : {};
+        }
+        if (fault === 'future') b.closedAt = MIRROR_NOW + 1000;
+        if (fault === 'reopened') { b.isClosed = false; delete b.closedAt; tree.zoew_daily_collected_cod_dod = {}; tree.zoew_daily_pickup_cod_dod = {}; }
+        if (fault === 'phone') {
+            tree.zoew_scan_history_cod_dod.row.phone = '099000111';
+            const p = tree.zoew_daily_pickup_cod_dod['2026-11-01']; p.pickedUpBarcodes.MIRROR = '099000111'; p.pickedUpPhones = { '099000111': 1 };
+        }
+        if (fault === 'swapped-value') {
+            const other = structuredClone(tree.zoew_scan_history_cod_dod.row); other.id = 'other'; other.barcodes[0].code = 'OTHER';
+            other.barcodes[0].cod = 20; other.barcodes[0].dod = 3; tree.zoew_scan_history_cod_dod.other = other;
+            tree.zoew_barcode_registry.OTHER = true;
+            tree.zoew_daily_revenue_cod_dod['2026-11-01'] = { codDollar: 30, dodDollar: 5, totalCount: 2 };
+            tree.zoew_monthly_revenue_cod_dod['2026-11'] = { codDollar: 30, dodDollar: 5, totalCount: 2 };
+            model.adjust('2026-11-01', 20, 3, 1);
+            model.expectParcel?.('OTHER', { root: 'history', day: '2026-11-01', cod: 20, dod: 3, closed: true, deducted: false, closedAt: [closedAt - 100, closedAt + 100] });
+            tree.zoew_daily_pickup_cod_dod['2026-11-01'] = { packagesPickedUp: 2, pickedUpBarcodes: { MIRROR: '012000111', OTHER: '012000111' }, pickedUpPhones: { '012000111': 2 } };
+            [b.cod, other.barcodes[0].cod] = [20, 10]; [b.dod, other.barcodes[0].dod] = [3, 2];
+            tree.zoew_daily_collected_cod_dod = { '2026-11-07': { MIRROR: { c: 20, d: 3 }, OTHER: { c: 10, d: 2 } } };
+        }
+        expect(() => model.verify(tree, fault === 'swapped-value' ? ['MIRROR', 'OTHER'] : ['MIRROR'], fault, MIRROR_NOW)).toThrow();
+    });
+    it('server trash claim នៅសល់មិនជា settled green', () => {
+        const tree = mirrorFixture(); tree.zoew_recently_deleted_cod_dod.row = { ...tree.zoew_scan_history_cod_dod.row, trashReason: 'kept', restoreClaim: { token: 'lost-local' } };
+        delete tree.zoew_scan_history_cod_dod.row;
+        expect(mirrorVerdict(tree)).toContain('collected-restore-unsettled');
+    });
+    it('parcel ថ្មីដែលមិនបាន register intent ត្រូវ fail closed', () => {
+        const tree = mirrorFixture(), model = createRevenueExpectation({}, { requireParcelIntents: true });
+        model.adjust('2026-11-01', 10, 2, 1);
+        expect(() => model.verify(tree, ['MIRROR'], 'untracked', MIRROR_NOW)).toThrow();
+    });
+});
+
+it('parcel intent ទាមទារ barcode ថ្មីទោះ caller ភ្លេច knownCodes', () => {
+    const tree = mirrorFixture(), model = createRevenueExpectation({}, { requireParcelIntents: true });
+    model.adjust('2026-11-01', 10, 2, 1);
+    expect(() => model.verify(tree, [], 'unlisted', MIRROR_NOW)).toThrow('intent');
+});
+it('parcel intent ពេលបិទឆ្លងអធ្រាត្រ និង duplicate រក្សាត្រាដើម', () => {
+    const tree = mirrorFixture(), model = createRevenueExpectation(tree);
+    const start = Date.parse('2026-11-06T23:59:59+07:00'), end = Date.parse('2026-11-07T00:00:01+07:00');
+    tree.zoew_scan_history_cod_dod.row.barcodes[0].closedAt = end;
+    model.expectParcel('MIRROR', { root: 'history', day: '2026-11-01', cod: 10, dod: 2, closed: true, deducted: false, closedAt: [start, end] });
+    expect(() => model.verify(tree, ['MIRROR'], 'midnight', MIRROR_NOW)).not.toThrow();
+    tree.zoew_scan_history_cod_dod.row.barcodes[0].closedAt = end + 5000;
+    expect(() => model.verify(tree, ['MIRROR'], 'repeat-retimed', MIRROR_NOW)).toThrow('closedAt');
+});
+it('parcel intent ថ្មីត្រូវប្រើក្នុង restore matrix និងមិនយក actual តម្លៃជំនួស input', () => {
+    const source = readFileSync(require.resolve('../../audit-tools/money-cookie-blob.js'), 'utf8');
+    expect(source).toContain('createRevenueExpectation(initial, { requireParcelIntents: true })');
+    const { parse } = require('acorn'), { simple } = require('acorn-walk');
+    const calls: any[] = [];
+    simple(parse(source, { ecmaVersion: 'latest' }), { CallExpression(node: any) {
+        if (node.callee.type === 'MemberExpression' && node.callee.object.name === 'revenue' && node.callee.property.name === 'expectParcel') calls.push(node);
+    } });
+    expect(calls).toHaveLength(7);
+    const seeds = calls.filter(node => node.arguments[1].properties.some((p: any) => p.key?.name === 'cod'));
+    expect(seeds).toHaveLength(4);
+    for (const node of seeds) for (const p of node.arguments[1].properties.filter((p: any) => ['cod', 'dod', 'closed'].includes(p.key.name))) expect(p.value.type).toBe('Literal');
+});
+
+it('clock witness កត់ supplied server clock ពេល offset ប្ដូរ ដោយមិនប្ដូរ Date.now', () => {
+    const { installMoneyClockWitness } = require('../../audit-tools/money-cookie-blob.js');
+    let raw = 10000;
+    const date = { now: () => raw }, win: any = { serverTimeOffsetMs: -500 };
+    runInNewContext('(' + installMoneyClockWitness.toString() + ')()', { window: win, Date: date });
+    expect(date.now()).toBe(10000);
+    raw = 11000; win.serverTimeOffsetMs = 1500;
+    expect(date.now()).toBe(11000);
+    expect(win.__moneyClockWitness).toEqual({ min: 9500, max: 12500 });
+    // Idempotent install សម្រាប់ context ដែលតេស្ត mode ច្រើន។
+    const wrapped = date.now;
+    runInNewContext('(' + installMoneyClockWitness.toString() + ')()', { window: win, Date: date });
+    expect(date.now).toBe(wrapped);
+});
+
+it('clock evidence ឆ្លង devices និង reopen រក្សា envelope ចាស់ ហើយបាត់ witness ត្រូវ fail', async () => {
+    const source = readFileSync(require.resolve('../../audit-tools/money-cookie-blob.js'), 'utf8');
+    const { installMoneyClockWitness } = require('../../audit-tools/money-cookie-blob.js');
+    const first = source.indexOf('    const clockSeen ='), last = source.indexOf('    let steps =', first);
+    expect(first).toBeGreaterThan(0); expect(last).toBeGreaterThan(first);
+    const devices = [10, -20].map(offset => {
+        let script: any, raw = 1000, win: any = { serverTimeOffsetMs: offset }, date: any = { now: () => raw };
+        const page = { evaluate: (fn: any) => runInNewContext('(' + fn.toString() + ')()', { window: win, Date: date }) };
+        return { page, ctx: { addInitScript: (fn: any) => { script = fn; } },
+            tick(value: number, nextOffset: number) { raw = value; win.serverTimeOffsetMs = nextOffset; date.now(); },
+            reopen() { win = { serverTimeOffsetMs: -50 }; date = { now: () => raw }; return page.evaluate(script); },
+            loseWitness() { delete win.__moneyClockWitness; } };
+    });
+    const code = '(async () => {' + source.slice(first, last) + '; return { beginClock, captureClock, clockSeen }; })()';
+    const lab = await runInNewContext(code, { devices, installMoneyClockWitness, expectation: undefined, assert: require('node:assert/strict') });
+    const bounds = await lab.beginClock();
+    devices[0].tick(1100, 100);
+    await lab.captureClock(bounds, [devices[0]]); // មុន page.close ខណៈ write gate នៅចាំ។
+    await devices[0].reopen(); devices[0].tick(1150, -50); devices[1].tick(1100, -100);
+    expect(await lab.captureClock(bounds)).toEqual({ min: 980, max: 1200 });
+    expect(lab.clockSeen.max).toBe(1200);
+    devices[1].loseWitness();
+    await expect(lab.captureClock()).rejects.toThrow('clock witness');
+    expect(source).toContain('await captureClock(actionClock, [dev]);\n                    await dev.page.close().finally(() => gates[0].release(true))');
+});
+
+it('browser matrix close checkpoint បញ្ជូន clock witness ដែលចាប់បានពិត', async () => {
+    const source = readFileSync(require.resolve('../../audit-tools/money-cookie-blob.js'), 'utf8');
+    const first = source.indexOf("            if (movement === 'pickup2h' || signedTrash) {"), last = source.indexOf('\n            await Promise.all(devices.map', first);
+    expect(first).toBeGreaterThan(0); expect(last).toBeGreaterThan(first);
+    const clock = { min: 1000, max: 1001 }, calls: any[] = [], starts: any[] = [];
+    const run = runInNewContext('(async () => {' + source.slice(first, last) + '})', {
+        movement: 'pickup2h', signedTrash: false, flow: 'pickup2h', mode: 'duplicate', code: 'PARCEL', target: { code: 'PARCEL' },
+        beginClock: async () => clock, window: { __startOp: (args: any) => starts.push(args) },
+        devices: [{ page: { evaluate: (fn: any, args: any) => fn(args) } }], verify: async (...args: any[]) => calls.push(args)
+    });
+    await run();
+    expect(starts).toEqual([{ wanted: 'closeOrder', pick: 0, target: { code: 'PARCEL' } }]);
+    expect(calls).toEqual([['pickup2h/duplicate/closed', 'PARCEL', 'history', false, { closed: true, closedClock: clock }]]);
+});
+it('shared browser harness មិនមាន identifier ដែលមិនបានប្រកាស', () => {
+    const source = readFileSync(require.resolve('../../audit-tools/money-cookie-blob.js'), 'utf8');
+    const { parse } = require('acorn'), { analyze } = require('eslint-scope'), globals = require('globals');
+    const allowed = new Set([...Object.keys({ ...globals.es2021, ...globals.node, ...globals.browser }),
+        'fb', 'db', 'lookupSecretKey', 'deriveLookupSecretKey', 'rememberLookupSecretKey', 'openLookupApiConfigModal',
+        'connectSharedZtoPalm', 'submitZtoPalmLogin', 'closeModal', 'encryptLookupSecret']);
+    const unknown = (text: string) => [...new Set(analyze(parse(text, { ecmaVersion: 2022, ranges: true }), { ecmaVersion: 2022, sourceType: 'script' })
+        .globalScope.through.map((ref: any) => ref.identifier.name).filter((name: string) => !allowed.has(name)))];
+    expect(unknown(source)).toEqual([]);
+    const poison = source.replace('closedClock: closeClock', 'closedClock: missingClock');
+    expect(poison).not.toBe(source);
+    expect(unknown(poison)).toEqual(['missingClock']);
+});
+
+it('failed browser operation រក្សា console cause និង connection state ដោយមិនប្ដូរលទ្ធផល', async () => {
+    const { PAGE_OPS } = require('../../audit-tools/money-multidevice-core.js');
+    const errorLog = vi.fn(), browserConsole = { error: errorLog };
+    const win: any = { scanHistory: [{ id: 'row', barcodes: [{ code: 'PARCEL' }] }], deletedItems: [], navigator: { onLine: true },
+        document: { querySelectorAll: () => [{ textContent: 'synthetic claim held' }] },
+        isDatabaseConnected: false, serverClockTrusted: true, serverTimeOffsetMs: 7, connectionFlowSnapshot: () => ({ phase: 'warming' }) };
+    win.removeSingleBarcode = async () => { browserConsole.error(new Error('synthetic admission refused')); return 'failed'; };
+    runInNewContext('(' + PAGE_OPS.toString() + ')()', { window: win, console: browserConsole, setTimeout });
+    expect(win.__startOp({ wanted: 'removeBarcode', target: { code: 'PARCEL' }, pick: 0 })).toBe('removeBarcode');
+    await Promise.all(win.__ops);
+    expect(errorLog).toHaveBeenCalledTimes(1);
+    expect(win.__consoleErrors()[0]).toContain('synthetic admission refused');
+    expect(win.__operationHistory()[0]).toMatchObject({ wanted: 'removeBarcode', r: 'failed', diagnostic: { online: true, connected: false, phase: 'warming', clockTrusted: true, offset: 7, toasts: ['synthetic claim held'] } });
+});
+
+it.each(['serializer', 'state'])('audit diagnostic %s បោះកំហុស មិនអាចប្ដូរលទ្ធផល operation ឬរារាំង console ដើម', async fault => {
+    const { PAGE_OPS } = require('../../audit-tools/money-multidevice-core.js');
+    const originalError = vi.fn(), browserConsole = { error: originalError };
+    const win: any = { scanHistory: [{ id: 'row', barcodes: [{ code: 'PARCEL' }] }], deletedItems: [],
+        connectionFlowSnapshot: () => { if (fault === 'state') throw new Error('diagnostic reader failed'); return { phase: 'ready' }; } };
+    win.removeSingleBarcode = async () => {
+        if (fault === 'serializer') browserConsole.error(Object.defineProperty({}, 'stack', { get() { throw new Error('diagnostic getter failed'); } }));
+        return 'failed';
+    };
+    runInNewContext('(' + PAGE_OPS.toString() + ')()', { window: win, console: browserConsole, setTimeout });
+    win.__startOp({ wanted: 'removeBarcode', target: { code: 'PARCEL' }, pick: 0 });
+    await expect(Promise.all(win.__ops)).resolves.toBeDefined();
+    expect(win.__operationHistory()).toHaveLength(1);
+    expect(win.__operationHistory()[0]).toMatchObject({ wanted: 'removeBarcode', r: 'failed' });
+    expect(originalError).toHaveBeenCalledTimes(fault === 'serializer' ? 1 : 0);
+});

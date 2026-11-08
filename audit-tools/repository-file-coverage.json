@@ -2634,6 +2634,9 @@
     "ZoeW/tests/money-multidevice-oracle.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/money-operation-trace.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/more-menu-scroll.test.ts": {
       "policy": "zoew-self-verification"
     },
@@ -3969,6 +3972,9 @@
       "policy": "guard-1"
     },
     "audit-tools/money-multidevice-core.js": {
+      "policy": "money-multidevice-harness"
+    },
+    "audit-tools/money-operation-trace.js": {
       "policy": "money-multidevice-harness"
     },
     "audit-tools/money-reality-check.js": {

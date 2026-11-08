@@ -145,3 +145,50 @@ describe('meta-checker៖ ម៉ូឌុល .mjs មិនរអិលចេញ
         expect(code).toBe(1);
     });
 });
+
+describe('meta-checker៖ ចុះឈ្មោះ helper ដោយមិនរំលង checker ពិត', () => {
+    const helper = 'money-operation-trace.js';
+    const sectionEnd = coverage.indexOf("console.log('\\n=== ១ខ.");
+    const classify = (source = coverage, extra: Record<string, string> = {}) => {
+        expect(sectionEnd).toBeGreaterThan(coverage.indexOf('const missingEnv ='));
+        const end = source.indexOf("console.log('\\n=== ១ខ.");
+        expect(end).toBeGreaterThan(source.indexOf('const missingEnv ='));
+        return runInNewContext(source.slice(0, end) + '\n({ topCheckers, checkers, missingEnv, envOf, fail });', {
+            __dirname: tools, console: { log() {} }, require: (name: string) => name === 'fs' ? {
+                ...fs,
+                readdirSync: (dir: string) => dir === tools ? [...fs.readdirSync(dir), ...Object.keys(extra)] : fs.readdirSync(dir),
+                readFileSync: (file: string, encoding: BufferEncoding) => path.dirname(file) === tools && Object.hasOwn(extra, path.basename(file))
+                    ? extra[path.basename(file)] : fs.readFileSync(file, encoding)
+            } : require(name)
+        }, { timeout: 3000 });
+    };
+
+    it('អ្នកស្កេនពិតរំលងតែ helper ដាន ហើយរក្សា checker លុយនិងម៉ូឌុលដែលមាន override', () => {
+        const result = classify();
+        expect(result.topCheckers.length).toBeGreaterThan(100);
+        expect(result.topCheckers).not.toContain(helper);
+        for (const file of ['money-reality-test.js', 'server-time-function-test.mjs', 'emu/money-multidevice-emu-test.js']) {
+            expect(result.checkers).toContain(file);
+            expect(result.envOf.has(file)).toBe(true);
+        }
+        expect(result.missingEnv).toEqual([]);
+        expect(result.fail).toBe(0);
+    });
+
+    it('ឈ្មោះស្រដៀង helper ដែលមិនចុះបញ្ជីនៅតែធ្លាក់ពេលគ្មាន override ទាំង js និង mjs', () => {
+        const extra = Object.fromEntries(['money-operation-trace-control.js', 'money-operation-trace-control.mjs']
+            .map(file => [file, "module.exports = {};\n"]));
+        const result = classify(coverage, extra);
+        for (const file of Object.keys(extra)) expect(result.topCheckers).toContain(file);
+        expect([...result.missingEnv].sort()).toEqual(Object.keys(extra).sort());
+        expect(result.fail).toBe(1);
+    });
+
+    it('ការដកការចុះឈ្មោះ helper ធ្វើឱ្យអ្នកយាម override ធ្លាក់វិញ', () => {
+        const mutant = coverage.replace("'money-operation-trace.js', ", '').replace(", 'money-operation-trace.js'", '');
+        const result = classify(mutant);
+        expect(result.topCheckers).toContain(helper);
+        expect(result.missingEnv).toEqual([helper]);
+        expect(result.fail).toBe(1);
+    });
+});

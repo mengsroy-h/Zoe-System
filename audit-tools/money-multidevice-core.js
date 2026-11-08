@@ -23,7 +23,87 @@ function barcodesOf(it) {
     return null;
 }
 
-function invariant(dump, dateKey, monthKey, knownCodes, expectedScope) {
+// Scope នេះសម្រាប់ fresh browser fixtures ដែលគ្មាន purge/legacy៖ now មកពីនាឡិកា lab,
+// មិនយកកូនសោកញ្ចក់ដែលនៅសល់ធ្វើជាព្រំដែន activation។ Real-dump CLI មាន scope ផ្សេង។
+function collectedMirror(dump, now) {
+    const errors = [], expected = new Map(), actual = new Map();
+    const object = value => !!value && typeof value === 'object' && !Array.isArray(value);
+    const money = value => typeof value === 'number' && Number.isFinite(value) && value >= 0 && r2(value) === value;
+    const keyOf = code => String(code || '').trim().toUpperCase().replace(/[%.#$\[\]\/\x00-\x1F\x7F]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
+    const calendar = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Phnom_Penh', year: 'numeric', month: '2-digit', day: '2-digit' });
+    const dayOf = stamp => typeof stamp === 'number' && Number.isFinite(stamp) && stamp > 0 && stamp <= 8640000000000000
+        ? calendar.format(stamp) : '';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dayOf(now))) return { errors: ['collected-clock-unmeasured'], expected: 0, actual: 0 };
+    const today = dayOf(now), cutoff = dayOf(now - 6 * 86400000);
+    const addError = value => { if (errors.length < 12) errors.push(value); };
+    for (const [where, bag] of [['history', dump.zoew_scan_history_cod_dod], ['trash', dump.zoew_recently_deleted_cod_dod]]) {
+        for (const item of Object.values(bag || {})) {
+            if (!object(item) || !item.barcodes || typeof item.barcodes !== 'object') { addError('collected-legacy-row:' + where); continue; }
+            if (item.restoreClaimId !== undefined || item.restoreClaimToken !== undefined || item.restoreClaim !== undefined) {
+                addError('collected-restore-unsettled:' + item.id); continue;
+            }
+            const reason = typeof item.trashReason === 'string' ? item.trashReason : item.isFromDeletion ? 'kept' : 'remove';
+            const removed = where === 'trash' && ['remove', 'returned', 'misplaced', 'sent'].includes(reason);
+            for (const barcode of barcodesOf(item) || []) {
+                if (!barcode || !barcode.code || barcode.isClosed !== true || barcode.isDeducted === true || removed) continue;
+                const key = keyOf(barcode.code), day = dayOf(barcode.closedAt);
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || day > today || !money(barcode.cod) || !money(barcode.dod)) { addError('collected-source-invalid:' + key); continue; }
+                if (expected.has(key)) addError('collected-source-duplicate:' + key);
+                expected.set(key, { day, c: barcode.cod, d: barcode.dod });
+            }
+        }
+    }
+    const mirror = dump.zoew_daily_collected_cod_dod;
+    if (mirror != null && !object(mirror)) addError('collected-root-invalid');
+    for (const [day, entries] of Object.entries(object(mirror) ? mirror : {})) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || dayOf(Date.parse(day + 'T00:00:00+07:00')) !== day || day > today || !object(entries)) { addError('collected-day-invalid:' + day); continue; }
+        for (const [key, value] of Object.entries(entries)) {
+            if (!object(value) || Object.keys(value).sort().join(',') !== 'c,d' || !money(value.c) || !money(value.d)) addError('collected-value-invalid:' + day + '/' + key);
+            const hits = actual.get(key) || [];
+            hits.push({ day, c: value?.c, d: value?.d }); actual.set(key, hits);
+        }
+    }
+    for (const [key, want] of expected) {
+        const hits = actual.get(key) || [];
+        if (!hits.length && want.day < cutoff) continue;
+        if (hits.length !== 1) addError('collected-' + (hits.length ? 'duplicate:' : 'missing:') + key);
+        else if (hits[0].day !== want.day) addError('collected-wrong-day:' + key);
+        else if (hits[0].c !== want.c || hits[0].d !== want.d) addError('collected-wrong-value:' + key);
+    }
+    for (const [key, hits] of actual) if (!expected.has(key)) addError('collected-unexpected:' + key + ':' + hits.map(hit => hit.day).join(','));
+    return { errors, expected: expected.size, actual: actual.size, cutoff, today };
+}
+
+// Fixture aging តែប៉ុណ្ណោះ៖ validate មុនផ្លាស់ថ្ងៃ និងចម្លងតែ leaf ដែលបានផ្ទៀង។
+// Caller ត្រូវសរសេរ ops នេះជាមួយ timestamp edit ក្នុង atomic fixture write ដដែល។
+function collectedFixtureAgeOps(dump, before, after, now) {
+    const canonical = value => JSON.stringify(value, function (key, entry) {
+        return entry && typeof entry === 'object' && !Array.isArray(entry)
+            ? Object.fromEntries(Object.keys(entry).sort().map(name => [name, entry[name]])) : entry;
+    });
+    if (!before?.id || canonical(dump.zoew_scan_history_cod_dod?.[before.id]) !== canonical(before)) throw new Error('collected fixture age snapshot ខុស');
+    const withoutStamps = row => JSON.parse(JSON.stringify(row, (key, value) => ['closedAt', 'createdAt'].includes(key) ? undefined : value));
+    if (canonical(withoutStamps(before)) !== canonical(withoutStamps(after))) throw new Error('collected fixture age ប្ដូរ identity/value');
+    const checked = collectedMirror(dump, now);
+    if (checked.errors.length) throw new Error('collected fixture មុន age: ' + checked.errors.join(','));
+    const keyOf = code => String(code || '').trim().toUpperCase().replace(/[%.#$\[\]\/\x00-\x1F\x7F]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
+    const dayOf = stamp => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Phnom_Penh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(stamp);
+    const ops = [];
+    for (const barcode of barcodesOf(before) || []) {
+        if (!barcode.isClosed || barcode.isDeducted === true) continue;
+        const next = (barcodesOf(after) || []).find(row => row.code === barcode.code);
+        if (!next || !next.isClosed || next.cod !== barcode.cod || next.dod !== barcode.dod || next.isDeducted !== barcode.isDeducted) throw new Error('collected fixture age ប្ដូរ identity/value');
+        const oldDay = dayOf(barcode.closedAt), newDay = dayOf(next.closedAt), key = keyOf(barcode.code);
+        if (oldDay === newDay) continue;
+        const value = dump.zoew_daily_collected_cod_dod?.[oldDay]?.[key];
+        if (!value || newDay < checked.cutoff || newDay > checked.today) throw new Error('collected fixture age គ្មាន leaf ដែលផ្លាស់បាន');
+        ops.push({ k: 'set', p: ['zoew_daily_collected_cod_dod', oldDay, key], v: null },
+            { k: 'set', p: ['zoew_daily_collected_cod_dod', newDay, key], v: { c: value.c, d: value.d } });
+    }
+    return ops;
+}
+
+function invariant(dump, dateKey, monthKey, knownCodes, expectedScope, collectedNow) {
     const hist = dump.zoew_scan_history_cod_dod || {};
     const trash = dump.zoew_recently_deleted_cod_dod || {};
     let cod = 0, dod = 0, count = 0, closed = 0;
@@ -112,11 +192,13 @@ function invariant(dump, dateKey, monthKey, knownCodes, expectedScope) {
         monthCod: r2(parseFloat(month.codDollar) || 0), monthDod: r2(parseFloat(month.dodDollar) || 0), monthCount: parseFloat(month.totalCount) || 0,
         expectMonthCod: r2(mCod), expectMonthDod: r2(mDod), expectMonthCount: mCount,
         pkg: parseFloat(pick.packagesPickedUp) || 0, expectPkg: closed, pickExtra, pickMissing, pickWrongOwner, phoneMismatch,
-        phoneSum, zeroRef, dup, orphans, registryMissing, lost, receipts, seenCodes: seen
+        phoneSum, zeroRef, dup, orphans, registryMissing, lost, receipts, seenCodes: seen,
+        collected: collectedNow === undefined ? null : collectedMirror(dump, collectedNow)
     };
 }
 
 function invariantBroken(inv) {
+    if (inv.collected?.errors.length) return inv.collected.errors.join('; ');
     if (inv.expectCod !== inv.gotCod || inv.expectDod !== inv.gotDod || inv.expectCount !== inv.gotCount) return 'ledger ថ្ងៃ ≠ ផលបូក barcode មិនទាន់ដក';
     if (inv.monthCod !== inv.expectMonthCod || inv.monthDod !== inv.expectMonthDod || inv.monthCount !== inv.expectMonthCount) return 'ledger ខែ ≠ ផលបូក ledger ថ្ងៃ';
     if (inv.pkg !== inv.expectPkg) return 'packagesPickedUp ≠ barcode បិទ';
@@ -147,8 +229,46 @@ const PAGE_OPS = function () {
     const w = window;
     w.__ops = [];
     w.__opResults = [];
-    const operationHistory = [];
-    const recordOperation = (result) => { w.__opResults.push(result); operationHistory.push(result); };
+    const operationHistory = [], consoleErrors = [], attemptEvents = [];
+    let attemptSequence = 0, droppedAttemptEvents = 0;
+    const traceTarget = value => {
+        const out = {};
+        try { for (const key of ['id', 'code']) if (typeof value?.[key] === 'string') out[key] = value[key].slice(0, 256); } catch (_) {}
+        return out;
+    };
+    const traceState = selected => {
+        try {
+            const online = w.navigator?.onLine, connected = w.isDatabaseConnected,
+                phase = w.connectionFlowSnapshot?.().phase, cleanupHeld = selected?.id ? w.cleanupInFlight?.has(selected.id) : undefined;
+            return { online: typeof online === 'boolean' ? online : undefined, connected: typeof connected === 'boolean' ? connected : undefined,
+                phase: typeof phase === 'string' && /^[a-z-]{1,40}$/.test(phase) ? phase : undefined,
+                cleanupHeld: typeof cleanupHeld === 'boolean' ? cleanupHeld : undefined };
+        }
+        catch (_) { return { diagnosticUnavailable: true }; }
+    };
+    const traceEvent = value => {
+        try {
+            attemptEvents.push({ at: Date.now(), ...value });
+            if (attemptEvents.length > 128) { droppedAttemptEvents += attemptEvents.length - 128; attemptEvents.splice(0, attemptEvents.length - 128); }
+        } catch (_) {}
+    };
+    w.__operationTrace = () => JSON.parse(JSON.stringify({ limit: 128, droppedEvents: droppedAttemptEvents, events: attemptEvents }));
+    const originalError = console.error;
+    console.error = function (...args) {
+        try { consoleErrors.push(args.map(value => value?.stack || String(value)).join(' ').slice(0, 8192)); }
+        catch (_) { consoleErrors.push('diagnostic serialization unavailable'); }
+        if (consoleErrors.length > 12) consoleErrors.splice(0, consoleErrors.length - 12);
+        return originalError.apply(this, args);
+    };
+    w.__consoleErrors = () => consoleErrors.slice(-12);
+    const recordOperation = (result) => {
+        try {
+            if (result.r === 'failed') result.diagnostic = { online: w.navigator?.onLine, connected: w.isDatabaseConnected,
+                phase: w.connectionFlowSnapshot?.().phase, clockTrusted: w.serverClockTrusted, offset: w.serverTimeOffsetMs,
+                toasts: [...(w.document?.querySelectorAll?.('#toastContainer .toast') || [])].map(node => node.textContent).slice(-4) };
+        } catch (_) { result.diagnosticUnavailable = true; }
+        w.__opResults.push(result); operationHistory.push(result);
+    };
     w.__operationHistory = () => operationHistory.map((result) => ({ ...result }));
     const bcOf = (it, pick) => (it && Array.isArray(it.barcodes) && it.barcodes.length) ? it.barcodes[Math.floor(pick * it.barcodes.length) % it.barcodes.length] : null;
     const at = (arr, pick) => arr.length ? arr[Math.floor(pick * arr.length) % arr.length] : null;
@@ -157,6 +277,22 @@ const PAGE_OPS = function () {
         const matches = (it) => it && (!target || (target.code ? (it.barcodes || []).some((b) => b && b.code === target.code) : !target.id || it.id === target.id));
         const live = (w.scanHistory || []).filter(matches);
         const trash = (w.deletedItems || []).filter(matches);
+        const attempt = ++attemptSequence, requested = traceTarget(target);
+        let selected = {};
+        const traceWanted = ['scan', 'closeOrder', 'closeBarcode', 'removeBarcode', 'deleteItem', 'restore', 'editPrice', 'sweep', 'zreturn'].includes(wanted) ? wanted : 'unsupported';
+        const opening = { phase: 'start', attempt, wanted: traceWanted, requested, selected, state: traceState(requested) };
+        traceEvent(opening);
+        const select = value => {
+            try {
+                selected = traceTarget(value); Object.assign(opening.selected, selected);
+                Object.assign(opening.state, traceState(selected));
+            } catch (_) {}
+        };
+        const invoke = (fn, args, item) => { select(item); return fn.apply(w, args); };
+        const finishTrace = result => traceEvent({ phase: 'end', attempt, wanted: traceWanted, requested, selected,
+            result: ['done', 'failed', 'missing', 'pending', 'late', 'stale', 'cancelled', 'blocked', 'deleted', 'undefined', 'true', 'false', 'object', 'threw', 'rejected', 'not-selected'].includes(result) ? result : 'other',
+            state: traceState(selected) });
+        const skipped = () => { finishTrace('not-selected'); return null; };
         let started = null;
         try {
             if (wanted === 'scan') {
@@ -164,30 +300,34 @@ const PAGE_OPS = function () {
                 const bcText = document.getElementById('modalBarcodeText');
                 const modal = document.getElementById('phoneModal');
                 const open = modal && getComputedStyle(modal).display !== 'none';
-                if (!open || !bcText || bcText.innerText !== code) return null;
+                if (!open || !bcText || bcText.innerText !== code) return skipped();
                 const p = document.getElementById('modalPhoneInput'); if (p) p.value = phone;
                 const c = document.getElementById('modalCodInput'); if (c) c.value = String(amt);
                 const d2 = document.getElementById('modalDodInput'); if (d2) d2.value = String(Math.round(amt / 4 * 100) / 100);
                 started = Promise.resolve(w.confirmPhone());
-            } else if (wanted === 'closeOrder') { const it = at(live, pick); if (!it) return null; started = Promise.resolve(w.toggleCloseStatus(it.id)); }
-            else if (wanted === 'closeBarcode') { const it = at(live, pick); const b = bcOf(it, pick); if (!it || !b) return null; started = Promise.resolve(w.toggleIndividualBarcodeClose(it.id, b.code)); }
-            else if (wanted === 'removeBarcode') { const it = at(live, pick); const b = bcOf(it, pick); if (!it || !b) return null; started = Promise.resolve(w.removeSingleBarcode(it.id, b.code)); }
-            else if (wanted === 'deleteItem') { const it = at(live, pick); if (!it) return null; started = Promise.resolve(w.deleteSingleItem(it.id)); }
-            else if (wanted === 'restore') { const it = at(trash, pick); if (!it) return null; w.promptRestoreDeletedItem(it.id); started = Promise.resolve(w.executeRestoreItem()); }
+            } else if (wanted === 'closeOrder') { const it = at(live, pick); if (!it) return skipped(); started = Promise.resolve(w.toggleCloseStatus(it.id)); }
+            else if (wanted === 'closeBarcode') { const it = at(live, pick); const b = bcOf(it, pick); if (!it || !b) return skipped(); started = Promise.resolve(w.toggleIndividualBarcodeClose(it.id, b.code)); }
+            else if (wanted === 'removeBarcode') {
+                const it = at(live, pick), b = bcOf(it, pick); if (!it || !b) return skipped();
+                const fn = w.removeSingleBarcode, id = it.id, barcode = b.code;
+                started = Promise.resolve(invoke(fn, [id, barcode], { id, code: barcode }));
+            }
+            else if (wanted === 'deleteItem') { const it = at(live, pick); if (!it) return skipped(); started = Promise.resolve(w.deleteSingleItem(it.id)); }
+            else if (wanted === 'restore') { const it = at(trash, pick); if (!it) return skipped(); w.promptRestoreDeletedItem(it.id); started = Promise.resolve(w.executeRestoreItem()); }
             else if (wanted === 'editPrice') {
-                const it = at(live, pick); const b = bcOf(it, pick); if (!it || !b) return null;
+                const it = at(live, pick); const b = bcOf(it, pick); if (!it || !b) return skipped();
                 w.openEditBarcodePriceModal(it.id, b.code);
                 const c = document.getElementById('editBcCodInput'); if (c) c.value = String(amt);
                 const d2 = document.getElementById('editBcDodInput'); if (d2) d2.value = '0';
                 started = Promise.resolve(w.saveEditedBarcodePrice());
             } else if (wanted === 'sweep') { started = Promise.resolve(w.runAutomaticCleanupRules()); }
             else if (wanted === 'zreturn') {
-                if (!target || !target.id || !target.code || !(target.at > 0)) return null;
+                if (!target || !target.id || !target.code || !(target.at > 0)) return skipped();
                 started = Promise.resolve(w.claimAndCleanupItem(target.id, 'abandon', { codes: [target.code], returnedAt: new Map([[target.code, target.at]]) }));
             }
-            else return null;
-        } catch (e) { recordOperation({ wanted, threw: String(e && e.message) }); return 'threw:' + wanted + ':' + (e && e.message); }
-        const p = started.then((r) => { recordOperation({ wanted, r: typeof r === 'object' ? 'object' : String(r) }); }, (e) => { recordOperation({ wanted, e: String(e && e.message) }); });
+            else return skipped();
+        } catch (e) { finishTrace('threw'); recordOperation({ wanted, threw: String(e && e.message) }); return 'threw:' + wanted + ':' + (e && e.message); }
+        const p = started.then((r) => { const result = typeof r === 'object' ? 'object' : String(r); finishTrace(result); recordOperation({ wanted, r: result }); }, (e) => { finishTrace('rejected'); recordOperation({ wanted, e: String(e && e.message) }); });
         w.__ops.push(p);
         return wanted;
     };
@@ -263,7 +403,8 @@ async function recoveryEvidence(devices) {
         gate: device.gate?.evidence(),
         state: await Promise.race([
             device.page.evaluate(() => ({
-                journals: window.__journals(), operations: window.__operationHistory(),
+                journals: window.__journals(), operations: window.__operationHistory(), operationTrace: window.__operationTrace?.(), consoleErrors: window.__consoleErrors?.(),
+                toasts: [...(window.document?.querySelectorAll?.('#toastContainer .toast') || [])].map(node => node.textContent).slice(-4),
                 claims: window.pendingTrashClaims?.(window.liveShopScope?.()),
                 liveClaims: window.liveTrashClaims ? [...window.liveTrashClaims] : null,
                 cleanupLive: window.cleanupJournalLive ? [...window.cleanupJournalLive.keys()] : null,
@@ -275,4 +416,4 @@ async function recoveryEvidence(devices) {
     })));
 }
 
-module.exports = { r2, rng, LICENSE_STUB, invariant, invariantBroken, openBarcodeTargets, PAGE_OPS, recoveryEvidence, devicesSettled };
+module.exports = { collectedMirror, collectedFixtureAgeOps, r2, rng, LICENSE_STUB, invariant, invariantBroken, openBarcodeTargets, PAGE_OPS, recoveryEvidence, devicesSettled };

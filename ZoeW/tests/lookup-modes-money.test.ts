@@ -677,3 +677,242 @@ it.each((['firebase', 'supabase'] as const).flatMap(backend =>
         expect(readCleanupJournal()).toEqual([]);
     }
 );
+
+it.each(['control', 'drop', 'cod', 'swap', 'duplicate'])('ផ្លូវបិទ app ពិត និង collected write ខូច៖ %s', async fault => {
+    await useMode('sheet'); const id = await scan();
+    const expected = createRevenueExpectation(clone(lab.store));
+    const originalUpdate = firebaseState.fb.update;
+    let hits = 0;
+    firebaseState.fb.update = (async (r: any, updates: any) => {
+        if (r.path !== C || !Object.values(updates).some(Boolean)) return originalUpdate(r, updates);
+        hits++;
+        if (fault === 'drop') return;
+        await originalUpdate(r, updates);
+        if (fault !== 'control') {
+            const mirror = getAt(C) || {};
+            for (const entries of Object.values(mirror) as any[]) for (const leaf of Object.values(entries) as any[]) {
+                if (fault === 'cod') leaf.c += 99;
+                if (fault === 'swap') { leaf.c -= 1; leaf.d += 1; }
+            }
+            if (fault === 'duplicate') mirror['2026-10-19'] = clone(mirror[day()]);
+            setAt(C, mirror);
+        }
+    }) as any;
+    expect(await applyBarcodeCloseChange(id, CODE, true, { silent: true, showModal: false })).toBe(true);
+    sync();
+    expect(hits).toBeGreaterThan(0);
+    expect(currentItem().barcodes[0].isClosed).toBe(true);
+    expectMoney(10, 2, 1);
+    const inspect = () => expected.verify(lab.store, [CODE], fault, Date.now());
+    if (fault === 'control') expect(inspect).not.toThrow();
+    else expect(inspect).toThrow();
+});
+
+// អយស្ករនេះកត់ intent ពី input/នាឡិកាមុនសកម្មភាព។ SDK ខូចអាចធ្វើ source និង mirror ខុសជាមួយគ្នា។
+type OracleLookup = 'absent' | 'disabled' | 'sheet' | 'cookie' | 'cookie-signed' | 'palm';
+type CorrelatedFault = 'control' | 'backdate-both' | 'reopen-both' | 'swap-parcel-values';
+const oracleLookups: OracleLookup[] = ['absent', 'disabled', 'sheet', 'cookie', 'cookie-signed', 'palm'];
+const correlatedFaults: CorrelatedFault[] = ['control', 'backdate-both', 'reopen-both', 'swap-parcel-values'];
+const operationOracleCases = (['firebase', 'supabase'] as const).flatMap(backend => oracleLookups.flatMap(lookup =>
+    correlatedFaults.map(fault => ({ backend, lookup, fault }))));
+const configureOracleMode = useMode;
+async function configureOracleLookup(lookup: OracleLookup) {
+    if (lookup === 'absent' || lookup === 'disabled') {
+        if (lookup === 'absent') appLocalStore.removeItem('zoew_lookup_api_config');
+        else appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: false }));
+        noteZtoTrashMode(null);
+    } else await configureOracleMode(lookup === 'cookie-signed' ? 'cookie' : lookup);
+}
+async function oracleClose(lookup: OracleLookup, id: string) {
+    if (lookup === 'cookie-signed') {
+        setZtoPickupVerdict(CODE, true, Date.now());
+        await autoCloseBarcodeFromZto({ itemId: id, code: CODE }, dataState.scanHistory);
+        await syncZtoFinalMarks();
+    } else if (lookup === 'palm') {
+        expect(await recordSigned(id, CODE, () => true)).toBe(true);
+        await syncZtoFinalMarks();
+    } else expect(await applyBarcodeCloseChange(id, CODE, true, { silent: true, showModal: false })).toBe(true);
+    sync();
+}
+function parcelExpectation(scanDay: string) {
+    const expected = createRevenueExpectation(clone(lab.store), { requireParcelIntents: true });
+    // Optional call ទុកឱ្យអយស្ករចាស់រត់ដល់ assertion៖ ដក expectParcel ចេញត្រូវធ្លាក់ negative controls មិនមែន crash។
+    for (const [code, cod, dod] of [[CODE, 10, 2], [SECOND, 3.5, 0.25]] as const) {
+        expected.expectParcel?.(code, { cod, dod, day: scanDay, root: 'history', closed: false, deducted: false, phone: '012345678' });
+    }
+    return expected;
+}
+function injectCorrelatedCollectedFault(fault: CorrelatedFault) {
+    const originalUpdate = firebaseState.fb.update;
+    const badStamp = Date.now() - 86400000;
+    const badDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Phnom_Penh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(badStamp);
+    let hits = 0;
+    firebaseState.fb.update = (async (r: any, updates: any) => {
+        await originalUpdate(r, updates);
+        if (r.path !== C || !Object.values(updates).some(Boolean)) return;
+        hits++;
+        if (fault === 'control') return;
+        const history = getAt(H) || {};
+        const row = (Object.values(history) as any[]).find(item => item.barcodes?.some(barcode => barcode.code === CODE));
+        expect(row, 'ការចាក់ fault ត្រូវចំ barcode ពិតក្រោយ commit').toBeTruthy();
+        const barcode = row.barcodes.find(entry => entry.code === CODE);
+        const mirror = getAt(C) || {};
+        if (fault === 'backdate-both') {
+            barcode.closedAt = badStamp;
+            if (row.isClosed) row.closedAt = badStamp;
+            for (const record of Object.values(mirror) as any[]) delete record[CODE];
+            mirror[badDay] ||= {}; mirror[badDay][CODE] = { c: barcode.cod, d: barcode.dod };
+        } else if (fault === 'reopen-both') {
+            barcode.isClosed = false; delete barcode.closedAt;
+            row.isClosed = false; delete row.closedAt;
+            for (const record of Object.values(mirror) as any[]) delete record[CODE];
+            setAt(P, null);
+        } else {
+            const sibling = row.barcodes.find(entry => entry.code === SECOND);
+            expect(sibling, 'ការប្ដូរតម្លៃត្រូវមាន barcode ពីរនៅ server').toBeTruthy();
+            Object.assign(barcode, { cod: 3.5, dod: 0.25 });
+            Object.assign(sibling, { cod: 10, dod: 2 });
+            for (const record of Object.values(mirror) as any[]) if (record[CODE]) record[CODE] = { c: 3.5, d: 0.25 };
+        }
+        setAt(H, history); setAt(C, mirror);
+    }) as any;
+    return () => hits;
+}
+function expectCorrelatedFaultPresent(fault: CorrelatedFault, wantedClosedAt: number) {
+    const barcode = currentItem(CODE).barcodes.find(entry => entry.code === CODE)!;
+    if (fault === 'backdate-both') expect(barcode.closedAt).toBe(wantedClosedAt - 86400000);
+    if (fault === 'reopen-both') {
+        expect(barcode.isClosed).toBe(false); expect(getAt(C)).toBeNull();
+        for (const pickup of Object.values(getAt(P) || {}) as any[]) {
+            expect(pickup.packagesPickedUp || 0).toBe(0);
+            expect(pickup.pickedUpBarcodes || {}).toEqual({}); expect(pickup.pickedUpPhones || {}).toEqual({});
+        }
+    }
+    if (fault === 'swap-parcel-values') {
+        expect(barcode).toMatchObject({ cod: 3.5, dod: 0.25 });
+        expect(currentItem(SECOND).barcodes.find(entry => entry.code === SECOND)).toMatchObject({ cod: 10, dod: 2 });
+    }
+}
+it.each(operationOracleCases)('[parcel-oracle-close] $backend $lookup $fault៖ source/mirror ខុសជាមួយគ្នា មិនអាចធ្វើ expected តាម actual', async ({ backend, lookup, fault }) => {
+    useSyntheticBackend(backend); await configureOracleLookup(lookup);
+    const scanDay = day(), useLookup = lookup !== 'absent' && lookup !== 'disabled';
+    const id = await scan(CODE, 10, 2, useLookup); await scan(SECOND, 3.5, 0.25, useLookup);
+    const expected = parcelExpectation(scanDay);
+    expected.verify(clone(lab.store), [CODE, SECOND], 'before-close', Date.now());
+    const closeAt = Date.now();
+    expected.expectParcel?.(CODE, { closed: true, closedAt: [closeAt, closeAt] });
+    const hits = injectCorrelatedCollectedFault(fault);
+    await oracleClose(lookup, id);
+    expect(hits()).toBeGreaterThan(0); expectIdentities([CODE, SECOND], []); expectMoney(13.5, 2.25, 2);
+    expectCorrelatedFaultPresent(fault, closeAt);
+    // ភស្តុតាងថា aggregate/mirror oracle ចាស់មិនចាប់ថ្នាក់នេះ មិនមែន test គ្រាន់តែបង្កើតទិន្នន័យខូចទទេ។
+    expect(independentInvariantBroken(independentInvariant(clone(lab.store), scanDay, scanDay.slice(0, 7), [CODE, SECOND], undefined, Date.now()))).toBeNull();
+    const inspect = () => expected.verify(clone(lab.store), [CODE, SECOND], 'close-' + fault, Date.now());
+    if (fault === 'control') expect(inspect).not.toThrow(); else expect(inspect).toThrow();
+});
+it.each(operationOracleCases.filter(row => !['palm', 'cookie-signed'].includes(row.lookup)))('[parcel-oracle-restore] $backend $lookup $fault៖ ស្តារបិទ renew closedAt និងតម្លៃដើមតាម intent', async ({ backend, lookup, fault }) => {
+    useSyntheticBackend(backend); await configureOracleLookup(lookup);
+    const scanDay = day(), useLookup = lookup !== 'absent' && lookup !== 'disabled';
+    const id = await scan(CODE, 10, 2, useLookup); await scan(SECOND, 3.5, 0.25, useLookup);
+    const expected = parcelExpectation(scanDay), firstCloseAt = Date.now();
+    await oracleClose(lookup, id); expected.expectParcel?.(CODE, { closed: true, closedAt: [firstCloseAt, firstCloseAt] });
+    expected.verify(clone(lab.store), [CODE, SECOND], 'closed-before-remove', Date.now());
+    await removeSingleBarcode(id, CODE); sync();
+    expected.adjust(scanDay, -10, -2, -1); expected.expectParcel?.(CODE, { root: 'trash', deducted: true });
+    expected.verify(clone(lab.store), [CODE, SECOND], 'removed-before-restore', Date.now());
+    const removed = trashId(); vi.setSystemTime(NOW + 86400000);
+    const restoreAt = Date.now();
+    expected.adjust(scanDay, 10, 2, 1); expected.expectParcel?.(CODE, { root: 'history', deducted: false, closed: true, closedAt: [restoreAt, restoreAt] });
+    const hits = injectCorrelatedCollectedFault(fault);
+    await restore(removed);
+    expect(hits()).toBeGreaterThan(0); expectIdentities([CODE, SECOND], []);
+    expect(getAt(D + '/' + scanDay)).toMatchObject({ codDollar: 13.5, dodDollar: 2.25, totalCount: 2 });
+    expectCorrelatedFaultPresent(fault, restoreAt);
+    expect(independentInvariantBroken(independentInvariant(clone(lab.store), scanDay, scanDay.slice(0, 7), [CODE, SECOND], undefined, Date.now()))).toBeNull();
+    const inspect = () => expected.verify(clone(lab.store), [CODE, SECOND], 'restore-' + fault, Date.now());
+    if (fault === 'control') expect(inspect).not.toThrow(); else expect(inspect).toThrow();
+});
+it.each((['firebase', 'supabase'] as const).flatMap(backend => (['palm', 'cookie-signed'] as const).map(lookup => ({ backend, lookup }))))(
+    '[parcel-oracle-blocked] $backend $lookup៖ ស្តារហាមរក្សា intent ដើម និងមិនបាញ់ mirror write', async ({ backend, lookup }) => {
+        useSyntheticBackend(backend); await configureOracleLookup(lookup);
+        const scanDay = day(), id = await scan(); await scan(SECOND, 3.5, 0.25);
+        const expected = parcelExpectation(scanDay), closedAt = Date.now();
+        await oracleClose(lookup, id); expected.expectParcel?.(CODE, { closed: true, closedAt: [closedAt, closedAt] });
+        await removeSingleBarcode(id, CODE); sync();
+        expected.adjust(scanDay, -10, -2, -1); expected.expectParcel?.(CODE, { root: 'trash', deducted: true });
+        expected.verify(clone(lab.store), [CODE, SECOND], 'blocked-before', Date.now());
+        const removed = trashId(), before = clone(lab.store), hits = injectCorrelatedCollectedFault('backdate-both');
+        vi.setSystemTime(NOW + 86400000); await restore(removed); await restore(removed);
+        expect(hits()).toBe(0); expect(lab.store).toEqual(before); expectIdentities([SECOND], [CODE]);
+        expected.verify(clone(lab.store), [CODE, SECOND], 'blocked-after', Date.now());
+    }
+);
+
+it.each((['firebase', 'supabase'] as const).flatMap(backend => (['absent', 'disabled', 'sheet', 'cookie'] as const).flatMap(lookup =>
+    (['control', 'old-restoredAt', 'forbidden-closedAt'] as const).map(fault => ({ backend, lookup, fault })))))(
+    '[parcel-oracle-open-restore] $backend $lookup $fault៖ ស្តារបើកត្រូវ renew restoredAt ហើយគ្មាន closedAt', async ({ backend, lookup, fault }) => {
+        useSyntheticBackend(backend); await configureOracleLookup(lookup);
+        const scanDay = day(), useLookup = lookup !== 'absent' && lookup !== 'disabled';
+        const id = await scan(CODE, 10, 2, useLookup); await scan(SECOND, 3.5, 0.25, useLookup);
+        const expected = parcelExpectation(scanDay);
+        await removeSingleBarcode(id, CODE); sync();
+        expected.adjust(scanDay, -10, -2, -1); expected.expectParcel?.(CODE, { root: 'trash', deducted: true });
+        expected.verify(clone(lab.store), [CODE, SECOND], 'open-before-restore', Date.now());
+        const removed = trashId(); vi.setSystemTime(NOW + 86400000); const restoreAt = Date.now();
+        expected.adjust(scanDay, 10, 2, 1);
+        expected.expectParcel?.(CODE, { root: 'history', closed: false, deducted: false, restoredAt: [restoreAt, restoreAt] });
+        const originalUpdate = firebaseState.fb.update; let hits = 0;
+        firebaseState.fb.update = (async (r: any, updates: any) => {
+            await originalUpdate(r, updates);
+            if (r.path || !Object.keys(updates).some(path => path.startsWith(H + '/'))) return;
+            const history = getAt(H) || {};
+            const row = (Object.values(history) as any[]).find(item => item.barcodes?.some(barcode => barcode.code === CODE));
+            if (!row || row.restoreClaimId || row.restoreClaimToken || getAt(T + '/' + removed)) return;
+            hits++;
+            const barcode = row.barcodes.find(entry => entry.code === CODE);
+            if (fault === 'old-restoredAt') barcode.restoredAt = NOW;
+            if (fault === 'forbidden-closedAt') barcode.closedAt = NOW;
+            setAt(H, history);
+        }) as any;
+        await restore(removed); expect(hits).toBeGreaterThan(0); expectIdentities([CODE, SECOND], []);
+        const barcode = currentItem(CODE).barcodes.find(entry => entry.code === CODE)!;
+        expect(barcode.isClosed).toBe(false); expect(getAt(C)).toBeNull();
+        if (fault === 'old-restoredAt') expect(barcode.restoredAt).toBe(NOW);
+        if (fault === 'forbidden-closedAt') expect(barcode.closedAt).toBe(NOW);
+        expect(independentInvariantBroken(independentInvariant(clone(lab.store), scanDay, scanDay.slice(0, 7), [CODE, SECOND], undefined, Date.now()))).toBeNull();
+        const inspect = () => expected.verify(clone(lab.store), [CODE, SECOND], 'open-restore-' + fault, Date.now());
+        if (fault === 'control') expect(inspect).not.toThrow(); else expect(inspect).toThrow();
+    }
+);
+
+it.each((['firebase', 'supabase'] as const).flatMap(backend => oracleLookups.map(lookup => ({ backend, lookup }))))(
+    '[parcel-oracle-repeat-close] $backend $lookup៖ បិទស្ទួនពេលក្រោយរក្សាបង្អួច closedAt ដើម', async ({ backend, lookup }) => {
+        useSyntheticBackend(backend); await configureOracleLookup(lookup);
+        const scanDay = day(), useLookup = lookup !== 'absent' && lookup !== 'disabled';
+        const id = await scan(CODE, 10, 2, useLookup); await scan(SECOND, 3.5, 0.25, useLookup);
+        const expected = parcelExpectation(scanDay), closedAt = Date.now();
+        expected.expectParcel?.(CODE, { closed: true, closedAt: [closedAt, closedAt] });
+        await oracleClose(lookup, id); expected.verify(clone(lab.store), [CODE, SECOND], 'first-close', Date.now());
+        vi.setSystemTime(NOW + 3600000); await oracleClose(lookup, id);
+        expected.verify(clone(lab.store), [CODE, SECOND], 'repeat-close', Date.now());
+    }
+);
+it.each((['firebase', 'supabase'] as const).flatMap(backend => (['absent', 'disabled', 'sheet', 'cookie'] as const).flatMap(lookup =>
+    [false, true].map(closed => ({ backend, lookup, closed })))))(
+    '[parcel-oracle-repeat-restore] $backend $lookup closed=$closed៖ ស្តារស្ទួនរក្សាពេលស្តារដើម មិនបន្ថែមប្រាក់', async ({ backend, lookup, closed }) => {
+        useSyntheticBackend(backend); await configureOracleLookup(lookup);
+        const scanDay = day(), useLookup = lookup !== 'absent' && lookup !== 'disabled';
+        const id = await scan(CODE, 10, 2, useLookup); await scan(SECOND, 3.5, 0.25, useLookup);
+        const expected = parcelExpectation(scanDay), originalClose = Date.now();
+        if (closed) { await oracleClose(lookup, id); expected.expectParcel?.(CODE, { closed: true, closedAt: [originalClose, originalClose] }); }
+        await removeSingleBarcode(id, CODE); sync();
+        expected.adjust(scanDay, -10, -2, -1); expected.expectParcel?.(CODE, { root: 'trash', deducted: true });
+        expected.verify(clone(lab.store), [CODE, SECOND], 'before-repeat-restore', Date.now());
+        const removed = trashId(); vi.setSystemTime(NOW + 86400000); const restoredAt = Date.now();
+        expected.adjust(scanDay, 10, 2, 1);
+        expected.expectParcel?.(CODE, { root: 'history', deducted: false, ...(closed ? { closedAt: [restoredAt, restoredAt] } : { restoredAt: [restoredAt, restoredAt] }) });
+        await restore(removed); expected.verify(clone(lab.store), [CODE, SECOND], 'first-restore', Date.now());
+        vi.setSystemTime(NOW + 90000000); await restore(removed);
+        expected.verify(clone(lab.store), [CODE, SECOND], 'repeat-restore', Date.now());
+    }
+);

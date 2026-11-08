@@ -32,7 +32,7 @@ const path = require('path');
 const assert = require('node:assert/strict');
 const { createPgHarness } = require('./supabase-pg.js');
 const { startFakeSupabase } = require('./supabase-fake-server.js');
-const { r2, rng, LICENSE_STUB, invariant, invariantBroken, openBarcodeTargets, PAGE_OPS, recoveryEvidence, devicesSettled } = require('./money-multidevice-core.js');
+const { r2, rng, LICENSE_STUB, invariant, invariantBroken, collectedFixtureAgeOps, openBarcodeTargets, PAGE_OPS, recoveryEvidence, devicesSettled } = require('./money-multidevice-core.js');
 const { cookieFixture, networkGate, restoreFlows } = require('./money-cookie-blob.js');
 
 const ROOT = process.env.SBMONEY_APP_DIR ? path.resolve(process.env.SBMONEY_APP_DIR) : path.join(__dirname, '..');
@@ -265,16 +265,17 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
             const shop = shops[0];
             const neighbors = shops.slice(1);
             const snapshots = await Promise.all(neighbors.map((neighbor) => tree(neighbor.tenant)));
-            let isolationChecks = 0, matrixSteps = 0;
+            let isolationChecks = 0, matrixSteps = 0, expectation;
             const onCheckpoint = async (label) => {
                 const current = await Promise.all(neighbors.map((neighbor) => tree(neighbor.tenant)));
                 neighbors.forEach((neighbor, i) => assert.deepEqual(current[i], snapshots[i], label + ': ហាងជិតខាង ' + neighbor.index + ' ត្រូវនៅដដែល'));
                 isolationChecks++;
             };
             for (const authMode of ['sheet', 'cookie', 'palm']) {
-                const result = await restoreFlows({ devices: shop.devices, read: () => tree(shop.tenant),
+                const result = await restoreFlows({ expectation, devices: shop.devices, read: () => tree(shop.tenant),
                     write: (ops) => serverWrite(shop.tenant, ops), dateKey, monthKey, knownCodes: shop.knownCodes,
                     fixture: cookie, origin, site: String(200101 + shop.index), tag: 's' + shop.index, backend: 'supabase', authMode, onCheckpoint });
+                expectation = result.expectation;
                 matrixSteps += result.steps;
             }
             check(matrixSteps > 0 && isolationChecks === matrixSteps,
@@ -321,7 +322,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
                             bcs.forEach((b) => { if (b) b.createdAt = old; });
                             shop.trail.push('age:abandon:' + id);
                         }
-                        await serverWrite(shop.tenant, [{ k: 'set', p: ['zoew_scan_history_cod_dod', id], v: item }]);
+                        await serverWrite(shop.tenant, [{ k: 'set', p: ['zoew_scan_history_cod_dod', id], v: item },
+                            ...collectedFixtureAgeOps(t, hist[id], item, Date.now())]);
                         await Promise.all(shop.devices.map((d) => d.sync()));
                         await sleep(1500);
                         plan.forEach((p) => { p.wanted = 'sweep'; p.mode = p.mode === 'offline-reload' ? 'online' : p.mode; });
@@ -369,12 +371,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
                 broke = 'ឧបករណ៍មិនស្ងប់ក្នុង ៦០ វិ. (pending · journal · blocked · cleanup journal) ក្រោយជុំ ' + i + '\n        '
                     + JSON.stringify(stuck.map((s, k) => ({ dev: devices[k].name, status: s.status, phase: s.phase, pending: s.pending, blocked: s.blocked, rows: s.rows, cleanupJournal: s.cleanupJournal, pickupJournal: s.pickupJournal, trashClaims: s.trashClaims })));
                 const trees = await Promise.all(shops.map((shop) => tree(shop.tenant)));
-                console.log('    EVIDENCE ' + JSON.stringify({ round: i, devices: await recoveryEvidence(devices), shops: shops.map((shop, k) => ({ index: shop.index, server: trees[k], invariant: invariant(trees[k], dateKey, monthKey, shop.knownCodes) })) }));
+                console.log('    EVIDENCE ' + JSON.stringify({ round: i, devices: await recoveryEvidence(devices), shops: shops.map((shop, k) => ({ index: shop.index, server: trees[k], invariant: invariant(trees[k], dateKey, monthKey, shop.knownCodes, undefined, Date.now()) })) }));
                 break;
             }
             const views = await Promise.all(devices.map((d) => d.state()));
             const trees = await Promise.all(shops.map((shop) => tree(shop.tenant)));
-            const invs = shops.map((shop, k) => invariant(trees[k], dateKey, monthKey, shop.knownCodes));
+            const invs = shops.map((shop, k) => invariant(trees[k], dateKey, monthKey, shop.knownCodes, undefined, Date.now()));
             const serverCodes = invs.map((inv) => new Set(Object.keys(inv.seenCodes)));
             for (const shop of shops) {
                 const foreign = shops.filter((other) => other !== shop).flatMap((other) => [...serverCodes[other.index]]);

@@ -2625,6 +2625,9 @@
     "ZoeW/tests/modal-focus-trap.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/modal-keyboard-device-checker.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/modal-keyboard.test.tsx": {
       "policy": "zoew-self-verification"
     },

@@ -1970,6 +1970,12 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-11-08 — ផ្ទៀង Animation ពិតដោយមិនជំនួសស៊ុម live
+
+- Audit ១២២៨ លើ `09ec3b97`៖ paired PostgreSQL និងផ្នែក ៤ ឆ្លង។ ផ្នែក ២ ធ្លាក់នៅ `configModal` បិទ keyboard លើ APK tablet 1280×800៖ ១១ ស៊ុម មានស៊ុមកណ្តាលតែ ១ និងចន្លោះធំបំផុត ១៥០ ms។ ខ្សែកោង Android ពិតអាចផ្គូផ្គងគ្រប់ sample ប៉ុន្តែ staircase ខូចក៏អាចផ្គូផ្គងបាន; នេះជាភស្តុតាងមិនគ្រប់ មិនមែនការបញ្ជាក់ថា app ខូច ឬរលូនទេ។ ផ្នែក ៣ ធ្លាក់ដោយ HISTORY ខ្វះលិបិក្រម paired SDK test; បន្ថែមជួរត្រឹមត្រូវ មិនបន្ធូរ doc-scope។
+- Checker-first៖ `ZoeW/tests/modal-keyboard-device-checker.test.ts` ក្រហម ២៦/៣៣ មុនកែ។ `modal-keyboard-device-test` ចាប់ Animation object ដែល app បង្កើតពិត ហើយក្រោយការថត live និង natural finish ទើបផ្ទៀង duration, easing, keyframes, lifecycle និង geometry នៅ ១១ ពេលកំណត់ សម្រាប់គ្រប់កាតដែលផ្លាស់ទី និងទិសបើក/បិទ។ មិនបង្កើត Animation ជំនួស មិន seek ពេល live និងមិនបន្ថែមការរង់ចាំ ឬពិដានពេល។
+- Focused ៤៦/៤៦ ឆ្លង រួម missing/instant/staircase/wrong endpoint/overshoot/reversal និង lifecycle/cleanup controls។ Independent review រត់ ៤៦ ករណី និង ៨ lifecycle combinations ដាច់ដោយឡែក គ្មាន blocker សម្រាប់ CI។ Live predicate ដើម រួមជាន់ស៊ុមកណ្តាល ២ និង endpoint checks នៅដដែល; trace Audit ១២២៨ នៅតែធ្លាក់ ទោះ controlled probe ល្អ។ App motion/PTR/gesture source និងកំណែមិនប្រែ។ Local Chromium ជាប់ socket EPERM ដដែល; នេះមិនមែន live-browser pass ឬការបិទ failure ចាស់ទេ ហើយត្រូវផ្ទៀង CI លើ commit ថ្មី។
+
 ### 2026-11-08 — រក្សាភស្តុតាងពេល ZoeW suite ធ្លាក់
 
 - Audit ១២២៧ លើ `5746a869`៖ ផ្នែក ១–៣, ZTO/native, F03 និង Registration Auth ឆ្លង; ផ្នែក ៤ ធ្លាក់នៅ `supabase-pickup-reset-paired-sdk.pg.test.ts` ព្រោះ child checker ចេញមិនស្មើសូន្យ។ សេចក្តីសង្ខេបរក្សា object dump ប៉ុន្តែលាក់ error ដើម ហើយ Vitest JSON និង scratch ត្រូវលុបក្រោយរត់។ មូលហេតុ PostgreSQL ក្នុងការរត់នោះមិនទាន់បញ្ជាក់; baseline `578ca5be` ឆ្លងមិនអាចលុបចោល failure នេះបាន។
@@ -4732,6 +4738,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/modal-backdrop-keep.test.tsx` | — | ផ្នែក ៨ |
 | `ZoeW/tests/modal-chrome-state.test.tsx` | — | ផ្នែក ៨ · ផ្នែក ៩ |
 | `ZoeW/tests/modal-focus-trap.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
+| `ZoeW/tests/modal-keyboard-device-checker.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/modal-keyboard.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/money-multidevice-oracle.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/more-menu-scroll.test.ts` | — | ផ្នែក ៨ |
@@ -4867,6 +4874,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/supabase-original-tenant.pg.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-overlay-increment.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-own-keys.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/supabase-pickup-reset-paired-sdk.pg.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-poll-starvation.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-pull-paging.test.ts` | — | ផ្នែក ៧ |
 | `ZoeW/tests/supabase-realtime-race.test.ts` | — | ផ្នែក ៨ |

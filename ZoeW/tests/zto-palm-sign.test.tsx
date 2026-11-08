@@ -8,6 +8,7 @@ import { buildHistoryRowModel } from '../src/app/components/history/rowModel';
 import { BarcodeListContainer } from '../src/app/components/barcode/BarcodeListContainer';
 import { ZtoPalmSignModal } from '../src/app/components/modals/ZtoPalmSignModal';
 import { dataState, firebaseState, securityState, uiState } from '../src/core/state';
+import { acceptServerClockOffset, resetServerClock } from '../src/core/clock';
 import { palmSignState } from '../src/core/palm-sign-state';
 import { appLocalStore } from '../src/core/storage';
 import { modalIsOpen, registerModalMeta, unregisterModalMeta } from '../src/core/modals';
@@ -122,6 +123,11 @@ async function openReceipt(codes: string[]) {
     vi.mocked(fetch).mockClear();
 }
 const bodies = () => vi.mocked(fetch).mock.calls.map(([, init]) => JSON.parse(String(init?.body)));
+function verifiedUiSession() {
+    resetServerClock(); firebaseState.isDatabaseConnected = true;
+    expect(acceptServerClockOffset(0, { epochMs: Date.now(), wallMs: Date.now(), monotonicMs: performance.now() }, false)).toBe(true);
+    firebaseState.sessionExpiryCheck = 'live';
+}
 function deferred() {
     let resolve!: (value: Response) => void;
     const promise = new Promise<Response>((yes) => { resolve = yes; });
@@ -155,6 +161,7 @@ beforeEach(async () => {
         ? json({ success: true, barcode: body.barcode, stage: 'dispatch', ztoClosed: false, dispatchProof: 'proof-' + body.barcode }) : signed(body.barcode); }));
 });
 afterEach(async () => {
+    resetServerClock();
     firebaseState.authGeneration++; securityState.lookupSecretKey = null;
     await runPalmSignOutbox();
     act(() => closeModal('ztoPalmSignModal'));
@@ -264,6 +271,7 @@ it('ការងារ durable ផ្ញើ session និង ID token តាម
     expect(await queuedJobs()).toEqual([expect.objectContaining({ signedCleanupConfirmed: true, photo: PHOTO })]);
 });
 it('Palm បង្ហាញ Sign លើប្រវត្តិ និង Barcode · Cookie ត្រឡប់ជា បិទ', async () => {
+    verifiedUiSession();
     uiState.viewListView = [{ itemId: 'item1', code: CODE, index: 1, locker: '', time: null, origin: '', moneyClass: '', money: [], sum: null, closed: false }];
     mount(<><table><tbody><tr><HistoryRow row={buildHistoryRowModel(dataState.scanHistory[0], 1, false, false)} /></tr></tbody></table><BarcodeListContainer /></>);
     expect(document.querySelector('.close-btn')?.textContent).toContain('Sign');
@@ -378,6 +386,7 @@ it('ប្រអប់ត្រូវការស្កេន និងរូប
     expect(document.querySelector('input[type=file]')?.getAttribute('capture')).toBe('environment');
 });
 it('ម៉ាស៊ីនស្កេន Enter/Tab ក្នុងផ្ទាំង Sign ជ្រើសកញ្ចប់ ដោយមិនផ្ញើទៅជួរបញ្ចូល', async () => {
+    verifiedUiSession();
     const { noteScannerKeyDown } = await import('../src/app/behaviors/scanner-input');
     await openDispatch();
     palmSignState.selectedCodes = [];

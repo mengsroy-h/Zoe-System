@@ -78,7 +78,7 @@ function sliceFn(name) {
 
 const NEEDED = [
     'elapsedSince', 'withTimeout', 'dbOp', 'dbOpStalled', 'armLateCommit', 'notifyIfSlow',
-    'getFormattedDate', 'appZoneParts', 'getZoneDateKey', 'getServerNow',
+    'getFormattedDate', 'appZoneParts', 'getZoneDateKey',
     'ledgerNumber', 'ledgerAppliedDelta', 'ledgerDeltaWithClamp', 'revertLedgerRecordInMemory',
     'recalcItemMoneyFromBarcodes', 'applyLedgerBucketDelta', 'commitRevenueBucketDelta',
     'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'ledgerMemoryCompensationClaimed', 'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual',
@@ -248,6 +248,11 @@ function makeCtx(mode) {
         + NEEDED.filter((n) => sliceFn(n)).map(sliceFn).join('\n'), ctx);
     const operation = moduleRuntime(ROOT, SRC, ['src/core/shop-scope.ts', 'src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts', 'src/services/row-operation-lock.ts', 'src/services/price-operation.ts']);
     vm.runInContext(operation.code, ctx);
+    // getServerNow មាន anchor monotonic ឯកជន; ស្រង់ module ពិតរបស់វា
+    // មិនមែន function ដាច់ដោយឡែកពី state របស់វាទេ។
+    vm.runInContext(moduleRuntime(ROOT, SRC, [
+        { path: 'src/core/clock.ts', expose: ['getServerNow'] }
+    ]).code, ctx);
     ctx.__els = els;
     return ctx;
 }

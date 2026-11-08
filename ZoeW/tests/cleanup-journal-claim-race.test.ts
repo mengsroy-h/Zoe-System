@@ -38,7 +38,7 @@ beforeEach(() => {
     firebaseState.auth = { currentUser: { uid: 'u1', getIdToken: async () => 'fixture-token' } } as any;
     firebaseState.isDatabaseInitialized = true;
     firebaseState.isDatabaseConnected = true;
-    firebaseState.serverClockTrusted = true;
+    firebaseState.sessionExpiryCheck = 'live'; firebaseState.serverClockTrusted = true;
     firebaseState.hasEverConnectedToDatabase = true;
     const ref = (_db: any, path = '') => ({ path, key: path.split('/').pop(), toString: () => 'https://journal-race.firebaseio.com/' + path });
     firebaseState.fb = {

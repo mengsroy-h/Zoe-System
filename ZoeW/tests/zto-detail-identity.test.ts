@@ -243,3 +243,5 @@ describe('ZTO /detail ៖ App ផ្ញើ ID token តែទៅ Function ZTO', 
         expect(text).not.toContain('shop-a-key-0123456789abcdef');
     });
 });
+
+beforeEach(() => { firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live'; });

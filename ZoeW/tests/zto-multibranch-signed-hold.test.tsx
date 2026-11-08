@@ -242,3 +242,5 @@ describe('ZTO-E14 ៖ គម្រោងតែមួយ សាខាច្រើ
         expect(abandoned('o1')).toBe(false);
     });
 });
+
+beforeEach(() => { firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live'; });

@@ -2,6 +2,7 @@ import { fieldValue, focusField, setFieldValue } from '../app/refs';
 import { modalIsOpen } from '../core/modals';
 import { latinDigits } from '../core/text';
 import { firebaseState, scanState, uiState } from '../core/state';
+import { sessionUserActionAllowed } from '../core/session-verification';
 import { viewState } from '../core/view-state';
 import { isBarcodeAlreadyUsed } from '../domain/registry';
 import { triggerScanAction } from './scan-action';
@@ -121,6 +122,7 @@ function pumpBatchScan() {
     const run = batchRun;
     if (!run) return;
     if (!batchSessionIsCurrent(run)) { endBatchScan('session'); return; }
+    if (!sessionUserActionAllowed('scan')) return;
     if (run.waiting) {
         if (currentIsOpen(run)) return;
         run.waiting = false;
@@ -151,7 +153,10 @@ function beginRun(codes: string[], scanner: boolean) {
         db: firebaseState.db, auth: firebaseState.authGeneration, unsubscribe: null
     };
     batchRun = run;
-    run.unsubscribe = uiState.subscribe(() => { if (batchRun === run) pumpBatchScan(); });
+    const pump = () => { if (batchRun === run) pumpBatchScan(); };
+    const stopUi = uiState.subscribe(pump);
+    const stopSession = firebaseState.subscribe(pump);
+    run.unsubscribe = () => { stopUi(); stopSession(); };
     renderBatchScanStatus();
     pumpBatchScan();
 }

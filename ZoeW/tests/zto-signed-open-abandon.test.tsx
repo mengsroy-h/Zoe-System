@@ -227,3 +227,5 @@ describe('8-day rule vs a ZTO-signed barcode that is still open', () => {
         expect(abandoned('plain1')).toBe(true);
     });
 });
+
+beforeEach(() => { firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live'; });

@@ -12,7 +12,7 @@ import { proceedAfterLogin } from './license';
 import { applyCurrentFilter } from './monthly-report';
 import { forgetRememberedLogin, loginBackendScope, rememberLogin } from './login-memory';
 import { forgetLoginPassword, rememberLoginPassword, rememberPasswordPrefIsOff, setRememberPasswordPref } from './password-memory';
-import { clearRememberedSession, clearSensitiveModalFields, showLoginModalWithPrefill } from './session';
+import { armSessionExpiryCheck, clearRememberedSession, clearSensitiveModalFields, showLoginModalWithPrefill } from './session';
 import { renderRecentlyDeleted } from './trash';
 import { detachDatabaseListeners, resetDbListenerHealthState, updateRecentPhonesList } from '../services/db-listeners';
 import { showToast } from '../ui/toast';
@@ -117,6 +117,7 @@ export function setupAuthListener() {
             }
             sessionUid = user.uid;
             firebaseState.autoLoginAttempted = false;
+            armSessionExpiryCheck(user, myAuthGeneration);
             proceedAfterLogin(user, myAuthGeneration);
         } else {
             sessionUid = '';
@@ -193,6 +194,7 @@ export function performLogin(email, password, rememberMe, rememberPassword = !re
 
             if (firebaseState.authGeneration === generationAtLogin && userCredential && userCredential.user) {
                 firebaseState.authGeneration++;
+                armSessionExpiryCheck(userCredential.user, firebaseState.authGeneration);
                 proceedAfterLogin(userCredential.user, firebaseState.authGeneration);
             }
         })

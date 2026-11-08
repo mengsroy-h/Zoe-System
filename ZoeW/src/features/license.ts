@@ -1,4 +1,5 @@
 import { fieldValue, focusField, setFieldValue } from '../app/refs';
+import { openModalIds } from '../core/modals';
 import { viewState } from '../core/view-state';
 import { firebaseState, uiState } from '../core/state';
 import { safeFocusScanner } from '../core/timezone';
@@ -37,14 +38,19 @@ export function licenseFailureMessage(reason) {
     }
 }
 
+let pendingActivation = null;
+let activationRecoveryInFlight = null;
+
 export async function ensureAppActivated() {
     if (viewState.backendKind === 'supabase') {
+        pendingActivation = null;
         closeModal('activationModal');
         return true;
     }
     const sessionIsCurrent = captureAuthDatabaseGuard();
     const status = await ZoeLicense.getStatus(LICENSE_APP_CODE);
     if (!sessionIsCurrent()) return false;
+    pendingActivation = status.reason === 'clock-unverified' ? { isCurrent: sessionIsCurrent, user: firebaseState.auth && firebaseState.auth.currentUser, generation: firebaseState.authGeneration } : null;
     if (status.state === 'active') {
         closeModal('activationModal');
         return true;
@@ -57,7 +63,25 @@ export async function ensureAppActivated() {
     return false;
 }
 
+export function retryPendingActivation() {
+    const pending = pendingActivation;
+    if (!pending) return Promise.resolve(false);
+    if (!pending.isCurrent()) {
+        pendingActivation = null;
+        return Promise.resolve(false);
+    }
+    if (!pending.user || viewState.activationBusy || openModalIds().some((id) => id !== 'activationModal' && id !== 'loginModal')) return Promise.resolve(false);
+    if (activationRecoveryInFlight && activationRecoveryInFlight.isCurrent()) return activationRecoveryInFlight.result;
+    if (activationRetry.timer) { clearTimeout(activationRetry.timer); activationRetry.timer = null; }
+    const recovery = proceedAfterLogin(pending.user, pending.generation).finally(() => {
+        if (activationRecoveryInFlight && activationRecoveryInFlight.result === recovery) activationRecoveryInFlight = null;
+    });
+    activationRecoveryInFlight = { isCurrent: pending.isCurrent, result: recovery };
+    return recovery;
+}
+
 export function runPeriodicLicenseCheck() {
+    if (pendingActivation) return retryPendingActivation();
     if (firebaseState.licenseRecheckInFlight || !firebaseState.auth || !firebaseState.auth.currentUser || !firebaseState.isDatabaseInitialized || uiState.isModalOpen) return Promise.resolve(false);
     firebaseState.licenseRecheckInFlight = true;
     return withTimeout(ensureAppActivated(), 20000, 'Periodic activation check timed out').then((result) => result, (error) => {
@@ -120,6 +144,7 @@ export function cancelActivationRetry() {
 }
 
 export function scheduleActivationRetry(user, myAuthGeneration) {
+    const sessionIsCurrent = captureAuthDatabaseGuard();
     if (activationRetry.generation !== myAuthGeneration) cancelActivationRetry();
     const attempt = activationRetry.attempt;
     if (attempt >= ACTIVATION_RETRY_STEPS_MS.length) {
@@ -132,32 +157,37 @@ export function scheduleActivationRetry(user, myAuthGeneration) {
     activationRetry.attempt = attempt + 1;
     activationRetry.timer = setTimeout(() => {
         activationRetry.timer = null;
-        if (myAuthGeneration !== firebaseState.authGeneration) return;
+        if (!sessionIsCurrent() || myAuthGeneration !== firebaseState.authGeneration) return;
         if (!firebaseState.auth || firebaseState.auth.currentUser !== user) return;
-        proceedAfterLogin(user, myAuthGeneration);
+        if (pendingActivation) void retryPendingActivation();
+        else void proceedAfterLogin(user, myAuthGeneration);
     }, ACTIVATION_RETRY_STEPS_MS[attempt]);
     if (attempt === 0) showToast(ACTIVATION_RETRY_TOAST);
     return true;
 }
 
 export async function proceedAfterLogin(user, myAuthGeneration) {
+    if (myAuthGeneration !== firebaseState.authGeneration || !firebaseState.auth || firebaseState.auth.currentUser !== user) return false;
+    const sessionIsCurrent = captureAuthDatabaseGuard();
     refreshShopBoundUi();
     let activated;
     try {
         activated = await withTimeout(ensureAppActivated(), 20000, 'Activation check timed out');
     } catch (e) {
-        if (myAuthGeneration !== firebaseState.authGeneration) return;
+        if (!sessionIsCurrent()) return false;
         console.error("Activation check failed:", e);
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Activation check after login" });
         scheduleActivationRetry(user, myAuthGeneration);
-        return;
+        return false;
     }
-    if (myAuthGeneration !== firebaseState.authGeneration) return;
-    cancelActivationRetry();
+    if (!sessionIsCurrent()) return false;
     if (!activated) {
         closeModal('loginModal');
-        return;
+        if (pendingActivation && pendingActivation.isCurrent()) scheduleActivationRetry(user, myAuthGeneration);
+        else cancelActivationRetry();
+        return false;
     }
+    cancelActivationRetry();
 
     closeModal('loginModal');
     const wasAlreadySignedIn = dbListenersBelongToSession();
@@ -172,4 +202,5 @@ export async function proceedAfterLogin(user, myAuthGeneration) {
     resumeInterruptedCleanups();
     prefetchCustomerDataTableRowsIfConfigured();
     safeFocusScanner();
+    return true;
 }

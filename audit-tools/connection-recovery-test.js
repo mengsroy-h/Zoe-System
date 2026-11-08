@@ -1144,7 +1144,10 @@ function buildContext() {
     const refs = { connected: { path: 'connected' }, offset: { path: 'offset' } };
     const ctx = {
         console: { error: () => {} }, Set, Math,
-        navigator: { onLine: true }, window: {},
+        navigator: { onLine: true }, window: { ZoeLicense: {
+            syncServerTime: () => ({ then: (done) => { done(true); return { catch() {} }; } }),
+            getTrustedServerNow: () => 1700000001234, getServerTimeOffset: () => 1234
+        } },
         setTimeout: () => 1, clearTimeout: () => {},
         db: {}, dbRefConnected: refs.connected, dbRefServerTimeOffset: refs.offset,
         renderConnectionStatus: () => {}, scheduleReconnectWatchdog: () => {},
@@ -1170,6 +1173,7 @@ function buildContext() {
         sliceFnFrom(kg, 'clearInfoListenerRecovery') + '\n' +
         sliceFnFrom(kg, 'noteInfoListenerAlive') + '\n' +
         sliceFnFrom(kg, 'detachInfoListeners') + '\n' +
+        (sliceFnFrom(kg, 'getTrustedServerNow') || '') + '\n' +
         sliceFnFrom(kg, 'attachInfoListeners') + '\n' +
         'this.__probe = () => ({ failed: infoListenersFailed, timer: infoListenerRecoveryTimer, pending: Array.from(infoListenerFailedPaths), connected: isDatabaseConnected, offset: serverTimeOffsetMs, synced: serverTimeSynced });\n';
     try {

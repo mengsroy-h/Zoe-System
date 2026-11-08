@@ -242,3 +242,5 @@ describe('ZTO ៖ ទាញស្ថានភាពស្របគ្នាម�
         expect(ztoPickupStatus.get(codes[2]).closed).toBe(true);
     });
 });
+
+beforeEach(() => { firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live'; });

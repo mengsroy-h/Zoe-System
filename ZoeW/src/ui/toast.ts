@@ -1,4 +1,5 @@
 import { securityState, uiState } from '../core/state';
+import { sessionVerificationRequired } from '../core/session-verification';
 import { viewState } from '../core/view-state';
 
 let toastSeq = 0;
@@ -95,7 +96,7 @@ export function armToastDismiss(el, delay) {
     const item = toastItem(el);
     if (!item) return;
     clearToastTimer(item.id);
-    if (securityState.appIsLocked) {
+    if (securityState.appIsLocked || sessionVerificationRequired()) {
         heldToastDelays.set(item.id, delay);
         return;
     }
@@ -104,6 +105,10 @@ export function armToastDismiss(el, delay) {
         toastTimers.delete(item.id);
         const live = toastItem(item.id);
         if (!live) return;
+        if (securityState.appIsLocked || sessionVerificationRequired()) {
+            heldToastDelays.set(item.id, delay);
+            return;
+        }
         if (live.live !== null && expireLiveToast(live)) return;
         live.show = false;
         uiState.touch();
@@ -111,11 +116,11 @@ export function armToastDismiss(el, delay) {
     }, delay));
 }
 
-export function releaseHeldToasts() {
+export function releaseHeldToasts(refresh = true) {
     if (!heldToastDelays.size) return;
     const held = Array.from(heldToastDelays.entries());
     heldToastDelays.clear();
-    refreshLiveToasts();
+    if (refresh) refreshLiveToasts();
     for (let i = 0; i < held.length; i++) {
         if (toastTimers.has(held[i][0]) || !toastItem(held[i][0])) continue;
         armToastDismiss(held[i][0], held[i][1]);
@@ -226,6 +231,7 @@ export function refreshLiveToasts() {
         expiredLiveKeys.delete(key);
         if (state && state.kind === 'success' && showToast(state.msg, 'success') !== null) liveSuccessAnnounced++;
     });
+    if (!securityState.appIsLocked && !sessionVerificationRequired()) releaseHeldToasts(false);
 }
 
 let networkToastEpisode = false;
@@ -293,6 +299,9 @@ export function liveToastState(key) {
         return firebaseState.sessionExpiryCheck === 'expired'
             ? { msg: SESSION_EXPIRED_TOAST, kind: 'warn', settled: true }
             : { msg: SESSION_SIGNED_OUT_TOAST, kind: 'warn', settled: true };
+    }
+    if (key === 'signin' && firebaseState.sessionExpiryCheck === 'unverified') {
+        return { msg: '⚠️ មិនទាន់ផ្ទៀងផ្ទាត់សុពលភាពវគ្គ — សូមភ្ជាប់អ៊ីនធឺណិត រួចផ្ទៀងផ្ទាត់ម្ដងទៀត', kind: 'warn', settled: false };
     }
     if ((navigator.onLine as boolean) === false) {
         return key === 'signin'

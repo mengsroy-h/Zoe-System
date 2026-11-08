@@ -98,7 +98,7 @@ function extractConst(src, name) {
 }
 
 const src = fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, '\n');
-const protocolRuntime = moduleRuntime(ROOT, src, ['src/domain/scan-protocol.ts', { path: 'src/domain/registry-purge-proof.ts', expose: ['REGISTRY_RELEASES_ROOT', 'REGISTRY_PURGE_MAX_WRITES', 'boundedRegistryPurgeIntent', 'slotRegistryPurgeIntent', 'registryPurgeReceiptValid', 'registryPurgeReceiptMatches', 'registryPurgeIntent'] }, { path: 'src/services/registry-purge.ts', expose: ['purgeTrashWithRegistry'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations'] }]);
+const protocolRuntime = moduleRuntime(ROOT, src, [{ path: 'src/core/session-verification.ts', expose: ['sessionVerificationRequired'] }, { path: 'src/core/clock.ts', expose: ['getServerClockBounds', 'captureClockOperation', 'serverClockIsTrustworthy', 'cleanupClockIsTrustworthy'] }, 'src/domain/scan-protocol.ts', { path: 'src/domain/trash-claim.ts', expose: ['trashClaimMayBeLive'] }, { path: 'src/domain/registry-purge-proof.ts', expose: ['REGISTRY_RELEASES_ROOT', 'REGISTRY_PURGE_MAX_WRITES', 'boundedRegistryPurgeIntent', 'slotRegistryPurgeIntent', 'registryPurgeReceiptValid', 'registryPurgeReceiptMatches', 'registryPurgeIntent'] }, { path: 'src/services/registry-purge.ts', expose: ['purgeTrashWithRegistry'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations'] }]);
 
 const FNS = ['safeStoreGet', 'safeStoreSet', 'safeStoreRemove', 'barcodeEntriesOf', 'normalizeBarcodesOf', 'stripHistoryOnlyMarkers', 'trashClaimPolicy', 'newTrashClaimToken', 'trashClaimAge', 'trashClaimHeldByOther', 'ownLeftoverTrashClaim', 'trashClaimOwned', 'stripTrashClaim', 'itemHasLiveTrashClaim', 'trashClaimRecords', 'writeTrashClaimRecords', 'noteTrashClaim', 'forgetTrashClaim', 'pendingTrashClaims', 'trashClaimOwner', 'trashClaimOwnerIsCurrent', 'claimTrashBarcodes', 'releaseTrashClaims', 'beginTrashClaim', 'releaseLeftoverTrashClaims', 'itemHasRestoreMarkers', 'dropStaleRestoreMarkers',
     'applyBarcodeCloseState', 'barcodeCloseIsRipe', 'barcodeAbandonIsRipe', 'barcodeAbandonBasis', 'itemAbandonRipeAt', 'parseTimestampFromId',
@@ -175,13 +175,15 @@ function buildWorld(store, now) {
         })
     };
     const context = vm.createContext({ ztoState: { ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 }, ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 } }, ZTO_TRASH_MODE_ACTIVE_MS: 7 * 24 * 60 * 60 * 1000, 
-        crypto: require('crypto').webcrypto, TextEncoder, console: auditConsole, queueMicrotask, setTimeout, clearTimeout, Promise, Math, Date, JSON, window: {},
+        crypto: require('crypto').webcrypto, TextEncoder, console: auditConsole, queueMicrotask, setTimeout, clearTimeout, Promise, Math, Date: class extends Date { static now() { return world.now; } }, JSON, window: {},
         db: { app: { options: { databaseURL: 'https://marker-fixture.invalid' } } }, fb, authGeneration: 0, appLocalStore,
         auth: { currentUser: { uid: 'fixture-user' } }, isInitializingFirebase: false,
         dataState: { pickupPendingVersion: 0 }, dailyPickupData: {},
         getLookupApiConfig: () => null,
         dbRefDeleted: fb.ref({}, 'zoew_recently_deleted_cod_dod'),
         dbRefHistory: fb.ref({}, 'zoew_scan_history_cod_dod'),
+        // offset បែបសាកល្បងត្រូវគ្នានឹងនាឡិកាអាជីវកម្មថេរខាងក្រោម។
+        sessionExpiryCheck: 'live', serverTimeOffsetMs: 0,
         getServerNow: () => world.now,
         getFormattedDate: () => '2026-08-26',
         ...ledgerStubEntries((d, cod, dod, count) => world.revenueLog.push({ d: d, cod: cod, dod: dod, count: count })),

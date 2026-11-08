@@ -8,6 +8,7 @@
 import { performance } from 'node:perf_hooks';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../src/core/state';
+import { resetServerClock } from '../src/core/clock';
 import { appLocalStore } from '../src/core/storage';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { getZoneDateKey } from '../src/core/timezone';
@@ -459,4 +460,53 @@ it('⛔ ការពិតស្ថិតិយក ៖ copy ក្នុងធ�
     const marks = pickup.pickupTruthMarks(DAY, wanted, [pending], trash);
     const closedOf = (code: string) => marks.find((m) => m.key === key(code))?.closed;
     expect([closedOf('M5T0001'), closedOf('M5T0002'), closedOf('M5T0003'), closedOf('M5T0004')]).toEqual([false, false, true, true]);
+});
+
+it('មិនដក Barcode ពេលនាឡិកាមិនទាន់បានផ្ទៀងផ្ទាត់', async () => {
+    seedItem('p1', ['M5P0001', 'M5P0002'], ['M5P0001']);
+    loadViewsFromServer();
+    const source = clone(dataState.scanHistory[0]);
+    expect(source?.barcodes?.length).toBeGreaterThan(0);
+    firebaseState.serverClockTrusted = false;
+    const before = clone(lab.store[HISTORY]);
+    expect(await removeSingleBarcode(source.id, source.barcodes[0].code)).toBe('failed');
+    expect(lab.store[HISTORY]).toEqual(before);
+    expect(trashItems()).toEqual([]);
+});
+
+
+it('មិនដកតាមគម្រោងចាស់ក្រោយនាឡិកាបាត់ទំនុកចិត្ត និង Sync វិញ', async () => {
+    seedItem('p1', ['M5P0001', 'M5P0002'], ['M5P0001']);
+    loadViewsFromServer();
+    let calls = 0;
+    lab.txGate = (path) => {
+        if (path === HISTORY + '/p1' && ++calls === 2) {
+            resetServerClock();
+            firebaseState.serverClockTrusted = true;
+        }
+        return null;
+    };
+    expect(await removeSingleBarcode('p1', 'M5P0001')).not.toBe('done');
+    expect(calls).toBeGreaterThanOrEqual(2);
+    expect(serverBarcode('p1', 'M5P0001')).not.toBeNull();
+    expect(trashItems()).toEqual([]);
+});
+
+it('ការដកដែលបានបញ្ជាក់នៅតែបញ្ចប់ដោយពេលគម្រោងដើម បើនាឡិកាប្រែក្រោយសរសេរ', async () => {
+    seedItem('p1', ['M5P0001', 'M5P0002'], ['M5P0001']);
+    loadViewsFromServer();
+    const runTransaction = firebaseState.fb.runTransaction;
+    let calls = 0;
+    firebaseState.fb.runTransaction = async (ref, updater) => {
+        const result = await runTransaction(ref, updater);
+        if (ref.path === HISTORY + '/p1' && ++calls === 2 && result.committed) {
+            firebaseState.serverClockTrusted = false;
+            firebaseState.serverTimeOffsetMs = 7 * 86400000;
+        }
+        return result;
+    };
+    expect(await removeSingleBarcode('p1', 'M5P0001')).toBe('done');
+    expect(trashItems()).toHaveLength(1);
+    expect(trashItems()[0].closedAt).toBe(NOW);
+    expect(serverBarcode('p1', 'M5P0001')).toBeNull();
 });

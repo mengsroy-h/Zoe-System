@@ -98,7 +98,7 @@ function buildWorld(mode) {
     const store = {};
     const ctx = { ztoState: { ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 }, ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 } }, ZTO_TRASH_MODE_ACTIVE_MS: 7 * 24 * 60 * 60 * 1000, 
         console: { log: () => {}, error: () => {}, warn: () => {} },
-        Promise, JSON, Object, Array, Number, String, Boolean, Math, Set, Map, Date,
+        Promise, JSON, Object, Array, Number, String, Boolean, Math, Set, Map, Date: class extends Date { static now() { return NOW; } },
         setTimeout, clearTimeout, isNaN, parseFloat, parseInt, isFinite,
         window: { ZoeErrors: recorder }, ZoeErrors: recorder,
         appLocalStore: { getItem: () => null },
@@ -107,8 +107,11 @@ function buildWorld(mode) {
     vm.createContext(ctx);
     const preamble = `
 let db = {}, fb = null;
+const auth = { currentUser: { uid: 'fixture-user' }, app: { options: { databaseURL: 'https://stale-claim.invalid' } } };
+let authGeneration = 0;
 let scanHistory = [], deletedItems = [];
-let serverClockTrusted = true, isDatabaseConnected = true;
+// នាឡិកាទុកចិត្តបែបសាកល្បង; ការវាស់ claim ចាស់រក្សាម៉ោងថេរដើម។
+let serverTimeOffsetMs = 0, serverClockTrusted = true, isDatabaseConnected = true;
 const cleanupInFlight = new Set(), staleRestoreMarkerSweeps = new Set();
 const staleClearClaimSweeps = new Set();
 const activeRestoreClaims = new Map();
@@ -137,7 +140,7 @@ function itemAbandonRipeAt(item, p) { return p + ABANDON_AGE_MS; }
         + (extractFn(src, 'liveShopScope') || "function liveShopScope() { return shopScope(); }") + '\n'
         + 'function abandonZtoSignedHolds() { return new Set(); }\n'
         + (extractFn(src, 'shopScopePending') || 'function shopScopePending() { return false; }');
-    const rowRuntime = moduleRuntime(ROOT, src, ['src/services/row-operation-lock.ts']);
+    const rowRuntime = moduleRuntime(ROOT, src, [{ path: 'src/core/clock.ts', expose: ['getServerClockBounds', 'captureClockOperation', 'serverClockIsTrustworthy'] }, { path: 'src/core/storage.ts', expose: ['safeStoreGet'] }, 'src/services/row-operation-lock.ts', { path: 'src/services/trash-generation.ts', expose: ['captureTrashGenerationOwner', 'trashGenerationOwnerCurrent'] }]);
     vm.runInContext(rowRuntime.code + '\n' + preamble + NEEDED_CONSTS.map(constSource).join('\n') + '\n' + SHOP_GATE + '\n'
         + FNS.map(fnSource).join('\n') + `
 globalThis.__setFb = (i) => { fb = i; };

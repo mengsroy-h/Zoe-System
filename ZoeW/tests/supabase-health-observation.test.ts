@@ -47,7 +47,7 @@ describe('សុខភាព Supabase ប្រើ transport និង database 
         const before = database.snapshotState();
         expect((await read()).val()).toBe(null);
         expect(database.snapshotState()).toEqual(before);
-        expect(connected).toEqual([false]); expect(offsets).toEqual([0]);
+        expect(connected).toEqual([false]); expect(offsets).toEqual([]);
         expect(fetchSpy).toHaveBeenCalledTimes(1);
         expect(auth.getSession).not.toHaveBeenCalled();
         expect(auth.refreshSession).not.toHaveBeenCalled();

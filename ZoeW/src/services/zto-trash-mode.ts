@@ -1,5 +1,5 @@
 import { firebaseState, ztoState } from '../core/state';
-import { cleanupClockIsTrustworthy, getServerNow } from '../core/clock';
+import { captureClockOperation, cleanupClockIsTrustworthy, getServerClockBounds, getServerNow } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
 import { sameShop, shopScope } from '../core/shop-scope';
 import { appLocalStore, appSessionStore, safeStoreGet, safeStoreSet } from '../core/storage';
@@ -174,9 +174,13 @@ export function shopZtoTrashMode() {
     const shop = ztoState.ztoTrashMode;
     if (shop.state === 'pending' || shop.state === 'failed') return '';
     if (shop.state !== 'ok') return 'local';
-    const now = getServerNow();
-    const mode = shop.palmAt && now - shop.palmAt <= ZTO_TRASH_MODE_ACTIVE_MS ? 'palm'
-        : shop.cookieAt && now - shop.cookieAt <= ZTO_TRASH_MODE_ACTIVE_MS ? 'cookie' : 'local';
+    const bounds = getServerClockBounds();
+    if (!bounds) {
+        const prior = lastSeenShopZtoTrashMode();
+        return prior === 'palm' || prior === 'cookie' ? prior : '';
+    }
+    const mode = shop.palmAt && bounds.lowerMs - shop.palmAt <= ZTO_TRASH_MODE_ACTIVE_MS ? 'palm'
+        : shop.cookieAt && bounds.lowerMs - shop.cookieAt <= ZTO_TRASH_MODE_ACTIVE_MS ? 'cookie' : 'local';
     const scope = shopScope();
     if (ztoTrashModeSeen.shop !== scope || ztoTrashModeSeen.mode !== mode) ztoTrashModeSeen = { shop: scope, mode };
     return mode;
@@ -233,12 +237,17 @@ function noteZtoTrashModeRefused(err, markDb, generation, account, op) {
     return true;
 }
 
-function sendZtoTrashModeWrite(path, update, op) {
+function sendZtoTrashModeWrite(path, update, op, clockOperation = null) {
     const sdk = firebaseState.fb;
     const markDb = firebaseState.db;
     const generation = firebaseState.authGeneration;
     const account = ztoTrashModeAccount();
-    const updater = Object.assign(update, { txOutcomeWitness: () => 'not-applied', txAdvisory: true });
+    const scope = shopScope();
+    const updater = Object.assign((current) => {
+        if (markDb !== firebaseState.db || generation !== firebaseState.authGeneration || account !== ztoTrashModeAccount()
+            || !sameShop(scope, shopScope()) || !ztoTrashModeWritable() || clockOperation && !clockOperation.current()) return undefined;
+        return update(current);
+    }, { txOutcomeWitness: () => 'not-applied', txAdvisory: true });
     return Promise.resolve().then(() => sdk.runTransaction(sdk.ref(markDb, ZTO_TRASH_MODE_PATH + '/' + path), updater))
         .catch((err) => {
             noteZtoTrashModeRefused(err, markDb, generation, account, op);
@@ -275,6 +284,8 @@ function addZtoTrashModeIntent(shop, path) {
 export function markZtoTrashMode(deviceMode) {
     const key = ZTO_TRASH_MODE_KEYS[deviceMode];
     if (!key || !ztoTrashModeWritable() || ztoTrashModeRefusedHere()) return false;
+    const clockOperation = captureClockOperation();
+    if (!clockOperation.current()) return false;
     const device = ztoTrashModeDeviceKey();
     if (!device) return false;
     const path = deviceMode + '/' + device;
@@ -283,7 +294,7 @@ export function markZtoTrashMode(deviceMode) {
     if (stamp && now - stamp < ZTO_TRASH_MODE_MARK_GAP_MS) return false;
     if (elapsedSince(ztoState.ztoTrashModeWrote[key]) < ZTO_TRASH_MODE_RETRY_MS) return false;
     ztoState.ztoTrashModeWrote = ztoTrashModeGapStamp(ztoState.ztoTrashModeWrote, key);
-    sendZtoTrashModeWrite(path, () => now, 'stamp').catch(() => {});
+    sendZtoTrashModeWrite(path, () => now, 'stamp', clockOperation).catch(() => {});
     return true;
 }
 
@@ -344,9 +355,11 @@ export function pruneZtoTrashMode() {
     const shop = ztoState.ztoTrashMode;
     if (!ztoTrashModeWritable() || ztoTrashModeRefusedHere() || !cleanupClockIsTrustworthy()) return 0;
     if (elapsedSince(ztoTrashModePrunedAt) < ZTO_TRASH_MODE_RETRY_MS) return 0;
-    const now = getServerNow();
-    const stale = Object.keys(shop.stamps).filter((path) => now - shop.stamps[path] > ZTO_TRASH_MODE_ACTIVE_MS
-        || shop.stamps[path] - now > ZTO_TRASH_MODE_FUTURE_MS).sort();
+    const clockOperation = captureClockOperation();
+    const bounds = getServerClockBounds();
+    if (!clockOperation.current() || !bounds) return 0;
+    const stale = Object.keys(shop.stamps).filter((path) => bounds.lowerMs - shop.stamps[path] > ZTO_TRASH_MODE_ACTIVE_MS
+        || shop.stamps[path] - bounds.upperMs > ZTO_TRASH_MODE_FUTURE_MS).sort();
     if (!stale.length) return 0;
     const start = ztoTrashModePruneTurn % stale.length;
     const batch = stale.slice(start).concat(stale.slice(0, start)).slice(0, ZTO_TRASH_MODE_PRUNE_MAX);
@@ -354,7 +367,12 @@ export function pruneZtoTrashMode() {
     ztoTrashModePrunedAt = Date.now();
     for (const path of batch) {
         const seen = shop.stamps[path];
-        sendZtoTrashModeWrite(path, (current) => (current == null || current === seen ? null : undefined), 'prune').catch(() => {});
+        sendZtoTrashModeWrite(path, (current) => {
+            const currentBounds = getServerClockBounds();
+            if (!cleanupClockIsTrustworthy() || !currentBounds
+                || !(currentBounds.lowerMs - seen > ZTO_TRASH_MODE_ACTIVE_MS || seen - currentBounds.upperMs > ZTO_TRASH_MODE_FUTURE_MS)) return undefined;
+            return current == null || current === seen ? null : undefined;
+        }, 'prune', clockOperation).catch(() => {});
     }
     return batch.length;
 }

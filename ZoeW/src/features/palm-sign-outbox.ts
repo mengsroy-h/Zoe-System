@@ -1,5 +1,5 @@
 import { rowOperationActive } from '../services/row-operation-lock';
-import { getServerNow, cleanupClockIsTrustworthy } from '../core/clock';
+import { getServerNow, cleanupClockIsTrustworthy, captureClockOperation, getServerClockBounds } from '../core/clock';
 import { palmOriginalFingerprint } from '../services/palm-sign-transport';
 import { PALM_PHOTO_PROTOCOL as PHOTO_PROTOCOL, palmOriginalPhotoHash, palmScanConfirmed as scanConfirmed, palmPhotoConfirmed } from '../services/palm-sign-transport';
 import { createStore, registerStore } from '../core/store';
@@ -137,9 +137,11 @@ export async function persistPalmSignJob(input: Pick<SignJob, 'code' | 'itemId' 
         const currentBarcode = currentItem?.barcodes?.find((entry) => entry.code === input.code);
         return !!currentBarcode && !rowOperationActive(currentItem) && barcodeSignIdentity(currentItem, currentBarcode) === identity;
     };
-    const row = await sealSignJob(op.owner, op.key, { ...input, signQueuedAt: getServerNow(), signMan: input.signMan.trim(), reservationProtocol: PALM_RESERVATION_PROTOCOL,
+    const clock = captureClockOperation();
+    const signQueuedAt = clock.current() ? getServerNow() : undefined;
+    const row = await sealSignJob(op.owner, op.key, { ...input, signQueuedAt, signMan: input.signMan.trim(), reservationProtocol: PALM_RESERVATION_PROTOCOL,
         originalFingerprint: await palmOriginalFingerprint(input.code, input.requestId, input.signMan, input.photo), originalSHA256: await palmOriginalPhotoHash(input.photo), signature: op.signature, parcelIdentity: barcodeSignIdentity(item, barcode), phase: 'queued', attempts: 0, message: '⏳ កំពុងផ្ញើរូប និង Sign ទៅ ZTO' });
-    const added = await addSignJob(row, () => op.current() && current() && parcelCurrent(), op.key);
+    const added = await addSignJob(row, () => op.current() && current() && parcelCurrent() && (signQueuedAt === undefined || clock.current()), op.key);
     if (!added) throw new Error('outbox:duplicate');
     if (op.current()) {
         if (palmSignOutboxState.owner !== op.owner) { palmSignOutboxState.rows = []; palmSignOutboxState.recoveryRows = []; }
@@ -150,10 +152,13 @@ export async function persistPalmSignJob(input: Pick<SignJob, 'code' | 'itemId' 
 }
 
 async function updateJob(op: NonNullable<ReturnType<typeof localContext>>, value: StoredSignJob, patch: Partial<SignJob>, due = 0, leaseUntil = 0) {
+    const clock = patch.userRetryAt === undefined ? null : captureClockOperation();
+    if (clock && !clock.current()) throw new Error('outbox:clock');
+    const current = () => op.current() && (!clock || clock.current());
     const job = { ...value.job, ...patch };
     const sealed = await sealSignJob(op.owner, op.key, job);
     const next = { ...sealed, revision: value.row.revision + 1, due, leaseUntil };
-    if (!await replaceSignJob(value.row, next, op.current)) throw new Error('outbox:changed');
+    if (!await replaceSignJob(value.row, next, current)) throw new Error('outbox:changed');
     value.row = next;
     value.job = job;
 }
@@ -270,8 +275,11 @@ function retainedParcelCurrent(job: SignJob) {
 
 async function retainSignedJob(op: NonNullable<ReturnType<typeof context>>, value: StoredSignJob, check: SignRecoveryCheck) {
     if (!op.current() || !check.signedStatusVerified || !retainedParcelCurrent(value.job)) return false;
-    const verifiedAt = value.job.signedVerifiedAt || (cleanupClockIsTrustworthy() ? getServerNow() : undefined);
-    await updateJob({ ...op, current: () => op.current() && retainedParcelCurrent(value.job) }, value, { recovery: { ...(value.job.recovery || { archivedAt: Date.now(), previousPhase: value.job.phase, previousMessage: value.job.message }), dismissed: true },
+    const clock = captureClockOperation();
+    const existing = Number.isFinite(value.job.signedVerifiedAt) && value.job.signedVerifiedAt! > 0;
+    const verifiedAt = existing ? value.job.signedVerifiedAt : cleanupClockIsTrustworthy() && clock.current() ? getServerNow() : undefined;
+    await updateJob({ ...op, current: () => op.current() && retainedParcelCurrent(value.job)
+        && (existing || verifiedAt === undefined || clock.current() && cleanupClockIsTrustworthy()) }, value, { recovery: { ...(value.job.recovery || { archivedAt: Date.now(), previousPhase: value.job.phase, previousMessage: value.job.message }), dismissed: true },
         phase: 'action', readOnlyProbe: true, continueRequested: false, continuationAllowed: false,
         recoveryCheck: { ...check, continuation: undefined }, signedCleanupConfirmed: true, signedVerifiedAt: verifiedAt,
         signedCleanupAt: verifiedAt ? verifiedAt + SIGN_CLEANUP_MS : undefined, message: '✅ ZTO បញ្ជាក់ Sign រួច។ ការងារ រូបដើម និងប្រវត្តិក្នុងឧបករណ៍នឹងលុបអចិន្ត្រៃយ៍ក្រោយ 24 ម៉ោង។' });
@@ -755,29 +763,36 @@ async function maintainQueueLifecycle(op: NonNullable<ReturnType<typeof localCon
         if (!op.current()) return;
         if (activeJobs.has(value.row.id) || busyActions.has(value.row.id)
             || pendingDeadline(value.row.leaseUntil, Date.now(), SIGN_OUTBOX_LEASE_MS)) continue;
+        const clock = captureClockOperation();
+        const current = () => op.current() && clock.current() && cleanupClockIsTrustworthy();
+        const bounds = getServerClockBounds();
         const now = getServerNow();
-        if (!Number.isFinite(now) || now <= 0) continue;
+        if (!current() || !bounds || !Number.isFinite(now) || now <= 0) continue;
         const job = value.job;
+        const ageCurrent = (since: number, age: number) => {
+            const fresh = getServerClockBounds();
+            return current() && !!fresh && fresh.lowerMs - since >= age;
+        };
         if (job.signedCleanupAt !== undefined) {
-            if (cleanupClockIsTrustworthy() && Number.isFinite(now) && Number.isFinite(job.signedVerifiedAt)
-                && job.signedVerifiedAt! > 0 && job.signedCleanupAt === job.signedVerifiedAt! + SIGN_CLEANUP_MS
-                && now >= job.signedCleanupAt && job.signedCleanupConfirmed === true) {
-                await replaceSignJob(value.row, null, () => {
-                    const commitNow = getServerNow();
-                    return op.current() && cleanupClockIsTrustworthy() && Number.isFinite(commitNow) && commitNow >= job.signedCleanupAt!;
-                });
+            if (Number.isFinite(job.signedVerifiedAt) && job.signedVerifiedAt! > 0
+                && job.signedCleanupAt === job.signedVerifiedAt! + SIGN_CLEANUP_MS
+                && bounds.lowerMs >= job.signedCleanupAt && job.signedCleanupConfirmed === true) {
+                await replaceSignJob(value.row, null, () => ageCurrent(job.signedVerifiedAt!, SIGN_CLEANUP_MS));
             }
             continue;
         }
         if (job.signedCleanupConfirmed === true) {
-            if (cleanupClockIsTrustworthy() && Number.isFinite(now) && now > 0) await updateJob(op, value, { signedVerifiedAt: now, signedCleanupAt: now + SIGN_CLEANUP_MS });
+            const verifiedAt = Number.isFinite(job.signedVerifiedAt) && job.signedVerifiedAt! > 0 ? job.signedVerifiedAt! : now;
+            await updateJob({ ...op, current }, value, { signedVerifiedAt: verifiedAt, signedCleanupAt: verifiedAt + SIGN_CLEANUP_MS });
             continue;
         }
         if (job.recovery || signedEvidence(job)) continue;
-        if (!Number.isFinite(job.signQueuedAt) || job.signQueuedAt! <= 0 || job.signQueuedAt! > now) {
-            await updateJob(op, value, { signQueuedAt: now }, value.row.due, value.row.leaseUntil);
-        } else if (now - (Number.isFinite(job.userRetryAt) && job.userRetryAt! >= job.signQueuedAt! && job.userRetryAt! <= now ? job.userRetryAt! : job.signQueuedAt!) >= SIGN_QUEUE_WAIT_MS) {
-            await updateJob(op, value, { recovery: { archivedAt: now, previousPhase: job.phase, previousMessage: job.message },
+        if (!Number.isFinite(job.signQueuedAt) || job.signQueuedAt! <= 0) {
+            await updateJob({ ...op, current }, value, { signQueuedAt: now }, value.row.due, value.row.leaseUntil);
+        } else {
+            const since = Number.isFinite(job.userRetryAt) && job.userRetryAt! >= job.signQueuedAt! ? job.userRetryAt! : job.signQueuedAt!;
+            if (bounds.lowerMs - since < SIGN_QUEUE_WAIT_MS) continue;
+            await updateJob({ ...op, current: () => ageCurrent(since, SIGN_QUEUE_WAIT_MS) }, value, { recovery: { archivedAt: now, previousPhase: job.phase, previousMessage: job.message },
                 phase: 'action', readOnlyProbe: true, continueRequested: false, continuationAllowed: false,
                 message: '⚠️ ហួសពេលរង់ចាំ 10 នាទី។ ' + job.message });
         }

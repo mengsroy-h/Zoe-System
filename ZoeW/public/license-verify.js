@@ -19,8 +19,81 @@
 
     let serverTimeOffsetMs = 0;
     let serverTimeSynced = false;
+    let serverTimeAnchor = null;
+    let serverTimeGeneration = 0;
+    let serverTimeObservation = 0;
+    let serverTimeExternalSample = null;
+    const CLOCK_DIVERGENCE_MS = 2000;
+
+    function readClock() {
+        let mono;
+        try { mono = performance.now(); } catch (e) { return null; }
+        const wall = Date.now();
+        return Number.isFinite(mono) && Number.isFinite(wall) ? { mono: mono, wall: wall } : null;
+    }
+
+    function resetServerTime() {
+        serverTimeAnchor = null;
+        serverTimeSynced = false;
+        serverTimeOffsetMs = 0;
+        serverTimeGeneration++;
+        serverTimeObservation++;
+    }
+
+    function clockElapsed(start, end) {
+        if (!start || !end) return null;
+        const mono = end.mono - start.mono;
+        const wall = end.wall - start.wall;
+        return mono >= 0 && wall >= 0 && Math.abs(mono - wall) <= CLOCK_DIVERGENCE_MS ? Math.max(mono, wall) : null;
+    }
+
+    function trustedClock() {
+        if (!serverTimeAnchor) return null;
+        const clock = readClock();
+        const age = clockElapsed(serverTimeAnchor, clock);
+        if (age === null || age > OFFLINE_GRACE_MS) {
+            resetServerTime();
+            return null;
+        }
+        const lowerAge = Math.min(clock.mono - serverTimeAnchor.mono, clock.wall - serverTimeAnchor.wall);
+        return { now: serverTimeAnchor.epoch + lowerAge, uncertainty: serverTimeAnchor.uncertainty + age - lowerAge, clock: clock };
+    }
+
+    function getTrustedServerNow() {
+        const current = trustedClock();
+        return current ? current.now : null;
+    }
+
+    function getServerTimeGeneration() {
+        trustedClock();
+        return serverTimeGeneration;
+    }
+
+    function getServerTimeSample() {
+        if (!trustedClock()) return null;
+        return serverTimeAnchor.sample;
+    }
+
+    function acceptServerTime(epoch, clock, uncertainty, source) {
+        if (!Number.isFinite(epoch) || epoch <= 0 || epoch > 8640000000000000 || !clock || !Number.isFinite(uncertainty) || uncertainty < 0) return false;
+        const previous = trustedClock();
+        const currentClock = readClock();
+        const age = clockElapsed(clock, currentClock);
+        if (age === null || age > OFFLINE_GRACE_MS) return false;
+        const lowerAge = Math.min(currentClock.mono - clock.mono, currentClock.wall - clock.wall);
+        if (previous && (epoch + lowerAge > previous.now + previous.uncertainty + CLOCK_DIVERGENCE_MS || epoch + uncertainty + age < previous.now - CLOCK_DIVERGENCE_MS)) resetServerTime();
+        serverTimeAnchor = { epoch: epoch, mono: clock.mono, wall: clock.wall, uncertainty: uncertainty, source: source };
+        serverTimeOffsetMs = epoch - clock.wall;
+        serverTimeSynced = true;
+        serverTimeObservation++;
+        serverTimeAnchor.sample = Object.freeze({ epochMs: epoch, monotonicMs: clock.mono, wallMs: clock.wall,
+            uncertaintyMs: uncertainty, generation: serverTimeGeneration, observation: serverTimeObservation, source: source });
+        return true;
+    }
+
     function getServerNow() {
-        return Date.now() + serverTimeOffsetMs;
+        const now = getTrustedServerNow();
+        return now === null ? Date.now() : now;
     }
 
     let cachedPublicKeys = null;
@@ -168,7 +241,7 @@
     const activationInFlight = new Map();
 
     async function activate(keyString, appCode) {
-        const startedAt = Date.now();
+        const startedAt = readClock();
         const owner = {};
         const identityOf = (record) => JSON.stringify(record && [record.keyString, record.id, record.a, record.iat, record.exp, record.activationId]);
         const snapshot = identityOf(loadLocalRecord(appCode));
@@ -183,9 +256,9 @@
             if (online.ok !== true) {
                 return { valid: false, reason: online.reason || 'network', payload: result.payload };
             }
-            if (!serverTimeSynced) await syncServerTime({ priority: true });
+            if (getTrustedServerNow() === null) await syncServerTime({ priority: true });
             if (!isCurrent()) return { valid: false, reason: 'verify-unavailable' };
-            if (!serverTimeSynced) {
+            if (getTrustedServerNow() === null) {
                 return { valid: false, reason: 'clock-unverified', payload: result.payload };
             }
             if (online.seat !== 'mine') {
@@ -194,11 +267,15 @@
                 else if (online.seat === 'seat-unavailable') seatReason = 'seat-unavailable';
                 return { valid: false, reason: seatReason, payload: result.payload };
             }
-            const now = getServerNow();
+            const current = trustedClock();
+            if (!current) return { valid: false, reason: 'clock-unverified', payload: result.payload };
+            const now = current.now;
             const ceiling = typeof online.expiresAt === 'number' ? online.expiresAt : result.payload.exp * 1000;
             if (now > ceiling) {
                 return { valid: false, reason: 'expired', payload: result.payload };
             }
+            if (now + current.uncertainty > ceiling) return { valid: false, reason: 'clock-unverified', payload: result.payload };
+            const elapsed = clockElapsed(startedAt, current.clock);
             const record = {
                 activationId: bytesToBase32(crypto.getRandomValues(new Uint8Array(15))),
                 keyString: keyString.trim(),
@@ -206,7 +283,7 @@
                 a: result.payload.a,
                 iat: result.payload.iat,
                 exp: result.payload.exp,
-                activatedAt: Math.min(now, startedAt + serverTimeOffsetMs),
+                activatedAt: elapsed === null ? now : now - elapsed,
                 releaseEpoch: online.releaseEpoch,
                 lastOnlineCheck: now,
                 onlineExp: ceiling,
@@ -243,6 +320,8 @@
     }
 
     async function fetchWithBodyTimeout(url, readBody, init) {
+        const startedAt = readClock();
+        const observation = serverTimeObservation;
         const controller = new AbortController();
         let timer;
         const timeout = new Promise((resolve, reject) => {
@@ -254,8 +333,12 @@
         try {
             return await Promise.race([timeout, (async () => {
                 const res = await fetch(url, Object.assign({ cache: 'no-store' }, init || {}, { signal: controller.signal }));
+                const receivedAt = readClock();
                 const body = readBody ? await readBody(res) : undefined;
-                return { res: res, body: body };
+                const endedAt = readClock();
+                const elapsed = clockElapsed(startedAt, endedAt);
+                if (elapsed === null || elapsed > NET_TIMEOUT_MS) throw new Error('network timeout');
+                return { res: res, body: body, startedAt: startedAt, receivedAt: receivedAt, endedAt: endedAt, elapsed: elapsed, observation: observation };
             })()]);
         } finally {
             clearTimeout(timer);
@@ -278,16 +361,21 @@
             const dateHeader = res.headers.get('Date');
             if (dateHeader) {
                 const serverMs = new Date(dateHeader).getTime();
-                if (!isNaN(serverMs)) {
-                    serverTimeOffsetMs = serverMs - Date.now();
-                    serverTimeSynced = true;
+                const current = readClock();
+                const elapsed = clockElapsed(out.startedAt, current);
+                const bodyElapsed = clockElapsed(out.receivedAt, current);
+                if (elapsed !== null && elapsed <= NET_TIMEOUT_MS && bodyElapsed !== null && out.observation === serverTimeObservation) {
+                    const lowerBodyElapsed = Math.min(current.mono - out.receivedAt.mono, current.wall - out.receivedAt.wall);
+                    acceptServerTime(serverMs + lowerBodyElapsed, current, elapsed + 1000, 'http-date');
                 }
             }
             if (!res.ok) return { ok: null, reason: 'network' };
             const data = out.body;
             if (data === null || data === undefined) return { ok: false, reason: 'not-found' };
             if (data.revoked === true) return { ok: false, reason: 'revoked' };
-            if (typeof data.expiresAt === 'number' && serverTimeSynced && getServerNow() > data.expiresAt) {
+            if (typeof data.expiresAt === 'number' && !Number.isFinite(data.expiresAt)) return { ok: null, reason: 'network' };
+            const trustedNow = getTrustedServerNow();
+            if (typeof data.expiresAt === 'number' && trustedNow !== null && trustedNow > data.expiresAt) {
                 return { ok: false, reason: 'expired-server' };
             }
             let claimReleaseEpoch = typeof data.releasedAt === 'number' ? data.releasedAt : 0;
@@ -473,28 +561,46 @@
                 const body = out.body;
                 if (!body || body.nonce !== nonce || !Number.isSafeInteger(body.now) ||
                     body.now <= 0 || body.now > 8640000000000000) return null;
-                return body.now;
+                return { epoch: body.now, out: out };
             });
             if (!pending) return false;
-            const serverMs = await pending;
-            if (serverMs === null) return false;
-            serverTimeOffsetMs = serverMs - Date.now();
-            serverTimeSynced = true;
-            return true;
+            const sample = await pending;
+            if (sample === null) return false;
+            if (sample.acceptedObservation !== undefined) return sample.acceptedObservation === serverTimeObservation && getTrustedServerNow() !== null;
+            const current = readClock();
+            const elapsed = clockElapsed(sample.out.startedAt, current);
+            if (elapsed === null || elapsed > NET_TIMEOUT_MS || sample.out.observation !== serverTimeObservation) return false;
+            const accepted = acceptServerTime(sample.epoch, current, elapsed, 'nonce');
+            if (accepted) sample.acceptedObservation = serverTimeObservation;
+            return accepted;
         } catch (e) {
             return false;
         }
     }
 
+    function setServerTimeSample(sample) {
+        if (!sample || !Object.isFrozen(sample) || sample.source !== 'supabase-rpc'
+            || !Number.isFinite(sample.epochMs) || sample.epochMs <= 0 || sample.epochMs > 8640000000000000
+            || !Number.isFinite(sample.monotonicMs) || sample.monotonicMs < 0 || !Number.isFinite(sample.wallMs)
+            || !Number.isFinite(sample.uncertaintyMs) || sample.uncertaintyMs < 0) return false;
+        if (sample === serverTimeExternalSample) return !!trustedClock() && serverTimeAnchor.externalSample === sample;
+        if (serverTimeExternalSample && sample.monotonicMs < serverTimeExternalSample.monotonicMs) return false;
+        const current = trustedClock();
+        if (current && sample.monotonicMs < serverTimeAnchor.mono) return false;
+        if (!acceptServerTime(sample.epochMs, { mono: sample.monotonicMs, wall: sample.wallMs }, sample.uncertaintyMs, 'supabase-rpc')) return false;
+        serverTimeExternalSample = sample;
+        serverTimeAnchor.externalSample = sample;
+        return true;
+    }
+
     function setServerTimeOffset(ms) {
-        if (typeof ms === 'number' && !isNaN(ms)) {
-            serverTimeOffsetMs = ms;
-            serverTimeSynced = true;
-        }
+        const clock = readClock();
+        if (Number.isFinite(ms) && clock) acceptServerTime(clock.wall + ms, clock, 0, 'offset');
     }
 
     function getServerTimeOffset() {
-        return serverTimeSynced ? serverTimeOffsetMs : null;
+        const current = trustedClock();
+        return current ? current.now - current.clock.wall : null;
     }
 
     function recordSeenMark(record) {
@@ -545,13 +651,18 @@
             return { state: 'required', reason: online.reason };
         }
 
-        let now = monotonicNow(record);
+        if (online.ok === true && getTrustedServerNow() === null) {
+            await syncServerTime();
+            if (JSON.stringify(loadLocalRecord(appCode)) !== recordSnapshot) return recheck();
+        }
+        const current = trustedClock();
+        const ceilingBeforeRefresh = Number.isFinite(record.onlineExp) ? record.onlineExp : (signed ? signed.exp : record.exp) * 1000;
+        if (!current) return { state: 'offline-grace-exceeded', exp: ceilingBeforeRefresh, reason: 'clock-unverified' };
+        let now = Math.max(current.now, recordSeenMark(record));
         if (online.ok === true) {
-            if (serverTimeSynced) {
-                now = getServerNow();
-                record.seenMax = now;
-            }
-            if (online.seat !== 'unknown' && online.seat !== 'seat-unavailable' && serverTimeSynced) record.lastOnlineCheck = now;
+            now = current.now;
+            record.seenMax = now;
+            if (online.seat !== 'unknown' && online.seat !== 'seat-unavailable') record.lastOnlineCheck = now;
             record.onlineExp = online.expiresAt;
             saveLocalRecord(appCode, record);
         } else if (now > recordSeenMark(record)) {
@@ -562,14 +673,16 @@
         const ceiling = typeof record.onlineExp === 'number' ? record.onlineExp : (signed && typeof signed.exp === 'number' ? signed.exp : record.exp) * 1000;
 
         if (now > ceiling) {
-            if (online.ok === true && serverTimeSynced) {
+            if (online.ok === true) {
                 clearLocalRecord(appCode);
                 return { state: 'required', reason: 'expired' };
             }
             return { state: 'offline-grace-exceeded', exp: ceiling };
         }
 
-        if (!(online.ok === true && online.seat !== 'unknown' && online.seat !== 'seat-unavailable') && now - (record.lastOnlineCheck || 0) > OFFLINE_GRACE_MS) {
+        if (now + current.uncertainty > ceiling) return { state: 'offline-grace-exceeded', exp: ceiling, reason: 'clock-unverified' };
+
+        if (!(online.ok === true && online.seat !== 'unknown' && online.seat !== 'seat-unavailable') && now + current.uncertainty - (record.lastOnlineCheck || 0) > OFFLINE_GRACE_MS) {
             return online.ok === true && online.seat === 'seat-unavailable'
                 ? { state: 'offline-grace-exceeded', exp: ceiling, reason: 'seat-unavailable' }
                 : { state: 'offline-grace-exceeded', exp: ceiling };
@@ -595,7 +708,9 @@
         const appCode = opts.appCode;
         const days = opts.days;
         const id = randomKeyId();
-        const now = Math.floor(getServerNow() / 1000);
+        const issuedAt = opts.issuedAt === undefined ? getServerNow() : opts.issuedAt;
+        if (!Number.isFinite(issuedAt) || issuedAt <= 0) throw new Error('clock-unverified');
+        const now = Math.floor(issuedAt / 1000);
         const exp = now + Math.round(days * 86400);
         const payload = { a: appCode, id: id, iat: now, exp: exp };
         const payloadB64 = bytesToB64url(new TextEncoder().encode(JSON.stringify(payload)));
@@ -629,8 +744,13 @@
         signNewKey: signNewKey,
         generateKeyPair: generateKeyPair,
         getServerNow: getServerNow,
+        getTrustedServerNow: getTrustedServerNow,
+        getServerTimeGeneration: getServerTimeGeneration,
+        getServerTimeSample: getServerTimeSample,
+        resetServerTime: resetServerTime,
         syncServerTime: syncServerTime,
         setServerTimeOffset: setServerTimeOffset,
+        setServerTimeSample: setServerTimeSample,
         getServerTimeOffset: getServerTimeOffset
     };
 })(window);

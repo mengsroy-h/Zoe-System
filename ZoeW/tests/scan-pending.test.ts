@@ -1,3 +1,4 @@
+import { acceptServerClockOffset, resetServerClock } from '../src/core/clock';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { firebaseState, uiState } from '../src/core/state';
 import { appLocalStore } from '../src/core/storage';
@@ -56,6 +57,8 @@ beforeEach(() => {
     firebaseState.isInitializingFirebase = false;
     firebaseState.fb = { set: writes, update: writes, runTransaction: writes } as any;
     storage.setItem('zoew_firebase_config', JSON.stringify(options));
+    resetServerClock();
+    acceptServerClockOffset(1, null, false);
     warnPendingScans();
 });
 afterEach(() => {

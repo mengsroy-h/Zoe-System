@@ -591,3 +591,5 @@ describe('a device without ZTO Lookup in a ZTO shop', () => {
         expect(at(`${T}/del2`).trashMode, 'another shop never inherits the remembered mode').toBe('local');
     });
 });
+
+beforeEach(() => { firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live'; });

@@ -3,7 +3,7 @@ import { createLocalWriteJournal } from './write-journal';
 import { TX_ROOT_READ_TIMEOUT_MS, txReadServerValue, txReadWasRefused, txRestUrl, txSameValue } from './tx-outcome';
 import { ledgerCompanionCopyState, ledgerCompanionState, ledgerJournalRecord, ledgerJournalUpdate, ledgerJournalWitness, ledgerRecordTokens, ledgerOpRing } from '../domain/ledger';
 import { txMutationSources } from './tx-disconnect';
-import { getServerNow } from '../core/clock';
+import { captureClockOperation, getServerClockBounds, getServerNow } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
 import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
 import { scanTransportIntent, scanTransportReceipt } from '../domain/scan-transport-proof';
@@ -69,7 +69,7 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
     const purgeLike = (ops) => ops.some(op => op?.p?.[0] === REGISTRY_RELEASES_ROOT && op.v !== null
         || op?.p?.[0] === 'zoew_trash_consumptions' && op?.v?.kind === 'purge');
     const purgeRefused = (code) => Object.assign(new Error('Purge requires complete durable evidence'), { code, txOutcome: 'not-applied', noRetry: true, nativeUnsent: true });
-    const sendAtomic = async (row) => {
+    const sendAtomic = async (row, clockOperation?) => {
         if (!current()) throw new Error('Connection session changed');
         const updates = {};
         for (const op of row.ops) updates[op.p.join('/')] = op.v;
@@ -86,6 +86,7 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
             if (purge.receipts.some(receipt => receipt.releasedBy !== uid)) throw purgeRefused('permission_denied');
             if (new TextEncoder().encode(JSON.stringify(updates)).byteLength > REGISTRY_PURGE_MAX_BYTES) throw purgeRefused('write_purge_oversize');
         }
+        if (clockOperation && !clockOperation.current()) { state.deferred = true; return false; }
         let started;
         try { started = sdk.update(root, updates); } catch (e) { e.nativeUnsent = true; throw e; }
         try { await started; }
@@ -144,16 +145,27 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
     const purgeStampKey = NATIVE_RECEIPT_PURGE_STAMP_KEY + encodeURIComponent(scope);
     const purgeReceipts = async () => {
         if (state.purged || !current()) return;
-        state.purged = true;
+        const clockOperation = captureClockOperation();
+        if (!clockOperation.current()) return;
         if (elapsedSince(Number(safeStoreGet(appLocalStore, purgeStampKey))) < NATIVE_RECEIPT_PURGE_GAP_MS) return;
-        safeStoreSet(appLocalStore, purgeStampKey, Date.now());
         const receiptsRef = sdk.ref(db, NATIVE_WRITE_RECEIPTS);
         const ownReceipts = typeof sdk.query === 'function' && typeof sdk.orderByChild === 'function' && typeof sdk.equalTo === 'function'
             ? sdk.query(receiptsRef, sdk.orderByChild('uid'), sdk.equalTo(uid)) : receiptsRef;
-        const snapshot = await sdk.get(ownReceipts);
+        if (!clockOperation.current()) return;
+        state.purged = true;
+        let snapshot;
+        try { snapshot = await sdk.get(ownReceipts); }
+        catch (e) {
+            if (clockOperation.current()) safeStoreSet(appLocalStore, purgeStampKey, Date.now());
+            else state.purged = false;
+            throw e;
+        }
         if (!current()) return;
+        if (!clockOperation.current()) { state.purged = false; return; }
         const receipts = snapshot && typeof snapshot.val === 'function' ? snapshot.val() : null;
-        const cutoff = getServerNow() - NATIVE_RECEIPT_RETENTION_MS - NATIVE_RECEIPT_PURGE_MARGIN_MS;
+        const bounds = getServerClockBounds();
+        if (!bounds) { state.purged = false; return; }
+        const cutoff = bounds.lowerMs - NATIVE_RECEIPT_RETENTION_MS - NATIVE_RECEIPT_PURGE_MARGIN_MS;
         const cap = NATIVE_RECEIPT_PURGE_MAX * NATIVE_RECEIPT_PURGE_ROUNDS;
         const expired = [];
         for (const id of Object.keys(receipts && typeof receipts === 'object' ? receipts : {})) {
@@ -162,8 +174,15 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
             if (expired.push(id) > cap) break;
         }
         const batch = expired.slice(0, cap);
+        if (!clockOperation.current()) { state.purged = false; return; }
+        safeStoreSet(appLocalStore, purgeStampKey, Date.now());
         for (let at = 0; at < batch.length; at += NATIVE_RECEIPT_PURGE_MAX) {
             if (!current()) return;
+            if (!clockOperation.current()) {
+                state.purged = false;
+                safeStoreRemove(appLocalStore, purgeStampKey);
+                return;
+            }
             const updates = {};
             for (const id of batch.slice(at, at + NATIVE_RECEIPT_PURGE_MAX)) updates[NATIVE_WRITE_RECEIPTS + '/' + id] = null;
             await sdk.update(root, updates);
@@ -191,6 +210,7 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
     const settleRow = async (row, canReplay, copyRoots) => {
         if (!current()) return;
         if (row.hash) {
+            const clockOperation = captureClockOperation();
             if (await payloadHash(row.ops) !== row.hash) { if (current()) state.blocked++; return; }
             if (!current()) return;
             const scan = scanTransportIntent(row.ops);
@@ -207,12 +227,19 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
                     return;
                 }
             }
-            if (!(row.queuedAt > 0) || getServerNow() - row.queuedAt > NATIVE_RECEIPT_RETENTION_MS) { state.blocked++; return; }
             const receipt = await read(NATIVE_WRITE_RECEIPTS + '/' + row.opId);
             if (!receiptMatches(receipt, row)) {
                 if (receipt) { state.blocked++; return; }
                 if (row.refused) { if (current()) remove(row.opId); return; }
-                await sendAtomic(row);
+                if (!clockOperation.current()) { state.deferred = true; return; }
+                const bounds = getServerClockBounds();
+                if (!clockOperation.current()) { state.deferred = true; return; }
+                if (!bounds) { state.deferred = true; return; }
+                const youngestAge = bounds.lowerMs - row.queuedAt, oldestAge = bounds.upperMs - row.queuedAt;
+                if (!(row.queuedAt > 0) || !Number.isFinite(youngestAge) || !Number.isFinite(oldestAge)
+                    || oldestAge < 0 || youngestAge > NATIVE_RECEIPT_RETENTION_MS) { state.blocked++; return; }
+                if (youngestAge < 0 || oldestAge > NATIVE_RECEIPT_RETENTION_MS) { state.deferred = true; return; }
+                if (await sendAtomic(row, clockOperation) === false) return;
             }
             if (current()) remove(row.opId);
             return;
@@ -377,9 +404,11 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
             if (!current() || state.blocked) throw Object.assign(new Error('Write outcome needs verification'), { code: 'write_recovery_pending', noRetry: true });
             const path = ownedPath === undefined ? new URL(String(ref)).pathname.split('/').filter(Boolean).map(decodeURIComponent)
                 : String(ownedPath).split('/').filter(Boolean);
-            const row: any = { v: 1, scope, topic, opId, sentAfter: 0, stage: 'sent', queuedAt: getServerNow(), ops: [] as any[] };
+            const clockOperation = captureClockOperation();
+            const row: any = { v: 1, scope, topic, opId, sentAfter: 0, stage: 'sent', queuedAt: clockOperation.current() ? getServerNow() : 0, ops: [] as any[] };
             if (method === 'runTransaction' && value.connectionIntent) row.intent = value.connectionIntent;
             const persist = () => {
+                if (!clockOperation.current()) row.queuedAt = 0;
                 if (!current() || !journal.put(row)) throw Object.assign(new Error('Write journal unavailable'), { code: 'write_journal_unavailable', noRetry: true });
             };
             try {

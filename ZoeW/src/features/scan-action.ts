@@ -2,6 +2,7 @@ import { fieldValue, focusField, setFieldValue } from '../app/refs';
 import { viewState } from '../core/view-state';
 import { dataState, firebaseState, scanState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
+import { sessionUserActionAllowed } from '../core/session-verification';
 import { appLocalStore, safeStoreSet } from '../core/storage';
 import { latinDigits, normalizeStoredPhone } from '../core/text';
 import { getFormattedClockTime, getFormattedDate, safeFocusScanner } from '../core/timezone';
@@ -29,6 +30,7 @@ import { showToast } from '../ui/toast';
 export const SCAN_MONEY_MAX = 100000;
 
 export function triggerScanAction(barcode) {
+    if (!sessionUserActionAllowed('scan')) return;
     if (uiState.isModalOpen) return;
 
     let cleanBarcode = latinDigits(String(barcode || '')).trim();

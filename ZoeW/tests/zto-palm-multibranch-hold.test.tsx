@@ -145,3 +145,5 @@ describe('ZTO-E14 (Palm) ៖ គម្រោងតែមួយ សាខាច�
         expect(abandoned('s881')).toBe(true);
     });
 });
+
+beforeEach(() => { firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live'; });

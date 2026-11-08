@@ -16,6 +16,8 @@ let server: any;
 let storage: Map<string, string>;
 let writes: number;
 let denyStorage: boolean;
+let clockTrusted = true;
+let clockGeneration = 0;
 
 function lockManager() {
     const held = new Set<string>();
@@ -45,7 +47,7 @@ function tab(locks?: ReturnType<typeof lockManager>) {
     const modules: Record<string, any> = {
         '../core/state': { firebaseState: state },
         '../services/row-operation-lock': { rowOperationActive },
-        '../core/clock': { getServerNow: () => Date.now() },
+        '../core/clock': { getServerClockBounds: () => clockTrusted ? { lowerMs: Date.now(), upperMs: Date.now() } : null, getServerNow: () => Date.now(), captureClockOperation: () => { const generation = clockGeneration, trusted = clockTrusted; return { current: () => trusted && clockTrusted && generation === clockGeneration }; } },
         '../core/shop-scope': { liveShopScope: scope },
         '../core/storage': {
             appLocalStore: store,
@@ -78,7 +80,7 @@ function tab(locks?: ReturnType<typeof lockManager>) {
 beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(NOW);
     server = { id: 'parcel', barcodes: [{ code: 'TAB001', cod: 12.5, dod: 1, isClosed: false }] };
-    storage = new Map(); writes = 0; denyStorage = false;
+    storage = new Map(); writes = 0; denyStorage = false; clockTrusted = true; clockGeneration = 0;
 });
 afterEach(() => vi.useRealTimers());
 
@@ -205,4 +207,33 @@ it('browser បដិសេធសោ ➜ មិនធ្វើសកម្មភ
     expect(a.api.pendingTrashClaims(a.scope())).toEqual([]);
     expect(writes).toBe(0);
     await claim.settle(false);
+});
+
+
+it('នាឡិកាមិនទុកចិត្ត មិនបង្កើត claim ថ្មី', async () => {
+    const a = tab(); clockTrusted = false;
+    const before = copy(server);
+    await a.api.claimTrashBarcodes('parcel', 'new_token', () => ['TAB001']);
+    expect(server).toEqual(before); expect(writes).toBe(0);
+});
+
+it('នាឡិកាប្ដូរជំនាន់ ហើយ Sync វិញ មិនបើក updater ចាស់', async () => {
+    const a = tab(); const execute = a.state.fb.runTransaction;
+    a.state.fb.runTransaction = (ref: any, update: any) => {
+        clockGeneration++;
+        return execute(ref, update);
+    };
+    const before = copy(server);
+    await a.api.claimTrashBarcodes('parcel', 'new_token', () => ['TAB001']);
+    expect(server).toEqual(before); expect(writes).toBe(0);
+});
+
+it('ដោះ claim ផុតកំណត់ មិនបន្តក្រោយប្ដូរជំនាន់នាឡិកា', async () => {
+    const a = tab(); server.barcodes[0].trashClaim = 'old_token';
+    server.barcodes[0].trashClaimAt = NOW - 2 * a.api.trashClaimPolicy().staleMs;
+    const execute = a.state.fb.runTransaction;
+    a.state.fb.runTransaction = (ref: any, update: any) => { clockGeneration++; return execute(ref, update); };
+    const before = copy(server);
+    expect(await a.api.releaseTrashClaims('parcel', 'old_token', undefined, true)).toBe(false);
+    expect(server).toEqual(before);
 });

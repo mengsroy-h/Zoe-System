@@ -184,3 +184,5 @@ describe('7-day cleanup on a device whose sign-list read is blocked (ZTO-1)', ()
         expect(at).toBeGreaterThan(0);
     });
 });
+
+beforeEach(() => { firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live'; });

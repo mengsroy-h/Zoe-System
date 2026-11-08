@@ -7,6 +7,7 @@ import { createRequire } from 'node:module';
 import vm from 'node:vm';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { dataState, firebaseState } from '../src/core/state';
+import { acceptServerClockOffset, resetServerClock } from '../src/core/clock';
 import * as storage from '../src/core/storage';
 import * as evidenceRetention from '../src/services/evidence-retention';
 import { dbListenerFailedPaths, dbListenerPendingPaths, DB_LISTENER_KEY_DELETED } from '../src/core/text';
@@ -157,10 +158,25 @@ beforeEach(() => {
     firebaseState.firebaseConfig = { databaseURL: HOST } as any;
     localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: HOST }));
     firebaseState.isDatabaseInitialized = true; firebaseState.isDatabaseConnected = true; firebaseState.hasEverConnectedToDatabase = true;
+    firebaseState.sessionExpiryCheck = 'live';
     firebaseState.dbListenersFailed = false; firebaseState.serverClockTrusted = true; firebaseState.serverTimeOffsetMs = 0;
     vi.stubGlobal('fetch', vi.fn(serverRead));
 });
 afterEach(() => { firebaseState.authGeneration++; vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.useRealTimers(); localStorage.clear(); });
+
+it.each([false, true])('ព្រំអាយុអប្បបរមារក្សាភស្តុតាងជិតកំណត់ backend=%s', async supabase => {
+    firebaseState.fb = sdk(supabase) as any;
+    vi.spyOn(performance, 'now').mockReturnValue(1000); resetServerClock();
+    expect(acceptServerClockOffset(0, Object.freeze({ epochMs: NOW - 1000, estimateEpochMs: NOW,
+        uncertaintyMs: 2000, wallMs: NOW, monotonicMs: 1000 }), false)).toBe(true);
+    firebaseState.sessionExpiryCheck = 'live';
+    const uncertain = scanId('a'), old = scanId('b');
+    const cutoff = NOW - EVIDENCE_RETENTION_MS - evidenceRetention.EVIDENCE_RETENTION_MARGIN_MS;
+    lab.store = { zoew_scan_operations: { [uncertain]: op(uncertain, 'committed', cutoff - 500), [old]: op(old, 'committed', cutoff - 1500) } };
+    await runEvidenceRetentionSweep();
+    expect(keys('zoew_scan_operations')).toEqual([uncertain]);
+    expect(lab.deletes).toEqual(['zoew_scan_operations/' + old]);
+});
 
 it('លុបតែភស្តុតាងចាស់ដែលគ្មានអ្វីយោង ហើយទុកអ្វីៗផ្សេងទាំងអស់ (rules ពិតមិនបដិសេធការលុបណាមួយ)', async () => {
     const id = seed();
@@ -606,7 +622,7 @@ it.each([NaN, Infinity, -Infinity])('invalid server-clock offset %s starts no ev
     expect(fetch).not.toHaveBeenCalled();
     expect(lab.writes).toEqual([]);
     expect(savedCursors()).toEqual({});
-    firebaseState.serverTimeOffsetMs = 0;
+    firebaseState.serverTimeOffsetMs = 0; firebaseState.serverClockTrusted = true;
     expect(await runEvidenceRetentionSweep()).toBe(4);
     expect(lab.deletes).toHaveLength(4);
 });
@@ -619,7 +635,7 @@ it.each([NaN, Infinity, -Infinity])('clock becoming %s during a holder read cann
     expect(await nextSweep()).toBe(0);
     expect(lab.writes).toEqual([]);
     expect(savedCursors()).toEqual(checkpoint);
-    firebaseState.serverTimeOffsetMs = 0; lab.afterRead = null;
+    firebaseState.serverTimeOffsetMs = 0; firebaseState.serverClockTrusted = true; lab.afterRead = null;
     expect(await nextSweep()).toBe(1);
     expect(getAt(root + '/' + tail)).toBeNull();
 });
@@ -634,4 +650,29 @@ it('alternating owners preserve their independent cursor progress', async () => 
     expect(await runEvidenceRetentionSweep()).toBe(1);
     expect(rootPages(root).at(-1)?.after).toBe(held.at(-1));
     expect(getAt(root + '/' + tail)).toBeNull();
+});
+
+it('សម័យមិនទាន់ផ្ទៀងផ្ទាត់ទុកភស្តុតាងចាស់ រួចបន្តក្រោយផ្ទៀងផ្ទាត់', async () => {
+    seed();
+    firebaseState.sessionExpiryCheck = 'unverified';
+    expect(await runEvidenceRetentionSweep()).toBe(0);
+    expect(lab.deletes).toEqual([]);
+    firebaseState.sessionExpiryCheck = 'live';
+    expect(await runEvidenceRetentionSweep()).toBe(4);
+});
+
+it('សម័យបាត់ការផ្ទៀងផ្ទាត់ពេលអានមិនត្រូវលុបភស្តុតាង', async () => {
+    seed();
+    lab.afterRead = () => { firebaseState.sessionExpiryCheck = 'unverified'; };
+    expect(await runEvidenceRetentionSweep()).toBe(0);
+    expect(lab.deletes).toEqual([]);
+});
+
+it('អាចអានភស្តុតាងដែលគ្មានអ្នកកាន់ ទោះសម័យមិនទាន់ផ្ទៀងផ្ទាត់', async () => {
+    const ids = seed();
+    await runEvidenceRetentionSweep();
+    seed();
+    firebaseState.sessionExpiryCheck = 'unverified';
+    expect(await evidenceRetention.evidenceRetirable(evidenceSweep.owner!, 'zoew_scan_operations', ids.a,
+        getAt('zoew_scan_operations/' + ids.a), NOW - EVIDENCE_RETENTION_MS)).toBe(true);
 });

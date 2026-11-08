@@ -336,3 +336,5 @@ describe('ការពិនិត្យប្រឆាំង (អ្នកយ�
         expect(srv.requests.slice(before).map((r) => r.from + '..' + r.to), '⛔ វគ្គថ្មី ៖ បញ្ជីខ្លី ➜ ការអានទាំងមូលតែមួយ (មិនមែនការចងចាំពីវគ្គចាស់)').toEqual([d(7) + '..' + d(0)]);
     });
 });
+
+beforeEach(() => { firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live'; });

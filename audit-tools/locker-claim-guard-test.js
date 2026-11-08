@@ -87,9 +87,11 @@ function buildWorld() {
         __log: log
     };
     vm.createContext(ctx);
-    const runtime = require('./react-view').moduleRuntime(ROOT, src, ['src/domain/barcode-key.ts', 'src/core/shop-scope.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/services/row-operation-lock.ts', { path: 'src/features/clear-history.ts', expose: ['claimHistoryItemForClear', 'buildClearHistoryTrashItem', 'finalizeClaimedHistoryClear'] }]);
+    const runtime = require('./react-view').moduleRuntime(ROOT, src, [{ path: 'src/core/clock.ts', expose: ['captureClockOperation', 'serverClockIsTrustworthy', 'cleanupClockIsTrustworthy'] }, 'src/domain/barcode-key.ts', 'src/core/shop-scope.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/services/row-operation-lock.ts', { path: 'src/features/clear-history.ts', expose: ['claimHistoryItemForClear', 'buildClearHistoryTrashItem', 'finalizeClaimedHistoryClear'] }]);
     vm.runInContext(runtime.code, ctx);
+    // ទំនុកចិត្តបែបសាកល្បងនេះរក្សានាឡិកាអាជីវកម្មថេររបស់ fixture ដើម។
     const preamble = `
+let serverTimeOffsetMs = 0, serverClockTrusted = true;
 let db = {}, fb = null, auth = { currentUser: { uid: 'fixture-user', email: 'a@b.c' }, app: { options: { databaseURL: 'https://fixture.invalid' } } }, authGeneration = 0;
 let lockerBarcodeIndex = {}, activeLocker = 'A1', lockerAssignGeneration = 0;
 const DB_OP_TIMEOUT_MS = 15000;

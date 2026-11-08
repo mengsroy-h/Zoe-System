@@ -88,6 +88,8 @@ const offenders = [];
 let filesScanned = 0;
 let helperFiles = 0;
 let callSites = 0;
+let pairedRequestAgeMatches = 0;
+let requestAgeControlSource = null;
 
 const FN_TYPES = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression']);
 
@@ -132,12 +134,55 @@ function scanScope(node, body, inherited, params, onSub) {
     });
 }
 
+// ⛔ នេះវាស់ភាពខុសគ្នារវាងនាឡិកាពីរនៅពេលសំណើ មិនមែនពិដានល្បឿនទេ។
+// `elapsedSince()` ប្តូររយៈពេលអវិជ្ជមានទៅ Infinity ដូច្នេះមិនរក្សាតម្លៃសម្រាប់ប្រៀបធៀបនាឡិកាពីរទេ។
+// អនុញ្ញាតតែ initializer មួយក្នុង noteServerTime របស់ម៉ូឌុល Supabase ពិត។ ការបដិសេធនាឡិកាលោត
+// និងសំណើហួសពិដាន វាស់ដោយ ZoeW/tests/server-clock-estimator.test.ts។
+function pairedRequestAgeSubtractions(ast) {
+    const allowed = new Set();
+    const factories = ast.body.filter(n => n.type === 'FunctionDeclaration' && n.id && n.id.name === 'createSupabaseDatabase');
+    if (factories.length !== 1) return allowed;
+    const declarations = factories[0].body.body.filter(n => n.type === 'VariableDeclaration').flatMap(n => n.declarations);
+    const writers = declarations.filter(n => n.id.type === 'Identifier' && n.id.name === 'noteServerTime'
+        && n.init && n.init.type === 'ArrowFunctionExpression' && n.init.body.type === 'BlockStatement');
+    if (writers.length !== 1) return allowed;
+    const writer = writers[0].init;
+    if (writer.params.length !== 3 || writer.params[2].type !== 'Identifier' || writer.params[2].name !== 'wallStarted') return allowed;
+    const locals = writer.body.body.filter(n => n.type === 'VariableDeclaration').flatMap(n => n.declarations);
+    const wall = locals.filter(n => n.id.type === 'Identifier' && n.id.name === 'wallNow' && isRawClock(n.init));
+    if (wall.length !== 1) return allowed;
+    for (const n of locals) {
+        const init = n.init;
+        if (n.id.type === 'Identifier' && n.id.name === 'wallRoundTrip' && init && init.type === 'BinaryExpression' && init.operator === '-'
+            && init.left.type === 'Identifier' && init.left.name === 'wallNow'
+            && init.right.type === 'Identifier' && init.right.name === 'wallStarted') allowed.add(init);
+    }
+    return allowed;
+}
+
+function rawClockSubtractions(ast, helperRange, allowed) {
+    const found = [];
+    scanScope(ast, ast, new Set(), [], (n, clockVars) => {
+        if (helperRange && n.start >= helperRange[0] && n.end <= helperRange[1]) return;
+        const leftIsClock = isRawClock(n.left)
+            || (n.left.type === 'Identifier' && clockVars.has(n.left.name));
+        if (!leftIsClock) return;
+        // ការដកតម្លៃ **ថេរ** (`Date.now() - 60000`) ជាការគណនាថ្ងៃឈប់ មិនមែនរយៈពេលកន្លងផុត
+        if (n.right.type === 'Literal' || allowed.has(n)) return;
+        found.push(n);
+    });
+    return found;
+}
+
 for (const rel of FILES) {
     const file = path.join(ROOT, rel);
     if (!fs.existsSync(file)) continue;
     filesScanned++;
     const code = fs.readFileSync(file, 'utf8');
     const programs = modulePrograms(code, file, { ecmaVersion: 2022, locations: true, sourceType: 'script' });
+    const moduleFile = path.join(path.dirname(file), 'audit-module-views.json');
+    const requestAgeModule = rel === 'ZoeW/app.js' && fs.existsSync(moduleFile)
+        ? JSON.parse(fs.readFileSync(moduleFile, 'utf8'))['src/services/supabase-rtdb.ts'] : null;
     let fileHasHelper = false;
     for (const ast of programs) {
 
@@ -148,15 +193,13 @@ for (const rel of FILES) {
     });
     if (helperRange) fileHasHelper = true;
 
-    scanScope(ast, ast, new Set(), [], (n, clockVars) => {
-        if (helperRange && n.start >= helperRange[0] && n.end <= helperRange[1]) return;
-        const leftIsClock = isRawClock(n.left)
-            || (n.left.type === 'Identifier' && clockVars.has(n.left.name));
-        if (!leftIsClock) return;
-        // ការដកតម្លៃ **ថេរ** (`Date.now() - 60000`) ជាការគណនាថ្ងៃឈប់ មិនមែនរយៈពេលកន្លងផុត
-        if (n.right.type === 'Literal') return;
+    const allowed = requestAgeModule && code.slice(ast.start, ast.end) === requestAgeModule
+        ? pairedRequestAgeSubtractions(ast) : new Set();
+    pairedRequestAgeMatches += allowed.size;
+    if (allowed.size) requestAgeControlSource = requestAgeModule;
+    for (const n of rawClockSubtractions(ast, helperRange, allowed)) {
         offenders.push(rel + ':' + n.loc.start.line + '  ' + code.slice(n.start, n.end).replace(/\s+/g, ' ').slice(0, 70));
-    });
+    }
     }
     if (fileHasHelper) helperFiles++;
 }
@@ -171,6 +214,21 @@ ok('ជាន់អប្បបរមា ៖ ស្កេនឯកសារ App 
 ok('ជាន់អប្បបរមា ៖ `elapsedSince()` មានក្នុង App យ៉ាងតិច ២ (រកឃើញ ' + helperFiles + ')', helperFiles >= 2);
 ok('ជាន់អប្បបរមា ៖ រកឃើញកន្លែងហៅ `elapsedSince()` យ៉ាងតិច ១០ (រកឃើញ ' + callSites + ')', callSites >= 10);
 ok('គ្មានការដកនាឡិកាឆៅក្រៅ `elapsedSince()`', offenders.length === 0, offenders.slice(0, 8));
+ok('លើកលែងសកម្មតែមួយ៖ wallRoundTrip របស់ noteServerTime ក្នុងម៉ូឌុល Supabase ពិត', pairedRequestAgeMatches === 1, pairedRequestAgeMatches);
+
+// ⛔ បន្ថែម rate limiter ទាំងក្នុងតួដដែល និង callback ខាងក្នុង៖ ការលើកលែងមិនអាចលាក់វា។
+for (const [label, injected] of [
+    ['តួដដែល', 'const cooldown = wallNow - lastRetryAt;'],
+    ['callback ខាងក្នុង', 'const retry = () => { const wallNow = Date.now(); return wallNow - wallStarted; };']
+]) {
+    const marker = 'const wallRoundTrip = wallNow - wallStarted;';
+    const control = requestAgeControlSource && requestAgeControlSource.replace(marker, marker + '\n' + injected);
+    const ast = acorn.parse(control || '', { ecmaVersion: 2022 });
+    const allowed = pairedRequestAgeSubtractions(ast);
+    const caught = rawClockSubtractions(ast, null, allowed);
+    ok('ទិសផ្ទុយ៖ raw clock subtraction នៅ ' + label + ' នៅតែត្រូវចាប់',
+        control !== requestAgeControlSource && allowed.size === 1 && caught.length === 1, caught.length);
+}
 
 // ── ២. ឥរិយាបថ ៖ រត់ `elapsedSince()` ពិត ─────────────────────────────────
 console.log('\n=== elapsedSince() ៖ ថយក្រោយ ➜ fail-open · ទៅមុខ ➜ នៅតែទប់ ===');

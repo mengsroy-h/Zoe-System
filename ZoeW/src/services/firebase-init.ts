@@ -1,6 +1,6 @@
 import { dataState, firebaseState, uiState } from '../core/state';
 import { viewState } from '../core/view-state';
-import { pendingHistoryPatches, pendingRegistryReleases } from '../core/clock';
+import { pendingHistoryPatches, pendingRegistryReleases, resetServerClock } from '../core/clock';
 import { appLocalStore, safeStoreGet } from '../core/storage';
 import { setupAuthListener } from '../features/auth';
 import { clearCustomerDataTableCache } from '../features/customer-table';
@@ -115,8 +115,7 @@ async function tearDownBackend(existingApps) {
     firebaseState.isDatabaseInitialized = false;
     firebaseState.isDatabaseConnected = false;
     firebaseState.hasEverConnectedToDatabase = false;
-    firebaseState.serverClockTrusted = false;
-    firebaseState.serverTimeOffsetMs = 0;
+    resetServerClock();
     firebaseState.networkJustReturned = false;
     resetDbListenerHealthState();
     renderConnectionStatus();

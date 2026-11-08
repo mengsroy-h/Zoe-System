@@ -140,6 +140,7 @@ function makeNative() {
 }
 
 beforeEach(() => {
+    firebaseState.sessionExpiryCheck = 'live'; firebaseState.serverClockTrusted = true; firebaseState.serverTimeOffsetMs = 0;
     vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(NOW);
     vi.stubGlobal('crypto', webcrypto);
     vi.stubGlobal('confirm', () => true);

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { appLocalStore, appSessionStore } from '../src/core/storage';
 import { firebaseState, securityState, uiState } from '../src/core/state';
+import { acceptServerClockOffset, resetServerClock } from '../src/core/clock';
 import { viewState } from '../src/core/view-state';
 import { modalIsOpen, modalMeta, registerModalMeta, setModalDisplay, unregisterModalMeta } from '../src/core/modals';
 import { refTo, setFieldValue } from '../src/app/refs';
@@ -33,6 +34,9 @@ beforeEach(() => {
     Object.assign(viewState, { appLockOpen: false, appLockMessage: '' });
     firebaseState.authGeneration++; firebaseState.auth = { currentUser: { uid: 'shop-a' } } as any;
     firebaseState.fb = { signOut: vi.fn(async () => { firebaseState.auth.currentUser = null; }) } as any;
+    resetServerClock(); firebaseState.isDatabaseConnected = true;
+    acceptServerClockOffset(0, { epochMs: Date.now(), wallMs: Date.now(), monotonicMs: performance.now() }, false);
+    firebaseState.sessionExpiryCheck = 'live';
     refTo('appLockPinInput')(document.createElement('input')); registerModalMeta('loginModal', {}); setModalDisplay('loginModal', 'none');
     cryptoCalls.derive.mockReset().mockResolvedValue({ type: 'secret' });
     cryptoCalls.remember.mockReset().mockResolvedValue(true); vi.stubGlobal('confirm', () => true);

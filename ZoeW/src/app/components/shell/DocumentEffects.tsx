@@ -1,5 +1,6 @@
 import { useLayoutEffect } from 'react';
-import { uiState } from '../../../core/state';
+import { firebaseState, uiState } from '../../../core/state';
+import { sessionVerificationRequired } from '../../../core/session-verification';
 import { viewState } from '../../../core/view-state';
 import { useStoreValue } from '../../hooks/useStore';
 
@@ -33,6 +34,7 @@ export function DocumentEffects() {
     const modalViewportHeight = useStoreValue(uiState, (s) => s.modalViewportHeight);
     const keyboardCover = useStoreValue(uiState, (s) => s.keyboardCover);
     const appLocked = useStoreValue(viewState, (s) => s.appLockOpen);
+    const sessionVerifying = useStoreValue(firebaseState, sessionVerificationRequired);
     const bootRevealing = useStoreValue(viewState, (s) => s.bootRevealing);
     const perfLite = useStoreValue(viewState, (s) => s.perfLite);
     const title = useStoreValue(viewState, (s) => s.documentTitle);
@@ -41,7 +43,7 @@ export function DocumentEffects() {
         document.body.style.overflow = scrollLocked ? 'hidden' : '';
     }, [scrollLocked]);
 
-    useBodyClass('app-locked', appLocked);
+    useBodyClass('app-locked', appLocked || sessionVerifying);
     useBodyClass('boot-reveal', bootRevealing);
     useBodyClass('perf-lite', perfLite);
     useBodyClass('chrome-hidden', chromeHidden || keyboardOpen);

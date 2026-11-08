@@ -1014,8 +1014,10 @@ iOS standalone also re-measures when the body or a bar's border-box resizes (`li
 
 - Expiry views and push schedules require a trusted finite server-clock offset. While the offset is unresolved, preserve the saved schedule and expose the view as unmeasurable; force refresh does not bypass that gate. Regression scenarios must start with fresh history and an incorrect device clock before the first trusted offset.
 
-Retention/revenue timestamps (`createdAt` · `closedAt` · `deletedAt` · `lockerUpdatedAt` and the compared "now") use
-**`getServerNow()`**. Local cosmetic timers (PIN lockout · salt id · scan debounce · script deadlines · cache TTL) keep
+Retention/revenue event timestamps (`createdAt` · `closedAt` · `deletedAt` · `lockerUpdatedAt`) use the server-time
+estimate **`getServerNow()`**. Age eligibility uses trusted `getServerClockBounds()`: lower for minimum-age removal,
+upper for maximum-age replay/security admission; crossing a boundary waits without discarding proof. Do not replace
+ZoeW scan timestamps with a conservative bound or rewrite original ZTO/persisted times. Local cosmetic timers (PIN lockout · salt id · scan debounce · script deadlines · cache TTL) keep
 raw `Date.now()` on purpose.
 
 - Search argument-less `new Date()` too; `clock-hygiene.js` scans the AST in 4 directions with no dead allowlist entries.
@@ -1024,12 +1026,27 @@ raw `Date.now()` on purpose.
   stored format `HH:MM:SS (YYYY-MM-DD)` never changes; sorting via `formatScanStamp(raw)` (fail-open).
 - `elapsedSince(mark)`: `!mark` or `delta < 0` ➜ `Infinity` (fail-open); shared byte-identical in both apps. Deadline
   comparisons (`Date.now() < lockoutUntil`) stay.
-- Destructive cleanup: `cleanupClockIsTrustworthy()` = `serverClockTrusted && isDatabaseConnected` ⛔ never drop
-  `isDatabaseConnected`; the gate sits inside `runAutomaticCleanupRules()` and `runAutomaticDeletedCleanup()` ⛔ no
-  `performance.now()` jump detection.
-- `serverClockOffsetIsFromServer(offsetMs)` = `offsetMs !== 0 || isDatabaseConnected || hasEverConnectedToDatabase`
-  ⛔ never simplify; non-number values `return` at once. `.info/serverTimeOffset` applies a value only once it holds; a
-  backend switch resets `serverClockTrusted` and the offset (the old backend never vouches for the new one).
+- Destructive cleanup requires `serverClockIsTrustworthy()` and `isDatabaseConnected`; never remove either gate from
+  `runAutomaticCleanupRules()` or `runAutomaticDeletedCleanup()`. Central clock validation compares wall and monotonic
+  elapsed time only to detect uncertainty, never to prove tampering or parcel age. Suspension and clock changes wait for
+  a fresh server sample; bounded refresh must recover without a permanent latch. Never add cleanup-local jump detectors.
+- Server time advances from an accepted epoch and monotonic sample. Reject ambiguous or excessive request timing;
+  cached offsets and listener reattachment cannot establish freshness. Native Firebase `.info` callbacks and an observed
+  disconnected-to-connected handshake cannot prove sample age; native clock authority requires a request-bound verified
+  time sample with its original wall and monotonic receipt metadata. Supabase retains immutable bounded RPC samples.
+  Keep estimate and uncertainty distinct; an RPC midpoint is not exact authority. Transfer the original interval into
+  license verification, never recertify a numeric offset with zero uncertainty. Compare overlapping intervals for resamples.
+  Uncertainty invalidates old clock-operation leases even if a new sample arrives before a consumer checks; normal
+  resamples keep valid leases. Endpoint failure holds new time-sensitive work but preserves a continuous trusted offline anchor.
+- New business timestamps require trusted admission and clock-generation fences through awaited work and speculative
+  updaters. Committed outcome proofs, compensation and persisted original timestamps remain recoverable; never discard
+  unknown evidence or replace an original ZTO timestamp with current time. Session expiry uses clock certainty independently
+  of database connectivity; uncertainty must not silently grant an indefinitely live session. Guards: `server-clock-continuity`
+  and `server-clock-estimator` Vitest suites, `cleanup-clock-guard-test`, and the affected operation-recovery suites.
+- Raw-offset compatibility keeps `serverClockOffsetIsFromServer(offsetMs)` = `offsetMs !== 0 || isDatabaseConnected || hasEverConnectedToDatabase`;
+  non-number values return at once. Immutable metadata-backed zero-offset samples instead require the complete validated
+  interval. Native `.info/serverTimeOffset` alone never establishes freshness. A backend switch resets `serverClockTrusted`
+  and the offset; the old backend never vouches for the new one.
 
 ## ⛔ CSP and `data-act`
 

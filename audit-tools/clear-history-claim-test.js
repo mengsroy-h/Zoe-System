@@ -142,6 +142,8 @@ function makeTab(app, shared, suffix) {
         auth: { currentUser: { uid: 'fixture-user' }, app: { options: { databaseURL: 'https://fixture.invalid' } } },
         appLocalStore: { getItem: () => null },
         liveTrashClaims: new Set(), trashClaimPage: Math.random().toString(36).slice(2),
+        serverClockTrusted: true, serverTimeOffsetMs: 0,
+        Date: class extends Date { static now() { return shared.now; } },
         getServerNow: () => shared.now,
         generateUniqueId: () => `${suffix}_${++sequence}`,
         normalizeBarcodesOf: (item) => item,
@@ -150,7 +152,7 @@ function makeTab(app, shared, suffix) {
         setTimeout: (fn, ms) => (ms >= 10000 ? setTimeout(fn, ms) : (fn(), 0)),
         clearTimeout: (t) => { if (t) clearTimeout(t); }
     });
-    const runtime = require('./react-view').moduleRuntime(APP_ROOT, source, ['src/domain/barcode-key.ts', 'src/core/shop-scope.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/services/row-operation-lock.ts']);
+    const runtime = require('./react-view').moduleRuntime(APP_ROOT, source, [{ path: 'src/core/clock.ts', expose: ['getServerClockBounds', 'captureClockOperation'] }, { path: 'src/domain/trash-claim.ts', expose: ['trashClaimMayBeLive'] }, 'src/domain/barcode-key.ts', 'src/core/shop-scope.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/services/row-operation-lock.ts']);
     new vm.Script(`${runtime.code}\n${runtime.withoutBindings(helpers)}\nglobalThis.clearHelpers = { claimHistoryItemForClear, buildClearHistoryTrashItem, finalizeClaimedHistoryClear, clearClearHistoryFinalization, CLEAR_HISTORY_CLAIM_LEASE_MS };`).runInContext(context);
     return context.clearHelpers;
 }

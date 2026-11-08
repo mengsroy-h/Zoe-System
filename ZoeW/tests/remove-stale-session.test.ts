@@ -39,6 +39,8 @@ function commitLedger() {
 }
 
 beforeEach(() => {
+    firebaseState.serverClockTrusted = true;
+    firebaseState.serverTimeOffsetMs = 0;
     vi.useFakeTimers();
     ledgerPending = [];
     trashDocs = {};

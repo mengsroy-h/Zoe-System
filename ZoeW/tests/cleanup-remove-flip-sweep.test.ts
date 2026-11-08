@@ -91,7 +91,7 @@ beforeEach(() => {
     firebaseState.auth = { currentUser: { uid: 'audit-user', getIdToken: async () => 'synthetic-id' } } as any;
     firebaseState.firebaseConfig = { databaseURL: HOST } as any;
     firebaseState.isDatabaseInitialized = true; firebaseState.isDatabaseConnected = true; firebaseState.hasEverConnectedToDatabase = true;
-    firebaseState.serverClockTrusted = true; firebaseState.serverTimeOffsetMs = 0;
+    firebaseState.sessionExpiryCheck = 'live'; firebaseState.serverClockTrusted = true; firebaseState.serverTimeOffsetMs = 0;
     firebaseState.dbRefHistory = ref(H) as any; firebaseState.dbRefDeleted = ref(T) as any; firebaseState.dbRefDailyRevenue = ref(D) as any; firebaseState.dbRefMonthlyRevenue = ref(M) as any;
     firebaseState.dbRefDailyPickup = ref('zoew_daily_pickup_cod_dod') as any; firebaseState.dbRefDailyCollected = ref('zoew_daily_collected_cod_dod') as any;
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: HOST }));

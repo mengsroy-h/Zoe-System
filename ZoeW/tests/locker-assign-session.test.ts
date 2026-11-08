@@ -1,3 +1,4 @@
+import { acceptServerClockOffset, resetServerClock } from '../src/core/clock';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../src/core/state';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
@@ -43,6 +44,7 @@ beforeEach(() => {
     uiState.toasts = [];
     uiState.activeLocker = 'L-02';
     firebaseState.db = { name: 'db' } as any;
+    resetServerClock(); acceptServerClockOffset(1, null, false);
     (window as any).ZoeErrors = { capture: vi.fn() };
     firebaseState.fb = {
         ref: (_db: any, path: string) => ({ path }),
@@ -95,4 +97,26 @@ describe('Locker ៖ ការកំណត់ទីតាំងចុះយឺ�
         await vi.advanceTimersByTimeAsync(10);
         expect(toasts().some((m) => m.indexOf('❌') !== -1)).toBe(true);
     });
+});
+
+it('uncertain clock refuses locker assignment before SDK mutation', async () => {
+    seed(); resetServerClock();
+    const write = vi.spyOn(firebaseState.fb, 'runTransaction').mockResolvedValue({ committed: false });
+    await assignLockerToEntry('ZTA001');
+    expect(write).not.toHaveBeenCalled();
+});
+
+it('a retried locker updater cannot reuse a timestamp after clock resync', async () => {
+    seed();
+    let updater!: (value: any) => any;
+    firebaseState.fb.runTransaction = (_ref, fn) => {
+        updater = fn;
+        return new Promise(resolve => { settle = { resolve, reject: () => {} }; });
+    };
+    const task = assignLockerToEntry('ZTA001');
+    resetServerClock(); acceptServerClockOffset(1, null, false);
+    expect(updater(JSON.parse(JSON.stringify(dataState.scanHistory[0])))).toBeUndefined();
+    settle!.resolve({ committed: false });
+    await task;
+    expect(liveLocker()).toBeUndefined();
 });

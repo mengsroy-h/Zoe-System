@@ -854,3 +854,84 @@ it.each(['whole', 'barcode'])('history commit មុន ACK របស់ %s ៖ 
     expect(readPickupJournal()).toEqual([]);
     const settled = clone(tree); await resumePickupIntents(); expect(tree).toEqual(settled); assertMoney();
 });
+
+it('ពេលវេលាមិនទុកចិត្ត មិនបង្កើត close plan ថ្មី', async () => {
+    const journal = pickupIntentTracker(() => true, 'target');
+    await journal.prepare(DAY, ['ONE']);
+    firebaseState.serverClockTrusted = false;
+    expect(journal.startClose(tree[HISTORY].target, true, true)).toBe(false);
+    expect(readPickupJournal()[0]?.closePlan).toBeUndefined();
+    expect(writes).not.toContain(HISTORY + '/target');
+    journal.release();
+});
+
+it('callback ចាស់មិនរស់ឡើងវិញក្រោយ clock resync ប៉ុន្តែ plan ដើមអាច recover', async () => {
+    const { acceptServerClockOffset, serverClockIsTrustworthy } = await import('../src/core/clock');
+    expect(acceptServerClockOffset(0, undefined, false)).toBe(true);
+    const journal = pickupIntentTracker(() => true, 'target');
+    await journal.prepare(DAY, ['ONE']);
+    expect(journal.startClose(tree[HISTORY].target, true, true)).toBe(true);
+    const plan = clone(readPickupJournal()[0].closePlan);
+    vi.setSystemTime(NOW + 3600000);
+    expect(serverClockIsTrustworthy()).toBe(false);
+    expect(acceptServerClockOffset(-3600000, undefined, false)).toBe(true);
+    expect(journal.applyClose(clone(tree[HISTORY].target))?.kind).toBe('conflict');
+    expect(readPickupJournal()[0].closePlan).toEqual(plan);
+    journal.release(); pickupIntentsLive.clear();
+    await resumePickupIntents();
+    expect(tree[HISTORY].target.barcodes[0].closedAt).toBe(plan.serverTransitionAt);
+    expect(tree[PICKUP][DAY].packagesPickedUp).toBe(1);
+    expect(readPickupJournal()).toEqual([]);
+});
+
+it.each(['uncertain', 'resynced'])('replay close ៖ %s រក្សា plan ដោយមិនសរសេរពី callback ចាស់', async kind => {
+    const { acceptServerClockOffset, serverClockIsTrustworthy } = await import('../src/core/clock');
+    await offlineClose();
+    const plan = clone(readPickupJournal()[0].closePlan);
+    expect(acceptServerClockOffset(0, undefined, false)).toBe(true);
+    const api = firebaseState.fb as any, transact = api.runTransaction;
+    if (kind === 'uncertain') firebaseState.serverClockTrusted = false;
+    else api.runTransaction = async (ref: any, updater: any) => {
+        if (ref.path === HISTORY + '/target') {
+            vi.setSystemTime(NOW + 3600000);
+            expect(serverClockIsTrustworthy()).toBe(false);
+            expect(acceptServerClockOffset(-3600000, undefined, false)).toBe(true);
+        }
+        return transact(ref, updater);
+    };
+    writes = []; await resumePickupIntents();
+    expect(tree[HISTORY].target.barcodes[0].isClosed).toBe(false);
+    expect(writes).not.toContain(HISTORY + '/target');
+    expect(readPickupJournal()[0].closePlan).toEqual(plan);
+    api.runTransaction = transact;
+    expect(acceptServerClockOffset(kind === 'uncertain' ? 0 : -3600000, undefined, false)).toBe(true);
+    await resumePickupIntents();
+    expect(tree[HISTORY].target.barcodes[0].closedAt).toBe(plan.serverTransitionAt);
+    expect(tree[PICKUP][DAY].packagesPickedUp).toBe(1);
+    expect(readPickupJournal()).toEqual([]);
+});
+
+it('legacy close callback គ្មាន plan នៅតែគោរព clock generation', async () => {
+    const { acceptServerClockOffset, serverClockIsTrustworthy } = await import('../src/core/clock');
+    expect(acceptServerClockOffset(0, undefined, false)).toBe(true);
+    delete tree[HISTORY].target.barcodes[0].createdAt;
+    const journal = pickupIntentTracker(() => true, 'target'); await journal.prepare(DAY, ['ONE']);
+    expect(journal.startClose(tree[HISTORY].target, true, true)).toBe(true);
+    expect(readPickupJournal()[0].closePlan).toBeUndefined();
+    vi.setSystemTime(NOW + 3600000); expect(serverClockIsTrustworthy()).toBe(false);
+    expect(acceptServerClockOffset(-3600000, undefined, false)).toBe(true);
+    expect(journal.applyClose(clone(tree[HISTORY].target))?.kind).toBe('conflict');
+    journal.release();
+});
+
+it('clock sample ថ្មីធម្មតា និង offline មិនបោះបង់ close ដែលមានម៉ោងទុកចិត្ត', async () => {
+    const { acceptServerClockOffset } = await import('../src/core/clock');
+    expect(acceptServerClockOffset(0, undefined, false)).toBe(true);
+    const journal = pickupIntentTracker(() => true, 'target'); await journal.prepare(DAY, ['ONE']);
+    firebaseState.isDatabaseConnected = false;
+    expect(journal.startClose(tree[HISTORY].target, true, true)).toBe(true);
+    firebaseState.isDatabaseConnected = true;
+    expect(acceptServerClockOffset(0, undefined, false)).toBe(true);
+    expect(journal.applyClose(clone(tree[HISTORY].target))?.kind).toBe('before');
+    journal.release();
+});

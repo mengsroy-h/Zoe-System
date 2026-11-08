@@ -109,7 +109,7 @@ function build(items, ledgerDays, ledgerMonths, exitState = 'failed') {
         appLocalStore: { getItem: () => null }, ztoStatusLoaded: true, ztoPickupStatus: new Map(),
         authGeneration: 0,
         getServerNow: () => NOW,
-        cleanupClockIsTrustworthy: () => true,
+        serverClockTrusted: true, serverTimeOffsetMs: 0, isDatabaseConnected: true, sessionExpiryCheck: 'live',
         activeRestoreClaims: new Map(),
         isActiveRestoreClaim: (claim) => !!(claim && NOW - claim.claimedAt < 2 * 60 * 1000),
         collectItemBarcodes: (item) => (item.barcodes || []).map((barcode) => barcode.code),
@@ -131,6 +131,8 @@ function build(items, ledgerDays, ledgerMonths, exitState = 'failed') {
         }
     });
     const runtime = require('./react-view').moduleRuntime(ROOT, source, [
+        { path: 'src/core/clock.ts', expose: ['captureClockOperation', 'getServerClockBounds', 'cleanupClockIsTrustworthy', 'resetServerClock'] },
+        'src/core/session-verification.ts',
         'src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/core/shop-scope.ts',
         { path: 'src/domain/registry-purge-proof.ts', expose: ['REGISTRY_RELEASES_ROOT', 'REGISTRY_PURGE_MAX_WRITES', 'boundedRegistryPurgeIntent', 'slotRegistryPurgeIntent', 'registryPurgeReceiptValid', 'registryPurgeReceiptMatches', 'registryPurgeIntent'] },
         { path: 'src/services/registry-purge.ts', expose: ['purgeTrashWithRegistry'] }
@@ -268,6 +270,25 @@ function build(items, ledgerDays, ledgerMonths, exitState = 'failed') {
     check(!hasKeyFn || JSON.stringify(world.log.releasedKeys.slice().sort()) === JSON.stringify(['returned_old@2027-01-05', 'returned_receipted@2027-01-05']),
         'purge ➜ ដោះសោដក `ded` តែរបស់ returned ដែល purge ពិត ហើយ `at` ត្រូវ (មិនមែន at ផ្សេង · មិនមែន pickup)', world.log.releasedKeys);
     check(!hasKeyFn || purged.includes('returned_otherkey'), 'សោ `at` ផ្សេង មិនរារាំង purge របស់ធុងសំរាម', purged);
+
+    for (const gate of ['session', 'clock']) {
+        const held = build([{ id: 'held_' + gate, trashReason: 'returned', deletedAt: NOW - 3 * DAY,
+            barcodes: [{ code: 'HELD_' + gate.toUpperCase(), isDeducted: true }] }]);
+        const before = JSON.stringify(held.store);
+        if (gate === 'session') held.context.sessionExpiryCheck = 'pending';
+        else held.context.resetServerClock();
+        await held.context.__run();
+        check(JSON.stringify(held.store) === before && held.log.batches.length === 0 && held.log.releasedClaims.length === 0
+            && held.log.releasedBarcodes.length === 0 && held.log.releasedKeys.length === 0 && held.log.exits.length === 0,
+            gate + ' មិនទាន់ផ្ទៀង ➜ មិន purge, ដកប្រាក់ ឬដោះ registry/claim', held.log);
+        held.context.sessionExpiryCheck = 'live';
+        held.context.serverClockTrusted = true;
+        await held.context.__run();
+        check(!held.store.zoew_recently_deleted_cod_dod?.['held_' + gate]
+            && !held.store.zoew_barcode_registry?.['HELD_' + gate.toUpperCase()]
+            && held.log.batches.flat().includes('held_' + gate),
+            gate + ' ផ្ទៀងវិញ ➜ purge ពិតអាចបន្ត', held.log);
+    }
 
     console.log('\n' + pass + ' ok, ' + fail + ' fail');
     process.exit(fail ? 1 : 0);

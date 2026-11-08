@@ -1,9 +1,9 @@
 import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../src/core/state';
-import { getServerNow } from '../src/core/clock';
+import { getServerNow, resetServerClock } from '../src/core/clock';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
-import { clearHistory } from '../src/features/clear-history';
+import { clearHistory, claimHistoryItemForClear } from '../src/features/clear-history';
 import { getZtoTrashMode } from '../src/features/lookup-config';
 import { activeClearHistoryClaims } from '../src/ui/history-render';
 
@@ -241,4 +241,23 @@ describe('«លុបទាំងអស់» ៖ slot ធុងសំរាម�
         expect(getAt(TRASH + '/' + ID).trashReason).toBe('delete');
         expect(trashCopiesOf('C').length).toBe(1);
     }, 30000);
+});
+
+it('clear claim ថ្មីមិនសរសេរក្រោយនាឡិកា Sync ឡើងវិញក្នុង updater', async () => {
+    install([itemOf(ID, 'C', 7)], {});
+    const execute = firebaseState.fb.runTransaction;
+    firebaseState.fb.runTransaction = ((ref: any, update: any) => {
+        if (ref.path === HISTORY + '/' + ID) { resetServerClock(); firebaseState.serverClockTrusted = true; }
+        return execute(ref, update);
+    }) as any;
+    await expect(claimHistoryItemForClear(ID, 'clear_clock_test')).rejects.toThrow();
+    expect(getAt(HISTORY + '/' + ID).clearClaim).toBeUndefined();
+});
+
+it('clear claim បានរក្សាទុកលើ server អាចបន្តដោយ timestamp ដើមពេលនាឡិកាមិនទុកចិត្ត', async () => {
+    install([itemOf(ID, 'C', 7)], {});
+    const admitted = await claimHistoryItemForClear(ID, 'clear_clock_resume');
+    resetServerClock();
+    const resumed = await claimHistoryItemForClear(ID, 'clear_clock_resume');
+    expect(resumed.clearClaim).toEqual(admitted.clearClaim);
 });

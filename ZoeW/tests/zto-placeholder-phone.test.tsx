@@ -175,3 +175,5 @@ describe('E7 k10 ៖ លេខដាក់កន្លែងពី ZTO មិន
         expect(rows[0].cod).toBe(3);
     });
 });
+
+beforeEach(() => { firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live'; });

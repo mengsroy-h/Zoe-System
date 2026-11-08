@@ -46,7 +46,7 @@ it.each(['firebase', 'supabase'].flatMap((provider) => ['unchanged', 'open-resto
     firebaseState.db = { name: 'test', app: { options } } as any;
     firebaseState.fb = mem.sdk as any;
     firebaseState.serverTimeOffsetMs = 0;
-    firebaseState.serverClockTrusted = true;
+    firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live';
     firebaseState.isDatabaseConnected = true;
     firebaseState.isDatabaseInitialized = true;
     firebaseState.isInitializingFirebase = false;
@@ -179,7 +179,7 @@ it('បញ្ជីទទេពិតលើក្រុមធំ មិនបង
     firebaseState.fb = createScanMemorySdk().sdk as any;
     firebaseState.auth = { currentUser: { uid: 'fixture' } } as any;
     firebaseState.db = {} as any;
-    firebaseState.serverClockTrusted = true;
+    firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live';
     firebaseState.serverTimeOffsetMs = 0;
     const size = 1000;
     let reads = 0;
@@ -218,7 +218,7 @@ it.each([['firebase', 'unchanged'], ['firebase', 'open-restored'], ['supabase', 
     firebaseState.db = { name: 'test', app: { options } } as any;
     firebaseState.fb = mem.sdk as any;
     firebaseState.serverTimeOffsetMs = 0;
-    firebaseState.serverClockTrusted = true;
+    firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live';
     firebaseState.isDatabaseConnected = true;
     firebaseState.isDatabaseInitialized = true;
     firebaseState.isInitializingFirebase = false;

@@ -103,6 +103,7 @@ describe('ZTO Sign evidence keeps flowing to the pickup cleanup', () => {
         firebaseState.serverTimeOffsetMs = 0;
         firebaseState.isDatabaseConnected = false;
         firebaseState.hasEverConnectedToDatabase = false;
+        firebaseState.serverClockTrusted = false;
         loadZtoPickupStatusOnce();
         expect(ztoPickupStatus.get('ZTX0000001')).toMatchObject({ closed: true, signedAt: signed, signedAtExact: true });
         expect(ztoPickupStatus.get('ZTX0000002').signedAt, 'no device-clock guess before the server offset').toBeFalsy();
@@ -189,6 +190,7 @@ describe('ZTO Sign evidence keeps flowing to the pickup cleanup', () => {
         vi.setSystemTime(new Date(T0 - 30 * 60000));
         firebaseState.isDatabaseConnected = false;
         firebaseState.hasEverConnectedToDatabase = false;
+        firebaseState.serverClockTrusted = false;
         loadZtoPickupStatusOnce();
         setZtoPickupVerdict('ZTX0000009', false);
         const stored = JSON.parse(appLocalStore.getItem('zoew_zto_pickup_status_v1')!);
@@ -217,6 +219,7 @@ describe('ZTO Sign evidence keeps flowing to the pickup cleanup', () => {
         firebaseState.serverTimeOffsetMs = 0;
         firebaseState.isDatabaseConnected = false;
         firebaseState.hasEverConnectedToDatabase = false;
+        firebaseState.serverClockTrusted = false;
         loadZtoPickupStatusOnce();
         setZtoPickupVerdict('ZTX0000007', true);
         expect(ztoPickupStatus.get('ZTX0000007')).toMatchObject({ closed: true, signedAt: signed, signedAtExact: true });
@@ -224,3 +227,5 @@ describe('ZTO Sign evidence keeps flowing to the pickup cleanup', () => {
         expect(stored.ZTX0000007).toMatchObject({ closed: true, signedAt: signed, signedAtExact: true });
     });
 });
+
+beforeEach(() => { firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live'; });

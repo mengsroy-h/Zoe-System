@@ -154,7 +154,7 @@ function seed(items: any[]) {
     firebaseState.auth = { currentUser: { uid: 'u1', getIdToken: async () => 'tok' } } as any;
     firebaseState.isDatabaseInitialized = true;
     firebaseState.isDatabaseConnected = true;
-    firebaseState.serverClockTrusted = true;
+    firebaseState.sessionExpiryCheck = 'live'; firebaseState.serverClockTrusted = true;
     firebaseState.hasEverConnectedToDatabase = true;
     firebaseState.dbListenersFailed = false;
     firebaseState.serverTimeOffsetMs = 0;
@@ -745,4 +745,18 @@ describe('M4 ៖ ដកកញ្ចប់បិទ · App បិទកណ្ត�
             .toEqual({ journal: 1, alarms: 0, warned: false, money: { day: [100, 10], month: [100, 10] } });
         expect(cleanupStorageSnapshot()).toEqual(pendingBeforeResume);
     }, 30000);
+});
+
+describe('ការវាស់បញ្ច្រាស៖ ច្រកអនុញ្ញាតការសម្អាត', () => {
+    for (const gate of ['pending-session', 'untrusted-clock']) it('មិនប៉ះប្រវត្តិឬប្រាក់នៅពេល ' + gate, async () => {
+        const item = expiredItem();
+        seed([item]);
+        if (gate === 'pending-session') firebaseState.sessionExpiryCheck = 'pending';
+        else firebaseState.serverClockTrusted = false;
+        const before = clone(lab.store);
+        await claimAndCleanupItem(item.id, 'abandon');
+        await flush();
+        expect(lab.store).toEqual(before);
+        expect(readCleanupJournal()).toHaveLength(0);
+    });
 });

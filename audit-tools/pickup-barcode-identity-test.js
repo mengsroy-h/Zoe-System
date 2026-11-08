@@ -74,7 +74,7 @@ function sliceConst(name) {
     const m = new RegExp('const\\s+' + name + '\\s*=\\s*([^;\\n]+);').exec(SRC);
     return m ? 'const ' + name + ' = ' + m[1] + ';' : null;
 }
-const protocolRuntime = moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/barcode.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts']);
+const protocolRuntime = moduleRuntime(ROOT, SRC, [{ path: 'src/core/clock.ts', expose: ['captureClockOperation', 'getServerClockBounds', 'serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'resetServerClock'] }, 'src/core/session-verification.ts', 'src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/barcode.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts']);
 const clone = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
 
 // ── ០. ជាន់អប្បបរមា ─────────────────────────────────────────────────
@@ -314,6 +314,7 @@ function makeDevice(shared, name) {
         dbRefDailyPickup: { path: 'zoew_daily_pickup_cod_dod' },
         dbRefDailyCollected: { path: 'zoew_daily_collected_cod_dod' },
         getServerNow: () => T0,
+        serverClockTrusted: true, serverTimeOffsetMs: T0 - Date.now(), isDatabaseConnected: true, sessionExpiryCheck: 'live',
         getFormattedDate: () => SCAN_DATE,
         showToast: (m) => { dev.toasts.push(String(m)); },
         closeModal: () => {},
@@ -401,6 +402,28 @@ const phoneSum = (rec) => Object.keys((rec && rec.pickedUpPhones) || {})
     .reduce((s, k) => s + (parseFloat(rec.pickedUpPhones[k]) || 0), 0);
 
 (async () => {
+    // clock admission ប្រើ module ពិត; fixture ជោគជ័យមិនត្រូវរំលងផ្លូវបដិសេធ។
+    {
+        const shared = makeShared({ zoew_scan_history_cod_dod: { clock_hold: parcel('clock_hold', [bc('CLOCK1', false)]) } });
+        const A = makeDevice(shared, 'clock-control');
+        const originalHistory = JSON.stringify(shared.get('zoew_scan_history_cod_dod'));
+        A.ctx.resetServerClock();
+        const refused = await A.ctx.toggleIndividualBarcodeClose('clock_hold', 'CLOCK1');
+        await settle();
+        ok('clock មិនទុកចិត្ត ➜ Close មិនប្តូរ history, pickup ឬ collected', refused === false
+            && JSON.stringify(shared.get('zoew_scan_history_cod_dod')) === originalHistory
+            && packagesOf(shared.pickup()) === 0 && !shared.get('zoew_daily_collected_cod_dod'), shared.store);
+        ok('clock មិនទុកចិត្ត ➜ journal មិនបង្កើត transition proof', A.ctx.readPickupJournal().every(entry =>
+            entry.stage === 'prepared' && entry.transitionKnown !== true && entry.allowedAddKeys.length === 0), A.ctx.readPickupJournal());
+        A.ctx.serverClockTrusted = true;
+        A.ctx.serverTimeOffsetMs = T0 - Date.now();
+        const retried = await A.ctx.toggleIndividualBarcodeClose('clock_hold', 'CLOCK1');
+        await settle();
+        ok('clock ទុកចិត្តវិញ ➜ ចុច Close ថ្មីបិទ និងរាប់ barcode មួយ', retried === true
+            && shared.get('zoew_scan_history_cod_dod/clock_hold').barcodes[0].isClosed === true
+            && packagesOf(shared.pickup()) === 1, shared.store);
+        A.dispose();
+    }
     // ── ៣. លំដាប់ដែលអ្នកប្រើវាស់បាន (ក្រៅបណ្តាញ ➜ ឧបករណ៍ផ្សេងបើក ➜ ភ្ជាប់មកវិញ)
     async function offlineReplay(label, opts) {
         console.log('\n=== ' + label + ' ===');

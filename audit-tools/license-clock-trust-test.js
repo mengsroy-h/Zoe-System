@@ -7,7 +7,7 @@
 // នោះគឺ `attachInfoListeners()` ក្នុង `app.js` — ដែល **គ្មាន checker ណាមួយ
 // មើលសោះ**៖
 //   • រាល់តេស្ត browser ជំនួស `setServerTimeOffset` ដោយ **stub ទទេ**
-//   • `license-grace-test.js` ចាក់ `serverTimeSynced` **ដោយផ្ទាល់** ចូល sandbox
+//   • fixture ចាស់របស់ `license-grace-test.js` ចាក់ទង់ `serverTimeSynced` ជំនួសម៉ោងពិត
 // ➜ ស្នាមភ្ជាប់រវាង App និងម៉ូឌុល **មិនដែលត្រូវវាស់សោះ**។ វាស់បានក្នុងជុំនេះ៖
 // mutation ដែល **ដកការហៅនោះចេញទាំងស្រុង** និង mutation ដែលធ្វើឲ្យ
 // `setServerTimeOffset()` ទទួលយកអ្វីក៏បាន — **រស់រានទាំង ២** លើ checker ទាំងអស់។
@@ -65,7 +65,7 @@ function sliceFn(src, name) {
 const STUBBED = new Set([
     'clearInfoListenerRecovery', 'clearReconnectWatchdog', 'retryFailedDbListenersNow',
     'flushPendingHistoryPatches', 'flushPendingRegistryReleases', 'scheduleReconnectWatchdog', 'renderConnectionStatus',
-    'handleInfoListenerError', 'retryPendingRoleCheck', 'onValue', 'off', 'val',
+    'handleInfoListenerError', 'retryPendingRoleCheck', 'runSessionExpiryCheck', 'resumePriceOperations', 'forceDatabaseReconnect', 'retryPendingActivation', 'onValue', 'off', 'val',
     'setServerTimeOffset', 'splice', 'forEach', 'catch', 'then', 'get'
 ]);
 
@@ -96,6 +96,7 @@ function collectHelpers(appSrc, body, moduleNames = new Set()) {
 // WebCrypto ៖ មានតែ primitive ទេដែលជា stub។ រាល់ logic របស់ License នៅពិត។
 function fakeCrypto(signatureValid) {
     return {
+        getRandomValues: (bytes) => require('node:crypto').webcrypto.getRandomValues(bytes),
         subtle: {
             importKey: () => Promise.resolve({ __key: true }),
             verify: () => Promise.resolve(signatureValid !== false)
@@ -119,7 +120,7 @@ function buildEnv(app, opts) {
     if (!body) return null;
 
     const store = Object.assign({}, opts.store);
-    const clock = { now: opts.now || Date.now() };
+    const clock = { now: opts.now || Date.now(), mono: 0 };
     const RealDate = Date;
     function FakeDate(...args) {
         if (!(this instanceof FakeDate)) return new RealDate(...args).toString();
@@ -132,7 +133,7 @@ function buildEnv(app, opts) {
         console, Promise, Error, JSON, Object, Array, Number, String, Boolean, isNaN,
         Math, Map, Set, RegExp, setTimeout, clearTimeout, AbortController,
         TextEncoder, TextDecoder, Uint8Array,
-        Date: FakeDate,
+        Date: FakeDate, performance: { now: () => clock.mono },
         navigator: { onLine: opts.onLine !== false },
         crypto: fakeCrypto(opts.signatureValid),
         atob: (s) => Buffer.from(s, 'base64').toString('binary'),
@@ -142,7 +143,13 @@ function buildEnv(app, opts) {
             setItem: (k, v) => { store[k] = v; },
             removeItem: (k) => { delete store[k]; }
         },
-        fetch: () => Promise.reject(new Error('offline')),
+        fetch: async (url) => {
+            if (!/\/\.netlify\/functions\/server-time\?/.test(String(url)) || opts.onLine === false || opts.serverOffset === undefined) throw new Error('offline');
+            const delay = opts.responseDelayMs || 0;
+            clock.now += delay;
+            clock.mono += delay;
+            return {ok: true, status: 200, redirected: false, headers: {get: name => name.toLowerCase() === 'content-type' ? 'application/json' : null}, json: async () => ({nonce: new URL(url).searchParams.get('nonce'), now: clock.now + opts.serverOffset})};
+        },
         document: { getElementById: () => null },
         __store: store, __clock: clock
     };
@@ -152,10 +159,15 @@ function buildEnv(app, opts) {
 
     vm.runInContext(licSrc, ctx);
 
-    ctx.performance = require('node:perf_hooks').performance;
+    ctx.performance = { now: () => clock.mono };
     const recovery = app === 'ZoeW' ? require('./react-view').scanRecoveryRuntime(ROOT, appSrc) : null;
+    const coreClock = app === 'ZoeW' ? require('./react-view').moduleRuntime(ROOT, appSrc, ['src/core/clock.ts']) : null;
+    const moduleNames = new Set([...(recovery ? recovery.names : []), ...(coreClock ? coreClock.names : [])]);
     const listenerCode = `
         let serverTimeOffsetMs = 0;
+        let serverClockTrusted = false;
+        let sessionExpiryCheck = 'pending';
+        let lastDbLivenessOkAt = 0;
         let serverTimeSynced = false;
         let serverTimeSyncWaiters = [];
         let isDatabaseConnected = false;
@@ -180,7 +192,11 @@ function buildEnv(app, opts) {
         const INFO_LISTENER_KEY_CONNECTED = 'connected';
         const INFO_LISTENER_KEY_OFFSET = 'serverTimeOffset';
         function retryPendingRoleCheck() {}
-        ${collectHelpers(appSrc, body, recovery ? recovery.names : new Set())}
+        function runSessionExpiryCheck() {}
+        function retryPendingActivation() {}
+        function resumePriceOperations() {}
+        function forceDatabaseReconnect() {}
+        ${collectHelpers(appSrc, body, moduleNames)}
         ${body}
         globalThis.__drive = (connected, offsetValue, offsetOnly) => {
             fb = {
@@ -200,7 +216,10 @@ function buildEnv(app, opts) {
         globalThis.__armWaiter = () => { serverTimeSyncWaiters.push(() => { __waitersReleased++; }); };
         globalThis.__released = () => __waitersReleased;
     `;
-    vm.runInContext(recovery ? recovery.withoutBindings(listenerCode) : listenerCode, ctx);
+    let fixtureCode = recovery ? recovery.withoutBindings(listenerCode) : listenerCode;
+    if (coreClock) fixtureCode = coreClock.withoutBindings(fixtureCode);
+    vm.runInContext(fixtureCode, ctx);
+    if (coreClock) vm.runInContext(coreClock.code, ctx);
     if (recovery) vm.runInContext(recovery.code, ctx);
 
     return { ctx, store, clock, sandbox };
@@ -222,7 +241,9 @@ if (found.length < 2 || !fs.existsSync(path.join(ROOT, 'ZoeW/license-verify.js')
 }
 
 let scenarios = 0;
+const drain = async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); };
 
+(async () => {
 for (const app of APPS) {
     console.log('\n== ' + app + ' ==');
 
@@ -231,6 +252,7 @@ for (const app of APPS) {
     for (const pre of [null, 0]) {
         const env = buildEnv(app, { onLine: false });
         env.sandbox.__drive(false, pre);
+        await drain();
         const offset = env.ctx.ZoeLicense.getServerTimeOffset();
         scenarios++;
         ok(app + ' ៖ មុន handshake តម្លៃ `' + JSON.stringify(pre) + '` ➜ License នៅ **មិនទាន់ sync**',
@@ -241,20 +263,22 @@ for (const app of APPS) {
     {
         const env = buildEnv(app, { onLine: false });
         env.sandbox.__drive(false, undefined);
+        await drain();
         const offset = env.ctx.ZoeLicense.getServerTimeOffset();
         scenarios++;
         ok(app + ' ៖ តម្លៃមិនមែនលេខ ➜ License នៅ **មិនទាន់ sync**', offset === null, offset);
     }
 
-    // ២ — ទិសផ្ទុយ ៖ offset ពិតពី handshake **ត្រូវតែ** ឆ្លងទៅដល់ License
+    // ២ — ទិសផ្ទុយ ៖ nonce response ពិត **ត្រូវតែ** ផ្តល់ម៉ោងដល់ License និង ZoeW
     //     បើអត់ការអះអាងនេះ ការ «កុំទុកចិត្ត» នឹងបៃតង ទោះការចិញ្ចឹមត្រូវដកចេញ
     {
-        const env = buildEnv(app, { onLine: true });
+        const env = buildEnv(app, { onLine: true, serverOffset: -45000 });
         env.sandbox.__drive(true, -45000);
+        await drain();
         const offset = env.ctx.ZoeLicense.getServerTimeOffset();
         scenarios++;
-        ok(app + ' ៖ ⛔ ទិសផ្ទុយ — offset ពិត (-45000) **ត្រូវឆ្លងទៅដល់** License',
-            offset === -45000, offset);
+        ok(app + ' ៖ ⛔ ទិសផ្ទុយ — nonce response (-45000) ផ្តល់ម៉ោងដែលទុកចិត្តបាន',
+            offset === -45000 && (app !== 'ZoeW' || env.ctx.serverClockIsTrustworthy() && env.ctx.getServerNow() === env.clock.now - 45000), offset);
     }
 
     // ២ក — offset ពិតដែលមកដល់ **មុន** `.info/connected === true`
@@ -262,24 +286,59 @@ for (const app of APPS) {
     //      **មិនអាស្រ័យលើលំដាប់** — បើមិនដូច្នេះ offset ពិតត្រូវទម្លាក់ចោល
     //      ហើយ App ធ្លាក់ទៅនាឡិកាឧបករណ៍ដោយស្ងាត់។
     {
-        const env = buildEnv(app, { onLine: true });
+        const env = buildEnv(app, { onLine: true, serverOffset: -45000 });
         env.sandbox.__drive(false, -45000, true);
+        await drain();
         const offset = env.ctx.ZoeLicense.getServerTimeOffset();
         scenarios++;
-        ok(app + ' ៖ ⛔ offset ពិតមកដល់ **មុន** `connected` ➜ ត្រូវទទួលយកដដែល',
-            offset === -45000, offset);
+        ok(app + ' ៖ ⛔ nonce response មុន `connected` ➜ ត្រូវទទួលយកដដែល',
+            offset === -45000 && (app !== 'ZoeW' || env.ctx.serverClockIsTrustworthy() && env.ctx.getServerNow() === env.clock.now - 45000), offset);
     }
 
     // ២ខ — offset ០ ដែលមកដល់ **ក្រោយ** ភ្ជាប់រួច ជាតម្លៃពិត ➜ ត្រូវទទួលយក
     {
-        const env = buildEnv(app, { onLine: true });
+        const env = buildEnv(app, { onLine: true, serverOffset: 0 });
         env.sandbox.__drive(true, 7000);
+        await drain();
         env.sandbox.__drive(true, 0, true);
+        await drain();
         const offset = env.ctx.ZoeLicense.getServerTimeOffset();
         scenarios++;
-        ok(app + ' ៖ offset ០ ក្រោយភ្ជាប់រួច ➜ ត្រូវទទួលយក (មិនត្រូវច្រានចោល)',
-            offset === 0, offset);
+        ok(app + ' ៖ nonce response offset ០ ➜ ត្រូវទទួលយក (មិនត្រូវច្រានចោល)',
+            offset === 0 && (app !== 'ZoeW' || env.ctx.serverClockIsTrustworthy() && env.ctx.getServerNow() === env.clock.now), offset);
     }
+}
+
+// ⛔ callback `.info` គ្មាន sample ដែលបានផ្ទៀងផ្ទាត់ មិនអាចផ្តល់សិទ្ធិនាឡិកា។
+for (const [connected, offset, offsetOnly] of [[true, -45000, false], [true, 0, false], [false, -45000, true]]) {
+    const env = buildEnv('ZoeW', { onLine: true });
+    env.sandbox.__drive(connected, offset, offsetOnly);
+    await drain();
+    scenarios++;
+    ok('ZoeW ៖ cached .info គ្មាន nonce response មិនទុកចិត្ត (' + [connected, offset, offsetOnly].join(',') + ')',
+        env.ctx.ZoeLicense.getServerTimeOffset() === null && !env.ctx.serverClockIsTrustworthy());
+}
+
+{
+    const env = buildEnv('ZoeW', { onLine: true, serverOffset: -45000, responseDelayMs: 1200 });
+    env.sandbox.__drive(true, 0);
+    await drain();
+    const sample = env.ctx.ZoeLicense.getServerTimeSample();
+    const bounds = env.ctx.getServerClockBounds();
+    scenarios++;
+    ok('ZoeW ៖ nonce sample ពិតរក្សាព្រំដែនពេលទាំងពីរ និងភាពមិនប្រាកដប្រជា',
+        sample && Object.isFrozen(sample) && sample.source === 'nonce' && sample.uncertaintyMs === 1200
+        && bounds && bounds.lowerMs === sample.epochMs && bounds.upperMs === sample.epochMs + sample.uncertaintyMs,
+        { sample, bounds });
+}
+{
+    const env = buildEnv('ZoeW', { onLine: true });
+    env.ctx.ZoeLicense.setServerTimeOffset(-45000);
+    env.sandbox.__drive(true, -45000);
+    await drain();
+    scenarios++;
+    ok('ZoeW ៖ offset API គ្មានភស្តុតាង nonce/http-date មិនផ្តល់សិទ្ធិដល់នាឡិកា business',
+        !env.ctx.serverClockIsTrustworthy() && env.ctx.getServerClockBounds() === null);
 }
 
 // ── ៣. ZoeKeyGen ៖ ការការពារ «មិនអាចផ្ទៀងផ្ទាត់ម៉ោង ➜ មិនចេញ Key» ────────
@@ -287,6 +346,7 @@ for (const app of APPS) {
     const env = buildEnv('ZoeKeyGen', { onLine: false });
     env.sandbox.__armWaiter();
     env.sandbox.__drive(false, null);
+        await drain();
     const st = env.sandbox.__state();
     scenarios++;
     ok('ZoeKeyGen ៖ មុន handshake ➜ `serverTimeSynced` នៅ **false**', st.appSynced === false, st);
@@ -295,12 +355,25 @@ for (const app of APPS) {
         env.sandbox.__released() === 0, env.sandbox.__released());
 }
 {
-    const env = buildEnv('ZoeKeyGen', { onLine: true });
+    const env = buildEnv('ZoeKeyGen', { onLine: true, serverOffset: -45000 });
     env.sandbox.__armWaiter();
     env.sandbox.__drive(true, -45000);
+        await drain();
     scenarios++;
     ok('ZoeKeyGen ៖ ⛔ ទិសផ្ទុយ — handshake ពិត ➜ អ្នករង់ចាំ **ត្រូវដោះ**',
         env.sandbox.__released() === 1 && env.sandbox.__state().appSynced === true,
+        { released: env.sandbox.__released(), state: env.sandbox.__state() });
+}
+
+
+{
+    const env = buildEnv('ZoeKeyGen', { onLine: true });
+    env.sandbox.__armWaiter();
+    env.sandbox.__drive(true, -45000);
+    await drain();
+    scenarios++;
+    ok('ZoeKeyGen ៖ cached offset គ្មាន nonce response មិនទុកចិត្ត និងមិនដោះអ្នករង់ចាំ',
+        env.ctx.ZoeLicense.getServerTimeOffset() === null && env.sandbox.__released() === 0 && env.sandbox.__state().appSynced === false,
         { released: env.sandbox.__released(), state: env.sandbox.__state() });
 }
 
@@ -315,7 +388,6 @@ const recordOf = () => JSON.stringify({
     note: '', lastOnlineCheck: REAL_NOW, onlineExp: REAL_NOW + 200 * 86400000
 });
 
-(async () => {
     {
         const env = buildEnv('ZoeW', {
             onLine: false,
@@ -323,6 +395,7 @@ const recordOf = () => JSON.stringify({
             store: { ['zoe_license_activation_' + APP_CODE]: recordOf() }
         });
         env.sandbox.__drive(false, null);
+        await drain();
         const st = await env.ctx.ZoeLicense.getStatus(APP_CODE);
         scenarios++;
         ok('⛔ ក្រៅបណ្តាញ + នាឡិកាឧបករណ៍លោត ១ ឆ្នាំ ➜ License **មិនត្រូវលុប**',
@@ -337,9 +410,14 @@ const recordOf = () => JSON.stringify({
         const env = buildEnv('ZoeW', {
             onLine: true,
             now: REAL_NOW,
+            serverOffset: 365 * 86400000,
             store: { ['zoe_license_activation_' + APP_CODE]: recordOf() }
         });
         env.sandbox.__drive(true, 365 * 86400000);
+        await drain();
+        scenarios++;
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ nonce response ផ្តល់ម៉ោង server ដែលហួសពិដានពិត',
+            env.ctx.serverClockIsTrustworthy() && env.ctx.getServerNow() === REAL_NOW + 365 * 86400000);
         const st = await env.ctx.ZoeLicense.getStatus(APP_CODE);
         scenarios++;
         ok('⛔ ទិសផ្ទុយ ៖ ម៉ោង server ពិតបញ្ជាក់ថាហួស ➜ **មិនត្រូវផ្តល់សិទ្ធិ**',
@@ -370,6 +448,7 @@ const recordOf = () => JSON.stringify({
             ? Promise.resolve({ ok: true, status: 200, headers: { get: () => null }, json: () => Promise.resolve(keyBody), text: () => Promise.resolve('') })
             : Promise.reject(new Error('offline')));
         env.sandbox.__drive(false, null);
+        await drain();
         const st = await env.ctx.ZoeLicense.getStatus(APP_CODE);
         scenarios++;
         ok('⛔ N3 (' + variant + ') ៖ ម៉ោង server មិនដែល sync (Date header អានមិនបាន) + នាឡិកាឧបករណ៍លឿនហួសពិដាន ➜ License **មិនត្រូវលុប**',
@@ -392,4 +471,4 @@ const recordOf = () => JSON.stringify({
 
     console.log('\n' + pass + ' ok, ' + fail + ' FAIL');
     process.exit(fail ? 1 : 0);
-})();
+})().catch(error => { console.error(error); process.exit(1); });

@@ -1,4 +1,5 @@
 import { securityState, uiState } from '../../core/state';
+import { sessionVerificationRequired } from '../../core/session-verification';
 import { modalElement } from '../components/modals/Modal';
 import { topmostModal } from '../lifecycle/layers';
 import type { LifecycleScope } from '../lifecycle/scope';
@@ -10,7 +11,7 @@ const FOCUS_OUTSIDE_LAYER = '.toast-container';
 let tabBackwards = false;
 
 export function focusTrapLayer(): HTMLElement | null {
-    if (securityState.appIsLocked) {
+    if (securityState.appIsLocked || sessionVerificationRequired()) {
         const pin = elementOf('appLockPinInput');
         return pin ? (pin.closest('.app-lock') as HTMLElement | null) : null;
     }

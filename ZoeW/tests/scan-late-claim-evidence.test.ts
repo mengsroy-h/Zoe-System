@@ -36,6 +36,7 @@ const rows = () => journal().list(scope);
 const flush = async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); };
 
 beforeEach(() => {
+    firebaseState.sessionExpiryCheck = 'live'; firebaseState.serverClockTrusted = true; firebaseState.serverTimeOffsetMs = 0;
     vi.useFakeTimers(); vi.setSystemTime(NOW);
     appLocalStore.clear(); pendingRegistryReleases.clear(); clearZtoPickupStatusStore();
     dbListenerFailedPaths.clear(); dbListenerPendingPaths.clear();

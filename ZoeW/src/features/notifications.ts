@@ -1,5 +1,5 @@
 import { refreshDrawerGroups, toggleDrawerGroup } from '../core/actions';
-import { getServerNow } from '../core/clock';
+import { getServerNow, serverClockIsTrustworthy } from '../core/clock';
 import { getZoneDateKey } from '../core/timezone';
 import { dataState, firebaseState, uiState } from '../core/state';
 import { viewState } from '../core/view-state';
@@ -211,7 +211,7 @@ export function nearExpiryView(history, now, stale): NotifyView {
 }
 
 export function refreshNotifyView() {
-    const stale = !firebaseState.serverClockTrusted || !Number.isFinite(firebaseState.serverTimeOffsetMs)
+    const stale = !serverClockIsTrustworthy()
         || !firebaseState.isDatabaseInitialized || dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY);
     uiState.notifyView = nearExpiryView(dataState.scanHistory, getServerNow(), stale);
     refreshNotifyRemovedView();

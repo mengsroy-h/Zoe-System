@@ -110,6 +110,7 @@ const CLOCK_GATE = extractFn(src, 'cleanupClockIsTrustworthy')
 
 function buildWorld(opts) {
     let deviceNow = opts.deviceNow;
+    let elapsed = 1000;
     const RealDate = Date;
     function FakeDate(...args) {
         if (!(this instanceof FakeDate)) return new RealDate(...args).toString();
@@ -142,11 +143,15 @@ function buildWorld(opts) {
         extractFn(src, 'dbOp'),
         extractFn(src, 'dbOpStalled'),
         'let serverTimeOffsetMs = 0;',
+        'let serverClockSample = null;',
         'let serverClockTrusted = false;',
         'let isDatabaseConnected = false, hasEverConnectedToDatabase = false;',
         'let dbRefConnected = "connected", dbRefServerTimeOffset = "offset";',
         'let db = {}, fb = null;',
         'let authGeneration = 0;',
+        "let sessionExpiryCheck = 'idle';",
+        'function runSessionExpiryCheck() { return Promise.resolve(false); }',
+        'function retryPendingActivation() { return Promise.resolve(false); }',
         'let infoListenerGeneration = 0;',
         'let deletedCleanupInFlight = false, deletedCleanupOwner = null, deletedCleanupCursor = null;',
         extractFn(src, 'deletedCleanupCurrent'),
@@ -188,7 +193,9 @@ function buildWorld(opts) {
         'const infoListenerFailedPaths = new Set();',
         "const INFO_LISTENER_KEY_CONNECTED = 'connected';",
         "const INFO_LISTENER_KEY_OFFSET = 'serverTimeOffset';",
+        extractFn(src, 'sessionVerificationRequired'),
         extractFn(src, 'getServerNow'),
+        extractFn(src, 'acceptServerClockOffset'),
         extractFn(src, 'serverClockOffsetIsFromServer'),
         CLOCK_GATE,
         // ⛔ ច្រកទ្វារ «ហាងស្គាល់» (`shopScopePending()`) ៖ function ពិត ➜ sandbox គ្មាន Config ➜ ឆ្លើយ `false` (វាស់ក្នុង `ZoeW/tests/shop-pending-cleanup.test.tsx`)
@@ -209,25 +216,27 @@ function buildWorld(opts) {
         extractFn(src, 'runAutomaticDeletedCleanup'),
         'globalThis.__seed = (h, t) => { scanHistory = h; deletedItems = t; };',
         'globalThis.__handshake = (offset) => {',
-        '    fb = { off() {}, onValue(ref, cb) { cb({ val: () => (ref === "connected" ? true : offset) }); } };',
+        '    fb = { __supabase: true, off() {}, onValue(ref, cb) { cb({ val: () => (ref === "connected" ? true : offset), serverClockSample: ref === "offset" ? Object.freeze({ epochMs: Date.now() + offset, monotonicMs: performance.now(), wallMs: Date.now() }) : null }); } };',
         '    attachInfoListeners();',
         '};',
         // ⛔ WiFi ដាច់ ៖ `.info/connected` បាញ់ `false` ខណៈ offset **នៅដដែល**
         //    (RTDB មិនផ្ញើ offset ថ្មីពេលដាច់ទេ) — នេះជាស្ថានភាពពិត
         //    ដែលអ្នកប្រើប្តូរនាឡិកាទូរស័ព្ទក្នុងវា។
         'globalThis.__disconnect = (offset) => {',
-        '    fb = { off() {}, onValue(ref, cb) { cb({ val: () => (ref === "connected" ? false : offset) }); } };',
+        '    fb = { __supabase: true, off() {}, onValue(ref, cb) { cb({ val: () => (ref === "connected" ? false : offset) }); } };',
         '    attachInfoListeners();',
         '};',
         'globalThis.__run = async () => { runAutomaticCleanupRules(); await runAutomaticDeletedCleanup(); };',
         'globalThis.__serverNow = () => getServerNow();'
     ].filter(Boolean).join('\n\n');
 
-    ctx.performance = require('node:perf_hooks').performance;
+    ctx.performance = { now: () => elapsed };
     const recovery = require('./react-view').scanRecoveryRuntime(ROOT, src);
-    new vm.Script(recovery.withoutBindings(code)).runInContext(ctx);
+    const clock = require('./react-view').moduleRuntime(ROOT, src, ['src/core/clock.ts']);
+    new vm.Script(clock.withoutBindings(recovery.withoutBindings(code))).runInContext(ctx);
+    vm.runInContext(clock.code, ctx);
     vm.runInContext(recovery.code, ctx);
-    return { ctx, log, setDeviceNow: (ms) => { deviceNow = ms; } };
+    return { ctx, log, setDeviceNow: (ms) => { deviceNow = ms; }, advanceElapsed: (ms) => { elapsed += ms; } };
 }
 
 // ធាតុពិត ៖ កញ្ចប់បើកថ្មីៗ · barcode ដែលទើបបិទ · ធុងសំរាមថ្មីៗ
@@ -312,6 +321,29 @@ function freshSeed() {
         await w.ctx.__run();
         ok('   ក្រោយភ្ជាប់មកវិញ ➜ ការសម្អាតដដែល **រត់វិញ** (ការពន្យារមិនបាត់ការងារ)',
             w.log.claims.length >= 1 && w.log.purges.length === 1,
+            { claims: w.log.claims, purges: w.log.purges });
+    }
+
+    {
+        const w = buildWorld({ deviceNow: REAL_NOW, online: true });
+        w.ctx.__handshake(0);
+        const seed = freshSeed();
+        w.ctx.__seed(seed.history, seed.trash);
+        await w.ctx.__run();
+        ok('នៅភ្ជាប់ + sample ពិត + ធាតុថ្មី ➜ គ្មានការសម្អាត',
+            w.log.claims.length === 0 && w.log.purges.length === 0);
+        w.setDeviceNow(REAL_NOW + YEAR_MS);
+        w.advanceElapsed(1000);
+        await w.ctx.__run();
+        ok('នៅភ្ជាប់ + ម៉ោងលោតមួយឆ្នាំ ➜ មិនបំផ្លាញកញ្ចប់ថ្មី',
+            w.log.claims.length === 0 && w.log.purges.length === 0,
+            { claims: w.log.claims, purges: w.log.purges });
+        w.advanceElapsed(31 * 24 * 60 * 60 * 1000);
+        w.setDeviceNow(REAL_NOW + 31 * 24 * 60 * 60 * 1000 + 1000);
+        w.ctx.__handshake(0);
+        await w.ctx.__run();
+        ok('ពេលវេលាពិតកើន ➜ ការសម្អាតនៅដំណើរការ',
+            w.log.claims.length >= 2 && w.log.purges.length === 1,
             { claims: w.log.claims, purges: w.log.purges });
     }
 

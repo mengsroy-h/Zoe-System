@@ -924,3 +924,5 @@ describe('Cookie ៖ ភស្តុតាងត្រឡប់ពេលគ្�
         expect(lab.store).toEqual(before);
     });
 });
+
+beforeEach(() => { firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live'; });

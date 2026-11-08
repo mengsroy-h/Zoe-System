@@ -1,3 +1,4 @@
+import { acceptServerClockOffset, resetServerClock } from '../src/core/clock';
 /**
  * App និង Function ពិត ជាមួយ upstream សាកល្បង៖ SSO scan03 + native signed companion + own-site track។
  * ផ្ទៀងកញ្ចប់មកដល់ដែលមិនទាន់ចែកចាយ ការបែងទំព័រ បណ្តាញខូច និងភាពគ្រប់នៃបញ្ជី។
@@ -565,3 +566,9 @@ describe('ZTO Palm ៖ ទាញបញ្ជីមកដល់ដូច Cookie',
         expect(appLocalStore.getItem('zoew_lookup_api_config'), 'ឈ្មោះដែលមានស្រាប់មិនត្រូវសរសេរជាន់').toBe(named);
     });
 });
+
+beforeEach(() => {
+    resetServerClock();
+    acceptServerClockOffset(1, { epochMs: Date.now(), wallMs: Date.now(), monotonicMs: performance.now() }, false);
+});
+afterEach(() => resetServerClock());

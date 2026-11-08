@@ -180,6 +180,9 @@ function tabFor(app, shared, suffix) {
         ztoReturnedEvidence: new Map(),
         dbRefHistory: shared.fb.ref(shared.db, 'zoew_scan_history_cod_dod'),
         fb: shared.fb,
+        // នាឡិកាទុកចិត្តបែបសាកល្បង សម្រាប់ការប្រជែង restore; រក្សាម៉ោងអាជីវកម្មថេរ។
+        serverClockTrusted: true, serverTimeOffsetMs: 0,
+        Date: class extends Date { static now() { return shared.now; } },
         getServerNow: () => shared.now,
         getFormattedDate: () => '2026-08-19',
         generateUniqueId: () => `${suffix}_${++seq}`,
@@ -190,7 +193,7 @@ function tabFor(app, shared, suffix) {
         setTimeout: (fn, ms) => (ms >= 10000 ? setTimeout(fn, ms) : (fn(), 0)),
         clearTimeout: (t) => { if (t) clearTimeout(t); }
     });
-    const runtime = require('./react-view').moduleRuntime(APP_ROOT, source, ['src/domain/barcode-key.ts', 'src/core/shop-scope.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/services/row-operation-lock.ts']);
+    const runtime = require('./react-view').moduleRuntime(APP_ROOT, source, [{ path: 'src/core/clock.ts', expose: ['getServerClockBounds', 'captureClockOperation', 'serverClockIsTrustworthy', 'cleanupClockIsTrustworthy'] }, { path: 'src/features/zto-status.ts', expose: ['resolveZtoPickupSignTime'] }, 'src/domain/barcode-key.ts', 'src/core/shop-scope.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/services/row-operation-lock.ts']);
     new vm.Script(`${runtime.code}\n${runtime.withoutBindings(restoreHelpers)}\nglobalThis.restoreHelpers = { claimDeletedItemForRestore, findRestoreTargetId, applyClaimedRestoreToHistory, finalizeClaimedRestore, clearRestoreFinalization, cancelBlockedRestore, captureTrashGenerationOwner, trashConsumptionOf, RESTORE_CLAIM_LEASE_MS };`).runInContext(context);
     return context.restoreHelpers;
 }

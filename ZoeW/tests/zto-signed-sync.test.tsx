@@ -1,3 +1,4 @@
+import { acceptServerClockOffset, resetServerClock } from '../src/core/clock';
 import { createScanMemorySdk } from './helpers/scan-memory-sdk';
 /**
  * ⛔ ZTO ៖ ការទាញបញ្ជីលឿន · ភស្តុតាង «ចុះហត្ថលេខា» (ZTO Palm) · បិទដូចបិទដោយដៃ · ឈ្មោះសាខា (សំណើម្ចាស់គម្រោង)។
@@ -91,7 +92,7 @@ function urlOf(call: any[]) {
 }
 
 beforeEach(() => {
-    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.useFakeTimers({ toFake: ['Date', 'performance'] });
     vi.setSystemTime(new Date(NOW));
     appLocalStore.clear();
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true,
@@ -116,6 +117,8 @@ beforeEach(() => {
     firebaseState.isInitializingFirebase = false;
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
     firebaseState.fb = createScanMemorySdk('audit-token').sdk as any;
+    resetServerClock(); acceptServerClockOffset(1, { epochMs: NOW, wallMs: Date.now(), monotonicMs: performance.now() }, false);
+    firebaseState.sessionExpiryCheck = 'live';
     h.saves.length = 0;
     h.confirms.length = 0;
     for (const name of ['ztoListSyncFrom', 'ztoListSyncTo'] as const) {
@@ -311,7 +314,7 @@ describe('បិទតាម ZTO ស្វ័យប្រវត្តិ ៖ ប
         await runZtoStatusSweep(true, items, []);
         expect(h.calls).toHaveLength(10);
         items.forEach((it) => { if (h.calls.some((c) => c.itemId === it.id)) it.barcodes[0].isClosed = true; });
-        vi.setSystemTime(new Date(NOW + ZTO_STATUS_SWEEP_GAP_MS + 1000));
+        vi.advanceTimersByTime(NOW + ZTO_STATUS_SWEEP_GAP_MS + 1000 - Date.now());
         ztoState.ztoStatusLastSweepAt = 0;
         await runZtoStatusSweep(false, items, []);
         expect(h.calls.map((c) => c.code).slice(10).sort()).toEqual(codes.slice(10));
@@ -329,7 +332,7 @@ describe('បិទតាម ZTO ស្វ័យប្រវត្តិ ៖ ប
         vi.stubGlobal('fetch', signedOnly(codes));
         await runZtoStatusSweep(true, items, []);
         expect(h.calls).toHaveLength(10);
-        vi.setSystemTime(new Date(NOW + ZTO_STATUS_SWEEP_GAP_MS + 1000));
+        vi.advanceTimersByTime(NOW + ZTO_STATUS_SWEEP_GAP_MS + 1000 - Date.now());
         ztoState.ztoStatusLastSweepAt = 0;
         await runZtoStatusSweep(false, items, []);
         const second = h.calls.slice(10).map((c) => c.code).sort();
@@ -408,7 +411,7 @@ describe('បិទតាម ZTO ស្វ័យប្រវត្តិ ៖ ប
         }));
         await runZtoStatusSweep(true, items, []);
         expect(h.calls).toHaveLength(10);
-        vi.setSystemTime(new Date(NOW + ZTO_STATUS_SWEEP_GAP_MS + 1000));
+        vi.advanceTimersByTime(NOW + ZTO_STATUS_SWEEP_GAP_MS + 1000 - Date.now());
         ztoState.ztoStatusLastSweepAt = 0;
         await runZtoStatusSweep(false, items, []);
         expect(signedCalls).toBe(2);
@@ -576,6 +579,8 @@ describe('⛔ ទ្វារបញ្ចូល = ទ្វារបិទស្
     it('5. ទ្វារទាំង ២ សម្រេចដូចគ្នាលើ server ដដែល (មានភស្តុតាង ➜ បិទ · គ្មាន ➜ បើក)', async () => {
         const outcome = async (signed: string[]) => {
             firebaseState.fb = createScanMemorySdk('audit-token').sdk as any;
+    resetServerClock(); acceptServerClockOffset(1, { epochMs: NOW, wallMs: Date.now(), monotonicMs: performance.now() }, false);
+    firebaseState.sessionExpiryCheck = 'live';
             h.calls.length = 0;
             h.saves.length = 0;
             dataState.scanHistory = [];
@@ -594,3 +599,5 @@ describe('⛔ ទ្វារបញ្ចូល = ទ្វារបិទស្
         expect(await outcome([])).toEqual({ importDoor: false, autoDoor: false });
     });
 });
+
+beforeEach(() => { firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live'; });

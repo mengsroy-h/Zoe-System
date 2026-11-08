@@ -113,6 +113,7 @@ function build(source, options = {}) {
         window: {},
         navigator: { onLine: options.online !== false },
         Date: FixedDate,
+        performance: { now: () => 0 },
         AbortController,
         crypto: require("node:crypto").webcrypto,
         console,

@@ -16,7 +16,7 @@ for (const n of ast.body) {
     if (d.id.type === 'Identifier') decl.set(d.id.name, 'var ' + src.slice(d.start, d.end) + ';');
   }
 }
-const fns = ['captureSensitiveSession', 'isSensitiveSessionCurrent', 'adminOwnerIsCurrent',
+const fns = ['keygenIdleStamp', 'captureSensitiveSession', 'isSensitiveSessionCurrent', 'adminOwnerIsCurrent',
   'invalidateSensitiveSession', 'clearSigningKey', 'lockKeygenSession', 'sbAdminLogin',
   'sbAdminLogout', 'sbAdminReset', 'sbAdminConfigProblem', 'sbAdminJwtRole',
   'sbAdminRequest', 'setSbAdminBusy', 'sbInputValue'];
@@ -36,7 +36,7 @@ async function scenario(action, stage) {
   }
   const gate = deferred(); const calls = []; const toasts = []; const alerts = [];
   let enteredGate = false;
-  const ctx = vm.createContext({URL, atob, console, Date, Promise,
+  const ctx = vm.createContext({URL, atob, console, Date, Promise, performance: {now: () => Date.now()},
     document: {getElementById: el, querySelectorAll: () => []},
     safeStoreSet() {}, safeStoreRemove() {}, updateSigningKeyBadge() {}, refreshKgStatus() {},
     renderSbLookupTargets() {}, showToast: t => toasts.push(t), alert: t => alerts.push(t),

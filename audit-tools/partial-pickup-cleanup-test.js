@@ -223,6 +223,8 @@ function buildWorld(historySeed, startNow) {
         dbRefMonthlyRevenue: fb.ref({}, 'zoew_monthly_revenue_cod_dod'),
         dailyRevenueData: {},
         monthlyRevenueData: {},
+        // offset បែបសាកល្បងត្រូវគ្នានឹងនាឡិកាអាជីវកម្មថេរខាងក្រោម។
+        sessionExpiryCheck: 'live', serverTimeOffsetMs: 0,
         getServerNow: () => world.now,
         getFormattedDate: () => '2026-08-19',
         ...ledgerStubEntries(
@@ -303,7 +305,7 @@ function buildWorld(historySeed, startNow) {
         'globalThis.claimAndCleanupItem = claimAndCleanupItem;'
     ].join('\n\n');
 
-    const protocol = moduleRuntime(ROOT, src, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations'] }]);
+    const protocol = moduleRuntime(ROOT, src, [{ path: 'src/core/session-verification.ts', expose: ['sessionVerificationRequired'] }, { path: 'src/core/clock.ts', expose: ['captureClockOperation', 'serverClockIsTrustworthy', 'cleanupClockIsTrustworthy'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations'] }]);
     context.__storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://fixture-partial-pickup-cleanup-test.invalid' }) });
     context.auth = { currentUser: { uid: 'fixture-user' } };
     context.dataState = { pickupPendingVersion: 0 };

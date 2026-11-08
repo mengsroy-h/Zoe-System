@@ -72,6 +72,8 @@ function constDecl(name, fallback) {
     return m[1];
 }
 
+const CLOCK_DECL = constDecl('CLOCK_DIVERGENCE_MS', '0');
+const GRACE_DECL = constDecl('OFFLINE_GRACE_MS', '0');
 const SLOT_DECL = constDecl('LICENSE_SEAT_SLOTS', "['d1']");
 const TRIES_DECL = constDecl('LICENSE_SEAT_CLAIM_TRIES', '1');
 const META_LIMITS_DECL = constDecl('SEAT_META_LIMITS', '{ model: 80, platform: 40, serial: 64 }');
@@ -84,7 +86,7 @@ const APP = CODE || 'ZOE';
 const RECORD_KEY = 'zoe_license_activation_' + APP;
 
 const FNS = [
-    'networkLooksDown', 'sharedRequest', 'fetchWithBodyTimeout',
+    'readClock', 'resetServerTime', 'clockElapsed', 'trustedClock', 'getTrustedServerNow', 'acceptServerTime', 'getServerNow', 'setServerTimeOffset', 'networkLooksDown', 'sharedRequest', 'fetchWithBodyTimeout',
     'storageKey', 'loadLocalRecord', 'saveLocalRecord', 'clearLocalRecord',
     'recordSeenMark', 'monotonicNow',
     'getDeviceId', 'licenseSeatUrl', 'seatLimitOf', 'seatHolderOf', 'readSeat', 'claimSeat',
@@ -197,9 +199,14 @@ function makeServer(opts) {
 function build(server, opts) {
     opts = opts || {};
     const store = Object.assign({}, opts.store);
+    const clock = { now: NOW, mono: 0 };
+    class Clock extends Date {
+        constructor(...args) { super(...(args.length ? args : [clock.now])); }
+        static now() { return clock.now; }
+    }
     const sandbox = {
         console, Promise, Error, JSON, Object, Array, Number, String, Boolean, isNaN, isFinite,
-        setTimeout, clearTimeout, Date, AbortController, Map, Set, TextEncoder, RegExp, Math, Uint8Array,
+        setTimeout, clearTimeout, Date: Clock, performance: { now: () => clock.mono }, AbortController, Map, Set, TextEncoder, RegExp, Math, Uint8Array,
         crypto: { getRandomValues: ((seed) => (a) => { for (let i = 0; i < a.length; i++) a[i] = (i * 37 + seed * 101 + 11) & 255; return a; })(++buildSeed) },
         localStorage: opts.noStorage ? {
             getItem: () => { throw new Error('blocked'); },
@@ -215,8 +222,10 @@ function build(server, opts) {
     };
     const ctx = vm.createContext(sandbox);
     vm.runInContext(`
-        var serverTimeOffsetMs = 0, serverTimeSynced = ${opts.serverTimeSynced === false ? 'false' : 'true'};
-        const OFFLINE_GRACE_MS = ${3 * 24 * 60 * 60 * 1000};
+        var serverTimeOffsetMs = 0, serverTimeSynced = false;
+        var serverTimeAnchor = null, serverTimeGeneration = 0, serverTimeObservation = 0;
+        ${CLOCK_DECL}
+        ${GRACE_DECL}
         const LICENSE_DB_URL = 'https://example-rtdb.firebaseio.com';
         const NET_TIMEOUT_MS = 10000;
         const NET_MAX_IN_FLIGHT = 2;
@@ -229,7 +238,6 @@ function build(server, opts) {
         const netInFlight = new Map();
         const statusInFlight = new Map();
         const activationInFlight = new Map();
-        function getServerNow() { return ${NOW}; }
         function bytesToBase32(bytes) {
             const alphabet = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
             let bits = 0, value = 0, output = '';
@@ -247,7 +255,8 @@ function build(server, opts) {
         function verifyKeyString(k) { return verifySignatureAndScope(k); }
     `, ctx);
     vm.runInContext(SLICED, ctx);
-    return { ctx, store, server };
+    if (opts.serverTimeSynced !== false) vm.runInContext('setServerTimeOffset(0)', ctx);
+    return { ctx, store, server, clock };
 }
 
 const RECORD = (id) => JSON.stringify({
@@ -488,12 +497,13 @@ const status = (h) => vm.runInContext("getStatus('" + APP + "')", h.ctx);
         const srvAct = makeServer({ claimDelayMs: 30 });
         const DEV_ACT = 'ZZZACTIVATED00000003';
         const hAct = build(srvAct, { store: { zoe_license_device_id: DEV_ACT } });
-        vm.runInContext('var __t0 = Date.now(); function getServerNow() { return ' + NOW + ' + (Date.now() - __t0); }', hAct.ctx);
         const serverNow = () => vm.runInContext('getServerNow()', hAct.ctx);
         let releasedAtAct = 0;
         srvAct.onClaimed = () => {
             srvAct.onClaimed = null;
             setTimeout(() => {
+                hAct.clock.now += 5;
+                hAct.clock.mono += 5;
                 releasedAtAct = serverNow();
                 srvAct.seats = {};
                 srvAct.key = Object.assign({}, srvAct.key, { releasedAt: releasedAtAct });

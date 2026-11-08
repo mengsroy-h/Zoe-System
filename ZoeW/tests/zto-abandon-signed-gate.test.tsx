@@ -639,3 +639,5 @@ describe('ការពិនិត្យប្រឆាំង (អ្នកយ�
         expect(abandoned('slow'), '⛔ ចុះហត្ថលេខាក្រោយការអានចាប់ផ្តើមអាចបាត់ ➜ រង់ចាំ').toBe(false);
     });
 });
+
+beforeEach(() => { firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live'; });

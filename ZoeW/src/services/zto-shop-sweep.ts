@@ -1,5 +1,5 @@
 import { firebaseState, ztoState } from '../core/state';
-import { getServerNow } from '../core/clock';
+import { captureClockOperation, getServerClockBounds, getServerNow } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
 
 export const ZTO_SHOP_SWEEP_PATH = 'zoew_settings/zto_signed_sweep';
@@ -12,7 +12,8 @@ function ztoShopSweepStamp(v) {
 
 function ztoShopSweepSaneStamp(v) {
     const at = ztoShopSweepStamp(v);
-    return at && at <= getServerNow() + ZTO_SHOP_SWEEP_MARK_GAP_MS ? at : 0;
+    const bounds = getServerClockBounds();
+    return at && (!bounds || at <= bounds.upperMs + ZTO_SHOP_SWEEP_MARK_GAP_MS) ? at : 0;
 }
 
 export function resetZtoShopSweep() {
@@ -70,15 +71,26 @@ export function retryZtoShopSweepListener() {
 export function ztoShopSweepHolds(ripeAt) {
     const shop = ztoState.ztoShopSweep;
     if (shop.state === 'pending' || shop.state === 'failed') return true;
-    if (shop.state !== 'ok' || !shop.activeAt || getServerNow() - shop.activeAt > ZTO_SHOP_SWEEP_ACTIVE_MS) return false;
-    return typeof ripeAt === 'number' && isFinite(ripeAt) && shop.completeAt < ripeAt;
+    if (shop.state !== 'ok' || !shop.activeAt) return false;
+    const bounds = getServerClockBounds();
+    if (bounds && bounds.lowerMs - shop.activeAt > ZTO_SHOP_SWEEP_ACTIVE_MS) return false;
+    return typeof ripeAt === 'number' && isFinite(ripeAt);
 }
 
 export function markZtoShopSweep(completeAt) {
     const sdk = firebaseState.fb;
     const markRef = firebaseState.dbRefZtoSignedSweep;
     if (!sdk || !markRef || typeof sdk.update !== 'function') return false;
+    const clock = captureClockOperation();
+    const markAuth = firebaseState.auth;
+    const authUid = markAuth?.currentUser?.uid;
+    const markAuthGeneration = firebaseState.authGeneration;
+    const sessionGeneration = ztoState.ztoSessionGeneration;
+    const current = () => clock.current() && sdk === firebaseState.fb && markRef === firebaseState.dbRefZtoSignedSweep
+        && markAuth === firebaseState.auth && authUid === firebaseState.auth?.currentUser?.uid
+        && markAuthGeneration === firebaseState.authGeneration && sessionGeneration === ztoState.ztoSessionGeneration;
     const now = getServerNow();
+    if (!current()) return false;
     const wrote = ztoState.ztoShopSweepWrote;
     const lastActive = Math.max(ztoState.ztoShopSweep.activeAt, wrote.activeAt);
     const lastComplete = Math.max(ztoState.ztoShopSweep.completeAt, wrote.completeAt);
@@ -86,7 +98,14 @@ export function markZtoShopSweep(completeAt) {
     if (ztoShopSweepStamp(completeAt) && completeAt - lastComplete >= ZTO_SHOP_SWEEP_MARK_GAP_MS) patch.completeAt = completeAt;
     if (patch.completeAt || !lastActive || now - lastActive >= ZTO_SHOP_SWEEP_MARK_GAP_MS) patch.activeAt = now;
     if (!patch.activeAt) return false;
-    ztoState.ztoShopSweepWrote = { activeAt: patch.activeAt, completeAt: patch.completeAt || wrote.completeAt };
-    Promise.resolve().then(() => sdk.update(markRef, patch)).catch(() => {});
+    const reserved = { activeAt: patch.activeAt, completeAt: patch.completeAt || wrote.completeAt };
+    ztoState.ztoShopSweepWrote = reserved;
+    Promise.resolve().then(() => {
+        if (!current()) {
+            if (ztoState.ztoShopSweepWrote === reserved) ztoState.ztoShopSweepWrote = wrote;
+            return;
+        }
+        return sdk.update(markRef, patch);
+    }).catch(() => {});
     return true;
 }

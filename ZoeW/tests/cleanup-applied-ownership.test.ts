@@ -1,7 +1,7 @@
 import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
-import { getServerNow } from '../src/core/clock';
+import { getServerNow, resetServerClock } from '../src/core/clock';
 import { beginCleanupOperation, releaseCleanupOperation, claimAndCleanupItem, claimCleanupTrashSlot, cleanupInFlight, cleanupJournalLive, cleanupLedgerKeyOf, cleanupPartialTrashId, markCleanupJournalLive, noteCleanupJournalEntry, readCleanupJournal, releaseCleanupJournalLive, resumeCleanupJournalEntry } from '../src/domain/cleanup';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { ABANDON_AGE_MS, TWO_HOURS_MS } from '../src/features/session';
@@ -125,6 +125,7 @@ function seedItem(reason: 'abandon' | 'close') {
     return item;
 }
 function install(reason: 'abandon' | 'close', scheme: 'firebase' | 'supabase') {
+    firebaseState.sessionExpiryCheck = 'live';
     lab.refScheme = scheme;
     const item = seedItem(reason);
     lab.store = {
@@ -358,12 +359,13 @@ describe('automatic cleanup whose claim reply was lost (txOutcome applied) decid
         expect(readCleanupJournal().length).toBe(1);
     }, 20000);
 
-    it('9. resume «slot» · our own slot write landed before the app died (same deletedAt) ➜ deducted once · flipped', async () => {
+    it('៩. សម័យមិនទាន់ផ្ទៀងផ្ទាត់អាចបញ្ចប់ slot ដែលបានសរសេររួច ដោយកាត់តែម្តង', async () => {
         const item = install('abandon', 'firebase');
         setAt(HISTORY + '/' + ID, null);
         dataState.scanHistory = [];
         const trashItem = slotEntry(item);
         setAt(TRASH + '/' + ID, trashItem);
+        firebaseState.sessionExpiryCheck = 'unverified';
         await resumeCleanupJournalEntry(ID);
         await flush();
         expect(getAt(DAILY + '/' + DAY).codDollar).toBe(90);
@@ -754,4 +756,42 @@ it.each(['legacy', 'scan'].flatMap(kind => ['copy', 'purge-race', 'purge-termina
         expect({ daily: getAt(DAILY), monthly: getAt(MONTHLY) }).toEqual(beforePurge);
         expect({ live: Object.values(getAt(HISTORY) || {}).some((row: any) => row.barcodes.some((barcode: any) => barcode.code === 'A')), registry: getAt('zoew_barcode_registry/A') }).toEqual({ live: false, registry: null });
     } else expect(trashCopiesOf('A'), JSON.stringify({ copies: trashCopiesOf('A'), journal: readCleanupJournal(), toasts: uiState.toasts })).toHaveLength(1);
+});
+
+for (const action of ['cleanup', 'delete']) it(action + ' ៖ updater ចាស់មិនចាកចេញពី history ក្រោយនាឡិកា Sync ឡើងវិញ', async () => {
+    install('abandon', 'firebase');
+    const execute = firebaseState.fb.runTransaction;
+    let interrupted = false;
+    firebaseState.fb.runTransaction = ((ref: any, update: any) => {
+        if (ref.path === HISTORY + '/' + ID && !interrupted) {
+            const proposed = update(getAt(ref.path));
+            if (proposed === null) {
+                interrupted = true;
+                resetServerClock(); firebaseState.serverClockTrusted = true;
+            }
+        }
+        return execute(ref, update);
+    }) as any;
+    if (action === 'cleanup') await claimAndCleanupItem(ID, 'abandon');
+    else await deleteSingleItem(ID, { confirmed: true, quiet: true });
+    expect(interrupted).toBe(true);
+    expect(getAt(HISTORY + '/' + ID)?.barcodes.map((b: any) => b.code)).toEqual(['A']);
+    expect(getAt(TRASH + '/' + ID)).toBeNull();
+    expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
+});
+
+for (const action of ['cleanup', 'delete']) it(action + ' ៖ ចាកចេញបានបញ្ជាក់រួច នៅតែរក្សាទុក trash ពេលនាឡិកាមិនទុកចិត្ត', async () => {
+    install('abandon', 'firebase');
+    let interrupted = false;
+    lab.hook = ({ path, proposed, apply }) => {
+        if (path !== HISTORY + '/' + ID || proposed !== null || interrupted) return;
+        interrupted = true; apply(); resetServerClock();
+        return { committed: true, snapshot: snap(makeRef(path), null) };
+    };
+    if (action === 'cleanup') await claimAndCleanupItem(ID, 'abandon');
+    else await deleteSingleItem(ID, { confirmed: true, quiet: true });
+    expect(interrupted).toBe(true);
+    expect(getAt(HISTORY + '/' + ID)).toBeNull();
+    expect(getAt(TRASH + '/' + ID)?.barcodes.map((b: any) => b.code)).toEqual(['A']);
+    expect(readCleanupJournal()).toHaveLength(0);
 });

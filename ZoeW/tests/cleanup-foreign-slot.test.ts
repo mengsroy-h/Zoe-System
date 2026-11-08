@@ -140,7 +140,7 @@ function install(reason: 'abandon' | 'close', occupant: 'delete' | 'returned' | 
     firebaseState.auth = { currentUser: { uid: 'u1', getIdToken: async () => 'tok' } } as any;
     firebaseState.isDatabaseInitialized = true;
     firebaseState.isDatabaseConnected = true;
-    firebaseState.serverClockTrusted = true;
+    firebaseState.sessionExpiryCheck = 'live'; firebaseState.serverClockTrusted = true;
     firebaseState.hasEverConnectedToDatabase = true;
     firebaseState.dbRefHistory = makeRef(HISTORY) as any;
     firebaseState.dbRefDeleted = makeRef(TRASH) as any;

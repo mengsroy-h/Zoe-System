@@ -472,3 +472,5 @@ describe('⛔ E1 ៖ ជុំដែលគ្មានកញ្ចប់បើ�
         expect(ztoState.ztoSignedSweepWaitMs, 'មិនគ្រប់ ➜ ចន្លោះទ្វេ').toBeGreaterThan(ZTO_SIGNED_SWEEP_GAP_MS);
     });
 });
+
+beforeEach(() => { firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live'; });

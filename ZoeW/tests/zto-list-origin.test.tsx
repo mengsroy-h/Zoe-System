@@ -1,9 +1,10 @@
+import { acceptServerClockOffset, resetServerClock } from '../src/core/clock';
 /**
  * ⛔ ប្រភពកញ្ចប់ក្នុងប្រអប់បញ្ជី ZTO (សំណើម្ចាស់គម្រោង ៖ «ដឹងថាកញ្ចប់មកពីចិន វៀតណាម»)។
  * ZTO គ្មានវាលប្រទេស (`countryCode: null` គ្រប់ payload ពិត) ➜ Function ផ្ញើ `from` = `recSite` (ZTO ឃ្លាំងក្វាងចូវអន្តរជាតិ · Shopee SHPE · សាខាក្នុងស្រុក)
  * ➜ ជួរដេកបង្ហាញ «📍 …» លើបន្ទាត់ដាច់ ដូច ZTO សរសេរ (មិនទាយប្រទេស) · មិនរក្សាទុកក្នុងកញ្ចប់ (`addOrUpdateEntry` ទទួលវាលច្បាស់លាស់)។
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ztoListGroupModel } from '../src/app/components/zto/model';
 import { classifyZtoListRows, ztoListSkipText } from '../src/features/zto-list-sync';
 import { getZoneDateKey } from '../src/core/timezone';
@@ -46,3 +47,9 @@ describe('ប្រភពកញ្ចប់ ៖ Function `from` ➜ ជួរដ
             .toEqual([ztoListSkipText('scan-type')]);
     });
 });
+
+beforeEach(() => {
+    resetServerClock();
+    acceptServerClockOffset(1, { epochMs: Date.now(), wallMs: Date.now(), monotonicMs: performance.now() }, false);
+});
+afterEach(() => resetServerClock());

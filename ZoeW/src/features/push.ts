@@ -1,4 +1,4 @@
-import { getServerNow } from '../core/clock';
+import { getServerNow, serverClockIsTrustworthy } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
 import { dataState, firebaseState, uiState } from '../core/state';
 import { viewState } from '../core/view-state';
@@ -665,7 +665,7 @@ export function syncExpirySchedule(force?: boolean): Promise<boolean> {
     }
     const saved = readSaved();
     if (!saved.on || pushRuntime.scheduleInFlight) return Promise.resolve(false);
-    if (!firebaseState.serverClockTrusted || !Number.isFinite(firebaseState.serverTimeOffsetMs)
+    if (!serverClockIsTrustworthy()
         || !firebaseState.isDatabaseInitialized || dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY)) return Promise.resolve(false);
     if (!force && elapsedSince(pushRuntime.scheduleAttemptAt) < PUSH_SCHEDULE_MIN_GAP_MS) return Promise.resolve(false);
     if (pushIdentityMissing()) return Promise.resolve(false);

@@ -332,3 +332,5 @@ describe('Palm warms the Function like Cookie mode (owner report: Palm lookup sl
         expect(u.search).toBe('');
     });
 });
+
+beforeEach(() => { firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live'; });

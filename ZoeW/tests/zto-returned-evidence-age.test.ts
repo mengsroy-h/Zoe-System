@@ -93,3 +93,5 @@ describe('ZTO return evidence age vs the 🔒 «ត្រឡប់» stamp', () 
         expect(ztoReturnedEvidence.has(pickupBarcodeKey('ZTRG900001'))).toBe(false);
     });
 });
+
+beforeEach(() => { firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live'; });

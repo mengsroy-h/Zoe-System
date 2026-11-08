@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState } from '../src/core/state';
 import { viewState } from '../src/core/view-state';
+import { acceptServerClockOffset } from '../src/core/clock';
 import { appLocalStore } from '../src/core/storage';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { ABANDON_AGE_MS, clearSensitiveModalFields } from '../src/features/session';
@@ -239,4 +240,17 @@ it.each([[false, 0], [true, NaN], [true, Infinity]])('Push៖ force មិនជ
     expect(posts).toHaveLength(1);
     expect(posts[0].times).toHaveLength(1);
     expect(posts[0].times[0]).toBeGreaterThan(now);
+});
+
+
+it('ម៉ោងលោតក្រោយ sync មិនជំនួសកាលវិភាគដែលបានរក្សា', async () => {
+    firebaseState.isDatabaseConnected = true;
+    expect(acceptServerClockOffset(0, null, false)).toBe(true);
+    const before = saved();
+    const send = vi.fn(async () => reply());
+    vi.stubGlobal('fetch', send);
+    vi.setSystemTime(Date.now() + 365 * 86400000);
+    expect(await syncExpirySchedule(true)).toBe(false);
+    expect(send).not.toHaveBeenCalled();
+    expect(saved()).toEqual(before);
 });

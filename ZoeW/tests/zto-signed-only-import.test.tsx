@@ -1,3 +1,4 @@
+import { acceptServerClockOffset, resetServerClock } from '../src/core/clock';
 import { createScanMemorySdk } from './helpers/scan-memory-sdk';
 /**
  * ⛔ ZTO-E12 ៖ កញ្ចប់ «ចុះហត្ថលេខា» (05) ដែលគ្មានស្កេនមកដល់ក្នុងចន្លោះ ➜ បញ្ចូលជា «យករួច» លើថ្ងៃ ZTO ស្កេនចុះហត្ថលេខា (សំណើម្ចាស់គម្រោង ៖
@@ -74,7 +75,7 @@ function openItem(id: string, code: string) {
 }
 
 beforeEach(() => {
-    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.useFakeTimers({ toFake: ['Date', 'performance'] });
     vi.setSystemTime(new Date(NOW));
     appLocalStore.clear();
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(CFG));
@@ -98,6 +99,7 @@ beforeEach(() => {
     firebaseState.isInitializingFirebase = false;
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
     firebaseState.fb = createScanMemorySdk('audit-token').sdk as any;
+    resetServerClock(); acceptServerClockOffset(1, { epochMs: NOW, wallMs: Date.now(), monotonicMs: performance.now() }, false);
     for (const name of ['ztoListSyncFrom', 'ztoListSyncTo'] as const) {
         const input = document.createElement('input');
         input.value = name === 'ztoListSyncFrom' ? RANGE.from : RANGE.to;
@@ -239,3 +241,5 @@ describe('ជួរក្នុងប្រអប់ ៖ ថ្ងៃមកដ�
         expect(notesOf('ZT0000001002')).not.toContain('✍️');
     });
 });
+
+beforeEach(() => { firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live'; });

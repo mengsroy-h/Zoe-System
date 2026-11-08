@@ -120,3 +120,5 @@ describe('ZTO Sign ៖ រក្សាម៉ោង Sign ពិត សម្រ�
         expect(ztoPickupStatus.get('ZTSIGNINVALID').signedAt).toBe(getServerNow());
     });
 });
+
+beforeEach(() => { firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live'; });

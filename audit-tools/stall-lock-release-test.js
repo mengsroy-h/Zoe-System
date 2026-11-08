@@ -123,7 +123,9 @@ function buildWorld(mode) {
     ctx.authGeneration = 0;
     vm.createContext(ctx);
 
+    // ទំនុកចិត្តបែបសាកល្បងនេះរក្សានាឡិកាអាជីវកម្មថេររបស់ fixture ដើម។
     const preamble = `
+let sessionExpiryCheck = 'live', serverTimeOffsetMs = 0, serverClockTrusted = true;
 let db = {}, fb = null;
 let dbRefDeleted = { p: 'del' }, dbRefHistory = { p: 'hist' };
 let dbRefDailyRevenue = { p: 'rev' }, dbRefMonthlyRevenue = { p: 'mrev' };
@@ -200,7 +202,7 @@ globalThis.__ledger = () => { const k = __ledgerKeyed(); return { cod: Math.roun
 globalThis.__claim = claimAndCleanupItem;
 globalThis.__confirmRemove = confirmScannedRemoval;
 `;
-    const protocol = moduleRuntime(ROOT, src, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations'] }]);
+    const protocol = moduleRuntime(ROOT, src, [{ path: 'src/core/session-verification.ts', expose: ['sessionVerificationRequired'] }, { path: 'src/core/clock.ts', expose: ['captureClockOperation', 'serverClockIsTrustworthy', 'cleanupClockIsTrustworthy'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations'] }]);
     ctx.__storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://fixture-stall-lock-release-test.invalid' }) });
     ctx.auth = { currentUser: { uid: 'fixture-user' } };
     ctx.dataState = { pickupPendingVersion: 0 };

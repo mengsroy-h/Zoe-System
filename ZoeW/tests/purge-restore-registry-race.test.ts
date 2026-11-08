@@ -1,5 +1,6 @@
 import { webcrypto } from 'node:crypto';
 import { DB_OP_TIMEOUT_MS } from '../src/services/network';
+import { RETURNED_TRASH_RETENTION_MS, TRASH_RETENTION_MS } from '../src/features/session';
 import { withTransactionOutcomeResolution } from '../src/services/tx-outcome';
 import { TRASH_CONSUMPTIONS_ROOT, purgeCertificateOf, trashConsumptionOf } from '../src/domain/trash-generation';
 import { prunedPut, purgesSource, slotPurgeAdmitted } from './helpers/purge-slot-model';
@@ -49,7 +50,7 @@ beforeEach(() => {
     firebaseState.firebaseConfig = { databaseURL: HOST } as any;
     firebaseState.auth = { currentUser: { uid: 'purge-user', getIdToken: async () => 'synthetic-token' } } as any;
     firebaseState.isInitializingFirebase = false; firebaseState.isDatabaseInitialized = true; firebaseState.isDatabaseConnected = true;
-    firebaseState.serverClockTrusted = true; firebaseState.serverTimeOffsetMs = 0; firebaseState.hasEverConnectedToDatabase = true;
+    firebaseState.serverClockTrusted = true; firebaseState.serverTimeOffsetMs = 0; firebaseState.hasEverConnectedToDatabase = true; firebaseState.sessionExpiryCheck = 'live';
     firebaseState.fb = {
         ref, increment: (n: number) => ({ inc: n }), get: async (target: any) => snap(at(target.path)),
         runTransaction: async (target: any, update: any) => {
@@ -643,4 +644,79 @@ it('auto purge៖ callback ចាស់មិនបង្វិល cursor រប
     const third = runAutomaticDeletedCleanup(); await vi.advanceTimersByTimeAsync(DB_OP_TIMEOUT_MS + 1); await third;
     expect(at(T + '/third')).toBeNull(); expect(at(T + '/second')).not.toBeNull();
     expect(purgesSource(batches[2], 'third')).toBe(true);
+});
+
+it.each(['disconnected', 'untrusted', 'corrected'].flatMap(clock => [T + '/source', TRASH_CONSUMPTIONS_ROOT + '/source', T].map(stage => [clock, stage])))('retention sweep៖ នាឡិកា %s ក្រោយអាន %s មិនចាប់ផ្ដើម purge', async (clock, stage) => {
+    store[T].source.deletedAt = NOW - 31 * 86400000;
+    dataState.deletedItems = [source()];
+    const before = clone(store); let changed = false;
+    readHook = path => {
+        if (path !== stage || changed) return;
+        changed = true;
+        if (clock === 'disconnected') firebaseState.isDatabaseConnected = false;
+        else if (clock === 'untrusted') firebaseState.serverClockTrusted = false;
+        else firebaseState.serverTimeOffsetMs = -2 * 86400000;
+    };
+    await runAutomaticDeletedCleanup();
+    expect(changed, 'ជាន់អប្បបរមា៖ ការបោសបានឆ្លងច្រកដើម និងរង់ចាំអានពិត').toBe(true);
+    expect(batches, 'មិនចេញសំណើលុបក្រោយនាឡិកាផ្លាស់').toEqual([]);
+    expect(store).toEqual(before);
+    expect(dataState.deletedCleanupInFlight).toBe(false);
+
+    readHook = null; firebaseState.isDatabaseConnected = true; firebaseState.serverClockTrusted = true; firebaseState.serverTimeOffsetMs = 0;
+    await runAutomaticDeletedCleanup();
+    expect(at(T + '/source')).toBeNull(); expect(at(R + '/' + CODE)).toBeNull();
+    expect(at(TRASH_CONSUMPTIONS_ROOT + '/source')).toMatchObject({ sourceId: 'source', kind: 'purge' });
+    expect(batches).toHaveLength(1); expect(money()).toEqual({ daily: before[D], monthly: before[M] });
+});
+
+it.each(['returned', 'remove', 'delete', 'pickup', 'legacy'].flatMap(reason => [-1, 0, 1].map(delta => [reason, delta] as const)))('retention sweep៖ %s ព្រំដែន %s ms លុបតែពេលលើសរយៈរក្សា', async (reason, delta) => {
+    const retention = reason === 'returned' ? RETURNED_TRASH_RETENTION_MS : TRASH_RETENTION_MS;
+    const row = store[T].source;
+    row.deletedAt = NOW - retention - delta;
+    if (reason === 'legacy') delete row.trashReason; else row.trashReason = reason;
+    row.barcodes[0].isDeducted = reason === 'returned' || reason === 'remove';
+    dataState.deletedItems = [source()]; const before = clone(store);
+    await runAutomaticDeletedCleanup();
+    if (delta <= 0) {
+        expect(store).toEqual(before); expect(batches).toEqual([]);
+        expect(dataState.deletedItems).toEqual([before[T].source]);
+    } else {
+        expect(at(T + '/source')).toBeNull(); expect(at(R + '/' + CODE)).toBeNull();
+        expect(at(TRASH_CONSUMPTIONS_ROOT + '/source')).toMatchObject({ sourceId: 'source', kind: 'purge' });
+        expect(batches).toHaveLength(1); expect(dataState.deletedItems).toEqual([]);
+    }
+    expect(money()).toEqual({ daily: before[D], monthly: before[M] });
+});
+
+it.each(['source', 'target', 'updater'])('retention sweep៖ នាឡិកាផុតនៅ stale Restore %s មិនដោះ claim', async stage => {
+    store[T].source.deletedAt = NOW - TRASH_RETENTION_MS - 1;
+    store[T].source.restoreClaim = { token: 'expired_restore', targetId: 'target', claimedAt: NOW - 3600000 };
+    dataState.deletedItems = [source()]; const before = clone(store);
+    const api: any = firebaseState.fb, get = api.get, tx = api.runTransaction; let changed = false;
+    api.get = async (target: any) => {
+        const result = await get(target);
+        if ((stage === 'source' && target.path === T + '/source') || (stage === 'target' && target.path === H + '/target')) {
+            changed = true; firebaseState.serverClockTrusted = false;
+        }
+        return result;
+    };
+    api.runTransaction = async (target: any, updater: any) => tx(target, (value: any) => {
+        if (stage === 'updater') { changed = true; firebaseState.serverClockTrusted = false; }
+        return updater(value);
+    });
+    await runAutomaticDeletedCleanup();
+    expect(changed).toBe(true); expect(store).toEqual(before); expect(events).toEqual([]); expect(batches).toEqual([]);
+    api.get = get; api.runTransaction = tx; firebaseState.serverClockTrusted = true;
+    await runAutomaticDeletedCleanup();
+    expect(at(T + '/source')).toBeNull(); expect(at(R + '/' + CODE)).toBeNull(); expect(batches).toHaveLength(1);
+    expect(money()).toEqual({ daily: before[D], monthly: before[M] });
+});
+
+it.each([NaN, Infinity, -Infinity])('retention sweep៖ ម៉ោងមិនកំណត់ %s មិនលុបធុងសំរាម', async offset => {
+    store[T].source.deletedAt = NOW - TRASH_RETENTION_MS - 1;
+    dataState.deletedItems = [source()]; const before = clone(store);
+    firebaseState.serverTimeOffsetMs = offset;
+    await runAutomaticDeletedCleanup();
+    expect(store).toEqual(before); expect(batches).toEqual([]); expect(events).toEqual([]);
 });

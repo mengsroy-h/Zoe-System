@@ -502,3 +502,5 @@ describe('ការពិនិត្យប្រឆាំង ៖ សារព�
         expect(detail.length, '⛔ ជុំទី ២ តាមពេល (មិនរង់ចាំជុំ ៦០ វិ.)').toBe(20);
     });
 });
+
+beforeEach(() => { firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live'; });

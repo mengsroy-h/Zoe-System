@@ -126,6 +126,8 @@ function seedTrash(items: any[]) {
 }
 
 beforeEach(() => {
+    firebaseState.serverClockTrusted = true;
+    firebaseState.serverTimeOffsetMs = 0;
     appLocalStore.clear();
     server = {};
     txPaths = [];

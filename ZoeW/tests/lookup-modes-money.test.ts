@@ -208,6 +208,7 @@ beforeEach(async () => {
     firebaseState.auth = { currentUser: { uid: 'money-user', getIdToken: async () => 'synthetic-id' } } as any;
     firebaseState.firebaseConfig = { databaseURL: HOST } as any;
     firebaseState.isDatabaseInitialized = true; firebaseState.isDatabaseConnected = true; firebaseState.hasEverConnectedToDatabase = true;
+    firebaseState.sessionExpiryCheck = 'live';
     firebaseState.serverClockTrusted = true; firebaseState.serverTimeOffsetMs = 0;
     firebaseState.dbRefHistory = ref(H); firebaseState.dbRefDeleted = ref(T); firebaseState.dbRefDailyRevenue = ref(D); firebaseState.dbRefMonthlyRevenue = ref(M);
     firebaseState.dbRefDailyPickup = ref(P); firebaseState.dbRefDailyCollected = ref(C);
@@ -914,5 +915,30 @@ it.each((['firebase', 'supabase'] as const).flatMap(backend => (['absent', 'disa
         await restore(removed); expected.verify(clone(lab.store), [CODE, SECOND], 'first-restore', Date.now());
         vi.setSystemTime(NOW + 90000000); await restore(removed);
         expected.verify(clone(lab.store), [CODE, SECOND], 'repeat-restore', Date.now());
+    }
+);
+
+it.each(['pending', 'unverified', 'clock-untrusted'] as const)(
+    '[audit-session-admission] Cookie %s៖ មិនបិទឬប្ដូរប្រាក់មុនផ្ទៀង ហើយបន្តក្រោយផ្ទៀងវិញ',
+    async state => {
+        await useMode('cookie');
+        const id = await scan();
+        setZtoPickupVerdict(CODE, true, NOW);
+        const before = clone(lab.store);
+        const transactions = lab.tx.length;
+        firebaseState.sessionExpiryCheck = state === 'clock-untrusted' ? 'live' : state;
+        firebaseState.serverClockTrusted = state !== 'clock-untrusted';
+        expect(await autoCloseBarcodeFromZto({ itemId: id, code: CODE }, dataState.scanHistory)).toBe(false);
+        expect(lab.store).toEqual(before);
+        expect(lab.tx).toHaveLength(transactions);
+        sync(); expectMoney(10, 2, 1); expectIdentities([CODE], []);
+        expect(currentItem().barcodes[0].isClosed).toBe(false);
+        firebaseState.sessionExpiryCheck = 'live';
+        firebaseState.serverClockTrusted = true;
+        expect(await autoCloseBarcodeFromZto({ itemId: id, code: CODE }, dataState.scanHistory)).toBe(true);
+        await closedTotals(); sync();
+        expect(lab.tx.length).toBeGreaterThan(transactions);
+        expectMoney(10, 2, 1); expectIdentities([CODE], []);
+        expect(currentItem().barcodes[0].isClosed).toBe(true);
     }
 );

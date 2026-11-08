@@ -136,6 +136,7 @@ function install() {
     firebaseState.isDatabaseInitialized = true;
     firebaseState.isDatabaseConnected = true;
     firebaseState.serverClockTrusted = true;
+    firebaseState.sessionExpiryCheck = 'live';
     firebaseState.hasEverConnectedToDatabase = true;
     pointAt('A');
     dataState.scanHistory = [clone(item)];

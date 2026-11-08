@@ -1,4 +1,4 @@
-import { getServerNow, serverClockIsTrustworthy } from '../core/clock';
+import { captureClockOperation, getServerNow, serverClockIsTrustworthy } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
 import { dataState, firebaseState, uiState } from '../core/state';
 import { viewState } from '../core/view-state';
@@ -669,6 +669,7 @@ export function syncExpirySchedule(force?: boolean): Promise<boolean> {
         || !firebaseState.isDatabaseInitialized || dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY)) return Promise.resolve(false);
     if (!force && elapsedSince(pushRuntime.scheduleAttemptAt) < PUSH_SCHEDULE_MIN_GAP_MS) return Promise.resolve(false);
     if (pushIdentityMissing()) return Promise.resolve(false);
+    const clock = captureClockOperation();
     const times = expiryScheduleTimes(dataState.scanHistory, getServerNow());
     const sig = scheduleSignature(times);
     if (!force && sig === saved.schedSig && elapsedSince(saved.schedAt) < PUSH_SCHEDULE_REFRESH_MS) return Promise.resolve(false);
@@ -678,7 +679,7 @@ export function syncExpirySchedule(force?: boolean): Promise<boolean> {
     const shop = shopScope();
     const backend = viewState.backendKind;
     const identityCurrent = capturePushIdentity();
-    const owner = { current: () => identityCurrent() && firebaseState.db === scheduleDb && firebaseState.authGeneration === generation
+    const owner = { current: () => clock.current() && identityCurrent() && firebaseState.db === scheduleDb && firebaseState.authGeneration === generation
         && firebaseState.auth?.currentUser === user && shopScope() === shop && viewState.backendKind === backend
         && readSaved().on && readSaved().shop === saved.shop };
     const current = () => pushScheduleRun === owner && owner.current();

@@ -676,3 +676,48 @@ it('អាចអានភស្តុតាងដែលគ្មានអ្ន�
     expect(await evidenceRetention.evidenceRetirable(evidenceSweep.owner!, 'zoew_scan_operations', ids.a,
         getAt('zoew_scan_operations/' + ids.a), NOW - EVIDENCE_RETENTION_MS)).toBe(true);
 });
+
+
+it('ឯករាជ្យ៖ ពិនិត្យព្រំពេលអប្បបរមាថ្មីក្រោយរង់ចាំអានភស្តុតាង', async () => {
+    firebaseState.fb = sdk(true) as any;
+    vi.spyOn(performance, 'now').mockReturnValue(1000);
+    resetServerClock();
+    expect(acceptServerClockOffset(0, Object.freeze({ epochMs: NOW, uncertaintyMs: 0, wallMs: Date.now(), monotonicMs: 1000 }), true)).toBe(true);
+    firebaseState.sessionExpiryCheck = 'live';
+    const id = scanId('a');
+    lab.store = { zoew_scan_operations: { [id]: op(id, 'committed', NOW - EVIDENCE_RETENTION_MS - 3600000 - 500) } };
+    dataState.scanHistory = []; dataState.deletedItems = [];
+    lab.afterRead = p => {
+        if (p === 'zoew_scan_pending/' + id) {
+            expect(acceptServerClockOffset(0, Object.freeze({ epochMs: NOW - 1500, uncertaintyMs: 0, wallMs: Date.now(), monotonicMs: 1000 }), false)).toBe(true);
+        }
+    };
+    await runEvidenceRetentionSweep();
+    expect(lab.deletes).toEqual([]);
+});
+
+it.each(['fallback', 'reset-resample', 'older-control'])('ឯករាជ្យ៖ ពិនិត្យពេលមុនលុបភស្តុតាងរាល់ជំហានក្រោយ %s', async mode => {
+    firebaseState.fb = sdk(true) as any;
+    vi.spyOn(performance, 'now').mockReturnValue(1000);
+    resetServerClock();
+    const sample = (at: number) => acceptServerClockOffset(0, Object.freeze({ epochMs: at, uncertaintyMs: 0, wallMs: Date.now(), monotonicMs: 1000 }), false);
+    expect(sample(NOW)).toBe(true); firebaseState.sessionExpiryCheck = 'live';
+    const id = scanId('a');
+    lab.store = { zoew_scan_operations: { [id]: op(id, 'committed', NOW - EVIDENCE_RETENTION_MS - 3600000 - (mode === 'older-control' ? 5000 : 500)) } };
+    dataState.scanHistory = []; dataState.deletedItems = [];
+    if (mode === 'fallback') {
+        lab.beforeWrite = () => {
+            lab.beforeWrite = null;
+            expect(sample(NOW - 1500)).toBe(true);
+            throw Object.assign(new Error('permission_denied'), { code: 'PERMISSION_DENIED' });
+        };
+    } else {
+        lab.afterRead = p => {
+            if (p !== 'zoew_scan_pending/' + id) return;
+            if (mode === 'reset-resample') resetServerClock();
+            expect(sample(NOW - 1500)).toBe(true); firebaseState.sessionExpiryCheck = 'live';
+        };
+    }
+    await runEvidenceRetentionSweep();
+    expect(lab.deletes).toEqual(mode === 'older-control' ? ['zoew_scan_operations/' + id] : []);
+});

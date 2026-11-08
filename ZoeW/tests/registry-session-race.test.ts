@@ -42,6 +42,7 @@ function deferred<T>() {
 }
 
 beforeEach(() => {
+    firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live';
     vi.useFakeTimers();
     scanStorageFault.enabled = false; scanStorageFault.attempted = 0;
     const options = { databaseURL: 'https://registry-session-fixture.firebaseio.com' };

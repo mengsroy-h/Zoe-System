@@ -31,6 +31,7 @@ function cleanupFixture() {
     return context;
 }
 beforeEach(() => {
+    firebaseState.sessionExpiryCheck = 'live';
     localStorage.clear(); localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: HOST }));
     vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(NOW); vi.stubGlobal('crypto', webcrypto);
     firebaseState.authGeneration++; firebaseState.firebaseConfig = { databaseURL: HOST } as any;

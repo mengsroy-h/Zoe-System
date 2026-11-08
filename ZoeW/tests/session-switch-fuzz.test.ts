@@ -252,6 +252,7 @@ function seedShopA() {
     } } } as any;
     firebaseState.isDatabaseInitialized = true;
     firebaseState.isDatabaseConnected = true;
+    firebaseState.sessionExpiryCheck = 'live';
     firebaseState.serverClockTrusted = true;
     firebaseState.hasEverConnectedToDatabase = true;
     attachShop(DB_A, URL_A);
@@ -571,3 +572,32 @@ it('healthy Reset without projectId binds actual token audience and original dur
     expect(getAt(DAILY + '/' + lab.day).codDollar).toBe(100);
     expect(getAt(MONTHLY + '/' + lab.day.substring(0, 7)).codDollar).toBe(100);
 });
+
+const SESSION_ADMISSION_SCENARIOS = SCENARIOS.filter(scenario => [
+    claimAndCleanupItem, runAutomaticDeletedCleanup, runAutomaticCleanupRules, runEvidenceRetentionSweep
+].some(operation => scenario.name.includes(operation.name)) || scenario.name.includes('settlePurgeDeduction'));
+expect(SESSION_ADMISSION_SCENARIOS).toHaveLength(6);
+for (const scenario of SESSION_ADMISSION_SCENARIOS) {
+    it.each(['pending', 'unverified', 'clock-untrusted'] as const)(
+        '[audit-session-admission] ' + scenario.name + ' %s៖ រក្សាទិន្នន័យមុនផ្ទៀង ហើយបន្តក្រោយផ្ទៀងវិញ',
+        async state => {
+            resetBetweenRuns();
+            let before: Record<string, any> = {};
+            const blocked: Scenario = { ...scenario, prepare: () => {
+                scenario.prepare?.();
+                before = clone(lab.store);
+                firebaseState.sessionExpiryCheck = state === 'clock-untrusted' ? 'live' : state;
+                firebaseState.serverClockTrusted = state !== 'clock-untrusted';
+            } };
+            const held = await runScenario(blocked, Infinity);
+            expect(held.writes).toBe(0);
+            expect(lab.store).toEqual(before);
+            firebaseState.sessionExpiryCheck = 'live';
+            firebaseState.serverClockTrusted = true;
+            const resumed = Promise.resolve().then(() => scenario.run());
+            await drain(); await resumed;
+            expect(lab.writes).toBeGreaterThan(0);
+            expect(lab.store).not.toEqual(before);
+        }, 120000
+    );
+}

@@ -202,7 +202,7 @@ globalThis.__ledger = () => { const k = __ledgerKeyed(); return { cod: Math.roun
 globalThis.__claim = claimAndCleanupItem;
 globalThis.__confirmRemove = confirmScannedRemoval;
 `;
-    const protocol = moduleRuntime(ROOT, src, [{ path: 'src/core/session-verification.ts', expose: ['sessionVerificationRequired'] }, { path: 'src/core/clock.ts', expose: ['captureClockOperation', 'serverClockIsTrustworthy', 'cleanupClockIsTrustworthy'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations'] }]);
+    const protocol = moduleRuntime(ROOT, src, [{ path: 'src/core/session-verification.ts', expose: ['sessionVerificationRequired'] }, { path: 'src/core/clock.ts', expose: ['captureClockOperation', 'serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'getServerClockBounds'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations'] }]);
     ctx.__storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://fixture-stall-lock-release-test.invalid' }) });
     ctx.auth = { currentUser: { uid: 'fixture-user' } };
     ctx.dataState = { pickupPendingVersion: 0 };
@@ -349,6 +349,20 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
             w.ctx.__trash().length >= 1, w.ctx.__trash());
         ok('⛔ ការសរសេរដែលចុះយឺត ➜ លុយនៅតែត្រូវដក (គ្មានការបញ្ច្រាសខុស)',
             w.ctx.__ledger().cod === -3.25, w.ctx.__ledger());
+    }
+
+    {
+        const w = buildWorld('ok');
+        w.setCurrent({ id: 'clock_hold', createdAt: Date.now() - 30 * 24 * 3600 * 1000, scanDate: '2026-09-01',
+            barcodes: [{ code: 'CLOCK1', cod: 4, dod: 0, isClosed: false }] });
+        vm.runInContext('serverClockTrusted = false;', w.ctx);
+        await w.ctx.__claim('clock_hold', 'abandon');
+        ok('នាឡិកាមិនទុកចិត្ត៖ គ្មាន trash ឬប្រាក់', w.log.updates === 0 && w.ctx.__ledger().cod === 0);
+        vm.runInContext('serverClockTrusted = true;', w.ctx);
+        await w.ctx.__claim('clock_hold', 'abandon');
+        await sleep(SETTLE_MS);
+        ok('នាឡិកាត្រឡប់៖ trash និងប្រាក់តែម្តង', w.ctx.__trash().length === 1 && w.ctx.__ledger().cod === -4);
+        ok('នាឡិកាត្រឡប់៖ គ្មានកំហុសលាក់', w.log.captures.length === 0, w.log.captures);
     }
 
     // ── ៣. `confirmScannedRemoval` ៖ សោស្កេនដកត្រូវដោះ ─────────────────────

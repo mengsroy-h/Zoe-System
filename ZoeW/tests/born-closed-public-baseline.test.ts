@@ -25,7 +25,7 @@ const PHONE = '012999888';
 const originalStorageWrite = appLocalStore.setItem.bind(appLocalStore), originalStorageRemove = appLocalStore.removeItem.bind(appLocalStore);
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.useRealTimers(); delete (window as any).ZoeErrors; });
 
-it.each(['cookie', 'palm'].flatMap(provider => ['normal', 'late-save', 'handoff', 'after-ack', 'mirror-refused', 'phase-refused', 'ack-reused', 'ack-purged', 'ack-mirror-missing', 'ack-registry', 'ack-receipt', 'ack-session', 'ack-busy', 'ack-clear-empty', 'ack-trash-zero', 'ack-duplicate', 'ack-restored', 'ack-cross-copy', 'ack-sibling', 'ack-sign-metadata', 'ack-between-price', 'ack-between-closed-at', 'ack-between-intent', 'ack-between-deducted', 'ack-between-reopen', 'ack-between-restored', 'ack-between-trash', 'ack-cleanup', 'ack-cleanup-partial', 'ack-cleanup-consumed', 'ack-cleanup-deducted', 'newer-sign-verdict', 'newer-open-verdict', 'reset-after-epoch'].map(fault => ({ provider, fault }))))('ផ្លូវ import born-closed ពិត៖ $provider · $fault', async ({ provider, fault }) => {
+it.each(['cookie', 'palm'].flatMap(provider => ['normal', 'late-save', 'handoff', 'after-ack', 'mirror-refused', 'phase-refused', 'ack-reused', 'ack-purged', 'ack-mirror-missing', 'ack-registry', 'ack-receipt', 'ack-session', 'ack-busy', 'ack-clear-empty', 'ack-trash-zero', 'ack-duplicate', 'ack-restored', 'ack-cross-copy', 'ack-sibling', 'ack-sign-metadata', 'ack-between-price', 'ack-between-closed-at', 'ack-between-intent', 'ack-between-deducted', 'ack-between-reopen', 'ack-between-restored', 'ack-between-trash', 'ack-cleanup', 'ack-cleanup-partial', 'ack-cleanup-consumed', 'ack-cleanup-deducted', 'ack-cleanup-young', 'ack-cleanup-untrusted', 'ack-cleanup-session-pending', 'newer-sign-verdict', 'newer-open-verdict', 'reset-after-epoch'].map(fault => ({ provider, fault }))))('ផ្លូវ import born-closed ពិត៖ $provider · $fault', async ({ provider, fault }) => {
     vi.useFakeTimers({ toFake: fault === 'late-save' ? ['Date', 'setTimeout', 'clearTimeout'] : ['Date'] }); vi.setSystemTime(NOW); vi.spyOn(clock, 'getServerNow').mockReturnValue(NOW);
     vi.stubGlobal('crypto', webcrypto); vi.stubGlobal('confirm', () => true);
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
@@ -83,10 +83,18 @@ it.each(['cookie', 'palm'].flatMap(provider => ['normal', 'late-save', 'handoff'
                 originalStorageWrite('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true,
                     url: window.location.origin + '/.netlify/functions/zto-order-detail?' + (provider === 'palm' ? 'palm=1&' : '') + 'barcode={barcode}' }));
                 vi.spyOn(clock, 'getServerNow').mockReturnValue(NOW + 3 * 3600000);
+                firebaseState.serverTimeOffsetMs = 3 * 3600000;
                 if (fault === 'ack-cleanup-partial') cleanupProof.scan = await addOrUpdateEntry('BORNSIBLING', '012999888', 7, 0, 'N/A', NOW + 3 * 3600000, NOW + 3 * 3600000);
                 cleanupProof.signed = await syncZtoFinalMarks();
                 dataState.scanHistory = Object.values(get(H));
+                cleanupProof.before = copy(tree);
+                cleanupProof.writesBefore = serverWrites;
+                if (fault === 'ack-cleanup-young') firebaseState.serverTimeOffsetMs = 0;
+                if (fault === 'ack-cleanup-untrusted') firebaseState.serverClockTrusted = false;
+                if (fault === 'ack-cleanup-session-pending') firebaseState.sessionExpiryCheck = 'pending';
                 await claimAndCleanupItem(row.id, 'close');
+                cleanupProof.after = copy(tree);
+                cleanupProof.writesAfter = serverWrites;
                 cleanupProof.history = get(targetPath);
                 cleanupProof.trash = get('zoew_recently_deleted_cod_dod');
                 const moved: any = Object.values(cleanupProof.trash || {})[0];
@@ -187,6 +195,17 @@ it.each(['cookie', 'palm'].flatMap(provider => ['normal', 'late-save', 'handoff'
             if (fault.startsWith('ack-cleanup')) await vi.waitFor(() => expect(cleanupProof.done).toBe(true));
             expect(cleanupProof.error).toBeUndefined();
             if (fault.startsWith('ack-between-')) expect(cleanupProof.done).toBe(true);
+            if (['ack-cleanup-young', 'ack-cleanup-untrusted', 'ack-cleanup-session-pending'].includes(fault)) {
+                expect(cleanupProof.signed).toBe(1);
+                expect(cleanupProof.before[H]).toBeDefined();
+                expect(cleanupProof.after).toEqual(cleanupProof.before);
+                expect(cleanupProof.trash).toBeNull();
+                if (fault !== 'ack-cleanup-young') expect(cleanupProof.writesAfter).toBe(cleanupProof.writesBefore);
+                expect(get(C + '/' + DAY + '/' + CODE)).toEqual({ c: 5, d: 0 });
+                expect(get(D + '/' + DAY)).toMatchObject({ codDollar: 5, totalCount: 1 });
+                expect(get(M + '/2026-10')).toMatchObject({ codDollar: 5, totalCount: 1 });
+                return;
+            }
             const journal = () => createScanEvidenceJournal(appLocalStore, 2).list(pendingScanScope());
             if (fault === 'ack-cleanup' || fault === 'ack-cleanup-partial') {
                 await vi.waitFor(() => expect(cleanupProof.done).toBe(true));

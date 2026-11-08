@@ -28,6 +28,7 @@ import { importZtoListRows, runZtoListSyncPreview } from '../src/features/zto-li
 import { encryptLookupSecret } from '../src/services/crypto';
 import { noteZtoTrashMode, resetZtoTrashMode } from '../src/services/zto-trash-mode';
 import { closeModal } from '../src/ui/modal';
+import { buildMonthlyReport, monthlyReportRows } from '../src/features/monthly-report';
 const H = 'zoew_scan_history_cod_dod';
 const T = 'zoew_recently_deleted_cod_dod';
 const D = 'zoew_daily_revenue_cod_dod';
@@ -346,4 +347,52 @@ it.each(matrix)('$backend $mode៖ បិទដោយដៃទាំងពីរ
     establishTime(NOW + 5 * HOUR);
     for (const item of [...dataState.scanHistory]) await claimAndCleanupItem(item.id, 'close'); sync();
     expect(codes(H)).toEqual([]); expect(codes(T)).toEqual([CODE, SECOND]); expectMoney(2); await expectPickup();
+});
+
+it.each((['firebase', 'supabase'] as const).flatMap(backend => [
+    { edge: Date.UTC(2026, 10, 30, 17), before: '2026-11-30', after: '2026-12-01' },
+    { edge: Date.UTC(2026, 11, 31, 17), before: '2026-12-31', after: '2027-01-01' },
+    { edge: Date.UTC(2028, 1, 28, 17), before: '2028-02-28', after: '2028-02-29' }
+].map(boundary => ({ backend, ...boundary }))))('$backend៖ ប្រតិទិនស្កេន $before ទៅ $after រក្សាក្រុមថ្ងៃ និង ledger', async ({ backend, edge, before, after }) => {
+    await configure(backend, 'cookie');
+    network = async url => json({ success: true, found: true, barcode: url.searchParams.get('barcode'),
+        phone: '012345678', cod: 10, dod: 2, ztoClosed: false });
+    for (const [code, at, expectedDay] of [[CODE, edge - 1, before], [SECOND, edge, after]] as const) {
+        establishTime(at);
+        triggerScanAction(code);
+        await waitFor(() => expect(fieldValue('modalPhoneInput')).toBe('012345678'));
+        await confirmPhone();
+        await waitFor(() => expect(codes(H)).toContain(code)); sync(); closeModal('phoneModal');
+        expect(currentItem(code)).toMatchObject({ scanDate: expectedDay, createdAt: at });
+        expect(bar(code).createdAt).toBe(at);
+        expect(getAt(D + '/' + expectedDay)).toMatchObject({ totalCount: 1, codDollar: 10, dodDollar: 2 });
+    }
+    expect(dataState.scanHistory).toHaveLength(2);
+    expect(currentItem(CODE).time).toBe('23:59:59 (' + before + ')');
+    expect(currentItem(SECOND).time).toBe('00:00:00 (' + after + ')');
+    const months = [...new Set([before.slice(0, 7), after.slice(0, 7)])];
+    for (const month of months) {
+        const count = months.length === 1 ? 2 : 1;
+        expect(getAt(M + '/' + month)).toMatchObject({ totalCount: count, codDollar: count * 10, dodDollar: count * 2 });
+        const report = buildMonthlyReport(month);
+        const expectedDays = [before, after].filter(day => day.startsWith(month));
+        expect(report.days.map(day => day.date)).toEqual(expectedDays);
+        expect(report.totals).toMatchObject({ count, total: count * 12, pendingTotal: count * 12, collectedTotal: 0 });
+        expect(report.mismatch).toBe(false);
+        expect(monthlyReportRows(report).slice(0, -1).map(row => row[0])).toEqual(expectedDays);
+    }
+});
+
+it.each(matrix.flatMap(variant => ['', null, 'abc', '2026-02-31 09:00:00', '2026-04-31 09:00:00'].map(at => ({ ...variant, at }))))('$backend $mode៖ ត្រាខ្វះឬខូច $at ប្រើម៉ោងបញ្ចូលក្រោយព្រមាន', async ({ backend, mode, at }) => {
+    await configure(backend, mode);
+    const confirms = vi.fn((_question: string) => true); vi.stubGlobal('confirm', confirms);
+    ztoState.ztoListSyncResult = { rows: [{ barcode: CODE, phone: '012345678', cod: 10, dod: 2, at, ztoClosed: false }],
+        signedRows: [], from: dayOf(NOW), to: dayOf(NOW), verifiedAt: NOW, verifiedServerAt: NOW, palm: mode === 'palm' } as any;
+    await importZtoListRows();
+    await waitFor(() => expect(codes(H)).toContain(CODE)); sync();
+    expect(confirms).toHaveBeenCalledTimes(1);
+    expect(confirms.mock.calls[0][0]).toContain('កញ្ចប់គ្មានម៉ោងស្កេនពី ZTO ➜ ប្រើម៉ោងបញ្ចូលជំនួស');
+    expect(currentItem(CODE)).toMatchObject({ createdAt: NOW, scanDate: dayOf(NOW) });
+    expect(bar(CODE).createdAt).toBe(NOW);
+    expect(getAt(D + '/' + dayOf(NOW))).toMatchObject({ totalCount: 1, codDollar: 10, dodDollar: 2 });
 });

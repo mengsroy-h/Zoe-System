@@ -12,6 +12,7 @@ let held: Set<string>;
 const waiters = new Map<string, () => void>();
 
 beforeEach(() => {
+    firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live';
     localStorage.clear(); localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: HOST }));
     held = new Set();
     Object.defineProperty(navigator, 'locks', { configurable: true, value: { request: (name: string, callback: any) => {
@@ -54,4 +55,20 @@ it('⛔ ការរក្សាទុកដែលនៅបន្ត ➜ lock �
     await settled(failedName);
     expect(held.has(failedName), 'ការរក្សាទុកបរាជ័យយឺត ➜ lock ដោះដែរ').toBe(false);
     releasePendingScan(late);
+});
+
+
+it('[audit-fixture-clock] clock មិនទាន់ផ្ទៀង មិនបង្កើត evidence ឬ lock ហើយបន្តក្រោយផ្ទៀង', async () => {
+    firebaseState.serverClockTrusted = false;
+    const before = Object.keys(localStorage).map(key => [key, localStorage.getItem(key)]);
+    expect(() => preparePendingScan('CLOCKLOCK0001', 1, 0, Date.now(), 'direct', 2)).toThrow('Scan clock uncertain');
+    expect(Object.keys(localStorage).map(key => [key, localStorage.getItem(key)])).toEqual(before);
+    expect(held.size).toBe(0);
+    firebaseState.serverClockTrusted = true;
+    const handle = preparePendingScan('CLOCKLOCK0001', 1, 0, Date.now(), 'direct', 2);
+    const name = SCAN_EVIDENCE_LOCK_PREFIX + handle.record.id;
+    await Promise.resolve();
+    expect(held.has(name)).toBe(true);
+    releasePendingScan(handle); await settled(name);
+    expect(held.has(name)).toBe(false);
 });

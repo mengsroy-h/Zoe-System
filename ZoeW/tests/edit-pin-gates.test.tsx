@@ -36,6 +36,7 @@ const routes = [
 ];
 
 beforeEach(() => {
+    firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live';
     vi.useFakeTimers(); localStorage.clear(); sessionStorage.clear();
     localStorage.setItem('zoew_security_pin_hash', 'test-pin-hash');
     Object.assign(securityState, { isVerifyingPin: false, pinTargetAction: null, lookupSecretKey: null, appIsLocked: false });

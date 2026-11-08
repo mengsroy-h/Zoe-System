@@ -328,7 +328,7 @@ function runResetPickup(mode, opts) {
         }
     });
     const ctx = vm.createContext(box);
-    const resetRuntime = moduleRuntime(ROOT, zoewSrc, [{ path: 'src/core/session-verification.ts', expose: ['sessionVerificationRequired'] }, { path: 'src/core/clock.ts', expose: ['captureClockOperation', 'serverClockIsTrustworthy', 'cleanupClockIsTrustworthy'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts',
+    const resetRuntime = moduleRuntime(ROOT, zoewSrc, [{ path: 'src/core/session-verification.ts', expose: ['sessionVerificationRequired'] }, { path: 'src/core/clock.ts', expose: ['captureClockOperation', 'serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'getServerClockBounds'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts',
         { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied', 'pickupResetAppliedReceipt', 'pickupResetAttemptId', 'pickupResetBatchHash', 'pickupResetBoundReceipt', 'pickupResetCasOf', 'pickupResetCasText', 'pickupResetContextOf', 'pickupResetReceiptMatches'] },
         'src/domain/pickup.ts',
         { path: 'src/services/tx-outcome.ts', expose: ['executeNativePickupReset', 'nativePickupResetStatus'] },
@@ -510,6 +510,7 @@ function runAbandonCleanup(mode) {
         dailyRevenueData: {}, monthlyRevenueData: {},
         // នាឡិកាទុកចិត្តបែបសាកល្បង សម្រាប់ ledger/network; រក្សាម៉ោង fixture ដើម។
         sessionExpiryCheck: 'live', serverTimeOffsetMs: 0, serverClockTrusted: true,
+        Date: class extends Date { static now() { return NOW; } },
         getServerNow: () => NOW,
         getFormattedDate: () => '2026-08-21',
         addRevenueToDailyAndMonthlyRecord: ledger.add,
@@ -571,7 +572,7 @@ function runAbandonCleanup(mode) {
         parts.push(body);
     }
     parts.push('globalThis.__inflight = () => cleanupInFlight.size;');
-    const protocol = moduleRuntime(ROOT, zoewSrc, [{ path: 'src/core/session-verification.ts', expose: ['sessionVerificationRequired'] }, { path: 'src/core/clock.ts', expose: ['captureClockOperation', 'serverClockIsTrustworthy', 'cleanupClockIsTrustworthy'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations'] }]);
+    const protocol = moduleRuntime(ROOT, zoewSrc, [{ path: 'src/core/session-verification.ts', expose: ['sessionVerificationRequired'] }, { path: 'src/core/clock.ts', expose: ['captureClockOperation', 'serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'getServerClockBounds'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations'] }]);
     ctx.__storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://fixture-db-stall-guard-test.invalid' }) });
     ctx.auth = { currentUser: { uid: 'fixture-user' } };
     ctx.dataState = { pickupPendingVersion: 0 };

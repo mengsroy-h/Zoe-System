@@ -7,7 +7,7 @@ import { ledgerLatestMonths, ledgerOpRing, ledgerTokenSeen } from '../domain/led
 import { trashSourceUnconsumed, TRASH_CONSUMPTIONS_ROOT } from '../domain/trash-generation';
 import { collectedDayOfStamp, collectedRetentionCutoffKey, reconcileCollectedHistory } from '../domain/collected';
 import { capturePickupContext, commitPickupMarks, getPickupPhoneKey, pickupBarcodeKey } from '../domain/pickup';
-import { cleanupClockIsTrustworthy, getServerClockBounds } from '../core/clock';
+import { captureClockOperation, cleanupClockIsTrustworthy, getServerClockBounds } from '../core/clock';
 import { barcodeRegistryKey } from '../domain/registry';
 import { SCAN_LEDGER_MAX_MONEY, SCAN_OPERATIONS_ROOT, SCAN_PENDING_ROOT, scanLedgerIncrementSafe, scanOperationSame, scanOperationValid, scanPendingMatches, scanStoredMoney,
     scanRegistryOwned, scanRegistryOwner, type ScanOperation } from '../domain/scan-protocol';
@@ -538,7 +538,7 @@ export async function resumePendingScanOperations() {
             if (!current()) return;
             if (record.corrupt || pendingScanIsCurrent(activeScans.get(record.id)) || pendingScanIsLive(record.id)
                 || pendingScanIsCurrent(recoveryAttempts.get(record.id)?.handle)) continue;
-            const handle: PendingScanHandle = { record, db: owner.db, sdk: owner.sdk, auth: owner.auth };
+            const handle: PendingScanHandle = { record, clock: captureClockOperation(), db: owner.db, sdk: owner.sdk, auth: owner.auth };
             const base = operationOf(handle);
             if (!base) continue;
             cursor.id = record.id;
@@ -582,7 +582,7 @@ export async function resolveRetainedScanEvidence() {
             if (busy(entry.id)) { kept.push(entry); continue; }
             const record = createScanEvidenceJournal(appLocalStore, entry.v === 2 ? 2 : 1).list(scope).find(row => row.id === entry.id);
             if (!record) { finished++; continue; }
-            const handle: PendingScanHandle = { record, db, sdk, auth };
+            const handle: PendingScanHandle = { record, clock: captureClockOperation(), db, sdk, auth };
             const base = record.corrupt ? null : operationOf(handle);
             let completed = false;
             for (let round = 0; base && round < SCAN_EVIDENCE_EXIT_ATTEMPTS; round++) {

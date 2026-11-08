@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.36';
+const APP_VERSION = '2.24.37';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -2777,7 +2777,7 @@ function seatDeviceLabel(d) {
     if (d.meta && d.meta.model) parts.push(d.meta.model);
     if (d.meta && d.meta.platform) parts.push(d.meta.platform);
     parts.push(d.meta && d.meta.serial ? 'Serial ' + d.meta.serial : 'ID ' + d.device.slice(0, 6) + '…');
-    parts.push('ចងនៅ ' + (d.at > 0 ? new Date(d.at).toLocaleDateString('km-KH') : '-'));
+    parts.push('ចងនៅ ' + (d.at > 0 ? new Date(d.at).toLocaleDateString('km-KH', { timeZone: 'Asia/Phnom_Penh' }) : '-'));
     return d.slot + ' · ' + parts.join(' · ');
 }
 function seatDevicesOf(node, limit) {
@@ -2887,7 +2887,7 @@ function renderKeyList() {
         else if (row.expiresAt && now > row.expiresAt) statusHtml = '<span class="badge badge-expired">ផុតកំណត់</span>';
         else statusHtml = '<span class="badge badge-active">Active</span>';
 
-        const expStr = row.expiresAt ? new Date(row.expiresAt).toLocaleDateString('km-KH') : '-';
+        const expStr = row.expiresAt ? new Date(row.expiresAt).toLocaleDateString('km-KH', { timeZone: 'Asia/Phnom_Penh' }) : '-';
 
         let seatHtml;
         if (seatReadFailed) {
@@ -2903,7 +2903,7 @@ function renderKeyList() {
         if (row.inconsistent) {
             const perAppText = row.paths.map((p) => (APP_LABELS[p] || p) + ' = '
                 + (row.perApp[p].revoked ? 'Revoked' : 'Active') + ', ផុតកំណត់ '
-                + (row.perApp[p].expiresAt ? new Date(row.perApp[p].expiresAt).toLocaleDateString('km-KH') : '-')).join(' · ');
+                + (row.perApp[p].expiresAt ? new Date(row.perApp[p].expiresAt).toLocaleDateString('km-KH', { timeZone: 'Asia/Phnom_Penh' }) : '-')).join(' · ');
             statusHtml += ` <span class="badge badge-revoked" title="${escapeHtml('ស្ថានភាពមិនដូចគ្នារវាង App (ការធ្វើបច្ចុប្បន្នភាពមុនជោគជ័យមិនពេញលេញ)៖ ' + perAppText)}">⚠️ មិនត្រូវគ្នា</span>`;
         }
 
@@ -3212,7 +3212,7 @@ async function confirmExtendKey() {
             const outcomes = results.map((r) => (r.status === 'rejected' && r.reason ? r.reason.extendOutcome : ''));
             if (failedPaths.length === 0) {
                 const until = Math.max.apply(null, results.map((r) => r.value));
-                showToast('✅ បានបន្ថែមសុពលភាពរួចរាល់! ផុតកំណត់ ៖ ' + new Date(until).toLocaleDateString('km-KH'));
+                showToast('✅ បានបន្ថែមសុពលភាពរួចរាល់! ផុតកំណត់ ៖ ' + new Date(until).toLocaleDateString('km-KH', { timeZone: 'Asia/Phnom_Penh' }));
             } else if (outcomes.some((o) => o === 'unknown')) {
                 alert(ADMIN_WRITE_PENDING_TEXT);
             } else if (outcomes.some((o) => o === 'clock')) {
@@ -3376,7 +3376,7 @@ function renderNoticeList() {
             </div>
             ${row.body ? `<div class="notice-body">${escapeHtml(row.body)}</div>` : ''}
             <div class="notice-meta">
-                <span>${escapeHtml(row.at > 0 ? new Date(row.at).toLocaleString('km-KH') : '-')}</span>
+                <span>${escapeHtml(row.at > 0 ? new Date(row.at).toLocaleString('km-KH', { timeZone: 'Asia/Phnom_Penh' }) : '-')}</span>
                 <button class="btn-mini" data-notice-id="${escapeHtml(row.id)}" data-action="delete-notice">🗑️ លុប</button>
             </div>
         </li>`).join('');
@@ -3807,7 +3807,7 @@ function sbDeviceLabel(d) {
     const member = sbMemberCache.find((m) => m.user_id && m.user_id === d.user_id);
     if (member) parts.push(member.username);
     const seen = Date.parse(String(d.last_seen || ''));
-    parts.push('ប្រើចុងក្រោយ ' + (isFinite(seen) ? new Date(seen).toLocaleDateString('km-KH') : '-'));
+    parts.push('ប្រើចុងក្រោយ ' + (isFinite(seen) ? new Date(seen).toLocaleDateString('km-KH', { timeZone: 'Asia/Phnom_Penh' }) : '-'));
     return parts.join(' · ');
 }
 
@@ -3871,7 +3871,7 @@ function renderSbTenantList() {
                 + '<button class="btn-mini" data-tenant-id="' + escapeHtml(row.id) + '" data-username="' + escapeHtml(m.username) + '" data-action="sb-remove-member">ដកចេញពីហាង</button>').join('') || '-');
         const sbDevicesCell = sbDevicesHtml(row.id);
         const until = Date.parse(String(row.expires_at || ''));
-        const untilText = isFinite(until) ? new Date(until).toLocaleDateString('km-KH') : '-';
+        const untilText = isFinite(until) ? new Date(until).toLocaleDateString('km-KH', { timeZone: 'Asia/Phnom_Penh' }) : '-';
         return `<tr>
             <td>${escapeHtml(row.name)}</td>
             <td>${escapeHtml(row.branch_code)}</td>
@@ -3935,7 +3935,7 @@ async function sbIssueInvite(session, tenant, role) {
         link: sbInviteSetupLink(session, row.code),
         role: role,
         tenantName: String(tenant.name || ''),
-        untilText: isFinite(until) ? new Date(until).toLocaleString('km-KH') : '-'
+        untilText: isFinite(until) ? new Date(until).toLocaleString('km-KH', { timeZone: 'Asia/Phnom_Penh' }) : '-'
     };
     renderSbInviteResult();
     return true;

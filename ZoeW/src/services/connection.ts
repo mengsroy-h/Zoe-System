@@ -149,24 +149,29 @@ export function probeDatabaseLiveness(reason?) {
     if (firebaseState.dbLivenessProbe) return firebaseState.dbLivenessProbe;
     if (!databaseLivenessProbeAllowed()) return Promise.resolve(null);
     const probeDb = firebaseState.db;
+    const probeSdk = firebaseState.fb;
+    const probeConnectionRef = firebaseState.dbRefConnected;
+    const probeTransportEpoch = typeof probeSdk.connectionEpoch === 'function' ? probeSdk.connectionEpoch(probeConnectionRef) : null;
     const probeAuthEpoch = firebaseState.authGeneration;
     const generation = firebaseState.infoListenerGeneration;
     const probe = new Promise((resolve) => {
         const timer = setTimeout(() => resolve(false), DB_LIVENESS_PROBE_TIMEOUT_MS);
         const answered = (alive) => { clearTimeout(timer); resolve(alive); };
         let started = null;
-        try { started = firebaseState.fb.get(firebaseState.fb.ref(probeDb, DB_LIVENESS_PROBE_PATH)); } catch (e) { answered(null); return; }
+        try { started = probeSdk.get(probeSdk.ref(probeDb, DB_LIVENESS_PROBE_PATH)); } catch (e) { answered(null); return; }
         Promise.resolve(started).then(() => answered(true), (error) => answered(
             /^(?:database\/)?permission_denied$/i.test(String(error && (error.code || error.message) || '')) ? true : null
         ));
     }).then((alive) => {
         if (firebaseState.dbLivenessProbe === probe) firebaseState.dbLivenessProbe = null;
-        if (firebaseState.db !== probeDb || firebaseState.infoListenerGeneration !== generation || firebaseState.authGeneration !== probeAuthEpoch) return null;
+        if (firebaseState.db !== probeDb || firebaseState.fb !== probeSdk || firebaseState.infoListenerGeneration !== generation || firebaseState.authGeneration !== probeAuthEpoch) return null;
+        if (probeTransportEpoch !== null && probeSdk.connectionEpoch(probeConnectionRef) !== probeTransportEpoch) return null;
         if (alive === null) return null;
         if (alive) {
             firebaseState.lastDbLivenessOkAt = Date.now();
             return true;
         }
+        if (dbListenerPendingPaths.size) return null;
         noteDatabaseLinkUnresponsive(reason);
         return false;
     });

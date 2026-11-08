@@ -26,6 +26,7 @@ function seed(history: any[]) {
 }
 
 beforeEach(() => {
+    firebaseState.serverClockTrusted = true;
     dbListenerPendingPaths.clear();
     dbListenerFailedPaths.clear();
     uiState.toasts = [];
@@ -115,4 +116,18 @@ describe('Locker ៖ ស្កេនដាក់ទីតាំង = ចុះ�
         expect(transaction).not.toHaveBeenCalled();
         expect(toasts().some((m) => m.indexOf('រួចហើយ') !== -1)).toBe(true);
     });
+});
+
+
+it('[audit-fixture-clock] clock មិនទាន់ផ្ទៀង មិនសរសេរ Locker ហើយបន្តក្រោយផ្ទៀង', async () => {
+    seed([{ id: 'clock-item', phone: '0962222222', barcodes: [{ code: 'CLOCKITEM', isClosed: false }] }]);
+    const before = JSON.stringify(dataState.scanHistory);
+    firebaseState.serverClockTrusted = false;
+    step(() => { handleLockerScan('CLOCKITEM'); });
+    expect(transaction).not.toHaveBeenCalled();
+    expect(JSON.stringify(dataState.scanHistory)).toBe(before);
+    firebaseState.serverClockTrusted = true;
+    step(() => { handleLockerScan('CLOCKITEM'); });
+    await new Promise(resolve => setTimeout(resolve, 30));
+    expect(transaction).toHaveBeenCalledTimes(1);
 });

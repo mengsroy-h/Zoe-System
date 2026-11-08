@@ -70,6 +70,7 @@ const settle = async () => { for (let i = 0; i < 20; i++) await new Promise((r) 
 const money = () => [getAt(D + '/' + DAY()), getAt(M + '/' + DAY().slice(0, 7))].map((r) => [r.codDollar, r.totalCount]);
 
 beforeEach(() => {
+    firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live';
     scanStorageFault.phase = ''; scanStorageFault.hits = 0; scanStorageFault.importTimeout = false;
     pendingRegistryReleases.clear(); dbListenerPendingPaths.clear(); dbListenerFailedPaths.clear();
     localStorage.clear();
@@ -86,6 +87,7 @@ beforeEach(() => {
     dataState.scanHistory = Object.values(clone(lab.store[H]));
     dataState.dailyRevenueData = clone(lab.store[D]); dataState.monthlyRevenueData = clone(lab.store[M]);
     firebaseState.authGeneration++; firebaseState.db = { name: 'm1', app: { options: { databaseURL: HOST } } } as any;
+    firebaseState.serverClockTrusted = true;
     firebaseState.auth = { currentUser: { uid: 'u', getIdToken: async () => 'tok' } } as any;
     firebaseState.firebaseConfig = { databaseURL: HOST } as any;
     firebaseState.dbRefHistory = ref(H) as any; firebaseState.dbRefDailyRevenue = ref(D) as any; firebaseState.dbRefMonthlyRevenue = ref(M) as any;
@@ -518,4 +520,20 @@ it.each(['same', 'local-replacement', 'server-replacement'])('import pickup foll
     expect(result).toBe(scenario === 'same');
     expect(getAt(H + '/itemI').barcodes[0].isClosed).toBe(scenario === 'same');
     expect(money()).toEqual([[10, 1], [10, 1]]);
+});
+
+it.each([1, 2])('ការរក្សាទុក v%s ទប់ clock មិនទុកចិត្ត មុន evidence និង effects ហើយបន្តក្រោយផ្ទៀង', async version => {
+    const save = version === 1 ? addOrUpdateEntry : publicAddOrUpdateEntry;
+    const before = clone(lab.store);
+    const tx = vi.spyOn(firebaseState.fb, 'runTransaction');
+    const update = vi.spyOn(firebaseState.fb, 'update');
+    firebaseState.serverClockTrusted = false;
+    await expect(save('X200000002', '012000111', 5, 0)).rejects.toMatchObject({ code: 'clock_uncertain' });
+    expect(lab.store).toEqual(before);
+    expect(tx).not.toHaveBeenCalled(); expect(update).not.toHaveBeenCalled();
+    expect(createScanEvidenceJournal(localStorage, version as 1 | 2).list(pendingScanScope())).toEqual([]);
+    firebaseState.serverClockTrusted = true;
+    expect(await save('X200000002', '012000111', 5, 0)).toBe(true);
+    expect(getAt(H + '/itemI').barcodes.map((barcode: any) => barcode.code)).toEqual(['A100000001', 'X200000002']);
+    expect(money()).toEqual([[15, 2], [15, 2]]);
 });

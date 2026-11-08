@@ -114,9 +114,10 @@
         "audit-tools/function-surface-test.js",
         "audit-tools/keygen-notice-test.js",
         "audit-tools/keygen-session-security-test.js",
-        "audit-tools/keygen-biometric-test.js"
+        "audit-tools/keygen-biometric-test.js",
+        "audit-tools/zoew-suite-test.js"
       ],
-      "evidence": "Function inventory និងតេស្តឥរិយាបថ session · ជីវមាត្រ (WebAuthn PRF ក្លែង + crypto ពិត) របស់ ZoeKeyGen អាន app.js ពិត។",
+      "evidence": "Function inventory និងតេស្តឥរិយាបថ session · ជីវមាត្រ (WebAuthn PRF ក្លែង + crypto ពិត) របស់ ZoeKeyGen អាន app.js ពិត។ Vitest វាស់ផ្លូវបង្ហាញថ្ងៃ/ម៉ោងនៅតំបន់ម៉ោងឧបករណ៍ផ្សេងៗ។",
       "limitation": "មាន inventory function និងសេណារីយ៉ូឥរិយាបថជាច្រើន។ ចំនួន function មិនមែនចំនួន function ដែលបានធ្វើ behavioral coverage ពេញលេញទេ។"
     },
     "guard-15": {
@@ -4936,6 +4937,15 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-secondary-clock.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/keygen-calendar.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-calendar-validation.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/palm-calendar-boundaries.test.tsx": {
       "policy": "zoew-self-verification"
     }
   }

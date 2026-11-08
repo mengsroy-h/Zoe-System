@@ -19,7 +19,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const { reactRuntime } = require('./react-view.js');
+const { reactRuntime, moduleRuntime } = require('./react-view.js');
 
 const ROOT = process.env.HEALTH_APP_DIR ? path.resolve(process.env.HEALTH_APP_DIR) : path.resolve(__dirname, '..');
 const APP_JS = path.join(ROOT, 'ZoeW', 'app.js');
@@ -230,6 +230,7 @@ function buildRuntime(over) {
     };
     ctx.globalThis = ctx;
     vm.createContext(ctx);
+    vm.runInContext(moduleRuntime(ROOT, SRC, [{ path: 'src/core/clock.ts', expose: ['serverClockIsTrustworthy'] }]).code, ctx);
     // ⛔ ស្រទាប់ React (ឃ្លាំង `uiState`/`viewState` · `fieldValue` · ប្រអប់) — កូដពិតពីទិដ្ឋភាព (`react-view.js`)
     vm.runInContext(reactRuntime(SRC, { exclude: NEEDED, context: ctx }), ctx);
     const code = NEEDED.map((n) => src[n]).filter(Boolean).join('\n') + '\n' + constSrc

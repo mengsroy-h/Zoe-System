@@ -1,4 +1,6 @@
 import { it, expect, vi } from 'vitest';
+import { captureClockOperation } from '../src/core/clock';
+import { firebaseState } from '../src/core/state';
 import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -29,7 +31,9 @@ it.each(['claimed', 'taken', 'release-failed', 'release-pending', 'stale-session
             let resolveRelease!: (value: boolean) => void;
             const release = new Promise<boolean>(resolve => { resolveRelease = resolve; });
             const releaseRegistry = vi.fn(() => scenario === 'release-pending' ? release : Promise.resolve(scenario !== 'release-failed'));
+            firebaseState.serverClockTrusted = true;
             const context = vm.createContext({
+                captureClockOperation,
                 window: { localStorage: storage, sessionStorage: memoryStorage() }, crypto: require('node:crypto'),
                 db: {}, fb: {}, auth: { currentUser: { uid: 'runtime-user' } }, authGeneration: 1, isInitializingFirebase: false,
                 getFormattedDate: () => '2026-10-30', getServerNow: () => 1793358000000,

@@ -92,7 +92,7 @@ for (const mode of ['receipt', 'absent', 'foreign', 'extra']) it('native restart
         update: sent, set: sent, runTransaction: vi.fn(), deleteApp: async () => {}, get: async () => ({ val: () => null }) };
     const sdk = withTransactionOutcomeResolution(raw); sdk.getAuth(app); sdk.getDatabase(app);
     Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db, isDatabaseInitialized: true,
-        isInitializingFirebase: false, firebaseSdkUnavailable: false, isDatabaseConnected: true, sessionExpiryCheck: 'live', authLoginOperation: null });
+        isInitializingFirebase: false, firebaseSdkUnavailable: false, isDatabaseConnected: true, serverClockTrusted: true, sessionExpiryCheck: 'live', authLoginOperation: null });
     try {
         const verdict = await sdk.set(sdk.ref(db, 'zoew_settings/exchange_rate'), 4200).then(() => 'sent', (error: any) => error.code);
         const proven = mode === 'receipt';

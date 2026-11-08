@@ -127,6 +127,7 @@ beforeEach(() => {
     firebaseState.isDatabaseInitialized = true;
     firebaseState.isDatabaseConnected = true;
     firebaseState.serverClockTrusted = true;
+    firebaseState.sessionExpiryCheck = 'live';
     firebaseState.hasEverConnectedToDatabase = true;
     firebaseState.authGeneration++;
 });

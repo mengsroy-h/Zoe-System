@@ -1,6 +1,6 @@
 import { sessionVerificationRequired } from '../core/session-verification';
 import { dataState, firebaseState } from '../core/state';
-import { cleanupClockIsTrustworthy, getServerClockBounds } from '../core/clock';
+import { captureClockOperation, cleanupClockIsTrustworthy, getServerClockBounds } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
 import { liveShopScope, shopScopePending } from '../core/shop-scope';
 import { isValidKey, nameCompare } from '../core/rtdb-key';
@@ -131,7 +131,14 @@ export async function evidenceRetirable(owner: EvidenceOwner, root: string, key:
     return true;
 }
 
-async function retireEvidence(owner: EvidenceOwner, root: string, keys: string[]) {
+async function retireEvidence(owner: EvidenceOwner, root: string, candidates: Array<{ key: string; at: number }>, clock: ReturnType<typeof captureClockOperation>) {
+    const eligibleKeys = () => {
+        const bounds = getServerClockBounds();
+        if (!clock.current() || !bounds) throw new Error('evidence:clock');
+        const before = bounds.lowerMs - EVIDENCE_RETENTION_MS - EVIDENCE_RETENTION_MARGIN_MS;
+        return candidates.filter(candidate => candidate.at < before).map(candidate => candidate.key);
+    };
+    const keys = eligibleKeys();
     if (!evidenceOwnerCurrent(owner) || !evidenceClockCurrent() || sessionVerificationRequired()) throw new Error('evidence:session');
     if (!keys.length) return 0;
     try {
@@ -142,6 +149,7 @@ async function retireEvidence(owner: EvidenceOwner, root: string, keys: string[]
         if (!evidenceOwnerCurrent(owner) || !evidenceDeleteRefused(error)) throw error;
         let removed = 0;
         for (const key of keys) {
+            if (!eligibleKeys().includes(key)) continue;
             if (!evidenceOwnerCurrent(owner) || !evidenceClockCurrent() || sessionVerificationRequired()) throw new Error('evidence:session');
             try {
                 await dbOp(owner.sdk.update(owner.sdk.ref(owner.db), { [root + '/' + key]: null }));
@@ -165,6 +173,7 @@ export async function runEvidenceRetentionSweep() {
     if (dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY) || dbListenerViewIsStale(DB_LISTENER_KEY_DELETED)) return 0;
     const flow = connectionFlowSnapshot();
     if (flow.phase !== 'ready' || flow.pendingWrites > 0) return 0;
+    const clock = captureClockOperation();
     const owner = captureEvidenceOwner();
     if (!owner) return 0;
     if (!evidenceSweep.owner || !evidenceOwnerCurrent(evidenceSweep.owner)) {
@@ -184,12 +193,12 @@ export async function runEvidenceRetentionSweep() {
             if (!evidenceOwnerCurrent(owner) || !evidenceClockCurrent()) break;
             try {
                 const page = await listEvidence(owner, root, field, before);
-                const keys: string[] = [];
+                const candidates: Array<{ key: string; at: number }> = [];
                 for (const [key, value] of page.candidates) {
                     if (!evidenceOwnerCurrent(owner) || !evidenceClockCurrent() || sessionVerificationRequired()) throw new Error('evidence:session');
-                    if (await evidenceRetirable(owner, root, key, value, before)) keys.push(key);
+                    if (await evidenceRetirable(owner, root, key, value, before)) candidates.push({ key, at: value[field] });
                 }
-                removed += await retireEvidence(owner, root, keys);
+                removed += await retireEvidence(owner, root, candidates, clock);
                 checkpointEvidence(owner, root, page.after);
             } catch (error) {
             }

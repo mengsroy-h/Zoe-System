@@ -437,10 +437,11 @@ it.each(['ack', 'unknown', 'native-proof'])('Restore final %s ៖ consumption �
         codDollar: 0, dodDollar: 0, totalCount: 0, ded: { source: { at: row.deletedAt, cod: 7, dod: 0, count: 1 } }
     };
     dataState.deletedItems = [clone(row)]; dataState.dailyRevenueData = clone(store[D]); dataState.monthlyRevenueData = clone(store[M]);
-    let finalWrites = 0;
+    let finalWrites = 0, unknownProofReads = 0;
     afterWrite = (_target, patch) => {
         if (patch[TRASH_CONSUMPTIONS_ROOT + '/source']?.kind !== 'restore') return;
         finalWrites++;
+        if (mode === 'unknown') readHook = path => { if (path === 'zoew_restore_finalizations/source') { unknownProofReads++; throw new Error('authoritative financial receipt unavailable'); } };
         if (mode !== 'ack') throw new Error('final ACK unavailable');
     };
     let sdk: any = null;
@@ -461,6 +462,7 @@ it.each(['ack', 'unknown', 'native-proof'])('Restore final %s ៖ consumption �
         }
         expect(uiState.toasts.some(toast => /បានស្តារទិន្នន័យ/.test(toast.msg))).toBe(mode !== 'unknown');
         expect(Boolean(storedRestoreClaims().source)).toBe(mode === 'unknown');
+        if (mode === 'unknown') expect(unknownProofReads).toBeGreaterThan(0);
         const before = money(); uiState.pendingRestoreId = 'source'; await executeRestoreItem();
         expect(money()).toEqual(before); expect(finalWrites).toBe(1);
     } finally { if (sdk) await sdk.deleteApp(firebaseState.db.app); }

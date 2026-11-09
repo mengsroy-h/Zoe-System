@@ -44,6 +44,13 @@ const DAILY = 'zoew_daily_revenue_cod_dod';
 const MONTHLY = 'zoew_monthly_revenue_cod_dod';
 const PICKUP = 'zoew_daily_pickup_cod_dod';
 const SETTINGS = 'zoew_settings';
+const EMPTY_IMPORT_CASES = [
+    ['object ទទេ', {}],
+    ['root object ទទេ', { [REG]: {} }],
+    ['root null', { [REG]: null }],
+    ['root array ទទេ', { [REG]: [] }],
+    ['archive v1 ទទេ', { format: 'zoe-supabase-tenant', version: 1, manifest: {}, data: {} }]
+];
 
 let pass = 0, fail = 0;
 const skipped = [];
@@ -363,6 +370,7 @@ async function runSkipInvalidKeepTests(root, rec) {
         // input ខូចទាំងមូល (Firebase ទទេ export ជា null · array · គ្មាន root ស្គាល់ · គ្មាន record ល្អ) ➜ --skip-invalid មិនអាចទុក input ទាំងមូលចោល ➜ REFUSED មិនលុបអ្វីទាំងអស់
         const shopFull = () => ({ [HIST]: { skA: itemA, skB: itemB }, [REG]: { ZTSKA: true, ZTSKB: true }, [DAILY]: { '2026-10-01': dayOld } });
         const wholeCases = [
+            ...EMPTY_IMPORT_CASES.map(([label, value]) => [label, JSON.stringify(value)]),
             ['null (Firebase ទទេ)', 'null'],
             ['array', JSON.stringify([itemA, itemB])],
             ['root មិនស្គាល់ទាំងអស់', JSON.stringify({ license_keys: { k1: { expiresAt: 1 } } })],
@@ -1094,6 +1102,20 @@ async function cliScenarios(rec, ctx, toolRoot, only) {
             rec('--replace --skip-invalid (Postgres ពិត) ៖ កូនសោ registry របស់ barcode ក្នុង record ដែលរក្សា នៅដដែល',
                 (t2[REG] || {}).ZTBROKENPRIMITIVE === true, Object.keys(t2[REG] || {}).length);
             rec('--replace --skip-invalid (Postgres ពិត) ៖ record ដែលពិតជាមិនមានក្នុង input នៅត្រូវលុប', !(t2[HIST] || {}).notInInput, Object.keys(t2[HIST] || {}).length);
+            const beforeEmpty = await D.tree(T2.id);
+            const seqBeforeEmpty = await D.seq(T2.id);
+            for (const [label, value] of EMPTY_IMPORT_CASES) for (const skipInvalid of [false, true]) {
+                const file = path.join(dir, 'empty-' + crypto.randomBytes(4).toString('hex') + '.json');
+                fs.writeFileSync(file, JSON.stringify(value));
+                const requestMark = ctx.fake.requests.length;
+                const args = [file, '--tenant', T2.id, '--apply', '--replace'];
+                if (skipInvalid) args.push('--skip-invalid');
+                const empty = await runNode(cli, args, { env });
+                rec('input ' + label + ' · skip-invalid=' + skipInvalid + ' (Postgres ពិត) ៖ បដិសេធមុន RPC · persisted tenant នៅដដែល',
+                    empty.code !== 0 && /REFUSED/.test(empty.out) && !/VERIFIED/.test(empty.out)
+                    && ctx.fake.requests.length === requestMark && writesFor(ctx, T2.id, requestMark).length === 0
+                    && await D.seq(T2.id) === seqBeforeEmpty && sameTree(await D.tree(T2.id), beforeEmpty), empty.all.slice(-400));
+            }
         }
     } finally {
         ctx.fake.setRpcHook(null);
@@ -1133,8 +1155,8 @@ const JS_MUTATIONS = [
         from: 'const keepsRegistry = (d) => keptOwners && d.root === REGISTRY_ROOT && !inputCopySkipped(d);', to: 'const keepsRegistry = () => false;', run: 'invalid' },
     { name: 'CLI រក្សាកូនសោ registry ទោះ record ដែលរក្សាមិនមែនប្រវត្តិ/ធុងសំរាម', file: 'tools/supabase-migrate/migrate.js',
         from: 'const keptOwners = leftAsIs.some((d) => BARCODE_OWNER_ROOTS.includes(d.root));', to: 'const keptOwners = leftAsIs.length > 0;', run: 'keep' },
-    { name: 'CLI --skip-invalid ទុក input ខូចទាំងមូលចោល (null · array) ➜ --replace លុបហាងទាំងមូល', file: 'tools/supabase-migrate/migrate.js',
-        from: 'const wholeInputBad = errorCount > 0 && kept.length === 0;', to: 'const wholeInputBad = false;', run: 'keep' },
+    { name: 'CLI រំលង input គ្មាន record ➜ --replace លុបហាងទាំងមូល', file: 'tools/supabase-migrate/migrate.js',
+        from: 'if (!kept.length) {', to: 'if (false) {', run: 'keep' },
     { name: 'CLI បោះពុម្ព secret', file: 'tools/supabase-migrate/migrate.js', from: "say('Target : ' + target.url", to: "say('Target : ' + target.url + ' ' + target.key", run: 'auth' },
     { name: 'RPC មិន abort សំណើដែលផុតពិដាន', file: 'firebase-backup/supabase.js', from: 'clearTimeout(timer);\n            controller.abort();', to: 'clearTimeout(timer);', run: 'hang' },
     { name: 'retry លើ 401', file: 'firebase-backup/supabase.js', from: 'const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);',

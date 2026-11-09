@@ -1220,11 +1220,12 @@ export async function prepareCleanupTrashGeneration(trashItem, operation, owner 
             if (!targetId || targetId === trashItem.id || await readSlot(targetId) !== null) return false;
         }
         if (!clock.current()) return false;
-        const generation = await allocateTrashGeneration(targetId, owner);
+        const deletedAt = operation.deletedAt || getServerNow();
+        const generation = await allocateTrashGeneration(targetId, owner, deletedAt);
         if (generation === null || !trashGenerationOwnerCurrent(owner) || !clock.current()) return false;
         operation.trashTargetId = targetId;
         operation.trashGeneration = generation;
-        if (!operation.deletedAt) operation.deletedAt = getServerNow();
+        operation.deletedAt = deletedAt;
         return true;
     } catch (error) { return false; }
 }

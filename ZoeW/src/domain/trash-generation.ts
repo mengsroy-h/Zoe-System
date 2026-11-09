@@ -96,5 +96,5 @@ export function trashSourceUnconsumed(item, receipt) {
     if (generation === null || !id(item?.id)) return false;
     if (receipt === null) return generation === 0 || generation === 1;
     return trashConsumptionValid(receipt) && receipt.sourceId === item.id && receipt.generation < TRASH_GENERATION_MAX
-        && generation === receipt.generation + 1;
+        && generation === receipt.generation + 1 && integer(item.deletedAt, 1) && item.deletedAt > receipt.deletedAt;
 }

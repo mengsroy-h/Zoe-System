@@ -5,8 +5,12 @@ import { activeClearHistoryClaims } from '../src/ui/history-render';
 import { clearHistory, claimHistoryItemForClear, buildClearHistoryTrashItem, resetClearHistoryOperationState } from '../src/features/clear-history';
 import { deleteSingleItem } from '../src/features/entry-ops';
 import { removeSingleBarcode } from '../src/features/barcode-ops';
-import { claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, cleanupOperationOwners, cleanupPartialTrashId, claimCleanupTrashSlot, resolveCleanupSlot, clearCleanupJournalEntry, noteCleanupJournalEntry, readCleanupJournal, resumeCleanupJournalEntry } from '../src/domain/cleanup';
+import { claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, cleanupOperationOwners, cleanupPartialTrashId, claimCleanupTrashSlot, cleanupJournalEntryKey, resolveCleanupSlot, clearCleanupJournalEntry, noteCleanupJournalEntry, readCleanupJournal, resumeCleanupJournalEntry } from '../src/domain/cleanup';
 import { TRASH_CONSUMPTIONS_ROOT } from '../src/domain/trash-generation';
+import { preparePendingScan } from '../src/services/scan-pending';
+import { claimScanOperation, saveScanOperation } from '../src/services/scan-operation';
+import { executeRestoreItem } from '../src/features/restore';
+import { purgeTrashWithRegistry } from '../src/services/registry-purge';
 import { cleanupServerRead } from './helpers/cleanup-server-read';
 
 const H = 'zoew_scan_history_cod_dod', T = 'zoew_recently_deleted_cod_dod', D = 'zoew_daily_revenue_cod_dod', M = 'zoew_monthly_revenue_cod_dod';
@@ -279,4 +283,107 @@ it.each(['uid', 'scope'])('generation ៖ Delete មិនបញ្ជូន rel
     await deleteSingleItem(ID, { confirmed: true });
     expect(switched).toBe(true); expect(effects.slice(afterSwitch)).toEqual([]);
     expect(at(H + '/' + ID)?.barcodes[0].code).toBe('GEN0001'); expect(at(T)).toEqual({});
+});
+
+
+it.each(['delete', 'remove', 'auto', 'clear'])('generation ៖ fresh %s មិនប្រើ timestamp ស្មើ ឬថយក្រោយ consumption មុន source ចាកចេញ', async route => {
+    const target = route === 'remove' ? cleanupPartialTrashId(ID, 'remove', at(H + '/' + ID)) : ID;
+    for (const priorAt of [NOW, NOW + 1]) {
+        store[TRASH_CONSUMPTIONS_ROOT] = { [target]: { ...consumption(target, 4), deletedAt: priorAt } };
+        const before = copy(store), beforeEffects = effects.length;
+        if (route === 'delete') await deleteSingleItem(ID, { confirmed: true });
+        if (route === 'remove') await removeSingleBarcode(ID, 'GEN0001');
+        if (route === 'auto') await claimAndCleanupItem(ID, 'abandon');
+        if (route === 'clear') await clearHistory();
+        for (const root of [H, T, D, M, TRASH_CONSUMPTIONS_ROOT]) expect(at(root)).toEqual(before[root]);
+        expect(effects.slice(beforeEffects).every(([path]) => path.startsWith(H + '/') || path.startsWith('zoew_daily_pickup_cod_dod/'))).toBe(true);
+        expect(readCleanupJournal()).toHaveLength(0);
+    }
+});
+
+it('generation ៖ scan→Remove→purge→scan តម្លៃថ្មី ៖ same-at HOLD ហើយ +1ms ដកតែម្តងដោយ receipt generation ថ្មី', async () => {
+    const prune = value => { if (value === null || value === undefined) return null; if (typeof value !== 'object') return value; const out = Array.isArray(value) ? [] : {}; for (const [key, child] of Object.entries(value)) { const clean = prune(child); if (clean !== null) out[key] = clean; } return Object.keys(out).length ? out : null; };
+    afterUpdate = () => { store = prune(store) || {}; };
+    store = {}; dataState.scanHistory = []; dataState.deletedItems = []; dataState.dailyRevenueData = {}; dataState.monthlyRevenueData = {};
+    const sync = () => {
+        dataState.scanHistory = Object.values(at(H) || {}) as any; dataState.deletedItems = Object.values(at(T) || {}) as any;
+        dataState.dailyRevenueData = at(D) || {}; dataState.monthlyRevenueData = at(M) || {};
+    };
+    const scan = async (code: string, cod: number, dod: number) => {
+        const handle = preparePendingScan(code, cod, dod, NOW, 'direct', 2);
+        expect(await claimScanOperation(handle, code)).toBe('claimed'); expect(await saveScanOperation(handle, '012345678', 'A1')).toBe(true); sync();
+        return handle.record.id;
+    };
+    const firstIntent = await scan('GEN0001', 10, 2); await scan('GEN0002', 3.5, 0.25);
+    const parent = Object.keys(at(H))[0]; expect(Object.keys(at(H))).toHaveLength(1);
+    expect(await removeSingleBarcode(parent, 'GEN0001')).toBe('done'); sync();
+    const trash = Object.values(at(T))[0] as any;
+    expect(trash).toMatchObject({ trashGeneration: 1, deletedAt: NOW });
+    expect(await purgeTrashWithRegistry(trash)).toBe(true); sync();
+    expect(at(T + '/' + trash.id)).toBeNull();
+    const consumed = at(TRASH_CONSUMPTIONS_ROOT + '/' + trash.id); expect(consumed).toMatchObject({ generation: 1, deletedAt: NOW, kind: 'purge' });
+    const freshIntent = await scan('GEN0001', 9, 3); expect(freshIntent).not.toBe(firstIntent);
+    expect(Object.keys(at(H))).toEqual([parent]);
+    const before = copy(store), effectCount = effects.length;
+    await removeSingleBarcode(parent, 'GEN0001'); sync();
+    expect(store).toEqual(before);
+    expect(effects.slice(effectCount).every(([path, value]) => path === H + '/' + parent && value?.barcodes?.length === 2)).toBe(true);
+    expect(readCleanupJournal()).toHaveLength(0);
+    vi.setSystemTime(NOW + 1);
+    expect(await removeSingleBarcode(parent, 'GEN0001')).toBe('done'); sync();
+    const current = at(T + '/' + trash.id);
+    expect(current).toMatchObject({ trashGeneration: 2, deletedAt: NOW + 1, cod: 9, dod: 3 });
+    expect(current.barcodes[0]).toMatchObject({ scanIntent: freshIntent, isDeducted: true });
+    expect(at(TRASH_CONSUMPTIONS_ROOT + '/' + trash.id)).toEqual(consumed);
+    for (const [root, bucket] of [[D, DAY], [M, DAY.slice(0, 7)]]) {
+        const ledger = at(root + '/' + bucket);
+        expect([Math.round(ledger.codDollar * 100), Math.round(ledger.dodDollar * 100), ledger.totalCount]).toEqual([350, 25, 1]);
+        expect(ledger.ded[trash.id]).toEqual({ at: NOW + 1, cod: 9, dod: 3, count: 1 });
+    }
+    const settled = copy(store); await removeSingleBarcode(parent, 'GEN0001'); expect(store).toEqual(settled);
+});
+
+
+it.each(['ledger', 'undo'])('generation ៖ persisted %s same-at ឬ rollback មិនខ្ចី old deduction ហើយ journal bytes នៅដដែល', async stage => {
+    for (const offset of [0, 1]) for (const back of [false, true]) {
+        const trash = { ...at(H + '/' + ID) || at(T + '/' + ID), deletedAt: NOW - 1000, trashReason: 'remove', trashMode: 'local', trashGeneration: 2,
+            cod: 9, dod: 3, price: 12, barcodes: [{ ...((at(H + '/' + ID) || at(T + '/' + ID)).barcodes[0]), cod: 9, dod: 3, isDeducted: false }] };
+        delete store[H][ID]; store[T][ID] = copy(trash); dataState.scanHistory = []; dataState.deletedItems = [copy(trash)];
+        store[TRASH_CONSUMPTIONS_ROOT] = { [ID]: { ...consumption(ID, 1), deletedAt: trash.deletedAt + offset } };
+        for (const [root, bucket] of [[D, DAY], [M, DAY.slice(0, 7)]]) store[root][bucket] = { codDollar: 12.5, dodDollar: 3.25, totalCount: 2,
+            op: 'op_prior_12345', ded: { [ID]: { at: trash.deletedAt, cod: 10, dod: 2, count: 1, ...(back ? { back: true } : {}) } } };
+        noteCleanupJournalEntry({ id: ID, reason: 'remove', stage, trashItem: trash, revenue: { scanDate: DAY, cod: 9, dod: 3, count: 1 }, ledger: 'keyed', prior: { d: ['op_prior_12345'], m: ['op_prior_12345'] } });
+        const key = cleanupJournalEntryKey(readCleanupJournal()[0]), bytes = localStorage.getItem(key), before = copy(store), effectCount = effects.length;
+        await resumeCleanupJournalEntry(ID);
+        expect(store).toEqual(before); expect(effects).toHaveLength(effectCount); expect(localStorage.getItem(key)).toBe(bytes);
+    }
+});
+
+it.each(['restore', 'purge'])('generation ៖ persisted same-at %s រក្សា source និង old money proof', async route => {
+    const trash = { ...at(H + '/' + ID), deletedAt: NOW - 1000, trashReason: 'remove', trashMode: 'local', trashGeneration: 2 };
+    delete store[H][ID]; store[T][ID] = copy(trash); dataState.scanHistory = []; dataState.deletedItems = [copy(trash)];
+    store[TRASH_CONSUMPTIONS_ROOT] = { [ID]: consumption(ID, 1) };
+    trash.barcodes[0].isDeducted = true; store[T][ID] = copy(trash); dataState.deletedItems = [copy(trash)];
+    store.zoew_barcode_registry = { GEN0001: true };
+    for (const [root, bucket] of [[D, DAY], [M, DAY.slice(0, 7)]]) store[root][bucket] = { codDollar: 0, dodDollar: 0, totalCount: 0, ded: { [ID]: { at: trash.deletedAt, cod: 7, dod: 0, count: 1 } } };
+    const before = copy(store);
+    if (route === 'restore') { uiState.pendingRestoreId = ID; await executeRestoreItem(); }
+    else expect(await purgeTrashWithRegistry(trash)).toBe(false);
+    expect(store).toEqual(before); expect(effects).toEqual([]);
+});
+
+it('generation ៖ persisted newer-at source2 ដក9/3 តែម្តង ជំនួស receipt10/2 ចាស់', async () => {
+    const trash = { ...at(H + '/' + ID), deletedAt: NOW - 999, trashReason: 'remove', trashMode: 'local', trashGeneration: 2,
+        cod: 9, dod: 3, price: 12, barcodes: [{ ...at(H + '/' + ID).barcodes[0], cod: 9, dod: 3, isDeducted: false }] };
+    delete store[H][ID]; store[T][ID] = copy(trash); dataState.scanHistory = []; dataState.deletedItems = [copy(trash)];
+    store[TRASH_CONSUMPTIONS_ROOT] = { [ID]: consumption(ID, 1) };
+    for (const [root, bucket] of [[D, DAY], [M, DAY.slice(0, 7)]]) store[root][bucket] = { codDollar: 12.5, dodDollar: 3.25, totalCount: 2, op: 'op_prior_12345', ded: { [ID]: { at: NOW - 1000, cod: 10, dod: 2, count: 1 } } };
+    noteCleanupJournalEntry({ id: ID, reason: 'remove', stage: 'ledger', trashItem: trash, revenue: { scanDate: DAY, cod: 9, dod: 3, count: 1 }, ledger: 'keyed', prior: { d: ['op_prior_12345'], m: ['op_prior_12345'] } });
+    await resumeCleanupJournalEntry(ID);
+    for (const [root, bucket] of [[D, DAY], [M, DAY.slice(0, 7)]]) {
+        const ledger = at(root + '/' + bucket); expect([ledger.codDollar, ledger.dodDollar, ledger.totalCount]).toEqual([3.5, 0.25, 1]);
+        expect(ledger.ded[ID]).toEqual({ at: NOW - 999, cod: 9, dod: 3, count: 1 });
+    }
+    expect(at(T + '/' + ID).barcodes[0].isDeducted).toBe(true);
+    const before = copy(store); await resumeCleanupJournalEntry(ID); expect(store).toEqual(before);
 });

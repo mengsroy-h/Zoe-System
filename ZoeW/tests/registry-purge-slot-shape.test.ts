@@ -119,7 +119,7 @@ describe('F03 consumption ៖ certificate ក្នុង G ជាទម្រ�
         expect(generation.trashConsumptionSame(sparse, sparseRead)).toBe(true);
         const keyed: any = { ...core, first: '0', members: { '0': { o: 0, id: receipt('0', 1).id } }, keys: [receipt('0', 1).id] };
         expect(generation.trashConsumptionValid(keyed)).toBe(true);
-        expect(generation.trashSourceUnconsumed({ id: 'source', trashGeneration: 4 }, read)).toBe(true);
+        expect(generation.trashSourceUnconsumed({ id: 'source', trashGeneration: 4, deletedAt: core.deletedAt + 1 }, read)).toBe(true);
         const shifted: any = clone(read); shifted.members = [null, ...read.members];
         expect(generation.trashConsumptionValid(shifted)).toBe(false);
     });

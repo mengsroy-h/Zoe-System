@@ -2070,14 +2070,17 @@ testToastAdmissionFixture();
                 const log = { recoveries: 0, proceeds: 0, callbacks: [] };
                 const ctx = {
                     console, Promise, Object, Array, Error,
+                    document: { hidden: false, addEventListener() {}, removeEventListener() {} },
+                    appLocalStore: { getItem: () => "synthetic-config" },
+                    safeStoreGet: (store, key) => store.getItem(key),
                     setTimeout: (fn, ms) => { const t = { fn, ms, dead: false }; timers.push(t); return t; },
                     clearTimeout: (t) => { if (t) t.dead = true; },
                     __log: log
                 };
                 vm.createContext(ctx);
                 vm.runInContext([
-                    'let auth = {}, authUnsubscribe = null, authRecoveryTimeout = null, authGeneration = 0, pendingRoleRecheck = false;',
-                    'const fb = { onAuthStateChanged: (a, cb) => { __log.callbacks.push(cb); return () => {}; } };',
+                    'let auth = { currentUser: null }, authUnsubscribe = null, authRecoveryTimeout = null, authGeneration = 0, pendingRoleRecheck = false;',
+                    'const fb = { onAuthStateChanged: (a, cb) => { __log.callbacks.push((user) => { a.currentUser = user; cb(user); }); return () => {}; } };',
                     'function attemptAuthStorageRecovery() { __log.recoveries++; }',
                     'function verifyAdminRoleThenProceed() { __log.proceeds++; }',
                     'function updateAuthButton() {}',

@@ -5035,6 +5035,9 @@
     },
     "ZoeW/tests/supabase-probe-session-cleanup.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/keygen-auth-recovery-owner.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

@@ -196,7 +196,7 @@ Actions ➜ New repository secret** ៖
 ]
 ```
 
-`serviceAccount` ជាខ្លឹមសារ File JSON ដែលទាញពី Firebase Console (ជំហានទី ២)
+`serviceAccount` ជាខ្លឹមសារ File JSON របស់គណនី backup អានតែម្យ៉ាង ដែលទាញពី Google Cloud Console (ជំហានទី ២)
 ដាក់ចូលទាំងស្រុង — ឬជា String មួយក៏បាន។ `secretKey` ជា Secret key របស់ Supabase (ជំហានទី ២) ៖ `ci-config.js` សរសេរវាចូល
 `secrets/<name>.key` (mode 0600) ក្រៅ checkout ហើយ workflow លុបវាចោលដូចសោ Firebase។ `name` អនុញ្ញាតតែអក្សរឡាតាំង/លេខ/`.`/`-`/`_`។
 

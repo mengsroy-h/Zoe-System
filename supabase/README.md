@@ -348,7 +348,7 @@ where m.user_id is null and a.user_id is null;
 - **ZoeKeyGen** ៖ ចូលដោយគណនី Admin (`platform_admins`) · បដិសេធ Secret key/`service_role` មុនផ្ញើអ្វីសោះ · Setup Link ផ្ទុកតែ URL · Publishable key ·
   កូដអញ្ជើញ (⛔ គ្មាន token ឬពាក្យសម្ងាត់ Admin) · ចាកចេញ ➜ កូដ · Link · ឈ្មោះហាង លុបចេញពីអេក្រង់។
 - **HTTP** ៖ CORS តែ origin ក្នុង `ZOE_ALLOWED_ORIGINS` · body ≤ 8 KB · កំហុសខាងក្នុងមិនលេចក្នុងចម្លើយ · function មិនសរសេរ log (ពាក្យសម្ងាត់ · កូដ · secret)។
-- ⚠️ **ព្រំដែនដែលនៅសល់** ៖ access token ដែលចេញរួច នៅប្រើបានរហូតដល់ផុតអាយុ (JWT expiry) សូម្បីក្រោយកំណត់ពាក្យសម្ងាត់ថ្មី · គណនី admin មានអំណាចលើ
+- ⚠️ **ព្រំដែនដែលនៅសល់** ៖ signature របស់ JWT អាចនៅមានសុពលភាពរហូតដល់ token ផុតអាយុ សូម្បីក្រោយប្តូរពាក្យសម្ងាត់។ សិទ្ធិ Database របស់សមាជិក និង Admin នៅតែផ្ទៀង session ដែលនៅមានក្នុង `auth.sessions` ហើយបដិសេធ session ដែលដករួច នៅការផ្ទៀងថ្មីបន្ទាប់; វាមិនលុបសិទ្ធិដែល transaction ទទួលរួច ឬធានាថា Auth endpoint ទាំងអស់បដិសេធ JWT ភ្លាមទេ។ គណនី admin មានអំណាចលើ
   គ្រប់ហាង ➜ ពាក្យសម្ងាត់ខ្លាំង និងកុំចែករំលែក · Free tier គ្មាន backup ពី Supabase ➜ backup ហាងតាម `firebase-backup/` ត្រូវការ secret key ដែល
   មានសិទ្ធិពេញ ➜ បង្កើតសោដាច់សម្រាប់ backup ហើយទុកតែក្នុង GitHub secret។
 - **backup · ការផ្ទេរទិន្នន័យ** ៖ `zoe_admin_tenants` · `zoe_admin_export` · `zoe_admin_write` ហៅបានតែ service_role (anon/authenticated ➜ permission denied) ·

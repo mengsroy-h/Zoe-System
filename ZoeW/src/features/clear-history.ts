@@ -110,10 +110,11 @@ export async function claimHistoryItemForClear(id, token, owner = captureTrashGe
     if (!resume && !clock.current()) throw new Error('CLEAR_HISTORY_CLOCK_CHANGED');
     if (existing && !clearHistoryClaimValid(existing)) throw new Error('CLEAR_HISTORY_GENERATION_HOLD');
     if (existing && existing.token !== token && isActiveClearHistoryClaim(existing)) throw new Error('CLEAR_HISTORY_IN_PROGRESS');
-    const generation = existing?.token === token ? existing.trashGeneration : await allocateTrashGeneration(id, owner);
+    const deletedAt = resume ? existing.deletedAt : getServerNow();
+    const generation = resume ? existing.trashGeneration : await allocateTrashGeneration(id, owner, deletedAt);
     if (generation === null || !trashGenerationOwnerCurrent(owner)) throw new Error('CLEAR_HISTORY_GENERATION_HOLD');
     if (!resume && !clock.current()) throw new Error('CLEAR_HISTORY_CLOCK_CHANGED');
-    const planned = resume ? existing : { token, claimedAt: getServerNow(), trashGeneration: generation, deletedAt: getServerNow() };
+    const planned = resume ? existing : { token, claimedAt: getServerNow(), trashGeneration: generation, deletedAt };
     if (!clearHistoryClaimValid(planned)) throw new Error('CLEAR_HISTORY_GENERATION_HOLD');
     let status = 'CLEAR_HISTORY_MISSING';
     clearTokenOwners.set(id, { token, owner });

@@ -1,4 +1,4 @@
-import { TRASH_CONSUMPTIONS_ROOT, trashConsumptionOf, trashConsumptionValid, trashGenerationOf, trashSourceUnconsumed, type TrashConsumption } from '../domain/trash-generation';
+import { TRASH_CONSUMPTIONS_ROOT, trashConsumptionOf, trashConsumptionSame, trashConsumptionValid, trashGenerationOf, trashSourceUnconsumed, type TrashConsumption } from '../domain/trash-generation';
 import { captureTrashGenerationOwner, readTrashConsumption, trashGenerationOwnerCurrent } from '../services/trash-generation';
 import { rowOperationActive } from '../services/row-operation-lock';
 import { setModalDisplay } from '../core/modals';
@@ -475,9 +475,10 @@ export async function finalizeClaimedRestore(sourceId, token, targetId, revenueD
     const clockOperation = captureClockOperation();
     if (!clockOperation.current()) throw new Error('RESTORE_CLOCK_UNTRUSTED');
     const target = `zoew_scan_history_cod_dod/${targetId}`;
+    const finalization = { token, targetId, finalizedAt: getServerNow() };
     const updates = {
         [`${TRASH_CONSUMPTIONS_ROOT}/${sourceId}`]: consumption,
-        [`zoew_restore_finalizations/${sourceId}`]: { token, targetId, finalizedAt: getServerNow() },
+        [`zoew_restore_finalizations/${sourceId}`]: finalization,
         [`zoew_recently_deleted_cod_dod/${sourceId}`]: null,
         ...(dropTarget ? { [target]: null } : { [`${target}/restoreClaimId`]: null, [`${target}/restoreClaimToken`]: null, [`${target}/restoreAddedCodes`]: null })
     };
@@ -510,7 +511,19 @@ export async function finalizeClaimedRestore(sourceId, token, targetId, revenueD
                 throw error;
             }
             stopIfSwitched();
-            if (!trashSnapshot.exists()) throw Object.assign(new Error('RESTORE_FINAL_UNKNOWN'), { cause: error });
+            if (!trashSnapshot.exists()) {
+                try {
+                    const [receipt, settled] = await Promise.all([
+                        readRestoreServerNode(owner.sdk, finalizeDb, `zoew_restore_finalizations/${sourceId}`),
+                        readTrashConsumption(sourceId, owner)
+                    ]);
+                    stopIfSwitched();
+                    if (receipt && typeof receipt === 'object' && !Array.isArray(receipt) && Object.keys(receipt).length === 3
+                        && Object.keys(finalization).every(key => receipt[key] === finalization[key])
+                        && settled.ok && trashConsumptionSame(consumption, settled.value)) return;
+                } catch (proofError) { stopIfSwitched(); }
+                throw Object.assign(new Error('RESTORE_FINAL_UNKNOWN'), { cause: error });
+            }
             const currentTrash = trashSnapshot.val();
             const currentClaim = currentTrash && currentTrash.restoreClaim;
             if (!currentClaim || currentClaim.token !== token || currentClaim.targetId !== targetId) throw new Error('RESTORE_CLAIM_LOST');

@@ -510,3 +510,50 @@ it('ការដកដែលបានបញ្ជាក់នៅតែបញ្�
     expect(trashItems()[0].closedAt).toBe(NOW);
     expect(serverBarcode('p1', 'M5P0001')).toBeNull();
 });
+
+
+it.each(['exact', 'reset', 'missing-final', 'wrong-final-token', 'wrong-final-target', 'wrong-final-at', 'missing-consumption', 'generation', 'scope', 'actor', 'source', 'birth', 'deleted-at', 'consumption-token', 'consumption-target', 'extra-final', 'unread', 'session'] as const)('Restore ACK បាត់ ៖ exact financial receipts %s បន្តតែ mirrors · ខ្វះ proof នៅ HOLD', async proof => {
+    seedItem('ack', ['ACK0001', 'ACK0002'], ['ACK0001']); loadViewsFromServer();
+    expect(await removeSingleBarcode('ack', 'ACK0001')).toBe('done'); await sleep(20);
+    const trash = trashItems()[0]; expect(pickupKeys()).toEqual([]);
+    const sdk: any = firebaseState.fb, originalUpdate = sdk.update, originalGet = sdk.get;
+    let finalized = 0, proofReads = 0;
+    sdk.update = async (ref: any, patch: any) => {
+        await originalUpdate(ref, patch);
+        if (!patch['zoew_restore_finalizations/' + trash.id]) return;
+        finalized++;
+        const finalPath = 'zoew_restore_finalizations/' + trash.id, receiptPath = 'zoew_trash_consumptions/' + trash.id;
+        if (proof === 'missing-final') setAt(finalPath, null);
+        if (proof === 'wrong-final-token') setAt(finalPath, { ...getAt(finalPath), token: 'foreign' });
+        if (proof === 'wrong-final-target') setAt(finalPath, { ...getAt(finalPath), targetId: 'foreign' });
+        if (proof === 'wrong-final-at') setAt(finalPath, { ...getAt(finalPath), finalizedAt: NOW - 1 });
+        if (proof === 'missing-consumption') setAt(receiptPath, null);
+        if (proof === 'generation') setAt(receiptPath, { ...getAt(receiptPath), generation: 2 });
+        if (proof === 'scope') setAt(receiptPath, { ...getAt(receiptPath), scope: 'other-shop' });
+        const field = { actor: 'actorUid', source: 'sourceId', birth: 'rowBirth', 'deleted-at': 'deletedAt', 'consumption-token': 'token', 'consumption-target': 'targetId' }[proof];
+        if (field) { const saved = getAt(receiptPath); setAt(receiptPath, { ...saved, [field]: typeof saved[field] === 'number' ? saved[field] + 1 : 'foreign' }); }
+        if (proof === 'extra-final') setAt(finalPath, { ...getAt(finalPath), extra: true });
+        if (proof === 'reset') setAt(PICKUP + '/' + DAY, { ...getAt(PICKUP + '/' + DAY), pickupRevision: 20, pickupResetEpoch: 1, packagesPickedUp: 0 });
+        throw Object.assign(new Error('committed financial write; acknowledgement unavailable'), { txOutcome: 'unknown' });
+    };
+    sdk.get = async (ref: any) => {
+        if (finalized && (ref.path === 'zoew_restore_finalizations/' + trash.id || ref.path === 'zoew_trash_consumptions/' + trash.id)) {
+            proofReads++;
+            if (proof === 'unread') throw new Error('authoritative receipt read unavailable');
+            if (proof === 'session') firebaseState.authGeneration++;
+        }
+        return originalGet(ref);
+    };
+    await restore(trash.id);
+    expect(finalized).toBe(1);
+    expect(getAt(TRASH + '/' + trash.id)).toBeNull(); expect(revenueDay()).toEqual([100, 10, 10]);
+    const exact = proof === 'exact' || proof === 'reset';
+    expect(pickupKeys()).toEqual(proof === 'exact' ? [key('ACK0001')] : []);
+    if (exact) expect(getAt(MIRROR + '/' + DAY + '/' + key('ACK0001'))).toEqual({ c: 4, d: 1 });
+    else expect(pickupJournal()).toHaveLength(1);
+    const settledMoney = [getAt(DAILY), getAt(MONTHLY)];
+    if (proof !== 'session') { crashAndReload(); await resumeDoors(); }
+    expect([getAt(DAILY), getAt(MONTHLY)]).toEqual(settledMoney);
+    expect(pickupKeys()).toEqual(proof === 'exact' ? [key('ACK0001')] : []);
+    expect(finalized).toBe(1); expect(proofReads).toBeGreaterThan(0);
+});

@@ -1058,6 +1058,8 @@ describe('Palm list: arrival scan03 and signed companion with track proof', () =
     });
 
     it('sign list ➜ billStatus 5 over signSiteDate · only rows whose billStatus is 5 are evidence · Argus contract', async () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date('2026-10-16T12:00:00Z'));
         const { sessionToken: session } = await login();
         const sent = serve({ '5': () => page([item('KH0000000009', '5'), item('KH0000000010', '4'), item('KH0000000009', '5'), item('KH0000000011', '3'), item('KH0000000012', '4')], { pages: 3, total: 41 }) });
         const body = JSON.parse((await call(listQuery(), session)).body);
@@ -1065,10 +1067,30 @@ describe('Palm list: arrival scan03 and signed companion with track proof', () =
         expect(sent[0].path).toBe('/zto/dispatch/v1/queryDispatchList');
         expect(Object.keys(sent[0].body)).toEqual(['billStatus', 'signSiteDateFrom', 'signSiteDateTo', 'pageNum', 'pageSize']);
         expect(sent[0].body).toMatchObject({ billStatus: '5', signSiteDateFrom: '2026-10-10 00:00:00', pageNum: 1, pageSize: 100 });
-        expect(sent[0].body.signSiteDateTo.endsWith(' 23:59:59')).toBe(true);
+        expect(sent[0].body.signSiteDateTo).toBe('2026-10-16 23:59:59');
         expect(body).toMatchObject({ success: true, list: true, enabled: true, kind: 'signed', page: 1, pages: 3, total: 41,
             site: 'KH001', siteName: 'Test branch', rows: [], signedOk: true, signed: ['KH0000000009'], signedScans: 2, otherScans: 3, provider: 'zto-palm' });
         expect(body.signedRows).toEqual([{ barcode: 'KH0000000009', phone: '012345678', cod: 2.5, dod: 0, at: '', from: '' }]);
+    });
+
+    it.each([
+        ['2026-11-09T16:59:59.999Z', '2026-10-10', '2026-10-16', '2026-10-10', '2026-11-09'],
+        ['2026-11-09T17:00:00.000Z', '2026-10-10', '2026-10-16', '2026-10-11', '2026-11-10'],
+        ['2026-11-09T23:59:59.999Z', '2026-10-10', '2026-10-16', '2026-10-11', '2026-11-10'],
+        ['2026-11-10T00:00:00.000Z', '2026-10-10', '2026-10-16', '2026-10-11', '2026-11-10'],
+        ['2026-11-09T16:59:59.999Z', '2026-10-13', '2026-11-12', '2026-10-13', '2026-11-12'],
+        ['2026-11-09T17:00:00.000Z', '2026-11-09', '2026-11-09', '2026-11-09', '2026-11-10']
+    ])('បញ្ជី Sign នៅ %s ៖ ជួររួមគោរពថ្ងៃភ្នំពេញ និងពិដាន ៣១ ថ្ងៃ · exact រក្សាជួរដែលស្នើ', async (now, from, to, expectedFrom, expectedTo) => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date(now));
+        const { sessionToken: session } = await login();
+        const sent = serve({ '5': () => page([item('KH0000000009', '5')]) });
+        expect((await call(listQuery({ from, to }), session)).statusCode).toBe(200);
+        expect(sent[0].body).toEqual({ billStatus: '5', signSiteDateFrom: expectedFrom + ' 00:00:00',
+            signSiteDateTo: expectedTo + ' 23:59:59', pageNum: 1, pageSize: 100 });
+        expect((await call(listQuery({ from, to, exact: '1' }), session)).statusCode).toBe(200);
+        expect(sent.at(-1)!.body).toEqual({ billStatus: '5', signSiteDateFrom: from + ' 00:00:00',
+            signSiteDateTo: to + ' 23:59:59', pageNum: 1, pageSize: 100 });
     });
 
     it.each([null, item('bad code', '5')])('malformed signed row %s មិនអាចធ្វើឱ្យបញ្ជី complete ហើយ healthy retry នៅដំណើរការ', async malformed => {

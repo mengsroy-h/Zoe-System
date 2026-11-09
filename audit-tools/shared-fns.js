@@ -19,7 +19,7 @@ const EXPECTED_DIVERGENT = new Set([
     'applySetupLinkFromUrl', 'atTop', 'attemptAuthStorageRecovery', 'cancelPinEntryFlow',
     'cancelPinSetupFlow', 'checkPinAndOpenConfig', 'closeModal', 'ensureAppActivated',
     'forceExpireSession', 'handleConfigQrResult', 'hashPin',
-    'initDatabaseListeners', 'initFirebase', 'isFirebaseSessionExpired', 'isPinFlowPending',
+    'initDatabaseListeners', 'initFirebase', 'isPinFlowPending',
     'licenseFailureMessage',
     'loginWithFirebase', 'logoutApp', 'openConfigModal', 'openConfigQrScanner', 'openModalHelper',
     'requestPinBeforeConfig', 'retryPendingRoleCheck', 'sanitizePhoneNumber', 'saveFirebaseConfig',

@@ -42,7 +42,7 @@
 
 ## 📌 ការងារដែលនៅសល់ — ការផ្ទៀងផ្ទាត់ដោយអ្នកប្រើ
 
-- 2026-11-09 · Clock/Audit៖ CI លើ `3fc2a88e4ba7247dfb3f6e085543f9332815ca97` មាន២៣៨/២៤៣ checker ជាប់; `ui-flow`, `app-lock`, `sheet-import`, wrapper ក្នុង `function-surface` និង ZTO LOCK នៅក្រហម។ ការកែ fixture បន្ទាប់នៅតែ candidate ដាច់ដោយឡែក; ត្រូវផ្ទៀង browser CI លើ commit ថ្មី។ មិន refresh LOCK ដើម្បីបៃតង; ការផ្ទុកប្រវត្តិក្រោយ session ផ្ទៀងត្រូវវាស់លើ iPhone/Android ពិតមុន merge។
+- 2026-11-09 · Clock/Audit៖ CI លើ `ba034d6400d09d6eefe25cb7c10c69047b4561ce` មាន២៤១/២៤៣ checker ជាប់; នៅសល់ unused session wrapper និង ZTO LOCK ៣។ Candidate ZoeW `2.50.190`/`zoew-v454` នៅដាច់ដោយឡែក មិនទាន់ផ្សាយ; ត្រូវផ្ទៀង CI លើ commit ថ្មី។ ការផ្ទុកប្រវត្តិក្រោយ session ផ្ទៀងត្រូវវាស់លើ iPhone/Android ពិតមុន merge។
 
 - 2026-11-07 · PR393៖ Registration atomic បានបញ្ចូលក្នុង branch រួច។ Audit និង Registration Auth លើ head `a711893b4f3b0d3b48dcdb1801937f4fd8baa732` បានផ្ទៀង; F03 ជាប់ក្រោយរត់ឡើងវិញ ប៉ុន្តែមូលហេតុបរាជ័យដំបូងមិនទាន់បញ្ជាក់។ Hosted migration/backup/restore និងការរង់ចាំ handler ចាស់ឱ្យចប់ នៅមិនទាន់ផ្ទៀង; ការកែ test និងឯកសារថ្មីត្រូវការ CI លើ commit ថ្មី មុន merge។ Dead-code ដែលបានដកចេញពីការកែ នៅមិនទាន់បញ្ចប់។
 
@@ -121,6 +121,14 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ archive ផ្នែក ៩ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.190] — 2026-11-09 · ផ្ទៀង session API និងសោ ZTO
+
+**ZoeW** (`zoew-v453` ➜ `zoew-v454`)។ ZoeKeyGen នៅ `2.24.37` ដដែល។ Candidate នេះមិនទាន់ផ្សាយ។
+
+ការចូលប្រព័ន្ធ ការផុតវគ្គ៤ម៉ោង និងការទប់សកម្មភាពពេលមិនទាន់ផ្ទៀង រក្សា tri-state `live`/`expired`/`unverified`។ ដកតែ boolean wrapper `isFirebaseSessionExpired` ដែលគ្មាន production caller; វាមិនមានលើ audit-only window API ទៀត។ Unit consumer ត្រូវវាស់ tri-state API ដែល app ប្រើពិត។ មិនប្ដូរគោលការណ៍ប្រាក់ ម៉ោងស្កេន ឬព្រំ ZTO ទេ; មូលដ្ឋានភស្តុតាងនិង hash refresh ស្ថិតក្នុងផ្នែក២។
+
+**សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ ផ្ទៀង full Audit លើ commit ថ្មីមុន merge និងរក្សាការផ្ទៀង iPhone/Android សម្រាប់ history recovery ដែលនៅបើក។ មិនមាន backend migration ឬការបោះពុម្ព rules ថ្មី។ កុំប្រើ audit-console helper ដែលដកចេញ; តេស្តប្រើ `getFirebaseSessionVerdict` និងទទួល `unverified` ដាច់ពី `live`។
 
 ### [2.50.189] — 2026-11-09 · បន្តផ្ទុកប្រវត្តិក្រោយផ្ទៀងវគ្គ
 
@@ -1993,6 +2001,20 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-11-09 — Audit 1236៖ ផ្ទៀងសោ ZTO និង session wrapper
+
+Head `ba034d6400d09d6eefe25cb7c10c69047b4561ce` មាន២៤១/២៤៣ checker ជាប់ គ្មាន skip/partial; browser fixtures ដែលកែបានឆ្លង `ui-flow`១០២, `app-lock`១៥៩ និង `sheet-import`៨២។ នៅសល់ boolean wrapper ដែលគ្មាន runtime caller និង ZTO hash៣។
+
+ការអនុញ្ញាត ZTO ត្រូវបានផ្ទៀងពីសំណួរ/ចម្លើយដើម មិនយកឯកសារប្រវត្តិជាសិទ្ធិថ្មីទេ; សំណើ និងព្រំដែនរស់ក្នុងធាតុ «2026-11-08 — នាឡិកា Server និងព្រំដែនប្រតិបត្តិការដែលកំពុងរង់ចាំ»។ មុន refresh បានផ្ទៀង checker ZTO ទាំង១១លើ head ដដែល រួម rendered `zto-list-sync`៦៣៦ និង `zto-sync-banner`២០៩; workflow source selection មាន ZTO tests១៦៦៩ក្នុង៧៨ឯកសារឆ្លង។ Independent replay បញ្ជាក់ scan ប្រើ trusted app scan timestamp ខណៈ list import រក្សា actual ZTO arrival និងលំដាប់ Sign/Return ដើម។
+
+Rollback ឯកសារ locked ទាំង៣ទៅ bytes `cf1a564a` ដែលផ្គូផ្គង hash ដើម តែកាន់ clock infrastructure បច្ចុប្បន្ន ធ្វើឱ្យ behavioral tests៣៦ធ្លាក់/១៧ជាប់; candidate ឆ្លង។ នេះមិនមែនការរត់ full tree ចាស់ដែលគ្មាន clock API ថ្មីទេ ហើយ dependency/syntax/startup errors មិនត្រូវបានរាប់ជាការចាប់ regression។ ការកែ LOCK មានតែ SHA256 របស់ `zto-list-sync.ts`, `zto-status.ts` និង `zto-shop-sweep.ts`; production bytes ZTO និង assertions ទាំងអស់នៅដដែល។
+
+Session wrapper `isFirebaseSessionExpired` គ្រាន់តែបម្លែង tri-state verdict ទៅ boolean។ Runtime login/activation/periodic/resume/reconnect ប្រើ API tri-state រួច; unit consumer ត្រូវវាស់ API នោះដោយបំបែក `unverified` ពី `live`។ ដក wrapper និង stale audit references ជំនួសការបន្ថែម caller ក្លែង ឬ allowlist ដើម្បីឱ្យ checker បៃតង។ ផ្ទៃ `window` ក្នុង audit build បាត់ helper មួយនេះ; production entry points និងគោលការណ៍៤ម៉ោងមិនប្ដូរ។ ZoeW version/cache និងប្រវត្តិកំណែត្រូវបាន align តាម source-scope guard; ZoeKeyGen នៅដដែល។
+
+ការផ្ទៀង candidate៖ focused session/ZTO/LOCK/forbidden-zone រួម២៩៥/២៩៥ក្នុង១១ឯកសារជាប់ គ្មាន pending។ LOCK clean១៦/១៦; ប្រែ១ byte ក្នុងឯកសារដែល refresh មួយម្ដងៗធ្វើឱ្យ pin នោះធ្លាក់១ ខណៈ១៥ផ្សេងទៀតជាប់។ ដក wrapper តែប៉ុណ្ណោះមុន release metadata ធ្វើឱ្យ Vite output ទាំង២៥ឯកសារមាន path/SHA256 ដូច baseline; metadata កំណែ/cache ថ្មីនៅបង្កើតសំបកកំណែថ្មីតាមធម្មតា។ Security mutations ដែលបម្លែង unknown/expired ទៅ live, ទទួលម្ចាស់ចាស់ ឬដក expired sign-out សុទ្ធតែធ្លាក់តាម assertions មិនមែន startup error។
+
+Full Audit លើ candidate ថ្មីនៅមិនទាន់វាស់; source-only function-surface predicate មិនជំនួស rendered checker ទាំងមូល។ លទ្ធផល ZTO ខាងលើប្រើ CI fixtures/source និង transport ក្លែងតាម guard; មិនមែន live ZTO ឬ iPhone/Android ពិតទេ។ ការផ្ទៀង history recovery លើឧបករណ៍ពិត និងការអនុញ្ញាតផ្សាយ/merge នៅជាជំហានដាច់ដោយឡែក។
 
 ### 2026-11-09 — Audit 1235៖ ព្រំសំណាកនាឡិកា និងការបំបែក service worker ក្នុង fixture
 

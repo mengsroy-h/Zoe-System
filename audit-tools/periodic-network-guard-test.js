@@ -185,7 +185,7 @@ const PENDING_ACTIVATION_DECL = (source.match(/(?:^|\n)[ \t]*(let pendingActivat
             ok('⛔ ក្រោយ arm ចប់ ទង់ត្រូវ settle ចេញពី `pending`',
                 armCtx.flag() !== 'pending', armCtx.flag());
             const before = armCounts.session;
-            // ⛔ `isFirebaseSessionExpired` របស់ sandbox ត្រឡប់ promise ដែល
+            // ⛔ `getFirebaseSessionVerdict` របស់ sandbox ត្រឡប់ promise ដែល
             // **តេស្តជាអ្នកដោះ** ➜ `await` ដោយមិនដោះ = ព្យួរ ➜ event loop ស្ងួត
             // ➜ node ចេញ **exit 0 ដោយស្ងាត់** ហើយការអះអាងខាងក្រោមមិនដែលរត់។
             const againCheck = armCtx.sessionCheck();

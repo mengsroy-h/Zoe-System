@@ -204,14 +204,38 @@ it.each([1,5])('F06 metadata៖ offline %sh អាន authTime ដោយគ្�
   const result=await f.sdk.getIdTokenResult(f.auth.currentUser);
   expect(result.token).toBe('');expect(result.authTime).toBe(new Date(cached.authTime*1000).toISOString());
   firebaseState.fb=f.sdk;firebaseState.auth=f.auth;firebaseState.db={};resetServerClock();
+  const {getFirebaseSessionVerdict}=await import('../src/features/session');
+  expect(await getFirebaseSessionVerdict(f.auth.currentUser)).toBe('unverified');
   firebaseState.isDatabaseConnected=true;
   expect(acceptServerClockOffset(0,{epochMs:Date.now(),wallMs:Date.now(),monotonicMs:performance.now()},false)).toBe(true);
   firebaseState.isDatabaseConnected=false;
-  const {isFirebaseSessionExpired}=await import('../src/features/session');
-  expect(await isFirebaseSessionExpired(f.auth.currentUser)).toBe(hours>4);
+  expect(await getFirebaseSessionVerdict(f.auth.currentUser)).toBe(hours>4?'expired':'live');
+  resetServerClock();
+  expect(await getFirebaseSessionVerdict(f.auth.currentUser)).toBe('unverified');
   const {ztoIdToken}=await import('../src/features/lookup-api');
   expect(await ztoIdToken()).toBe('');
  }finally{await f.sdk.deleteApp(f.app);}
+});
+it.each(['generation','user','auth','sdk','db','backend'])('F06 metadata៖ ម្ចាស់ %s ផ្លាស់ ខណៈអាន authTime មិនផ្ទៀងផ្ទាត់វគ្គថ្មី',async owner=>{
+ const gate=deferred<string|null>(),f=await metadataSdk(()=>gate.promise,metadataJwt(1).token);
+ const user=f.auth.currentUser,previousConfig=firebaseState.firebaseConfig;
+ try{
+  firebaseState.fb=f.sdk;firebaseState.auth=f.auth;firebaseState.db={};resetServerClock();
+  firebaseState.firebaseConfig={supabaseUrl:BASE};
+  firebaseState.isDatabaseConnected=true;
+  expect(acceptServerClockOffset(0,{epochMs:Date.now(),wallMs:Date.now(),monotonicMs:performance.now()},false)).toBe(true);
+  const {getFirebaseSessionVerdict}=await import('../src/features/session');
+  const work=getFirebaseSessionVerdict(user);
+  await vi.waitFor(()=>expect(f.transport.accessToken).toHaveBeenCalledOnce());
+  if(owner==='generation')firebaseState.authGeneration++;
+  if(owner==='user')firebaseState.auth.currentUser={...user};
+  if(owner==='auth')firebaseState.auth={...f.auth};
+  if(owner==='sdk')firebaseState.fb={...f.sdk};
+  if(owner==='db')firebaseState.db={};
+  if(owner==='backend')firebaseState.firebaseConfig={supabaseUrl:'https://other.invalid'};
+  gate.resolve(null);
+  expect(await work).toBe('unverified');
+ }finally{gate.resolve(null);firebaseState.firebaseConfig=previousConfig;resetServerClock();await f.sdk.deleteApp(f.app);}
 });
 it('F06 metadata control៖ token ថ្មីរក្សារូបរាង result និងមិនប្រើ cached authTime',async()=>{
  const fresh=metadataJwt(1,{exp:Math.floor(Date.now()/1000)+3600}),f=await metadataSdk(async()=>fresh.token);

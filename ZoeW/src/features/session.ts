@@ -96,10 +96,6 @@ export async function getFirebaseSessionVerdict(user) {
     }
 }
 
-export async function isFirebaseSessionExpired(user) {
-    return (await getFirebaseSessionVerdict(user)) === 'expired';
-}
-
 export function retrySessionVerification() {
     if ((navigator.onLine as boolean) !== false) forceDatabaseReconnect();
     return runSessionExpiryCheck();

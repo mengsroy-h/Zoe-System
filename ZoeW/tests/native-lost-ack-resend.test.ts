@@ -5,6 +5,7 @@
 // (scan saved on the server, ledger reverted, registry key released). Only an absent receipt is a refusal.
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { firebaseState } from '../src/core/state';
+import { acceptServerClockOffset, getServerNow, resetServerClock } from '../src/core/clock';
 import { withTransactionOutcomeResolution } from '../src/services/tx-outcome';
 import { nativeWriteRecoveryState } from '../src/services/native-write-recovery';
 import { createLocalWriteJournal } from '../src/services/write-journal';
@@ -24,6 +25,7 @@ function lab(update: any) {
     const sdk = withTransactionOutcomeResolution(raw); sdk.getAuth(app); sdk.getDatabase(app);
     Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db, isDatabaseInitialized: true,
         isInitializingFirebase: false, firebaseSdkUnavailable: false, isDatabaseConnected: true, sessionExpiryCheck: 'live', authLoginOperation: null });
+    resetServerClock(); acceptServerClockOffset(0, null, false);
     return { sdk, db };
 }
 const verdictOf = (p: Promise<any>) => p.then(() => 'sent', (e: any) => e.code || e.message);
@@ -125,7 +127,7 @@ it('control ៖ a row whose send never reached the server (journaled, then the A
     const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(ops)));
     const hash = Array.from(new Uint8Array(bytes), (n) => n.toString(16).padStart(2, '0')).join('');
     expect(records().length, 'precondition').toBe(0);
-    expect(createLocalWriteJournal().put({ v: 1, scope, topic: 'firebase', opId: 'native_resend0000000009', sentAfter: 0, stage: 'sent', queuedAt: Date.now(), ops, hash }), 'precondition').toBe(true);
+    expect(createLocalWriteJournal().put({ v: 1, scope, topic: 'firebase', opId: 'native_resend0000000009', sentAfter: 0, stage: 'sent', queuedAt: getServerNow(), ops, hash }), 'precondition').toBe(true);
     await native.sdk.retryWriteRecovery(native.db);
     expect({ onServer: tree['zoew_scan_history_cod_dod/row9']?.phone, rows: records().length }).toEqual({ onServer: '012000999', rows: 0 });
 });

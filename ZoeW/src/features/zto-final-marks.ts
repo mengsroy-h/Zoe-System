@@ -1,6 +1,6 @@
 import { rowOperationActive } from '../services/row-operation-lock';
 import { dataState, firebaseState, ztoState } from '../core/state';
-import { getServerNow } from '../core/clock';
+import { captureClockOperation, getServerNow, serverClockIsTrustworthy } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
 import { shopScopePending } from '../core/shop-scope';
 import { ZTO_SIGNED_REOPEN_TEXT } from '../core/text';
@@ -121,8 +121,14 @@ export function explainZtoRestoreBlock(reason) {
 }
 
 export function pruneZtoReturnedEvidence() {
+    const clock = captureClockOperation();
     const now = getServerNow();
     ztoReturnedEvidence.forEach((entry, key) => {
+        if (!clock.current()) return;
+        if (entry.notedPending === true) {
+            entry.noted = now;
+            delete entry.notedPending;
+        }
         const noted = typeof entry.noted === 'number' && isFinite(entry.noted) ? entry.noted : entry.at;
         if (!(now - noted <= ZTO_FINAL_RETURNED_TTL_MS)) ztoReturnedEvidence.delete(key);
     });
@@ -137,7 +143,8 @@ export function noteZtoReturnedEvidence(code, at, kind = 'returned') {
     const key = pickupBarcodeKey(code);
     if (!key || typeof at !== 'number' || !isFinite(at) || at <= 0) return;
     ztoReturnedEvidence.delete(key);
-    ztoReturnedEvidence.set(key, { at: at, noted: getServerNow(), kind: kind === 'misplaced' || kind === 'sent' || kind === 'left' ? kind : 'returned' });
+    const noted = getServerNow();
+    ztoReturnedEvidence.set(key, { at: at, noted, ...(serverClockIsTrustworthy() ? {} : { notedPending: true }), kind: kind === 'misplaced' || kind === 'sent' || kind === 'left' ? kind : 'returned' });
     pruneZtoReturnedEvidence();
 }
 
@@ -182,6 +189,7 @@ export function applyZtoFinalMarks(current, wanted, trash) {
 }
 
 export function collectZtoFinalTargets() {
+    if (!serverClockIsTrustworthy()) return [];
     loadZtoPickupStatusOnce();
     pruneZtoReturnedEvidence();
     const signedAt = getServerNow();
@@ -233,12 +241,14 @@ export async function syncZtoFinalMarks() {
     if (!api || !targetDb || typeof api.runTransaction !== 'function' || typeof api.ref !== 'function') return 0;
     if (ztoState.ztoFinalInFlight || shopScopePending()) return 0;
     if (ztoState.ztoFinalRefusedDb === targetDb && elapsedSince(ztoState.ztoFinalRefusedAt) < ZTO_FINAL_REFUSED_RETRY_MS) return 0;
+    const clock = captureClockOperation();
+    if (!clock.current()) return 0;
     const targets = collectZtoFinalTargets().slice(0, ZTO_FINAL_SWEEP_BATCH);
     if (!targets.length) return 0;
     const session = captureZtoSession();
     const owner = {};
     ztoFinalRun = owner;
-    const current = () => ztoFinalRun === owner && session.current();
+    const current = () => ztoFinalRun === owner && session.current() && clock.current();
     ztoState.ztoFinalInFlight = true;
     let written = 0;
     let refused = 0;

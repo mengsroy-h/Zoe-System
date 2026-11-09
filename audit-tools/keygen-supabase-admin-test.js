@@ -86,7 +86,7 @@ function sliceNested(source, name) {
 const decls = topLevel(src);
 const SB_FN_NAMES = [...decls.keys()].filter((n) => decls.get(n).kind === 'function' && /^sb[A-Z]|Sb[A-Z]/.test(n));
 const SB_VAR_NAMES = [...decls.keys()].filter((n) => decls.get(n).kind !== 'function' && /^(SB_|sb[A-Z])/.test(n));
-const HELPER_FNS = ['fetchWithTimeout', 'elapsedSince', 'captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession', ...(decls.has('lookupSetupScrubUrl') ? ['lookupSetupScrubUrl', 'lookupSetupSecretName'] : []), 'adminOwnerIsCurrent', 'safeStoreGet',
+const HELPER_FNS = [...['keygenIdleStamp', 'keygenIdleElapsed', 'getTrustedServerNow', 'captureKeygenClock'].filter(n => decls.has(n)), 'fetchWithTimeout', 'elapsedSince', 'captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession', ...(decls.has('lookupSetupScrubUrl') ? ['lookupSetupScrubUrl', 'lookupSetupSecretName'] : []), 'adminOwnerIsCurrent', 'safeStoreGet',
     'safeStoreSet', 'escapeHtml', 'copySensitiveText', 'showLoginModalWithPrefill', 'makeQrCode', 'renderQrInto',
     'downloadQrPng', 'saveQrImage', 'seatMetaText'];
 const HELPER_VARS = ['SETUP_LINK_URL_KEY', 'QR_MAX_MODULES', 'lookupSetupGeneration'];
@@ -295,6 +295,9 @@ function buildKeygen(env) {
         prompt: (m, d) => { log.prompts.push(String(m)); return answers.prompt.length ? answers.prompt.shift() : d; },
         showToast: (m) => log.toasts.push(String(m)),
         getServerNow: () => Date.now(),
+        performance: { now: () => Date.now() },
+        waitForServerTimeSync: async () => true,
+        ZoeLicense: { getTrustedServerNow: () => Date.now(), getServerTimeGeneration: () => 1 },
         document: dom.document,
         navigator: { clipboard: { writeText: (t) => { log.clipboard.push(String(t)); return Promise.resolve(); } }, onLine: true },
         auth: { currentUser: user },
@@ -886,15 +889,15 @@ async function behavior() {
         await C.sbAdminLogin();
         await drain();
         ok('⛔ លក្ខខណ្ឌចាំបាច់ ៖ ចូលវិញសម្រាប់ការសាកពិដានស្ងៀម', panelOpen() && !!C.sbAdminSession);
-        const idleBy = (ms) => run('sbAdminLastUseAt = Date.now() - SB_ADMIN_IDLE_MS + (' + ms + ')');
+        const idleBy = (ms) => run('sbAdminLastUseAt = keygenIdleStamp(); sbAdminLastUseAt.wall -= SB_ADMIN_IDLE_MS - (' + ms + '); sbAdminLastUseAt.mono -= SB_ADMIN_IDLE_MS - (' + ms + ')');
         const expire = () => run('typeof expireIdleSbAdmin === "function" ? expireIdleSbAdmin() : null');
         const activity = () => run('typeof sbAdminActivity === "function" ? sbAdminActivity() : null');
-        ok('ចូលរួច ➜ ត្រាពេលប្រើ = ឥឡូវ (Date.now)', Math.abs(Date.now() - Number(run('sbAdminLastUseAt'))) < 5000);
+        ok('ចូលរួច ➜ ត្រាពេលប្រើ = ឥឡូវ (Date.now)', Math.abs(Date.now() - Number(run('sbAdminLastUseAt.wall'))) < 5000);
         idleBy(60000);
         ok('ស្ងៀមតិចជាង ១៥ នាទី ➜ session នៅ', expire() === false && !!C.sbAdminSession && panelOpen());
         idleBy(1000);
         activity();
-        ok('សកម្មភាព (pointer/key) មុនដល់ពិដាន ➜ ត្រាពេលថ្មី · session នៅ', Math.abs(Date.now() - Number(run('sbAdminLastUseAt'))) < 5000 && !!C.sbAdminSession);
+        ok('សកម្មភាព (pointer/key) មុនដល់ពិដាន ➜ ត្រាពេលថ្មី · session នៅ', Math.abs(Date.now() - Number(run('sbAdminLastUseAt.wall'))) < 5000 && !!C.sbAdminSession);
         idleBy(-1000);
         const fIdle = K.log.fetches.length;
         const tIdle = K.log.toasts.length;

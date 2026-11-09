@@ -1,6 +1,6 @@
 import { rowOperationActive } from '../services/row-operation-lock';
 import { firebaseState } from '../core/state';
-import { getServerNow } from '../core/clock';
+import { captureClockOperation, getServerClockBounds, getServerNow } from '../core/clock';
 import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
 import { liveShopScope } from '../core/shop-scope';
 import { barcodeEntriesOf, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodesOf, stripTrashClaim } from './barcode';
@@ -16,23 +16,29 @@ export function newTrashClaimToken() {
     return 'tc_' + Math.max(0, Math.floor(getServerNow())).toString(36) + '_' + Math.random().toString(36).slice(2, 12).padEnd(10, '0');
 }
 
-export function trashClaimAge(barcode, now) {
+export function trashClaimAge(barcode, now, futureNow = now) {
     const at = barcode && typeof barcode.trashClaimAt === 'number' && isFinite(barcode.trashClaimAt) ? barcode.trashClaimAt : 0;
-    if (!at || at - now > trashClaimPolicy().futureMs) return Infinity;
+    if (!at || at - futureNow > trashClaimPolicy().futureMs) return Infinity;
     return Math.max(0, now - at);
 }
 
-export function trashClaimHeldByOther(barcode, token, now) {
+function trashClaimMayBeLive(barcode) {
+    const bounds = getServerClockBounds();
+    return !bounds || trashClaimAge(barcode, bounds.lowerMs, bounds.upperMs) <= trashClaimPolicy().staleMs;
+}
+
+export function trashClaimHeldByOther(barcode, token, _now) {
     return !!barcode && typeof barcode.trashClaim === 'string' && barcode.trashClaim !== token
-        && trashClaimAge(barcode, now) <= trashClaimPolicy().staleMs && !ownLeftoverTrashClaim(barcode.trashClaim);
+        && trashClaimMayBeLive(barcode) && !ownLeftoverTrashClaim(barcode.trashClaim);
 }
 
 export function ownLeftoverTrashClaim(claim) {
     return !liveTrashClaims.has(claim) && trashClaimRecords().some((r) => r.token === claim && r.page === trashClaimPage && r.scope === liveShopScope());
 }
 
-export function trashClaimOwned(barcode, token, now) {
-    return !!barcode && !!token && barcode.trashClaim === token && trashClaimAge(barcode, now) <= trashClaimPolicy().refreshMs;
+export function trashClaimOwned(barcode, token, _now) {
+    const bounds = getServerClockBounds();
+    return !!bounds && !!barcode && !!token && barcode.trashClaim === token && trashClaimAge(barcode, bounds.upperMs) <= trashClaimPolicy().refreshMs;
 }
 
 export function itemHasLiveTrashClaim(item, now, token?) {
@@ -89,7 +95,9 @@ export function claimTrashBarcodes(itemId, token, pick, allowEmptySource = false
     const emptyBarcodes = value => value == null || typeof value === 'object' && Object.keys(value).length === 0;
     const owner = trashClaimOwner();
     if (!owner.api || !owner.db || !itemId || !/^[a-zA-Z0-9_-]+$/.test(itemId)) return Promise.resolve({ state: 'failed', codes: [] });
+    const clock = captureClockOperation();
     const current = () => trashClaimOwnerIsCurrent(owner);
+    if (!clock.current()) return Promise.resolve({ state: 'stale', codes: [] });
     let stamped = [];
     let blocked = false;
     let reason = '';
@@ -99,7 +107,7 @@ export function claimTrashBarcodes(itemId, token, pick, allowEmptySource = false
         blocked = false;
         reason = '';
         present = !!item && typeof item === 'object';
-        if (!current()) return;
+        if (!current() || !clock.current()) return;
         if (allowEmptySource && item === null) return null;
         if (!present) return;
         const emptySource = allowEmptySource && !Array.isArray(item) && emptyBarcodes(item.barcodes);
@@ -114,6 +122,7 @@ export function claimTrashBarcodes(itemId, token, pick, allowEmptySource = false
         ensureBarcodeArrayForItem(item);
         const now = getServerNow();
         const wanted = new Set(pick(item, now) || []);
+        if (!clock.current()) return;
         barcodeEntriesOf(item.barcodes).forEach(({ barcode }) => {
             if (!barcode || !wanted.has(barcode.code)) return;
             if (trashClaimHeldByOther(barcode, token, now)) { blocked = true; reason = 'claim'; return; }
@@ -147,14 +156,16 @@ export function claimTrashBarcodes(itemId, token, pick, allowEmptySource = false
 
 export function releaseTrashClaims(itemId, token, owner = trashClaimOwner(), staleOnly = false) {
     if (!trashClaimOwnerIsCurrent(owner) || !itemId || !/^[a-zA-Z0-9_-]+$/.test(itemId)) return Promise.resolve(false);
+    const clock = staleOnly ? captureClockOperation() : null;
+    if (clock && !clock.current()) return Promise.resolve(false);
     let held = false;
     let blocked = false;
     const updater: any = (item) => {
         held = false;
-        blocked = rowOperationActive(item);
+        blocked = rowOperationActive(item) || !!clock && !clock.current();
         if (blocked) return;
         if (!trashClaimOwnerIsCurrent(owner) || !item || typeof item !== 'object') return;
-        if (staleOnly && barcodeEntriesOf(item.barcodes).some(({ barcode }) => barcode?.trashClaim === token && trashClaimAge(barcode, getServerNow()) <= trashClaimPolicy().staleMs)) {
+        if (staleOnly && barcodeEntriesOf(item.barcodes).some(({ barcode }) => barcode?.trashClaim === token && trashClaimMayBeLive(barcode))) {
             held = true;
             return;
         }

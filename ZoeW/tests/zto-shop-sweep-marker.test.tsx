@@ -178,7 +178,7 @@ afterEach(() => {
 });
 
 describe('ZTO-M2 ៖ ឧបករណ៍គ្មាន ZTO រង់ចាំការអានបញ្ជីចុះហត្ថលេខារបស់ឧបករណ៍ ZTO ក្នុងហាងដដែល', () => {
-    it('A (ZTO) អានពេញលេញមុនកញ្ចប់ផុតកំណត់ ➜ B (គ្មាន ZTO) មិនដកលុយ · A អានម្តងទៀតក្រោយផុតកំណត់ (មិនចុះហត្ថលេខា) ➜ B ដកធម្មតា', async () => {
+    it('A (ZTO) អានពេញលេញមុនកញ្ចប់ផុតកំណត់ ➜ B (គ្មាន ZTO) មិនដកលុយ · A អានម្តងទៀតក្រោយផុតកំណត់ ➜ B រង់ចាំពិដានដដែល', async () => {
         dataState.scanHistory = [openItem('x', 'ZTM2000001', 7 * DAY - 10 * MIN)];
         attach();
         deliver(PATH);
@@ -193,7 +193,9 @@ describe('ZTO-M2 ៖ ឧបករណ៍គ្មាន ZTO រង់ចាំក
         expect(shared.completeAt, 'ការអានក្រោយផុតកំណត់ ➜ completeAt ថ្មី').toBe(NOW + 20 * MIN);
         asDeviceB();
         await cleanupNow();
-        expect(abandoned('x'), 'ការអានគ្រប ➜ B ដកធម្មតា (កញ្ចប់មិនចុះហត្ថលេខា)').toBe(true);
+        expect(abandoned('x'), 'ត្រារួមមិនបញ្ជាក់ព្រំពេល ➜ B នៅរង់ចាំ').toBe(false);
+        for (let i = 0; i <= HOLD_MAX / MIN; i++) { advance(MIN); await cleanupNow(); }
+        expect(abandoned('x'), 'ហួសពិដានដដែល ➜ B ដកធម្មតា').toBe(true);
     });
 
     it('A រកឃើញក្នុងបញ្ជីចុះហត្ថលេខា ➜ បិទ «យករួច» ➜ B មិនដែលដកលុយ', async () => {
@@ -244,7 +246,7 @@ describe('ZTO-M2 ៖ ឧបករណ៍គ្មាន ZTO រង់ចាំក
         expect(abandoned('f'), '⛔ B មិនដកលុយកញ្ចប់ដែល ZTO ចុះហត្ថលេខា ខណៈ A សាកបិទម្តងទៀត').toBe(false);
     });
 
-    it('វគ្គរង់ចាំថ្មីក្រោយ completeAt ឡើង ៖ កញ្ចប់ដែលទុំបន្ទាប់បានរង់ចាំពេញពិដាន', async () => {
+    it('completeAt រួមកើនមិនបន្តវគ្គរង់ចាំ ៖ រក្សាពិដានដើម', async () => {
         dataState.scanHistory = [openItem('x', 'ZTM2000013', 7 * DAY - 10 * MIN), openItem('y', 'ZTM2000014', 7 * DAY - 32 * MIN)];
         attach();
         deliver(PATH);
@@ -265,9 +267,13 @@ describe('ZTO-M2 ៖ ឧបករណ៍គ្មាន ZTO រង់ចាំក
         queueDelivery = false;
         deliver(PATH);
         await cleanupNow();
-        expect(abandoned('x'), 'ការអានគ្រប x ➜ ដក').toBe(true);
+        expect(abandoned('x'), 'ត្រារួមមិនបញ្ចប់វគ្គមុនពិដាន').toBe(false);
+        expect(ztoState.ztoAbandonHoldSince).toBe(since);
         for (let i = 0; i < 16; i++) { advance(MIN); await cleanupNow(); }
-        expect(abandoned('y'), '⛔ y (ទុំក្រោយការអាន) បានវគ្គរង់ចាំថ្មី មិនមែនសល់ពីវគ្គចាស់').toBe(false);
+        expect(abandoned('x'), 'ហួសពិដានដើម ➜ x ដក').toBe(true);
+        expect(abandoned('y'), '⛔ y ទើបទុំ ត្រូវរង់ចាំពេញពិដានផ្ទាល់ខ្លួន').toBe(false);
+        for (let i = 0; i <= HOLD_MAX / MIN; i++) { advance(MIN); await cleanupNow(); }
+        expect(abandoned('y'), 'y ហួសពិដានផ្ទាល់ខ្លួន ➜ ដកធម្មតា').toBe(true);
     });
 
     it('ទិសផ្ទុយ ៖ ហាងគ្មានឧបករណ៍ ZTO (គ្មានសញ្ញា) ➜ B ដកភ្លាម', async () => {
@@ -507,3 +513,5 @@ describe('ZTO-M2 ៖ ឧបករណ៍ ZTO សរសេរសញ្ញាហា
         expect(updates.filter((u) => u.path === PATH).length).toBe(0);
     });
 });
+
+beforeEach(() => { firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live'; });

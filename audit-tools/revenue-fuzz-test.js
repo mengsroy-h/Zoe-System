@@ -48,7 +48,7 @@ const LICENSE_STUB = `window.ZoeLicense = {
     setServerTimeOffset: function () {}, syncServerTime: function () { return Promise.resolve(); },
     activate: function () { return Promise.resolve({ ok: true }); },
     verifyKeyString: function () { return Promise.resolve({ ok: true }); }, clearActivation: function () {}
-};`;
+};` + require('./browser-clock-fixture.cjs').CLOCK_FIXTURE;
 
 const BOOT = function (seed) {
     const store = JSON.parse(JSON.stringify(seed));

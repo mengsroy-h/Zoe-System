@@ -86,8 +86,9 @@ function build(options) {
     // ថ្ងៃផុតកំណត់លើ Server ៖ Extend សរសេរតាម transaction លើ `expiresAt` (CAS) ➜ fake ផ្ញើតម្លៃថ្មីតាម `fb.update` របស់ scenario (ពេលឆ្លើយ · ព្យួរ · បដិសេធ)
     const keyServer = { 'license_keys/ADM/key-a/expiresAt': 1000, 'license_keys/ADM/key-b/expiresAt': 1000 };
     const license = {
+        getTrustedServerNow: () => 1000, getServerTimeGeneration: () => 1, resetServerTime() {},
         generateKeyPair: () => Promise.resolve({ publicKeyJwk: { kty: 'EC', x: 'pub' }, privateKeyJwk: { kty: 'EC', crv: 'P-256', d: 'private' } }),
-        signNewKey: () => Promise.resolve({ keyString: 'signed-key', payload: { id: 'key-1' } }),
+        signNewKey: () => Promise.resolve({ keyString: 'signed-key', payload: { id: 'key-1', iat: 1, exp: 2592001 } }),
         verifyKeyString: () => Promise.resolve({ valid: true })
     };
     const sandbox = {
@@ -103,7 +104,7 @@ function build(options) {
         TextEncoder,
         TextDecoder,
         Math,
-        Date,
+        Date, performance: { now: () => Date.now() },
         setTimeout,
         clearTimeout,
         confirm: () => true,
@@ -195,6 +196,7 @@ function build(options) {
     const keyErrDecl = (src.match(/^const SIGNING_KEY_TEXT_ERRORS = \{[\s\S]*?\n\};$/m) || [])[0];
     if (keyTextDecl && keyErrDecl) vm.runInContext(keyTextDecl + '\n' + keyErrDecl, ctx);
     vm.runInContext(slice([
+        ...['keygenIdleStamp', 'keygenIdleElapsed', 'getTrustedServerNow', 'captureKeygenClock', 'keygenClockIsCurrent'].filter(name => src.includes('function ' + name + '(')),
         'safeStoreSet', 'safeStoreGet', 'safeStoreRemove',
         'safeStoreRemove',
         'invalidateSensitiveSession',
@@ -466,6 +468,7 @@ function releaseRestFixture(options) {
     h.ctx.db = { app: { options: { databaseURL: 'https://' + RELEASE_DB_HOST + '/' } } };
     h.ctx.appLocalStore = { getItem: (k) => (k === 'zoew_firebase_config' ? JSON.stringify({ databaseURL: 'https://kg-live-config.firebaseio.com' }) : null) };
     h.ctx.getServerNow = () => o.sentAt;
+    h.license.getTrustedServerNow = () => o.synced ? o.sentAt : null;
     vm.runInContext('var serverTimeSynced = ' + (o.synced ? 'true' : 'false') + ';', h.ctx);
     const tokens = [];
     h.ctx.auth.currentUser.getIdToken = () => { tokens.push(h.ctx.auth.currentUser.uid); return o.token ? o.token.promise : Promise.resolve('admin-id-token'); };
@@ -815,10 +818,10 @@ async function run() {
         if (stage === 'write') h.ctx.fb.update = () => pending.promise;
         const oldGenerate = h.ctx.generateLicenseKey();
         await drain();
-        h.license.signNewKey = () => Promise.resolve({ keyString: 'synthetic-new-key', payload: { id: 'synthetic-new-id' } });
+        h.license.signNewKey = () => Promise.resolve({ keyString: 'synthetic-new-key', payload: { id: 'synthetic-new-id', iat: 1, exp: 2592001 } });
         h.getElementById('privateKeyInput').value = JSON.stringify(reloadKey);
         await h.ctx.loadSigningKey();
-        pending.resolve(stage === 'clock' ? true : { keyString: 'synthetic-old-key', payload: { id: 'synthetic-old-id' } });
+        pending.resolve(stage === 'clock' ? true : { keyString: 'synthetic-old-key', payload: { id: 'synthetic-old-id', iat: 1, exp: 2592001 } });
         await oldGenerate;
         ok(stage + '៖ Load Key ឡើងវិញមិនទុកសោ Generate ជាប់',
             h.ctx.isGeneratingKey === false && !h.getElementById('genGenerateBtn').disabled);
@@ -877,7 +880,7 @@ async function run() {
             { lastGeneratedKey: h.ctx.lastGeneratedKey, shown: h.getElementById('genResultKey').textContent });
         h.ctx.fb.update = () => { h.log.updates++; return Promise.resolve(); };
         h.ctx.waitForServerTimeSync = () => Promise.resolve(true);
-        h.license.signNewKey = () => Promise.resolve({ keyString: 'synthetic-after-pin', payload: { id: 'synthetic-after-pin-id' } });
+        h.license.signNewKey = () => Promise.resolve({ keyString: 'synthetic-after-pin', payload: { id: 'synthetic-after-pin-id', iat: 1, exp: 2592001 } });
         await h.ctx.generateLicenseKey();
         ok(stage + ' ៖ Generate បន្ទាប់បង្ហាញ Key បាន', h.ctx.lastGeneratedKey === 'synthetic-after-pin', h.ctx.lastGeneratedKey);
     }
@@ -1074,7 +1077,7 @@ async function run() {
         if (newer === 'written') {
             h.ctx.fb.update = () => { h.log.updates++; return Promise.resolve(); };
             h.ctx.withTimeout = (promise) => promise;
-            h.license.signNewKey = () => Promise.resolve({ keyString: 'synthetic-newer-key', payload: { id: 'synthetic-newer-id' } });
+            h.license.signNewKey = () => Promise.resolve({ keyString: 'synthetic-newer-key', payload: { id: 'synthetic-newer-id', iat: 1, exp: 2592001 } });
             await h.ctx.generateLicenseKey();
             ok(label + ' ៖ លក្ខខណ្ឌចាំបាច់ — Generate ថ្មីបង្ហាញ Key ថ្មី', h.ctx.lastGeneratedKey === 'synthetic-newer-key', h.ctx.lastGeneratedKey);
         } else if (newer !== 'none') {
@@ -1388,13 +1391,14 @@ async function run() {
         const f = build({ privateKey: { kty: 'EC', crv: 'P-256', d: 'idle-private', x: 'x', y: 'y' } });
         f.clock = { now: 1700000000000 };
         f.ctx.Date = class extends Date { static now() { return f.clock.now; } };
+        f.ctx.performance = { now: () => f.clock.now };
         f.ctx.__pinPrompts = 0;
         vm.runInContext(realDecl('SIGNING_KEY_IDLE_MS') + '\nvar signingKeyLastUseAt = 0;', f.ctx);
         vm.runInContext(slice(['elapsedSince', 'noteSigningKeyActivity', 'expireIdleSigningKey', 'requestSessionSigningKeyRestoreIfEligible']), f.ctx);
         f.ctx.isPinFlowPending = () => f.ctx.__pinPrompts > 0;
         f.ctx.requestPinBeforeConfig = () => { f.ctx.__pinPrompts++; };
         f.storage.set('zoekeygen_signing_key_enc', '{"iv":[1],"data":[2]}');
-        vm.runInContext('signingKeyLastUseAt = Date.now();', f.ctx);
+        vm.runInContext('signingKeyLastUseAt = keygenIdleStamp();', f.ctx);
         return f;
     }
     const idleMs = vm.runInNewContext(realDecl('SIGNING_KEY_IDLE_MS').replace(/^const /, 'var ') + '; SIGNING_KEY_IDLE_MS');
@@ -1442,7 +1446,7 @@ async function run() {
     idle.clock.now += idleMs - 1000;
     idle.ctx.noteSigningKeyActivity();
     ok('ទិសផ្ទុយ ៖ ចុច/វាយមុនដល់ពិដាន ➜ Key នៅ · ត្រាសកម្មភាព = ឥឡូវ',
-        vm.runInContext('!!signingPrivateKeyJwk && signingKeyLastUseAt === Date.now()', idle.ctx) && !idle.log.toasts.length, idle.log.toasts);
+        vm.runInContext('!!signingPrivateKeyJwk && signingKeyLastUseAt.wall === Date.now()', idle.ctx) && !idle.log.toasts.length, idle.log.toasts);
     idle = build();
     vm.runInContext(realDecl('SIGNING_KEY_IDLE_MS') + '\nvar signingKeyLastUseAt = 5;', idle.ctx);
     vm.runInContext(slice(['clearSigningKey']), idle.ctx);
@@ -1453,7 +1457,7 @@ async function run() {
     idle.getElementById('privateKeyInput').value = JSON.stringify({ kty: 'EC', crv: 'P-256', d: 'fresh', x: 'x', y: 'y' });
     await idle.ctx.loadSigningKey();
     await drain();
-    ok('Load Signing Key ➜ ចាប់ផ្តើមនាឡិកាទុកចោល (ត្រា > 0)', vm.runInContext('!!signingPrivateKeyJwk && signingKeyLastUseAt > 0', idle.ctx));
+    ok('Load Signing Key ➜ ចាប់ផ្តើមនាឡិកាទុកចោល (ត្រា > 0)', vm.runInContext('!!signingPrivateKeyJwk && signingKeyLastUseAt.wall > 0', idle.ctx));
     const bootBlock = src.slice(src.indexOf("document.addEventListener('DOMContentLoaded'"));
     ok('⛔ ខ្សែភ្ជាប់ ៖ DOMContentLoaded ចង pointerdown/keydown ➜ noteSigningKeyActivity · setInterval ➜ expireIdleSigningKey · visibilitychange (មើលឃើញ) ➜ expireIdleSigningKey',
         /addEventListener\('pointerdown', noteSigningKeyActivity/.test(bootBlock) && /addEventListener\('keydown', noteSigningKeyActivity/.test(bootBlock)
@@ -1468,6 +1472,7 @@ async function run() {
         const f = build();
         f.clock = { now: 1700000000000 };
         f.ctx.Date = class extends Date { static now() { return f.clock.now; } };
+        f.ctx.performance = { now: () => f.clock.now };
         f.ctx.__logouts = [];
         f.ctx.__locks = [];
         f.ctx.logoutApp = (auto) => { f.ctx.__logouts.push(auto === true); };
@@ -1475,7 +1480,7 @@ async function run() {
         f.ctx.hasUncopiedKeypair = () => false;
         vm.runInContext(realDecl('KEYGEN_IDLE_LOGOUT_MS') + '\nvar keygenLastActivityAt = 0; authButtonIsLoggedIn = ' + (loggedIn ? 'true' : 'false') + '; isGeneratingKey = false;', f.ctx);
         vm.runInContext(slice(['elapsedSince', 'noteKeygenActivity', 'expireIdleKeygenSession', 'khmerMinutes']), f.ctx);
-        vm.runInContext('keygenLastActivityAt = Date.now();', f.ctx);
+        vm.runInContext('keygenLastActivityAt = keygenIdleStamp();', f.ctx);
         return f;
     }
     const logoutMs = vm.runInNewContext(realDecl('KEYGEN_IDLE_LOGOUT_MS').replace(/^const /, 'var ') + '; KEYGEN_IDLE_LOGOUT_MS');
@@ -1515,13 +1520,13 @@ async function run() {
     il.clock.now += logoutMs - 1000;
     il.ctx.noteKeygenActivity();
     ok('ទិសផ្ទុយ ៖ ចុច/វាយមុនដល់ពិដាន ➜ នៅចូល · ត្រាសកម្មភាព = ឥឡូវ',
-        il.ctx.__logouts.length === 0 && vm.runInContext('keygenLastActivityAt === Date.now()', il.ctx), { logouts: il.ctx.__logouts });
+        il.ctx.__logouts.length === 0 && vm.runInContext('keygenLastActivityAt.wall === Date.now()', il.ctx), { logouts: il.ctx.__logouts });
     ok('⛔ ខ្សែភ្ជាប់ ៖ pointerdown/keydown ➜ noteKeygenActivity · setInterval ➜ expireIdleKeygenSession · visibilitychange ➜ expireIdleKeygenSession',
         /\['pointerdown', 'keydown'\]\.forEach\(\(evt\) => document\.addEventListener\(evt, noteKeygenActivity, \{ capture: true, passive: true \}\)\)/.test(bootBlock)
         && /setInterval\(expireIdleKeygenSession, \d+\)/.test(bootBlock)
         && /'visibilitychange', \(\) => \{\s*if \(document\.hidden\) return;[\s\S]{0,200}expireIdleKeygenSession\(\);/.test(bootBlock));
     ok('⛔ ការចូល (updateAuthButton(true)) ចាប់ផ្តើមនាឡិកាទុកចោល',
-        /function updateAuthButton\(isLoggedIn\) \{[\s\S]*?if \(authButtonIsLoggedIn\) keygenLastActivityAt = Date\.now\(\);/.test(src));
+        /function updateAuthButton\(isLoggedIn\) \{[\s\S]*?if \(authButtonIsLoggedIn\) keygenLastActivityAt = keygenIdleStamp\(\);/.test(src));
     // logoutApp(auto) ៖ auto ➜ មិនសួរ confirm ទោះ Keypair មិនទាន់ចម្លង · ដោយដៃ ➜ សួរ
     const lo = build();
     lo.ctx.__confirms = 0; lo.ctx.__signOuts = 0;
@@ -1575,7 +1580,7 @@ async function run() {
     for (const [label, text] of Object.entries(variants)) {
         const nh = build();
         let signed = null;
-        nh.license.signNewKey = (jwk) => { signed = jwk; return Promise.resolve({ keyString: 'k', payload: { id: 'p' } }); };
+        nh.license.signNewKey = (jwk) => { signed = jwk; return Promise.resolve({ keyString: 'k', payload: { id: 'p', iat: 1, exp: 2592001 } }); };
         nh.getElementById('privateKeyInput').value = text;
         await nh.ctx.loadSigningKey();
         const loaded = vm.runInContext('JSON.stringify(signingPrivateKeyJwk)', nh.ctx);

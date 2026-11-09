@@ -2,6 +2,7 @@
 let failed = 0;const offOrigin=[];let commitGate=null;let collectedWrites=0;
 const fs = require('fs'), path = require('path'), os = require('os'), http = require('http'), assert = require('assert/strict');
 const { pathToFileURL } = require('url');
+const { initializeSdkClock } = require('./sdk-clock-fixture.cjs');
 const ROOT = path.resolve(process.env.SCANSDK_APP_DIR || process.env.ZOE_REPO_ROOT || path.join(__dirname, '../..'));
 const deps = path.join(ROOT, 'ZoeW/node_modules');
 const port = Number(process.env.SCANRULES_EMU_PORT || 9000);
@@ -84,6 +85,7 @@ const bounded = (promise, label) => Promise.race([promise, pause(60000).then(() 
 export { resumePendingScanOperations } from './ZoeW/src/services/scan-operation';
 export { createScanEvidenceJournal } from './ZoeW/src/services/scan-evidence';
 export { pendingScanScope } from './ZoeW/src/services/scan-pending';
+export { acceptServerClockOffset, resetServerClock } from './ZoeW/src/core/clock';
 export { withTransactionOutcomeResolution, txResolvingPaths } from './ZoeW/src/services/tx-outcome';
 export { initDatabaseListeners, anyDbListenerViewIsStale } from './ZoeW/src/services/db-listeners';
 export { dbListenerPendingPaths, dbListenerFailedPaths } from './ZoeW/src/core/text';
@@ -111,6 +113,7 @@ export { ztoState, firebaseState, dataState, uiState } from './ZoeW/src/core/sta
       runTransaction:async(ref,fn,options)=>{try{if(String(ref).includes('/zoew_daily_collected_cod_dod'))collectedWrites++;return await database.runTransaction(ref,fn,options);}catch(e){errors.push({kind:'transaction',path:String(ref),error:String(e)});throw e;}}
     };
     const sdk=api.withTransactionOutcomeResolution(raw);sdk.getAuth(app);sdk.getDatabase(app);Object.assign(api.firebaseState,{fb:sdk,db,auth,firebaseConfig:app.options,isDatabaseInitialized:true,isInitializingFirebase:false,firebaseSdkUnavailable:false,isDatabaseConnected:true,sessionExpiryCheck:'live',authLoginOperation:null});
+    initializeSdkClock(api);
     api.dataState.scanHistory=[];api.dataState.deletedItems=[];api.dataState.dailyRevenueData={};api.dataState.monthlyRevenueData={};api.dataState.dailyPickupData={};api.dataState.dailyCollectedData={};
     for(const [key,root] of [['dbRefHistory',H],['dbRefDeleted','zoew_recently_deleted_cod_dod'],['dbRefDailyRevenue',D],['dbRefMonthlyRevenue',M],['dbRefRegistry',R],['dbRefDailyPickup','zoew_daily_pickup_cod_dod'],['dbRefDailyCollected','zoew_daily_collected_cod_dod']])api.firebaseState[key]=sdk.ref(db,root);
     api.firebaseState.dbLivenessProbe=Promise.resolve(null);
@@ -123,7 +126,6 @@ export { ztoState, firebaseState, dataState, uiState } from './ZoeW/src/core/sta
         localStorage.setItem('zoew_zto_pickup_status_v1',JSON.stringify({[code]:{closed:true,at:now-60000,signedAt:now-3*3600000,signedAtExact:true}}));
         const row={barcode:code,phone:'0910000000',cod:0.1,dod:0.5,at:arrival,ztoClosed:true,skip:'',from:'cn'};
         api.ztoState.ztoListSyncResult={palm:true,verifiedAt:now,verifiedServerAt:now,rows:[row],signedRows:[{...row,at:signed}],from:arrival.slice(0,10),to:localTime(now).slice(0,10),total:1};
-        api.firebaseState.serverClockTrusted=true;
         api.initDatabaseListeners();
         await bounded((async()=>{while(api.anyDbListenerViewIsStale(['history','deleted']))await pause(10);})(),'cleanup-history-ready');
         const held=new Promise(resolve=>commitGate={held:false,resolve});

@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.36';
+const APP_VERSION = '2.24.37';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -97,6 +97,21 @@ function elapsedSince(mark) {
     if (!mark) return Infinity;
     const delta = Date.now() - mark;
     return delta >= 0 ? delta : Infinity;
+}
+
+function keygenIdleStamp() {
+    const wall = Date.now();
+    let mono = NaN;
+    try { mono = performance.now(); } catch (e) {}
+    return { wall: wall, mono: mono };
+}
+
+function keygenIdleElapsed(mark) {
+    if (!mark || !Number.isFinite(mark.wall) || !Number.isFinite(mark.mono)) return Infinity;
+    const now = keygenIdleStamp();
+    const wall = now.wall - mark.wall;
+    const mono = now.mono - mark.mono;
+    return Number.isFinite(wall) && Number.isFinite(mono) && wall >= 0 && mono >= 0 && Math.abs(wall - mono) <= 2000 ? mono : Infinity;
 }
 
 const BOOT_SPLASH_MIN_MS = 380;
@@ -497,27 +512,47 @@ function setupConnectionRecovery() {
 }
 
 function getServerNow() {
-    return Date.now() + serverTimeOffsetMs;
+    return window.ZoeLicense ? window.ZoeLicense.getServerNow() : Date.now() + serverTimeOffsetMs;
+}
+
+function getTrustedServerNow() {
+    if (!window.ZoeLicense || typeof window.ZoeLicense.getTrustedServerNow !== 'function') return null;
+    const now = window.ZoeLicense.getTrustedServerNow();
+    return Number.isFinite(now) && now > 0 ? now : null;
+}
+
+function captureKeygenClock() {
+    const now = getTrustedServerNow();
+    if (now === null) return null;
+    return { now: now, generation: window.ZoeLicense.getServerTimeGeneration() };
+}
+
+function keygenClockIsCurrent(clock) {
+    return !!clock && getTrustedServerNow() !== null && clock.generation === window.ZoeLicense.getServerTimeGeneration();
 }
 
 function waitForServerTimeSync(timeoutMs) {
-    if (serverTimeSynced) return Promise.resolve(true);
+    if (getTrustedServerNow() !== null) return Promise.resolve(true);
+    serverTimeSynced = false;
     return new Promise((resolve) => {
         let settled = false;
         const finish = (result) => {
             if (settled) return;
             settled = true;
             clearTimeout(timer);
-            resolve(result);
+            const index = serverTimeSyncWaiters.indexOf(onSync);
+            if (index !== -1) serverTimeSyncWaiters.splice(index, 1);
+            resolve(result && getTrustedServerNow() !== null);
         };
-        const timer = setTimeout(() => finish(serverTimeSynced), timeoutMs);
-        serverTimeSyncWaiters.push(() => finish(true));
+        const onSync = () => finish(true);
+        const timer = setTimeout(() => finish(true), timeoutMs);
+        serverTimeSyncWaiters.push(onSync);
 
         if (window.ZoeLicense) {
             window.ZoeLicense.syncServerTime().then((ok) => {
-                if (settled || serverTimeSynced || !ok) return;
+                if (settled || !ok) return;
                 const offset = window.ZoeLicense.getServerTimeOffset();
-                if (typeof offset === 'number') {
+                if (Number.isFinite(offset)) {
                     serverTimeOffsetMs = offset;
                     serverTimeSynced = true;
                     finish(true);
@@ -876,12 +911,13 @@ function attachInfoListeners() {
         if (listenerGeneration !== infoListenerGeneration) return;
         noteInfoListenerAlive(INFO_LISTENER_KEY_OFFSET);
         const val = snap.val();
-        if (typeof val !== 'number') return;
-        serverTimeOffsetMs = val;
-        if (!serverClockOffsetIsFromServer(val)) return;
-        serverTimeSynced = true;
-        if (window.ZoeLicense) window.ZoeLicense.setServerTimeOffset(val);
-        serverTimeSyncWaiters.splice(0).forEach((fn) => fn());
+        if (!Number.isFinite(val) || !serverClockOffsetIsFromServer(val) || !window.ZoeLicense) return;
+        window.ZoeLicense.syncServerTime().then((ok) => {
+            if (!ok || listenerGeneration !== infoListenerGeneration || getTrustedServerNow() === null) return;
+            serverTimeOffsetMs = window.ZoeLicense.getServerTimeOffset();
+            serverTimeSynced = true;
+            serverTimeSyncWaiters.splice(0).forEach((fn) => fn());
+        }).catch(() => {});
     }, (err) => {
         if (listenerGeneration !== infoListenerGeneration) return;
         handleInfoListenerError(err, INFO_LISTENER_KEY_OFFSET);
@@ -921,6 +957,7 @@ async function initFirebase() {
             }
             serverTimeSynced = false;
             serverTimeOffsetMs = 0;
+            if (window.ZoeLicense) window.ZoeLicense.resetServerTime();
             isDatabaseConnected = false;
             hasEverConnectedToDatabase = false;
             networkJustReturned = false;
@@ -1291,7 +1328,7 @@ async function tryRestoreSigningKeyFromSession() {
         await validateSigningKeyAgainstShippedPublicKey(restoredKeyJwk);
         if (!isSensitiveSessionCurrent(operation, true) || signingKeySessionKey !== sessionKey) return;
         signingPrivateKeyJwk = restoredKeyJwk;
-        signingKeyLastUseAt = Date.now();
+        signingKeyLastUseAt = keygenIdleStamp();
         updateSigningKeyBadge();
         const cb = document.getElementById('rememberSigningKeyCheckbox');
         if (cb) cb.checked = true;
@@ -1996,7 +2033,7 @@ function updateAuthButton(isLoggedIn) {
     const btn = document.getElementById('navAuthBtn');
     if (!btn) return;
     btn.textContent = authButtonIsLoggedIn ? '🚪 ចាកចេញ' : '🔑 ចូល';
-    if (authButtonIsLoggedIn) keygenLastActivityAt = Date.now();
+    if (authButtonIsLoggedIn) keygenLastActivityAt = keygenIdleStamp();
     refreshKgStatus();
 }
 
@@ -2006,12 +2043,12 @@ let signingKeyLastUseAt = 0;
 
 function noteSigningKeyActivity() {
     if (!signingPrivateKeyJwk || expireIdleSigningKey()) return;
-    signingKeyLastUseAt = Date.now();
+    signingKeyLastUseAt = keygenIdleStamp();
 }
 
 function expireIdleSigningKey() {
     if (!signingPrivateKeyJwk || isGeneratingKey) return false;
-    if (elapsedSince(signingKeyLastUseAt) < SIGNING_KEY_IDLE_MS) return false;
+    if (keygenIdleElapsed(signingKeyLastUseAt) < SIGNING_KEY_IDLE_MS) return false;
     invalidateSensitiveSession();
     signingPrivateKeyJwk = null;
     signingKeySessionKey = null;
@@ -2091,7 +2128,7 @@ async function loadSigningKey(event) {
         await validateSigningKeyAgainstShippedPublicKey(jwk);
         if (!isSensitiveSessionCurrent(operation, true)) return;
         signingPrivateKeyJwk = jwk;
-        signingKeyLastUseAt = Date.now();
+        signingKeyLastUseAt = keygenIdleStamp();
         if (input) input.value = '';
         updateSigningKeyBadge();
         showToast('✅ Signing Key ត្រូវបាន Load ដោយជោគជ័យ!');
@@ -2228,7 +2265,8 @@ async function generateLicenseKey() {
     if (!db || !operation) { alert('សូមចូលប្រព័ន្ធ និងភ្ជាប់ Firebase សិន!'); return; }
     const operationDb = db;
     const generateIsCurrent = () => adminOperationIsCurrent(operation) && db === operationDb && signingPrivateKeyJwk === privateKeyJwk;
-    const generateWrite = (run) => () => (generateIsCurrent() ? run() : Promise.reject(Object.assign(new Error('Generate key session changed'), { noRetry: true })));
+    let clock = null;
+    const generateWrite = (run) => () => (generateIsCurrent() && keygenClockIsCurrent(clock) ? run() : Promise.reject(Object.assign(new Error('Generate key session or clock changed'), { noRetry: true, code: 'clock-unverified' })));
 
     const appSelect = LICENSE_APP_CODE;
     const days = parseFloat(document.getElementById('genDaysInput').value) || 0;
@@ -2248,23 +2286,25 @@ async function generateLicenseKey() {
     try {
         const timeSynced = await waitForServerTimeSync(15000);
         if (!generateIsCurrent()) return;
-        if (!timeSynced) {
+        clock = captureKeygenClock();
+        if (!timeSynced || !clock) {
             alert('មិនអាចផ្ទៀងផ្ទាត់ម៉ោង Server បានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត (ដើម្បីកុំឲ្យថ្ងៃចេញ/ផុតកំណត់របស់ Key ខុសពីម៉ោងម៉ាស៊ីនរបស់អ្នក)។');
             return;
         }
         if (genBtn) genBtn.textContent = 'កំពុងបង្កើត...';
 
-        const { keyString, payload } = await window.ZoeLicense.signNewKey(privateKeyJwk, { appCode: appSelect, days: days });
+        const { keyString, payload } = await window.ZoeLicense.signNewKey(privateKeyJwk, { appCode: appSelect, days: days, issuedAt: clock.now });
         if (!generateIsCurrent()) return;
+        if (!keygenClockIsCurrent(clock)) throw Object.assign(new Error('Generate key clock changed'), { code: 'clock-unverified' });
 
         const targetPaths = [appSelect];
         const publicRecord = {
-            expiresAt: getServerNow() + Math.round(days * 86400000),
+            expiresAt: payload.exp * 1000,
             revoked: false,
             maxDevices: maxDevices
         };
         const metaRecord = {
-            issuedAt: getServerNow(),
+            issuedAt: payload.iat * 1000,
             scope: appSelect,
             note: note || '',
             createdBy: operation.user.email || operation.user.uid
@@ -2338,6 +2378,10 @@ async function generateLicenseKey() {
         refreshKeyList();
     } catch (e) {
         if (!generateIsCurrent()) return;
+        if (e && e.code === 'clock-unverified') {
+            alert('មិនអាចផ្ទៀងផ្ទាត់ម៉ោង Server បានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត។');
+            return;
+        }
         console.error(e);
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'generateLicenseKey' });
         alert(e && e.message === 'Generate key timed out'
@@ -2733,7 +2777,7 @@ function seatDeviceLabel(d) {
     if (d.meta && d.meta.model) parts.push(d.meta.model);
     if (d.meta && d.meta.platform) parts.push(d.meta.platform);
     parts.push(d.meta && d.meta.serial ? 'Serial ' + d.meta.serial : 'ID ' + d.device.slice(0, 6) + '…');
-    parts.push('ចងនៅ ' + (d.at > 0 ? new Date(d.at).toLocaleDateString('km-KH') : '-'));
+    parts.push('ចងនៅ ' + (d.at > 0 ? new Date(d.at).toLocaleDateString('km-KH', { timeZone: 'Asia/Phnom_Penh' }) : '-'));
     return d.slot + ' · ' + parts.join(' · ');
 }
 function seatDevicesOf(node, limit) {
@@ -2843,7 +2887,7 @@ function renderKeyList() {
         else if (row.expiresAt && now > row.expiresAt) statusHtml = '<span class="badge badge-expired">ផុតកំណត់</span>';
         else statusHtml = '<span class="badge badge-active">Active</span>';
 
-        const expStr = row.expiresAt ? new Date(row.expiresAt).toLocaleDateString('km-KH') : '-';
+        const expStr = row.expiresAt ? new Date(row.expiresAt).toLocaleDateString('km-KH', { timeZone: 'Asia/Phnom_Penh' }) : '-';
 
         let seatHtml;
         if (seatReadFailed) {
@@ -2859,7 +2903,7 @@ function renderKeyList() {
         if (row.inconsistent) {
             const perAppText = row.paths.map((p) => (APP_LABELS[p] || p) + ' = '
                 + (row.perApp[p].revoked ? 'Revoked' : 'Active') + ', ផុតកំណត់ '
-                + (row.perApp[p].expiresAt ? new Date(row.perApp[p].expiresAt).toLocaleDateString('km-KH') : '-')).join(' · ');
+                + (row.perApp[p].expiresAt ? new Date(row.perApp[p].expiresAt).toLocaleDateString('km-KH', { timeZone: 'Asia/Phnom_Penh' }) : '-')).join(' · ');
             statusHtml += ` <span class="badge badge-revoked" title="${escapeHtml('ស្ថានភាពមិនដូចគ្នារវាង App (ការធ្វើបច្ចុប្បន្នភាពមុនជោគជ័យមិនពេញលេញ)៖ ' + perAppText)}">⚠️ មិនត្រូវគ្នា</span>`;
         }
 
@@ -2998,7 +3042,8 @@ async function releaseKeySeat(id) {
         let sent;
         let stampRefused = false;
         try {
-            const sentAt = serverTimeSynced ? getServerNow() : NaN;
+            const clock = captureKeygenClock();
+            const sentAt = clock ? clock.now : NaN;
             sent = await patchLicenseViaRest(operation, operationDb, release, isCurrent);
             if (sent.outcome === 'refused') {
                 stampRefused = true;
@@ -3010,7 +3055,7 @@ async function releaseKeySeat(id) {
                 if (!isCurrent()) return;
                 const shownAt = (p) => (row.perApp && row.perApp[p] ? row.perApp[p].releasedAt : undefined);
                 if (nodes && nodes.every((n) => n.seats === null && (stampRefused
-                    || (typeof n.releasedAt === 'number' && n.releasedAt >= sentAt && n.releasedAt !== shownAt(n.path))))) sent = { outcome: 'applied' };
+                    || (keygenClockIsCurrent(clock) && typeof n.releasedAt === 'number' && n.releasedAt >= sentAt && n.releasedAt !== shownAt(n.path))))) sent = { outcome: 'applied' };
             }
         } catch (e) {
             if (!isCurrent()) return;
@@ -3125,17 +3170,20 @@ async function confirmExtendKey() {
         if (isNaN(days) || days <= 0) { alert('សុពលភាពត្រូវធំជាង 0 ថ្ងៃ!'); return; }
         const timeSynced = await waitForServerTimeSync(15000);
         if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
-        if (!timeSynced) {
+        const clock = captureKeygenClock();
+        if (!timeSynced || !clock) {
             alert('មិនអាចផ្ទៀងផ្ទាត់ម៉ោង Server បានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត។');
             return;
         }
         const addMs = Math.round(days * 86400000);
-        const from = getServerNow();
+        const from = clock.now;
         const isCurrent = () => adminOperationIsCurrent(operation) && db === operationDb;
         const extendPath = (p) => {
+            if (!isCurrent() || !keygenClockIsCurrent(clock)) return Promise.reject(Object.assign(new Error('Extend clock changed'), { extendOutcome: 'clock' }));
             const shown = row.perApp && row.perApp[p] ? row.perApp[p].expiresAt : undefined;
             let outcome = 'missing';
             return fb.runTransaction(fb.ref(operationDb, `license_keys/${p}/${targetId}/expiresAt`), (current) => {
+                if (!isCurrent() || !keygenClockIsCurrent(clock)) { outcome = 'clock'; return; }
                 if (current === null || current === undefined) { outcome = 'missing'; return null; }
                 if (typeof current !== 'number' || current !== shown) { outcome = 'changed'; return; }
                 outcome = 'extended';
@@ -3164,9 +3212,11 @@ async function confirmExtendKey() {
             const outcomes = results.map((r) => (r.status === 'rejected' && r.reason ? r.reason.extendOutcome : ''));
             if (failedPaths.length === 0) {
                 const until = Math.max.apply(null, results.map((r) => r.value));
-                showToast('✅ បានបន្ថែមសុពលភាពរួចរាល់! ផុតកំណត់ ៖ ' + new Date(until).toLocaleDateString('km-KH'));
+                showToast('✅ បានបន្ថែមសុពលភាពរួចរាល់! ផុតកំណត់ ៖ ' + new Date(until).toLocaleDateString('km-KH', { timeZone: 'Asia/Phnom_Penh' }));
             } else if (outcomes.some((o) => o === 'unknown')) {
                 alert(ADMIN_WRITE_PENDING_TEXT);
+            } else if (outcomes.some((o) => o === 'clock')) {
+                alert('មិនអាចផ្ទៀងផ្ទាត់ម៉ោង Server បានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត។');
             } else if (outcomes.some((o) => o === 'changed')) {
                 alert('⚠️ ថ្ងៃផុតកំណត់របស់ Key នេះត្រូវបានកែពីឧបករណ៍ផ្សេង — បញ្ជីត្រូវបានធ្វើឲ្យស្រស់ សូមពិនិត្យថ្ងៃផុតកំណត់ ហើយបន្ថែមម្តងទៀត។'
                     + (failedPaths.length < row.paths.length ? ' (App ដែលនៅខ្វះ ៖ ' + failedPaths.join(', ') + ')' : ''));
@@ -3326,7 +3376,7 @@ function renderNoticeList() {
             </div>
             ${row.body ? `<div class="notice-body">${escapeHtml(row.body)}</div>` : ''}
             <div class="notice-meta">
-                <span>${escapeHtml(row.at > 0 ? new Date(row.at).toLocaleString('km-KH') : '-')}</span>
+                <span>${escapeHtml(row.at > 0 ? new Date(row.at).toLocaleString('km-KH', { timeZone: 'Asia/Phnom_Penh' }) : '-')}</span>
                 <button class="btn-mini" data-notice-id="${escapeHtml(row.id)}" data-action="delete-notice">🗑️ លុប</button>
             </div>
         </li>`).join('');
@@ -3345,23 +3395,33 @@ async function sendNotice() {
     if (!confirm('ផ្ញើដំណឹងនេះទៅ ZoeW គ្រប់ឧបករណ៍?\n\n' + NOTICE_KIND_LABELS[built.payload.kind] + ' ៖ ' + built.payload.title)) return;
     if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
     const bucket = noticeBucketPath();
-    const id = newNoticeId(built.payload.at);
     const owner = {};
     noticeSendOwner = owner;
     isSendingNotice = true;
     setNoticeSendBusy(true);
     let write = null;
     let writeFailed = false;
+    let writeStarted = false;
     try {
+        const timeSynced = await waitForServerTimeSync(15000);
+        if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
+        const clock = captureKeygenClock();
+        if (!timeSynced || !clock) throw Object.assign(new Error('Notice clock unverified'), { code: 'clock-unverified' });
+        const payload = { ...built.payload, at: Math.floor(clock.now) };
+        const id = newNoticeId(payload.at);
         const snap = await withTimeout(fb.get(fb.ref(operationDb, bucket)), 15000, 'Notice read timed out');
         if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
+        if (!keygenClockIsCurrent(clock)) throw Object.assign(new Error('Notice clock changed'), { code: 'clock-unverified' });
         const updates = {};
         noticeIdsToTrim(snap.exists() ? Object.keys(snap.val() || {}) : [], NOTICE_KEEP_MAX)
             .forEach((oldId) => { updates[bucket + '/' + oldId] = null; });
-        updates[bucket + '/' + id] = built.payload;
-        write = retryAsync(() => adminOperationIsCurrent(operation) && db === operationDb
-            ? fb.update(fb.ref(operationDb), updates)
-            : Promise.reject(Object.assign(new Error('Notice send session changed'), { noRetry: true })), 3, 1000);
+        updates[bucket + '/' + id] = payload;
+        write = retryAsync(() => {
+            if (!adminOperationIsCurrent(operation) || db !== operationDb) return Promise.reject(Object.assign(new Error('Notice send session changed'), { noRetry: true }));
+            if (!keygenClockIsCurrent(clock)) return Promise.reject(Object.assign(new Error('Notice clock changed'), { noRetry: true, code: 'clock-unverified' }));
+            writeStarted = true;
+            return fb.update(fb.ref(operationDb), updates);
+        }, 3, 1000);
         write.catch(() => { writeFailed = true; });
         await withTimeout(write, 15000, 'Notice send timed out');
         if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
@@ -3372,6 +3432,12 @@ async function sendNotice() {
         refreshNoticeList();
     } catch (e) {
         if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
+        if (e && e.code === 'clock-unverified') {
+            alert(writeStarted
+                ? '⏳ ការផ្ញើមិនទាន់បញ្ជាក់ទេ។ ម៉ោង Server ត្រូវការផ្ទៀងផ្ទាត់ឡើងវិញ។ សូមចុច 🔄 Refresh មើលបញ្ជី មុនផ្ញើម្តងទៀត។'
+                : 'មិនអាចផ្ទៀងផ្ទាត់ម៉ោង Server បានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត។');
+            return;
+        }
         console.error(e);
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'sendNotice' });
         if (write && !writeFailed) {
@@ -3591,7 +3657,7 @@ async function sbAdminLogin(event) {
             return;
         }
         sbAdminSession = session;
-        sbAdminLastUseAt = Date.now();
+        sbAdminLastUseAt = keygenIdleStamp();
         refreshKgStatus();
         const panel = document.getElementById('sbAdminPanel');
         if (panel) panel.classList.remove('hidden');
@@ -3670,7 +3736,7 @@ function sbAdminRevoke(session) {
 function expireIdleSbAdmin() {
     const session = sbAdminSession;
     if (!session || sbAdminBusy) return false;
-    if (elapsedSince(sbAdminLastUseAt) < SB_ADMIN_IDLE_MS) return false;
+    if (keygenIdleElapsed(sbAdminLastUseAt) < SB_ADMIN_IDLE_MS) return false;
     sbAdminReset(false);
     sbAdminRevoke(session);
     showToast('🔒 ចាកចេញពី Supabase Admin ក្រោយមិនប្រើ ១៥ នាទី — សូមចូលម្តងទៀត');
@@ -3679,7 +3745,7 @@ function expireIdleSbAdmin() {
 
 function sbAdminActivity() {
     if (!sbAdminSession || expireIdleSbAdmin()) return;
-    sbAdminLastUseAt = Date.now();
+    sbAdminLastUseAt = keygenIdleStamp();
 }
 
 function sbAdminLogout() {
@@ -3741,7 +3807,7 @@ function sbDeviceLabel(d) {
     const member = sbMemberCache.find((m) => m.user_id && m.user_id === d.user_id);
     if (member) parts.push(member.username);
     const seen = Date.parse(String(d.last_seen || ''));
-    parts.push('ប្រើចុងក្រោយ ' + (isFinite(seen) ? new Date(seen).toLocaleDateString('km-KH') : '-'));
+    parts.push('ប្រើចុងក្រោយ ' + (isFinite(seen) ? new Date(seen).toLocaleDateString('km-KH', { timeZone: 'Asia/Phnom_Penh' }) : '-'));
     return parts.join(' · ');
 }
 
@@ -3805,7 +3871,7 @@ function renderSbTenantList() {
                 + '<button class="btn-mini" data-tenant-id="' + escapeHtml(row.id) + '" data-username="' + escapeHtml(m.username) + '" data-action="sb-remove-member">ដកចេញពីហាង</button>').join('') || '-');
         const sbDevicesCell = sbDevicesHtml(row.id);
         const until = Date.parse(String(row.expires_at || ''));
-        const untilText = isFinite(until) ? new Date(until).toLocaleDateString('km-KH') : '-';
+        const untilText = isFinite(until) ? new Date(until).toLocaleDateString('km-KH', { timeZone: 'Asia/Phnom_Penh' }) : '-';
         return `<tr>
             <td>${escapeHtml(row.name)}</td>
             <td>${escapeHtml(row.branch_code)}</td>
@@ -3869,7 +3935,7 @@ async function sbIssueInvite(session, tenant, role) {
         link: sbInviteSetupLink(session, row.code),
         role: role,
         tenantName: String(tenant.name || ''),
-        untilText: isFinite(until) ? new Date(until).toLocaleString('km-KH') : '-'
+        untilText: isFinite(until) ? new Date(until).toLocaleString('km-KH', { timeZone: 'Asia/Phnom_Penh' }) : '-'
     };
     renderSbInviteResult();
     return true;
@@ -3890,8 +3956,15 @@ async function sbCreateTenant() {
     setSbAdminBusy(true);
     const generation = sbAdminGeneration;
     try {
+        const timeSynced = await waitForServerTimeSync(15000);
+        if (!sbAdminIsCurrent(session)) return;
+        const clock = captureKeygenClock();
+        if (!timeSynced || !clock) {
+            alert('មិនអាចផ្ទៀងផ្ទាត់ម៉ោង Server បានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត។');
+            return;
+        }
         const created = await sbAdminRpc(session, 'admin_create_tenant', {
-            p_name: name, p_branch_code: branch, p_expires_at: new Date(getServerNow() + days * 86400000).toISOString()
+            p_name: name, p_branch_code: branch, p_expires_at: new Date(clock.now + days * 86400000).toISOString()
         });
         if (!sbAdminIsCurrent(session)) return;
         if (!created.ok || !created.body || typeof created.body.id !== 'string') { alert('បង្កើតហាងមិនបាន ៖ ' + sbAdminErrorText(created)); return; }
@@ -4107,12 +4180,12 @@ let kgNextTarget = null;
 
 function noteKeygenActivity() {
     if (!authButtonIsLoggedIn || expireIdleKeygenSession()) return;
-    keygenLastActivityAt = Date.now();
+    keygenLastActivityAt = keygenIdleStamp();
 }
 
 function expireIdleKeygenSession() {
     if (!authButtonIsLoggedIn || isGeneratingKey || hasUncopiedKeypair()) return false;
-    if (elapsedSince(keygenLastActivityAt) < KEYGEN_IDLE_LOGOUT_MS) return false;
+    if (keygenIdleElapsed(keygenLastActivityAt) < KEYGEN_IDLE_LOGOUT_MS) return false;
     keygenLastActivityAt = 0;
     lockKeygenSession(true);
     logoutApp(true);

@@ -10,6 +10,7 @@ import { showLoginModalWithPrefill, clearRememberedSession } from '../src/featur
 
 vi.mock('../src/features/license', () => ({ proceedAfterLogin: vi.fn() }));
 vi.mock('../src/features/session', () => ({
+  armSessionExpiryCheck: vi.fn(() => true),
   showLoginModalWithPrefill: vi.fn(),
   clearRememberedSession: vi.fn(() => appLocalStore.removeItem('remembered_email'))
 }));

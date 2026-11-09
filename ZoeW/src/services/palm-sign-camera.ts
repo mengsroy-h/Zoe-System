@@ -298,6 +298,7 @@ export function palmSignExifShot(exif: PalmSignExif) {
     if (!m) return { lines: [], at: 0 };
     const [year, month, day, hour, minute, second] = m.slice(1).map(Number);
     if (year < 2000 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59 || second > 59) return { lines: [], at: 0 };
+    if (day > new Date(Date.UTC(year, month, 0)).getUTCDate()) return { lines: [], at: 0 };
     const fix = isFinite(exif.lat) && isFinite(exif.lng) ? { lat: exif.lat, lng: exif.lng, at: 0 } : null;
     const zone = /^([+-])(\d{2}):(\d{2})$/.exec(typeof exif.offset === 'string' ? exif.offset : '');
     if (zone) {

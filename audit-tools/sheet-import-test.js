@@ -188,21 +188,24 @@ function serve(dir) {
 }
 
 const LICENSE_STUB = `window.ZoeLicense = {
+    __sheetImportFixture: true,
     getStatus: function () { return Promise.resolve({ state: 'active' }); },
     setServerTimeOffset: function () {},
     syncServerTime: function () { return Promise.resolve(); },
     activate: function () { return Promise.resolve({ ok: true }); },
     verifyKeyString: function () { return Promise.resolve({ ok: true }); },
     clearActivation: function () {}
-};`;
+};` + require('./browser-clock-fixture.cjs').CLOCK_FIXTURE;
 
 const FAKE_SDK = function () {
     const noop = () => {};
+    const authTime = new Date().toISOString();
     window.firebaseSDK = {
         initializeApp: () => ({}),
         getApps: () => [],
         deleteApp: () => Promise.resolve(),
         getAuth: () => ({ currentUser: { uid: 'u1', email: 'a@b.c' } }),
+        getIdTokenResult: () => Promise.resolve({ authTime, claims: {} }),
         onAuthStateChanged: (a, cb) => { setTimeout(() => cb(a.currentUser), 10); return noop; },
         signInWithEmailAndPassword: () => Promise.resolve({ user: { uid: 'u1' } }),
         signOut: () => Promise.resolve(),
@@ -280,7 +283,7 @@ async function withTimeout(promise, ms, label) {
     const server = await serve(APP);
     const port = server.address().port;
     const browser = await chromium.launch({ executablePath: CHROME });
-    const ctx = await browser.newContext({ viewport: { width: 412, height: 880 } });
+    const ctx = await browser.newContext({ viewport: { width: 412, height: 880 }, serviceWorkers: 'block' });
     const page = await ctx.newPage();
 
     const sent = [];
@@ -307,6 +310,13 @@ async function withTimeout(promise, ms, label) {
     async function boot() {
         await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
         await page.waitForTimeout(2200);
+        const state = await page.evaluate(() => ({ fixture: !!(window.ZoeLicense && window.ZoeLicense.__sheetImportFixture === true),
+            sample: !!(window.ZoeLicense && window.ZoeLicense.getServerTimeSample && window.ZoeLicense.getServerTimeSample()),
+            trusted: typeof window.serverClockIsTrustworthy === 'function' && window.serverClockIsTrustworthy(),
+            session: window.sessionExpiryCheck, verifying: !!document.querySelector('[data-session-verification]') }));
+        if (!state.fixture || !state.trusted || state.session !== 'live' || state.verifying) {
+            throw new Error('fixture មិនទាន់ផ្ទៀងផ្ទាត់ក្រោយ reload៖ ' + JSON.stringify(state));
+        }
         await page.evaluate(() => document.querySelectorAll('.modal').forEach((m) => { if (m.id !== 'sheetImportModal') m.style.display = 'none'; }));
     }
     const shown = (id) => page.evaluate((i) => {

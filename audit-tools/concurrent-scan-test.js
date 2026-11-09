@@ -189,9 +189,16 @@ function makeCtx(server, fbSet) {
         reconciliations
     };
     ctx.authGeneration = 0;
+    ctx.serverClockTrusted = true;
+    ctx.serverTimeOffsetMs = 0;
+    ctx.isDatabaseConnected = true;
+    ctx.sessionExpiryCheck = 'live';
+    ctx.navigator = { onLine: true };
     vm.createContext(ctx);
     vm.runInContext(moduleRuntime(ROOT, src, [
         'src/core/storage.ts', 'src/core/shop-scope.ts',
+        { path: 'src/core/clock.ts', expose: ['captureClockOperation', 'serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'getServerClockBounds'] },
+        'src/core/session-verification.ts',
         { path: 'src/services/scan-evidence.ts', expose: ['createScanEvidenceJournal'] },
         'src/services/scan-pending.ts', 'src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts',
         { path: 'src/services/row-operation-lock.ts', expose: ['rowOperationActive'] },
@@ -373,8 +380,26 @@ async function runStorageFailure() {
     ok(ctx.revenue.count === 0 && ctx.reconciliations.length === 0, 'unpersisted scan performs no ledger effect', ctx.revenue);
     ok(server.ord1.barcodes.length === 1 && ctx.scanHistory[0].barcodes.length === 1,
         'unpersisted scan changes neither server nor optimistic barcode list');
+    await runClockControls();
     await runProtocolControls();
     finish();
+}
+
+async function runClockControls() {
+    const rows = {}; seedOrder(rows, ['AAA']);
+    const f = makeFirebase(rows), c = makeCtx(rows, f);
+    c.scanHistory.push(clone(rows.ord1));
+    const before = JSON.stringify(f.store);
+    c.serverClockTrusted = false;
+    let held = false;
+    try { held = await c.addOrUpdateEntry('BBB', '0970003546', 7, 0, 'L1') !== true; }
+    catch (error) { held = error.code === 'clock_uncertain'; }
+    ok(held && JSON.stringify(f.store) === before, 'នាឡិកាមិនទុកចិត្ត៖ ស្កេនគ្មានការសរសេរ');
+    c.serverClockTrusted = true;
+    ok(await c.addOrUpdateEntry('BBB', '0970003546', 7, 0, 'L1') === true,
+        'នាឡិកាត្រឡប់៖ ស្កេនថ្មីដំណើរការ');
+    ok(c.committed().length === 1 && f.store[DAILY]['2026-08-20'].totalCount === 1,
+        'នាឡិកាត្រឡប់៖ receipt និងប្រាក់តែម្តង');
 }
 
 async function runProtocolControls() {

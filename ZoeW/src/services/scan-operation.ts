@@ -7,7 +7,7 @@ import { ledgerLatestMonths, ledgerOpRing, ledgerTokenSeen } from '../domain/led
 import { trashSourceUnconsumed, TRASH_CONSUMPTIONS_ROOT } from '../domain/trash-generation';
 import { collectedDayOfStamp, collectedRetentionCutoffKey, reconcileCollectedHistory } from '../domain/collected';
 import { capturePickupContext, commitPickupMarks, getPickupPhoneKey, pickupBarcodeKey } from '../domain/pickup';
-import { cleanupClockIsTrustworthy, getServerNow } from '../core/clock';
+import { captureClockOperation, cleanupClockIsTrustworthy, getServerClockBounds } from '../core/clock';
 import { barcodeRegistryKey } from '../domain/registry';
 import { SCAN_LEDGER_MAX_MONEY, SCAN_OPERATIONS_ROOT, SCAN_PENDING_ROOT, scanLedgerIncrementSafe, scanOperationSame, scanOperationValid, scanPendingMatches, scanStoredMoney,
     scanRegistryOwned, scanRegistryOwner, type ScanOperation } from '../domain/scan-protocol';
@@ -102,6 +102,10 @@ function operationCurrent(handle: PendingScanHandle, operation: ScanOperation) {
     return !shopScopePending() && pendingScanIsCurrent(handle) && operation.actorUid === firebaseState.auth?.currentUser?.uid && operation.scope === liveShopScope();
 }
 
+function scanMayStartEffect(handle: PendingScanHandle, operation: ScanOperation) {
+    return operationCurrent(handle, operation) && handle.clock?.current() === true;
+}
+
 async function readOperationNode(handle: PendingScanHandle, operation: ScanOperation, path: string) {
     if (!operationCurrent(handle, operation)) throw new Error('Scan operation owner changed');
     const value = await readRestoreServerNode(handle.sdk, handle.db, path);
@@ -190,7 +194,8 @@ async function completeImportCollected(handle: PendingScanHandle, operation: Sca
         const leafHolds = leaf => !!leaf && typeof leaf === 'object' && !Array.isArray(leaf) && Object.keys(leaf).length === 2
             && leaf.c === holder.barcode.cod && leaf.d === holder.barcode.dod;
         const leaf = await readOperationNode(handle, operation, leafPath);
-        if (!leafHolds(leaf) && !(leaf === null && cleanupClockIsTrustworthy() && day < collectedRetentionCutoffKey(getServerNow()))) {
+        const bounds = getServerClockBounds();
+        if (!leafHolds(leaf) && !(leaf === null && cleanupClockIsTrustworthy() && bounds && day < collectedRetentionCutoffKey(bounds.lowerMs))) {
             if (live) return false;
             const healed = await reconcileCollectedHistory(holder.id, [operation.registryKey], undefined, undefined, true, undefined, () => operationCurrent(handle, operation));
             if (healed !== true || !leafHolds(await readOperationNode(handle, operation, leafPath))) return false;
@@ -267,7 +272,7 @@ function validLedgerBucket(value) {
 async function admittedOperation(handle: PendingScanHandle, operation: ScanOperation) {
     const path = SCAN_OPERATIONS_ROOT + '/' + operation.id;
     let saved = await readOperationNode(handle, operation, path);
-    if (saved === null) {
+    if (saved === null && scanMayStartEffect(handle, operation)) {
         const updates = { [path]: operation, [SCAN_PENDING_ROOT + '/' + operation.id]: operation.actorUid };
         try { await handle.sdk.update(handle.sdk.ref(handle.db), updates); } catch (e) {}
         saved = await readOperationNode(handle, operation, path);
@@ -283,9 +288,10 @@ export async function claimScanOperation(handle: PendingScanHandle, code: string
         const operation = await admittedOperation(handle, original);
         if (!operation || operation.phase === 'cancelled') return 'unknown';
         if (operation.phase === 'committed') return 'claimed';
+        if (!scanMayStartEffect(handle, operation)) return 'unknown';
         const ref = handle.sdk.ref(handle.db, 'zoew_barcode_registry/' + operation.registryKey);
         const updater: any = (value) => {
-            if (!operationCurrent(handle, operation)) return;
+            if (!scanMayStartEffect(handle, operation)) return;
             return value === null || scanRegistryOwned(value, operation) ? scanRegistryOwner(operation) : undefined;
         };
         updater.txOutcomeWitness = (value) => scanRegistryOwned(value, operation) ? 'applied' : null;
@@ -335,7 +341,7 @@ export async function cancelScanOperation(handle: PendingScanHandle) {
 
 async function prepareScanMonth(handle: PendingScanHandle, operation: ScanOperation) {
     const update: any = (current) => {
-        if (!operationCurrent(handle, operation)) return;
+        if (!scanMayStartEffect(handle, operation)) return;
         const months = current && typeof current === 'object' ? { ...current } : {};
         const prior = months[operation.month];
         if (prior !== undefined && prior !== null && !validLedgerBucket(prior)) return;
@@ -347,7 +353,10 @@ async function prepareScanMonth(handle: PendingScanHandle, operation: ScanOperat
         return kept;
     };
     update.txOutcomeWitness = (value) => ledgerTokenSeen(value?.[operation.month], operation.monthToken) ? 'applied' : null;
-    await scanMonthMutation(handle, operation, () => handle.sdk.runTransaction(handle.sdk.ref(handle.db, 'zoew_monthly_revenue_cod_dod'), update, { applyLocally: false }));
+    await scanMonthMutation(handle, operation, () => {
+        if (!scanMayStartEffect(handle, operation)) throw new Error('Scan clock changed');
+        return handle.sdk.runTransaction(handle.sdk.ref(handle.db, 'zoew_monthly_revenue_cod_dod'), update, { applyLocally: false });
+    });
     const bucket = await readOperationNode(handle, operation, 'zoew_monthly_revenue_cod_dod/' + operation.month);
     return validLedgerBucket(bucket) && ledgerTokenSeen(bucket, operation.monthToken);
 }
@@ -431,13 +440,14 @@ export async function saveScanOperation(handle: PendingScanHandle, phone, locker
         if (!scanOperationSame(operation, original, false)) { scanHeld(handle); return 'unknown'; }
         if (operation.phase === 'committed') return await finishCommittedScan(handle, operation) || 'unknown';
         if (operation.phase === 'cancelled') return 'unknown';
+        if (!scanMayStartEffect(handle, operation)) { scanHeld(handle); return 'unknown'; }
         let preparedHere = false;
         if (operation.phase === 'admitted') {
             const existing = phone === 'គ្មានលេខ' ? null : dataState.scanHistory.find(item => item.phone === phone
                 && item.scanDate === original.scanDate && (item.isClosed === true) === (closedAt > 0));
             if (rowOperationActive(existing)) { await cancelScanOperation(handle); return 'unknown'; }
             const prepared = { ...operation, phase: 'prepared', targetId: existing?.id || generateUniqueId(), payloadHash, phone, locker, closedAt };
-            const update: any = value => operationCurrent(handle, original) && (value === null
+            const update: any = value => scanMayStartEffect(handle, original) && (value === null
                 || scanOperationSame(value, original, false) && value.phase === 'admitted') ? prepared : undefined;
             update.txOutcomeWitness = value => scanOperationSame(value, prepared) && value.phase === 'prepared' ? 'applied' : null;
             const bound = await handle.sdk.runTransaction(handle.sdk.ref(handle.db, SCAN_OPERATIONS_ROOT + '/' + original.id), update, { applyLocally: false });
@@ -450,7 +460,7 @@ export async function saveScanOperation(handle: PendingScanHandle, phone, locker
             : ledgerTokenSeen(await readOperationNode(handle, operation, 'zoew_monthly_revenue_cod_dod/' + operation.month), operation.monthToken);
         if (!monthReady) { scanHeld(handle, false); return 'unknown'; }
         const stage: any = value => {
-            if (!operationCurrent(handle, operation)) return;
+            if (!scanMayStartEffect(handle, operation)) return;
             if (scanPendingMatches(value, operation)) return value;
             return stagedScanRow(value, operation, phone, locker, closedAt) || undefined;
         };
@@ -528,7 +538,7 @@ export async function resumePendingScanOperations() {
             if (!current()) return;
             if (record.corrupt || pendingScanIsCurrent(activeScans.get(record.id)) || pendingScanIsLive(record.id)
                 || pendingScanIsCurrent(recoveryAttempts.get(record.id)?.handle)) continue;
-            const handle: PendingScanHandle = { record, db: owner.db, sdk: owner.sdk, auth: owner.auth };
+            const handle: PendingScanHandle = { record, clock: captureClockOperation(), db: owner.db, sdk: owner.sdk, auth: owner.auth };
             const base = operationOf(handle);
             if (!base) continue;
             cursor.id = record.id;
@@ -572,7 +582,7 @@ export async function resolveRetainedScanEvidence() {
             if (busy(entry.id)) { kept.push(entry); continue; }
             const record = createScanEvidenceJournal(appLocalStore, entry.v === 2 ? 2 : 1).list(scope).find(row => row.id === entry.id);
             if (!record) { finished++; continue; }
-            const handle: PendingScanHandle = { record, db, sdk, auth };
+            const handle: PendingScanHandle = { record, clock: captureClockOperation(), db, sdk, auth };
             const base = record.corrupt ? null : operationOf(handle);
             let completed = false;
             for (let round = 0; base && round < SCAN_EVIDENCE_EXIT_ATTEMPTS; round++) {

@@ -42,10 +42,15 @@ function build(serverRecord, opts) {
     opts = opts || {};
     const store = Object.assign({}, opts.store);
     const seat = { value: opts.seat === undefined ? {} : opts.seat };
-    const clock = { now: opts.now || 1000000 };
+    const clock = { now: opts.now || 1000000, mono: 0 };
+    const serverNow = opts.serverNow === undefined ? clock.now : opts.serverNow;
+    class Clock extends Date {
+        constructor(...args) { super(...(args.length ? args : [clock.now])); }
+        static now() { return clock.now; }
+    }
     const sandbox = {
         console, Promise, Error, JSON, Object, Array, Number, String, Boolean, isNaN,
-        setTimeout, clearTimeout, Date, AbortController, Map, Set, Math, RegExp, Uint8Array,
+        setTimeout, clearTimeout, Date: Clock, performance: { now: () => clock.mono }, AbortController, Map, Set, Math, RegExp, Uint8Array,
         crypto: { getRandomValues: (a) => { for (let i = 0; i < a.length; i++) a[i] = (i * 29 + 7) & 255; return a; } },
         localStorage: {
             getItem: (k) => (k in store ? store[k] : null),
@@ -60,7 +65,7 @@ function build(serverRecord, opts) {
             const res = (status, body) => Promise.resolve({
                 ok: status >= 200 && status < 300,
                 status: status,
-                headers: { get: () => null },
+                headers: { get: (name) => name === 'Date' && !opts.noClockResponse ? new Date(serverNow).toUTCString() : null },
                 json: () => Promise.resolve(body),
                 text: () => Promise.resolve(JSON.stringify(body))
             });
@@ -91,8 +96,10 @@ function build(serverRecord, opts) {
     const ctx = vm.createContext(sandbox);
     const src = fs.readFileSync(FILE, 'utf8');
     vm.runInContext(`
-        var serverTimeOffsetMs = 0, serverTimeSynced = ${opts.serverTimeSynced === false ? 'false' : 'true'};
-        const OFFLINE_GRACE_MS = ${GRACE};
+        var serverTimeOffsetMs = 0, serverTimeSynced = false;
+        var serverTimeAnchor = null, serverTimeGeneration = 0, serverTimeObservation = 0;
+        ${src.match(/const CLOCK_DIVERGENCE_MS = [^;]+;/)[0]}
+        ${src.match(/const OFFLINE_GRACE_MS = [^;]+;/)[0]}
         const LICENSE_DB_URL = 'https://example-rtdb.firebaseio.com';
         const DEVICE_ID_KEY = 'zoe_license_device_id';
         const DEVICE_ID_RE = /^[0-9A-Z]{20,32}$/;
@@ -113,7 +120,6 @@ function build(serverRecord, opts) {
         const netInFlight = new Map();
         const statusInFlight = new Map();
         const activationInFlight = new Map();
-        function getServerNow() { return __clock.now; }
         var __signedExp = ${(opts.now || 1000000) + 30 * 86400000};
         function verifyKeyString(keyString) {
             if (keyString.indexOf('BAD') !== -1) return Promise.resolve({ valid: false, reason: 'signature' });
@@ -121,7 +127,8 @@ function build(serverRecord, opts) {
         }
         function verifySignatureAndScope(keyString) { return verifyKeyString(keyString); }
     `, ctx);
-    vm.runInContext(sliceFns(src, ['networkLooksDown', 'sharedRequest', 'fetchWithBodyTimeout', 'storageKey', 'loadLocalRecord', 'saveLocalRecord', 'clearLocalRecord', 'recordSeenMark', 'monotonicNow', 'getDeviceId', 'licenseSeatUrl', 'seatLimitOf', 'seatHolderOf', 'readSeat', 'claimSeat', 'checkOnline', 'syncServerTime', 'activate', 'getStatus'].concat(src.includes('function checkLocalStatus(') ? ['checkLocalStatus'] : [])), ctx);
+    vm.runInContext(sliceFns(src, ['readClock', 'resetServerTime', 'clockElapsed', 'trustedClock', 'getTrustedServerNow', 'acceptServerTime', 'getServerNow', 'setServerTimeOffset', 'networkLooksDown', 'sharedRequest', 'fetchWithBodyTimeout', 'storageKey', 'loadLocalRecord', 'saveLocalRecord', 'clearLocalRecord', 'recordSeenMark', 'monotonicNow', 'getDeviceId', 'licenseSeatUrl', 'seatLimitOf', 'seatHolderOf', 'readSeat', 'claimSeat', 'checkOnline', 'syncServerTime', 'activate', 'getStatus'].concat(src.includes('function checkLocalStatus(') ? ['checkLocalStatus'] : [])), ctx);
+    if (opts.serverTimeSynced !== false) vm.runInContext('setServerTimeOffset(0)', ctx);
     return { ctx, store, clock };
 }
 
@@ -153,6 +160,7 @@ const LIVE = { revoked: false, expiresAt: 1000000 + 30 * 86400000 };
     ok('ក្រៅបណ្ដាញក្នុងអំឡុងអនុគ្រោះ ➜ នៅតែ active', st.state === 'active', st.state);
 
     h.clock.now = 1000000 + GRACE + 60000;
+    h.clock.mono = GRACE + 60000;
     st = await vm.runInContext("getStatus('" + APP + "')", h.ctx);
     ok('ហួសអនុគ្រោះ ➜ offline-grace-exceeded', st.state === 'offline-grace-exceeded', st.state);
 
@@ -211,7 +219,7 @@ const LIVE = { revoked: false, expiresAt: 1000000 + 30 * 86400000 };
             TextEncoder, TextDecoder, AbortController,
             fetch: () => Promise.reject(new Error('net')),
             navigator: { onLine: true },
-            Date, Math, JSON, Promise, Uint8Array, isNaN, parseInt,
+            Date, performance, Math, JSON, Promise, Uint8Array, isNaN, parseInt,
             String, Object, Array, Set, Map, RegExp, Number,
             localStorage: {
                 getItem: (k) => store[k] || null,
@@ -305,11 +313,11 @@ const LIVE = { revoked: false, expiresAt: 1000000 + 30 * 86400000 };
         ok('⛔ តែក៏ **មិនលុប** ដែរ (ការលុបទាមទារសាលក្រម server ពិត)',
             !!good.store[STORE_KEY], Object.keys(good.store));
 
-        // គ. នាឡិកាមិន sync តែ Key **មិនទាន់** ផុតកំណត់ ➜ នៅ active ធម្មតា
+        // គ. record នៅសល់សុពលភាព តែគ្មានម៉ោង server ដែលទុកចិត្តបាន ➜ រក្សាទុក តែមិនផ្តល់សិទ្ធិ។
         const fresh = build('offline', { store: JSON.parse(JSON.stringify(store)), now: 1000000 + 1000, serverTimeSynced: false });
         const freshSt = await vm.runInContext("getStatus('" + APP + "')", fresh.ctx);
-        ok('នាឡិកាមិន sync តែមិនទាន់ផុតកំណត់ ➜ នៅតែ active',
-            freshSt.state === 'active' && !!fresh.store[STORE_KEY], JSON.stringify(freshSt));
+        ok('គ្មានម៉ោង server ដែលទុកចិត្តបាន ➜ clock-unverified · record នៅ',
+            freshSt.state === 'offline-grace-exceeded' && freshSt.reason === 'clock-unverified' && !!fresh.store[STORE_KEY], JSON.stringify(freshSt));
 
         // ឃ. server ប្រាប់ `expiresAt` ហួសតាមម៉ោង server ដែល sync ➜ សាលក្រមអាជ្ញាធរ ➜ ត្រូវលុប
         const served = build({ revoked: false, expiresAt: 1 }, { store: JSON.parse(JSON.stringify(store)), now: 1000000 + 1000, serverTimeSynced: true });
@@ -317,7 +325,7 @@ const LIVE = { revoked: false, expiresAt: 1000000 + 30 * 86400000 };
         ok('សាលក្រម server (expired-server) លើម៉ោង sync ➜ ត្រូវលុបដដែល',
             !served.store[STORE_KEY], JSON.stringify(servedSt));
         // ឃខ. N3 ៖ ម៉ោងមិន sync (`Date` អានមិនបាន) ➜ ការប្រៀបធៀបជានាឡិកាឧបករណ៍ ➜ មិនផ្តល់សិទ្ធិ តែមិនលុបរហូតម៉ោង sync
-        const unsynced = build({ revoked: false, expiresAt: 1 }, { store: JSON.parse(JSON.stringify(store)), now: 1000000 + 1000, serverTimeSynced: false });
+        const unsynced = build({ revoked: false, expiresAt: 1 }, { store: JSON.parse(JSON.stringify(store)), now: 1000000 + 1000, serverTimeSynced: false, noClockResponse: true });
         const unsyncedSt = await vm.runInContext("getStatus('" + APP + "')", unsynced.ctx);
         ok('⛔ N3 ៖ ម៉ោងមិន sync + expiresAt ហួសតាមនាឡិកាឧបករណ៍ ➜ មិនផ្តល់សិទ្ធិ · record នៅ',
             unsyncedSt.state !== 'active' && !!unsynced.store[STORE_KEY], JSON.stringify(unsyncedSt));

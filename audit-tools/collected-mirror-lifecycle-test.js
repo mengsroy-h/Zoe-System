@@ -67,7 +67,7 @@ function serve(dir) {
     });
 }
 
-const LICENSE_STUB = 'window.ZoeLicense={getStatus:function(){return Promise.resolve({state:"active"});},setServerTimeOffset:function(){},syncServerTime:function(){return Promise.resolve();},activate:function(){return Promise.resolve({ok:true});},verifyKeyString:function(){return Promise.resolve({ok:true});},clearActivation:function(){}};';
+const LICENSE_STUB = 'window.ZoeLicense={getStatus:function(){return Promise.resolve({state:"active"});},setServerTimeOffset:function(){},syncServerTime:function(){return Promise.resolve();},activate:function(){return Promise.resolve({ok:true});},verifyKeyString:function(){return Promise.resolve({ok:true});},clearActivation:function(){}};' + require('./browser-clock-fixture.cjs').CLOCK_FIXTURE;
 
 // ⛔ fake SDK នេះ **បដិសេធតាម rules ពិត** ៖ stub ដែលទទួលយកគ្រប់ការសរសេរ
 // ធ្វើឲ្យ «server បដិសេធ» ក្លាយជារបៀបបរាជ័យដែលមិនដែលសាក។

@@ -65,6 +65,7 @@ beforeEach(() => {
     firebaseState.isDatabaseConnected = true;
     firebaseState.isDatabaseInitialized = true;
     firebaseState.serverClockTrusted = true;
+    firebaseState.sessionExpiryCheck = 'live';
     firebaseState.serverTimeOffsetMs = 0;
     const options = { supabaseUrl: 'https://synthetic-output.invalid' };
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));

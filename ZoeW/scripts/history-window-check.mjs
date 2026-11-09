@@ -76,7 +76,7 @@ try {
             localStorage.setItem('zoe_active_locker', 'A5');
         });
         await page.addInitScript('(' + FAKE_SDK.toString() + ')(' + JSON.stringify(data) + ');');
-        await page.clock.setFixedTime(HARNESS_CLOCK_START);
+        await page.clock.setSystemTime(HARNESS_CLOCK_START);
         await page.goto('http://127.0.0.1:' + srv.port + '/index.html');
         await page.waitForFunction(() => window.uiState?.historyView?.length === 600 && document.querySelector('#historyTableBody tr[data-id]'));
         await page.waitForTimeout(700);

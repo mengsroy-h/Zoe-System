@@ -23,6 +23,7 @@ const merge = (target: any, addedCodes: string[], insertMissing = true) => {
 
 beforeEach(() => {
     for (const k of Object.keys(store)) delete store[k];
+    firebaseState.serverClockTrusted = true;
     firebaseState.db = { restore: true } as any;
     firebaseState.fb = {
         ref: (_db: unknown, path: string) => ({ path }),

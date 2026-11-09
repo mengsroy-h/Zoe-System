@@ -114,9 +114,10 @@
         "audit-tools/function-surface-test.js",
         "audit-tools/keygen-notice-test.js",
         "audit-tools/keygen-session-security-test.js",
-        "audit-tools/keygen-biometric-test.js"
+        "audit-tools/keygen-biometric-test.js",
+        "audit-tools/zoew-suite-test.js"
       ],
-      "evidence": "Function inventory និងតេស្តឥរិយាបថ session · ជីវមាត្រ (WebAuthn PRF ក្លែង + crypto ពិត) របស់ ZoeKeyGen អាន app.js ពិត។",
+      "evidence": "Function inventory និងតេស្តឥរិយាបថ session · ជីវមាត្រ (WebAuthn PRF ក្លែង + crypto ពិត) របស់ ZoeKeyGen អាន app.js ពិត។ Vitest វាស់ផ្លូវបង្ហាញថ្ងៃ/ម៉ោងនៅតំបន់ម៉ោងឧបករណ៍ផ្សេងៗ។",
       "limitation": "មាន inventory function និងសេណារីយ៉ូឥរិយាបថជាច្រើន។ ចំនួន function មិនមែនចំនួន function ដែលបានធ្វើ behavioral coverage ពេញលេញទេ។"
     },
     "guard-15": {
@@ -172,9 +173,10 @@
         "audit-tools/license-clock-trust-test.js",
         "audit-tools/license-time-endpoint-test.js",
         "audit-tools/license-time-json-test.js",
-        "audit-tools/license-time-cors-browser-test.js"
+        "audit-tools/license-time-cors-browser-test.js",
+        "audit-tools/zoew-suite-test.js"
       ],
-      "evidence": "audit-tools/license-network-pressure-test.js និង license-clock-trust-test.js; byte-identical ទាំង 2 App",
+      "evidence": "audit-tools/license-network-pressure-test.js និង license-clock-trust-test.js; zoew-suite រត់ license-clock-continuity; byte-identical ទាំង 2 App",
       "limitation": "គ្របតែសេណារីយ៉ូ license/network/clock ដែលបានសាក។ មិនបញ្ជាក់ License Project ផលិតកម្ម។"
     },
     "guard-21": {
@@ -776,6 +778,31 @@
       ],
       "evidence": "អាន SQL template ពិតតាម CLI និងផ្ទៀង lock, timeout, លំដាប់ freshness/readiness និងគ្មាន cleanup/grant។",
       "limitation": "Static contract មិនបញ្ជាក់ transaction behavior ទេ; registration-auth integration រត់ SQL ពិតជាមួយ GoTrue/Postgres បណ្ដោះអាសន្ន។"
+    },
+    "audit-clock-fixture-contracts": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/zoew-suite-test.js"
+      ],
+      "evidence": "browser-clock-fixture-contract, sdk-audit-clock-fixture, browser-time-scenarios, entry-search-fixture-clock និង network fixture tests រត់ fixture ពិតជាមួយ clock/session owner; វាស់ midnight, drift, generation, authTime និងកម្មសិទ្ធិដែលផ្លាស់ប្ដូរ។",
+      "limitation": "ជាការវាស់ fixture និង guard ដាច់ដោយឡែក; មិនបញ្ជាក់ browser, emulator ឬប្រតិបត្តិការលុយពេញលេញ។"
+    },
+    "audit-static-contracts": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/zoew-suite-test.js"
+      ],
+      "evidence": "static-checker-contracts.test.ts និង payload-local-cache.test.ts វាស់ source module ពិត និង mutations ដែលដក guard, ប្ដូរ clock provenance, shadow binding ឬបញ្ជូន local object ចេញក្រៅ។",
+      "limitation": "ជាកិច្ចសន្យា AST និង owner ដែលមានព្រំដែន; getter exits ដែលកំណត់ជាក់លាក់មិនមែន whole-program taint proof ហើយមិនជំនួស browser/រូបរាង DOM ពិត។"
+    },
+    "audit-purge-owner-contract": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/zoew-suite-test.js",
+        "audit-tools/write-stall-guard-test.js"
+      ],
+      "evidence": "cleanup-purge-checker-contract.test.ts និង write-stall-guard-test រត់ cleanup/current owner ដែលស្រង់ពិត; វាស់ callback ដំបូង/settle/retry ពេល db, sdk, auth, shop, lease, trust និងព្រំអាយុផ្លាស់ប្ដូរ។",
+      "limitation": "ជាកិច្ចសន្យា callback ដាច់ដោយឡែក; មិនជំនួស transport, session lifecycle, browser ឬ backend ពេញលេញ។"
     }
   },
   "files": {
@@ -1740,6 +1767,9 @@
     "ZoeW/src/core/clock.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/core/session-verification.ts": {
+      "policy": "zoew-app"
+    },
     "ZoeW/src/core/elapsed.ts": {
       "policy": "zoew-app"
     },
@@ -2337,6 +2367,9 @@
     "ZoeW/tests/collected-price-day-scope.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/collected-clock-admission.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/collected-sync-pending.test.ts": {
       "policy": "zoew-self-verification"
     },
@@ -2433,6 +2466,12 @@
     "ZoeW/tests/health-endpoint.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/license-clock-recovery.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/license-clock-continuity.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/health-license-status.test.ts": {
       "policy": "zoew-self-verification"
     },
@@ -2526,6 +2565,15 @@
     "ZoeW/tests/keyboard-tabbar.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/keygen-clock-admission.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/keygen-idle-clock.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/keygen-notice-clock.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/keygen-sb-lock-ownership-fixes.test.ts": {
       "policy": "zoew-self-verification"
     },
@@ -2596,6 +2644,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/lookup-late-answer-busy.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/lookup-list-lifecycle.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/lookup-modes-money.test.ts": {
@@ -3066,7 +3117,31 @@
     "ZoeW/tests/seller-notices.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/native-server-clock-bridge.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/native-recovery-clock.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/restore-clock-admission.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-clock-fence.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/server-clock-continuity.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/server-clock-estimator.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/session-expiry-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scheduled-session-admission.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/session-clock-policy.test.tsx": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/session-listener-scope.test.ts": {
@@ -3478,6 +3553,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-shop-sweep-marker.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-sign-clock.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-sign-evidence-refresh.test.ts": {
@@ -4876,6 +4954,75 @@
       "policy": "registration-auth-reviewed-fixture",
       "encoding": "lf-text",
       "sha256": "c8c14a79fa6f74a0d358366e73445d2853c53fa5741a87f521412d83ebe5cc95"
+    },
+    "ZoeW/tests/claim-clock-boundaries.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-trash-mode-clock.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-secondary-clock.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/keygen-calendar.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-calendar-validation.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/palm-calendar-boundaries.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/browser-clock-fixture-contract.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/sdk-audit-clock-fixture.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "audit-tools/browser-clock-fixture.cjs": {
+      "policy": "audit-clock-fixture-contracts"
+    },
+    "audit-tools/emu/sdk-clock-fixture.cjs": {
+      "policy": "audit-clock-fixture-contracts"
+    },
+    "audit-tools/static-checker-contracts.cjs": {
+      "policy": "audit-static-contracts"
+    },
+    "audit-tools/payload-local-cache.cjs": {
+      "policy": "audit-static-contracts"
+    },
+    "ZoeW/tests/static-checker-contracts.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/payload-local-cache.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/history-observer-session-recovery.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/entry-search-fixture-clock.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/cleanup-purge-checker-contract.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "audit-tools/cleanup-purge-checker-contract.cjs": {
+      "policy": "audit-purge-owner-contract"
+    },
+    "ZoeW/tests/network-durable-clock-fixture.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-network-expiry-fixture.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/browser-time-scenarios.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/browser-route-isolation.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/restore-retention-fixture.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

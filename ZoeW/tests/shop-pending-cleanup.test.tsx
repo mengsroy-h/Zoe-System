@@ -68,7 +68,7 @@ beforeEach(() => {
     uiState.toasts = [];
     firebaseState.authGeneration++;
     firebaseState.serverTimeOffsetMs = 0;
-    firebaseState.serverClockTrusted = true;
+    firebaseState.sessionExpiryCheck = 'live'; firebaseState.serverClockTrusted = true;
     firebaseState.isDatabaseConnected = true;
     firebaseState.db = { name: 'audit-db' } as any;
     firebaseState.dbRefDeleted = { path: 'zoew_recently_deleted_cod_dod' } as any;

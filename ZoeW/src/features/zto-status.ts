@@ -1,7 +1,8 @@
+import { sessionVerificationRequired } from '../core/session-verification';
 import { modalIsOpen } from '../core/modals';
 import { viewState } from '../core/view-state';
 import { dataState, firebaseState, lookupState, securityState, uiState, ztoState } from '../core/state';
-import { cleanupClockIsTrustworthy, getServerNow, serverClockOffsetIsFromServer } from '../core/clock';
+import { captureClockOperation, cleanupClockIsTrustworthy, getServerClockBounds, getServerNow, serverClockIsTrustworthy } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
 import { liveShopScope, shopScopePending } from '../core/shop-scope';
 import { createScanImportProofCache, type ScanImportCandidate } from '../services/scan-import-proof';
@@ -115,6 +116,7 @@ function readDurableZtoImportLegacy(code) {
 export function getZtoPickupVerdict(code, candidate?: ScanImportCandidate) {
     loadZtoPickupStatusOnce();
     const legacy = ztoPickupStatus.get(pickupBarcodeKey(code));
+    if (resolveZtoPickupSignTime(legacy)) saveZtoPickupStatus();
     const stored = candidate && pickupBarcodeKey(candidate.code) === pickupBarcodeKey(code) ? createScanImportProofCache(appLocalStore).inspect(candidate, Date.now()) : null;
     if (stored?.status === 'invalid') return undefined;
     const bound = stored?.status === 'bound' ? stored.entry : null;
@@ -173,9 +175,11 @@ export function loadZtoPickupStatusOnce() {
         const restored: any = { closed: entry.closed, at: at };
         if (entry.closed === true) {
             const stored = typeof entry.signedAt === 'number' && isFinite(entry.signedAt) && entry.signedAt > 0 ? entry.signedAt : 0;
-            restored.signedAt = stored || ztoSignedTimeMillis(entry.signedAt);
+            restored.signedAt = stored;
+            const pending = entry.signedAtPending ?? (!stored ? entry.signedAt : undefined);
+            if (ztoSignedTimeMillis(pending, Infinity)) restored.signedAtPending = pending;
             restored.signedAtExact = !!restored.signedAt && entry.signedAtExact === true;
-            if (!restored.signedAt && serverClockOffsetIsFromServer(firebaseState.serverTimeOffsetMs)) { restored.signedAt = getServerNow(); upgraded = true; }
+            if (resolveZtoPickupSignTime(restored)) upgraded = true;
         }
         ztoPickupStatus.set(key, restored);
     });
@@ -186,6 +190,7 @@ export function saveZtoPickupStatus() {
     const out = {};
     ztoPickupStatus.forEach((entry, key) => {
         out[key] = { closed: entry.closed, at: entry.at };
+        if (entry.closed === true && ztoSignedTimeMillis(entry.signedAtPending, Infinity)) out[key].signedAtPending = entry.signedAtPending;
         if (entry.closed === true && typeof entry.signedAt === 'number' && isFinite(entry.signedAt) && entry.signedAt > 0) {
             out[key].signedAt = entry.signedAt;
             out[key].signedAtExact = entry.signedAtExact === true;
@@ -265,19 +270,39 @@ export function ztoSignedTimeMillis(value, now = getServerNow()) {
     return Number.isFinite(stamp) && stamp > 0 && stamp <= now ? stamp : 0;
 }
 
+function resolveZtoPickupSignTime(entry) {
+    if (!entry || entry.closed !== true || !entry.signedAtPending && Number.isFinite(entry.signedAt) && entry.signedAt > 0) return false;
+    const clock = captureClockOperation();
+    const now = getServerNow();
+    if (!clock.current()) return false;
+    const exact = ztoSignedTimeMillis(entry.signedAtPending, now);
+    const retained = typeof entry.signedAt === 'number' && isFinite(entry.signedAt) && entry.signedAt > 0 ? entry.signedAt : 0;
+    entry.signedAt = exact || retained || now;
+    entry.signedAtExact = !!exact || !!retained && entry.signedAtExact === true;
+    delete entry.signedAtPending;
+    return true;
+}
+
 export function setZtoPickupVerdict(code, closed, signedAt?, deferSave?) {
     const key = pickupBarcodeKey(code);
     if (!key) return;
     if (closed !== true && closed !== false && closed !== null) return;
     loadZtoPickupStatusOnce();
     const prior = ztoPickupStatus.get(key);
+    resolveZtoPickupSignTime(prior);
     const verdict: any = { closed: closed, at: Date.now() };
     if (closed === true) {
+        const clock = captureClockOperation();
         const now = getServerNow();
-        const exact = ztoSignedTimeMillis(signedAt, now);
+        const trusted = clock.current();
+        const exact = trusted ? ztoSignedTimeMillis(signedAt, now) : 0;
         const retained = prior && prior.closed === true && typeof prior.signedAt === 'number' && isFinite(prior.signedAt) && prior.signedAt > 0 ? prior.signedAt : 0;
-        verdict.signedAt = exact || retained || now;
+        verdict.signedAt = exact || retained || (trusted ? now : 0);
         verdict.signedAtExact = !!exact || !!retained && prior.signedAtExact === true;
+        if (!trusted) {
+            const pending = ztoSignedTimeMillis(signedAt, Infinity) ? signedAt : prior?.signedAtPending;
+            if (ztoSignedTimeMillis(pending, Infinity)) verdict.signedAtPending = pending;
+        }
     }
     ztoPickupStatus.delete(key);
     ztoPickupStatus.set(key, verdict);
@@ -401,7 +426,7 @@ export function collectOpenBarcodesForZtoStatus(dataToScan = dataState.scanHisto
 }
 
 export async function autoCloseBarcodeFromZto(entry, dataToScan, expectedSignIdentity?) {
-    if (!entry || !ztoAutoCloseEnabled()) return false;
+    if (!entry || !ztoAutoCloseEnabled() || sessionVerificationRequired()) return false;
     const list = Array.isArray(dataToScan) ? dataToScan : dataState.scanHistory;
     const item = list.find((i) => i && i.id === entry.itemId);
     if (!item || !Array.isArray(item.barcodes)) return false;
@@ -519,9 +544,11 @@ function ztoLocalSweepGuards() {
 
 export function ztoAbandonCleanupIsHeld(ripeAt?) {
     if (ztoState.ztoSignedOff) return false;
+    let sharedRipeHeld = false;
     if (!ztoLocalSweepGuards()) {
         if (!ztoShopSweepHolds(ripeAt)) return false;
-        if (ztoState.ztoShopSweep.advancedAt > ztoState.ztoAbandonHoldSince) ztoState.ztoAbandonHoldSince = 0;
+        const bounds = getServerClockBounds();
+        sharedRipeHeld = !bounds || bounds.lowerMs - ripeAt <= ZTO_ABANDON_HOLD_MAX_MS;
     } else {
         const fresh = !!ztoState.ztoSignedCompleteAt && elapsedSince(ztoState.ztoSignedCompleteAt) <= ZTO_SIGNED_FRESH_MS;
         const covers = typeof ripeAt !== 'number' || !isFinite(ripeAt) || ztoState.ztoSignedCompleteServerAt >= ripeAt;
@@ -535,7 +562,7 @@ export function ztoAbandonCleanupIsHeld(ripeAt?) {
     const resumed = !!ztoState.ztoAbandonCheckedAt && elapsedSince(ztoState.ztoAbandonCheckedAt) > ZTO_ABANDON_RESUME_GAP_MS;
     ztoState.ztoAbandonCheckedAt = Date.now();
     if (!ztoState.ztoAbandonHoldSince || resumed) ztoState.ztoAbandonHoldSince = Date.now();
-    return elapsedSince(ztoState.ztoAbandonHoldSince) <= ZTO_ABANDON_HOLD_MAX_MS;
+    return sharedRipeHeld || elapsedSince(ztoState.ztoAbandonHoldSince) <= ZTO_ABANDON_HOLD_MAX_MS;
 }
 
 export function ztoSignedSweepBackoffMs() {
@@ -579,7 +606,8 @@ export async function closeZtoSignedBarcodes(cfg, entries, dataToScan, force?, p
     const owners = answerOwners || captureZtoSignedAnswerOwners(open.concat(stale),
         Array.isArray(dataToScan) ? dataToScan : dataState.scanHistory, dataState.deletedItems);
     ztoState.ztoSignedSweepAt = Date.now();
-    const readServerAt = getServerNow();
+    const readClock = captureClockOperation();
+    const readServerAt = getServerClockBounds()?.lowerMs || 0;
     const range = ztoSignedSweepRange(ztoOldestOpenStamp(Array.isArray(dataToScan) ? dataToScan : dataState.scanHistory), !open.length);
     if (returnedSince) range.from = ztoOpenSinceDay(returnedSince, range.from);
     let signed = null;
@@ -615,10 +643,14 @@ export async function closeZtoSignedBarcodes(cfg, entries, dataToScan, force?, p
         if (key) signedKeys.add(key);
     }
     const signedTimes = new Map();
+    const signedRawTimes = new Map();
     for (const row of Array.isArray(signed.signedRows) ? signed.signedRows : []) {
         const key = pickupBarcodeKey(row && row.barcode);
-        const stamp = ztoSignedTimeMillis(row && row.at);
-        if (key && stamp > (signedTimes.get(key) || 0)) signedTimes.set(key, stamp);
+        const stamp = ztoSignedTimeMillis(row && row.at, serverClockIsTrustworthy() ? getServerNow() : Infinity);
+        if (key && stamp > (signedTimes.get(key) || 0)) {
+            signedTimes.set(key, stamp);
+            signedRawTimes.set(key, row.at);
+        }
     }
     const signedFor = (entry) => {
         if (!signedKeys.has(entry.key)) return false;
@@ -655,7 +687,7 @@ export async function closeZtoSignedBarcodes(cfg, entries, dataToScan, force?, p
             finished = false;
             continue;
         }
-        setZtoPickupVerdict(entries[i].code, true, signedTimes.get(entries[i].key));
+        setZtoPickupVerdict(entries[i].code, true, signedRawTimes.get(entries[i].key));
         out.keys.add(entries[i].key);
         if (done) out.closed++;
     }
@@ -665,7 +697,7 @@ export async function closeZtoSignedBarcodes(cfg, entries, dataToScan, force?, p
         if (!owners.current(stale[i].key)) { finished = false; continue; }
         const at = signedTimes.get(stale[i].key);
         if (!at && getZtoPickupVerdict(stale[i].code, stale[i].candidate)?.closed !== false) continue;
-        setZtoPickupVerdict(stale[i].code, true, at, true);
+        setZtoPickupVerdict(stale[i].code, true, signedRawTimes.get(stale[i].key), true);
         out.keys.add(stale[i].key);
         out.flipped++;
     }
@@ -679,7 +711,8 @@ export async function closeZtoSignedBarcodes(cfg, entries, dataToScan, force?, p
         ztoState.ztoSignedMismatchWideAt = Date.now();
     }
     if (rangeComplete && !mismatched && coversMismatch) ztoState.ztoSignedMismatchFrom = '';
-    const complete = rangeComplete && !mismatched && !ztoState.ztoSignedMismatchFrom;
+    const complete = rangeComplete && !mismatched && !ztoState.ztoSignedMismatchFrom
+        && !!readServerAt && readClock.current();
     if (rangeComplete) ztoState.ztoSignedSweepOkAt = Date.now();
     if (complete) {
         ztoState.ztoSignedCompleteAt = Date.now();
@@ -916,8 +949,9 @@ export async function checkZtoStatusForBarcode(cfg, code) {
     const data = out.body;
     if (!data || typeof data !== 'object') return null;
     const answer: any = { closed: typeof data.ztoClosed === 'boolean' ? data.ztoClosed : null };
-    const signedAt = answer.closed === true ? ztoSignedTimeMillis(data.ztoSignedAt) : 0;
-    if (signedAt) answer.signedAt = signedAt;
+    const trusted = serverClockIsTrustworthy();
+    const signedAt = answer.closed === true ? ztoSignedTimeMillis(data.ztoSignedAt, trusted ? getServerNow() : Infinity) : 0;
+    if (signedAt) answer.signedAt = trusted ? signedAt : data.ztoSignedAt;
     if (typeof data.ztoReturnedAt === 'string' && data.ztoReturnedAt) answer.returnedAt = data.ztoReturnedAt;
     if (answer.returnedAt && data.ztoSentOutAt === answer.returnedAt) answer.sentOut = true;
     else if (answer.returnedAt && data.ztoMisplacedAt === answer.returnedAt) answer.misplaced = true;

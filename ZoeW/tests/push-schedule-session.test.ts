@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState } from '../src/core/state';
 import { viewState } from '../src/core/view-state';
+import { acceptServerClockOffset, resetServerClock } from '../src/core/clock';
 import { appLocalStore } from '../src/core/storage';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { ABANDON_AGE_MS, clearSensitiveModalFields } from '../src/features/session';
@@ -239,4 +240,46 @@ it.each([[false, 0], [true, NaN], [true, Infinity]])('Push៖ force មិនជ
     expect(posts).toHaveLength(1);
     expect(posts[0].times).toHaveLength(1);
     expect(posts[0].times[0]).toBeGreaterThan(now);
+});
+
+
+it('ម៉ោងលោតក្រោយ sync មិនជំនួសកាលវិភាគដែលបានរក្សា', async () => {
+    firebaseState.isDatabaseConnected = true;
+    expect(acceptServerClockOffset(0, null, false)).toBe(true);
+    const before = saved();
+    const send = vi.fn(async () => reply());
+    vi.stubGlobal('fetch', send);
+    vi.setSystemTime(Date.now() + 365 * 86400000);
+    expect(await syncExpirySchedule(true)).toBe(false);
+    expect(send).not.toHaveBeenCalled();
+    expect(saved()).toEqual(before);
+});
+
+
+it.each(['untrusted', 'resampled'])('ឯករាជ្យ៖ មិនផ្ញើកាលវិភាគក្រោយនាឡិកាបាត់ទំនុកចិត្តពេលរង់ចាំ token %s', async (mode) => {
+    const pending = deferred<string>();
+    shop('a', () => pending.promise);
+    const posts: any[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (_url, options) => { posts.push(JSON.parse(options.body)); return reply(); }));
+    const work = syncExpirySchedule(true);
+    resetServerClock();
+    if (mode === 'resampled') acceptServerClockOffset(0, Object.freeze({ epochMs: Date.now(), uncertaintyMs: 0, wallMs: Date.now(), monotonicMs: performance.now() }), false);
+    pending.resolve('token-a');
+    expect(await work).toBe(false);
+    expect(posts).toEqual([]);
+});
+
+it.each(['untrusted', 'resampled'])('ឯករាជ្យ៖ ចម្លើយ Push យឺតមិនរក្សា cache ក្រោយនាឡិកាបាត់ទំនុកចិត្ត %s', async mode => {
+    const pending = deferred<Response>();
+    let posts = 0;
+    vi.stubGlobal('fetch', vi.fn(async () => { posts++; return pending.promise; }));
+    const work = syncExpirySchedule(true);
+    for (let i = 0; i < 10 && !posts; i++) await Promise.resolve();
+    expect(posts).toBe(1);
+    resetServerClock();
+    if (mode === 'resampled') acceptServerClockOffset(0, Object.freeze({ epochMs: Date.now(), uncertaintyMs: 0, wallMs: Date.now(), monotonicMs: performance.now() }), false);
+    pending.resolve(reply());
+    expect(await work).toBe(false);
+    expect(saved().schedSig).toBe('');
+    expect(pushRuntime.scheduleInFlight).toBe(false);
 });

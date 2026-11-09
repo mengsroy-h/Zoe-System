@@ -1,3 +1,4 @@
+import browserClockFixture from '../../audit-tools/browser-clock-fixture.cjs';
 /**
  * Firebase SDK ក្លែងក្លាយ — ចាក់ចូលទំព័រ **មុន** App ចាប់ផ្តើម។
  *
@@ -146,7 +147,7 @@ export const LICENSE_STUB = `window.ZoeLicense = {
     activate: function () { return Promise.resolve({ ok: true }); },
     verifyKeyString: function () { return Promise.resolve({ ok: true }); },
     clearActivation: function () {}
-};`;
+};` + browserClockFixture.CLOCK_FIXTURE;
 
 /**
  * ⛔ **ពេលវេលាចាប់ផ្តើមថេរ** ៖ ទិន្នន័យគំរូចងនឹងថ្ងៃ `2026-09-22` ➜ ឧបករណ៍

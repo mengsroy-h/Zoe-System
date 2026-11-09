@@ -12,7 +12,8 @@
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
-const { actionUsages } = require('./react-view');
+const { actionUsages, sliceFunction } = require('./react-view');
+const { dispatcherContract } = require('./static-checker-contracts.cjs');
 
 const root = path.resolve(__dirname, '..');
 const appRoot = process.env.CSP_APP_DIR ? path.resolve(process.env.CSP_APP_DIR) : root;
@@ -68,7 +69,7 @@ for (const app of ['ZoeW', 'ZoeKeyGen']) {
     if (isReact) {
         ok(app + ': dispatcher ពិនិត្យបញ្ជីមុនហៅ (`lookupAction()` ៖ own property នៃ ACTION_REGISTRY · ឈ្មោះក្រៅបញ្ជី ➜ មិនហៅ)',
             /function lookupAction\(name\) \{\s*if \(!name \|\| !Object\.prototype\.hasOwnProperty\.call\(ACTION_REGISTRY, name\)\) return null;/.test(js) &&
-            /function act\(name, \.\.\.args\) \{\s*const fn = lookupAction\(name\);\s*if \(!fn\) \{[^}]*return;\s*\}\s*fn\(\.\.\.args\);/.test(js) &&
+            dispatcherContract(sliceFunction(js, 'act')) &&
             /function onAct\(name, opts\) \{[\s\S]*?\bact\(name, \.\.\.args\);/.test(js));
         const registryBlock = (/const ACTION_REGISTRY = Object\.freeze\(\{([\s\S]*?)\}\);/.exec(js) || [])[1];
         const registry = new Set([...(registryBlock || '').matchAll(/^\s*([A-Za-z_$][\w$]*),?\s*$/gm)].map((m) => m[1]));
@@ -121,7 +122,7 @@ const LICENSE_STUB = `window.ZoeLicense = {
     setServerTimeOffset: function () {}, syncServerTime: function () { return Promise.resolve(); },
     activate: function () { return Promise.resolve({ ok: true }); },
     verifyKeyString: function () { return Promise.resolve({ ok: true }); }, clearActivation: function () {}
-};`;
+};` + require('./browser-clock-fixture.cjs').CLOCK_FIXTURE;
 
 const FAKE_SDK = function (seed) {
     const store = JSON.parse(JSON.stringify(seed));

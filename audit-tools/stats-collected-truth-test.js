@@ -59,7 +59,7 @@ function slice(from, to, what) {
 }
 const BOOT_SRC = slice('const BOOT = function (seed) {', 'function seedData()', 'BOOT');
 const LIC_A = FUZZ.indexOf('const LICENSE_STUB = `');
-const LICENSE_STUB = LIC_A === -1 ? null : FUZZ.slice(LIC_A + 'const LICENSE_STUB = `'.length, FUZZ.indexOf('};`') + 2);
+const LICENSE_STUB = LIC_A === -1 ? null : FUZZ.slice(LIC_A + 'const LICENSE_STUB = `'.length, FUZZ.indexOf('};`') + 2) + require('./browser-clock-fixture.cjs').CLOCK_FIXTURE;
 check(!!(BOOT_SRC && LICENSE_STUB), 'ស្រង់ BOOT · LICENSE_STUB ចេញពី `revenue-fuzz-test.js` (មិនចម្លង)');
 
 // ⛔ Seed **ផ្ទាល់ខ្លួន** ៖ ledger ត្រូវ *ធំជាង* ចំណូលពិត ដោយសារកញ្ចប់មិនទាន់យក។

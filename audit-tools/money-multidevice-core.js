@@ -13,7 +13,7 @@ const LICENSE_STUB = `window.ZoeLicense = {
     setServerTimeOffset: function () {}, syncServerTime: function () { return Promise.resolve(); },
     activate: function () { return Promise.resolve({ valid: true }); }, checkOnline: function () { return Promise.resolve({ ok: true }); },
     announcementsUrl: function () { return ''; }, clearActivation: function () {}
-};`;
+};` + require('./browser-clock-fixture.cjs').CLOCK_FIXTURE;
 
 function barcodesOf(it) {
     const v = it && it.barcodes;

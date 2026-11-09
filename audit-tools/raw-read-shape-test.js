@@ -49,11 +49,11 @@ function extractTrashNormalizer(src) {
 }
 
 async function makeCtx(src, options, closePlan) {
-    const protocol = moduleRuntime(ROOT, src, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/barcode.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts']);
+    const protocol = moduleRuntime(ROOT, src, [{ path: 'src/core/clock.ts', expose: ['captureClockOperation', 'getServerClockBounds', 'resetServerClock'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/barcode.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts']);
     const storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://raw-read-shape.invalid' }) });
     const ctx = {
         console, options,
-        db: {}, authGeneration: 0,
+        db: {}, authGeneration: 0, serverClockTrusted: true, serverTimeOffsetMs: 0,
         auth: { currentUser: { uid: 'raw-read-user' } }, isInitializingFirebase: false,
         appLocalStore: storage, dataState: { pickupPendingVersion: 0 },
         dbOp: (promise) => promise, txRestUrl: () => '', showToast: () => {},
@@ -293,6 +293,18 @@ for (const app of ['ZoeW']) {
             ok(!threw && result === undefined && planned.__closePlanCalls.at(-1) === 'conflict'
                 && Object.values(changed.barcodes).filter(Boolean).every(barcode => barcode.isClosed === false && !barcode.pickupTransition),
                 label + ' ➜ វគ្គ barcode ថ្មីមិនទទួលផែនការចាស់', threw ? threw.message : changed);
+            const clockHeld = JSON.parse(JSON.stringify(original));
+            const beforeClockHeld = JSON.stringify(clockHeld);
+            planned.resetServerClock();
+            threw = null;
+            try { result = invoke(clockHeld); } catch (error) { threw = error; }
+            ok(!threw && result === undefined && JSON.stringify(clockHeld) === beforeClockHeld,
+                label + ' ➜ clock បាត់ trust ក្រោយ prepare មិនប្តូរ history ឬ receipt', threw ? threw.message : clockHeld);
+            planned.serverClockTrusted = true;
+            threw = null;
+            try { result = invoke(clockHeld); } catch (error) { threw = error; }
+            ok(!threw && result === undefined && JSON.stringify(clockHeld) === beforeClockHeld,
+                label + ' ➜ trust ថ្មីមិនធ្វើឱ្យផែនការ clock generation ចាស់រស់វិញ', threw ? threw.message : clockHeld);
         }
     }
 }

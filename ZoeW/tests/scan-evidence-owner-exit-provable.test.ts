@@ -31,10 +31,10 @@ afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.useRealTimers(
  * ការអាន receipt លើកដំបូងក្នុងផ្លូវចេញបរាជ័យម្តង (TypeError 'Failed to fetch') ➜ ផ្លូវចេញព្យាយាមម្តងទៀត ហើយបញ្ចប់កំណត់ត្រា (mirror + «យករួច»)
  * ⛔ មិនទម្លាក់។ មុនកែ ៖ ទម្លាក់ ➜ «យករួច» និង mirror បាត់ជារៀងរហូត។ control ៖ ការសង្គ្រោះធម្មតាបញ្ចប់កំណត់ត្រាដដែល។
  */
-it.each(['transient-exit', 'control-resume'])('⛔ ផ្លូវចេញម្ចាស់ ធៀបនឹងកំណត់ត្រាដែល Server បញ្ជាក់ ៖ %s', async (mode) => {
+it.each(['transient-exit', 'control-resume', 'interval-retention'])('⛔ ផ្លូវចេញម្ចាស់ ធៀបនឹងកំណត់ត្រាដែល Server បញ្ជាក់ ៖ %s', async (mode) => {
     const provider: string = 'cookie', fault: string = 'handoff';
     let blip = false, blipHit = false;
-    vi.useFakeTimers({ toFake: fault === 'late-save' ? ['Date', 'setTimeout', 'clearTimeout'] : ['Date'] }); vi.setSystemTime(NOW); vi.spyOn(clock, 'getServerNow').mockReturnValue(NOW);
+    vi.useFakeTimers({ toFake: fault === 'late-save' ? ['Date', 'setTimeout', 'clearTimeout'] : ['Date'] }); vi.setSystemTime(NOW); const serverNow = vi.spyOn(clock, 'getServerNow').mockReturnValue(NOW);
     vi.stubGlobal('crypto', webcrypto); vi.stubGlobal('confirm', () => true);
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
     localStorage.clear(); localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: HOST }));
@@ -318,6 +318,26 @@ it.each(['transient-exit', 'control-resume'])('⛔ ផ្លូវចេញម�
             firebaseState.db = { app } as any; firebaseState.authGeneration++;
             dataState.scanHistory = Object.values(get(H)); dataState.pickupResumeInFlight = false;
             const toastsBefore = uiState.toasts.length;
+            if (mode === 'interval-retention') {
+                serverNow.mockRestore();
+                const midnight = Date.UTC(2026, 10, 5, 17);
+                vi.setSystemTime(midnight + 500); vi.spyOn(performance, 'now').mockReturnValue(1000); clock.resetServerClock();
+                expect(clock.acceptServerClockOffset(0, Object.freeze({ epochMs: midnight - 500, estimateEpochMs: midnight + 500,
+                    uncertaintyMs: 2000, wallMs: Date.now(), monotonicMs: 1000 }), false)).toBe(true);
+                firebaseState.sessionExpiryCheck = 'live';
+                await resumePendingScanOperations();
+                expect(journal()).toHaveLength(1); expect(journal()[0].phase).toBe('collected-pending');
+                expect(serverWrites).toBe(writesBefore); expect(get(C)).toBeNull();
+                expect(get(P + '/' + DAY)?.packagesPickedUp || 0).toBe(0);
+                expect(clock.acceptServerClockOffset(0, Object.freeze({ epochMs: midnight + 500, estimateEpochMs: midnight + 500,
+                    uncertaintyMs: 0, wallMs: Date.now(), monotonicMs: 1000 }), false)).toBe(true);
+                await resumePendingScanOperations();
+                expect(journal()).toEqual([]); expect(get(C)).toBeNull();
+                expect(get(P + '/' + DAY)?.pickedUpBarcodes?.[CODE]).toBe(PHONE);
+                expect(get(D + '/' + DAY)).toMatchObject({ codDollar: 5, totalCount: 1 });
+                expect(get(M + '/2026-10')).toMatchObject({ codDollar: 5, totalCount: 1 });
+                return;
+            }
             if (mode === 'transient-exit') {
                 blip = true;
                 vi.stubGlobal('confirm', () => true);

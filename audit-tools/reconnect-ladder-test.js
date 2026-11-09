@@ -60,6 +60,13 @@ if (missing.length) {
     console.log('\nសរុប: 0 ok, 1 FAIL');
     process.exit(1);
 }
+// callback ខាងក្នុងប្រើអថេរទាំងនេះពី attachInfoListeners។
+// រក្សាតម្លៃដំបូងពិត រួមទាំងពេលវាស់ប្រភព baseline ចាស់។
+const listenerClockState = ['disconnected', 'offsetValue', 'offsetSample'].map(name => {
+    const declaration = new RegExp('\\blet ' + name + ' = [^;]+;').exec(sliceFn('attachInfoListeners') || '');
+    return declaration ? declaration[0] : '';
+}).join('\n');
+const listenerCurrent = /\bconst current = [^;]+;/.exec(sliceFn('attachInfoListeners') || '')?.[0] || '';
 const connectedCb = sliceConnectedCallback();
 if (!connectedCb) {
     console.log('  FAIL   រក callback របស់ .info/connected មិនឃើញ');
@@ -132,7 +139,7 @@ function run({ handshakeMs, networkUpAt, connectedFromStart, ladder, budgetMs })
     vm.createContext(ctx);
 
     let code = [sliceConst('RECONNECT_FORCE_MIN_GAP_MS'), sliceConst('RECONNECT_WATCHDOG_STEPS_MS')].join('\n') +
-        '\n' + FNS.map(sliceFn).join('\n\n') + '\n' + connectedCb + '\n' +
+        '\n' + FNS.map(sliceFn).join('\n\n') + '\n' + listenerClockState + '\n' + connectedCb + '\n' +
         // ពិដានល្បឿនរបស់ `forceDatabaseReconnect` ឥឡូវឆ្លងកាត់ `elapsedSince()` (2.20.7)
         (sliceFn('elapsedSince') || 'function elapsedSince(mark) { return Date.now() - mark; }') + '\n' +
         // callback របស់ `.info/connected` ឥឡូវរលត់ទង់ស្តារ `.info/*` (កំណែ 2.19.3)។
@@ -143,6 +150,7 @@ function run({ handshakeMs, networkUpAt, connectedFromStart, ladder, budgetMs })
         "const INFO_LISTENER_KEY_CONNECTED = 'connected';\n" +
         "const INFO_LISTENER_KEY_OFFSET = 'serverTimeOffset';\n" +
         'const listenerGeneration = 1;\nlet infoListenerGeneration = 1;\n' +
+        'const database = db; const sdk = fb; const native = true; function observeNativeTime() {}\n' + listenerCurrent + '\n' +
         'let reconnectWatchdogTimer = null;\nlet reconnectWatchdogAttempt = 0;\nlet lastForcedReconnectAt = 0;\n' +
         'let hasEverConnectedToDatabase = ' + (connectedFromStart ? 'true' : 'false') + ';\n' +
         'let networkJustReturned = false;\n' +

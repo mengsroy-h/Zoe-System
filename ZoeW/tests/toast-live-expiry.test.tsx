@@ -21,6 +21,7 @@ beforeEach(() => {
     uiState.toasts = [];
     firebaseState.auth = { currentUser: { uid: 'u' } } as any;
     firebaseState.sessionExpiryCheck = 'live' as any;
+    firebaseState.serverClockTrusted = true;
     firebaseState.firebaseSdkUnavailable = false;
     firebaseState.reconnectWatchdogAttempt = 99;
     firebaseState.dbListenersFailed = false;

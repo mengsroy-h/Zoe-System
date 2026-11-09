@@ -3,7 +3,7 @@ import { TRASH_GENERATION_MAX, trashSourceUnconsumed } from '../domain/trash-gen
 import { cleanupAdmissionMatches, cleanupTrashLifecycleMatches } from '../domain/cleanup';
 import { rowOperationActive } from '../services/row-operation-lock';
 import { dataState, firebaseState } from '../core/state';
-import { getServerNow } from '../core/clock';
+import { captureClockOperation, getServerClockBounds, getServerNow } from '../core/clock';
 import { TRASH_FINAL_CONFIRM_NOTE } from '../core/text';
 import { generateUniqueId, stampTrashPolicy, stripHistoryOnlyMarkers, trashEntryIsFinal } from '../domain/barcode';
 import { getManualZtoTrashMode } from './lookup-config';
@@ -46,20 +46,25 @@ export function clearHistoryClaimValid(claim) {
 
 export function isActiveClearHistoryClaim(claim) {
     const claimedAt = claim && parseFloat(claim.claimedAt);
-    const now = getServerNow();
-    return !!(claim && typeof claim.token === 'string' && claim.token && isFinite(claimedAt) && claimedAt <= now && (now - claimedAt) < CLEAR_HISTORY_CLAIM_LEASE_MS);
+    const bounds = getServerClockBounds();
+    if (claim && !bounds) return true;
+    return !!(claim && bounds && typeof claim.token === 'string' && claim.token && isFinite(claimedAt) && claimedAt <= bounds.upperMs && (bounds.lowerMs - claimedAt) < CLEAR_HISTORY_CLAIM_LEASE_MS);
 }
 
 export const staleClearClaimSweeps = new Set();
 
 export function releaseStaleClearHistoryClaim(item) {
     if (!firebaseState.db || !firebaseState.fb || !item || !item.id || !/^[a-zA-Z0-9_-]+$/.test(item.id)) return;
+    const owner = captureTrashGenerationOwner();
+    const clock = captureClockOperation();
+    if (!owner || !clock.current()) return;
     if (!clearHistoryClaimValid(item.clearClaim) || isActiveClearHistoryClaim(item.clearClaim)) return;
     if (activeClearHistoryClaims.has(item.id)) return;
     if (staleClearClaimSweeps.has(item.id)) return;
     staleClearClaimSweeps.add(item.id);
     const release = () => { staleClearClaimSweeps.delete(item.id); };
-    dbOp(firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${item.id}`), (currentItem) => {
+    dbOp(owner.sdk.runTransaction(owner.sdk.ref(owner.db, `zoew_scan_history_cod_dod/${item.id}`), (currentItem) => {
+        if (!trashGenerationOwnerCurrent(owner) || !clock.current() || activeClearHistoryClaims.has(item.id)) return;
         if (rowOperationActive(currentItem)) return;
         if (!currentItem || !clearHistoryClaimValid(currentItem.clearClaim)) return;
         if (isActiveClearHistoryClaim(currentItem.clearClaim)) return;
@@ -93,6 +98,7 @@ export function buildClearHistoryTrashItem(item, id, mode = getManualZtoTrashMod
 }
 
 export async function claimHistoryItemForClear(id, token, owner = captureTrashGenerationOwner()) {
+    const clock = captureClockOperation();
     if (!owner) throw new Error('CLEAR_HISTORY_SESSION_SWITCHED');
     const path = `zoew_scan_history_cod_dod/${id}`;
     const expected = await readRestoreServerNode(owner.sdk, owner.db, path);
@@ -100,17 +106,21 @@ export async function claimHistoryItemForClear(id, token, owner = captureTrashGe
     if (!expected) throw new Error('CLEAR_HISTORY_MISSING');
     if (rowOperationActive(expected)) throw new Error('ROW_OPERATION_BUSY');
     const existing = expected.clearClaim;
+    const resume = existing?.token === token;
+    if (!resume && !clock.current()) throw new Error('CLEAR_HISTORY_CLOCK_CHANGED');
     if (existing && !clearHistoryClaimValid(existing)) throw new Error('CLEAR_HISTORY_GENERATION_HOLD');
     if (existing && existing.token !== token && isActiveClearHistoryClaim(existing)) throw new Error('CLEAR_HISTORY_IN_PROGRESS');
     const generation = existing?.token === token ? existing.trashGeneration : await allocateTrashGeneration(id, owner);
     if (generation === null || !trashGenerationOwnerCurrent(owner)) throw new Error('CLEAR_HISTORY_GENERATION_HOLD');
-    const planned = existing?.token === token ? existing : { token, claimedAt: getServerNow(), trashGeneration: generation, deletedAt: getServerNow() };
+    if (!resume && !clock.current()) throw new Error('CLEAR_HISTORY_CLOCK_CHANGED');
+    const planned = resume ? existing : { token, claimedAt: getServerNow(), trashGeneration: generation, deletedAt: getServerNow() };
     if (!clearHistoryClaimValid(planned)) throw new Error('CLEAR_HISTORY_GENERATION_HOLD');
     let status = 'CLEAR_HISTORY_MISSING';
     clearTokenOwners.set(id, { token, owner });
     activeClearHistoryClaims.set(id, token);
     let result;
     try { result = await dbOp(owner.sdk.runTransaction(owner.sdk.ref(owner.db, path), currentItem => {
+        if (!resume && !clock.current()) { status = 'CLEAR_HISTORY_CLOCK_CHANGED'; return; }
         if (!trashGenerationOwnerCurrent(owner) || !currentItem || !cleanupAdmissionMatches(expected, currentItem)) return;
         if (rowOperationActive(currentItem)) { status = 'ROW_OPERATION_BUSY'; return; }
         if (currentItem.restoreClaimId || currentItem.restoreClaimToken) { status = 'RESTORE_IN_PROGRESS'; return; }

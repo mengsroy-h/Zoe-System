@@ -4,7 +4,7 @@ import { runInNewContext } from 'node:vm';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 const require = createRequire(import.meta.url);
-const sandbox = { require, module: { exports: {} as any } };
+const sandbox = { require, __dirname: resolve('../audit-tools'), module: { exports: {} as any } };
 runInNewContext(readFileSync(resolve('../audit-tools/react-view.js'), 'utf8'), sandbox);
 const { wrappedTransactionCallSites } = sandbox.module.exports;
 const count = (source: string) => wrappedTransactionCallSites([source]).length;

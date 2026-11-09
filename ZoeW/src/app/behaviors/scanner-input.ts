@@ -1,5 +1,6 @@
 import { acceptPalmSignBarcode } from '../../features/zto-palm-sign';
 import { scanState, securityState, uiState } from '../../core/state';
+import { sessionUserActionAllowed } from '../../core/session-verification';
 import { latinDigits } from '../../core/text';
 import { isMobileDevice } from '../../core/timezone';
 import { queueScannedCode } from '../../features/batch-scan';
@@ -134,6 +135,7 @@ function dropHeldKeys(): void {
 function releaseHeldKeys(nextKeyAt?: number): void {
     const held = heldKeys;
     if (!held) return;
+    if (!sessionUserActionAllowed('scan')) { dropHeldKeys(); forgetScanBurst(); heldBreak = null; return; }
     const scanned = scanBurst.count >= SCANNER_MIN_CHARS;
     const lastKeyAt = scanBurst.at;
     const paused = typeof nextKeyAt === 'number' && nextKeyAt - lastKeyAt >= 0 && nextKeyAt - lastKeyAt <= SCANNER_SUFFIX_GAP_MS;
@@ -214,6 +216,7 @@ function holdScannerKey(e: KeyboardEvent, at: number): void {
 
 export function noteScannerKeyDown(e: KeyboardEvent): void {
     if (!e || e.defaultPrevented) return;
+    if (!sessionUserActionAllowed('scan')) { dropHeldKeys(); forgetScanBurst(); heldBreak = null; return; }
     const at = Number(e.timeStamp);
     if (heldKeys && !continuesHeldBurst(e, at)) releaseHeldKeys(scannerKeyChar(e) ? at : undefined);
     if (e.repeat) return;
@@ -270,6 +273,7 @@ export function setupHardwareScanner() {
 }
 
 export function hardwareScannerKeyPress(e: { key: string; preventDefault(): void }) {
+    if (!sessionUserActionAllowed('scan')) return;
     if (e.key === 'Enter') {
         e.preventDefault();
         submitManualBarcode();

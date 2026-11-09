@@ -1,3 +1,4 @@
+import { acceptServerClockOffset, resetServerClock } from '../src/core/clock';
 import { createScanMemorySdk } from './helpers/scan-memory-sdk';
 /**
  * ⛔ ប្រភពកញ្ចប់ ៖ ការ «បញ្ចូល» បញ្ជី ZTO ទុកប្រភព (`from` = `recSite`) ចូលប្រវត្តិ (`<id>/origins/<key>`) — កញ្ចប់ថ្មីដែលរក្សាទុកបាន
@@ -43,7 +44,7 @@ const listReply = (rows: any[]) => vi.fn(async () => json({ success: true, list:
     rows, signed: [], signedOk: true, signedPages: 1 }));
 
 beforeEach(() => {
-    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.useFakeTimers({ toFake: ['Date', 'performance'] });
     vi.setSystemTime(new Date(NOW));
     appLocalStore.clear();
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true,
@@ -84,6 +85,7 @@ beforeEach(() => {
             return { committed: true };
         }
     } as any;
+    resetServerClock(); acceptServerClockOffset(1, { epochMs: NOW, wallMs: Date.now(), monotonicMs: performance.now() }, false);
     for (const name of ['ztoListSyncFrom', 'ztoListSyncTo'] as const) {
         const input = document.createElement('input');
         input.value = name === 'ztoListSyncFrom' ? '2026-10-03' : '2026-10-06';

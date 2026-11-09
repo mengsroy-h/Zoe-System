@@ -93,6 +93,7 @@ function signLocally(codes: string[]) {
 async function settle() { for (let i = 0; i < 30; i++) await new Promise((r) => setTimeout(r, 0)); }
 
 beforeEach(() => {
+    firebaseState.sessionExpiryCheck = 'live';
     appLocalStore.clear(); appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://race.firebaseio.com' })); uiState.toasts = []; firebaseState.authGeneration++; firebaseState.dbListenerGeneration++;
     cleanupInFlight.clear(); dbListenerPendingPaths.clear(); dbListenerFailedPaths.clear();
     held = null; onHeld = null; lost = null; afterUpdate = null; collectedWrites = 0;

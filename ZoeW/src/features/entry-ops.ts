@@ -4,7 +4,7 @@ import { rowOperationActive } from '../services/row-operation-lock';
 import { fieldValue, focusField, setFieldValue } from '../app/refs';
 import { domText, viewState } from '../core/view-state';
 import { dataState, firebaseState, uiState } from '../core/state';
-import { getServerNow } from '../core/clock';
+import { captureClockOperation, getServerNow } from '../core/clock';
 import { RESTORE_IN_PROGRESS_CLOSE_TEXT, TRASH_FINAL_CONFIRM_NOTE, ZTO_SIGNED_REOPEN_TEXT, normalizeStoredPhone } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
 import { applyBarcodeCloseState, barcodeEntriesOf, barcodeZtoSigned, itemHasRestoreMarkers, normalizeBarcodesOf, stampTrashPolicy, stripHistoryOnlyMarkers, trashEntryIsFinal } from '../domain/barcode';
@@ -402,6 +402,8 @@ export async function toggleCloseStatus(id?) {
 }
 
 export async function deleteSingleItem(id, opts?) {
+    const clock = captureClockOperation();
+    if (!clock.current()) return 'blocked';
     if (cleanupInFlight.has(id)) return 'blocked';
     const quiet = !!(opts && opts.quiet);
     const say = (message) => { if (!quiet) showToast(message); };
@@ -442,8 +444,8 @@ export async function deleteSingleItem(id, opts?) {
     let operation = null;
     const releaseDelete = () => releaseCleanupOperation(id, operation);
     const deleteUpdater: any = (currentItem) => {
-        if (!deleteIsCurrent()) return;
         claimedWhole = null;
+        if (!deleteIsCurrent() || !clock.current()) return;
         clearClaimBlocked = false;
         restoreClaimBlocked = false;
         claimBusy = false;
@@ -540,8 +542,10 @@ export async function deleteSingleItem(id, opts?) {
     try {
         operation = beginCleanupOperation(id);
         await trashClaim.start();
+        if (!clock.current()) return 'blocked';
         const claim: any = await claimTrashBarcodes(id, claimToken, (current) => barcodeEntriesOf(current.barcodes).map(({ barcode }) => barcode && barcode.code).filter(Boolean), true);
         if (!deleteIsCurrent()) return 'stale';
+        if (!clock.current()) return 'blocked';
         if (claim.state !== 'idle' && (claim.state !== 'claimed' || claim.blocked)) {
             if (claim.state === 'none') {
                 settleClaim(true);
@@ -564,7 +568,7 @@ export async function deleteSingleItem(id, opts?) {
         }
         if (!claim.source || !generationOwner) return 'blocked';
         plannedSource = JSON.parse(JSON.stringify(claim.source));
-        if (!await prepareCleanupTrashGeneration({ ...plannedSource, id, trashReason: 'delete' }, operation, generationOwner) || !deleteIsCurrent()) {
+        if (!await prepareCleanupTrashGeneration({ ...plannedSource, id, trashReason: 'delete' }, operation, generationOwner) || !deleteIsCurrent() || !clock.current()) {
             if (deleteIsCurrent()) say('⏳ ការលុបកំពុងរង់ចាំការផ្ទៀងជំនាន់ធុងសំរាម។ សូម Sync រួចសាកម្ដងទៀត។');
             return deleteIsCurrent() ? 'blocked' : 'stale';
         }

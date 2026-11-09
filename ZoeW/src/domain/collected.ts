@@ -1,5 +1,6 @@
+import { sessionVerificationRequired } from '../core/session-verification';
 import { dataState, firebaseState, uiState } from '../core/state';
-import { PICKUP_DATE_KEY_PATTERN, cleanupClockIsTrustworthy, getServerNow } from '../core/clock';
+import { PICKUP_DATE_KEY_PATTERN, captureClockOperation, cleanupClockIsTrustworthy, getServerClockBounds, getServerNow } from '../core/clock';
 import { DB_LISTENER_KEY_DAILY_COLLECTED } from '../core/text';
 import { getZoneDateKey } from '../core/timezone';
 import { elapsedSince } from '../core/elapsed';
@@ -126,13 +127,14 @@ export function collectedSettleHeld(itemId) {
 export async function reconcileCollectedHistory(itemId, keys, attemptsLeft?, preserveCollectedDay?, quiet?, report?, operationCurrent?) {
     const targetKeys = [...new Set((keys || []).filter(Boolean))];
     if (!targetKeys.length || !firebaseState.dbRefDailyCollected || !firebaseState.db || !firebaseState.fb) return null;
+    const clock = preserveCollectedDay ? null : captureClockOperation();
     const attemptLimit = Math.min(3, Math.max(1, attemptsLeft || 3));
     const collectedAuthGeneration = firebaseState.authGeneration;
     const collectedDatabase = firebaseState.db;
     const collectedSdk = firebaseState.fb;
     const historyRef = collectedSdk.ref(collectedDatabase, `zoew_scan_history_cod_dod/${itemId}`);
     const isCurrent = () => collectedAuthGeneration === firebaseState.authGeneration && collectedDatabase === firebaseState.db
-        && (!operationCurrent || operationCurrent());
+        && (!operationCurrent || operationCurrent()) && (!clock || clock.current());
     const barcodesOf = (item) => {
         const barcodes = scanConfirmedBarcodes(item);
         if (barcodes === null) throw new Error('Pending scan proof unavailable');
@@ -202,8 +204,15 @@ export async function reconcileCollectedHistory(itemId, keys, attemptsLeft?, pre
                 applied = { server: Promise.all(barcodes.map(writeBarcode)).then((results) => results.every(Boolean)) };
             } else {
                 const days = new Set(Object.keys(dataState.dailyCollectedData || {}).filter((day) => PICKUP_DATE_KEY_PATTERN.test(day)));
-                const now = getServerNow();
+                const bounds = getServerClockBounds();
+                if (!bounds) return null;
+                const now = bounds.lowerMs;
                 const cutoff = collectedRetentionCutoffKey(now);
+                const latestCutoff = collectedRetentionCutoffKey(bounds.upperMs);
+                if (barcodes.some((barcode) => {
+                    const day = barcode.isClosed && collectedDayOfStamp(barcode.closedAt);
+                    return day && day >= cutoff && day < latestCutoff;
+                })) return null;
                 for (let index = 0; index < DAILY_COLLECTED_KEEP_DAYS; index++) days.add(getZoneDateKey(now, -index));
                 const marks = [];
                 barcodes.forEach((barcode) => {
@@ -286,10 +295,13 @@ export function staleCollectedDays(map, now) {
 }
 
 export function runAutomaticCollectedCleanup() {
+    if (sessionVerificationRequired()) return;
     if (!firebaseState.db || !firebaseState.fb || !firebaseState.dbRefDailyCollected) return;
     if (!cleanupClockIsTrustworthy()) return;
     if (dbListenerViewIsStale(DB_LISTENER_KEY_DAILY_COLLECTED)) return;
-    const stale = staleCollectedDays(dataState.dailyCollectedData, getServerNow());
+    const bounds = getServerClockBounds();
+    if (!bounds) return;
+    const stale = staleCollectedDays(dataState.dailyCollectedData, bounds.lowerMs);
     if (!stale.length) return;
     const collectedAuthGeneration = firebaseState.authGeneration;
     const collectedDatabase = firebaseState.db;

@@ -4,7 +4,7 @@ import { liveShopScope, shopScope, shopScopePending } from '../core/shop-scope';
 import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
 import { CLEANUP_JOURNAL_KEY, CLEANUP_LEGACY_JOURNAL_KEY, PICKUP_JOURNAL_KEY } from '../core/storage-keys';
 import { DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY } from '../core/text';
-import { getServerNow } from '../core/clock';
+import { captureClockOperation, getServerNow } from '../core/clock';
 import { getFormattedDate } from '../core/timezone';
 import { CLEANUP_LEDGER_RETRY_MAX, cleanupJournalEntryKey, cleanupJournalStorageKeys, readCleanupJournal } from './cleanup';
 import { reconcileCollectedHistory } from './collected';
@@ -711,9 +711,11 @@ function pickupCloseAcknowledgedKeys(entry, item) {
 }
 
 async function replayPickupClosePlan(entry, context) {
+    const clock = captureClockOperation();
+    if (!clock.current()) return null;
     const ref = context.sdk.ref(context.db, 'zoew_scan_history_cod_dod/' + entry.item);
     const result = await dbOp(context.sdk.runTransaction(ref, (item) => {
-        if (!pickupContextIsCurrent(context)) return;
+        if (!pickupContextIsCurrent(context) || !clock.current()) return;
         const current = readPickupJournal().find((candidate) => candidate.id === entry.id);
         if (!current || JSON.stringify(current.closePlan) !== JSON.stringify(entry.closePlan)) return;
         const applied = applyPickupClosePlan(current, item);
@@ -746,6 +748,7 @@ export function pickupIntentTracker(isCurrent, itemId?) {
     let admissionFailed = false;
     let transitionKnown = false;
     let everProposed = false;
+    let closeClock = null;
     const start = (closePlan?) => {
         const saved = !!context && isCurrent() && patchPickupJournalEntry(intent, { stage: 'started', ...(closePlan ? { closePlan } : {}) });
         if (!saved) admissionFailed = true;
@@ -754,6 +757,11 @@ export function pickupIntentTracker(isCurrent, itemId?) {
     return {
         context: () => context,
         startClose: (item, desiredClosed, whole = false) => {
+            closeClock = captureClockOperation();
+            if (!closeClock.current()) {
+                showToast('⏳ ម៉ោង server មិនទាន់ត្រឹមត្រូវ — សូម Sync/Refresh រួចសាកម្ដងទៀត។');
+                return false;
+            }
             const entry = readPickupJournal().find((entry) => entry.id === intent);
             if (!entry || new Set(entry.keys).size !== entry.keys.length
                 || barcodeEntriesOf(item?.barcodes).filter(({ barcode }) => entry.keys.includes(pickupBarcodeKey(barcode?.code))).length > entry.keys.length) return false;
@@ -767,6 +775,7 @@ export function pickupIntentTracker(isCurrent, itemId?) {
             return start(plan);
         },
         applyClose: (item) => {
+            if (closeClock && !closeClock.current()) return { kind: 'conflict' };
             const entry = readPickupJournal().find((candidate) => candidate.id === intent);
             if (!entry) return { kind: 'conflict' };
             if (entry.closePlan === undefined) return null;

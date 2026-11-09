@@ -21,6 +21,8 @@ const flush = () => vi.advanceTimersByTimeAsync(0);
 
 beforeEach(() => {
     vi.useFakeTimers();
+    firebaseState.serverClockTrusted = true;
+    firebaseState.serverTimeOffsetMs = 0;
     updates = [];
     item = { id: 'item1', phone: '0961111111', barcodes: [{ code: 'ZTX0001', cod: 5, dod: 0, isClosed: true, closedAt: Date.now() }] };
     uiState.toasts = [];

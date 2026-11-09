@@ -2,14 +2,14 @@ import { firebaseState } from '../core/state';
 import { appLocalStore } from '../core/storage';
 import { liveShopScope } from '../core/shop-scope';
 import { getFormattedDate } from '../core/timezone';
-import { getServerNow } from '../core/clock';
+import { captureClockOperation, getServerNow } from '../core/clock';
 import { type ScanImportProof } from './scan-import-proof';
 import { createScanEvidenceJournal, type ScanEvidenceRecord } from './scan-evidence';
 
 import { showToast } from '../ui/toast';
 import { viewState } from '../core/view-state';
 
-export type PendingScanHandle = { record: ScanEvidenceRecord; db: typeof firebaseState.db; auth: number; sdk?: typeof firebaseState.fb; claimed?: boolean; settlement?: Promise<boolean> };
+export type PendingScanHandle = { record: ScanEvidenceRecord; clock?: ReturnType<typeof captureClockOperation>; db: typeof firebaseState.db; auth: number; sdk?: typeof firebaseState.fb; claimed?: boolean; settlement?: Promise<boolean> };
 
 const scanEvidenceLive = new Map<string, PendingScanHandle>();
 const scanEvidenceLocks = new Map<string, () => void>();
@@ -34,15 +34,16 @@ function holdScanEvidenceLock(handle: PendingScanHandle) {
     } catch (e) {}
 }
 
-export function preparePendingScan(barcode, cod, dod, stampMs = 0, mode = 'direct', version: 1 | 2 = 1, importProof?: ScanImportProof, pickupEpoch?: number): PendingScanHandle {
+export function preparePendingScan(barcode, cod, dod, stampMs = 0, mode = 'direct', version: 1 | 2 = 1, importProof?: ScanImportProof, pickupEpoch?: number, clock = captureClockOperation()): PendingScanHandle {
     const scope = pendingScanScope();
     if (!scope || !firebaseState.db || !firebaseState.fb) throw Object.assign(new Error('Scan evidence scope unavailable'), { code: 'scan_evidence_unavailable' });
+    if (!clock.current()) throw Object.assign(new Error('Scan clock uncertain'), { code: 'clock_uncertain', noRetry: true });
     const createdAt = Number(stampMs) > 0 ? Number(stampMs) : getServerNow();
     const record = createScanEvidenceJournal(appLocalStore, version).prepare(scope, {
         barcode, createdAt, cod, dod, scanDate: getFormattedDate(createdAt as any), mode, ...(importProof === undefined ? {} : { importProof }),
         ...(pickupEpoch === undefined ? {} : { pickupEpoch })
     });
-    const handle = { record, db: firebaseState.db, auth: firebaseState.authGeneration, sdk: firebaseState.fb };
+    const handle = { record, clock, db: firebaseState.db, auth: firebaseState.authGeneration, sdk: firebaseState.fb };
     scanEvidenceLive.set(record.id, handle);
     holdScanEvidenceLock(handle);
     return handle;
@@ -137,6 +138,7 @@ export const SCAN_EVIDENCE_EXIT_HINT = 'បើនៅជាប់ សូមឲ្
 
 export function scanEvidenceRefusalText(error, importing = false) {
     const after = importing ? ' ការបញ្ចូលត្រូវបានផ្អាក មុនប៉ះប្រាក់។' : '';
+    if (error?.code === 'clock_uncertain') return '⏳ នាឡិកាមិនទាន់ផ្ទៀងផ្ទាត់បាន។ សូមភ្ជាប់បណ្តាញ ហើយសាកម្ដងទៀត។' + after;
     if (error?.code === 'pickup_epoch_unavailable') return '⏳ មិនអាចផ្ទៀងផ្ទាត់ស្ថិតិយកពី server បាន —' + (after || ' មិនទាន់រក្សាទុក។') + ' សូមភ្ជាប់បណ្តាញ រួចសាកម្តងទៀត។';
     if (error?.reason === 'unresolved') return '⚠️ ឧបករណ៍នេះមានការស្កេនមិនទាន់បញ្ចប់ច្រើនពេកសម្រាប់ហាង និងគណនីនេះ — មិនទាន់ទទួលការស្កេនថ្មី។' + after
         + ' App ផ្ទៀងវាម្ដងទៀតពេលភ្ជាប់ Server; ' + SCAN_EVIDENCE_EXIT_HINT;

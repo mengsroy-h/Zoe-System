@@ -68,12 +68,13 @@ function serve(dir) {
         s.listen(0, '127.0.0.1', () => res(s));
     });
 }
-const LICENSE_STUB = `window.ZoeLicense={getStatus:()=>Promise.resolve({state:'active'}),setServerTimeOffset(){},syncServerTime:()=>Promise.resolve(),activate:()=>Promise.resolve({ok:true}),verifyKeyString:()=>Promise.resolve({ok:true}),clearActivation(){}};`;
+const LICENSE_STUB = `window.ZoeLicense={getStatus:()=>Promise.resolve({state:'active'}),setServerTimeOffset(){},syncServerTime:()=>Promise.resolve(),activate:()=>Promise.resolve({ok:true}),verifyKeyString:()=>Promise.resolve({ok:true}),clearActivation(){}};` + require('./browser-clock-fixture.cjs').CLOCK_FIXTURE;
 
-const BOOT = function (seed) {
+const BOOT = function (seed, faults) {
     const store = JSON.parse(JSON.stringify(seed));
     window.__fakeStore = store;
-    window.__failTrashWrite = false;
+    window.__failTrashWrite = !!(faults && faults.failTrashWrite);
+    window.__trashWriteFailures = 0;
     window.__failHistoryTx = false;
     const listeners = [];
     function getPath(p) {
@@ -110,6 +111,7 @@ const BOOT = function (seed) {
     function fireAll() { [...new Set(listeners.map((l) => l.path))].forEach(fire); }
     window.__fireAll = fireAll;
     function denied(kind) {
+        if (kind === 'trash') window.__trashWriteFailures++;
         const e = new Error('PERMISSION_DENIED ' + kind);
         e.code = 'PERMISSION_DENIED';
         e.noRetry = true;
@@ -192,7 +194,7 @@ function seed(hist, revenue, pickup) {
     };
 }
 
-async function boot(browser, port, seedData) {
+async function boot(browser, port, seedData, faults) {
     const ctx = await browser.newContext({ viewport: { width: 412, height: 780 } });
     const page = await ctx.newPage();
     page.on('dialog', (d) => d.accept());
@@ -203,7 +205,7 @@ async function boot(browser, port, seedData) {
         return route.abort();
     });
     await page.addInitScript(`window.localStorage.setItem('zoew_firebase_config', ${JSON.stringify(JSON.stringify({ apiKey: 'k', databaseURL: 'https://fake-default-rtdb.firebaseio.com', projectId: 'p' }))});`);
-    await page.addInitScript('(' + BOOT.toString() + ')(' + JSON.stringify(seedData) + ');');
+    await page.addInitScript('(' + BOOT.toString() + ')(' + JSON.stringify(seedData) + ',' + JSON.stringify(faults || {}) + ');');
     await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
     await page.waitForTimeout(1600);
     return { ctx, page };
@@ -265,12 +267,22 @@ const memRev = (page) => page.evaluate((k) => (typeof dailyRevenueData !== 'unde
         it.createdAt = old;
         it.barcodes[0].createdAt = old;
         const s = seed({ it3: it }, { codDollar: 1.5, dodDollar: 0, totalCount: 1 });
-        const { ctx, page } = await boot(browser, port, s);
-        await page.evaluate(() => { window.__failTrashWrite = true; });
+        const { ctx, page } = await boot(browser, port, s, { failTrashWrite: true });
+        const failuresBefore = await page.evaluate(() => window.__trashWriteFailures);
+        ok('សម្អាតពេល boot ➜ បានប៉ះ fault ធុងសំរាមពិត', failuresBefore > 0, failuresBefore);
         await page.evaluate(() => window.runAutomaticCleanupRules());
         await page.waitForTimeout(1200);
         const after = await rev(page);
         ok('សម្អាត ៨ ថ្ងៃដែលធុងសំរាមធ្លាក់ ➜ ចំណូលត្រឡប់ទៅ 1.5 មិនមែន 6', after && after.codDollar === 1.5, after);
+        const identity = await page.evaluate(() => ({
+            live: window.__fakeStore.zoew_scan_history_cod_dod.it3,
+            trash: window.__fakeStore.zoew_recently_deleted_cod_dod.it3,
+            failures: window.__trashWriteFailures
+        }));
+        const afterM = await mrev(page);
+        ok('សម្អាតធ្លាក់ ➜ CC1 នៅក្នុងប្រវត្តិ គ្មានធុងសំរាមខ្មោច',
+            !!identity.live && identity.live.barcodes.length === 1 && identity.live.barcodes[0].code === 'CC1' && !identity.trash, identity);
+        ok('សម្អាតធ្លាក់ ➜ ចំណូលខែនៅ 1.5', afterM && afterM.codDollar === 1.5, afterM);
         await ctx.close();
     }
 

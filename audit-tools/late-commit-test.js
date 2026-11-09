@@ -266,7 +266,7 @@ function buildWorld(seed, opts) {
     };
 
     const context = vm.createContext({ ztoState: { ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 }, ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 } }, ZTO_TRASH_MODE_ACTIVE_MS: 7 * 24 * 60 * 60 * 1000, 
-        console, Promise, Math, Date, JSON, Object, Array, String, Number, Boolean, Map, Set, Error, RegExp,
+        console, Promise, Math, Date: class extends Date { static now() { return world.now; } }, JSON, Object, Array, String, Number, Boolean, Map, Set, Error, RegExp,
         parseFloat, parseInt, isNaN, isFinite, queueMicrotask,
         setTimeout: scaled.setTimeout,
         clearTimeout: scaled.clearTimeout,
@@ -281,6 +281,8 @@ function buildWorld(seed, opts) {
         dbRefMonthlyRevenue: fb.ref({}, 'zoew_monthly_revenue_cod_dod'),
         dbRefDailyPickup: fb.ref({}, 'zoew_daily_pickup_cod_dod'),
         dbRefDailyCollected: fb.ref({}, 'zoew_daily_collected_cod_dod'),
+        // នាឡិកាទុកចិត្តបែបសាកល្បង សម្រាប់ commit យឺត; រក្សា world.now ដើម។
+        sessionExpiryCheck: 'live', serverTimeOffsetMs: 0, serverClockTrusted: true,
         getServerNow: () => world.now,
         getFormattedDate: () => SCAN_DATE,
         showToast: (msg) => { world.toasts.push(String(msg)); },
@@ -347,7 +349,7 @@ function buildWorld(seed, opts) {
         ...REAL_FNS.map((name) => fnSrc[name]),
         optionalSrc
     ].join('\n\n');
-    const protocol = moduleRuntime(ROOT, src, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/barcode.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations'] }]);
+    const protocol = moduleRuntime(ROOT, src, [{ path: 'src/core/session-verification.ts', expose: ['sessionVerificationRequired'] }, { path: 'src/core/clock.ts', expose: ['captureClockOperation', 'serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'getServerClockBounds'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/barcode.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations'] }]);
     context.__storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://fixture-late-commit-test.invalid' }) });
     context.auth = { currentUser: { uid: 'fixture-user' } };
     context.dataState = { pickupPendingVersion: 0 };

@@ -273,6 +273,7 @@ export function shopOf(backend: Backend, site = SITE) {
 }
 
 export function signIn(backend: Backend, token: string, site = SITE) {
+    firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live';
     firebaseState.authGeneration++;
     firebaseState.db = { shop: shopOf(backend, site) } as any;
     if (backend === 'firebase') {

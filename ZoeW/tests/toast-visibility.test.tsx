@@ -12,7 +12,7 @@ import { ToastList } from '../src/app/components/toast/ToastList';
 import { firebaseState, securityState, uiState } from '../src/core/state';
 import { dbListenerPendingPaths } from '../src/core/text';
 import { hideAppLockScreen, showAppLockScreen } from '../src/features/app-lock';
-import { TOAST_LIFETIME_MS, TOAST_LIVE_LIMIT_MS, showLiveToast, showToast } from '../src/ui/toast';
+import { TOAST_LIFETIME_MS, TOAST_LIVE_LIMIT_MS, refreshLiveToasts, showLiveToast, showToast } from '../src/ui/toast';
 
 let host: HTMLElement;
 let root: any;
@@ -32,14 +32,87 @@ beforeEach(() => {
     root = createRoot(host);
     reactAct(() => { root.render(<ToastList />); });
     securityState.appIsLocked = false;
+    firebaseState.auth = null;
+    firebaseState.serverClockTrusted = true;
     reactAct(() => { uiState.toasts = []; uiState.flush(); });
 });
 
 afterEach(() => {
     securityState.appIsLocked = false;
+    firebaseState.auth = null;
+    refreshLiveToasts();
     reactAct(() => { vi.runOnlyPendingTimers(); uiState.flush(); });
     reactAct(() => { root.unmount(); });
     vi.useRealTimers();
+});
+
+describe('សម័យរង់ចាំផ្ទៀងផ្ទាត់ ៖ toast លាក់ត្រូវរក្សាអាយុ', () => {
+    for (const state of ['pending', 'unverified', 'expired']) {
+        it('សារ ' + state + ' រង់ចាំសម័យច្បាស់ រួចទើបចាប់អាយុពេញ', () => {
+            firebaseState.auth = { currentUser: { uid: 'held' } } as any;
+            firebaseState.sessionExpiryCheck = state;
+            step(() => { showToast('⚠️ ប្រាក់រង់ចាំផ្ទៀងផ្ទាត់'); });
+            step(() => { vi.advanceTimersByTime(60000); refreshLiveToasts(); });
+            expect(texts()).toEqual(['⚠️ ប្រាក់រង់ចាំផ្ទៀងផ្ទាត់']);
+            step(() => {
+                if (state === 'expired') firebaseState.auth = null;
+                else firebaseState.sessionExpiryCheck = 'live';
+                refreshLiveToasts();
+            });
+            step(() => { vi.advanceTimersByTime(TOAST_LIFETIME_MS - 1); });
+            expect(texts()).toEqual(['⚠️ ប្រាក់រង់ចាំផ្ទៀងផ្ទាត់']);
+            step(() => { vi.advanceTimersByTime(301); });
+            expect(texts()).toEqual([]);
+        });
+    }
+
+    it('toast មាន timer រួច ប៉ុន្តែនាឡិកាបាត់ទំនុកចិត្ត មិនបាត់ក្រោយវាំងនន', () => {
+        firebaseState.auth = { currentUser: { uid: 'held' } } as any;
+        firebaseState.sessionExpiryCheck = 'live';
+        step(() => { showToast('⚠️ លទ្ធផលរក្សាទុកមិនទាន់ច្បាស់'); });
+        step(() => { vi.advanceTimersByTime(1000); });
+        firebaseState.serverClockTrusted = false;
+        step(() => { vi.advanceTimersByTime(60000); });
+        expect(texts()).toEqual(['⚠️ លទ្ធផលរក្សាទុកមិនទាន់ច្បាស់']);
+        step(() => { firebaseState.serverClockTrusted = true; refreshLiveToasts(); });
+        step(() => { vi.advanceTimersByTime(TOAST_LIFETIME_MS - 1); });
+        expect(texts()).toHaveLength(1);
+        step(() => { vi.advanceTimersByTime(301); });
+        expect(texts()).toEqual([]);
+    });
+
+    it('សម័យផ្ទៀងផ្ទាត់រួច តែ PIN នៅជាប់សោ មិនចាប់អាយុមុនពេលដោះ', () => {
+        firebaseState.auth = { currentUser: { uid: 'held' } } as any;
+        firebaseState.sessionExpiryCheck = 'unverified';
+        step(() => { showToast('⚠️ សារដែលត្រូវអាន'); });
+        showAppLockScreen(true);
+        step(() => { firebaseState.sessionExpiryCheck = 'live'; refreshLiveToasts(); vi.advanceTimersByTime(60000); });
+        expect(texts()).toEqual(['⚠️ សារដែលត្រូវអាន']);
+        step(() => { hideAppLockScreen(); vi.advanceTimersByTime(TOAST_LIFETIME_MS + 300); });
+        expect(texts()).toEqual([]);
+    });
+
+    it('toast បណ្តាញរស់រង់ចាំផ្ទៀងផ្ទាត់ ហើយអានភាពជោគជ័យថ្មីមុនចាប់អាយុ', () => {
+        vi.spyOn(navigator, 'onLine', 'get').mockImplementation(() => true);
+        firebaseState.auth = { currentUser: { uid: 'held' } } as any;
+        firebaseState.sessionExpiryCheck = 'unverified';
+        firebaseState.isDatabaseConnected = false;
+        firebaseState.dbListenersFailed = false;
+        dbListenerPendingPaths.clear();
+        step(() => { showLiveToast('network'); vi.advanceTimersByTime(60000); });
+        expect(texts()).toEqual(['🔄 កំពុងភ្ជាប់ Server ឡើងវិញ...']);
+        step(() => { firebaseState.sessionExpiryCheck = 'live'; firebaseState.isDatabaseConnected = true; refreshLiveToasts(); });
+        expect(texts()).toEqual(['✅ ភ្ជាប់ Server វិញ — ទិន្នន័យទាន់សម័យ']);
+        step(() => { vi.advanceTimersByTime(TOAST_LIFETIME_MS + 300); });
+        expect(texts()).toEqual([]);
+    });
+
+    it('គ្មានអ្នកចូល ទោះស្ថានភាពចាស់មិនទាន់ផ្ទៀងផ្ទាត់ toast នៅផុតតាមអាយុធម្មតា', () => {
+        firebaseState.sessionExpiryCheck = 'unverified';
+        firebaseState.serverClockTrusted = false;
+        step(() => { showToast('⚠️ សូមចូលប្រព័ន្ធ'); vi.advanceTimersByTime(TOAST_LIFETIME_MS + 300); });
+        expect(texts()).toEqual([]);
+    });
 });
 
 describe('ពិដាន ៤ ៖ សារព្រមានមិនត្រូវបានរុញចេញដោយសារធម្មតា', () => {

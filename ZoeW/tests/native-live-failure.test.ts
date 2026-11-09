@@ -6,6 +6,7 @@
 // write refused while recovery is blocked answers `write_recovery_pending`.
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { firebaseState } from '../src/core/state';
+import { acceptServerClockOffset, resetServerClock } from '../src/core/clock';
 import { dbListenerPendingPaths } from '../src/core/text';
 import { nativeWriteRecoveryState } from '../src/services/native-write-recovery';
 import { withTransactionOutcomeResolution } from '../src/services/tx-outcome';
@@ -26,6 +27,7 @@ function lab(transaction: any, update?: any) {
   const sdk = withTransactionOutcomeResolution(raw); sdk.getAuth(app); sdk.getDatabase(app);
   Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db, isDatabaseInitialized: true,
     isInitializingFirebase: false, firebaseSdkUnavailable: false, isDatabaseConnected: true, sessionExpiryCheck: 'live', authLoginOperation: null });
+  resetServerClock(); acceptServerClockOffset(0, null, false);
   return { sdk, db, app, sets };
 }
 const ledgerUpdater = () => Object.assign((value: any) => ({ codDollar: ((value && value.codDollar) || 0) + 5, op: TOKEN, ops: { [TOKEN]: 1 } }),

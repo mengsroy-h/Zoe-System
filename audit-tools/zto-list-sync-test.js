@@ -88,6 +88,25 @@ ok('ជាន់អប្បបរមា ៖ អាន Function បាន', FUNC
 ok('ជាន់អប្បបរមា ៖ អាន app.js បាន', APP_SRC.length > 200000, APP_SRC.length);
 ok('ជាន់អប្បបរមា ៖ អាន index.html បាន', HTML_SRC.length > 20000, HTML_SRC.length);
 
+function installListClockFixture(context) {
+    const NativeDate = Date;
+    context.Date = class extends NativeDate {
+        static now() { return Number.isFinite(context.__now) ? context.__now : NativeDate.now(); }
+    };
+    context.performance = { now: () => context.Date.now() };
+    context.serverClockTrusted = true;
+    context.serverTimeOffsetMs = 0;
+    context.isDatabaseConnected = true;
+    context.sessionExpiryCheck = 'live';
+    if (!context.db) context.db = {};
+    const clockRuntime = require('./react-view').moduleRuntime(ROOT, APP_SRC, [
+        { path: 'src/core/clock.ts', expose: ['getServerClockBounds', 'captureClockOperation', 'serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'resetServerClock'] },
+        { path: 'src/core/session-verification.ts', expose: ['sessionVerificationRequired'] }
+    ]);
+    vm.runInContext(clockRuntime.code, context);
+    return clockRuntime;
+}
+
 function sliceBalanced(src, from) {
     let depth = 0;
     for (let i = from; i < src.length; i++) {
@@ -1024,6 +1043,7 @@ function firstBody(requests) {
         sandbox.globalThis = sandbox;
         try {
             vm.createContext(sandbox);
+            installListClockFixture(sandbox);
             vm.runInContext(require('./react-view').moduleRuntime(ROOT, APP_SRC, ['src/domain/barcode-key.ts']).code, sandbox);
             vm.runInContext(NEEDED_CONSTS.join('\n') + '\n' + parts.join('\n')
                 + '\nglobalThis.__classify = classifyZtoListRows;'
@@ -1031,6 +1051,13 @@ function firstBody(requests) {
             sandbox.__now = sandbox.__stamp0('2026-09-11 09:00:00');
             classify = sandbox.__classify;
             sandbox0Stamp = sandbox.__stamp0;
+            const owner = sandbox.captureClockOperation();
+            ok('នាឡិកាក្លែងមានព្រំដែនពិត និងម្ចាស់ប្រតិបត្តិការ', owner.current() && sandbox.getServerClockBounds().lowerMs === sandbox.__now);
+            sandbox.resetServerClock();
+            ok('នាឡិកាមិនទុកចិត្ត ➜ ព្រំដែនបិទ និងចាត់ថ្នាក់មិនបញ្ចូល', sandbox.getServerClockBounds() === null
+                && Object.values(classify([{ barcode: '77130500000111', phone: '0999888777', at: '2026-09-10 10:00:00' }], [], [])).every(rows => rows.length === 0));
+            sandbox.serverClockTrusted = true;
+            ok('ស្ដារទំនុកចិត្តមិនស្ដារម្ចាស់នាឡិកាចាស់', !owner.current() && sandbox.captureClockOperation().current());
         } catch (e) {
             ok('sandbox រត់បាន', false, String(e && e.message));
         }
@@ -1521,6 +1548,7 @@ function firstBody(requests) {
         let runImport = null;
         try {
             vm.createContext(box);
+            installListClockFixture(box);
             vm.runInContext(require('./react-view').moduleRuntime(ROOT, APP_SRC, [
                 'src/domain/barcode-key.ts', 'src/core/storage.ts', 'src/core/shop-scope.ts',
                 { path: 'src/services/scan-import-proof.ts', expose: ['scanImportProofValid', 'SCAN_IMPORT_CACHE_TTL_MS'] },
@@ -2415,6 +2443,7 @@ function firstBody(requests) {
         let runEntry = null;
         try {
             vm.createContext(ebox);
+            installListClockFixture(ebox);
             vm.runInContext(require('./react-view').moduleRuntime(ROOT, APP_SRC, ['src/domain/barcode-key.ts']).code, ebox);
             vm.runInContext(scanEvidenceRuntime(ROOT, APP_SRC) + '\n' + entryConsts.join('\n') + '\n' + entryParts.join('\n')
                 + '\nglobalThis.__entry = addOrUpdateEntry;globalThis.__legacyPrepare = preparePendingScan;'
@@ -2503,6 +2532,7 @@ function firstBody(requests) {
             getServerNow: () => vbox.__now, refreshCurrentHistoryView() {}, showToast() {}, updateRecentPhonesList() {}, viewState: {} };
         vbox.window = vbox; vbox.globalThis = vbox;
         vm.createContext(vbox);
+            installListClockFixture(vbox);
         const fakeSource = fs.readFileSync(path.join(__dirname, 'duplicate-money-test.js'), 'utf8');
         const bootStart = fakeSource.indexOf('const BOOT = function'), bootEnd = fakeSource.indexOf('function seedEmpty()');
         if (bootStart < 0 || bootEnd <= bootStart) throw new Error('Actual atomic SDK fixture missing');

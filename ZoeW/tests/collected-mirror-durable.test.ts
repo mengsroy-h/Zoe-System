@@ -310,6 +310,7 @@ beforeEach(() => {
     firebaseState.dbListenersFailed = false;
     firebaseState.isDatabaseConnected = true;
     firebaseState.serverClockTrusted = true;
+    firebaseState.sessionExpiryCheck = 'live';
     firebaseState.serverTimeOffsetMs = 0;
     firebaseState.fb = makeFb() as any;
     for (const [name, path] of [['dbRefHistory', HISTORY], ['dbRefDeleted', TRASH],
@@ -1886,6 +1887,7 @@ it.each(['remove', 'delete', 'abandon'])('MX-1 ពិនិត្យ ៦ · 5 %s
     const open = rerunAfterGate(HISTORY + '/');
     const run = kind === 'remove' ? removeSingleBarcode(id, 'MX1R8' + kind.length) : kind === 'delete' ? deleteSingleItem(id, { confirmed: true, quiet: true }) : cleanup.claimAndCleanupItem(id, 'abandon');
     await vi.advanceTimersByTimeAsync(100);
+    const held = JSON.stringify(lab.store);
     switchShopB();
     open();
     await vi.advanceTimersByTimeAsync(5000);
@@ -1893,6 +1895,7 @@ it.each(['remove', 'delete', 'abandon'])('MX-1 ពិនិត្យ ៦ · 5 %s
     const pass = resumeInterruptedCleanups();
     await vi.advanceTimersByTimeAsync(5000);
     await pass;
+    expect(JSON.stringify(lab.store), 'ប្រតិបត្តិការចាស់មិនសរសេរក្រោយប្តូរហាង').toBe(held);
     expect(capturesOf(id).length + lab.captures.filter((c) => !c.extra.itemId && !c.extra.itemIds).length, 'one alarm per interrupted operation').toBe(1);
 });
 

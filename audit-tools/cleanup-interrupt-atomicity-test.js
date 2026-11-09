@@ -47,7 +47,7 @@ if (!fs.existsSync(FILE)) {
     return;
 }
 const SRC = fs.readFileSync(FILE, 'utf8');
-const protocolRuntime = moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations'] }]);
+const protocolRuntime = moduleRuntime(ROOT, SRC, [{ path: 'src/core/session-verification.ts', expose: ['sessionVerificationRequired'] }, { path: 'src/core/clock.ts', expose: ['captureClockOperation', 'serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'getServerClockBounds'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations'] }]);
 
 function sliceFrom(src, name) {
     let start = src.indexOf('function ' + name + '(');
@@ -227,7 +227,7 @@ function makeRun(opts) {
 
     const box = { ztoState: { ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 }, ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 } }, ZTO_TRASH_MODE_ACTIVE_MS: 7 * 24 * 60 * 60 * 1000, 
         console: { log: () => {}, error: () => {}, warn: () => {} },
-        queueMicrotask, Date, JSON, Math, Object, Set, Map, Array, String, Number, Boolean,
+        queueMicrotask, Date: class extends Date { static now() { return NOW; } }, JSON, Math, Object, Set, Map, Array, String, Number, Boolean,
         parseFloat, parseInt, isNaN, isFinite, Promise, RegExp, Intl, Error,
         setTimeout: (fn, ms) => {
             const id = setTimeout(() => { liveTimers.delete(id); fn(); }, Math.min(ms || 0, 30));
@@ -246,6 +246,8 @@ function makeRun(opts) {
         dbRefHistory: { path: 'zoew_scan_history_cod_dod' },
         dbRefDailyRevenue: { path: 'zoew_daily_revenue_cod_dod' },
         dbRefMonthlyRevenue: { path: 'zoew_monthly_revenue_cod_dod' },
+        // offset ទុកចិត្តបែបសាកល្បង សម្រាប់លទ្ធផល transaction មិនមែនការផ្ទៀងនាឡិកា។
+        sessionExpiryCheck: 'live', serverTimeOffsetMs: 0,
         getServerNow: () => NOW,
         showToast: (m) => { toasts.push(String(m)); },
         refreshCurrentHistoryView: () => {},

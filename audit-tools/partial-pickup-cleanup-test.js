@@ -124,7 +124,7 @@ const src = fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, '\n');
     check(twoHours === 2 * 60 * 60 * 1000, '⛔ TWO_HOURS_MS ក្នុងកូដ ship = ២ ម៉ោង (ថេរសម្អាតស្វ័យប្រវត្តិ ៖ មិនប្តូរដោយគ្មានការស្នើ)', twoHours);
 }
 
-const REAL_FNS = ['barcodeRegistryKey', 'getZtoPickupVerdict', 'ztoVerdictCandidate', 'ztoImportLegacyValid', 'readDurableZtoImportLegacy',
+const REAL_FNS = ['barcodeRegistryKey', 'getZtoPickupVerdict', 'resolveZtoPickupSignTime', 'ztoSignedTimeMillis', 'ztoVerdictCandidate', 'ztoImportLegacyValid', 'readDurableZtoImportLegacy',
     'loadZtoPickupStatusOnce',
     'getZtoTrashMode', 'ztoTrashModeOf', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'lookupApiIsZto', 'lookupApiIsPalm', 'barcodeZtoSigned', 'stampTrashPolicy',
     'barcodeEntriesOf',
@@ -223,6 +223,8 @@ function buildWorld(historySeed, startNow) {
         dbRefMonthlyRevenue: fb.ref({}, 'zoew_monthly_revenue_cod_dod'),
         dailyRevenueData: {},
         monthlyRevenueData: {},
+        // offset បែបសាកល្បងត្រូវគ្នានឹងនាឡិកាអាជីវកម្មថេរខាងក្រោម។
+        sessionExpiryCheck: 'live', serverTimeOffsetMs: 0,
         getServerNow: () => world.now,
         getFormattedDate: () => '2026-08-19',
         ...ledgerStubEntries(
@@ -303,7 +305,7 @@ function buildWorld(historySeed, startNow) {
         'globalThis.claimAndCleanupItem = claimAndCleanupItem;'
     ].join('\n\n');
 
-    const protocol = moduleRuntime(ROOT, src, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations'] }]);
+    const protocol = moduleRuntime(ROOT, src, [{ path: 'src/core/session-verification.ts', expose: ['sessionVerificationRequired'] }, { path: 'src/core/clock.ts', expose: ['captureClockOperation', 'serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'getServerClockBounds'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations'] }]);
     context.__storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://fixture-partial-pickup-cleanup-test.invalid' }) });
     context.auth = { currentUser: { uid: 'fixture-user' } };
     context.dataState = { pickupPendingVersion: 0 };
@@ -311,6 +313,7 @@ function buildWorld(historySeed, startNow) {
     context.ztoStatusLoaded = false;
     context.ztoPickupStatus = new Map();
     context.navigator = { onLine: true };
+    Object.defineProperty(context, 'serverTimeOffsetMs', { get: () => world.now - Date.now() });
     vm.runInContext(protocol.code + '\n' + protocol.withoutBindings(code), context);
 
     world.context = context;
@@ -554,9 +557,24 @@ async function scenarioFreshPickupAtDeadline() {
     check(revenueTotal(world.revenueLog).dod === -25, 'ស្ថិតិចំណូលមិនប្រែទៀតទេ');
 }
 
+async function scenarioClockHold() {
+    const item = parcel('clock_hold', [{code:'CLOCK1',cod:4,dod:0,isClosed:false}]);
+    const world = buildWorld({clock_hold:item}, T0 + 8 * DAY);
+    vm.runInContext('serverClockTrusted = false;', world.context);
+    await world.tick(T0 + 8 * DAY);
+    check(world.transactionCalls === 0 && !!world.getPath('zoew_scan_history_cod_dod/clock_hold'),
+        'នាឡិកាមិនទុកចិត្ត៖ មិនសម្អាតប្រវត្តិ');
+    vm.runInContext('serverClockTrusted = true;', world.context);
+    await world.tick(T0 + 8 * DAY);
+    check(!world.getPath('zoew_scan_history_cod_dod/clock_hold')
+        && !!world.getPath('zoew_recently_deleted_cod_dod/clock_hold'), 'នាឡិកាត្រឡប់៖ សម្អាតបាន');
+    check(revenueTotal(world.revenueLog).cod === -4, 'នាឡិកាត្រឡប់៖ កាត់ប្រាក់តែម្តង');
+}
+
 (async () => {
     console.log('partial-pickup-cleanup-test — ការសម្អាតស្វ័យប្រវត្តិលើកញ្ចប់ដែលយករួចខ្លះ');
     console.log('App: ' + APP);
+    await scenarioClockHold();
     await scenarioMixedParcel();
     await scenarioAllOpen();
     await scenarioAllClosed();

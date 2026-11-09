@@ -1,6 +1,7 @@
 import { elementOf } from '../app/refs';
 import { createScratchCanvas } from '../platform/document-io';
 import { scanState, uiState } from '../core/state';
+import { sessionUserActionAllowed } from '../core/session-verification';
 import { elapsedSince } from '../core/elapsed';
 import { searchByPhone } from '../features/phone-suggest';
 import { triggerScanAction } from '../features/scan-action';
@@ -302,6 +303,7 @@ export function startZxingVideoScan(videoElement) {
 }
 
 export function processScannedCode(code) {
+    if (!sessionUserActionAllowed('scan')) return;
     if (uiState.isModalOpen || !code) return;
     let currentTime = Date.now();
     if (code !== scanState.lastScannedCode || elapsedSince(scanState.lastScanTime) > 2500) {

@@ -253,3 +253,5 @@ describe('signed-only list row of a parcel ZoeW already picked up, after its pic
         expect(imported.scanIntent).toMatch(/^scan_[a-f0-9]{32}$/);
     });
 });
+
+beforeEach(() => { firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live'; });

@@ -348,12 +348,22 @@ describe('panel-motion fixture៖ ប្រតិទិនថេរ តែចល
         expect(source.match(/await \w+\.newPage\(\)/g)).toHaveLength(3);
     });
 
-    it('Date គ្មានអាគុយម៉ង់ថេរ តែ constructor/parse/UTC និង timer/rAF/performance មិនត្រូវក្លែង', async () => {
+    it('Date គ្មានអាគុយម៉ង់ដើរតាម monotonic តែ constructor/parse/UTC និង timer/rAF/performance មិនត្រូវក្លែង', async () => {
         const context = fixture();
+        const beforePin = performance.now();
         vm.runInContext('pinPanelFixtureClock(FIXTURE_NOW)', context);
-        expect(context.Date.now()).toBe(beforeMidnight);
-        expect(new context.Date().getTime()).toBe(beforeMidnight);
-        expect(context.Date()).toBe(new Date(beforeMidnight).toString());
+        const afterPin = performance.now();
+        const expectClockRead = (read: () => number, precision = 1) => {
+            const beforeRead = performance.now();
+            const value = read();
+            const afterRead = performance.now();
+            // ព្រំវាស់មកពី monotonic ពិត មិនបន្ថែម epsilon ឬបង្កក clock ដើម្បីឱ្យជាប់។
+            expect(value).toBeGreaterThanOrEqual(Math.floor((beforeMidnight + Math.floor(beforeRead - afterPin)) / precision) * precision);
+            expect(value).toBeLessThanOrEqual(Math.floor((beforeMidnight + Math.floor(afterRead - beforePin)) / precision) * precision);
+        };
+        expectClockRead(() => context.Date.now());
+        expectClockRead(() => new context.Date().getTime());
+        expectClockRead(() => Date.parse(context.Date()), 1000);
         expect(new context.Date(0).getTime()).toBe(0);
         expect(new context.Date('2026-10-31T00:00:00Z').toISOString()).toBe('2026-10-31T00:00:00.000Z');
         expect(new context.Date(2026, 9, 30).getTime()).toBe(new Date(2026, 9, 30).getTime());
@@ -367,6 +377,7 @@ describe('panel-motion fixture៖ ប្រតិទិនថេរ តែចល
         const tick = performance.now(); expect(tick).toBeGreaterThan(start);
         await new Promise<void>((resolve) => context.requestAnimationFrame(() => resolve()));
         expect(performance.now()).toBeGreaterThan(tick);
-        expect(context.Date.now()).toBe(beforeMidnight);
+        expect(context.Date.now()).toBeGreaterThan(beforeMidnight);
+        expectClockRead(() => context.Date.now());
     });
 });

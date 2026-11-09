@@ -1,3 +1,4 @@
+import { acceptServerClockOffset, resetServerClock } from '../src/core/clock';
 /**
  * ↩️ កញ្ចប់ត្រឡប់ទៅវិញ (សំណើម្ចាស់គម្រោង ៖ «ចង់ឲ្យកញ្ចប់ដែលត្រឡប់ទៅវិញត្រូវលាក់ ឬបង្ហាញសញ្ញាក្នុងបញ្ជី ទាំង Cookie និង palm»)។
  * ភស្តុតាង ៖ សាខាខ្លួនស្កេន «ត្រឡប់ការស្កេន» (Argus `scanTypeCode: "-710"` · payload ពិតដែលម្ចាស់គម្រោងចម្លង) **ក្រោយ** ការមកដល់ចុងក្រោយ ➜
@@ -331,3 +332,9 @@ describe('📍 Cookie ៖ រាងជួរ Argus ពិត (ម្ចាស់
         expect(groups.fresh).toEqual([]);
     });
 });
+
+beforeEach(() => {
+    resetServerClock();
+    acceptServerClockOffset(1, { epochMs: Date.now(), wallMs: Date.now(), monotonicMs: performance.now() }, false);
+});
+afterEach(() => resetServerClock());

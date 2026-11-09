@@ -42,6 +42,9 @@ const LOCAL_CLOCK_OK = {
         registerServiceWorker: 'throttle `reg.update()` ១៥ នាទី — cosmetic/local ហើយវាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ update ភ្លាម)',
         elapsedSince: 'ជាមូលដ្ឋាននៃពិដានល្បឿនទាំងអស់ — អានក្លាក់ឆៅ **ដើម្បីធ្វើឲ្យវាមានសុវត្ថិភាព** (ថយក្រោយ ➜ Infinity); ចាក់សោដោយ `monotonic-gate-test.js`',
         getServerNow: 'និយមន័យរបស់នាឡិកា server ខ្លួនឯង',
+        serverClockIsTrustworthy: 'ផ្ទៀង wall clock ជាមួយ monotonic ដើម្បីសម្គាល់ភាពមិនប្រាកដ និងស្នើ sample ថ្មី; មិនសម្រេចអាយុកញ្ចប់ដោយ wall clock។',
+        getServerClockBounds: 'គណនាព្រំដែនម៉ោង Server ពី sample ដើម និងភាពបន្ត wall/monotonic; session និង retention ប្រើ interval ដោយឡែកពី timestamp estimate។',
+        acceptServerClockOffset: 'បង្កើត anchor ពេលទទួល sample Server តែប៉ុណ្ណោះ; ការអានបន្ទាប់ប្រើ monotonic មិនយក wall clock ថ្មី។',
         getZtoPickupVerdict: 'Local import-proof cache freshness only; candidate identity/provider/actor/scope must match and future observations are rejected. Not parcel age, receipt time or revenue time; scan-import-proof and scan-reboot-closure cover TTL boundaries and backward clock.',
         persistZtoImportVerdict: 'Publishes local import-proof observation cache with original verified stamp; device clock only checks bounded freshness, never invents server Sign time or financial receipt.',
         createScanImportProofCache: 'Default device clock for local persisted proof cache inspect/publish/lookup; ageOf rejects future/non-finite stamps, TTL only expires Sign evidence. Binding and exact evidence still required; no money or parcel retention timestamps.',
@@ -135,25 +138,17 @@ const LOCAL_CLOCK_OK = {
         '<top>': 'ថេរពេល boot splash និង throttle `reg.update()` — cosmetic/local',
         elapsedSince: 'ជាមូលដ្ឋាននៃពិដានល្បឿនទាំងអស់ — អានក្លាក់ឆៅ **ដើម្បីធ្វើឲ្យវាមានសុវត្ថិភាព** (ថយក្រោយ ➜ Infinity); ចាក់សោដោយ `monotonic-gate-test.js`',
         getServerNow: 'និយមន័យរបស់នាឡិកា server ខ្លួនឯង',
+        keygenIdleStamp: 'ត្រាសកម្មភាព local ជាគូ wall/monotonic; ភាពមិនប្រាកដបិទ credential idle ដោយសុវត្ថិភាព; keygen-idle-clock វាស់ rollback និង suspension។',
         verifySecurityPin: 'ការជាប់សោ PIN — local ដោយចេតនា',
         forceDatabaseReconnect: 'គម្លាតអប្បបរមារវាងវដ្តភ្ជាប់ឡើងវិញ — local',
         scheduleFirebaseSdkRetry: 'កត់ត្រាពេលព្យាយាមផ្ទុក SDK — ចូលរួមក្នុងពិដានល្បឿន local',
         retryFirebaseSdkNow: 'ពិដានល្បឿននៃការផ្ទុក SDK ឡើងវិញ — local',
         reloadForFirebaseSdk: 'គម្លាតអប្បបរមារវាងការផ្ទុកទំព័រឡើងវិញ — local សុទ្ធសាធ (server មិនស្គាល់វា ហើយវាមិនប៉ះ retention/revenue សោះ)',
         runBiometricUnlock: 'ការជាប់សោ PIN ដដែល (ការប្រៀបធៀបថ្ងៃឈប់ ៖ ថយក្រោយ ➜ lockout យូរជាង = ទិសសុវត្ថិភាព)',
-        noteSigningKeyActivity: 'ត្រាសកម្មភាពនៃ Signing Key (ពិដានទុកចោល) — local សុទ្ធសាធ · អ្នកអាន `expireIdleSigningKey()` ឆ្លង `elapsedSince()` ➜ ថយក្រោយ ➜ Infinity ➜ ដក Key (fail-closed)',
-        loadSigningKey: 'ត្រាសកម្មភាពពេល Load Signing Key — ដូច `noteSigningKeyActivity`',
-        tryRestoreSigningKeyFromSession: 'ត្រាសកម្មភាពពេលស្តារ Signing Key — ដូច `noteSigningKeyActivity`',
-        sbAdminActivity: 'ត្រាសកម្មភាពនៃ session Admin Supabase (ពិដានស្ងៀម) — local សុទ្ធសាធ · អ្នកអាន `expireIdleSbAdmin()` ឆ្លង `elapsedSince()` ➜ ថយក្រោយ ➜ Infinity ➜ ចាកចេញ (fail-closed)',
-        sbAdminLogin: 'ត្រាសកម្មភាពពេលចូល Admin Supabase — ដូច `sbAdminActivity`',
-        noteKeygenActivity: 'ត្រាសកម្មភាពនៃសម័យ Admin ZoeKeyGen (ពិដានចាកចេញស្វ័យប្រវត្តិ) — local សុទ្ធសាធ · អ្នកអាន `expireIdleKeygenSession` វាស់ដោយ `elapsedSince`',
-        updateAuthButton: 'ត្រាសកម្មភាពពេលចូលប្រព័ន្ធ — ដូច `noteKeygenActivity`'
     },
     'ZoeW/license-verify.js': {
         getServerNow: 'និយមន័យរបស់នាឡិកា server ខ្លួនឯង',
-        checkOnline: 'គណនា offset ពី header HTTP `Date` — ត្រូវការនាឡិកាឧបករណ៍ជាមូលដ្ឋាន',
-        syncServerTime: 'ដដែល — គណនា offset',
-        activate: 'ម៉ោងឧបករណ៍ពេលការអានរបស់ Activate ចាប់ផ្តើម បូក offset Server ដែលវាស់ក្នុង Activate ដដែល ➜ `activatedAt` = ម៉ោង Server ពេលការអានចាប់ផ្តើម (ការដោះចាប់ពីការកក់កៅអីតទៅ ចាប់បានឧបករណ៍) · មិនលើស `now` · គ្មានការដកនាឡិកាឆៅ (`monotonic-gate-test`)'
+        readClock: 'អាន wall/monotonic សម្រាប់ភាពបន្ត និងអាយុ request; authoritative status ប្រើ trusted clock; license-clock regression វាស់សំណើឆ្លងការផ្អាក។',
     },
 };
 
@@ -195,8 +190,14 @@ const LOCAL_CLOCK_SITES = [
 // ឯកសារដែលមាននាឡិកា server ផ្ទាល់ខ្លួន ➜ ត្រូវមាន getServerNow() និងផ្លូវធ្វើឲ្យ offset ស្រស់
 const CLOCK_OWNERS = {
     'ZoeW/app.js': /\.info\/serverTimeOffset/,
-    'ZoeKeyGen/app.js': /\.info\/serverTimeOffset/,
+    'ZoeKeyGen/app.js': /ZoeLicense\.syncServerTime/,
     'ZoeW/license-verify.js': /headers\.get\(\s*['"]date['"]\s*\)/i
+};
+
+const CLOCK_ACCESSORS = {
+    'ZoeW/app.js': /function getServerNow\(\)/,
+    'ZoeKeyGen/app.js': /function getServerNow\(\)\s*\{[\s\S]{0,120}?ZoeLicense\.getServerNow\(\)/,
+    'ZoeW/license-verify.js': /function getServerNow\(\)\s*\{[\s\S]{0,120}?getTrustedServerNow\(\)/
 };
 
 const FILES = Object.keys(LOCAL_CLOCK_OK);
@@ -350,8 +351,8 @@ for (const rel of FILES) {
     check(dead.length === 0, rel + ': បញ្ជីអនុញ្ញាតគ្មានធាតុងាប់ (សិទ្ធិតូចបំផុត)', dead);
 
     if (CLOCK_OWNERS[rel]) {
-        check(/function getServerNow\(\)\s*\{[\s\S]{0,120}?Date\.now\(\)\s*\+\s*serverTimeOffsetMs/.test(code),
-            rel + ': មាន `getServerNow()` = `Date.now() + serverTimeOffsetMs`');
+        check(CLOCK_ACCESSORS[rel].test(code),
+            rel + ': មាន accessor នាឡិកា Server រួម (ឥរិយាបថវាស់ដោយ clock, license និង keygen regression)');
         check(CLOCK_OWNERS[rel].test(code),
             rel + ': offset នៃនាឡិកា server ត្រូវធ្វើឲ្យស្រស់ពីប្រភពពិត');
     }

@@ -41,13 +41,16 @@ function sliceFn(name) {
 }
 
 const AUTH_DATABASE_GUARD = sliceFn('captureAuthDatabaseGuard') || 'function captureAuthDatabaseGuard() { return () => true; }';
+const PENDING_ACTIVATION_DECL = (source.match(/(?:^|\n)[ \t]*(let pendingActivation = [^\n]+;)/) || [])[1] || '';
 
 (async () => {
     const sessionFn = sliceFn('runSessionExpiryCheck');
+    const sessionHelpers = sliceFn('sessionExpiryOwner') + '\n' + sliceFn('sessionVerdictAt');
     const licenseFn = sliceFn('runPeriodicLicenseCheck');
     ok('មាន guard សម្រាប់ការពិនិត្យ Session ជាប្រចាំ', !!sessionFn);
     ok('មាន guard សម្រាប់ការពិនិត្យ License ជាប្រចាំ', !!licenseFn);
-    ok('ការអាន Firebase token មាន timeout', /withTimeout\(\s*fb\.getIdTokenResult\(/.test(sliceFn('isFirebaseSessionExpired')));
+    ok('ស្រង់ស្ថានភាពរង់ចាំផ្ទៀងផ្ទាត់ Activation ពិតបាន', !!PENDING_ACTIVATION_DECL);
+    ok('ការអាន Firebase token មាន timeout', /withTimeout\([^,]*\.getIdTokenResult\(/.test(sliceFn('getFirebaseSessionVerdict')));
     // ⛔ ZoeW (React) ចុះឈ្មោះវដ្តតាម `scope.every(ms, fn)` (`app/lifecycle/scope.ts` ៖ dispose ពេល unmount) ➜
     //    ទទួលវា **តែពេល** តួ `every()` ពិតជា `setInterval(fn, ms)` (ដេរីវេពីកូដ មិនមែនជឿឈ្មោះ)
     const everyIsInterval = /\bevery\(ms, fn\)\s*\{[^}]*setInterval\(fn, ms\)/.test(source);
@@ -64,11 +67,19 @@ const AUTH_DATABASE_GUARD = sliceFn('captureAuthDatabaseGuard') || 'function cap
             Promise,
             authGeneration: 0,
             db: {},
+            fb: {},
             auth: { currentUser: { uid: 'u1' } },
             isModalOpen: false,
             isDatabaseInitialized: true,
             withTimeout: (promise) => promise,
-            isFirebaseSessionExpired: () => {
+            loginBackendScope: () => 'fixture',
+            serverClockIsTrustworthy: () => true,
+            serverTimeOffsetMs: 0,
+            getServerNow: () => 0,
+            getServerClockBounds: () => ({ lowerMs: 0, upperMs: 0 }),
+            FOUR_HOURS_MS: 4 * 3600000,
+            refreshLiveToasts: () => {},
+            getFirebaseSessionVerdict: () => {
                 counts.session++;
                 return new Promise((resolve) => { resolveSession = resolve; });
             },
@@ -80,18 +91,18 @@ const AUTH_DATABASE_GUARD = sliceFn('captureAuthDatabaseGuard') || 'function cap
             window: { ZoeErrors: { capture: () => { counts.captured++; } } },
             ZoeErrors: { capture: () => { counts.captured++; } }
         });
-        vm.runInContext('let sessionExpiryCheckInFlight = false; let licenseRecheckInFlight = false; let sessionExpiryCheck = "live";\n'
-            + sessionFn + '\n' + licenseFn
+        vm.runInContext('let sessionExpiryCheckInFlight = false; let licenseRecheckInFlight = false; let sessionExpiryCheck = "live"; let sessionAuthTime = { authTimeMs: 0 };\n'
+            + PENDING_ACTIVATION_DECL + '\n' + sessionHelpers + '\n' + sessionFn + '\n' + licenseFn
             + '\nthis.sessionCheck = runSessionExpiryCheck; this.licenseCheck = runPeriodicLicenseCheck;', context);
 
         const firstSession = context.sessionCheck();
         const secondSession = context.sessionCheck();
         ok('Session interval ២ ជាន់គ្នា ➜ បាញ់ Firebase តែមួយសំណើ', counts.session === 1, counts);
-        resolveSession(false);
+        resolveSession('live');
         await Promise.all([firstSession, secondSession]);
         const thirdSession = context.sessionCheck();
         ok('Session guard ដោះសោវិញក្រោយសំណើចប់', counts.session === 2, counts);
-        resolveSession(false);
+        resolveSession('live');
         await thirdSession;
 
         // ══════════════════════════════════════════════════════════════
@@ -119,13 +130,20 @@ const AUTH_DATABASE_GUARD = sliceFn('captureAuthDatabaseGuard') || 'function cap
                 authGeneration: 7,
                 auth: { currentUser: { uid: 'u1' } },
                 db: {},
+                fb: {},
+                loginBackendScope: () => 'fixture',
+                serverClockIsTrustworthy: () => true,
+                serverTimeOffsetMs: 0,
+                getServerNow: () => 0,
+                getServerClockBounds: () => ({ lowerMs: 0, upperMs: 0 }),
+                FOUR_HOURS_MS: 4 * 3600000,
                 isModalOpen: false,
                 withTimeout: (promise) => promise,
                 ZoeLicense: { activate: () => Promise.resolve({ valid: true }) },
                 LICENSE_APP_CODE: 'ZOE',
                 ensureAppActivated: () => Promise.resolve(true),
                 initDatabaseListeners: () => { armCounts.listeners++; return true; },
-                isFirebaseSessionExpired: () => {
+                getFirebaseSessionVerdict: () => {
                     armCounts.session++;
                     return new Promise((resolve) => { resolveArmSession = resolve; });
                 },
@@ -143,8 +161,8 @@ const AUTH_DATABASE_GUARD = sliceFn('captureAuthDatabaseGuard') || 'function cap
             vm.runInContext(reactRuntime(source, { context: armCtx }), armCtx);
             // ⛔ ទង់ចាប់ផ្តើមជា `'pending'` — **តម្លៃដើមពិតរបស់ `app.js`**
             vm.runInContext('let sessionExpiryCheckInFlight = false; let isDatabaseInitialized = false;'
-                + ' let sessionExpiryCheck = "pending"; let listenersAuthGeneration = -1;\n'
-                + sessionFn + '\n' + activateFn + '\n'
+                + ' let sessionExpiryCheck = "pending"; let listenersAuthGeneration = -1; let sessionAuthTime = { authTimeMs: 0 }; let sessionExpiryArm = null;\n'
+                + sessionHelpers + '\n' + sessionFn + '\n' + activateFn + '\n'
                 + (sliceFn('dbListenersBelongToSession') || '') + '\n'
                 + (sliceFn('armSessionExpiryCheck') || '')
                 + '\n' + AUTH_DATABASE_GUARD
@@ -162,18 +180,18 @@ const AUTH_DATABASE_GUARD = sliceFn('captureAuthDatabaseGuard') || 'function cap
                 armCounts.listeners === 1, armCounts);
             ok('⛔ ការ Activate ជោគជ័យត្រូវ **arm** ច្រកទ្វារវគ្គ (បើអត់ ➜ ច្បាប់ ៤ ម៉ោង ងាប់ពេញអាយុទំព័រ)',
                 armCounts.session === 1, armCounts);
-            if (resolveArmSession) resolveArmSession(false);
+            if (resolveArmSession) resolveArmSession('live');
             await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
             ok('⛔ ក្រោយ arm ចប់ ទង់ត្រូវ settle ចេញពី `pending`',
                 armCtx.flag() !== 'pending', armCtx.flag());
             const before = armCounts.session;
-            // ⛔ `isFirebaseSessionExpired` របស់ sandbox ត្រឡប់ promise ដែល
+            // ⛔ `getFirebaseSessionVerdict` របស់ sandbox ត្រឡប់ promise ដែល
             // **តេស្តជាអ្នកដោះ** ➜ `await` ដោយមិនដោះ = ព្យួរ ➜ event loop ស្ងួត
             // ➜ node ចេញ **exit 0 ដោយស្ងាត់** ហើយការអះអាងខាងក្រោមមិនដែលរត់។
             const againCheck = armCtx.sessionCheck();
             ok('⛔ វដ្ត ៦០ វិ. ត្រូវរត់បានវិញក្រោយ Activate',
                 armCounts.session === before + 1, armCounts);
-            if (resolveArmSession) resolveArmSession(false);
+            if (resolveArmSession) resolveArmSession('live');
             await againCheck;
         }
 
@@ -235,7 +253,7 @@ const AUTH_DATABASE_GUARD = sliceFn('captureAuthDatabaseGuard') || 'function cap
             ZoeErrors: { capture: () => effects.push('error') }
         });
         vm.runInContext(reactRuntime(source, { exclude: activationNames, context }), context);
-        vm.runInContext('let licenseRecheckInFlight = false;\n' + activationFunctions, context);
+        vm.runInContext('let licenseRecheckInFlight = false;\n' + PENDING_ACTIVATION_DECL + '\n' + activationFunctions, context);
         return { context, effects, reads, activations, timers, element };
     }
     const changes = {

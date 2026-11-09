@@ -1,3 +1,4 @@
+import { acceptServerClockOffset, resetServerClock } from '../src/core/clock';
 import { webcrypto } from 'node:crypto';
 import { setTimeout as realSetTimeout, clearTimeout as realClearTimeout } from 'node:timers';
 /**
@@ -193,6 +194,8 @@ beforeEach(() => {
     }));
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date(NOW));
+    const clockStarted = performance.now();
+    vi.spyOn(Date, 'now').mockImplementation(() => Math.floor(NOW + performance.now() - clockStarted));
     lab.store = {};
     lab.phoneOfKey.clear();
     lab.inFlightClaims = 0;
@@ -233,6 +236,7 @@ beforeEach(() => {
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
     firebaseState.isDatabaseConnected = true;
     firebaseState.fb = makeFb() as any;
+    resetServerClock(); acceptServerClockOffset(1, null, false);
     for (const [name, path] of [['dbRefHistory', HISTORY], ['dbRefDeleted', 'zoew_recently_deleted_cod_dod'],
         ['dbRefDailyRevenue', 'zoew_daily_revenue_cod_dod'], ['dbRefMonthlyRevenue', 'zoew_monthly_revenue_cod_dod'],
         ['dbRefDailyCollected', 'zoew_daily_collected_cod_dod'], ['dbRefDailyPickup', 'zoew_daily_pickup_cod_dod'],
@@ -311,6 +315,7 @@ describe('ZTO list import — lanes by customer + day', () => {
     it('3. the first hung save stops new rows; lanes in flight finish (⏳ ≤ lanes); counts add up; the list stays', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date(NOW));
+        resetServerClock(); acceptServerClockOffset(1, null, false);
         const rows = distinctRows(12);
         for (let i = 4; i < rows.length; i++) lab.hangCodes.add(rows[i].barcode);
         loadList(rows);
@@ -496,3 +501,25 @@ it('ការបញ្ចូលជួរយករួចស្របគ្នា�
     expect(pickup.packagesPickedUp, 'lane ស្របគ្នាទាំងអស់ចូល «យករួច» ម្តង (CAS revision ប្រកួតគ្នា)').toBe(rows.length);
     expect(Object.keys(pickup.pickedUpBarcodes || {}).sort()).toEqual(rows.map((entry) => barcodeRegistryKey(entry.barcode)).sort());
 }, 20000);
+
+it('import cannot reuse fallback birth captured before the pickup epoch read and clock resync', async () => {
+    const rows = distinctRows(1);
+    rows[0].at = ''; (rows[0] as any).ztoClosed = true;
+    loadList(rows);
+    Object.assign(ztoState.ztoListSyncResult, { verifiedAt: NOW, verifiedServerAt: NOW });
+    const get = firebaseState.fb.get;
+    let crossed = false;
+    firebaseState.fb.get = async ref => {
+        const result = await get(ref);
+        if (!crossed && ref.path.startsWith('zoew_daily_pickup_cod_dod/')) {
+            crossed = true;
+            resetServerClock(); acceptServerClockOffset(3600000, null, false);
+        }
+        return result;
+    };
+    await importZtoListRows();
+    expect(crossed).toBe(true);
+    expect(lab.claims).toBe(0);
+    expect(Object.values(lab.store[HISTORY] || {})).toHaveLength(0);
+    expect(createScanEvidenceJournal(appLocalStore, 2).list(pendingScanScope())).toHaveLength(0);
+});

@@ -34,7 +34,7 @@ function build(opts) {
         record: ('serverRecord' in opts) ? opts.serverRecord : { revoked: false, expiresAt: T0 + 365 * DAY },
         calls: 0
     };
-    const clock = { now: typeof opts.now === 'number' ? opts.now : T0 };
+    const clock = { now: typeof opts.now === 'number' ? opts.now : T0, mono: 0 };
 
     function FakeDate(...a) {
         if (!(this instanceof FakeDate)) return new Date(clock.now).toString();
@@ -51,7 +51,7 @@ function build(opts) {
         btoa: (x) => Buffer.from(x, 'binary').toString('base64'),
         TextEncoder, TextDecoder, AbortController,
         navigator: { get onLine() { return !link.offline; } },
-        Date: FakeDate, Math, JSON, Promise, Uint8Array, isNaN, parseInt,
+        Date: FakeDate, performance: { now: () => clock.mono }, Math, JSON, Promise, Uint8Array, isNaN, parseInt,
         String, Object, Array, Set, Map, RegExp, Number, Boolean,
         localStorage: {
             getItem: (k) => (k in store ? store[k] : null),
@@ -106,6 +106,7 @@ function rec(h) {
 
     h.link.offline = true;
     h.clock.now = T0 + 4 * DAY;
+    h.clock.mono = 4 * DAY;
     let st = await h.L.getStatus('ADM');
     ok('ក.2 ក្រៅបណ្តាញ ៤ ថ្ងៃក្រោយ ➜ ហួសអនុគ្រោះ',
         st.state === 'offline-grace-exceeded', st.state);
@@ -166,10 +167,12 @@ function rec(h) {
 
     h.link.offline = true;
     h.clock.now = T0 + 2 * DAY;
+    h.clock.mono = 2 * DAY;
     st = await h.L.getStatus('ADM');
     ok('ឃ.3 ក្រៅបណ្តាញ ២ ថ្ងៃ (ក្នុងអនុគ្រោះ) ➜ នៅតែ active', st.state === 'active', st.state);
 
     h.clock.now = T0 + 5 * DAY;
+    h.clock.mono = 5 * DAY;
     st = await h.L.getStatus('ADM');
     ok('ឃ.4 ក្រៅបណ្តាញ ៥ ថ្ងៃ ➜ ហួសអនុគ្រោះ',
         st.state === 'offline-grace-exceeded', st.state);

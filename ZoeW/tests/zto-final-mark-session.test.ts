@@ -105,3 +105,5 @@ describe('ត្រា ZTO ៖ transaction យឺត និងវគ្គថ្
         expect(ztoState.ztoFinalInFlight).toBe(false);
     });
 });
+
+beforeEach(() => { firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live'; });

@@ -99,6 +99,7 @@ function useConfig(autoSubmit: boolean) {
 const answer = (body: any) => fetchGate.resolve({ ok: true, status: 200, json: async () => body });
 
 beforeEach(() => {
+    firebaseState.sessionExpiryCheck = 'live'; firebaseState.serverClockTrusted = true; firebaseState.serverTimeOffsetMs = 0;
     vi.stubGlobal('crypto', webcrypto);
     h.protocol = 1; h.preparedVersions.length = 0;
     h.toasts.length = 0; h.saves.length = 0; h.claims.length = 0;

@@ -1,7 +1,7 @@
 import { rowOperationActive } from '../services/row-operation-lock';
 import { viewState } from '../core/view-state';
 import { firebaseState, uiState } from '../core/state';
-import { getServerNow } from '../core/clock';
+import { captureClockOperation, getServerNow } from '../core/clock';
 import { DB_LISTENER_KEY_HISTORY, sanitizePhoneNumber } from '../core/text';
 import { safeFocusScanner } from '../core/timezone';
 import { barcodeEntriesOf, normalizeBarcodesOf } from '../domain/barcode';
@@ -106,6 +106,11 @@ export async function assignLockerToEntry(code) {
         return;
     }
 
+    const clock = captureClockOperation();
+    if (!clock.current()) {
+        showToast('⏳ ម៉ោងមិនទាន់ផ្ទៀងផ្ទាត់បាន។ សូមភ្ជាប់បណ្តាញ រួចសាកម្ដងទៀត។');
+        return;
+    }
     const ts = getServerNow();
     const updatedBy = (firebaseState.auth && firebaseState.auth.currentUser && (firebaseState.auth.currentUser.email || firebaseState.auth.currentUser.uid)) || '';
     const previousLocker = getEntryCurrentLocker(entry);
@@ -174,6 +179,7 @@ export async function assignLockerToEntry(code) {
 
     const writePromise = firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${itemId}`), (currentItem) => {
         applied = false;
+        if (!assignIsCurrent() || !clock.current()) return;
         if (!currentItem || typeof currentItem !== 'object') return currentItem;
         if (rowOperationActive(currentItem)) return;
         if (currentItem.clearClaim) return currentItem;

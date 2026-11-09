@@ -390,7 +390,7 @@ function unsignedToken(uid, email, projectId, authTime) {
         checkOnline: function () { return Promise.resolve({ ok: true }); },
         announcementsUrl: function () { return ''; },
         clearActivation: function () {}
-    };` }));
+    };` + require('../browser-clock-fixture.cjs').CLOCK_FIXTURE }));
     await ctx.addInitScript((cfg) => {
         try { if (!localStorage.getItem('zoew_firebase_config')) localStorage.setItem('zoew_firebase_config', cfg); } catch (e) {}
         window.__hiddenOverride = null;
@@ -448,6 +448,7 @@ function unsignedToken(uid, email, projectId, authTime) {
         };
         window.__fireIntervals = (ms) => { let n = 0; captured.forEach((c) => { if (c.ms === ms) { n++; try { c.fn(); } catch (e) {} } }); return n; };
         const realNow = Date.now.bind(Date);
+        window.__zoeFixtureServerNow = realNow;
         let skew = 0;
         try { skew = Number(sessionStorage.getItem('__bootSkew') || 0); } catch (e) {}
         Date.now = () => realNow() + skew;

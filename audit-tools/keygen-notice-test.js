@@ -54,7 +54,7 @@ function realDecl(name) {
     return m ? m[0] : null;
 }
 
-const FN_NAMES = ['noticeBucketPath', 'cleanNoticeText', 'buildNoticePayload', 'noticeErrorMessage', 'newNoticeId',
+const FN_NAMES = [...['getTrustedServerNow', 'captureKeygenClock', 'keygenClockIsCurrent'].filter(name => src.includes('function ' + name + '(')), 'noticeBucketPath', 'cleanNoticeText', 'buildNoticePayload', 'noticeErrorMessage', 'newNoticeId',
     'noticeIdsToTrim', 'noticeRowsOf', 'kickNoticePush', 'fetchWithTimeout', 'setNoticeSendBusy', 'refreshNoticeList', 'renderNoticeList',
     'sendNotice', 'deleteNotice', 'escapeHtml', 'captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession', ...(src.indexOf('function lookupSetupScrubUrl(') !== -1 ? ['lookupSetupScrubUrl', 'lookupSetupSecretName'] : []),
     'closeModal', 'clearPinInputValues',
@@ -112,10 +112,11 @@ function build(options) {
             querySelectorAll: (selector) => selector === '.modal.active' ? Object.values(elements).filter((el) => el.classList.contains('active')) : [] },
         showToast: (m) => log.toasts.push(m),
         getServerNow: () => opts.now || 1760000000000,
+        waitForServerTimeSync: async () => true,
         retryAsync: (fn) => Promise.resolve().then(fn),
         withTimeout: opts.withTimeout || ((p) => p),
         auth: { currentUser: user },
-        window: { ZoeErrors: { capture() { log.captures++; } } },
+        window: { ZoeLicense: { getTrustedServerNow: () => opts.now || 1760000000000, getServerTimeGeneration: () => 1 }, ZoeErrors: { capture() { log.captures++; } } },
         ZoeErrors: { capture() { log.captures++; } },
         fb: {
             ref: (db, p) => ({ db, path: p || '' }),

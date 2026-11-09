@@ -117,6 +117,7 @@ function syncLocalViewFromServer() {
 }
 
 beforeEach(() => {
+    firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live';
     vi.stubGlobal('crypto', webcrypto);
     lab.store = {};
     lab.txLog = [];
@@ -135,6 +136,7 @@ beforeEach(() => {
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
     firebaseState.isDatabaseConnected = true;
     firebaseState.serverTimeOffsetMs = 0;
+    firebaseState.serverClockTrusted = true;
     firebaseState.fb = makeFb() as any;
     for (const [name, path] of [['dbRefHistory', HISTORY], ['dbRefDeleted', TRASH],
         ['dbRefDailyRevenue', DAILY], ['dbRefMonthlyRevenue', 'zoew_monthly_revenue_cod_dod'],
@@ -306,4 +308,14 @@ describe('scan merge into an item the server no longer holds (removed/deleted by
         expect(getPath(DAILY + '/' + today).totalCount).toBe(1);
         expect(uiState.toasts.some((t: any) => String(t && t.msg || t).includes('មានក្នុងប្រព័ន្ធរួចហើយ'))).toBe(true);
     }, 20000);
+});
+
+it('merge ទប់ clock មិនទុកចិត្ត មុនសរសេរ ហើយមិននាំជួរចាស់ត្រឡប់ក្រោយផ្ទៀង', async () => {
+    const before = clone(lab.store);
+    firebaseState.serverClockTrusted = false;
+    await expect(addOrUpdateEntry(NEW, PHONE, 5, 0)).rejects.toMatchObject({ code: 'clock_uncertain' });
+    expect(lab.store).toEqual(before); expect(lab.txLog).toEqual([]); expect(lab.proposals).toEqual([]);
+    firebaseState.serverClockTrusted = true;
+    expect(await addOrUpdateEntry(NEW, PHONE, 5, 0)).toBe(true);
+    expect(codesOf(getPath(HISTORY + '/itemI'))).toEqual([NEW]);
 });

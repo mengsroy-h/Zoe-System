@@ -71,7 +71,7 @@ for (const version of [1, 2]) for (const mode of ['receipt', 'absent', 'partial'
         update: sent, set: sent, runTransaction: vi.fn(), deleteApp: async () => {}, get: async () => ({ val: () => null }) };
     const sdk = withTransactionOutcomeResolution(raw); sdk.getAuth(app); sdk.getDatabase(app);
     Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db, isDatabaseInitialized: true,
-        isInitializingFirebase: false, firebaseSdkUnavailable: false, isDatabaseConnected: true, sessionExpiryCheck: 'live', authLoginOperation: null });
+        isInitializingFirebase: false, firebaseSdkUnavailable: false, isDatabaseConnected: true, sessionExpiryCheck: 'live', serverClockTrusted: true, serverTimeOffsetMs: 0, authLoginOperation: null });
     try {
         const verdict = await sdk.set(sdk.ref(db, 'zoew_settings/exchange_rate'), 4200).then(() => 'sent', (error: any) => error.code);
         const proven = mode === 'receipt';
@@ -110,4 +110,45 @@ for (const version of [1, 2]) for (const mode of ['receipt', 'absent', 'partial'
         expect(journal.list('project|user', topic)).toHaveLength(proven ? 0 : 1);
         if (writes.length) expect(writes[0].p_ops.some(op => op.p[0] === 'zoew_barcode_registry')).toBe(false);
     } finally { db.close('test'); }
+});
+
+it('ការវាស់បញ្ច្រាស៖ នាឡិកាមិនទុកចិត្ត រក្សាការស្តាររង់ចាំរហូតមានភស្តុតាងអាយុ', async () => {
+    const version = Number(1), mode = String('absent');
+
+    const ops = operations(version);
+    if (mode === 'consumption') { if (version === 2) ops.at(-1)!.v.generation = 2; else ops.push(set(TRASH_CONSUMPTIONS_ROOT + '/trash1', null)); }
+    if (mode === 'extra') ops.push(set('zoew_settings/exchange_rate', 1));
+    const hash = Array.from(new Uint8Array(await webcrypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(ops)))), value => value.toString(16).padStart(2, '0')).join('');
+    const journal = createLocalWriteJournal(), scope = host + '/|user';
+    journal.put({ v: 1, scope, topic: 'firebase', opId: 'operation_purge_complete', ops, hash: mode === 'hash' ? '0'.repeat(64) : hash,
+        stage: 'sent', sentAfter: 1, queuedAt: Date.now() - 3 * 86400000 });
+    vi.stubGlobal('fetch', async (url: any) => {
+        const path = new URL(String(url)).pathname.replace(/^\//, '').replace(/\.json$/, '').split('/');
+        return Response.json(path[0] === REGISTRY_RELEASES_ROOT ? actualReceipt(path[1], mode, version) : null);
+    });
+    const app = { options: { databaseURL: host } }, db = { app };
+    const auth = { app, currentUser: { uid: 'user', getIdToken: async () => 'fixture' } };
+    const sent = vi.fn(async (_ref: unknown, _patch: Record<string, unknown>) => {});
+    const raw = { getAuth: () => auth, getDatabase: () => db, ref: (_db: any, path = '') => ({ toString: () => host + '/' + path }),
+        update: sent, set: sent, runTransaction: vi.fn(), deleteApp: async () => {}, get: async () => ({ val: () => null }) };
+    const sdk = withTransactionOutcomeResolution(raw); sdk.getAuth(app); sdk.getDatabase(app);
+    Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db, isDatabaseInitialized: true,
+        isInitializingFirebase: false, firebaseSdkUnavailable: false, isDatabaseConnected: true, sessionExpiryCheck: 'live', serverClockTrusted: false, serverTimeOffsetMs: 0, authLoginOperation: null });
+    try {
+        let settled = false;
+        const pending = sdk.set(sdk.ref(db, 'zoew_settings/exchange_rate'), 4200).then(() => 'sent', (error: any) => error.code).then(value => { settled = true; return value; });
+        for (let i = 0; i < 100 && !nativeWriteRecoveryState(db).deferred; i++) await new Promise(resolve => setTimeout(resolve, 5));
+        expect(nativeWriteRecoveryState(db).deferred).toBe(true);
+        expect(settled).toBe(false);
+        expect(sent).not.toHaveBeenCalled();
+        expect(journal.list(scope, 'firebase')).toHaveLength(1);
+        firebaseState.serverClockTrusted = true;
+        const verdict = await pending;
+        const proven = mode === 'receipt';
+        expect(verdict).toBe(proven ? 'sent' : 'write_recovery_pending');
+        expect(sent).toHaveBeenCalledTimes(proven ? 1 : 0);
+        expect(journal.list(scope, 'firebase')).toHaveLength(proven ? 0 : 1);
+        expect(nativeWriteRecoveryState(db).blocked).toBe(proven ? 0 : 1);
+        if (proven) expect(Object.keys(sent.mock.calls[0][1])).not.toContain('zoew_barcode_registry/PURGE0');
+    } finally { await sdk.deleteApp(app); }
 });

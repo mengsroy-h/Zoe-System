@@ -4,8 +4,10 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { createRequire } = require('module');
 const acorn = require('acorn');
 const ROOT = path.resolve(process.env.MONEYTRUTH_APP_DIR || path.join(__dirname, '..'));
+const coreRequire = createRequire(path.join(ROOT, 'audit-tools/money-multidevice-core.js'));
 let pass = 0, fail = 0;
 function check(label, condition, detail) {
     if (condition) { pass++; console.log('  ok    ' + label); }
@@ -91,7 +93,7 @@ function fixture() {
 }
 scenario('អថេរលុយរួមពិត', () => {
     const module = { exports: {} };
-    vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'audit-tools/money-multidevice-core.js'), 'utf8'), { module });
+    vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'audit-tools/money-multidevice-core.js'), 'utf8'), { module, require: coreRequire });
     const { invariant, invariantBroken } = module.exports;
     const verdict = (dump, known = ['ONE', 'TWO']) => invariantBroken(invariant(dump, day, month, known, undefined, Date.parse('2026-10-01T12:00:00+07:00')));
     check('ទិន្នន័យត្រឹមត្រូវមិនក្រហម', verdict(fixture()) === null);
@@ -137,7 +139,7 @@ scenario('journal observation follows current v2 entries and preserves legacy HO
     };
     const module = { exports: {} };
     vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'audit-tools/money-multidevice-core.js'), 'utf8'),
-        { module, window, localStorage, document: { getElementById: () => null } });
+        { module, require: coreRequire, window, localStorage, document: { getElementById: () => null } });
     module.exports.PAGE_OPS();
     check('empty current and legacy journals are settled', window.__state().cleanupJournal === 0 && window.__state().pickupJournal === 0);
     localStorage.setItem(cleanupPrefix + 'current', JSON.stringify({ id: 'current', stage: 'collected' }));
@@ -190,7 +192,7 @@ for (const file of [path.join('emu', 'money-multidevice-emu-test.js'), 'supabase
         // មិនប្រើ `false` ជំនួស helper ដែលបាត់៖ វាធ្វើឱ្យ negative controls បៃតងដោយគ្មានការវាស់។
         if (!realImport || !realGate) return;
         const core = { exports: {} };
-        vm.runInNewContext(fs.readFileSync(corePath, 'utf8'), { module: core });
+        vm.runInNewContext(fs.readFileSync(corePath, 'utf8'), { module: core, require: coreRequire });
         const devicesSettled = core.exports.devicesSettled;
         check(file + ' helper ទ្វារស្ងប់រួមមាន implementation ពិត', typeof devicesSettled === 'function');
         if (typeof devicesSettled !== 'function') return;
@@ -304,7 +306,7 @@ for (const file of [path.join('emu', 'money-multidevice-emu-test.js'), 'supabase
     check('historical executable gateway has the verified AST owner', !!historicalProof);
     if (historicalProof) {
         const core = { exports: {} };
-        vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'audit-tools/money-multidevice-core.js'), 'utf8'), { module: core });
+        vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'audit-tools/money-multidevice-core.js'), 'utf8'), { module: core, require: coreRequire });
         const fn = historicalProof.historical;
         const wait = vm.runInNewContext('(' + historicalSource.slice(fn.start, fn.end) + ')',
             { devicesSettled: core.exports.devicesSettled, Date, sleep: async () => {} });
@@ -341,7 +343,7 @@ for (const file of [path.join('emu', 'money-multidevice-emu-test.js'), 'supabase
             check(file + ' main executable gateway has verified ownership', !!proof);
             if (proof) {
                 const core = { exports: {} };
-                vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'audit-tools/money-multidevice-core.js'), 'utf8'), { module: core });
+                vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'audit-tools/money-multidevice-core.js'), 'utf8'), { module: core, require: coreRequire });
                 for (const kind of ['valid', 'pending', 'journal', 'claim', 'ACK-false', 'ACK-throws']) {
                     let tick = 0;
                     const state = { pending: kind === 'pending' ? 1 : 0, rows: 0, phase: 'ready', cleanupJournal: 0,

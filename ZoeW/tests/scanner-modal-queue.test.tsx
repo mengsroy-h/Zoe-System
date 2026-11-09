@@ -137,6 +137,7 @@ function openScan(code: string) {
 const phoneModalOpen = () => (uiState.modalStack || []).includes('phoneModal');
 
 beforeEach(() => {
+    firebaseState.sessionExpiryCheck = 'live'; firebaseState.serverClockTrusted = true; firebaseState.serverTimeOffsetMs = 0;
     // Keep real SHA-256 bytes, but avoid worker-pool scheduling under fake timers.
     vi.stubGlobal('crypto', { getRandomValues: webcrypto.getRandomValues.bind(webcrypto), randomUUID: webcrypto.randomUUID.bind(webcrypto), subtle: { digest: async (_algorithm: string, bytes: BufferSource) => {
         const hash = createHash('sha256').update(Buffer.from(bytes as ArrayBuffer)).digest();

@@ -5,7 +5,7 @@ import { setModalDisplay } from '../core/modals';
 import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
 import { liveShopScope, shopScope } from '../core/shop-scope';
 import { dataState, firebaseState, uiState } from '../core/state';
-import { cleanupClockIsTrustworthy, getServerNow } from '../core/clock';
+import { captureClockOperation, cleanupClockIsTrustworthy, getServerNow, getServerClockBounds } from '../core/clock';
 import { DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_DELETED, ZTO_RESTORE_FINAL_TEXT } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
 import { barcodeEntriesOf, barcodeZtoSigned, generateUniqueId, itemHasRestoreMarkers, normalizeBarcodesOf } from '../domain/barcode';
@@ -240,9 +240,10 @@ export async function rejectBlockedRestore(item, expectedToken?) {
 }
 
 export function isActiveRestoreClaim(claim, futureMs = 0) {
+    const bounds = getServerClockBounds();
+    if (claim && !bounds) return true;
     const claimedAt = claim && parseFloat(claim.claimedAt);
-    const now = getServerNow();
-    return !!(claim && typeof claim.token === 'string' && claim.token && isFinite(claimedAt) && claimedAt <= now + futureMs && (now - claimedAt) < RESTORE_CLAIM_LEASE_MS);
+    return !!(claim && bounds && typeof claim.token === 'string' && claim.token && isFinite(claimedAt) && claimedAt <= bounds.upperMs + futureMs && (bounds.lowerMs - claimedAt) < RESTORE_CLAIM_LEASE_MS);
 }
 
 export function generateRestoreClaimToken() {
@@ -251,6 +252,8 @@ export function generateRestoreClaimToken() {
 
 export async function claimDeletedItemForRestore(id, token, targetId, expectedSource?, isCurrent?: () => boolean) {
     if (isCurrent && !isCurrent()) throw new Error('RESTORE_SESSION_SWITCHED');
+    const clockOperation = captureClockOperation();
+    if (!clockOperation.current()) throw new Error('RESTORE_CLOCK_UNTRUSTED');
     const lifecycle = item => JSON.stringify([trashGenerationOf(item), item?.deletedAt, item?.createdAt ?? 0, item?.scanDate,
         barcodeEntriesOf(item?.barcodes).map(({ barcode }) => [barcode?.code, barcode?.createdAt ?? 0, barcode?.scanIntent ?? null, barcode?.restoredAt ?? null])
             .sort((left, right) => String(left[0]).localeCompare(String(right[0])))]);
@@ -264,6 +267,7 @@ export async function claimDeletedItemForRestore(id, token, targetId, expectedSo
         replacedClaim = null;
         claimStatus = 'ALREADY_RESTORED';
         if (isCurrent && !isCurrent()) { claimStatus = 'RESTORE_SESSION_SWITCHED'; return; }
+        if (!clockOperation.current()) return;
         if (!currentItem || typeof currentItem !== 'object') return;
         if (trashGenerationOf(currentItem) === null || expectedSource && lifecycle(currentItem) !== lifecycle(expectedSource)) {
             claimStatus = 'RESTORE_GENERATION_HOLD'; return;
@@ -288,6 +292,7 @@ export async function claimDeletedItemForRestore(id, token, targetId, expectedSo
         claimStatus = 'CLAIMED';
         return currentItem;
     }));
+    if (!clockOperation.current()) throw new Error('RESTORE_CLOCK_UNTRUSTED');
     if (isCurrent && !isCurrent()) throw new Error('RESTORE_SESSION_SWITCHED');
     if (!result || !result.committed || !claimedItem) throw new Error(claimStatus);
     return { item: claimedItem, replacedClaim, targetId: claimedTargetId };
@@ -295,15 +300,19 @@ export async function claimDeletedItemForRestore(id, token, targetId, expectedSo
 
 export async function bindRestoreClaimTarget(id, token, targetId, isCurrent?: () => boolean) {
     if (isCurrent && !isCurrent()) throw new Error('RESTORE_SESSION_SWITCHED');
+    const clockOperation = captureClockOperation();
+    if (!clockOperation.current()) throw new Error('RESTORE_CLOCK_UNTRUSTED');
     let bound = false;
     const result = await dbOp(firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_recently_deleted_cod_dod/${id}`), (currentItem) => {
         bound = false;
         if (isCurrent && !isCurrent()) return;
+        if (!clockOperation.current()) return;
         if (!currentItem || !currentItem.restoreClaim || currentItem.restoreClaim.token !== token) return;
         currentItem.restoreClaim = { token, claimedAt: getServerNow(), targetId };
         bound = true;
         return currentItem;
     }));
+    if (!clockOperation.current()) throw new Error('RESTORE_CLOCK_UNTRUSTED');
     if (isCurrent && !isCurrent()) throw new Error('RESTORE_SESSION_SWITCHED');
     if (!bound || !result || !result.committed) throw new Error('RESTORE_CLAIM_LOST');
 }
@@ -320,14 +329,16 @@ export async function clearRestoreFinalization(sourceId, token, isCurrent?: () =
     if (isCurrent && !isCurrent()) throw new Error('RESTORE_SESSION_SWITCHED');
 }
 
-export async function applyClaimedRestoreToHistory(targetId, sourceId, token, itemToRestore, applyRestoreMergeInto, isCurrent?: () => boolean) {
+export async function applyClaimedRestoreToHistory(targetId, sourceId, token, itemToRestore, applyRestoreMergeInto, isCurrent?: () => boolean, clockOperation = captureClockOperation()) {
     if (isCurrent && !isCurrent()) throw new Error('RESTORE_SESSION_SWITCHED');
+    if (!clockOperation.current()) throw new Error('RESTORE_CLOCK_UNTRUSTED');
     let targetChanged = false;
     let targetBusy = false;
     let committedItem = null;
     let lost = [];
     const result = await dbOp(firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${targetId}`), (currentItem) => {
         targetChanged = false;
+        if (!clockOperation.current()) return;
         if (isCurrent && !isCurrent()) return;
         targetBusy = rowOperationActive(currentItem);
         if (targetBusy) return;
@@ -357,6 +368,7 @@ export async function applyClaimedRestoreToHistory(targetId, sourceId, token, it
         return target;
     }));
     if (isCurrent && !isCurrent()) throw new Error('RESTORE_SESSION_SWITCHED');
+    if (!clockOperation.current()) throw new Error('RESTORE_CLOCK_UNTRUSTED');
     if (targetBusy) throw new Error('ROW_OPERATION_BUSY');
     if (targetChanged) return { targetChanged: true, item: null, lost: [] };
     if (!result || !result.committed || !committedItem) throw new Error('RESTORE_HISTORY_WRITE_FAILED');
@@ -460,6 +472,8 @@ export async function finalizeClaimedRestore(sourceId, token, targetId, revenueD
     const owner = captureTrashGenerationOwner();
     if (!owner || !trashConsumptionValid(consumption) || consumption.kind !== 'restore' || consumption.sourceId !== sourceId
         || consumption.token !== token || consumption.targetId !== targetId || consumption.actorUid !== owner.uid || consumption.scope !== owner.scope) throw new Error('RESTORE_GENERATION_HOLD');
+    const clockOperation = captureClockOperation();
+    if (!clockOperation.current()) throw new Error('RESTORE_CLOCK_UNTRUSTED');
     const target = `zoew_scan_history_cod_dod/${targetId}`;
     const updates = {
         [`${TRASH_CONSUMPTIONS_ROOT}/${sourceId}`]: consumption,
@@ -482,6 +496,7 @@ export async function finalizeClaimedRestore(sourceId, token, targetId, revenueD
     let lastError = null;
     for (let attempt = 0; attempt < 3; attempt++) {
         stopIfSwitched();
+        if (!clockOperation.current()) throw new Error('RESTORE_CLOCK_UNTRUSTED');
         try {
             await dbOp(firebaseState.fb.update(firebaseState.fb.ref(finalizeDb), updates));
             return;
@@ -570,6 +585,8 @@ export async function executeRestoreItem() {
             if (!pickupContext || !pickupJournal.start()) throw new Error('PICKUP_ADMISSION_FAILED');
             stopIfSwitched();
         }
+        const restoreClock = captureClockOperation();
+        if (!restoreClock.current()) throw new Error('RESTORE_CLOCK_UNTRUSTED');
         saveRestoreClaim(restoredId, { token, targetId });
         const claimed = await claimDeletedItemForRestore(restoredId, token, targetId, previewItem, restoreIsCurrent);
         stopIfSwitched();
@@ -593,6 +610,7 @@ export async function executeRestoreItem() {
         delete itemToRestore.restoreClaimId;
         delete itemToRestore.restoreClaimToken;
         delete itemToRestore.restoreAddedCodes;
+        if (!restoreClock.current()) throw new Error('RESTORE_CLOCK_UNTRUSTED');
         if (itemToRestore.isClosed) {
             itemToRestore.closedAt = getServerNow();
         } else {
@@ -638,7 +656,7 @@ export async function executeRestoreItem() {
             return target;
         };
 
-        let prepared = await applyClaimedRestoreToHistory(targetId, restoredId, token, itemToRestore, applyRestoreMergeInto, restoreIsCurrent);
+        let prepared = await applyClaimedRestoreToHistory(targetId, restoredId, token, itemToRestore, applyRestoreMergeInto, restoreIsCurrent, restoreClock);
         stopIfSwitched();
         if (prepared.targetChanged) {
             targetId = generateUniqueId();
@@ -646,7 +664,7 @@ export async function executeRestoreItem() {
             await bindRestoreClaimTarget(restoredId, token, targetId, restoreIsCurrent);
             stopIfSwitched();
             activeRestoreClaims.set(restoredId, { token, targetId });
-            prepared = await applyClaimedRestoreToHistory(targetId, restoredId, token, itemToRestore, applyRestoreMergeInto, restoreIsCurrent);
+            prepared = await applyClaimedRestoreToHistory(targetId, restoredId, token, itemToRestore, applyRestoreMergeInto, restoreIsCurrent, restoreClock);
             stopIfSwitched();
         }
         if (prepared.targetChanged || !prepared.item) throw new Error('RESTORE_TARGET_CHANGED');
@@ -691,6 +709,11 @@ export async function executeRestoreItem() {
     } catch (error) {
         if (!restoreIsCurrent()) {
             if (window.ZoeErrors) ZoeErrors.capture(new Error('Restore stopped after a database switch'), { zone: 'money', context: 'executeRestoreItem session switch', itemId: restoredId });
+            return;
+        }
+        if (error?.message === 'RESTORE_CLOCK_UNTRUSTED') {
+            showToast('⏳ នាឡិកាមិនទាន់បានផ្ទៀងផ្ទាត់។ សូមរង់ចាំ Sync ហើយសាកស្តារម្ដងទៀត។');
+            openRecentlyDeletedModal();
             return;
         }
         if (error?.message === 'RESTORE_FINAL_UNKNOWN') {
@@ -804,15 +827,18 @@ export async function releaseStaleRestoreClaimForPurge(id, isCurrent = () => tru
     const source = (await dbOp(api.get(api.ref(purgeDb, `zoew_recently_deleted_cod_dod/${id}`)))).val();
     if (!current()) return false;
     if (!source?.restoreClaim) return true;
+    const clockOperation = captureClockOperation();
+    if (!clockOperation.current()) return false;
     if (source.restoreBlocked === true || isActiveRestoreClaim(source.restoreClaim)) return false;
     const claim = source.restoreClaim;
     if (typeof claim.targetId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(claim.targetId)) return false;
     const target = (await dbOp(api.get(api.ref(purgeDb, `zoew_scan_history_cod_dod/${claim.targetId}`)))).val();
-    if (!current() || target?.restoreClaimId === id) return false;
+    if (!current() || !clockOperation.current() || target?.restoreClaimId === id) return false;
     let released = false;
     await dbOp(api.runTransaction(api.ref(purgeDb, `zoew_recently_deleted_cod_dod/${id}`), (currentItem) => {
         released = false;
         if (!current()) return;
+        if (!clockOperation.current()) return;
         if (!currentItem?.restoreClaim) { released = true; return; }
         if (currentItem.restoreBlocked === true || isActiveRestoreClaim(currentItem.restoreClaim)) return;
         if (currentItem.restoreClaim.token !== claim.token || currentItem.restoreClaim.targetId !== claim.targetId) return;

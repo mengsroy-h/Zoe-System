@@ -45,7 +45,7 @@ function lab(transaction: any, update: any = vi.fn(async () => {})) {
         update, set: update, runTransaction: transaction, deleteApp: async () => {} };
     const sdk = withTransactionOutcomeResolution(raw); sdk.getAuth(app); sdk.getDatabase(app);
     Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db, isDatabaseInitialized: true,
-        isInitializingFirebase: false, firebaseSdkUnavailable: false, isDatabaseConnected: true, sessionExpiryCheck: 'live', authLoginOperation: null });
+        isInitializingFirebase: false, firebaseSdkUnavailable: false, isDatabaseConnected: true, serverClockTrusted: true, sessionExpiryCheck: 'live', authLoginOperation: null });
     firebaseState.dbRefDailyRevenue = sdk.ref(db, 'zoew_daily_revenue_cod_dod');
     firebaseState.dbRefMonthlyRevenue = sdk.ref(db, MONTHLY);
     dataState.dailyRevenueData = { [DAY]: { codDollar: 40, dodDollar: 0, totalCount: 2 } };

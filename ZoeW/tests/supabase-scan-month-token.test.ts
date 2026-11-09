@@ -142,7 +142,7 @@ async function openSession() {
     const auth = { app: { options: { supabaseUrl: URL } }, currentUser: { uid: 'scan-owner' } };
     firebaseState.authGeneration++;
     Object.assign(firebaseState, { fb: sdk, db, auth, firebaseConfig: { supabaseUrl: URL }, isDatabaseInitialized: true, isInitializingFirebase: false,
-        firebaseSdkUnavailable: false, isDatabaseConnected: true, sessionExpiryCheck: 'live', authLoginOperation: null,
+        firebaseSdkUnavailable: false, isDatabaseConnected: true, serverClockTrusted: true, sessionExpiryCheck: 'live', authLoginOperation: null,
         dbRefHistory: db.ref(H), dbRefDailyRevenue: db.ref(D), dbRefMonthlyRevenue: db.ref(M) });
     db.setTenantTopic(TOPIC); db.setAuthed(true, SCOPE);
     await until(() => db.isReady() && !db.recoveryState().recovering, 'session ready');

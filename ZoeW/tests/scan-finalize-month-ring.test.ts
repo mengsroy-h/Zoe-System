@@ -2,7 +2,7 @@ import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, scanState, uiState, ztoState } from '../src/core/state';
 import { viewState } from '../src/core/view-state';
-import { pendingRegistryReleases } from '../src/core/clock';
+import { resetServerClock, pendingRegistryReleases } from '../src/core/clock';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { getFormattedDate } from '../src/core/timezone';
 import { ledgerOpRing, ledgerTokenSeen } from '../src/domain/ledger';
@@ -10,7 +10,7 @@ import { addOrUpdateEntry } from '../src/features/scan-action';
 import { clearZtoPickupStatusStore } from '../src/features/zto-status';
 import { createScanEvidenceJournal } from '../src/services/scan-evidence';
 import { pendingScanScope } from '../src/services/scan-pending';
-import { resumePendingScanOperations } from '../src/services/scan-operation';
+import { resolveRetainedScanEvidence, resumePendingScanOperations } from '../src/services/scan-operation';
 import { txResolvingPaths, withTransactionOutcomeResolution } from '../src/services/tx-outcome';
 import { nativeWriteRecoveryState } from '../src/services/native-write-recovery';
 
@@ -129,7 +129,7 @@ function makeNative() {
     sdk.getAuth(app); sdk.getDatabase(app);
     Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db, isDatabaseInitialized: true,
         isInitializingFirebase: false, firebaseSdkUnavailable: false, isDatabaseConnected: true,
-        sessionExpiryCheck: 'live', authLoginOperation: null, dbLivenessProbe: Promise.resolve(null) });
+        serverClockTrusted: true, sessionExpiryCheck: 'live', authLoginOperation: null, dbLivenessProbe: Promise.resolve(null) });
     firebaseState.dbRefHistory = sdk.ref(db, H);
     firebaseState.dbRefDailyRevenue = sdk.ref(db, D);
     firebaseState.dbRefMonthlyRevenue = sdk.ref(db, M);
@@ -273,5 +273,52 @@ it.each(['after', 'before'] as const)('Firebase parity (A498) ៖ App ត្រ�
     await flush();
     expect(operation().phase).toBe('committed');
     expect(money(), 'ប្រាក់ និងចំនួនកញ្ចប់ចូល ledger ម្ដង ទោះ CAS ដែលបាត់ចម្លើយបានចុះ ឬមិនបានចុះ').toEqual([[15, 0, 2], [15, 0, 2]]);
+    expect(evidence()).toEqual([]);
+});
+
+
+it.each(['untrusted', 'replaced-during-read'] as const)('[audit-recovery-clock] %s៖ រក្សា staged scan ហើយបន្តក្រោយ clock ថ្មី', async mode => {
+    await crashAfterStage();
+    churnMonthRing(12);
+    await reboot();
+    const before = copy(server);
+    const token = operation().monthToken;
+    let invalidated = false;
+    const fetchBefore = globalThis.fetch;
+    if (mode === 'untrusted') firebaseState.serverClockTrusted = false;
+    else vi.stubGlobal('fetch', async (...args: Parameters<typeof fetch>) => {
+        const result = await fetchBefore(...args);
+        if (!invalidated) {
+            invalidated = true;
+            resetServerClock();
+            firebaseState.serverClockTrusted = true;
+        }
+        return result;
+    });
+    await resumePendingScanOperations(); await flush();
+    expect(mode === 'untrusted' || invalidated).toBe(true);
+    expect(server).toEqual(before);
+    expect(operation().phase).toBe('prepared');
+    expect(ledgerTokenSeen(get(M + '/' + month()), token)).toBe(false);
+    expect(evidence()).toHaveLength(1);
+    firebaseState.serverClockTrusted = true;
+    vi.stubGlobal('fetch', fetchBefore);
+    await resumePendingScanOperations(); await flush();
+    expect(operation().phase).toBe('committed');
+    expect(money()).toEqual([[15, 0, 2], [15, 0, 2]]);
+    expect(holders()[0].scanPending).toBeUndefined();
+    expect(evidence()).toEqual([]);
+    const settled = copy(server);
+    await resumePendingScanOperations(); await flush();
+    expect(server).toEqual(settled);
+});
+
+it('[audit-recovery-clock] ផ្លូវម្ចាស់បញ្ចប់ staged scan ដោយ receipt មិនទម្លាក់ evidence មុន commit', async () => {
+    await crashAfterStage(); churnMonthRing(12); await reboot();
+    const result = await resolveRetainedScanEvidence();
+    expect(result).toMatchObject({ finished: 1, dropped: 0, kept: 0 });
+    expect(operation().phase).toBe('committed');
+    expect(money()).toEqual([[15, 0, 2], [15, 0, 2]]);
+    expect(holders()[0].scanPending).toBeUndefined();
     expect(evidence()).toEqual([]);
 });

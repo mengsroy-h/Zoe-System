@@ -2,7 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { modulePrograms } = require('./audit-module-ast');
-const { moduleRuntime, reactRuntime, renderedElement } = require('./react-view');
+const { infoListenerRecoveryContract } = require('./static-checker-contracts.cjs');
+const { auditAcorn, moduleRuntime, reactRuntime, renderedElement } = require('./react-view');
 
 const root = path.resolve(__dirname, '..');
 const appRoot = process.env.CONNRECOVERY_APP_DIR ? path.resolve(process.env.CONNRECOVERY_APP_DIR) : root;
@@ -14,6 +15,7 @@ function ok(label, cond, detail) {
 }
 
 const SRC = fs.readFileSync(path.join(appRoot, 'ZoeW', 'app.js'), 'utf8');
+const clockRuntime = moduleRuntime(appRoot, SRC, [{ path: 'src/core/clock.ts', expose: ['setServerClockRefresh', 'serverClockIsTrustworthy', 'acceptServerClockOffset', 'resetServerClock', 'getServerClockBounds', 'getServerNow', 'serverClockOffsetIsFromServer'] }]);
 
 // handler `visibilitychange` ហៅ `callee()` ក្នុងចម្ងាយ ៤០០ តួ។ ⛔ ZoeW (React) ចុះឈ្មោះតាមច្រកចេញ
 // `onDocumentVisibilityChange()` (`platform/document-io.ts`) ➜ ទទួលវា **តែពេល** តួរបស់វាពិតជាចង
@@ -41,7 +43,7 @@ function sliceFn(name) {
 }
 
 function onlineHandlerSource(source) {
-    const acorn = require('acorn');
+    const acorn = auditAcorn();
     const programs = source === SRC
         ? modulePrograms(source, path.join(appRoot, 'ZoeW', 'app.js'), { ecmaVersion: 'latest' })
         : [acorn.parse(source, { ecmaVersion: 'latest' })];
@@ -103,7 +105,7 @@ const ELAPSED_HELPER = sliceFn('elapsedSince') ||
             window: { ZoeErrors: { capture: () => {} } },
             document: { getElementById: () => null },
             isDatabaseConnected: true,
-            isDatabaseInitialized: true,
+            isDatabaseInitialized: true, appIsLocked: false, sessionExpiryCheck: 'live',
             queueMicrotask,
             showToast: (m) => state.toasts.push(m)
         };
@@ -152,7 +154,6 @@ const ELAPSED_HELPER = sliceFn('elapsedSince') ||
         'const resumePriceOperations = () => {};\n' +
         'const pendingRegistryReleases = new Map();\n' +
         'let registryReleaseFlushInFlight = false;\n' +
-        'const serverClockOffsetIsFromServer = () => true;\n' +
         'let serverClockTrusted = false;\n' +
             'let dbListenerPendingSeen = 0;\n' +
             'const LISTENER_RECOVERY_STEPS_MS = [2000];\n' +
@@ -160,7 +161,9 @@ const ELAPSED_HELPER = sliceFn('elapsedSince') ||
             errFn + '\n\n' + onlineFn + '\n\n' + extras + '\n' +
             'this.__err = handleDbListenerError; this.__online = connectionLooksOnline;';
         try {
-            vm.runInContext(src, core);
+            vm.runInContext(clockRuntime.withoutBindings(src), core);
+            vm.runInContext(clockRuntime.code, core);
+            vm.runInContext(moduleRuntime(appRoot, SRC, ['src/core/session-verification.ts', { path: 'src/ui/toast.ts', expose: ['releaseHeldToasts'] }]).code, core);
             core.__err(new Error('permission_denied'));
             ok('ក្រោយ listener ត្រូវបោះបង់ ៖ App មិនត្រូវអះអាងថាភ្ជាប់ Server រួចរាល់',
                 core.__online() === false, core.__online());
@@ -228,7 +231,7 @@ const CONST_STUBS = missingConsts
     .map((n) => 'const ' + n + ' = ' + (n === 'expiredLiveKeys' ? 'new Set()' : (/_STEPS_MS$/.test(n) ? '[1000]' : (/_GRACE_MS$/.test(n) ? '0' : '1'))) + ';')
     .join('\n');
 
-function buildContext() {
+function buildContext(backend = 'supabase') {
     const clock = { now: 1000, seq: 0, timers: [] };
     const log = { toasts: [], goOffline: 0, goOnline: 0, off: [], attached: [], captures: [], cleanupRuns: 0 };
 
@@ -258,6 +261,7 @@ function buildContext() {
     const listenerCallbacks = {};
     const listenerHistory = {};
     const fb = {
+        __supabase: backend === 'supabase',
         off: (ref) => { log.off.push(ref && ref.__path); },
         onValue: (ref, cb, errCb) => {
             const p = ref && ref.__path;
@@ -290,7 +294,7 @@ function buildContext() {
         db: {},
         auth: { currentUser: { uid: 'u1' } },
         isDatabaseConnected: true,
-        isDatabaseInitialized: false,
+        isDatabaseInitialized: false, appIsLocked: false, sessionExpiryCheck: 'live',
         dbRefHistory: refs.history,
         dbRefDeleted: refs.deleted,
         showToast: (m) => log.toasts.push(m),
@@ -303,7 +307,8 @@ function buildContext() {
         localStorage: { setItem: () => {}, getItem: () => null },
         generateUniqueId: () => 'id_1',
         parseTimestampFromId: () => 1,
-        getServerNow: () => clock.now,
+        retryPendingActivation: () => { log.activationRetries = (log.activationRetries || 0) + 1; },
+        runSessionExpiryCheck: () => { log.sessionChecks = (log.sessionChecks || 0) + 1; },
         normalizeBarcodesOf: () => {},
         debouncedRenderAfterHistorySync: () => {},
         runAutomaticDeletedCleanup: () => {},
@@ -388,7 +393,6 @@ function buildContext() {
         'const resumePriceOperations = () => {};\n' +
         'const pendingRegistryReleases = new Map();\n' +
         'let registryReleaseFlushInFlight = false;\n' +
-        'const serverClockOffsetIsFromServer = () => true;\n' +
         'let serverClockTrusted = false;\n' +
         'this.__probe = () => ({ dbListenersFailed, dbListenerRecoveryTimer, reconnectWatchdogTimer, ' +
         'reconnectWatchdogAttempt, lastDbListenerAttemptAt, pending: Array.from(dbListenerPendingPaths), ' +
@@ -403,21 +407,65 @@ function buildContext() {
         'resetDbListenerHealthState, runScheduledCleanup, clearReconnectWatchdog, ' +
         'attachInfoListeners, handleInfoListenerError, clearInfoListenerRecovery };\n';
 
-    ctx.performance = require('node:perf_hooks').performance;
+    ctx.performance = { now: () => clock.now };
     const recovery = require('./react-view').scanRecoveryRuntime(appRoot, SRC);
-    vm.runInContext(recovery.withoutBindings(code), ctx);
+    vm.runInContext(clockRuntime.withoutBindings(recovery.withoutBindings(code)), ctx);
+    vm.runInContext(clockRuntime.code, ctx);
     vm.runInContext(recovery.code, ctx);
     const pickupResetRecovery = moduleRuntime(appRoot, SRC, [
         { path: 'src/domain/pickup-reset-proof.ts', expose: ['pickupResetAppliedReceipt', 'pickupResetAttemptId', 'pickupResetBatchHash', 'pickupResetBoundReceipt', 'pickupResetCasOf', 'pickupResetCasText', 'pickupResetContextOf', 'pickupResetReceiptMatches'] },
         { path: 'src/services/pickup-reset.ts', expose: ['resumePickupResetOutcomes'] }
     ]);
     vm.runInContext(pickupResetRecovery.code, ctx);
+    vm.runInContext(moduleRuntime(appRoot, SRC, ['src/core/session-verification.ts', { path: 'src/ui/toast.ts', expose: ['releaseHeldToasts'] }]).code, ctx);
     return { ctx, log, clock, advance, listenerCallbacks, listenerHistory, statusDot, statusText, api: ctx.__api, probe: ctx.__probe,
         setConnHistory: ctx.__setConnHistory, connHistory: ctx.__connHistory,
-        setInfoRefs: ctx.__setInfoRefs, infoProbe: ctx.__infoProbe };
+        setInfoRefs: ctx.__setInfoRefs, infoProbe: ctx.__infoProbe,
+        serverSnapshot(offset) { return { val: () => offset, serverClockSample: Object.freeze({ epochMs: clock.now + offset, wallMs: clock.now, monotonicMs: clock.now, uncertaintyMs: 0 }) }; } };
 }
 
 // ── ១. ការតភ្ជាប់ធម្មតា ─────────────────────────────────────────────
+function testToastAdmissionFixture() {
+    const w = buildContext();
+    let released = 0;
+    w.ctx.releaseHeldToasts = () => { released++; };
+    for (const mode of ['locked', 'pending', 'untrusted', 'live']) {
+        w.ctx.appIsLocked = mode === 'locked';
+        w.ctx.sessionExpiryCheck = mode === 'pending' ? 'pending' : 'live';
+        vm.runInContext('serverClockTrusted = ' + (mode !== 'untrusted') + ';', w.ctx);
+        w.ctx.refreshLiveToasts();
+        ok('toast ដែលរង់ចាំចេញតែពេលដោះសោ និងវគ្គផ្ទៀងរួច — ' + mode, released === (mode === 'live' ? 1 : 0), released);
+    }
+}
+testToastAdmissionFixture();
+
+{
+    const t = buildContext('supabase');
+    t.setInfoRefs({ __path: 'info/connected' }, { __path: 'info/offset' });
+    t.api.attachInfoListeners();
+    t.listenerCallbacks['info/offset'].cb({ val: () => 1234 });
+    ok('Supabase៖ offset គ្មាន sample មិនបង្កើត clock ទុកចិត្ត', !t.ctx.serverClockIsTrustworthy());
+    t.listenerCallbacks['info/offset'].cb(t.serverSnapshot(1234));
+    ok('Supabase៖ sample ពិតឆ្លង clock owner និង bounds', t.ctx.serverClockIsTrustworthy()
+        && t.ctx.getServerClockBounds().lowerMs === t.clock.now + 1234);
+    t.ctx.Date.now = () => t.clock.now + 3000;
+    ok('Supabase៖ wall clock លោតឆ្ងាយពី monotonic បិទការទុកចិត្ត', !t.ctx.serverClockIsTrustworthy());
+}
+{
+    const t = buildContext('firebase');
+    let sample = null;
+    t.ctx.window.ZoeLicense = { getServerTimeSample: () => sample, getServerTimeGeneration: () => 1, syncServerTime: async () => false };
+    t.setInfoRefs({ __path: 'info/connected' }, { __path: 'info/offset' });
+    t.api.attachInfoListeners();
+    t.listenerCallbacks['info/offset'].cb({ val: () => 99999 });
+    ok('Firebase៖ offset SDK ដោយគ្មានភស្តុតាង provider មិនកំណត់ម៉ោង', !t.ctx.serverClockIsTrustworthy());
+    sample = Object.freeze({ epochMs: t.clock.now + 1234, wallMs: t.clock.now, monotonicMs: t.clock.now,
+        uncertaintyMs: 0, source: 'nonce', generation: 1, observation: 1 });
+    t.listenerCallbacks['info/offset'].cb({ val: () => 99999 });
+    ok('Firebase៖ clock owner ទទួល sample provider មិនមែន offset SDK', t.ctx.serverClockIsTrustworthy()
+        && t.ctx.getServerClockBounds().lowerMs === t.clock.now + 1234 && t.infoProbe().serverTimeOffsetMs === 1234);
+}
+
 {
     const t = buildContext();
     t.api.initDatabaseListeners();
@@ -1114,7 +1162,7 @@ function buildContext() {
         /function noteInfoListenerAlive\([\s\S]{0,300}?infoListenerFailedPaths\.size[\s\S]{0,80}?clearInfoListenerRecovery\(\)/.test(SRC),
         'បើរលត់ដោយមិនពិនិត្យ Set នោះ listener ដែលងាប់តែឯង មិនដែល attach ឡើងវិញ');
     ok('⛔ reattach ត្រូវរង់ចាំ snapshot `.info/*` ទាំង ២ មុនប្រកាសថាស្តាររួច',
-        /function attachInfoListeners\(\)[\s\S]{0,700}?infoListenerFailedPaths\.add\(INFO_LISTENER_KEY_CONNECTED\)[\s\S]{0,160}?infoListenerFailedPaths\.add\(INFO_LISTENER_KEY_OFFSET\)/.test(SRC),
+        infoListenerRecoveryContract(sliceFn('attachInfoListeners')).pending,
         'Set ទទេក្រោយ reattach ➜ connected មកមុនអាចលុប recovery ខណៈ serverTimeOffset នៅងាប់');
     ok('ចាកចេញ ➜ ការស្តារ `.info/*` ត្រូវ reset',
         /function resetDbListenerHealthState\(\)[\s\S]{0,200}?clearInfoListenerRecovery\(\);/.test(SRC));
@@ -1126,7 +1174,7 @@ function buildContext() {
     // **ការអនុវត្តតែមួយ** ដូច្នេះការកែម្ខាងតែម្នាក់ឯងនឹងធ្លាក់នៅទីនោះ។
     ok('ZoeKeyGen ៖ `.info/*` ក៏មានផ្លូវស្តារដដែល (ជាមួយកូនសោ path)',
         /function attachInfoListeners\(/.test(KG3)
-        && /fb\.onValue\(dbRefServerTimeOffset[\s\S]{0,700}?handleInfoListenerError\(err, INFO_LISTENER_KEY_OFFSET\)/.test(KG3));
+        && infoListenerRecoveryContract(sliceFnFrom(KG3, 'attachInfoListeners')).offset);
     ok('⛔ ZoeKeyGen ៖ ការរលត់ក៏ត្រូវពិនិត្យ Set ដែរ',
         /function noteInfoListenerAlive\([\s\S]{0,300}?infoListenerFailedPaths\.size/.test(KG3),
         'ZoeKeyGen ៖ `serverTimeSynced` ជាច្រកទ្វារនៃការចេញ Key ➜ offset ដែលកក ធ្ងន់ជាង');
@@ -1142,14 +1190,17 @@ function buildContext() {
         /let infoListenerGeneration = 0;/.test(kg));
     const history = { connected: [], offset: [] };
     const refs = { connected: { path: 'connected' }, offset: { path: 'offset' } };
+    let keygenSyncAttempts = 0;
     const ctx = {
         console: { error: () => {} }, Set, Math,
-        navigator: { onLine: true }, window: {},
+        navigator: { onLine: true }, window: { ZoeLicense: {
+            syncServerTime: () => { keygenSyncAttempts++; return { then: (done) => { done(true); return { catch() {} }; } }; },
+            getTrustedServerNow: () => 1700000001234, getServerTimeOffset: () => 1234
+        } },
         setTimeout: () => 1, clearTimeout: () => {},
         db: {}, dbRefConnected: refs.connected, dbRefServerTimeOffset: refs.offset,
         renderConnectionStatus: () => {}, scheduleReconnectWatchdog: () => {},
         clearReconnectWatchdog: () => {}, retryPendingRoleCheck: () => {},
-        serverClockOffsetIsFromServer: () => true,
         fb: {
             off: () => {},
             onValue: (ref, cb, errCb) => history[ref.path].push({ cb, errCb })
@@ -1167,9 +1218,11 @@ function buildContext() {
         'let isDatabaseConnected = false, hasEverConnectedToDatabase = false;\n' +
         'let serverTimeOffsetMs = 0, serverTimeSynced = false;\n' +
         'const serverTimeSyncWaiters = [];\n' +
+        sliceFnFrom(kg, 'serverClockOffsetIsFromServer') + '\n' +
         sliceFnFrom(kg, 'clearInfoListenerRecovery') + '\n' +
         sliceFnFrom(kg, 'noteInfoListenerAlive') + '\n' +
         sliceFnFrom(kg, 'detachInfoListeners') + '\n' +
+        (sliceFnFrom(kg, 'getTrustedServerNow') || '') + '\n' +
         sliceFnFrom(kg, 'attachInfoListeners') + '\n' +
         'this.__probe = () => ({ failed: infoListenersFailed, timer: infoListenerRecoveryTimer, pending: Array.from(infoListenerFailedPaths), connected: isDatabaseConnected, offset: serverTimeOffsetMs, synced: serverTimeSynced });\n';
     try {
@@ -1187,6 +1240,11 @@ function buildContext() {
         ok('⛔ ZoeKeyGen ៖ callback ចាស់មិនត្រូវទុកចិត្ត offset ឬបង្ហាញ connected ក្លែងក្លាយ',
             staleProbe.connected === false && staleProbe.offset === 0 && staleProbe.synced === false,
             staleProbe);
+        history.offset[1].cb({ val: () => 0 });
+        const offlineZeroProbe = ctx.__probe();
+        ok('⛔ ZoeKeyGen ៖ offset សូន្យមុន connected មិនមែនភស្តុតាងម៉ោង server',
+            offlineZeroProbe.synced === false && offlineZeroProbe.offset === 0 && keygenSyncAttempts === 0,
+            offlineZeroProbe);
         history.connected[1].cb({ val: () => true });
         history.offset[1].cb({ val: () => 1234 });
         const freshProbe = ctx.__probe();
@@ -1204,7 +1262,7 @@ function buildContext() {
     t.setInfoRefs({ __path: 'info/connected' }, { __path: 'info/offset' });
     t.api.attachInfoListeners();
     t.listenerCallbacks['info/connected'].cb(snap(true));
-    t.listenerCallbacks['info/offset'].cb(snap(1234));
+    t.listenerCallbacks['info/offset'].cb(t.serverSnapshot(1234));
     t.listenerCallbacks['info/offset'].errCb(new Error('permission_denied'));
     t.advance(2000);
     t.listenerCallbacks['info/connected'].cb(snap(true));
@@ -1212,7 +1270,7 @@ function buildContext() {
         t.infoProbe().infoListenersFailed === true, t.infoProbe());
     ok('⛔ reattach ក្រោយ offset ងាប់ ៖ កាលវិភាគត្រូវនៅរស់រហូតដល់ offset មកដល់',
         t.infoProbe().infoListenerRecoveryTimer !== null, t.infoProbe());
-    t.listenerCallbacks['info/offset'].cb(snap(5678));
+    t.listenerCallbacks['info/offset'].cb(t.serverSnapshot(5678));
     ok('offset ពិតប្រាកដមកដល់ក្រោយ reattach ➜ ទង់ recovery រលត់',
         t.infoProbe().infoListenersFailed === false && t.infoProbe().infoListenerRecoveryTimer === null,
         t.infoProbe());
@@ -1847,6 +1905,8 @@ function buildContext() {
             'globalThis.__retryState = () => ({ generation: authGeneration, queued: pendingHistoryPatches.size, busy: historyPatchFlushInFlight });'
         ].join('\n'), ctx);
 
+        ctx.performance = performance;
+        vm.runInContext(clockRuntime.code, ctx);
         ctx.__uiState = () => vm.runInContext('({ editingItemId, pinFlowGeneration: securityState.pinFlowGeneration, hasPinAction: !!pinTargetAction })', ctx);
         ctx.__elements = elements;
         ctx.__start();
@@ -2116,7 +2176,7 @@ function buildContext() {
 
             // handshake ធម្មតា
             t.listenerCallbacks['info/connected'].cb({ val: () => true });
-            t.listenerCallbacks['info/offset'].cb({ val: () => 1234 });
+            t.listenerCallbacks['info/offset'].cb(t.serverSnapshot(1234));
             ok('handshake ➜ offset ត្រូវបានទទួល', t.infoProbe().serverTimeOffsetMs === 1234,
                 t.infoProbe());
 
@@ -2135,7 +2195,7 @@ function buildContext() {
                 t.infoProbe().infoListenersFailed === true, t.infoProbe());
 
             // ការស្តារពិត ➜ ទង់ត្រូវរលត់ (ទិសផ្ទុយ)
-            t.listenerCallbacks['info/offset'].cb({ val: () => 5678 });
+            t.listenerCallbacks['info/offset'].cb(t.serverSnapshot(5678));
             ok('⛔ ទិសផ្ទុយ ៖ offset ដឹងខ្លួនវិញ ➜ ទង់រលត់',
                 t.infoProbe().infoListenersFailed === false, t.infoProbe());
             ok('⛔ ទិសផ្ទុយ ៖ offset ដឹងខ្លួនវិញ ➜ កាលវិភាគស្តារត្រូវលុប',
@@ -2150,7 +2210,7 @@ function buildContext() {
             t.setInfoRefs({ __path: 'info/connected' }, { __path: 'info/offset' });
             t.api.attachInfoListeners();
             t.listenerCallbacks['info/connected'].cb({ val: () => true });
-            t.listenerCallbacks['info/offset'].cb({ val: () => 1 });
+            t.listenerCallbacks['info/offset'].cb(t.serverSnapshot(1));
             t.listenerCallbacks['info/connected'].errCb(new Error('cancelled'), 'connected');
             ok('`.info/connected` ងាប់ ➜ លែងអះអាងថាភ្ជាប់',
                 t.infoProbe().isDatabaseConnected === false, t.infoProbe());
@@ -2162,7 +2222,7 @@ function buildContext() {
             t.setInfoRefs({ __path: 'info/connected' }, { __path: 'info/offset' });
             t.api.attachInfoListeners();
             t.listenerCallbacks['info/connected'].cb({ val: () => true });
-            t.listenerCallbacks['info/offset'].cb({ val: () => 1 });
+            t.listenerCallbacks['info/offset'].cb(t.serverSnapshot(1));
             t.listenerCallbacks['info/offset'].errCb(new Error('cancelled'), 'serverTimeOffset');
             ok('⛔ offset ងាប់តែឯង ➜ **មិនត្រូវ** ប្រកាសថាដាច់បណ្តាញ',
                 t.infoProbe().isDatabaseConnected === true,

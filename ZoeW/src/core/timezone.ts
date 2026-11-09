@@ -85,6 +85,7 @@ export function ztoScanStampMillis(raw) {
     const minute = Number(parts[5]);
     const second = Number(parts[6] || 0);
     if (month < 1 || month > 12 || day < 1 || day > 31) return 0;
+    if (day > new Date(Date.UTC(year, month, 0)).getUTCDate()) return 0;
     if (hour > 23 || minute > 59 || second > 59) return 0;
     const ms = appZoneWallClockToMillis(year, month, day, hour, minute, second);
     return isFinite(ms) && ms > 0 ? ms : 0;

@@ -1,3 +1,4 @@
+import { acceptServerClockOffset, resetServerClock } from '../src/core/clock';
 /**
  * ⛔ ZTO-F1 (ការផ្ទៀងផ្ទាត់ឡើងវិញ) ៖ ប្រអប់បញ្ជី ZTO ពេល «ដល់ថ្ងៃ» < ថ្ងៃនេះ។ ទំព័រ ១ (`withSigned=1`) អានបញ្ជី «ចុះហត្ថលេខា» ពី `from` ដល់ **ថ្ងៃនេះ**
  * (`listSignedRange()`) ហើយរាយ `signedPages` ➜ ទំព័រ «ចុះហត្ថលេខា» បន្ថែម (`signed=1`) ត្រូវអាន **បញ្ជីដដែល** (ជួរដដែល)។ មុនកែ ៖ E3 ប្តូរ `signed=1`
@@ -109,3 +110,9 @@ describe('ZTO-F1 ៖ ប្រអប់បញ្ជី «ដល់ថ្ងៃ»
             'ការអានតាមថ្ងៃមិនពង្រីកដល់ថ្ងៃនេះ').toBe(true);
     });
 });
+
+beforeEach(() => {
+    resetServerClock();
+    acceptServerClockOffset(1, { epochMs: Date.now(), wallMs: Date.now(), monotonicMs: performance.now() }, false);
+});
+afterEach(() => resetServerClock());

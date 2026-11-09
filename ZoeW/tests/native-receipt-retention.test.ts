@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { firebaseState } from '../src/core/state';
+import { acceptServerClockOffset, resetServerClock } from '../src/core/clock';
 import { withTransactionOutcomeResolution } from '../src/services/tx-outcome';
 import { NATIVE_RECEIPT_PURGE_GAP_MS, NATIVE_RECEIPT_PURGE_MARGIN_MS, NATIVE_RECEIPT_PURGE_MAX, NATIVE_RECEIPT_PURGE_ROUNDS, NATIVE_RECEIPT_RETENTION_MS, NATIVE_WRITE_RECEIPTS, nativeWriteRecoveryState } from '../src/services/native-write-recovery';
 import { dbListenerPendingPaths } from '../src/core/text';
@@ -19,6 +20,7 @@ function lab(update: any, uid = 'A', get: any = async () => ({ val: () => receip
   const sdk = withTransactionOutcomeResolution(raw); sdk.getAuth(app); sdk.getDatabase(app);
   Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db, isDatabaseInitialized: true,
     isInitializingFirebase: false, firebaseSdkUnavailable: false, isDatabaseConnected: true, sessionExpiryCheck: 'live', authLoginOperation: null });
+  resetServerClock(); acceptServerClockOffset(0, null, false);
   return { sdk, db, app };
 }
 

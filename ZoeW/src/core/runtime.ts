@@ -1,4 +1,5 @@
 export const ACTION_ALLOWLIST = [
+    "retrySessionVerification",
     "connectSharedZtoPalm",
     "disconnectZtoPalm",
     "submitZtoPalmLogin",

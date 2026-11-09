@@ -296,3 +296,5 @@ it.each([
         expect(JSON.parse(response.body), 'own branch keeps its verdict').toMatchObject({ found: false, code: 'ZTO_NO_CUSTOMER_DATA', ztoClosed: true, cached: false });
     }
 });
+
+beforeEach(() => { firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live'; });

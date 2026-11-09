@@ -3,6 +3,7 @@ export { INVALID_KEY_RE, isValidKey, nameCompare, tryParseInt, utf8Length } from
 import { REGISTRY_RELEASES_ROOT, registryPurgeIntent, registryPurgeReceiptMatches, registryPurgeRowOps } from '../domain/registry-purge-proof';
 import { txDisconnectResolving } from './tx-disconnect';
 import { elapsedSince } from '../core/elapsed';
+import { SERVER_CLOCK_DIVERGENCE_MS } from '../core/clock';
 import { SB_DOCS_CACHE_VERSION, docsCacheRecordIsValid } from './supabase-docs-cache';
 import { scanTransportIntent, scanTransportReceipt } from '../domain/scan-transport-proof';
 import { SCAN_OPERATIONS_ROOT } from '../domain/scan-protocol';
@@ -13,6 +14,7 @@ const ARRAY_KEY_RE = /^(0|[1-9]\d*)$/;
 const MAX_DEPTH = 32;
 
 export const SB_RPC_TIMEOUT_MS = 20000;
+export const SB_SERVER_SAMPLE_MAX_RTT_MS = SB_RPC_TIMEOUT_MS;
 export const SB_TX_MAX_RETRIES = 25;
 export const SB_RETRY_STEPS_MS = [1000, 2000, 4000, 8000, 15000, 30000];
 export const SB_POLL_REALTIME_MS = 300000;
@@ -215,6 +217,7 @@ class SbSnapshot {
     ref: any;
     key: string | null;
     _node: any;
+    serverClockSample: any;
     constructor(ref, node) {
         this.ref = ref;
         this.key = ref ? ref.key : null;
@@ -430,6 +433,8 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     const serverNowIsOld = () => serverTimeStale || !(serverNowSeen > 0) || elapsedSince(serverNowSeenAt) > SB_SERVER_NOW_FRESH_MS;
     let serverTimeStale = false;
     let offsetKnown = false;
+    let serverClockSample = null;
+    let serverClockSampleVersion = 0;
     let retryAttempt = 0;
     let retryTimer = null;
     let pollTimer = null;
@@ -607,26 +612,39 @@ export function createSupabaseDatabase(transport, hooks, options?) {
 
     const fireInfo = () => {
         infoListeners.forEach((l: any) => {
+            if (l.kind === 'offset' && !offsetKnown) return;
             const value = l.kind === 'connected' ? connected : (offsetKnown ? serverOffset : 0);
-            const json = JSON.stringify(value);
+            const json = JSON.stringify(l.kind === 'offset' && offsetKnown ? [value, connected, serverClockSampleVersion] : value);
             if (l.fired && json === l.last) return;
             l.fired = true;
             l.last = json;
-            try { l.cb(new SbSnapshot(l.ref, value)); } catch (e) { hooks.onListenerError(e); }
+            const snapshot = new SbSnapshot(l.ref, value);
+            if (l.kind === 'offset') snapshot.serverClockSample = serverClockSample;
+            try { l.cb(snapshot); } catch (e) { hooks.onListenerError(e); }
         });
     };
 
     const setConnected = (value) => {
+        value = !!value && online && (navigator.onLine as boolean) !== false;
         if (connected === value) return;
         connected = value;
         fireInfo();
     };
 
-    const noteServerTime = (now, t0, t1) => {
-        if (typeof now !== 'number' || !Number.isFinite(now)) return;
-        serverOffset = Math.round(now - (t0 + t1) / 2);
+    const noteServerTime = (now, t0, wallStarted) => {
+        const sampledAt = performance.now();
+        const roundTrip = sampledAt - t0;
+        const wallNow = Date.now();
+        const wallRoundTrip = wallNow - wallStarted;
+        if (typeof now !== 'number' || !Number.isFinite(now) || now <= 0 || !Number.isFinite(roundTrip) || roundTrip < 0 || roundTrip > SB_SERVER_SAMPLE_MAX_RTT_MS
+            || !Number.isFinite(wallRoundTrip) || Math.abs(wallRoundTrip - roundTrip) > SERVER_CLOCK_DIVERGENCE_MS) return;
+        const epochMs = now;
+        const estimateEpochMs = Math.round(now + roundTrip / 2);
+        serverClockSample = Object.freeze({ epochMs, estimateEpochMs, uncertaintyMs: Math.max(roundTrip, wallRoundTrip), monotonicMs: sampledAt, wallMs: wallNow, source: 'supabase-rpc' });
+        serverClockSampleVersion++;
+        serverOffset = estimateEpochMs - wallNow;
         serverNowSeen = now;
-        serverNowSeenAt = Date.now();
+        serverNowSeenAt = wallNow;
         serverTimeStale = false;
         offsetKnown = true;
         if (!clockSkewWarned && Math.abs(serverOffset) > SB_CLOCK_SKEW_WARN_MS && hooks.onClockSkew) {
@@ -639,7 +657,8 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     const rpc = async (fn, args, intent?, unjournaled?, writeTopic?) => {
         const epoch = sessionEpoch;
         const topic = fn === 'zoe_write' ? writeTopic : tenantTopic;
-        const t0 = Date.now();
+        const t0 = performance.now();
+        const wallStarted = Date.now();
         let journalRow = null;
         if (fn === 'zoe_write' && (typeof topic !== 'string' || !topic.startsWith('zoe:') || topic.length <= 4)) {
             throw new SbRpcError('write context unavailable', 'write_context', 0, '');
@@ -687,10 +706,10 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             writeJournal.remove(journalRow.scope, journalRow.topic, journalRow.opId);
         }
         if (!closed && epoch === sessionEpoch && topic === tenantTopic) {
-            if (fn === 'zoe_now') noteServerTime(data, t0, Date.now());
+            if (fn === 'zoe_now') noteServerTime(data, t0, wallStarted);
             else if (fn !== 'zoe_purge_execute_v1' && fn !== 'zoe_purge_status_v1'
                 && fn !== 'zoe_pickup_reset_execute_v1' && fn !== 'zoe_pickup_reset_status_v1'
-                && data && typeof data === 'object' && typeof data.now === 'number') noteServerTime(data.now, t0, Date.now());
+                && data && typeof data === 'object' && typeof data.now === 'number') noteServerTime(data.now, t0, wallStarted);
         }
         return data;
     };
@@ -745,7 +764,8 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             }
         }
         let data;
-        const t0 = Date.now();
+        const t0 = performance.now();
+        const wallStarted = Date.now();
         const rowOps = (typeof purgeRules?.rowOps === 'function' ? purgeRules.rowOps : registryPurgeRowOps)(row.ops);
         try {
             if (!rowOps) throw new SbRpcError('purge context unverified', 'purge_context', 0, '');
@@ -769,7 +789,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     seen.add(key); return false;
                 })) throw new SbRpcError('purge effects unreadable', 'bad_response', 0, '');
             }
-            if (!closed && epoch === sessionEpoch && row.scope === authScope && row.topic === tenantTopic) noteServerTime(data.now, t0, Date.now());
+            if (!closed && epoch === sessionEpoch && row.scope === authScope && row.topic === tenantTopic) noteServerTime(data.now, t0, wallStarted);
         } catch (error) {
             if (!readOnly && writeJournal) {
                 const retained = writeJournal.list(row.scope, row.topic).find(item => item.opId === row.opId);
@@ -1709,7 +1729,8 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             if (!current() || !expected) throw fail();
             await waitForLink();
             if (!current()) throw fail();
-            const started = Date.now();
+            const started = performance.now();
+            const wallStarted = Date.now();
             sent = true;
             const res = await rpc('zoe_pickup_reset_execute_v1', { p_expected_tenant: request.tenant, p_attempt_id: request.attemptId,
                 p_context: request.context, p_cas_text: request.casText });
@@ -1719,7 +1740,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                 if (!sessionCurrent() && decided.committed === true) return { committed: true, pickupReset: decided.pickupReset };
                 throw fail();
             }
-            noteServerTime(res.now, started, Date.now());
+            noteServerTime(res.now, started, wallStarted);
             if (!decided.committed) {
                 requestSync();
                 return { committed: false, snapshot: new SbSnapshot(ref, cloneCanonical(decided.value)) };
@@ -1750,13 +1771,14 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             const { current, request, cas } = pickupResetRequest(ref, raw, ownerCurrent);
             const expected = await pickupResetRules.boundReceipt(request.tenant, request.actorUid, request.context, request.attemptId, request.casText, 'operation');
             if (!current() || !expected) return unknown;
-            const started = Date.now();
+            const started = performance.now();
+            const wallStarted = Date.now();
             const res = await rpc('zoe_pickup_reset_status_v1', { p_expected_tenant: request.tenant, p_attempt_id: request.attemptId,
                 p_context: request.context, p_cas_text: request.casText });
             if (!current()) return unknown;
             const decided = pickupResetReply(res, expected, cas, true);
             if (!decided) return unknown;
-            noteServerTime(res.now, started, Date.now());
+            noteServerTime(res.now, started, wallStarted);
             return decided;
         } catch (error) { return unknown; }
     };

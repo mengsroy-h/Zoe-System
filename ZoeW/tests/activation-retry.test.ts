@@ -19,6 +19,7 @@ async function flush() {
 }
 
 beforeEach(() => {
+    firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live';
     vi.useFakeTimers();
     uiState.toasts = [];
     viewState.backendKind = 'firebase';

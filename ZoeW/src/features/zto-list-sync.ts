@@ -2,7 +2,7 @@ import { viewState } from '../core/view-state';
 import { ztoListGroupModel } from '../app/components/zto/model';
 import { fieldValue, setFieldValue } from '../app/refs';
 import { dataState, ztoState } from '../core/state';
-import { getServerNow } from '../core/clock';
+import { captureClockOperation, getServerClockBounds, getServerNow } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
 import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
 import { ZTO_LISTSYNC_KEY, ZTO_PALM_PAGES_KEY } from '../core/storage-keys';
@@ -168,7 +168,9 @@ export function ztoListRowNeedsSignedProbe(raw, now) {
 export async function resolveZtoListSignedVerdicts(cfg, rows) {
     const session = captureZtoSession();
     if (!cfg || !Array.isArray(rows)) return 0;
-    const now = getServerNow();
+    const bounds = getServerClockBounds();
+    if (!bounds) return 0;
+    const now = bounds.lowerMs;
     const seen = new Set();
     const pending = [];
     for (let i = 0; i < rows.length; i++) {
@@ -256,6 +258,8 @@ export function ztoListSignedRowIndex(signedRows) {
 
 export function classifyZtoListRows(rows, historyList, trashList, signedRows?, range?, pickupData?) {
     const out = { fresh: [], existing: [], duplicate: [], skipped: [], returned: [] };
+    const bounds = getServerClockBounds();
+    if (!bounds) return out;
     const list = Array.isArray(rows) ? rows : [];
     const known = new Set();
     const addKnown = (items) => {
@@ -289,7 +293,7 @@ export function classifyZtoListRows(rows, historyList, trashList, signedRows?, r
             out.skipped.push(row);
             continue;
         }
-        const ageState = ztoListRowAgeState(row.stampMs, getServerNow());
+        const ageState = ztoListRowAgeState(row.stampMs, bounds.lowerMs);
         if (ageState === 'purged') {
             row.skip = 'too-old-purged';
             out.skipped.push(row);
@@ -350,7 +354,7 @@ export function classifyZtoListRows(rows, historyList, trashList, signedRows?, r
             out.skipped.push(row);
             return;
         }
-        if (ztoListRowAgeState(row.stampMs, getServerNow()) === 'purged' || (!known.has(key) && pickedUpBefore.has(key))) {
+        if (ztoListRowAgeState(row.stampMs, bounds.lowerMs) === 'purged' || (!known.has(key) && pickedUpBefore.has(key))) {
             row.skip = 'too-old-purged';
             out.skipped.push(row);
             return;
@@ -1219,6 +1223,11 @@ export async function markZtoListRowPickedUp(code, signedAt?, createdAt?, settle
 
 export async function importZtoListRows() {
     const session = captureZtoSession();
+    const importClock = captureClockOperation();
+    if (!importClock.current()) {
+        showToast('⏳ ' + VIEW_NOT_MEASURABLE_TEXT);
+        return;
+    }
     if (ztoState.ztoListSyncInFlight) {
         showToast('⏳ កំពុងដំណើរការរួចហើយ...');
         return;
@@ -1275,7 +1284,7 @@ export async function importZtoListRows() {
             + '\n📅 កាលបរិច្ឆេទ និងម៉ោង យកតាមថ្ងៃស្កេនរបស់ ZTO ➜ លុយចុះលើថ្ងៃនោះ។'
             + noStampNote + pickedUpNote + signedOnlyNote + closeNote
         : 'បិទ ' + closeTargets.length + ' កញ្ចប់ក្នុង ZoeW ដែល ZTO បិទបញ្ជីរួច?' + closeNote;
-    if (!confirm(question)) {
+    if (!confirm(question) || !importClock.current()) {
         return;
     }
     ztoState.ztoListSyncInFlight = true;
@@ -1304,11 +1313,12 @@ export async function importZtoListRows() {
         let finished = 0;
         let stop = false;
         const runRow = async (row) => {
-            if (!session.current()) return 'lost';
+            if (!session.current() || !importClock.current()) return 'lost';
             if (isBarcodeAlreadyUsed(row.barcode)) return 'next';
             let scanEvidence;
             let lateWork = null;
             try {
+                const clock = captureClockOperation();
                 const birth = row.stampMs || getServerNow();
                 const date = getZoneDateKey(birth, 0);
                 const signedAt = ztoSignedTimeMillis(row.signedAt);
@@ -1318,7 +1328,7 @@ export async function importZtoListRows() {
                     identity: JSON.stringify([date, birth, getFormattedClockTime(birth) + ' (' + date + ')', null]) } : undefined;
                 const pickupEpoch = importProof ? await importPickupEpoch(date) : undefined;
                 if (!session.current()) return 'lost';
-                scanEvidence = preparePendingScan(row.barcode, row.cod, row.dod, birth, 'zto-import', 2, importProof, pickupEpoch);
+                scanEvidence = preparePendingScan(row.barcode, row.cod, row.dod, birth, 'zto-import', 2, importProof, pickupEpoch, clock);
                 notePendingScan(scanEvidence, 'claim-pending');
             } catch (e) {
                 if (scanEvidence) finishPendingScan(scanEvidence, 'not-started');

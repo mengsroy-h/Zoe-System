@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { firebaseState } from '../src/core/state';
+import { acceptServerClockOffset, resetServerClock } from '../src/core/clock';
 import { txRestUrl, withTransactionOutcomeResolution } from '../src/services/tx-outcome';
 import { dbListenerPendingPaths } from '../src/core/text';
 import { createLocalWriteJournal } from '../src/services/write-journal';
@@ -27,6 +28,7 @@ function lab(update: any, transaction?: any, databaseURL = host, rootHost = fixt
   const sdk = withTransactionOutcomeResolution(raw); sdk.getAuth(app); sdk.getDatabase(app);
   Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db, isDatabaseInitialized: true,
     isInitializingFirebase: false, firebaseSdkUnavailable: false, isDatabaseConnected: true, sessionExpiryCheck: 'live', authLoginOperation: null });
+  resetServerClock(); acceptServerClockOffset(0, null, false);
   return { sdk, db, app };
 }
 it('an acknowledged server value with a lost client completion is journaled and verified after recreation', async () => {

@@ -19,6 +19,7 @@ function between(start, end) {
 const extracted = [
   between('type MonthlyWaiter =', '\nfunction scanMonthMutation'),
   between('function scanMonthMutation', '\nfunction operationOf'),
+  between('function scanMayStartEffect', '\nasync function readOperationNode'),
   between('async function prepareScanMonth', '\nfunction stagedScanRow'),
   between('export async function saveScanOperation', '\nexport function scanImportCollectedOwned'),
 ].join('\n').replaceAll('export ', '');
@@ -60,9 +61,18 @@ async function scenario(poison) {
     notePendingScan: () => {}, scanHeld: () => {}, releasePendingScan: () => {}, warnPendingScans: () => {},
     validLedgerBucket: () => true, ledgerLatestMonths: x=>x, ledgerTokenSeen:()=>false,ledgerOpRing:()=>[],
   };
-  vm.createContext(context); vm.runInContext(js+'\nthis.save = saveScanOperation;', context, {timeout:1000});
+  vm.createContext(context); vm.runInContext(js+'\nthis.save = saveScanOperation; this.mayStart = scanMayStartEffect;', context, {timeout:1000});
   const db={};
-  const handles=['first','second'].map(id=> {const record={id,phase:'admitted',scanDate:'2026-11-06',month:'2026-11',monthToken:id}; operations.set('zoew_scan_operations/'+id,record); return {record,db,sdk};});
+  const heldRecord={id:'held',phase:'admitted',scanDate:'2026-11-06',month:'2026-11',monthToken:'held'};
+  operations.set('zoew_scan_operations/held', heldRecord);
+  const held={record:heldRecord,db,sdk,clock:{current:()=>false}};
+  assert.equal(context.mayStart(held, heldRecord), false, 'នាឡិកាមិនទុកចិត្ត៖ ទប់ការសរសេរ');
+  assert.equal(await context.save(held,'0910000000','N/A',0), 'unknown');
+  assert.equal(operations.get('zoew_scan_operations/held').phase, 'admitted', 'នាឡិកាមិនទុកចិត្ត៖ មិនសរសេរ prepared');
+  assert.equal(starts, 0, 'នាឡិកាមិនទុកចិត្ត៖ មិនចាប់ផ្តើម monthly');
+  digestCalls=0;
+
+  const handles=['first','second'].map(id=> {const record={id,phase:'admitted',scanDate:'2026-11-06',month:'2026-11',monthToken:id}; operations.set('zoew_scan_operations/'+id,record); return {record,db,sdk,clock: {current: () => true}};});
   const runs=handles.map(h=>context.save(h,'0910000001','N/A',0).then(value=>results.set(h.record.id,value)));
   await flush(); assert.equal(starts,1); assert.equal(timers.size,1);
   async function tick(ms) {const end=now+ms; for (;;) {const due=[...timers].filter(([,t])=>t.at<=end).sort((a,b)=>a[1].at-b[1].at)[0]; if(!due)break; now=due[1].at;timers.delete(due[0]);due[1].fn();await flush();}now=end;await flush();}
@@ -112,7 +122,7 @@ async function scenario(poison) {
   assert.equal(thirdAdvance?.[1], 'DB_OP_TIMEOUT_MS', 'ថវិកាទីបីត្រូវដដែល');
   const record = {id:'third', phase:'admitted', scanDate:'2026-11-06', month:'2026-11', monthToken:'third'};
   operations.set('zoew_scan_operations/third', record);
-  context.third = {record, db, sdk};
+  context.third = {record, db, sdk, clock: {current: () => true}};
   context.priorBudgets = context.budgetsStarted();
   const thirdRun = context.save(context.third, '0910000003', 'N/A', 0).then(value => results.set('third', value));
   await flush();

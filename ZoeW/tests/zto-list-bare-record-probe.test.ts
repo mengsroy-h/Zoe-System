@@ -207,3 +207,5 @@ describe('ទាញបញ្ជី ZTO (Cookie) ៖ ការសួរស្ថ�
         expect(h.calls).toEqual([]);
     });
 });
+
+beforeEach(() => { firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live'; });

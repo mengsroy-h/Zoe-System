@@ -190,6 +190,7 @@ function startPeriodicTasks(scope: LifecycleScope): void {
     });
     scope.listen(document, 'visibilitychange', () => {
         if (document.hidden) return;
+        runSessionExpiryCheck();
         sweepRecallHighlights();
         retryZtoShopSweepListener();
         retryZtoTrashModeListener();

@@ -109,7 +109,7 @@ function install(createdAt: number) {
     firebaseState.auth = { currentUser: { uid: 'u1', getIdToken: async () => 'tok' } } as any;
     firebaseState.isDatabaseInitialized = true;
     firebaseState.isDatabaseConnected = true;
-    firebaseState.serverClockTrusted = true;
+    firebaseState.sessionExpiryCheck = 'live'; firebaseState.serverClockTrusted = true;
     firebaseState.hasEverConnectedToDatabase = true;
     firebaseState.dbRefHistory = makeRef(DB_A, HISTORY) as any;
     firebaseState.dbRefDeleted = makeRef(DB_A, TRASH) as any;

@@ -203,7 +203,6 @@ function buildContext(app) {
         function renderRecentlyDeleted() {}
         function updateRecentPhonesList() {}
         function attemptAuthStorageRecovery() { __log.storageRecovery = true; }
-        function isFirebaseSessionExpired() { return Promise.resolve(false); }
         function forceExpireSession() {}
         function resetClearHistoryOperationState() {}
         function ensureAppActivated() { return Promise.resolve(activationAllowed); }

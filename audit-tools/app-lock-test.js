@@ -448,16 +448,18 @@ const LICENSE_STUB = `window.ZoeLicense = {
     activate: function () { return Promise.resolve({ ok: true }); },
     verifyKeyString: function () { return Promise.resolve({ ok: true }); },
     clearActivation: function () {}
-};`;
+};` + require('./browser-clock-fixture.cjs').CLOCK_FIXTURE;
 
 const FAKE_SDK = function () {
     const noop = () => {};
+    const authTime = new Date().toISOString();
     window.__signOutCalls = 0;
     window.firebaseSDK = {
         initializeApp: () => ({}),
         getApps: () => [],
         deleteApp: () => Promise.resolve(),
         getAuth: () => ({ currentUser: { uid: 'u1', email: 'a@b.c' } }),
+        getIdTokenResult: () => Promise.resolve({ authTime, claims: {} }),
         onAuthStateChanged: (a, cb) => { setTimeout(() => cb(a.currentUser), 10); return noop; },
         signInWithEmailAndPassword: () => Promise.resolve({ user: { uid: 'u1' } }),
         signOut: () => { window.__signOutCalls++; return Promise.resolve(); },
@@ -505,7 +507,7 @@ async function withTimeout(promise, ms, label) {
     const server = await serve(APP);
     const port = server.address().port;
     const browser = await chromium.launch({ executablePath: CHROME });
-    const ctx = await browser.newContext({ viewport: { width: 412, height: 880 } });
+    const ctx = await browser.newContext({ viewport: { width: 412, height: 880 }, serviceWorkers: 'block' });
     const page = await ctx.newPage();
     page.on('dialog', (d) => d.accept().catch(() => {}));
     // ⛔ ការធ្លាក់ត្រូវមានឈ្មោះ ៖ កំហុស runtime ក្នុងទំព័រ ធ្វើឲ្យជំហានបន្ទាប់
@@ -526,7 +528,13 @@ async function withTimeout(promise, ms, label) {
     await page.addInitScript('(' + FAKE_SDK.toString() + ')();');
 
     const load = () => page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
-    const settle = () => page.waitForTimeout(2200);
+    const settle = async () => {
+        await page.waitForTimeout(2200);
+        const s = await state();
+        if (s.sessionCheck !== 'live' || !s.clockTrusted || s.sessionVerification || s.serviceWorkerControlled) {
+            throw new Error('វគ្គ fixture មិនទាន់ផ្ទៀងផ្ទាត់ក្រោយផ្ទុក៖ ' + JSON.stringify(s));
+        }
+    };
     const state = () => page.evaluate(() => {
         const vis = (sel) => {
             const el = document.querySelector(sel);
@@ -534,7 +542,14 @@ async function withTimeout(promise, ms, label) {
             return getComputedStyle(el).visibility;
         };
         const lock = document.getElementById('appLockScreen');
+        const pin = document.getElementById('appLockPinInput');
+        const pinCard = pin && pin.closest('.app-lock-card');
         return {
+            sessionCheck: window.sessionExpiryCheck,
+            clockTrusted: typeof window.serverClockIsTrustworthy === 'function' && window.serverClockIsTrustworthy(),
+            sessionVerification: !!document.querySelector('[data-session-verification]'),
+            serviceWorkerControlled: !!(navigator.serviceWorker && navigator.serviceWorker.controller),
+            pinCardVisible: !!pinCard && getComputedStyle(pinCard).display !== 'none',
             bodyLocked: document.body.classList.contains('app-locked'),
             lockShown: !!lock && getComputedStyle(lock).display !== 'none',
             pages: vis('#appPages'),
@@ -620,7 +635,11 @@ async function withTimeout(promise, ms, label) {
         try {
             await fn();
         } catch (e) {
-            bad(title + ' ➜ ជំហានបោះកំហុស', String(e && e.message ? e.message : e).split('\n')[0]);
+            bad(title + ' ➜ ជំហានបោះកំហុស', {
+                error: String(e && e.message ? e.message : e).split('\n')[0],
+                state: await state().catch(() => null),
+                pageErrors: pageErrors.slice(-3)
+            });
         }
     }
 

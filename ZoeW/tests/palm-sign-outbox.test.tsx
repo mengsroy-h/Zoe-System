@@ -1,3 +1,4 @@
+import * as serverClock from '../src/core/clock';
 import { exportQueuedSignPhoto } from '../src/features/queued-sign-photo';
 import { saveOriginalQueuedPhoto } from '../src/platform/queued-photo-output';
 import { createHash, webcrypto } from 'node:crypto';
@@ -12,7 +13,7 @@ import { encryptLookupSecret } from '../src/services/crypto';
 import { openSignJob, sealSignJob, replaceSignJob, addSignJob, SIGN_OUTBOX_LEASE_MS } from '../src/services/palm-sign-outbox-store';
 import { palmOriginalFingerprint } from '../src/services/palm-sign-transport';
 import { openZtoPalmSign, submitZtoPalmSign, acceptPalmSignBarcode, setPalmSignName } from '../src/features/zto-palm-sign';
-import { actOnQueuedSign, discardUnreadablePalmSignJobs, palmSignOutboxState, runPalmSignOutbox, refreshPalmSignQueue } from '../src/features/palm-sign-outbox';
+import { actOnQueuedSign, discardUnreadablePalmSignJobs, palmSignOutboxState, runPalmSignOutbox, refreshPalmSignQueue, persistPalmSignJob } from '../src/features/palm-sign-outbox';
 import { applyBarcodeCloseChange } from '../src/features/barcode-ops';
 import { closeModal } from '../src/ui/modal';
 import { barcodeSignIdentity } from '../src/domain/barcode';
@@ -95,7 +96,9 @@ const closes = () => vi.mocked(applyBarcodeCloseChange).mock.calls.map((c) => c[
 beforeEach(async () => {
     resetZtoFinalMarks(); ztoPickupStatus.clear(); resetZtoTrashMode();
     cleanupInFlight.clear(); dbListenerFailedPaths.clear(); dbListenerPendingPaths.clear();
-    firebaseState.isDatabaseConnected = false; firebaseState.serverClockTrusted = false;
+    serverClock.resetServerClock();
+    firebaseState.isDatabaseConnected = true; firebaseState.serverClockTrusted = true; firebaseState.serverTimeOffsetMs = 0;
+    firebaseState.sessionExpiryCheck = 'live';
     disk.rows.clear(); disk.commit = null; disk.fail = false;
     vi.stubGlobal('crypto', webcrypto); vi.stubGlobal('indexedDB', {});
     vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
@@ -1925,6 +1928,7 @@ it('ជីវិត queue៖ លុបអចិន្ត្រៃយ៍ត្រ
 it('ជីវិត queue៖ លើស១០នាទីផ្លាស់ទៅសង្គ្រោះពេល offline ដោយមិនបាត់រូប', async () => {
     await queuedWithPolicy(false);
     const old = (await jobs())[0];
+    firebaseState.isDatabaseConnected = true; firebaseState.serverClockTrusted = true; firebaseState.serverTimeOffsetMs = 0;
     const clock = Date.now();
     disk.rows.set(old.row.id, await sealSignJob(old.row.owner, key, { ...old.job, signQueuedAt: clock - 600000 } as any));
     await runPalmSignOutbox();
@@ -1985,6 +1989,7 @@ it('ជីវិត queue៖ Sign រួចជាមួយរូប ត្រូ
 });
 it('ជីវិត queue៖ បន្តដោយដៃក្រោយ10នាទីមិនជាប់សង្គ្រោះវិញភ្លាម ហើយ request ដើមនៅដដែល', async () => {
     const online = await queuedWithPolicy(false); const old = (await jobs())[0]; const now = Date.now();
+    firebaseState.isDatabaseConnected = true; firebaseState.serverClockTrusted = true; firebaseState.serverTimeOffsetMs = 0;
     disk.rows.set(old.row.id, await sealSignJob(old.row.owner, key, { ...old.job, signQueuedAt: now - 600001 }));
     await runPalmSignOutbox(); expect((await jobs())[0].job.recovery).toBeTruthy();
     online.mockReturnValue(true); await actOnQueuedSign(old.row.id, 'recover');
@@ -2340,4 +2345,128 @@ it('ZTO_PALM_SIGN_RETRY_LATER (ថវិកា Function ជិតអស់មុ
     const sent = bodies('receipt');
     expect(sent).toHaveLength(2);
     expect(new Set(sent.map(body => body.requestId)).size).toBe(1); expect(sent[1].photo).toBe(photos[0]);
+});
+
+
+it.each(['delete-straddle', 'archive-straddle', 'archive-unknown', 'queue-future', 'retry-future', 'verified-preserve', 'delete-expired', 'archive-expired', 'delete-generation', 'archive-generation', 'delete-bounds', 'archive-bounds', 'initialize-generation', 'initialize-session', 'initialize-unknown'])('នាឡិកា outbox៖ %s', async mode => {
+    await queuedWithPolicy(false);
+    const old = (await jobs())[0];
+    const now = Date.now();
+    vi.spyOn(Date, 'now').mockReturnValue(now);
+    vi.spyOn(performance, 'now').mockReturnValue(1000);
+    firebaseState.isDatabaseConnected = true;
+    serverClock.resetServerClock();
+    expect(serverClock.acceptServerClockOffset(0, { epochMs: now - 100, estimateEpochMs: now, uncertaintyMs: 200, monotonicMs: 1000, wallMs: now }, false)).toBe(true);
+    const deleting = mode.startsWith('delete');
+    const initializing = mode.startsWith('initialize');
+    const expiry = mode.endsWith('straddle') ? now - 50 : now - 1000;
+    const patch: any = deleting
+        ? { signedCleanupConfirmed: true, signedVerifiedAt: expiry - 86400000, signedCleanupAt: expiry }
+        : { signQueuedAt: initializing ? undefined : expiry - 600000 };
+    if (mode === 'queue-future') patch.signQueuedAt = now + 50;
+    if (mode === 'retry-future') patch.userRetryAt = now + 50;
+    if (mode === 'verified-preserve') Object.assign(patch, { signedCleanupConfirmed: true, signedVerifiedAt: now + 50 });
+    disk.rows.set(old.row.id, await sealSignJob(old.row.owner, key, { ...old.job, ...patch }));
+    if (mode.endsWith('unknown')) serverClock.resetServerClock();
+    let callbackReached = false;
+    if (mode.endsWith('generation') || mode.endsWith('session') || mode.endsWith('bounds')) {
+        const replace = vi.mocked(replaceSignJob).getMockImplementation()!;
+        vi.mocked(replaceSignJob).mockImplementationOnce(async (previous, next, current) => {
+            callbackReached = true;
+            await Promise.resolve();
+            if (mode.endsWith('session')) firebaseState.authGeneration++;
+            else if (mode.endsWith('bounds')) serverClock.acceptServerClockOffset(0, { epochMs: now - 2000, estimateEpochMs: now, uncertaintyMs: 4000, monotonicMs: 1000, wallMs: now }, false);
+            else { serverClock.resetServerClock(); serverClock.acceptServerClockOffset(0, null, false); }
+            return replace(previous, next, current);
+        });
+    }
+    try {
+        await runPalmSignOutbox();
+        if (mode.endsWith('generation') || mode.endsWith('session') || mode.endsWith('bounds')) expect(callbackReached).toBe(true);
+        if (mode === 'delete-expired') expect(disk.rows.size).toBe(0);
+        else {
+            const kept = (await jobs())[0].job;
+            expect(kept.photo).toBe(old.job.photo);
+            if (mode === 'archive-expired') expect(kept.recovery).toBeTruthy();
+            else expect(kept.recovery).toBeUndefined();
+            if (mode === 'queue-future') expect(kept.signQueuedAt).toBe(now + 50);
+            if (mode === 'verified-preserve') expect(kept.signedVerifiedAt).toBe(now + 50);
+            if (initializing) expect(kept.signQueuedAt).toBeUndefined();
+        }
+        expect(requests).toEqual([]);
+    } finally { serverClock.resetServerClock(); }
+});
+
+
+it.each(['enqueue-unknown', 'enqueue-generation', 'retain-generation', 'retain-preserve'])('នាឡិកា outbox៖ %s', async mode => {
+    if (mode === 'enqueue-unknown') serverClock.resetServerClock();
+    const online = await queuedWithPolicy(false);
+    const old = (await jobs())[0];
+    if (mode === 'enqueue-unknown') { expect(old.job.signQueuedAt).toBeUndefined(); return; }
+    firebaseState.isDatabaseConnected = true;
+    serverClock.resetServerClock(); serverClock.acceptServerClockOffset(0, null, false);
+    try {
+        if (mode === 'enqueue-generation') {
+            disk.rows.clear();
+            const pending = gate<void>(); disk.commit = pending.promise;
+            const calls = vi.mocked(addSignJob).mock.calls.length;
+            const operation = persistPalmSignJob(old.job, () => true);
+            const outcome = operation.catch(error => error);
+            await vi.waitFor(() => expect(vi.mocked(addSignJob).mock.calls.length).toBe(calls + 1));
+            serverClock.resetServerClock(); serverClock.acceptServerClockOffset(0, null, false);
+            pending.resolve();
+            expect(await outcome).toBeInstanceOf(Error);
+            expect(disk.rows.size).toBe(0);
+        } else {
+            await actOnQueuedSign(old.row.id, 'archive');
+            const archived = (await jobs())[0];
+            const preserved = Date.now() + 50;
+            if (mode === 'retain-preserve') disk.rows.set(old.row.id, await sealSignJob(old.row.owner, key, { ...archived.job, signedVerifiedAt: preserved }));
+            const replace = vi.mocked(replaceSignJob).getMockImplementation()!;
+            let reached = false;
+            vi.mocked(replaceSignJob).mockImplementation(async (previous, next, current) => {
+                if (next && (await openSignJob(next, key)).signedCleanupConfirmed) {
+                    reached = true;
+                    if (mode === 'retain-generation') { serverClock.resetServerClock(); serverClock.acceptServerClockOffset(0, null, false); }
+                }
+                return replace(previous, next, current);
+            });
+            reservationFixtures = false;
+            network = async body => body.stage === 'status' ? reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: true }) : receipt(body);
+            online.mockReturnValue(true);
+            await actOnQueuedSign(old.row.id, 'recover');
+            expect(reached).toBe(true);
+            const kept = (await jobs())[0].job;
+            if (mode === 'retain-generation') expect(kept.signedVerifiedAt).toBeUndefined();
+            else expect(kept.signedVerifiedAt).toBe(preserved);
+            expect(kept.photo).toBe(old.job.photo);
+        }
+    } finally { disk.commit = null; serverClock.resetServerClock(); }
+});
+
+it.each(['unknown', 'generation', 'current'])('នាឡិកា outbox៖ retry %s', async mode => {
+    await queuedWithPolicy(false);
+    const old = (await jobs())[0];
+    firebaseState.isDatabaseConnected = true;
+    serverClock.resetServerClock();
+    if (mode !== 'unknown') serverClock.acceptServerClockOffset(0, null, false);
+    const queuedAt = Date.now() - 1000;
+    disk.rows.set(old.row.id, await sealSignJob(old.row.owner, key, { ...old.job, signQueuedAt: queuedAt, phase: 'action', continuationAllowed: true }));
+    const replace = vi.mocked(replaceSignJob).getMockImplementation()!;
+    let reached = false;
+    if (mode === 'generation') vi.mocked(replaceSignJob).mockImplementationOnce(async (previous, next, current) => {
+        reached = true;
+        if (mode === 'generation') { serverClock.resetServerClock(); serverClock.acceptServerClockOffset(0, null, false); }
+        return replace(previous, next, current);
+    });
+    try {
+        await actOnQueuedSign(old.row.id, 'continue');
+        const kept = (await jobs())[0].job;
+        if (mode === 'current') expect(kept.userRetryAt).toBeGreaterThan(queuedAt);
+        else { expect(kept.userRetryAt).toBeUndefined(); expect(kept.phase).toBe('action'); }
+        if (mode === 'generation') expect(reached).toBe(true);
+        expect(kept.signQueuedAt).toBe(queuedAt);
+        expect(kept.photo).toBe(old.job.photo);
+        expect(requests).toEqual([]);
+    } finally { serverClock.resetServerClock(); }
 });

@@ -26,6 +26,74 @@ function ok(label, cond, detail) {
     else { fail++; console.log('   FAIL  ' + label + (detail !== undefined ? '\n         ' + (typeof detail === 'string' ? detail : JSON.stringify(detail)) : '')); }
 }
 
+function licenseTimeoutRuntime(source) {
+    const acorn = require('acorn');
+    const wanted = new Set(['readClock', 'clockElapsed', 'fetchWithBodyTimeout']);
+    const declarations = [];
+    const walk = (node) => {
+        if (!node || typeof node !== 'object') return;
+        if (node.type === 'FunctionDeclaration' && wanted.has(node.id.name)) declarations.push(source.slice(node.start, node.end));
+        if (node.type === 'VariableDeclaration') for (const binding of node.declarations) {
+            if (['serverTimeObservation', 'CLOCK_DIVERGENCE_MS'].includes(binding.id.name)) declarations.push(node.kind + ' ' + source.slice(binding.start, binding.end) + ';');
+        }
+        for (const value of Object.values(node)) {
+            if (Array.isArray(value)) value.forEach(walk);
+            else if (value && typeof value === 'object') walk(value);
+        }
+    };
+    walk(acorn.parse(source, { ecmaVersion: 'latest' }));
+    return declarations.join('\n');
+}
+
+function licenseBodyInsideTimeout(source) {
+    const acorn = require('acorn');
+    let helper = null;
+    const visit = (node, fn) => {
+        if (!node || typeof node !== 'object') return;
+        fn(node);
+        for (const value of Object.values(node)) {
+            if (Array.isArray(value)) value.forEach(child => visit(child, fn));
+            else if (value && typeof value === 'object') visit(value, fn);
+        }
+    };
+    visit(acorn.parse(source, { ecmaVersion: 'latest' }), node => {
+        if (node.type === 'FunctionDeclaration' && node.id.name === 'fetchWithBodyTimeout') helper = node;
+    });
+    if (!helper) return false;
+    let guarded = false;
+    visit(helper.body, node => {
+        if (node.type !== 'TryStatement' || !node.finalizer) return;
+        const returned = node.block.body.find(child => child.type === 'ReturnStatement');
+        const race = returned?.argument?.type === 'AwaitExpression' ? returned.argument.argument : null;
+        if (race?.type !== 'CallExpression' || race.callee.type !== 'MemberExpression'
+            || race.callee.object.name !== 'Promise' || race.callee.property.name !== 'race') return;
+        const branches = race.arguments[0]?.type === 'ArrayExpression' ? race.arguments[0].elements : [];
+        if (!branches.some(child => child?.type === 'Identifier' && child.name === 'timeout')) return;
+        const work = branches.find(child => child?.type === 'CallExpression' && child.callee.type === 'ArrowFunctionExpression' && child.callee.async);
+        if (!work) return;
+        let fetchAwait = false, bodyAwait = false, clearFinally = false, clearEarly = false;
+        const steps = work.callee.body.body;
+        const awaitedCall = (expression, name) => expression?.type === 'AwaitExpression'
+            && expression.argument.type === 'CallExpression' && expression.argument.callee.name === name;
+        const fetchIndex = steps.findIndex(step => step.type === 'VariableDeclaration'
+            && step.declarations.some(binding => awaitedCall(binding.init, 'fetch')));
+        const bodyIndex = steps.findIndex(step => step.type === 'VariableDeclaration'
+            && step.declarations.some(binding => binding.init?.type === 'ConditionalExpression'
+                && binding.init.test.name === 'readBody' && awaitedCall(binding.init.consequent, 'readBody')));
+        fetchAwait = fetchIndex >= 0;
+        bodyAwait = bodyIndex > fetchIndex && steps.slice(0, bodyIndex).every(step => step.type === 'VariableDeclaration');
+        visit(helper.body, child => {
+            if (child.type === 'CallExpression' && child.callee.name === 'clearTimeout'
+                && !(child.start >= node.finalizer.start && child.end <= node.finalizer.end)) clearEarly = true;
+        });
+        visit(node.finalizer, child => {
+            if (child.type === 'CallExpression' && child.callee.name === 'clearTimeout' && child.arguments[0]?.name === 'timer') clearFinally = true;
+        });
+        guarded ||= fetchAwait && bodyAwait && clearFinally && !clearEarly;
+    });
+    return guarded;
+}
+
 // === ផ្នែកទី ១ — ស្តាទិច ===
 const src = fs.readFileSync(path.join(ROOT, 'ZoeW', 'app.js'), 'utf8');
 
@@ -69,7 +137,19 @@ ok('license-verify.js គ្មាន fetch() ឆៅក្រៅ helper',
     (licSrc.match(/(?<!function )\bfetch\(/g) || []).length === 1,
     'fetch ឆៅ៖ ' + (licSrc.match(/^.*(?<!function )\bfetch\(.*$/gm) || []).join(' | '));
 ok('license-verify.js អានតួ **ខាងក្នុង** បង្អួច timeout មិនមែនក្រោយវា',
-    /await fetch\([\s\S]{0,200}?await readBody\(res\)[\s\S]{0,120}?finally\s*\{\s*clearTimeout\(timer\);/.test(licSrc));
+    licenseBodyInsideTimeout(licSrc));
+for (const [before, after] of [
+    ['return await Promise.race([timeout,', 'return Promise.race([timeout,'],
+    ['readBody ? await readBody(res)', 'readBody ? readBody(res)'],
+    ['const receivedAt = readClock();', 'clearTimeout(timer); const receivedAt = readClock();'],
+    ['clearTimeout(timer);', 'clearTimeout(otherTimer);'],
+    ['const res = await fetch(', 'const res = null; const unused = async () => await fetch('],
+    ['readBody ? await readBody(res)', 'readBody ? (() => { async function unused() { await readBody(res); } return undefined; })()']
+]) {
+    const mutant = licSrc.replace(before, after);
+    ok('ទិសផ្ទុយ ៖ ការអានតួ/ការបិទ timer ខុសមិនអាចឆ្លងរចនាសម្ព័ន្ធ — ' + before,
+        mutant !== licSrc && !licenseBodyInsideTimeout(mutant));
+}
 ok('license-verify.js គ្មាន clearTimeout មុនអានតួ',
     !/finally\s*\{\s*clearTimeout\(timer\);\s*\}[\s\S]{0,1200}?await res\.(json|text)\(\)/.test(licSrc));
 
@@ -216,16 +296,7 @@ function serve() {
         good.status === 200 && good.body && good.body.ok === true, good);
 
     // ៤ខ — helper ពិតរបស់ license-verify.js ក៏ត្រូវឈប់ដែរ ពេលតួមិនមក
-    const licFn = (function () {
-        const at = licSrc.indexOf('async function fetchWithBodyTimeout(');
-        if (at === -1) return null;
-        let depth = 0, start = licSrc.indexOf('{', at), end = start;
-        for (let k = start; k < licSrc.length; k++) {
-            if (licSrc[k] === '{') depth++;
-            else if (licSrc[k] === '}') { depth--; if (!depth) { end = k; break; } }
-        }
-        return licSrc.slice(at, end + 1);
-    })();
+    const licFn = licenseTimeoutRuntime(licSrc);
     ok('ស្រង់ fetchWithBodyTimeout ពិតចេញពី license-verify.js បាន', !!licFn);
     if (licFn) {
         await page.evaluate('(function(){ const NET_TIMEOUT_MS = 700; ' + licFn +
@@ -237,11 +308,11 @@ function serve() {
                 await fetchWithBodyTimeout(b + '/headers-only', (r) => r.json());
                 return { rejected: false, ms: Date.now() - t0 };
             } catch (e) {
-                return { rejected: true, ms: Date.now() - t0, name: String(e && e.name) };
+                return { rejected: true, ms: Date.now() - t0, name: String(e && e.name), message: String(e && e.message) };
             }
         }, base);
         ok('checkOnline៖ header មករួច តែតួមិនមក ➜ ឈប់ក្នុងពេលកំណត់ (មិនព្យួររហូត)',
-            licPartial.rejected && licPartial.ms < 2500, licPartial);
+            licPartial.rejected && licPartial.ms < 2500 && licPartial.message === 'network timeout', licPartial);
         await page.waitForTimeout(400);
         ok('checkOnline៖ សំណើដែលព្យួរត្រូវ abort ពិត (មិនកកកុញ)',
             abortedSockets - licBefore >= 1, { licBefore, after: abortedSockets });

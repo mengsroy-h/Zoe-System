@@ -74,7 +74,7 @@ function SignQueueItem({ row, expanded, toggle, close }: { row: SignQueueView; e
         <p className={'sign-queue-status' + (row.signed ? ' is-signed' : '')} role="status">{queueStatus(row)}</p>
         {!row.busy && row.statusUnavailable && row.signed !== undefined ? <p className="sign-queue-hint">ពិនិត្យ ZTO ថ្មីមិនបាន</p> : null}
         {!row.signed || !row.cleanupAt || row.warning ? <p role={row.warning ? 'alert' : undefined}>{row.message}</p> : null}
-        {row.cleanupAt ? <p className="sign-queue-hint">{'លុបអចិន្ត្រៃយ៍៖ ' + new Date(row.cleanupAt).toLocaleString('km-KH')}</p> : null}
+        {row.cleanupAt ? <p className="sign-queue-hint">{'លុបអចិន្ត្រៃយ៍៖ ' + new Date(row.cleanupAt).toLocaleString('km-KH', { timeZone: 'Asia/Phnom_Penh' })}</p> : null}
         {expanded ? <div className="sign-queue-actions" id={menuId} data-sign-menu="" role="group" aria-label={'សកម្មភាពកញ្ចប់ ' + row.code}>
             <button type="button" className="sign-queue-save" onClick={() => { close(); void exportQueuedSignPhoto(row.id, row.code); }}>💾 រក្សាទុករូបដើម</button>
             {row.recovery ? <button type="button" className="sign-queue-secondary" disabled={row.busy} onClick={() => run('recover')}>ពិនិត្យ (មិនផ្ញើ Sign)</button>

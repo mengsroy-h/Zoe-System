@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { dataState, firebaseState, uiState } from '../../../core/state';
 import { getServerNow } from '../../../core/clock';
+import { sessionVerificationRequired, sessionUserActionAllowed } from '../../../core/session-verification';
 import { parseTimestampFromId } from '../../../domain/barcode';
 import { emptyViewMessage } from '../../../services/db-listeners';
 import { DB_LISTENER_KEY_HISTORY } from '../../../core/text';
@@ -98,19 +99,21 @@ function HistorySpacer({ height }: { height: number }) {
 }
 
 function HistoryMoreRow({ more, shown }: { more: number; shown: number }) {
+    useStore(firebaseState);
+    const sessionBlocked = sessionVerificationRequired();
     const ref = useRef<HTMLTableRowElement | null>(null);
     useEffect(() => {
         const el = ref.current;
-        if (!el || typeof IntersectionObserver !== 'function') return;
+        if (!el || sessionBlocked || typeof IntersectionObserver !== 'function') return;
         let fired = false;
         const io = new IntersectionObserver((entries) => {
-            if (fired || !entries.some((e) => e.isIntersecting)) return;
+            if (fired || !entries.some((e) => e.isIntersecting) || !sessionUserActionAllowed('showMoreHistoryRows')) return;
             fired = true;
             act('showMoreHistoryRows');
         }, { root: el.closest('.table-responsive'), rootMargin: '0px 0px 600px 0px' });
         io.observe(el);
-        return () => io.disconnect();
-    }, [shown]);
+        return () => { fired = true; io.disconnect(); };
+    }, [shown, sessionBlocked]);
     return (
         <tr className="history-more-row" ref={ref}>
             <td colSpan={4} style={{ textAlign: 'center', padding: '10px' }}>

@@ -1,5 +1,6 @@
 import type { SyntheticEvent } from 'react';
 import { lookupAction, ACTION_NAMES } from '../core/action-registry';
+import { sessionUserActionAllowed } from '../core/session-verification';
 
 export interface ActOptions {
     args?: unknown[];
@@ -8,6 +9,7 @@ export interface ActOptions {
 }
 
 export function act(name: string, ...args: unknown[]): void {
+    if (!sessionUserActionAllowed(name)) return;
     const fn = lookupAction(name);
     if (!fn) {
         if (import.meta.env.DEV) console.warn('[zoew] សកម្មភាពមិនស្គាល់ ៖', name);

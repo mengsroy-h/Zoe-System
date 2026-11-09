@@ -42,6 +42,8 @@
 
 ## 📌 ការងារដែលនៅសល់ — ការផ្ទៀងផ្ទាត់ដោយអ្នកប្រើ
 
+- 2026-11-09 · Clock/Audit៖ CI លើ `2afe5f24b4e6ce47b0dca6212960edbbf2c24b38` មាន២៤០/២៤៣ checker ជាប់; helper និង ZTO LOCK បានឆ្លង។ នៅសល់ keyboard live trace មិនគ្រប់ស៊ុម, nested daily-checker budget និង announcement feed មិនស៊ីកំណែ។ Candidate audit/feed បន្ទាប់នៅដាច់ដោយឡែក មិនទាន់ផ្សាយ; ត្រូវផ្ទៀង CI លើ commit ថ្មី។ ការផ្ទុកប្រវត្តិក្រោយ session ផ្ទៀងត្រូវវាស់លើ iPhone/Android ពិតមុន merge។
+
 - 2026-11-07 · PR393៖ Registration atomic បានបញ្ចូលក្នុង branch រួច។ Audit និង Registration Auth លើ head `a711893b4f3b0d3b48dcdb1801937f4fd8baa732` បានផ្ទៀង; F03 ជាប់ក្រោយរត់ឡើងវិញ ប៉ុន្តែមូលហេតុបរាជ័យដំបូងមិនទាន់បញ្ជាក់។ Hosted migration/backup/restore និងការរង់ចាំ handler ចាស់ឱ្យចប់ នៅមិនទាន់ផ្ទៀង; ការកែ test និងឯកសារថ្មីត្រូវការ CI លើ commit ថ្មី មុន merge។ Dead-code ដែលបានដកចេញពីការកែ នៅមិនទាន់បញ្ចប់។
 
 > ⛔ **ផ្នែកនេះកាន់តែការងារដែលនៅបើក** ៖ ស្ថានភាព git · អ្វីដែលអ្នកប្រើមិនទាន់បញ្ជាក់ · សកម្មភាពដោយដៃដែលមិនទាន់ធ្វើ · ការសម្រេចដែលនៅរស់។
@@ -119,6 +121,36 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ archive ផ្នែក ៩ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.190] — 2026-11-09 · ផ្ទៀង session API និងសោ ZTO
+
+**ZoeW** (`zoew-v453` ➜ `zoew-v454`)។ ZoeKeyGen នៅ `2.24.37` ដដែល។ Candidate នេះមិនទាន់ផ្សាយ។
+
+ការចូលប្រព័ន្ធ ការផុតវគ្គ៤ម៉ោង និងការទប់សកម្មភាពពេលមិនទាន់ផ្ទៀង រក្សា tri-state `live`/`expired`/`unverified`។ ដកតែ boolean wrapper `isFirebaseSessionExpired` ដែលគ្មាន production caller; វាមិនមានលើ audit-only window API ទៀត។ Unit consumer ត្រូវវាស់ tri-state API ដែល app ប្រើពិត។ មិនប្ដូរគោលការណ៍ប្រាក់ ម៉ោងស្កេន ឬព្រំ ZTO ទេ; មូលដ្ឋានភស្តុតាងនិង hash refresh ស្ថិតក្នុងផ្នែក២។
+
+**សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ ផ្ទៀង full Audit លើ commit ថ្មីមុន merge និងរក្សាការផ្ទៀង iPhone/Android សម្រាប់ history recovery ដែលនៅបើក។ មិនមាន backend migration ឬការបោះពុម្ព rules ថ្មី។ កុំប្រើ audit-console helper ដែលដកចេញ; តេស្តប្រើ `getFirebaseSessionVerdict` និងទទួល `unverified` ដាច់ពី `live`។
+
+### [2.50.189] — 2026-11-09 · បន្តផ្ទុកប្រវត្តិក្រោយផ្ទៀងវគ្គ
+
+**ZoeW** (`zoew-v452` ➜ `zoew-v453`)។ **ZoeKeyGen មិនប្រែ**។ Candidate សម្រាប់ពិនិត្យដាច់ដោយឡែក មិនទាន់ផ្សាយ។
+
+បញ្ជីប្រវត្តិបន្តការផ្ទុកជួរស្វ័យប្រវត្តិក្រោយ session ផ្ទៀងរួច ទោះជួរ «បង្ហាញបន្ថែម» នៅមើលឃើញជាប់ក៏ដោយ។ Clock/session ដែលមិនទាន់ប្រាកដនៅតែទប់សកម្មភាព; callback ចាស់បន្ទាប់ពីការប្ដូរជួរ ឬបិទផ្ទាំងមិនបញ្ចូលការផ្ទុកស្ទួន។ មិនប្តូរ animation, CSS, scroll API ឬ LOCK។
+
+**អ្នកយាម**៖ `history-observer-session-recovery.test.tsx`, `history-paging.test.tsx` និង `forbidden-zone-lock.test.ts` រួម session/clock tests។ ការរត់រួមចុងក្រោយ ៣០២/៣០២ក្នុង១៤ឯកសារជាប់; independent review ៣៤/៣៤ជាប់ដោយមានករណីបន្ថែម។ ករណី clock recovery និង callback ស្ទួនត្រូវរក្សាក្នុង regression test។ លទ្ធផលទាំងពីរមានករណីត្រួតគ្នា មិនបូកជាចំនួនតេស្តថ្មីទេ។
+
+**សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ មុន merge ត្រូវផ្ទៀងលើ iPhone និង Android ពិតថា history បន្តក្រោយ session verification, អាចទុក sentinel មើលឃើញជាប់ និងចាកចេញ/ត្រឡប់ ដោយមិនប៉ះចលនាដើម។ Browser, backend និង CI លើ commit ចុងក្រោយនៅត្រូវរត់; ZTO LOCK ៣នៅមិនទាន់ប្តូរ។ គ្មាន migration ឬ rules ថ្មី។
+
+### [2.50.188] · ZoeKeyGen [2.24.37] — 2026-11-08 · ម៉ោងដែលផ្ទៀងបាន និងការស្ដារការងារ
+
+**ZoeW** (`zoew-v451` ➜ `zoew-v452`) · **ZoeKeyGen** (`zoekeygen-v147` ➜ `zoekeygen-v148`)។ នេះជាកំណែសម្រាប់ពិនិត្យក្នុងសាខាដាច់ដោយឡែក មិនទាន់ផ្សាយ។
+
+ZoeW ផ្ទៀងម៉ោង Server មុនបង្កើតផលប៉ះពាល់ថ្មី និងរក្សាភស្តុតាងរង់ចាំពេល clock ឬ session មិនប្រាកដ។ ការស្ដារ scan ដែលមានភស្តុតាង staged ចាប់ clock lease ថ្មីមុនអាន Server ដើម្បីបញ្ចប់បានពេលវគ្គនិងម៉ោងត្រឹមត្រូវ; lease ចាស់មិនរស់ឡើងវិញក្រោយ reset/resample។ Push មិនទទួលស្គាល់ចម្លើយកាលវិភាគចាស់ក្រោយបាត់ clock lease; សំណើដែលផ្ញើចេញរួចមិនអាចហៅត្រឡប់វិញបាន។ ការសម្អាតភស្តុតាងផ្ទៀងព្រំដែនអាយុថ្មីមុនលុប។ Deadline សង្គ្រោះរូបបង្ហាញតាមម៉ោងកម្ពុជា; ថ្ងៃមិនមានក្នុងប្រតិទិន ZTO/EXIF ត្រូវចាត់ជាមិនត្រឹមត្រូវ។ ទិន្នន័យដើម រូប និង Sign ដែលបានរក្សាទុកមិនត្រូវសរសេរឡើងវិញ។ Connection រក្សាម្ចាស់ transport និងមិនបាត់ pending resync។
+
+ZoeKeyGen ប្រើប្រតិទិនកម្ពុជាក្នុងការបង្ហាញថ្ងៃ និងផ្ទៀង clock lease សម្រាប់ការងាររង់ចាំ។ App ទាំងពីររក្សា session ដែលមិនទាន់ផ្ទៀងដោយមិនអះអាងថាផុតកំណត់; ការងារថ្មីអាចត្រូវពន្យាររហូតដល់មានភស្តុតាងស្រស់។
+
+**អ្នកយាម**៖ តេស្ត clock/session, calendar, recovery និង checker fixture ដែលរាយក្នុងផ្នែក ២។ Hash ចាក់សោ ZTO ទាំងបីនៅក្រហមដដែល; focused local មិនមែន full Audit ឬឧបករណ៍ពិត។
+
+**សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ ផ្ទៀង rendered `zto-list-sync-test` និង `zto-sync-banner-test`, backend/emulator, iPhone/Android និង CI លើ commit ចុងក្រោយ មុនផ្សាយ។ កុំប្តូរ ZTO LOCK មុន guard ចាំបាច់ជាប់។ គ្មាន rules ឬ migration ថ្មី; កុំលុប pending journals ឬបង្ខំ reload ដើម្បីបញ្ចប់ការផ្លាស់កំណែ។
 
 ### [2.50.187] — 2026-11-07 · ព្រំដែនពេលរំលឹកកញ្ចប់ជិតត្រឡប់
 
@@ -1969,6 +2001,127 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-11-09 — Audit 1237៖ បែងចែកភស្តុតាងចលនា និងកំហុស fixture
+
+Head `2afe5f24b4e6ce47b0dca6212960edbbf2c24b38` មាន២៤០/២៤៣ checker ជាប់ គ្មាន skip/partial។ `function-surface` និង ZTO LOCK ដែលធ្លាប់ក្រហមបានឆ្លង; ក្រុមធ្លាក់ថ្មី៣ត្រូវបានពិនិត្យដាច់ពីគ្នា។
+
+- Keyboard៖ tablet ផ្តេក `lookupApiConfigModal` ពេលបិទ keyboard មាន live sample កណ្តាលតែ១ ជំនួសជាន់អប្បបរមា២។ ចន្លោះ១៣៤/១៥០ms អាចលាក់បានទាំងចលនារលូន និងចលនាជាជំហាន; effect ២៨៥ms ត្រឹមត្រូវក្រោយចប់មិនជំនួសភស្តុតាង live ទេ។ Exact-trace controls ប្រើ curve និង predicate ពិត បញ្ជាក់ភាពមិនអាចបែងចែកនេះ និងរក្សា sparse trace ឱ្យធ្លាក់។ មិនកែ motion, checker predicate, timeout ឬ workflow; មូលហេតុ frames ខ្វះនៅមិនទាន់បញ្ជាក់ ហើយករណីនេះមិនត្រូវបានហៅថា fixed ឬ harmless flake។
+- Daily checker៖ nested operation runner មានពិដាន child៤០វិនាទី និង test៥០វិនាទី; CI ទទួល status null នៅ៤០.០៨៣វិនាទី ខណៈចូល scenario database ចុងក្រោយ។ Artifact មិនបានរក្សា error code/signal ដោយសារ assertion ដំបូងឈប់មុន។ Profile local បង្ហាញការត្រៀម source ដដែលស៊ី២២.៦៩ក្នុង២៥.៧២វិនាទី ខណៈ VM execution០.៣៦វិនាទី។ Controlled same-CPU load បង្កើត timeout៤០.០៦៤វិនាទីជាមួយ `ETIMEDOUT`/`SIGTERM`; មិនមែនភស្តុតាងថា scenario database មាន bug ទេ។ ក្រោយរៀបចំ immutable source string តែម្តង ពេលធម្មតា២.៤៩វិនាទី និងក្រោម load ដូចគ្នា៤.៨៥១វិនាទី; child/test timeout និង១១០ assertions ដដែល។ Sandbox នីមួយៗនៅតែបង្កើតនិងរត់កូដថ្មី ដោយ clock lease, tokens និង store ដាច់គ្នា។ Clock-reset mutation នៅទាំងមុន/ក្រោយឱ្យ៣ធ្លាក់/១០៧ជាប់; exit-code poison ឱ្យ១១០ធ្លាក់/០ជាប់ ដោយអះអាងចប់គ្រប់ករណី។
+- Announcement៖ release bookkeeping មុនទុក feed នៅ `2.50.189` ខណៈ app បានឡើង `2.50.190`; notification contract ចាប់បាន២ធ្លាក់/៣២ជាប់។ កែ id/version និងអត្ថបទ Khmer ដែលពិពណ៌នាឥរិយាបថ session បច្ចុប្បន្ន។ អ្នកដែលបានអានឬបិទ entry ចាស់ឃើញ entry ថ្មី unread មួយ; app `2.50.190` មិនបង្ហាញថាមានកំណែថ្មីជាងទៀត។ Feed ជា network-only data ដែលមិនទាមទារ app/cache bump ថ្មី។
+
+ការផ្ទៀង local លើ candidate បញ្ចូលគ្នា៖ focused tests ២១១/២១១ ក្នុង១៣ឯកសារ, typecheck, lint, doc:check និង comment/diff checks ជាប់។ Independent replay នៃ patches ដាច់ដោយឡែកមាន១០៥/១០៥; keyboard negative controls នៅតែចាប់ការបន្ថយជាន់ live frame និង effect bypass។ ការងារនេះមិនកែ production business/clock/session/motion code, LOCK, version/cache ឬ scheduler។ Full CI លើ candidate ថ្មី, standalone daily checker ១៨១ assertions និង doc/version checkers ដែលត្រូវការ rendered measure-root នៅមិនទាន់រត់។ Keyboard live verification មិនទាន់បិទ; ការផ្ទៀងឧបករណ៍ពិតពីមុននៅដដែល។
+
+### 2026-11-09 — Audit 1236៖ ផ្ទៀងសោ ZTO និង session wrapper
+
+Head `ba034d6400d09d6eefe25cb7c10c69047b4561ce` មាន២៤១/២៤៣ checker ជាប់ គ្មាន skip/partial; browser fixtures ដែលកែបានឆ្លង `ui-flow`១០២, `app-lock`១៥៩ និង `sheet-import`៨២។ នៅសល់ boolean wrapper ដែលគ្មាន runtime caller និង ZTO hash៣។
+
+ការអនុញ្ញាត ZTO ត្រូវបានផ្ទៀងពីសំណួរ/ចម្លើយដើម មិនយកឯកសារប្រវត្តិជាសិទ្ធិថ្មីទេ; សំណើ និងព្រំដែនរស់ក្នុងធាតុ «2026-11-08 — នាឡិកា Server និងព្រំដែនប្រតិបត្តិការដែលកំពុងរង់ចាំ»។ មុន refresh បានផ្ទៀង checker ZTO ទាំង១១លើ head ដដែល រួម rendered `zto-list-sync`៦៣៦ និង `zto-sync-banner`២០៩; workflow source selection មាន ZTO tests១៦៦៩ក្នុង៧៨ឯកសារឆ្លង។ Independent replay បញ្ជាក់ scan ប្រើ trusted app scan timestamp ខណៈ list import រក្សា actual ZTO arrival និងលំដាប់ Sign/Return ដើម។
+
+Rollback ឯកសារ locked ទាំង៣ទៅ bytes `cf1a564a` ដែលផ្គូផ្គង hash ដើម តែកាន់ clock infrastructure បច្ចុប្បន្ន ធ្វើឱ្យ behavioral tests៣៦ធ្លាក់/១៧ជាប់; candidate ឆ្លង។ នេះមិនមែនការរត់ full tree ចាស់ដែលគ្មាន clock API ថ្មីទេ ហើយ dependency/syntax/startup errors មិនត្រូវបានរាប់ជាការចាប់ regression។ ការកែ LOCK មានតែ SHA256 របស់ `zto-list-sync.ts`, `zto-status.ts` និង `zto-shop-sweep.ts`; production bytes ZTO និង assertions ទាំងអស់នៅដដែល។
+
+Session wrapper `isFirebaseSessionExpired` គ្រាន់តែបម្លែង tri-state verdict ទៅ boolean។ Runtime login/activation/periodic/resume/reconnect ប្រើ API tri-state រួច; unit consumer ត្រូវវាស់ API នោះដោយបំបែក `unverified` ពី `live`។ ដក wrapper និង stale audit references ជំនួសការបន្ថែម caller ក្លែង ឬ allowlist ដើម្បីឱ្យ checker បៃតង។ ផ្ទៃ `window` ក្នុង audit build បាត់ helper មួយនេះ; production entry points និងគោលការណ៍៤ម៉ោងមិនប្ដូរ។ ZoeW version/cache និងប្រវត្តិកំណែត្រូវបាន align តាម source-scope guard; ZoeKeyGen នៅដដែល។
+
+ការផ្ទៀង candidate៖ focused session/ZTO/LOCK/forbidden-zone រួម២៩៥/២៩៥ក្នុង១១ឯកសារជាប់ គ្មាន pending។ LOCK clean១៦/១៦; ប្រែ១ byte ក្នុងឯកសារដែល refresh មួយម្ដងៗធ្វើឱ្យ pin នោះធ្លាក់១ ខណៈ១៥ផ្សេងទៀតជាប់។ ដក wrapper តែប៉ុណ្ណោះមុន release metadata ធ្វើឱ្យ Vite output ទាំង២៥ឯកសារមាន path/SHA256 ដូច baseline; metadata កំណែ/cache ថ្មីនៅបង្កើតសំបកកំណែថ្មីតាមធម្មតា។ Security mutations ដែលបម្លែង unknown/expired ទៅ live, ទទួលម្ចាស់ចាស់ ឬដក expired sign-out សុទ្ធតែធ្លាក់តាម assertions មិនមែន startup error។
+
+Full Audit លើ candidate ថ្មីនៅមិនទាន់វាស់; source-only function-surface predicate មិនជំនួស rendered checker ទាំងមូល។ លទ្ធផល ZTO ខាងលើប្រើ CI fixtures/source និង transport ក្លែងតាម guard; មិនមែន live ZTO ឬ iPhone/Android ពិតទេ។ ការផ្ទៀង history recovery លើឧបករណ៍ពិត និងការអនុញ្ញាតផ្សាយ/merge នៅជាជំហានដាច់ដោយឡែក។
+
+### 2026-11-09 — Audit 1235៖ ព្រំសំណាកនាឡិកា និងការបំបែក service worker ក្នុង fixture
+
+ផ្ទៀង head `3fc2a88e4ba7247dfb3f6e085543f9332815ca97` និង tree `1932ac12f01fcb9f4c02e018378ae59a8bd77b59`។ CI checker កម្រិតលើ២៣៨ជាប់/៥ធ្លាក់/០ skip/០ partial; ក្រុមធ្លាក់ចាស់១៦បានជាប់ ហើយគ្មានក្រុមធ្លាក់ថ្មី។ Vitest ផ្នែកទី២មាន៤៣៣៥ជាប់/៣ធ្លាក់ក្នុង២៣៨ឯកសារ; ធ្លាក់តែ ZTO LOCK ដើម។
+
+- `ui-flow`៖ epoch របស់ fixture ដែលបូក `performance.now()` អាចមានប្រភាគ millisecond ខណៈ uncertainty សូន្យ។ Clock owner ពិតបង្គត់ nonce estimate ហើយបដិសេធវានៅក្រៅ interval ទទឹងសូន្យ; sample ចាស់នៅត្រឹមត្រូវ ប៉ុន្តែថ្ងៃ fixture មិនផ្លាស់។ តេស្តដែលប្រើ monotonic ជាចំនួនគត់មិនឃើញ seam នេះ។ Regression ថ្មីប្រើ audit wrapper, SDK wrapper និង clock owner ពិតជាមួយប្រភាគ និងពេល boot ផ្សេងគ្នា; មិនពង្រីក clock tolerance ឬប្ដូរថ្ងៃក្នុង app។
+- `app-lock` និង `sheet-import`៖ checker អនុញ្ញាត service worker តែ mock `license-verify.js` តាម `page.route`។ Worker ពិត cache អក្សរកូដពី origin ហើយការផ្ទុកឡើងវិញរំលង route mock។ Replay របស់ SW/cache ជាមួយ auth/session និង React ពិតបង្ហាញ session មិនបានផ្ទៀង; PIN និង file action ត្រូវបានបិទត្រឹមត្រូវ។ Fixture ត្រូវបំបែក worker ដើម្បីរក្សាប្រភព license ក្លែងដែលបានកំណត់; មិនបិទ security gate ឬរំលង reload/sessionStorage assertions។
+
+Regression នាឡិកាមុនកែ៧ធ្លាក់/១៩ជាប់ ក្រោយកែ២៦/២៦ជាប់; replay ដោយ reviewer ដែល mount React PageData ពិតឱ្យលទ្ធផលដូចគ្នា។ Shared route regression មុនកែ៤ធ្លាក់/៨ជាប់ ក្រោយកែ១២/១២ជាប់; ដក app-lock context fix មួយឱ្យធ្លាក់១ ហើយដក sheet context fix មួយឱ្យធ្លាក់៣។ Wrong PIN រក្សា ciphertext, XLSX/CSV តាម React input ទៅ payload, server refusal/offline no-request និង token ខ្វះ/បដិសេធ/ផុតកំណត់ ត្រូវបានវាស់ដោយកូដពិត។ Focused integration២១៣/២១៣ក្នុង១០ឯកសារជាប់ គ្មាន pending។ Assertions/scenarios ដើមនៅដដែល; readiness diagnostics ប្រើតែ wait២២០០ms ដើម គ្មាន poll ឬពន្យារពេលបន្ថែម។
+
+ការផ្ទៀង local ជា source/DOM simulation មិនមែន browser ពិត។ Full Audit លើ candidate ថ្មី និង iPhone/Android ពិតនៅមិនទាន់វាស់។ មិនកែ shipped app, business rules, session/clock authority, App/cache version, LOCK ឬ production data; wrapper ដែលនៅក្រៅវិសាលភាពរក្សាដដែល។
+
+### 2026-11-09 — Audit 1234៖ កែការវាស់ clock/session និង callback ដោយមិនប្ដូរ App
+
+ផ្ទៀង head `ec77aaaeb3a6753165c9c9cff868de975fc8c107` និង tree `7669c54fc2cd38b477c823f3a9c658468ff08031`។ CI checker កម្រិតលើ ២២២ជាប់/២១ធ្លាក់/០ skip/០ partial; មិនមែនកំហុសផលិតផល២១ទេ។ Candidate នេះកែតែ tests, audit fixtures និងឧបករណ៍វាស់។ មិនប្ដូរ business rules, session/clock authority, UI/motion, App/cache version, LOCK ឬ production data។
+
+- Money witness អាន monotonic clock owner ពិត ជំនួស wall+offset ដើម្បីកុំឱ្យ timestamp ត្រឹមត្រូវខុស១ms។ បង្អួចនៅបដិសេធ ±១ms ដែលនៅក្រៅព្រំ។ Independent review ចាប់បានការហៅ audit wrapper ដែលបង្ខំ React commit; regression ប្រើ wrapper និង store ពិត ហើយ witness ជ្រើស raw owner ដោយមិនបង្ខំ render។ Truthfulness VM ត្រូវដោះ dependency តាម target root ពិត។
+- `app-lock` និង `sheet-import` fixture ត្រូវផ្ដល់ token authTime ថេរនៅពេល boot ដល់ auth/session owner ពិត។ Token ខ្វះ/បដិសេធ, clock មិនទុកចិត្ត និងអាយុលើស៤ម៉ោងនៅតែបិទ។ Local login-time sentinel និង browser assertions ដើមនៅដដែល។
+- `panel-motion` និង native history fixture មិនបង្កកតែ Date ខណៈ monotonic ដើរទៀត។ React input/action guard ពិតបង្ហាញការធ្លាក់មុនកែ; seed និង clock ចាប់នៅថ្ងៃថេរម៉ោង១៣កម្ពុជា ដើម្បីកុំឆ្លងអធ្រាត្រកណ្ដាលការវាស់។ មិនកែ CSS, animation ឬ scroll code។ Broad source run រកឃើញ unit contract ចាស់ដែលរំពឹង Date កក; ប្ដូរទៅព្រំដែលវាស់ពី monotonic ពិតដោយគ្មាន epsilon ហើយរក្សា constructor/parse/UTC និង native timer/rAF/performance identity។ Fixture កកដើមនៅធ្លាក់លើ contract ថ្មី។
+- `ui-flow`, `daily-collected` និង `restore-mutation` ប្ដូរពេល fixture ដោយរក្សា clock coordinates/verification ពិត។ `ledger-clamp-symmetry` បើក fault មុន boot cleanup មិនមែនក្រោយការសរសេរចប់; floor ថ្មីទាមទារ trash write បដិសេធពិត ហើយ barcode, day និងmonth នៅត្រឹមត្រូវ។
+- Firebase network fixture បំបែកពេល server ពី device wall skew ដូច្នេះ reload មិនបម្លែង journal ទៅអនាគតក្លែង។ Supabase fixture ផ្ដល់ clock តាម RPC read ពិតដាច់ពី held delta; request identity, clock-before-logout និង response-after-logout ត្រូវមានភស្តុតាង។ Missing/invalid clock, sibling response និង reversed arrival controls នៅតែធ្លាក់។ មិនប្ដូរ recovery authority ឬបោះបង់ unknown outcome។
+- Parser របស់ audit helper ដោះស្រាយតាម ZoeW dependency ឬ measured-root layout ពិត មិនពឹង ambient NODE_PATH។ Regression ថ្មីផ្ទៀង parser provenance; VM consumers ផ្ដល់ dirname ពិតដោយរក្សា assertions ដើម។
+- `trash-modal` រក្សា async ពេលស្រង់ function; `connection-recovery` និង `crud-rules-flow` ផ្ទុក clock/private dependencies ពិត។ Static recovery predicates មិនពឹងចម្ងាយអក្សរ ហើយទិសផ្ទុយចាប់ unreachable callback, shadow binding និង pending-set ដែលត្រូវលុប។ `write-stall-guard` រត់ callback ជាមួយម្ចាស់ដើមពិត ហើយបដិសេធ db/sdk/auth/shop/lease/trust ដែលផ្លាស់ និងអាយុស្មើព្រំ ក្នុងការហៅដំបូង/settle/retry។
+
+Final supported source suite៖ ៩១១១ជាប់/៣ ZTO LOCK ធ្លាក់/០ pending ក្នុង៤៦៨ឯកសារ; ដកតែ Chromium-dependent files៤ និង PostgreSQL files៥ដែល runtime មិនមាន។ មុនប្ដូរ legacy frozen-clock unit contract មាន៩១១០ជាប់/៤ធ្លាក់; updated contract បដិសេធ frozen baseline ហើយ list+entry១៩/១៩ជាប់។ Money final១៧៨/១៧៨, related៤៩៦/៤៩៦, truthfulness២២០/២២០; merged fixture៩៨/៩៨, static contract២០/២០, adjacent consumers១០៣/១០៣ និង source-input write-stall៤៨/៤៨ជាប់។ Typecheck/lint/build និង static checks ជាប់; ចំនួន focused ត្រួតគ្នា មិនបូកជាចំនួនតេស្តថ្មីទេ។
+
+ការវាស់ source-only ប្រើ owning modules, generated source/JSX stages និង transport fixtures ដែលបានបញ្ជាក់។ មិនបង្កើត rendered HTML ក្លែង និងមិនអះអាងថា full browser/backend Audit បានជាប់។ Browser, Firebase/Postgres E2E និង physical iPhone/Android នៅត្រូវផ្ទៀងលើ exact candidate។ `function-surface-test` រក្សា wrapper តាមវិសាលភាពដែលម្ចាស់បានកំណត់; ZTO hash mismatches ៣រក្សាឱ្យក្រហម មិន refresh LOCK ដើម្បីឱ្យបៃតង។
+
+
+### 2026-11-09 — Audit 1233៖ ផ្ទៀង fixture និងការវាស់ដោយមិនបន្ថយ guard
+
+ម្ចាស់អនុញ្ញាតជាក់លាក់ឱ្យកែការផ្ទុកប្រវត្តិបន្ថែមក្រោយ session ផ្ទៀង ដោយមិនប្តូរ animation ឬភាពរលូននៃ scroll។ `history-observer-session-recovery.test.tsx` ប្រើ React component និង action/session guard ពិត៖ baseline recovery ២ករណីធ្លាក់នៅ៥០ជួរ ខណៈ positive/manual controls ជាប់។ Review រកឃើញ callback ដែលសល់ក្រោយ disconnect; negative controls ៣ធ្លាក់មុនកែ cleanup។ Effect ថ្មីតាម readiness ហើយ cleanup បិទ latch ចាស់មុន disconnect; physical device validation នៅមិនទាន់រត់។
+
+ផ្ទៀង commit `3fb95c8` និង tree `e3e6500a` មុនរៀបចំ candidate ដាច់ដោយឡែក។ CI មាន checker កម្រិតលើ ១៩៣ជាប់ និង៥០ធ្លាក់; មិនរាប់ជាកំហុសផលិតផល៥០ទេ។ Fixture browser/native បន្ថែម frozen clock sample តាម sync ពិតរបស់ fixture ហើយ getter មិនបន្ត sample; SDK fixture ប្រើ clock owner ពិត និង reset generation។ ការកែ VM ភ្ជាប់ session/clock owner រួម private state ដើម្បីឱ្យការវាស់ទៅដល់ប្រតិបត្តិការដែលបានកំណត់។ Assertions, operation floors និងពិដានពេលដើមនៅដដែល; network timeout ត្រូវមានសំណើចាប់ផ្ដើម និង abort ពិត មិនមែន ReferenceError មុនសំណើ។
+
+អ្នកយាមថ្មី `browser-clock-fixture-contract.test.ts` និង `sdk-audit-clock-fixture.test.ts` មាន positive admission និង negative controls សម្រាប់ session រង់ចាំ, clock drift, generation និងកម្មសិទ្ធិដែលផ្លាស់ប្ដូរ។ ការវាស់ថ្មី browser ៤៦ និង SDK ១០ជាប់; baseline ដើមធ្លាក់នៅ prerequisite ដែលខ្វះ មិនមែនកំហុសផលិតផលដាច់ពីគ្នាតាមចំនួននោះទេ។ VM source-only ១៤ក្រុមជាប់; ការពុល session, lease, toast, seat និង abort ធ្វើឱ្យ assertion ដែលចង់វាស់ធ្លាក់ពិត។ ការវាស់ទាំងនេះមិនជំនួស browser ឬ backend ពេញលេញ។
+
+អ្នកយាម `static-checker-contracts.test.ts` និង `payload-local-cache.test.ts` មាន ៣៧ករណីជាប់ក្រោយ independent review រកឃើញ និងបិទ Map method replacement, alias escape និង binding shadow រួម destructuring។ Shared clock divergence ត្រូវមាន behavioral contract; payload លើកលែងតែ assignment offsets ដែលមានប្រភព local ផ្ទៀងបាន។ ZTO source-only checker ឆ្លង ៦២៥ assertions ប៉ុន្តែ១១ដែលទាមទារ rendered HTML នៅធ្លាក់; មិនរាយថា full checker ជាប់ទេ។
+
+កែ announcement ឱ្យត្រូវកំណែ App ដែលមានរួច និងបន្ថែមជួរលិបិក្រមដែលខ្វះ។ Vitest លើ candidate metadata/browser/SDK មាន ៨៩៣៧ជាប់, ១៥ធ្លាក់ និង៨៩មិនបានរត់ចប់៖ LOCK ដើម៣, artifact dependency symlink៨ និង Postgres setup៤; browser/PG setup ក៏ទប់សេណារីយ៉ូផ្សេង។ ក្រោយដាក់ dependencies ជាឯកសារពិតដោយមិនកែ source ឬ test, artifact ៩/៩ជាប់។ Chromium និង PostgreSQL មិនមានក្នុងបរិស្ថាននេះ; full audit និង CI លើកំណែថ្មីនៅត្រូវវាស់។ គ្មាន LOCK refresh, business policy edit, timeout increase, push, merge ឬ production write។
+
+Source suite លើ release candidate ដែលមាន history fix និងកំណែថ្មី៖ ៨៩៩២ជាប់/៣ ZTO LOCK ធ្លាក់/០ skip។ ការរត់នេះដកឯកសារ Chromium ៤ និង PostgreSQL ៥ដែលបរិស្ថានមិនគាំទ្រ ដោយបញ្ជាក់ជាមុន; មិនមែន full suite ឬ CI បៃតងទេ។ ក្រោយបន្ថែមតែ negative controls ពី review ពីរករណី ការរត់ focused ១៤ឯកសារ៣០២/៣០២ជាប់។ Typecheck, lint, production build, slot/purity/doc/Android/notice/comments, repository-file-coverage ១០/១០ និង strict version scope ១៨/១៨ជាប់។ Version scope ប្រើ SW ដែល build ពិត ហើយផ្ទៀង byte-equivalence មុនបង្កើតទិដ្ឋភាពអាន; មិនបង្កើត rendered HTML ក្លែង ឬអះអាង browser SW behavior ទេ។
+
+### 2026-11-08 — Audit 1232៖ បញ្ចូលការកែដែលមានភស្តុតាងក្នុង candidate ដាច់ដោយឡែក
+
+យក validation `6f7e11b` (tree `78fcf23b`) ជាគោល ហើយបញ្ចូល calendar/ZTO, baseline fixture, network lifecycle និង date followups តាមលំដាប់ដែលបានផ្ទៀង។ Fixture `born-closed` មាន offset +៣ ម៉ោងរួចពី baseline patch; រក្សាទាំងការកែនេះ និងករណីទប់ cleanup ថ្មី ដោយមិនបញ្ចូលបន្ទាត់ដដែលពីរដង។
+
+Audit source-suite ដើមមាន ១៥៧ failures៖ ១៤៤ ជា fixture clock/session មិនគ្រប់, ១០ ជាបញ្ហា recovery constructor ខ្វះ clock lease និង៣ជា ZTO hash ដែលរក្សាដដែល។ Candidate របស់ការវិនិច្ឆ័យដាច់ដោយឡែកបាន ៦៩៣ ជាប់/៣ធ្លាក់; នេះមិនមែនលទ្ធផល full CI លើ candidate រួមទេ។ ការកែផលិតផលបន្ថែមតែ import និង lease នៅ recovery constructors ទាំងពីរ; មិនប្តូរ receipt, money, owner ឬ cancellation guards។ Assertions ដើម និងករណីទប់ clock/session ត្រូវរក្សា។
+
+បញ្ចូលតែ VM checker fixes ដែលបានរត់ពេញលេញ ១២ឯកសារ៖ scan-month orchestration, setup logout, concurrent scan, partial pickup, stall lock, transaction outcome, cleanup interrupt, health, empty state, ledger count, DB stall និង late commit។ មិនបញ្ចូល write-stall partial, restore emulator provisional ឬ browser fixture ដែលមិនទាន់រត់ពេញលេញ។ ការវាស់លើ source view មិនជំនួស rendered browser ឬ backend ពិត; aggregate Audit, mutation meta និងបញ្ហា Supabase/revenue-fuzz នៅត្រូវផ្ទៀង។ កំណែ App/cache និង package-lock metadata ផ្លាស់តែលេខកំណែ; dependency graph មិនប្រែ។
+
+ការរត់លើ candidate រួមចុងក្រោយ៖ Vitest ៥៨ files មាន ១៥៣១ជាប់/៣ ZTO hash ធ្លាក់/០ skip រួម `zto-signed-sync` ២៧/២៧។ Calendar/photo/import ១៥៨ករណីដដែលជាប់នៅ UTC ក្នុង selection នេះ និងរត់ឡើងវិញជាប់ក្នុង Los Angeles, New York, Phnom Penh និង Kiritimati; មិនបូក repeated runs ជាករណីថ្មី។ VM checkers ទាំង១២ជាប់៖ orchestration ៥ scenario groups, concurrent ៤៨, partial pickup ៥៤, stall ៣៧, setup logout ៩៤, transaction outcome ១៤៩, cleanup interrupt ១១០, health ២២៦, empty state ៦០, DB stall ៣៥, late commit ៧១ និង ledger count ១៣។ ប្រភេទចំនួនខុសគ្នា មិនត្រូវបូកជាតេស្តតែមួយ។ អ្នកយាមបន្ថែម `khmer-timezone` ២១/២១, `keygen-notice` ៨៩/៨៩, `keygen-session-security` ៣៦៩/៣៦៩ និង `keylist-consistency` ៥១/៥១ជាប់ដោយមិនកែ assertion។
+
+Typecheck, lint, production Vite build, slot/purity/doc, Android static, notices, comments និង repository-file-coverage ១០/១០ជាប់។ Strict version-bump-scope ២០/២០ជាប់ទាំងធៀប validation tree និង `cf1a564a`; SW view ស្រង់ពី build ពិត និងផ្ទៀង byte-equivalence មិនបង្កើត HTML ក្លែង។ Version-check និង doc-scope ដែលត្រូវការ prerendered HTML នៅមិនទាន់រត់; source-view មិនមែន full measure tree។ គ្មាន browser/EPERM retry, backend/production write, LOCK refresh, push, merge ឬ deploy។
+
+### 2026-11-08 — នាឡិកា Server និងព្រំដែនប្រតិបត្តិការដែលកំពុងរង់ចាំ
+
+លើ `cf1a564a` តេស្តកូដពិតបញ្ជាក់ថា ក្រោយ sync ហើយនៅ online ការលោតម៉ោងឧបករណ៍មួយឆ្នាំអាចជ្រើសកញ្ចប់ថ្មីចូលធុងសំរាម និង purge ធុងថ្មី។ ការកែដំបូងប្រើ monotonic តែមួយមិនគ្រប់៖ iOS អាចផ្អាកវា ហើយធ្វើឱ្យ session និង timestamp ថ្មីយឺត។ ច្បាប់ចាស់ហាម detector ដើម្បីកុំឱ្យ cleanup ជាប់រហូត; ការកែច្បាប់ឥឡូវតម្រូវឱ្យមានការស្ដារដោយ sample ស្រស់ និងពិដាន retry ជំនួសការបើកទំនុកចិត្តពី cache។
+
+នាឡិការួមរក្សា epoch, wall និង monotonic របស់ sample ពិត។ ភាពខុសគ្នាបញ្ជាក់តែ «មិនប្រាកដ» មិនបញ្ជាក់ថាអ្នកប្រើកែម៉ោងទេ។ RPC ឆ្លងការផ្អាក ឬយូរហួសពិដានមិនផ្តល់ clock authority; offset សូន្យពិតនៅតែប្រើបាន។ Firebase ផ្តល់ timestamp មុន connected ប៉ុន្តែលំដាប់នេះមិនបញ្ជាក់ sample ស្រស់ទេ៖ actual SDK ដែលទទួល timestamp T ក្រោយផ្អាក ៣ ម៉ោងអាចទុក session អាយុពិត ៥ ម៉ោងជា live; baseline និង candidate ដំបូងធ្លាក់ safety ៤ ករណី និងឆ្លង fresh control ១។ Native clock authority ត្រូវពឹង sample nonce/HTTP-Date ដែលផ្ទៀង request និងរយៈពេលរង់ចាំ មិនមែន `.info` cache ឬ false→true តែមួយ។ Supabase រក្សា sample ដើមពេលភ្ជាប់ listener ឡើងវិញ។ ការស្កេន ការបិទ ការលុប ការស្តារ និង Locker ចាប់ lease មុន timestamp/await ហើយមិនរស់ឡើងវិញក្រោយ clock resync; ភស្តុតាងប្រតិបត្តិការដែល commit រួចនៅអាចផ្ទៀង និងបញ្ចប់។ ម៉ោង ZTO ដើម និងគោលការណ៍ Sign-only ដែលមានឯកសារមិនត្រូវប្តូរដោយការកែ clock lease ទេ។
+
+ការផ្ទៀង A/B រកឃើញផលប៉ះពាល់ថ្មីរបស់ការកែ monotonic៖ Sign ពិតដែលមកក្រោយ App ផ្អាក ៣ ម៉ោងអាចត្រូវ fallback ទៅម៉ោងមុនផ្អាក។ Baseline `cf1a564a` ឆ្លងករណីនេះ ខណៈ candidate ដំបូងធ្លាក់; ការកែបន្ទាប់រក្សា timestamp ដើមរង់ចាំ clock ស្រស់ និងទប់ final-mark transaction ចាស់។ ម្ចាស់អនុញ្ញាតការកែផ្នែកទទួល Sign ដែលចាក់សោ; LOCK នៅមិនទាន់ប្តូររហូតដល់ guard ចាំបាច់ឆ្លង។ Pickup recovery ដែលមានភស្តុតាង commit រួចនៅអាចអានបាន តែការសម្រេចអាយុក្នុង collected mirror ត្រូវ clock lease ដើម្បីកុំលុបចំណូលត្រឹមត្រូវពេលចាប់ផ្តើមដោយម៉ោងឧបករណ៍ខុស។
+
+Session បែងចែក live/expired/unverified៖ clock ដែលទុកចិត្តបាននៅក្រៅបណ្ដាញនៅផុតក្រោយ ៤ ម៉ោង; clock មិនប្រាកដលាក់ទិន្នន័យ និងទប់ការងារថ្មី ដោយមិនលុប auth ឬ pending evidence។ ការចាប់ផ្តើម offline ថ្មីត្រូវរង់ចាំការផ្ទៀង។ នេះជាការការពារនៅ client មិនមែន backend session TTL enforcement ទេ។ Lookup scan រក្សាម៉ោងស្កេន ZoeW; list import រក្សាម៉ោង arrival របស់ ZTO ដោយមិនបង្ខំឱ្យម៉ោងដើមទាំងពីរស្មើគ្នា។
+
+ភស្តុតាង checker-first ដាច់ដោយឡែក៖ clock continuity ១៧ ករណីធ្លាក់មុនកែ; request ឆ្លង suspend/RTT ២ ករណីធ្លាក់; notify/push ការហៅដំបូង ២ ករណីធ្លាក់; scan/locker/import, pickup, restore និង cleanup មានតេស្តមុនកែរបស់ផ្លូវផ្ទាល់។ មុនបញ្ចូល native bridge និង license/KeyGen ការរត់ ៧៤ suite ដែលប៉ះពាល់វាស់ ១៧១២/១៧១២ ឆ្លង; production build, typecheck និង lint ឆ្លង។ ការប្រៀប Lookup scan និង list import ថ្មី ២៦ ករណីឆ្លងទាំង baseline និង candidate ជាមួយ HTTP/SDK simulator; មិនមែន transport/rules ពិតទេ។ លទ្ធផលទាំងនេះមិនជំនួស integrated CI ទេ។ ការងារនៅ local មិនទាន់ផ្សាយ; browser prerender និង guard ZTO ពេញលេញនៅជាប់បរិស្ថាន Chromium។ Hash lock មិនទាន់ធ្វើបច្ចុប្បន្នភាព មុនអ្នកយាមចាំបាច់អាចវាស់បាន។ ត្រូវផ្ទៀងលើ iPhone/Android ពិត៖ ផ្អាក App, ប្តូរម៉ោង, offline លើស៤ម៉ោង, ត្រឡប់ online និងការផ្ទៀង pending evidence។
+
+ការផ្ទៀងឯករាជ្យបន្ថែមលើ `ZoeW/public/license-verify.js`, ច្បាប់ចម្លងក្នុង ZoeKeyGen និង `ZoeKeyGen/app.js` នៅ baseline រកឃើញបញ្ហាបន្ថែម៖ clock offset ចាស់អាចលុប activation ដែលនៅមានសុពលភាព, ចេញរយៈពេល key ខុស និងធ្វើឱ្យ expiry ក្នុង signature ខុសពី DB ក្រោយ await; response ម៉ោងដែលឆ្លងការផ្អាក និង offline grace/credential idle ពឹង wall clock ដោយមិនផ្ទៀងភាពបន្ត។ Regression actual-source ១៥ ករណី៖ control ២ ឆ្លង និង desired behavior ១៣ ធ្លាក់។ Candidate បន្ទាប់បញ្ចូល verifier ពីរច្បាប់ចម្លងដូចគ្នា៖ request មាន nonce និងពិដានអាយុ, រក្សា activation ពេល clock មិនប្រាកដ, និងចេញ expiry DB ពី payload ដែលចុះ signature ដដែល។ KeyGen idle ប្រើគូ wall/monotonic; notice ថ្មីត្រូវ clock ស្រស់ ហើយរក្សាភស្តុតាង ACK ពិត។ ការចាប់ផ្ដើម license offline ថ្មីអាចត្រូវរង់ចាំការផ្ទៀង Server ជំនួស grace ដែលពឹង wall clock; warm session ដែលមាន anchor បន្តត្រឹមត្រូវនៅរក្សា grace។ Native/core/license/KeyGen រួម ៦ suite ១៩៧ ករណី និង notice ៣ suite ៥៦ ករណីឆ្លង។ ការកែបន្ទាប់រក្សា interval ដើម ខណៈ timestamp ស្កេនរក្សា estimate; session/expiry ប្រើ bounds ហើយ Activation ដែលរង់ចាំ clock អាចសង្គ្រោះដោយមិនបញ្ចូល Key ឡើងវិញ។ Independent review ចាប់បាន candidate-only race ពី provider generation និង native midpoint ប្រភាគដែល Scan Protocol បដិសេធ; regression ក្រហមមុនកែ ហើយកែឱ្យ estimate ជាចំនួនគត់ ដោយរក្សា bounds ប្រភាគ។ Retention/replay ប្រើ lower/upper តាមទិសសុវត្ថិភាព ហើយការឆ្លងថ្ងៃរក្សា pending collected evidence។ លទ្ធផលបញ្ចូល ៨៣ suite ដែលប៉ះពាល់៖ ២០៥៣/២០៥៣ ឆ្លង; ZTO hash guard ដាច់ដោយឡែកនៅធ្លាក់ ២/១៦ ដោយចេតនាមិន refresh LOCK មុន guard ចាំបាច់ឆ្លង។ លទ្ធផលនេះមិនមែន final release verdict ទេ; ការផ្ទៀង boundary បន្ទាប់នៅបន្តដាច់ដោយឡែក។ មិនមានការហៅ production ឬប្តូរទិន្នន័យអតិថិជនទេ; មិនត្រូវអះអាងថានាឡិកាគ្រប់ App ត្រូវបានកែរួចឡើយ។
+
+
+ការកែព្រំដែនបន្ទាប់នៅក្នុងបេក្ខភាព local ដាច់ដោយឡែក៖ ម្ចាស់ឆ្លើយ «អនុញ្ញាតជានិច្ចមេ» ចំពោះសំណួរ «តើមេអនុញ្ញាតឱ្យខ្ញុំកែចំណុចពាក់ព័ន្ធក្នុង ZTO list import, status និង shop sweep ដែលចាក់សោ ព្រមទាំងធ្វើបច្ចុប្បន្នភាព hash lock ក្រោយ checker តម្រូវទាំងអស់ឆ្លងដែរឬទេ?»។ ការអនុញ្ញាតនេះគ្របលើការកែដែលបានវាស់ក្នុងឯកសារទាំងបី; hash នៅដដែលរហូតដល់ guard ចាំបាច់ឆ្លង។ ម្ចាស់ទាមទារឱ្យប្រាប់មុនថាមុនកែ និងក្រោយកែខុសគ្នាដូចម្តេច មុននាំចូលគម្រោង។ មិនមាន commit, push, merge, deploy ឬការប្តូរទិន្នន័យពិតទេ។
+
+មុនកែ point time អាចដោះសិទ្ធិ Restore/Clear/Trash, បោះចោលការងារ Sign និងរូប ២៤ ម៉ោង, ប្ដូរការងាររង់ចាំទៅ recovery មុន ១០ នាទី, ឬបាត់របៀបការពារ Palm មុន ៧ ថ្ងៃពិត។ ក្រោយកែ អាយុអប្បបរមាប្រើ lower bound, អាយុអតិបរមានៃសិទ្ធិខ្លួនប្រើ upper bound, និងពេលអនាគតត្រូវផ្ទៀងជាមួយ upper bound។ Transaction/save callback ផ្ទៀង clock និងម្ចាស់ session ដើមវិញ; clock មិនប្រាកដរក្សាទិន្នន័យ និងភស្តុតាង។ សិទ្ធិ token ដដែល, ប្រវត្តិ Restore ដែលបានរៀបចំ, CAS និងការដក mode ដោយម្ចាស់នៅដដែល។ ការងារ Sign ថ្មីពេលគ្មាន clock រក្សារូបដោយមិនបង្កើត signQueuedAt; retry ដោយដៃរង់ចាំ clock ស្រស់។ ពេលវិជ្ជមានដែលបានរក្សាទុកមិនត្រូវកែឡើងវិញតាមការសន្មត ហើយរយៈពេលគោលការណ៍ទាំងអស់នៅដដែល។
+
+បញ្ជី ZTO មិនរំលងជួរនៅព្រំ ៧/៣០ ថ្ងៃមុន lower bound បញ្ជាក់អាយុ; arrival/Sign និងលំដាប់ថ្ងៃម៉ោងដើមនៅដដែល។ ការស្កេនធម្មតានៅប្រើម៉ោងស្កេន ZoeW។ Completion watermark ថ្មីប្រើ lower bound នៃការចាប់ផ្ដើមអាន និង clock generation ដើម; activity stamp នៅជា point estimate ហើយការផ្ញើពន្យារពេលត្រូវផ្ទៀងម្ចាស់វិញ។ ត្រារួមពីកំណែចាស់គ្មានសញ្ញាបែងចែក មិនអាចអះអាង coverage ជាក់លាក់បាន៖ ឧបករណ៍គ្មាន ZTO រង់ចាំទាំងវគ្គ ៣០ នាទីដើម និងយ៉ាងតិច ៣០ នាទីពីពេលកញ្ចប់ទុំពិត។ កញ្ចប់ទុំក្រោយមិនទទួលវគ្គរង់ចាំដែលផុតរួចរបស់កញ្ចប់មុន; ត្រារួមដែលឡើងជាបន្តបន្ទាប់មិនពន្យារវគ្គរហូត។ នេះអាចពន្យារសម្អាតលើឧបករណ៍គ្មាន ZTO បន្ទាប់ពីឧបករណ៍ផ្សេងអានចប់; មិនមាន schema/backend ថ្មីទេ។
+
+Checker-first លើបេក្ខភាពដែលបានរក្សាទុក៖ claim ១៤ ធ្លាក់/៣ control ឆ្លង; mode ១២ ធ្លាក់/១ control ឆ្លង; outbox ១៣ ធ្លាក់ និង retry-writer ២ ធ្លាក់; ZTO ដំបូង ១១ ធ្លាក់/១ control ឆ្លង។ Independent review រកឃើញការបាត់ grace របស់កញ្ចប់ទុំក្រោយ ហើយ checker ថ្មីធ្លាក់ ២ មុនកែ; publication fence ធ្លាក់ ៨ មុនកែ។ តេស្តទាំងនេះប្រើ source ពិត ជាមួយ clock/adapter ដែលកំណត់បាន; មិនមែនភស្តុតាង backend, IndexedDB browser ឬឧបករណ៍ពិតទេ។ Guard ZTO ដែលត្រូវ browser និង hash refresh នៅបើក។ ការប្រៀប cleanup/money ៦៥ suite ដោយ fixture ដូចគ្នាលើ frozen candidate និងបេក្ខភាពថ្មី ទាំងពីរវាស់បាន ៩១ ធ្លាក់/១៦៧៩ ឆ្លង; លទ្ធផលក្រហមនេះត្រូវបានរក្សាទុក។ ការផ្ទៀង source និង fixture ដូចគ្នាបញ្ជាក់ថា ៧៥ ករណីខ្វះ live-session prerequisite និង ១៦ ករណីខ្វះ trusted-clock prerequisite ក្នុង fixture; ការបន្ថែមលក្ខខណ្ឌដើមទាំងនេះប៉ុណ្ណោះ មិនបន្ធូរ assertion ឬ timeout ហើយបន្ថែម negative control ៣ ដែលបញ្ជាក់ថា pending session/clock មិនទុកចិត្តនៅមិនសរសេរទិន្នន័យ។ ក្រោយបញ្ចូលការកែ fixture ជាក់លាក់ទាំងនេះ ជុំ ៦៥ suite ដដែលឆ្លង ១៧៧៣/១៧៧៣; ជុំ focused ដាច់ដោយឡែក ៨៣ suite ឆ្លង ២១០៩/២១០៩ (មានតេស្តខ្លះត្រួតគ្នា ដូច្នេះមិនបូក totals)។ Typecheck, lint, build, comment, slot/purity និង source-only clock/lease guards ឆ្លង; forbidden-zone ១១/១១ ឆ្លង។ Hash ZTO នៅធ្លាក់ ៣/១៦ ដោយមិនប្តូរ LOCK មុន full browser guards; ការផ្ទៀង CI/backend និងឧបករណ៍ពិតនៅមិនទាន់បិទ។ នេះមិនមែនអះអាងត្រៀមចេញប្រើទេ។
+
+ការផ្ទៀង fixture បន្ថែម៖ `pickup-barcode-identity`, `raw-read-shape` និង `returned-trash-retention` ធ្លាក់ពី dependency clock/session ខ្វះក្នុង sandbox។ បញ្ចូល module ពិត និង prerequisite ដើម ដោយរក្សា assertion ចាស់គ្រប់មួយ; ក្រោយកែឆ្លង ៩១/៩១, ១០០/១០០ និង ២៧/២៧។ Control ថ្មី ១៥ វាស់ការបាត់ trust, clock generation ចាស់, session pending និងការបន្តក្រោយផ្ទៀងវិញ; shadow mutation រត់ចប់ហើយធ្លាក់តាមឥរិយាបថ ៣, ៨ និង ១ មិនមែនពី syntax/dependency/timeout។ Product source និង policy មិនប្តូរក្នុងការកែ fixture នេះទេ។ `zto-function-artifact` ដើម ១ ឆ្លង/៨ ធ្លាក់ដោយ dependency symlink; snapshot ដាច់ដែល source/checker/package/lock ដូចគ្នា និង dependency ជាឯកសារពិតឆ្លង ៩/៩ ពីរជុំ។ នេះជា artifact/runtime ជាមួយ transport ក្លែង មិនមែន Netlify production; ថតដើមនៅប្រើ symlink ដដែល។ Browser prerender/guard ZTO នៅមិនបានវាស់; មិន retry ឬរំលង Chromium EPERM, មិន refresh LOCK និងមិនផ្សាយ។
+
+ការផ្ទៀងប្រតិទិនបន្ថែមលើបេក្ខភាព local៖ KeyGen ប្រើ locale ខ្មែរ តែគ្មាន timeZone ក្នុងផ្លូវបង្ហាញ ៨ កន្លែង ដូច្នេះឧបករណ៍ក្រៅកម្ពុជាបង្ហាញថ្ងៃផុតកំណត់ ឬម៉ោងដំណឹង/អញ្ជើញខុស។ `keygen-calendar.test.ts` រត់ function ពិតក្នុង child process ក្រោម UTC, ភ្នំពេញ, Los Angeles, New York និង Kiritimati នៅព្រំដែនថ្ងៃ/ខែ/ឆ្នាំ និងឆ្នាំបង្គ្រប់៖ មុនកែ ៣១ ធ្លាក់/១៤ ឆ្លង; ក្រោយបន្ថែម `timeZone: 'Asia/Phnom_Penh'` នៅទាំង ៨ កន្លែង ៤៥/៤៥ ឆ្លង។ មិនប្តូរ epoch, អាយុ Key, RPC, លំដាប់ដំណឹង ឬគោលការណ៍ទេ។ Shadow mutation ដក timezone មួយកន្លែងម្តងៗ ទាំង ៨ ត្រូវចាប់ដោយ assertion ឥរិយាបថ។
+
+ការស្កេនកូដពិត ៦ ករណីក្នុង `lookup-list-lifecycle.test.ts` បញ្ជាក់ការបំបែកអតិថិជនដូចគ្នាមុន/ក្រោយអធ្រាត្រ និងក្រុមថ្ងៃ/ខែ ledger ជាមួយ monthly report/Excel rows នៅចុងខែ ចុងឆ្នាំ និងថ្ងៃទី២៩កុម្ភៈ។ ករណីទាំងនេះឆ្លងក្រោមតំបន់ម៉ោងទាំង ៥ និង adapter ក្លែង Firebase/Supabase; មិនមែន backend ឬ browser ពិតទេ។ ជុំឯកសារពេញ lifecycle និង monthly settlement ៤៥/៤៥ ឆ្លង; ជុំ focused KeyGen និង formatter ១០៩/១០៩ ឆ្លង; guard security ៣៦៩, key-list ៥១ និង notice ៨៩ ឆ្លង។ មិនបូកការរត់ស្ទួនជាចំនួនគ្របដណ្តប់ថ្មីទេ។
+
+ការវាស់ ZTO ប្រតិទិន៖ `ztoScanStampMillis` ធ្លាប់បម្លែងថ្ងៃមិនមានដូច `2026-02-29`, `2026-02-31`, `2026-04-31` ទៅថ្ងៃពិតដោយស្វ័យប្រវត្តិ។ ម្ចាស់អនុញ្ញាតឱ្យកែ helper ដែលផ្នែក ZTO ចាក់សោប្រើ ដើម្បីកុំឱ្យថ្ងៃមិនមានក្លាយជាថ្ងៃផ្សេង ហើយរក្សាគោលការណ៍គ្មានម៉ោងដើម។ ការកែបន្ថែមការផ្ទៀងចំនួនថ្ងៃក្នុងខែតែមួយបន្ទាត់ក្នុង `core/timezone.ts`; គ្មាន byte ក្នុងឯកសារ ZTO ចាក់សោទាំង ១៣ ប្រែពីបេក្ខភាពមុនទេ។ ត្រាខូចត្រឡប់ 0៖ arrival បង្ហាញការព្រមានក្នុង confirmation ហើយប្រើម៉ោងនាំចូលដែលទុកចិត្ត; returned evidence ត្រូវរំលង; signed-only list មិនបង្កើតជួរនាំចូលពីថ្ងៃមិនមាន។ ផ្លូវ Sign timestamp មាន round-trip guard រួច និងនៅដដែល។ មិនកែ regex ទម្រង់សរសេរ ឬពេលវេលាត្រឹមត្រូវទេ។
+
+Checker-first `zto-calendar-validation.test.ts` និងករណីនាំចូលថ្មីក្នុង `lookup-list-lifecycle.test.ts`៖ មុនកែ ២៩ ធ្លាក់/៣៦ ឆ្លង ដោយករណីចាស់ ៣០ មិនត្រូវបានជ្រើសក្នុងជុំនោះ។ ក្រោយកែឯកសារទាំងពីរពេញ ៩៥/៩៥ ឆ្លង រួមឆ្នាំបង្គ្រប់ ២០០០/២០២៤/២០២៨ និងឆ្នាំ ២១០០ ដែលមិនបង្គ្រប់, Intl fallback, actual classifier/returned targets/Sign, និង Cookie/Palm × adapter ក្លែងទាំងពីរ ដែលរក្សាការព្រមាន និង ledger ថ្ងៃនាំចូល។ មិនមែន backend ឬ browser ពិតទេ។ Guard ប្រតិទិនខ្មែរពី source view ពិតឆ្លង ២១/២១; browser prerender មិនរត់ និង full measure-root មិនទាន់មាន។ `zto-lock` នៅ ១៣ ឆ្លង/៣ hash mismatch ដែលមានពីបេក្ខភាពមុន; មិន refresh LOCK មុន guard ZTO ចាំបាច់ទាំងអស់ឆ្លង។ ការផ្ទៀង browser/CI/ឧបករណ៍ពិត និង version/release នៅរង់ចាំ; គ្មាន publication ឬ retry Chromium EPERM។
+
+ការរត់ពង្រីក ២៣ suite៖ ៤៣៤ ឆ្លង និង ៤១ ធ្លាក់ក្នុង ៣ suite (`scan-save-unknown`, `born-closed-public-baseline`, `merge-into-deleted-item`)។ ផ្ទៀង fixture/config/setup/lockfile ដូចគ្នា និងប្រភព ZoeW មុនកែ helper៖ suite ទាំង ៣ ផ្តល់ ៤១ ធ្លាក់/៦៥ ឆ្លងដូចគ្នាទាំងមុននិងក្រោយ ហើយឈ្មោះ failure ដូចគ្នាទាំងអស់; មិនកែ fixture ទាំងនោះក្នុងជុំនេះ និងមិនរាប់លទ្ធផលក្រហមជា PASS ទេ។ Source-equivalence matrix ដាច់ដោយឡែកពីឆ្នាំ ១៩៧០ ដល់ ២៤០០៖ ត្រាត្រឹមត្រូវ ៣១០៣២ មិនប្រែ epoch; ថ្ងៃមិនមាន ២៩១២ ដែលមុននេះ normalize ឥឡូវសុទ្ធតែ 0។ នេះជាការវាស់កូដ source មិនមែនការធានាភាពត្រឹមត្រូវគ្រប់ប្រភេទទិន្នន័យ ឬផលិតកម្មទេ។
+
+ការវិនិច្ឆ័យ failure ទាំង ៤១ បន្តក្នុង worktree ដាច់៖ `scan-save-unknown` ២៦ និង `merge-into-deleted-item` ៧ ខ្វះ `serverClockTrusted` ក្នុង fixture; `born-closed-public-baseline` ៨ ប្ដូរ mock `getServerNow` ទៅ ៣ ម៉ោងក្រោយ តែ bounds ពិតនៅម៉ោងចាស់។ បន្ថែម trust ក្នុង fixture ពីរ និង offset ស្រប point time ក្នុង fixture មួយ ដោយមិនប្ដូរ product source ឬ assertion ចាស់។ ឯកសារទាំង ៣ ឆ្លង ១១៥/១១៥ រួម control ថ្មី ៩៖ clock មិនទុកចិត្តគ្មាន evidence/write, ផ្ទៀងវិញអាចបន្ត, និង cleanup រក្សាទុកកញ្ចប់មិនទាន់ទុំ/clock មិនទុកចិត្ត/session pending។ Mutation ដក scan gate ធ្លាក់ ៣, ដក cleanup session gate ធ្លាក់ ២, ប្រើ point ជំនួស lower bound ធ្លាក់ ១; Palm នៅមាន age gate មួយទៀត។ រក្សា timeout និង check ចាស់ទាំងអស់; គ្មាន LOCK refresh, browser retry ឬ publication។ នេះជាការកែ fixture ដែលខ្វះ prerequisite មិនមែនបន្ទន់ច្បាប់ផលិតផលទេ។ ជុំ consumer ២៣ suite ដដែលឆ្លង ៤៨៤/៤៨៤ ដោយគ្មានរំលង; test ថ្មីជាមួយ product source frozen មុនកែប្រតិទិនក៏ឆ្លង ១១៥/១១៥។ Typecheck, lint, slot/purity, docs, source-comment, coverage និង build ឆ្លង; hash ZTO នៅ ១៣ ឆ្លង/៣ mismatch ពីមុន ហើយ forbidden-zone ១១/១១ ឆ្លង។ លទ្ធផលនេះមិនជំនួស full CI/browser/backend/ឧបករណ៍ពិតទេ។
+ការផ្ទៀងឯករាជ្យបន្តលើបេក្ខភាពនាឡិកា និង delta ប្រតិទិន៖ រកឃើញចន្លោះចាស់ ៤ ដែលក៏កើតលើមូលដ្ឋាន `cf1a564a` មិនមែន regression ថ្មី។ `PalmSignQueueModal` បង្ហាញកាលកំណត់លុបរូបតាមម៉ោងឧបករណ៍; បន្ថែមតំបន់ `Asia/Phnom_Penh` ដោយមិនប្តូរ epoch លុប។ `palmSignExifShot` ធ្លាប់ទទួលថ្ងៃទី ២៩កុម្ភៈនៃឆ្នាំមិនបង្គ្រប់ និងថ្ងៃទី ៣១ក្នុងខែមាន ៣០ថ្ងៃ; ឥឡូវបដិសេធដូច metadata កាលបរិច្ឆេទខូចផ្សេងៗ ហើយផ្លូវដែលគ្មាន EXIF នៅដដែល។ មិនប្តូររូប ឬ Sign ដែលបានរក្សាទុករួច។ Checker ថ្មី `palm-calendar-boundaries.test.tsx` មុនកែ ១២ ធ្លាក់/៦ ឆ្លងក្រោម UTC; ក្រោយកែ ១៨/១៨ ក្រោមតំបន់ម៉ោងទាំង ៥។ Mutation ដក timezone ធ្លាក់ ៤ ហើយដក calendar guard ធ្លាក់ ៨ តាម assertion ពិត; គ្មានការបរាជ័យ dependency ឬ syntax ត្រូវបានរាប់ជាភស្តុតាងឥរិយាបថទេ។
+
+Push ចាប់ clock-operation fence មុនរង់ចាំ credential ហើយផ្ទៀងម្ដងទៀតមុន POST និងមុនរក្សា ACK។ បើ reset ហើយមាន sample ថ្មី វដ្តចាស់នៅតែមិនមានសិទ្ធិ; បើ POST បានចេញរួច មិនអះអាងថាអាចដកសំណើនោះវិញទេ តែមិនរក្សា cache ជាជោគជ័យពីចម្លើយយឺត។ Evidence retention រក្សា timestamp ដើមជាមួយ candidate ហើយគណនា lower-bound cutoff ថ្មីមុន batch និងមុន retry ម្តងមួយក្រោយ rules បដិសេធ។ Sample ថយក្រោយបន្តិចក្នុង generation ដដែលមិនអនុញ្ញាតលុបមុនរយៈរក្សា និង margin មួយម៉ោង; clock reset ផ្អាក sweep ចាស់។ Checker ថ្មីក្នុង suite ពីរនេះ ៧ ករណីធ្លាក់មុនកែ និង control ថាភស្តុតាងចាស់គ្រប់អាយុអាចលុបបាន ១ ឆ្លង; ក្រោយកែ ៩៦/៩៦ ឆ្លង ហើយជុំជិតខាង ៣៥០ ឆ្លង។ Mutation ដក push fence ធ្លាក់ ៤; ដក cutoff ថ្មីធ្លាក់ ២ និង control ២ ឆ្លង។ មិនបានបង្ហាញការរំលងគោលការណ៍៦០ថ្ងៃរបស់ server ឬការបាត់ប្រាក់ទេ; កំហុសដែលវាស់បានគឺ client margin។
+
+ជុំរួមចុងក្រោយលើការកែទាំង៤៖ ១១ suite ៣២១ តេស្តឆ្លងដោយគ្មានរំលង។ តេស្តប្រើ component/function ពិត និង clock ពិតក្នុង source តែ transport/auth/backend និងពេលវេលាជា fixture; មិនមែន browser/SDK/backend ផលិតកម្ម ឬឧបករណ៍ពិតទេ។ Hash ZTO ៣ ដែលបានដឹងនៅដដែល ហើយមិន refresh LOCK។ ការផ្ទៀង full CI លើ validation commit មិនជំនួសការផ្ទៀង delta ថ្មីទាំងនេះ; version/cache និង release entry ត្រូវរៀបចំនៅពេលបញ្ចូល។ មិនបាន publish, merge, deploy ឬប៉ះទិន្នន័យផលិតកម្មទេ។
+
 
 ### 2026-11-08 — ផ្ទៀង Animation ពិតដោយមិនជំនួសស៊ុម live
 
@@ -4642,6 +4795,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/biometric-no-device-mode.test.tsx` | ផ្នែក ១ | ផ្នែក ៨ |
 | `ZoeW/tests/born-closed-public-baseline.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/breadcrumb-redaction-copy.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/browser-clock-fixture-contract.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/build-checker-freshness.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/chrome-autohide-intent.test.tsx` | — | ផ្នែក ៨ |
 | `ZoeW/tests/cleanup-applied-foreign-op.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -4691,7 +4845,8 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/health-advice.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/health-no-backend.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/health-runtime-evidence.test.ts` | ផ្នែក ២ | — |
-| `ZoeW/tests/history-paging.test.tsx` | — | ផ្នែក ៧ |
+| `ZoeW/tests/history-observer-session-recovery.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/history-paging.test.tsx` | ផ្នែក ១ | ផ្នែក ៧ |
 | `ZoeW/tests/history-patch-late-commit.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/ios-accessory-focus.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/ios-adjusted-tap-focus.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -4707,6 +4862,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/ios-synthetic-click-focus.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/item-level-rows-gone.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/keyboard-tabbar.test.tsx` | — | ផ្នែក ៨ |
+| `ZoeW/tests/keygen-calendar.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/label-image.test.tsx` | — | ផ្នែក ៨ · ផ្នែក ៩ |
 | `ZoeW/tests/label-print.test.tsx` | ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/late-commit-stale-session.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
@@ -4729,6 +4885,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/lookup-import-race.test.ts` | ផ្នែក ១ | ផ្នែក ៩ |
 | `ZoeW/tests/lookup-key-restore-idb.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/lookup-late-answer-busy.test.ts` | — | ផ្នែក ៨ · ផ្នែក ៩ |
+| `ZoeW/tests/lookup-list-lifecycle.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/lookup-modes-money.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/lookup-plain-header-gone.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/manual-adjust-number-browser.test.ts` | ផ្នែក ១ | — |
@@ -4766,6 +4923,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/notify-removed-seen-live.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/notify-update-check.test.tsx` | — | ផ្នែក ៨ |
 | `ZoeW/tests/orientation-lock.test.ts` | — | ផ្នែក ៨ |
+| `ZoeW/tests/palm-calendar-boundaries.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/palm-sign-camera.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/palm-sign-confirmation-transport.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/palm-sign-journal.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -4775,6 +4933,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/palm-sign-reservation.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/palm-sign-restart.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/password-save-race.test.ts` | — | ផ្នែក ៨ |
+| `ZoeW/tests/payload-local-cache.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/phone-pickup-stale-view.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/phone-suggest-idle-scroll.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/pickup-cleanup-collected-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -4840,6 +4999,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/scanner-focus-after-close.test.tsx` | — | ផ្នែក ៨ |
 | `ZoeW/tests/scanner-modal-queue.test.tsx` | — | ផ្នែក ៨ · ផ្នែក ៩ |
 | `ZoeW/tests/scroll-thumb.test.tsx` | — | ផ្នែក ៧ · ផ្នែក ៨ |
+| `ZoeW/tests/sdk-audit-clock-fixture.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/search-glide-hold.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/secret-pem-redaction.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/seller-notices.test.tsx` | — | ផ្នែក ៧ |
@@ -4854,6 +5014,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/shop-bound-ui-refresh.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/shop-device-note.test.ts` | — | ផ្នែក ៨ · ផ្នែក ៩ |
 | `ZoeW/tests/shop-pending-cleanup.test.tsx` | — | ផ្នែក ៨ |
+| `ZoeW/tests/static-checker-contracts.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-account.test.tsx` | ផ្នែក ២ | ផ្នែក ៧ |
 | `ZoeW/tests/supabase-auth-unavailable.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ |
 | `ZoeW/tests/supabase-auth-write-ownership.test.ts` | — | ផ្នែក ៨ · ផ្នែក ៩ |
@@ -4914,6 +5075,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/zto-abandon-signed-gate.test.tsx` | — | ផ្នែក ៨ · ផ្នែក ៩ |
 | `ZoeW/tests/zto-barcode-shape.test.ts` | ផ្នែក ១ | ផ្នែក ៩ |
 | `ZoeW/tests/zto-born-closed-merge.test.ts` | — | ផ្នែក ៨ |
+| `ZoeW/tests/zto-calendar-validation.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-cookie-life.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/zto-detail-identity.test.ts` | — | ផ្នែក ៨ · ផ្នែក ៩ |
 | `ZoeW/tests/zto-empty-view-refresh.test.ts` | ផ្នែក ២ | — |

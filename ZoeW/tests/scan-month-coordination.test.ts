@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { refTo } from '../src/app/refs';
 import { dataState, firebaseState, scanState, uiState, ztoState } from '../src/core/state';
 import { viewState } from '../src/core/view-state';
-import { pendingRegistryReleases } from '../src/core/clock';
+import { acceptServerClockOffset, resetServerClock, pendingRegistryReleases } from '../src/core/clock';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { getFormattedDate } from '../src/core/timezone';
 import { clearZtoPickupStatusStore } from '../src/features/zto-status';
@@ -138,6 +138,7 @@ function makeNative() {
     Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db, isDatabaseInitialized: true,
         isInitializingFirebase: false, firebaseSdkUnavailable: false, isDatabaseConnected: true,
         sessionExpiryCheck: 'live', authLoginOperation: null, dbLivenessProbe: Promise.resolve(null) });
+    resetServerClock(); acceptServerClockOffset(1, null, false);
     firebaseState.dbRefHistory = sdk.ref(db, H);
     firebaseState.dbRefDailyRevenue = sdk.ref(db, D);
     firebaseState.dbRefMonthlyRevenue = sdk.ref(db, M);
@@ -212,10 +213,10 @@ it('monthly reservations never overlap and retain four independent scan intents'
 });
 
 it('one bounded budget removes queued work but retains a genuinely live native exclusion', async () => {
+    vi.useFakeTimers();
     makeNative();
     const first=await admitted('MONTH_HUNG_FIRST');const second=await admitted('MONTH_HUNG_WAIT');
     let release!:()=>void;monthGate=new Promise<void>(resolve=>release=resolve);
-    vi.useFakeTimers();
     const timers = vi.spyOn(globalThis, 'setTimeout');
     const budgetsStarted = () => timers.mock.calls.filter(([, delay]) => delay === DB_OP_TIMEOUT_MS).length;
     const a=saveScanOperation(first,'0910000001','N/A',0);const b=saveScanOperation(second,'0910000002','N/A',0);
@@ -261,9 +262,9 @@ it('a new actual database progresses while an old database mutation remains unac
 });
 
 it('late committed ACK retains exclusion without double money and recovery uses the receipt', async () => {
+    vi.useFakeTimers();
     makeNative();const first=await admitted('MONTH_LATE_COMMIT');let release!:()=>void;
     heldAcks.set(first.record.id,new Promise<void>(resolve=>release=resolve));
-    vi.useFakeTimers();
     const firstRun=saveScanOperation(first,'0910000001','N/A',0);
     await waitForRealCondition(()=>get('zoew_scan_operations/'+first.record.id)?.phase==='committed','actual committed server receipt');
     const second=await admitted('MONTH_AFTER_COMMIT');
@@ -277,20 +278,21 @@ it('late committed ACK retains exclusion without double money and recovery uses 
     expect(money()).toEqual([[11,0,2],[11,0,2]]);
 });
 
-it('a wall-clock jump does not expire a still-timely queued mutation', async () => {
+it('a wall-clock jump invalidates captured scan effects without changing queue elapsed budgets', async () => {
     makeNative();const first=await admitted('MONTH_CLOCK_FIRST');const second=await admitted('MONTH_CLOCK_SECOND');
     let release!:()=>void;monthGate=new Promise<void>(resolve=>release=resolve);
     const a=saveScanOperation(first,'0910000001','N/A',0);const b=saveScanOperation(second,'0910000002','N/A',0);
     await waitForRealCondition(()=>monthStarts===1,'clock first native reserve');await flush();
     vi.setSystemTime(NOW+86400000*10);monthGate=null;release();
-    expect(await Promise.all([a,b])).toEqual([true,true]);expect(money()).toEqual([[12,0,3],[12,0,3]]);
+    expect(await Promise.all([a,b])).toEqual(['unknown','unknown']);expect(money()).toEqual([[10,0,1],[10,0,1]]);
 });
 
 it('a rejected native mutation releases exclusion for the healthy queued intent', async () => {
     makeNative();const first=await admitted('MONTH_REJECTED');const second=await admitted('MONTH_AFTER_REJECTION');
     let release!:()=>void;monthGate=new Promise<void>(resolve=>release=resolve);monthFailure=true;
-    const a=saveScanOperation(first,'0910000001','N/A',0);const b=saveScanOperation(second,'0910000002','N/A',0);
-    await waitForRealCondition(()=>monthStarts===1,'rejected native mutation entered');await flush();
+    const a=saveScanOperation(first,'0910000001','N/A',0);
+    await waitForRealCondition(()=>monthStarts===1,'rejected native mutation entered');
+    const b=saveScanOperation(second,'0910000002','N/A',0);await flush();
     monthGate=null;release();
     expect(await a).toBe('unknown');expect(await b).toBe(true);expect(monthStarts).toBe(2);
     expect(money()).toEqual([[11,0,2],[11,0,2]]);

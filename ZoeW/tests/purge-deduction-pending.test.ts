@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
-import { pendingRegistryReleases } from '../src/core/clock';
+import { pendingRegistryReleases, resetServerClock } from '../src/core/clock';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { noteCleanupJournalEntry, PURGE_DEDUCTION_RETRY_MS, purgeDeductionWaits, readCleanupJournal, resumeCleanupJournalEntry, runAutomaticDeletedCleanup } from '../src/domain/cleanup';
 import { activeRestoreClaims, executePermanentDelete, restoreCancellationInFlight, restoreInFlight, restoreRecoveryHolds } from '../src/features/restore';
@@ -67,7 +67,7 @@ beforeEach(() => {
     firebaseState.firebaseConfig = { databaseURL: HOST } as any;
     firebaseState.auth = { currentUser: { uid: 'purge-user', getIdToken: async () => 'synthetic-token' } } as any;
     firebaseState.isInitializingFirebase = false; firebaseState.isDatabaseInitialized = true; firebaseState.isDatabaseConnected = true;
-    firebaseState.serverClockTrusted = true; firebaseState.serverTimeOffsetMs = 0; firebaseState.hasEverConnectedToDatabase = true;
+    firebaseState.serverClockTrusted = true; firebaseState.serverTimeOffsetMs = 0; firebaseState.hasEverConnectedToDatabase = true; firebaseState.sessionExpiryCheck = 'live';
     firebaseState.fb = {
         ref, increment: (n: number) => ({ inc: n }), get: async (target: any) => snap(at(target.path)),
         runTransaction: async (target: any, update: any) => {
@@ -281,4 +281,18 @@ for (const receipts of ['both', 'none'] as const) it('គ្មាន scanDate �
     await runAutomaticDeletedCleanup();
     expect({ day: totals(at(D + '/' + day)), month: totals(at(M + '/' + month)), copy: at(T + '/source'), other: totals(at(D + '/' + DAY)) })
         .toEqual({ day: receipts === 'both' ? [7, 2, 1] : [0, 0, 0], month: receipts === 'both' ? [7, 2, 1] : [0, 0, 0], copy: null, other: [7, 2, 1] });
+});
+
+it('purge ចាស់មិនបន្តក្រោយនាឡិកា Sync ឡើងវិញពេលអាន server', async () => {
+    arrange('returned', true);
+    const original = cleanupServerRead(at, () => {});
+    let interrupted = false;
+    vi.stubGlobal('fetch', (...args: Parameters<typeof fetch>) => {
+        if (!interrupted) { interrupted = true; resetServerClock(); firebaseState.serverClockTrusted = true; }
+        return original(...args);
+    });
+    await runAutomaticDeletedCleanup();
+    expect(interrupted).toBe(true);
+    expect(purgeWrites).toBe(0);
+    expect(at(T + '/source')).not.toBeNull();
 });

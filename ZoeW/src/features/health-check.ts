@@ -5,7 +5,7 @@ import { modalIsOpen } from '../core/modals';
 import { healthPendingRow, healthRow } from '../app/components/health/model';
 import { viewState } from '../core/view-state';
 import { firebaseState, lookupState, securityState, uiState } from '../core/state';
-import { cleanupClockIsTrustworthy, getServerNow } from '../core/clock';
+import { cleanupClockIsTrustworthy, getServerNow, serverClockIsTrustworthy } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
 import { getZoneDateKey } from '../core/timezone';
 import { appLocalStore, appSessionStore, safeStoreGet } from '../core/storage';
@@ -121,7 +121,7 @@ export async function healthDatabaseLiveRow() {
 }
 
 export function healthClockRow() {
-    if (!firebaseState.serverClockTrusted || !Number.isFinite(firebaseState.serverTimeOffsetMs)) {
+    if (!serverClockIsTrustworthy()) {
         return healthRow('warn', 'នាឡិកា Server', 'មិនទាន់ sync — ការសម្អាតស្វ័យប្រវត្តិត្រូវបានផ្អាកដោយចេតនា');
     }
     const drift = Math.round(Math.abs(firebaseState.serverTimeOffsetMs) / 1000);
@@ -138,7 +138,7 @@ export function healthTenantRow(account?, verified = false) {
     const label = 'ហាង «' + String(account.tenant_name || '') + '» · សាខា ' + String(account.branch_code || '—') + ' · ផុត ' + untilText;
     if (!verified) return healthRow('info', 'ហាង (Supabase)', label + ' — ព័ត៌មានចុងក្រោយ មិនទាន់ផ្ទៀងផ្ទាត់ជាមួយ Server');
     if (account.status === 'revoked' || account.status === 'expired') return healthRow('bad', 'ហាង (Supabase)', label + ' — ' + (account.status === 'revoked' ? 'ត្រូវបានបិទ' : 'ផុតកំណត់'));
-    if (account.status !== 'active' || !Number.isFinite(until) || (!firebaseState.serverClockTrusted || !Number.isFinite(getServerNow()))) return healthRow('warn', 'ហាង (Supabase)', label + ' — ស្ថានភាព ឬពេលផុតមិនទាន់ផ្ទៀងផ្ទាត់បាន');
+    if (account.status !== 'active' || !Number.isFinite(until) || (!serverClockIsTrustworthy() || !Number.isFinite(getServerNow()))) return healthRow('warn', 'ហាង (Supabase)', label + ' — ស្ថានភាព ឬពេលផុតមិនទាន់ផ្ទៀងផ្ទាត់បាន');
     return healthRow(until > getServerNow() ? 'ok' : 'bad', 'ហាង (Supabase)', label + (until > getServerNow() ? ' — Server បានបញ្ជាក់ក្នុងការពិនិត្យនេះ' : ' — ផុតកំណត់'));
 }
 

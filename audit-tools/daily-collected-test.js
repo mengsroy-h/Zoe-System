@@ -56,7 +56,7 @@ function scenario(name, fn) {
 function readOr(file) { try { return fs.readFileSync(file, 'utf8'); } catch (_) { return ''; } }
 
 const SRC = readOr(APP_JS);
-const protocolRuntime = moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations'] }]);
+const protocolRuntime = moduleRuntime(ROOT, SRC, [{ path: 'src/core/clock.ts', expose: ['serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'captureClockOperation', 'getServerClockBounds', 'acceptServerClockOffset', 'resetServerClock'] }, 'src/core/session-verification.ts', 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations'] }]);
 const HTML = readOr(INDEX_HTML);
 const RULES = readOr(RULES_JSON);
 
@@ -121,9 +121,9 @@ function makeSandbox(state) {
         STATS_COLLECTED_VIEW_KEYS: readKeyList('STATS_COLLECTED_VIEW_KEYS'),
         dbListenerPendingPaths: new Set(opts.pending || []),
         dbListenerFailedPaths: new Set(opts.failed || []), dbListenerReportedFailures: new Set(),
+        auth: null, sessionExpiryCheck: 'live', serverClockTrusted: false, serverTimeOffsetMs: 0, isDatabaseConnected: true, performance,
         db: {}, authGeneration: 0, dbRefDailyCollected: { __ref: NODE },
         getServerNow: () => opts.now,
-        cleanupClockIsTrustworthy: () => opts.clockOk !== false,
         showToast: (m) => calls.toast.push(String(m)),
         Intl: Intl,
         window: {},
@@ -169,7 +169,10 @@ function makeSandbox(state) {
     vm.runInContext(reactRuntime(SRC, { exclude: WANT, context: box }), box);
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
     vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', box);
-    vm.runInContext(bodies, box);
+    const clock = moduleRuntime(ROOT, SRC, [{ path: 'src/core/clock.ts', expose: ['serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'captureClockOperation', 'getServerClockBounds', 'acceptServerClockOffset', 'resetServerClock'] }, 'src/core/session-verification.ts']);
+    vm.runInContext(clock.withoutBindings(bodies) + '\n' + clock.code, box);
+    box.acceptServerClockOffset(0, Object.freeze({ epochMs: Number.isFinite(opts.now) ? opts.now : Date.now(), wallMs: Date.now(), monotonicMs: performance.now(), uncertaintyMs: 0 }));
+    if (opts.clockOk === false) box.resetServerClock();
     box.__container = renderedContainer(ROOT, box, 'src/app/components/stats/StatsCards.tsx', 'CollectedStatsCards');
     return box;
 }
@@ -387,6 +390,8 @@ scenario('១៣. ⛔ UI ៖ ប៊ូតុង · ប្រអប់ · កា�
 // ស្រង់មុខងារពិតតាម AST ដើម្បីវាស់ស្នាមភ្ជាប់ close/delete/restore ជាមួយគ្នា។
 const operationDeclarations = modulePrograms(SRC, path.join(ROOT, 'ZoeW', 'app.js'), { ecmaVersion: 'latest' }).flatMap(program => program.body);
 const fnCode = operationDeclarations.filter(node => node.type === 'FunctionDeclaration').map(node => SRC.slice(node.start, node.end)).join('\n');
+const operationModuleCode = moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts', 'src/services/row-operation-lock.ts']).code;
+const operationFunctionCode = protocolRuntime.withoutBindings(fnCode);
 const clone = value => value == null ? value : JSON.parse(JSON.stringify(value));
 const HISTORY = 'zoew_scan_history_cod_dod';
 const TRASH = 'zoew_recently_deleted_cod_dod';
@@ -395,6 +400,9 @@ const DAILY = 'zoew_daily_revenue_cod_dod';
 const MONTHLY = 'zoew_monthly_revenue_cod_dod';
 const PICKUP = 'zoew_daily_pickup_cod_dod';
 function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
+    let clockAdvanceMs = 0;
+    const clockDate = class extends Date { static now() { return Date.now() + clockAdvanceMs; } };
+    const clockPerformance = { now: () => performance.now() + clockAdvanceMs };
     const server = sharedStore || clone(initial);
     const calls = [];
     const messages = [];
@@ -422,9 +430,9 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
     }
     function snap(p) { const value = clone(read(p)); return { exists: () => value !== null, val: () => clone(value) }; }
     const box = {
-        crypto: require('crypto').webcrypto, console, queueMicrotask, Date, Intl, setTimeout, clearTimeout, Promise, Set, Map, WeakMap, performance: require('node:perf_hooks').performance,
+        crypto: require('crypto').webcrypto, console, queueMicrotask, Date: clockDate, Intl, setTimeout, clearTimeout, Promise, Set, Map, WeakMap, performance: clockPerformance,
         db: { app: { options: { databaseURL: 'https://collected-fixture.invalid' } } },
-        auth: { currentUser: { uid: 'fixture-user' } }, isInitializingFirebase: false, dataState: { pickupPendingVersion: 0 },
+        auth: { currentUser: { uid: 'fixture-user' } }, sessionExpiryCheck: 'live', serverClockTrusted: false, serverTimeOffsetMs: 0, isDatabaseConnected: true, isInitializingFirebase: false, dataState: { pickupPendingVersion: 0 },
         authGeneration: 0, dbRefHistory: { path: HISTORY }, dbRefDeleted: { path: TRASH },
         dbRefDailyCollected: { path: COLLECTED }, dbRefDailyPickup: { path: PICKUP },
         dailyCollectedData: clone(server[COLLECTED] || {}), dailyPickupData: clone(server[PICKUP] || {}),
@@ -462,8 +470,8 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
     box.window = box;
     box.globalThis = box;
     vm.createContext(box);
-    vm.runInContext(require('./react-view').moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts', 'src/services/row-operation-lock.ts']).code, box);
-    vm.runInContext(protocolRuntime.withoutBindings(fnCode), box);
+    vm.runInContext(operationModuleCode, box);
+    vm.runInContext(operationFunctionCode, box);
     for (const name of ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'PICKUP_PHONE_KEY_MAX',
         'RESTORE_INTENTS_KEY', 'CLEANUP_LIVE_LOCK_PREFIX', 'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX',
         'CLEANUP_STAGE_SLOT', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_UNDO',
@@ -483,7 +491,9 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
         probeDatabaseLiveness: () => Promise.resolve(null)
     });
     vm.runInContext(protocolRuntime.code, box);
-    return { box, server, calls, messages, read, write, sync() {
+    box.acceptServerClockOffset(0, Object.freeze({ epochMs: now, wallMs: box.Date.now(), monotonicMs: box.performance.now(), uncertaintyMs: 0 }));
+    box.sessionExpiryCheck = 'live';
+    return { box, server, calls, messages, read, write, advanceClock(ms) { now += ms; clockAdvanceMs += ms; }, sync() {
         box.scanHistory = Object.values(clone(server[HISTORY] || {}));
         box.deletedItems = Object.values(clone(server[TRASH] || {}));
         box.dailyCollectedData = clone(server[COLLECTED] || {});
@@ -592,7 +602,25 @@ async function closeOperation(s, method, closed) {
     if (method === 'single') return s.box[name]('fixture_item', 'FIXTURE1', closed, { showModal: false });
     return s.box[name]('fixture_item');
 }
+async function testCollectedClockFixture() {
+    for (const mode of ['untrusted', 'stale']) {
+        const s = makeOperationSandbox({ [HISTORY]: { fixture_item: operationItem(24.5, false) }, [COLLECTED]: {}, [PICKUP]: {} });
+        if (mode === 'untrusted') s.box.resetServerClock();
+        const work = closeOperation(s, 'single', true);
+        if (mode === 'stale') s.box.resetServerClock();
+        await work;
+        ok('នាឡិកា/វគ្គមិនទាន់ផ្ទៀង ➜ មិនបិទ និងមិនបង្កើតចំណូល — ' + mode,
+            s.read(HISTORY + '/fixture_item/barcodes/0/isClosed') === false && collectedTotal(s.server) === 0 && !s.calls.some(call => call.path === HISTORY || call.path.startsWith(HISTORY + '/') || call.path === COLLECTED || call.path.startsWith(COLLECTED + '/')), s.calls);
+    }
+    const pending = makeSandbox({ now: NOW_B, local: { '2020-01-01': { OLD: { c: 1, d: 0 } } }, server: { '2020-01-01': { OLD: { c: 1, d: 0 } } } });
+    pending.auth = { currentUser: { uid: 'fixture-user' } };
+    pending.sessionExpiryCheck = 'pending';
+    pending.runAutomaticCollectedCleanup();
+    ok('វគ្គរង់ចាំផ្ទៀង ➜ មិនសម្អាតចំណូលចាស់', pending.__calls.update.length === 0 && !!pending.__server['2020-01-01']);
+}
+
 (async () => {
+    await testCollectedClockFixture();
     await operationScenario('៨. ការកែទឹកប្រាក់អាន server ពិត ហើយមិនបង្កើតធាតុថ្មី', async () => {
         const initial = { [HISTORY]: { fixture_item: operationItem(8.25, true, NOW_B) },
             [COLLECTED]: { [DAY_B]: { FIXTURE1: { c: 5, d: 0 } } } };
@@ -964,7 +992,6 @@ async function closeOperation(s, method, closed) {
     for (const day of ['2026-09-05', '2026-09-06', '2026-09-07']) {
         await operationScenario('៣៦. កែតម្លៃជាប់ cleanup តាមព្រំដែនរក្សាទុក — ' + day, async () => {
             const s = makeOperationSandbox(retentionFixture(day));
-            s.box.cleanupClockIsTrustworthy = () => true;
             const held = holdNextCollectedWrite(s);
             editOperation(s, 24.5, 1.75);
             await operationTicks();
@@ -991,10 +1018,8 @@ async function closeOperation(s, method, closed) {
     for (const late of [false, true]) {
         await operationScenario('៣៧. កែតម្លៃឆ្លងអធ្រាត្រ ខណៈ cleanup បានលុបថ្ងៃដើម — ' + late, async () => {
             const day = '2026-09-06';
-            let now = Date.UTC(2026, 8, 12, 16, 59, 59);
+            const now = Date.UTC(2026, 8, 12, 16, 59, 59);
             const s = makeOperationSandbox(retentionFixture(day), now);
-            s.box.getServerNow = () => now;
-            s.box.cleanupClockIsTrustworthy = () => true;
             if (late) s.box.DB_OP_TIMEOUT_MS = 10;
             const held = holdNextCollectedWrite(s);
             editOperation(s, 24.5, 1.75);
@@ -1002,7 +1027,9 @@ async function closeOperation(s, method, closed) {
             ok('ជាន់អប្បបរមា៖ សំណើត្រូវបានទប់ ខណៈថ្ងៃដើមនៅក្នុង retention',
                 !!held.pending && s.box.collectedRetentionCutoffKey(now) === day, { held: !!held.pending, cutoff: s.box.collectedRetentionCutoffKey(now) });
             if (!held.pending) return;
-            now = Date.UTC(2026, 8, 12, 17, 0, 1);
+            s.advanceClock(2000);
+            ok('ជាន់អប្បបរមា៖ clock owner ពិតឆ្លងអធ្រាត្រ ហើយនៅទុកចិត្តបាន',
+                s.box.cleanupClockIsTrustworthy() && s.box.collectedRetentionCutoffKey(s.box.getServerClockBounds().lowerMs) === '2026-09-07');
             s.box.runAutomaticCollectedCleanup(); await operationTicks(late ? 25 : 2);
             ok('ក្រោយអធ្រាត្រ server បានលុបថ្ងៃដែលទើបហួសអាយុ', !s.read(COLLECTED + '/' + day + '/FIXTURE1'), s.read(COLLECTED));
             await s.box.fb.update(s.box.dbRefDailyCollected, { ['2026-09-13/FRESH2']: { c: 3.5, d: 1 } });
@@ -1019,7 +1046,6 @@ async function closeOperation(s, method, closed) {
         initial[COLLECTED]['2026-09-06'] = { KEEP1: { c: 6, d: 0.5 } };
         initial[COLLECTED]['មិនមែនថ្ងៃ'] = { META: { c: 0, d: 0 } };
         const s = makeOperationSandbox(initial);
-        s.box.cleanupClockIsTrustworthy = () => true;
         const beforeMoney = moneySources(s);
         const held = holdNextCollectedWrite(s);
         s.box.runAutomaticCollectedCleanup(); await operationTicks(2);
@@ -1036,7 +1062,6 @@ async function closeOperation(s, method, closed) {
     for (const late of [false, true]) {
         await operationScenario('៣៩. cleanup ត្រូវបដិសេធ ហើយអាចសាកឡើងវិញ — ' + late, async () => {
             const s = makeOperationSandbox(retentionFixture('2026-09-05'));
-            s.box.cleanupClockIsTrustworthy = () => true;
             if (late) s.box.DB_OP_TIMEOUT_MS = 10;
             const beforeMoney = moneySources(s);
             const held = holdNextCollectedWrite(s);
@@ -1056,7 +1081,6 @@ async function closeOperation(s, method, closed) {
     for (const change of ['auth', 'database']) {
         await operationScenario('៤០. cleanup ដែលបដិសេធក្រោយប្ដូរ session — ' + change, async () => {
             const s = makeOperationSandbox(retentionFixture('2026-09-05'));
-            s.box.cleanupClockIsTrustworthy = () => true;
             const reports = [];
             s.box.ZoeErrors = { capture: (error, context) => reports.push(context) };
             const held = holdNextCollectedWrite(s);
@@ -1075,9 +1099,13 @@ async function closeOperation(s, method, closed) {
     for (const gate of ['clock', 'listener']) {
         await operationScenario('៤១. មិនដាក់ការផុតអាយុថ្មី បើ cleanup មិនបានលុបពិត — ' + gate, async () => {
             const s = makeOperationSandbox(retentionFixture('2026-09-05'));
-            s.box.cleanupClockIsTrustworthy = () => gate !== 'clock';
+            if (gate === 'clock') s.box.resetServerClock();
             if (gate === 'listener') s.box.dbListenerFailedPaths.add(s.box.DB_LISTENER_KEY_DAILY_COLLECTED);
             s.box.runAutomaticCollectedCleanup(); await operationTicks(2);
+            if (gate === 'clock') {
+                s.box.acceptServerClockOffset(0, Object.freeze({ epochMs: NOW_B, wallMs: s.box.Date.now(), monotonicMs: s.box.performance.now(), uncertaintyMs: 0 }));
+                s.box.sessionExpiryCheck = 'live';
+            }
             editOperation(s, 24.5, 1.75); await operationTicks();
             ok('កែតម្លៃកំណត់ត្រាដែលនៅមាន ដោយមិនលុបតាមអាយុនៅក្នុងផ្លូវកែតម្លៃ — ' + gate,
                 s.read(COLLECTED + '/2026-09-05/FIXTURE1/c') === 24.5 && collectedTotal(s.server) === 26.25, s.read(COLLECTED));
@@ -1100,7 +1128,6 @@ async function closeOperation(s, method, closed) {
         const initial = editFixture();
         initial[COLLECTED]['2026-09-05'] = { EXPIRED2: { c: 3.5, d: 1 } };
         const s = makeOperationSandbox(initial);
-        s.box.cleanupClockIsTrustworthy = () => true;
         const held = holdNextCollectedWrite(s);
         editOperation(s, 24.5, 1.75);
         for (let index = 0; !held.pending && index < 30; index++) await operationTicks(1);

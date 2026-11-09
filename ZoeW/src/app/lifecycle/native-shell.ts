@@ -1,7 +1,9 @@
 import { securityState, uiState } from '../../core/state';
+import { sessionVerificationRequired } from '../../core/session-verification';
 import { viewState } from '../../core/view-state';
 import { ROOT_SCREEN_MODALS } from '../../core/modals';
 import { noteAppLockAway, relockAppAfterAway } from '../../features/app-lock';
+import { runSessionExpiryCheck } from '../../features/session';
 import { setEntryScanMode } from '../../features/scan-remove';
 import { isNativeAndroid } from '../../platform/native';
 import { switchAppPage } from '../../ui/page-nav';
@@ -20,7 +22,7 @@ export function setupNativeShell(scope: LifecycleScope): void {
         await Promise.all([
             App.addListener('backButton', () => { if (!scope.disposed) handleNativeBack(() => { App.minimizeApp().catch(() => {}); }, history); }),
             App.addListener('pause', () => { if (!scope.disposed) noteAppLockAway(); }),
-            App.addListener('resume', () => { if (!scope.disposed) relockAppAfterAway(); })
+            App.addListener('resume', () => { if (!scope.disposed) { relockAppAfterAway(); runSessionExpiryCheck(); } })
         ].map((pending) => pending.then((handle) => {
             scope.onDispose(() => { handle.remove().catch(() => {}); });
         })));
@@ -75,7 +77,7 @@ export function setupNativeShell(scope: LifecycleScope): void {
 }
 
 export function handleNativeBack(minimize: () => void, history?: BackHistory): void {
-    if (securityState.appIsLocked) { minimize(); return; }
+    if (securityState.appIsLocked || sessionVerificationRequired()) { minimize(); return; }
     if (!uiState.moreMenuOpen && ROOT_SCREEN_MODALS.includes(topmostModal())) { minimize(); return; }
     if (closeTopmostLayer({ includeMoreMenu: true })) return;
     const target = history ? history.popTarget() : null;

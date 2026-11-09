@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { firebaseState } from '../src/core/state';
+import { acceptServerClockOffset, resetServerClock } from '../src/core/clock';
 import { withTransactionOutcomeResolution } from '../src/services/tx-outcome';
 import { NATIVE_RECOVERY_RETRY_GAP_MS, nativeWriteRecoveryState } from '../src/services/native-write-recovery';
 import { dbListenerPendingPaths } from '../src/core/text';
@@ -19,6 +20,7 @@ function lab(update: any, transaction?: any) {
   const sdk = withTransactionOutcomeResolution(raw); sdk.getAuth(app); sdk.getDatabase(app);
   Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db, isDatabaseInitialized: true,
     isInitializingFirebase: false, firebaseSdkUnavailable: false, isDatabaseConnected: true, sessionExpiryCheck: 'live', authLoginOperation: null });
+  resetServerClock(); acceptServerClockOffset(0, null, false);
   return { sdk, db, app, auth };
 }
 const verdictOf = (p: Promise<any>) => p.then(() => 'sent', (e: any) => e.code || e.message);

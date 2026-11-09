@@ -5,7 +5,7 @@ import { modalIsOpen, setModalDisplay } from '../core/modals';
 import { fieldValue, setFieldValue } from '../app/refs';
 import { domText, viewState } from '../core/view-state';
 import { dataState, firebaseState, uiState } from '../core/state';
-import { getServerNow } from '../core/clock';
+import { captureClockOperation, getServerNow } from '../core/clock';
 import { formatScanStamp, getFormattedDate } from '../core/timezone';
 import { applyBarcodeCloseState, barcodeEntriesOf, barcodeSignIdentity, barcodeZtoSigned, ensureBarcodeArrayForItem, itemHasRestoreMarkers, stampTrashPolicy, stripHistoryOnlyMarkers } from '../domain/barcode';
 import { cleanupAdmissionMatches, cleanupPartialTrashId, prepareCleanupTrashGeneration, CLEANUP_STAGE_COLLECTED, CLEANUP_STAGE_FLIP, CLEANUP_STAGE_MOVED, cleanupInFlight, beginCleanupOperation, releaseCleanupOperation, clearCleanupJournalEntry, claimCleanupTrashSlot, deductCleanupRevenue, holdCleanupJournalLive, markCleanupJournalStage, patchCleanupJournalEntry, prepareCleanupClaim, remarkCleanupCollectedKept, restoreClaimedItemToScanHistory, settleCleanupDeduction } from '../domain/cleanup';
@@ -108,6 +108,11 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
 
     if (!confirmedByScan && !confirm(`តើអ្នកពិតជាចង់ដកកញ្ចប់អីវ៉ាន់ (${barcodeCode}) នេះចេញពីការគ្រប់គ្រងមែនទេ? (ZTO Login ឬកញ្ចប់ Sign រួច៖ មិនអាចស្តារបាន។ កញ្ចប់ផ្សេងស្តារតាមគោលការណ៍ធុងសំរាម។)`)) return 'cancelled';
 
+    const removeClock = captureClockOperation();
+    if (!removeClock.current()) {
+        showToast('⏳ នាឡិកាមិនទាន់បានផ្ទៀងផ្ទាត់។ សូមរង់ចាំ Sync ហើយសាកម្ដងទៀត។');
+        return 'failed';
+    }
     const generationOwner = captureTrashGenerationOwner();
     const removeDb = firebaseState.db;
     const removeGeneration = firebaseState.authGeneration;
@@ -176,6 +181,7 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
     };
     const durableRemoveUpdater: any = (currentItem) => {
         if (!removeIsCurrent()) return;
+        if (!removeClock.current()) { claimedBarcode = null; claimedWhole = null; return; }
         if (!cleanupAdmissionMatches(plannedSource, currentItem)) { claimedBarcode = null; claimedWhole = null; return; }
         const next = removeUpdater(currentItem);
         return next;
@@ -225,7 +231,7 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
         itemToTrash.time = removedBc.time || claimedParent.time;
         itemToTrash.isClosed = removedBc.isClosed || false;
         if (itemToTrash.isClosed) {
-            itemToTrash.closedAt = claimedParent.closedAt || getServerNow();
+            itemToTrash.closedAt = claimedParent.closedAt || preparedEntry.trashItem.deletedAt;
         } else {
             delete itemToTrash.closedAt;
         }
@@ -306,6 +312,7 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
         await trashClaim.start();
         removalPickupContext = await capturePickupContext(item.scanDate || getFormattedDate());
         if (!removeIsCurrent()) return 'stale';
+        if (!removeClock.current()) return 'failed';
         const claim: any = await claimTrashBarcodes(itemId, claimToken, (current) => (barcodeEntriesOf(current.barcodes).some(({ barcode }) => barcode && barcode.code === barcodeCode) ? [barcodeCode] : []));
         if (!removeIsCurrent()) return 'stale';
         if (claim.state !== 'claimed') {
@@ -322,7 +329,7 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
                 : `⚠️ ដកកញ្ចប់ (${barcodeCode}) មិនបានជោគជ័យ! គ្មានការដកដែលបានបញ្ជាក់ទេ — សូម Sync រួចសាកល្បងម្តងទៀត។`);
             return 'failed';
         }
-        if (!claim.source || !generationOwner) return 'failed';
+        if (!claim.source || !generationOwner || !removeClock.current()) return 'failed';
         plannedSource = JSON.parse(JSON.stringify(claim.source));
         removeUpdater(JSON.parse(JSON.stringify(plannedSource)));
         if (!claimedBarcode) return 'missing';
@@ -331,6 +338,7 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
             if (removeIsCurrent()) showToast('⏳ ការដកកំពុងរង់ចាំការផ្ទៀងជំនាន់ធុងសំរាម។ សូម Sync រួចសាកម្ដងទៀត។');
             return removeIsCurrent() ? 'failed' : 'stale';
         }
+        if (!removeClock.current()) return 'failed';
         preparedEntry = prepareCleanupClaim(itemId, 'remove', null, plannedPartial, removeMode, operation, removalPickupContext);
         const removeTx = firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${itemId}`), durableRemoveUpdater);
         let result;

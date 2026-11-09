@@ -1,7 +1,7 @@
 import { viewState } from '../core/view-state';
 import { documentIsHidden, onDocumentVisibilityChange } from '../platform/document-io';
 import { dataState, firebaseState, ztoState } from '../core/state';
-import { serverClockOffsetIsFromServer } from '../core/clock';
+import { acceptServerClockOffset, serverClockIsTrustworthy, setServerClockRefresh } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
 import { CLEANUP_JOURNAL_KEY, CLEANUP_LEGACY_JOURNAL_KEY, PICKUP_JOURNAL_KEY } from '../core/storage-keys';
 import { flushPendingRegistryReleases } from '../domain/registry';
@@ -13,6 +13,8 @@ import { noteConnectionTransition, refreshLiveToasts } from '../ui/toast';
 import { dbListenerPendingPaths } from '../core/text';
 import { resumePendingScanOperations } from './scan-operation';
 import { resumePriceOperations } from './price-operation';
+import { runSessionExpiryCheck } from '../features/session';
+import { retryPendingActivation } from '../features/license';
 import { connectionFlowSnapshot } from './connection-flow';
 import { watchFirebaseWebsocket, firebaseWebsocketIsBlocked, FIREBASE_WEBSOCKET_BLOCKED_TEXT } from './firebase-websocket-observation';
 
@@ -147,24 +149,29 @@ export function probeDatabaseLiveness(reason?) {
     if (firebaseState.dbLivenessProbe) return firebaseState.dbLivenessProbe;
     if (!databaseLivenessProbeAllowed()) return Promise.resolve(null);
     const probeDb = firebaseState.db;
+    const probeSdk = firebaseState.fb;
+    const probeConnectionRef = firebaseState.dbRefConnected;
+    const probeTransportEpoch = typeof probeSdk.connectionEpoch === 'function' ? probeSdk.connectionEpoch(probeConnectionRef) : null;
     const probeAuthEpoch = firebaseState.authGeneration;
     const generation = firebaseState.infoListenerGeneration;
     const probe = new Promise((resolve) => {
         const timer = setTimeout(() => resolve(false), DB_LIVENESS_PROBE_TIMEOUT_MS);
         const answered = (alive) => { clearTimeout(timer); resolve(alive); };
         let started = null;
-        try { started = firebaseState.fb.get(firebaseState.fb.ref(probeDb, DB_LIVENESS_PROBE_PATH)); } catch (e) { answered(null); return; }
+        try { started = probeSdk.get(probeSdk.ref(probeDb, DB_LIVENESS_PROBE_PATH)); } catch (e) { answered(null); return; }
         Promise.resolve(started).then(() => answered(true), (error) => answered(
             /^(?:database\/)?permission_denied$/i.test(String(error && (error.code || error.message) || '')) ? true : null
         ));
     }).then((alive) => {
         if (firebaseState.dbLivenessProbe === probe) firebaseState.dbLivenessProbe = null;
-        if (firebaseState.db !== probeDb || firebaseState.infoListenerGeneration !== generation || firebaseState.authGeneration !== probeAuthEpoch) return null;
+        if (firebaseState.db !== probeDb || firebaseState.fb !== probeSdk || firebaseState.infoListenerGeneration !== generation || firebaseState.authGeneration !== probeAuthEpoch) return null;
+        if (probeTransportEpoch !== null && probeSdk.connectionEpoch(probeConnectionRef) !== probeTransportEpoch) return null;
         if (alive === null) return null;
         if (alive) {
             firebaseState.lastDbLivenessOkAt = Date.now();
             return true;
         }
+        if (dbListenerPendingPaths.size) return null;
         noteDatabaseLinkUnresponsive(reason);
         return false;
     });
@@ -282,16 +289,63 @@ export function attachInfoListeners() {
     detachInfoListeners();
     if (!firebaseState.db || !firebaseState.fb || !firebaseState.dbRefConnected || !firebaseState.dbRefServerTimeOffset) return false;
     const listenerGeneration = ++firebaseState.infoListenerGeneration;
+    const database = firebaseState.db;
+    const sdk = firebaseState.fb;
+    const native = sdk.__supabase !== true;
+    let timeSyncPending = false;
+    let activationClockSample = null;
+    const retryActivationWithSample = (sample) => {
+        if (sample === activationClockSample) return;
+        activationClockSample = sample;
+        void retryPendingActivation();
+    };
+    const current = () => listenerGeneration === firebaseState.infoListenerGeneration && database === firebaseState.db && sdk === firebaseState.fb;
+    const acceptVerifiedTime = (library) => {
+        if (!current() || library !== window.ZoeLicense || typeof library?.getServerTimeSample !== 'function'
+            || typeof library.getServerTimeGeneration !== 'function') return false;
+        const sample = library.getServerTimeSample();
+        if (!sample || !Object.isFrozen(sample) || !['nonce', 'http-date'].includes(sample.source)
+            || !Number.isSafeInteger(sample.generation) || sample.generation < 0
+            || sample.generation !== library.getServerTimeGeneration()
+            || !Number.isSafeInteger(sample.observation) || sample.observation <= 0
+            || !Number.isFinite(sample.uncertaintyMs) || sample.uncertaintyMs < 0) return false;
+        if (!acceptServerClockOffset(sample.epochMs - sample.wallMs, sample, false)) return false;
+        retryActivationWithSample(sample);
+        if (firebaseState.sessionExpiryCheck === 'unverified') void runSessionExpiryCheck();
+        return true;
+    };
+    const syncVerifiedTime = async () => {
+        const library = window.ZoeLicense;
+        if (!current() || timeSyncPending || typeof library?.syncServerTime !== 'function'
+            || typeof library.getServerTimeGeneration !== 'function') return;
+        timeSyncPending = true;
+        try {
+            library.getServerTimeGeneration();
+            const synced = await library.syncServerTime({ priority: true });
+            if (!synced || !current() || library !== window.ZoeLicense) return;
+            acceptVerifiedTime(library);
+        } catch (e) {} finally { timeSyncPending = false; }
+    };
+    const observeNativeTime = () => {
+        try { acceptVerifiedTime(window.ZoeLicense); } catch (e) {}
+        serverClockIsTrustworthy();
+    };
+    setServerClockRefresh(() => {
+        if (!current() || (navigator.onLine as boolean) === false) return;
+        if (native) void syncVerifiedTime();
+        else forceDatabaseReconnect();
+    });
     infoListenerFailedPaths.clear();
     infoListenerFailedPaths.add(INFO_LISTENER_KEY_CONNECTED);
     infoListenerFailedPaths.add(INFO_LISTENER_KEY_OFFSET);
 
     firebaseState.fb.onValue(firebaseState.dbRefConnected, (snap) => {
-        if (listenerGeneration !== firebaseState.infoListenerGeneration) return;
+        if (!current()) return;
         noteInfoListenerAlive(INFO_LISTENER_KEY_CONNECTED);
         firebaseState.isDatabaseConnected = snap.val() === true;
         if (firebaseState.isDatabaseConnected) {
             firebaseState.hasEverConnectedToDatabase = true;
+            if (native) observeNativeTime();
             firebaseState.lastDbLivenessOkAt = Date.now();
             clearReconnectWatchdog();
             retryFailedDbListenersNow();
@@ -304,22 +358,24 @@ export function attachInfoListeners() {
         }
         renderConnectionStatus();
     }, (err) => {
-        if (listenerGeneration !== firebaseState.infoListenerGeneration) return;
+        if (!current()) return;
         handleInfoListenerError(err, INFO_LISTENER_KEY_CONNECTED);
     });
 
     firebaseState.fb.onValue(firebaseState.dbRefServerTimeOffset, (snap) => {
-        if (listenerGeneration !== firebaseState.infoListenerGeneration) return;
+        if (!current()) return;
         noteInfoListenerAlive(INFO_LISTENER_KEY_OFFSET);
+        if (native) { observeNativeTime(); return; }
         const val = snap.val();
-        if (typeof val !== 'number' || !serverClockOffsetIsFromServer(val)) return;
-        firebaseState.serverTimeOffsetMs = val;
-        firebaseState.serverClockTrusted = true;
-        if (window.ZoeLicense) window.ZoeLicense.setServerTimeOffset(val);
+        if (!snap.serverClockSample || !acceptServerClockOffset(val, snap.serverClockSample, false)) return;
+        if (typeof window.ZoeLicense?.setServerTimeSample === 'function') window.ZoeLicense.setServerTimeSample(snap.serverClockSample);
+        retryActivationWithSample(snap.serverClockSample);
+        if (firebaseState.sessionExpiryCheck === 'unverified') void runSessionExpiryCheck();
     }, (err) => {
-        if (listenerGeneration !== firebaseState.infoListenerGeneration) return;
+        if (!current()) return;
         handleInfoListenerError(err, INFO_LISTENER_KEY_OFFSET);
     });
 
+    if (native) observeNativeTime();
     return true;
 }

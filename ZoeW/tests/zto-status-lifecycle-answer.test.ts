@@ -33,7 +33,7 @@ it.each([['restored', true], ['restored', false], ['unchanged', true], ['unchang
     firebaseState.db = { name: 'test', app: { options } } as any;
     firebaseState.fb = mem.sdk as any;
     firebaseState.serverTimeOffsetMs = 0;
-    firebaseState.serverClockTrusted = true;
+    firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live';
     firebaseState.isDatabaseConnected = true;
     firebaseState.isDatabaseInitialized = true;
     firebaseState.isInitializingFirebase = false;

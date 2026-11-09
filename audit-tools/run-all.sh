@@ -13,8 +13,15 @@
 #   RUNALL_SHARD=k/n       រត់តែផ្នែកទី k ក្នុង n (CI ៖ job ស្របគ្នាលើ runner ច្រើន · ផ្នែកទាំង n រួមគ្នា = បញ្ជីពេញ)
 #   CHECKER_TIMEOUT=N     កំណត់ដោយផ្ទាល់សម្រាប់គ្រប់ checker; លំនាំដើម 300s, money matrix RTDB 2400s / Supabase 3000s
 RUNALL_CALLER_PWD="$PWD"
+BASE="${1:-}"
+if [ "$#" -gt 0 ]; then
+    case "$BASE" in ''|/*) ;; *) BASE="$RUNALL_CALLER_PWD/$BASE" ;; esac
+    if [ -z "$BASE" ] || [ ! -d "$BASE" ] || ! BASE="$(cd -- "$BASE" 2>/dev/null && pwd -P)"; then
+        echo "*** FAIL *** baseline ត្រូវជាថតដែលមានពិត និងអាចចូលបានពីថតអ្នកហៅ"
+        exit 2
+    fi
+fi
 cd "$(dirname "$0")/.." || exit 1
-BASE="$1"
 IMPORTPAIRED_BASE_SOURCE="${IMPORTPAIRED_BASE_SOURCE:-$BASE}"
 
 # ── ZoeW React ៖ checker វាស់ «root វាស់» មិនមែនប្រភព ─────────────────────────

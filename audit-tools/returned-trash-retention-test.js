@@ -113,7 +113,7 @@ function build(items, ledgerDays, ledgerMonths, exitState = 'failed') {
         activeRestoreClaims: new Map(),
         isActiveRestoreClaim: (claim) => !!(claim && NOW - claim.claimedAt < 2 * 60 * 1000),
         collectItemBarcodes: (item) => (item.barcodes || []).map((barcode) => barcode.code),
-        // ⛔ 2.50.49 ៖ purge លុបសោដក `ded/<trashId>` ជាមួយ ➜ `cleanupLedgerKeyOf()` ពិត (ផ្ទុកខាងក្រោម) · អ្នកដោះសោកត់ទុកតែប៉ុណ្ណោះ
+        // កត់ការប៉ុនប៉ងច្រកចាស់ ដើម្បីបដិសេធការលុប receipt ក្រោយ purge។
         releaseCleanupLedgerKeys: async (list) => { (list || []).forEach((c) => { if (c && c.ledgerKey) log.releasedKeys.push(c.id + '@' + c.ledgerKey.scanDate); }); },
         dailyRevenueData: JSON.parse(JSON.stringify(ledgerDays || {})),
         getFormattedDate: () => '2027-01-15',
@@ -156,7 +156,6 @@ function build(items, ledgerDays, ledgerMonths, exitState = 'failed') {
         balancedFunction('ledgerMonthTrimmed'),
         optionalFunction('cleanupEventAt', 'function cleanupEventAt() { return 0; }'),
         optionalFunction('cleanupScanDateOf', 'function cleanupScanDateOf(item) { return item && item.scanDate; }'),
-        optionalFunction('cleanupLedgerKeyOf', 'function cleanupLedgerKeyOf() { return null; }'),
         ...['elapsedSince', 'itemHasRestoreMarkers', 'recalcItemMoneyFromBarcodes', 'readRestoreServerNode'].map(balancedFunction),
         constant('PURGE_DEDUCTION_RETRY_MS'),
         constant('PURGE_DEDUCTION_RETRY_MAX_MS'),
@@ -211,7 +210,6 @@ function build(items, ledgerDays, ledgerMonths, exitState = 'failed') {
     check(vm.runInContext('__retention({})', world.context) === 30 * DAY,
         'ទិន្នន័យ legacy មិនត្រូវសន្មត់ថា returned');
 
-    const hasKeyFnEarly = /function cleanupLedgerKeyOf\(/.test(source);
     await world.context.__run();
     const remaining = world.context.__items().map((item) => item.id).sort();
     const purged = world.log.batches.flat().sort();
@@ -249,14 +247,14 @@ function build(items, ledgerDays, ledgerMonths, exitState = 'failed') {
     check(UNSETTLED.every(id => settledPurged.includes(id)) && ['EU', 'RU', 'RF', 'EX'].every(code => settled.log.releasedBarcodes.includes(code))
         && settled.log.exits.length === 3,
         'ផ្លូវចេញ ៖ ការដកចុះ (receipt ថ្ងៃ + ខែ `at` = `deletedAt`) ➜ purge copy ហើយដោះ registry ក្នុង cycle ដដែល', { settledPurged, exits: settled.log.exits.length });
-    check(!hasKeyFnEarly || ['returned_otherkey_unsettled@2027-01-05', 'returned_unsettled@2027-01-05'].every(key => settled.log.releasedKeys.includes(key))
-        && !settled.log.releasedKeys.some(key => key.startsWith('remove_unsettled')),
-        'ផ្លូវចេញ ៖ purge ដោះសោ `ded` ថ្ងៃតែរបស់ returned (ដូចផ្លូវធម្មតា)', settled.log.releasedKeys);
+    check(settled.log.releasedKeys.length === 0 && UNSETTLED.every(id =>
+        settled.store.zoew_daily_revenue_cod_dod['2027-01-05'].ded?.[id]?.at === seed.find(item => item.id === id).deletedAt),
+        'ផ្លូវចេញ ៖ purge រក្សា receipt ថ្ងៃរបស់ការដកដែលបានបញ្ជាក់', settled.log.releasedKeys);
     check(purged.includes('returned_receipted') && world.log.releasedBarcodes.includes('ER'),
         'receipt ថ្ងៃ និងខែដែល `at` ត្រូវ = ការកាត់ដល់ ➜ purge បានទោះ flag មិនទាន់ flip', purged);
     check(!world.log.toasts.some((message) => message.includes('ធុងសំរាមចាស់ខ្លះ')),
         'ការរង់ចាំការកាត់មិនបង្ហាញ toast រៀងរាល់ cycle', world.log.toasts);
-    // ⛔ សោដកដោះតែរបស់ព្រឹត្តិការណ៍ដដែល (`at` = `deletedAt`) របស់ធុងសំរាម `returned` ដែល purge ពិត · សោដែល `at` ផ្សេង (ព្រឹត្តិការណ៍មុន) និង `pickup` មិនប៉ះ
+    // រក្សា deduction receipt ក្រោយ purge ព្រោះ trash ID និង timestamp អាចប្រើឡើងវិញក្នុងជំនាន់ថ្មី។
     check(purged.every(id => world.store.zoew_trash_consumptions?.[id]?.kind === 'purge'
         && world.store.zoew_trash_consumptions[id].sourceId === id),
         'actual atomic purge writes a consumption witness for every removed source');
@@ -266,10 +264,10 @@ function build(items, ledgerDays, ledgerMonths, exitState = 'failed') {
     await invalid.context.__run();
     check(invalid.store.zoew_recently_deleted_cod_dod.invalid_count && invalid.store.zoew_barcode_registry.INVALID === true
         && invalid.log.batches.length === 0, 'malformed purge basis stays held without deleting source or registry');
-    const hasKeyFn = /function cleanupLedgerKeyOf\(/.test(source);
-    check(!hasKeyFn || JSON.stringify(world.log.releasedKeys.slice().sort()) === JSON.stringify(['returned_old@2027-01-05', 'returned_receipted@2027-01-05']),
-        'purge ➜ ដោះសោដក `ded` តែរបស់ returned ដែល purge ពិត ហើយ `at` ត្រូវ (មិនមែន at ផ្សេង · មិនមែន pickup)', world.log.releasedKeys);
-    check(!hasKeyFn || purged.includes('returned_otherkey'), 'សោ `at` ផ្សេង មិនរារាំង purge របស់ធុងសំរាម', purged);
+    check(world.log.releasedKeys.length === 0
+        && JSON.stringify(world.store.zoew_daily_revenue_cod_dod) === JSON.stringify(ledgerDays),
+        'purge រក្សា deduction receipts ទាំងអស់ និងមិនប៉ះចំណូលថ្ងៃ', world.store.zoew_daily_revenue_cod_dod);
+    check(purged.includes('returned_otherkey'), 'សោ `at` ផ្សេង មិនរារាំង purge របស់ធុងសំរាម', purged);
 
     for (const gate of ['session', 'clock']) {
         const held = build([{ id: 'held_' + gate, trashReason: 'returned', deletedAt: NOW - 3 * DAY,

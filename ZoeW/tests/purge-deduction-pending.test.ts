@@ -3,7 +3,7 @@ import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
 import { pendingRegistryReleases, resetServerClock } from '../src/core/clock';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { noteCleanupJournalEntry, PURGE_DEDUCTION_RETRY_MS, purgeDeductionWaits, readCleanupJournal, resumeCleanupJournalEntry, runAutomaticDeletedCleanup } from '../src/domain/cleanup';
-import { activeRestoreClaims, executePermanentDelete, restoreCancellationInFlight, restoreInFlight, restoreRecoveryHolds } from '../src/features/restore';
+import { activeRestoreClaims, executePermanentDelete, restoreCancellationInFlight, restoreInFlight, restoreLedgerKeyFor, restoreRecoveryHolds } from '../src/features/restore';
 import { resetZtoFinalMarks } from '../src/features/zto-final-marks';
 import { ztoPickupStatus } from '../src/features/zto-status';
 import { purgeTrashWithRegistry } from '../src/services/registry-purge';
@@ -48,8 +48,8 @@ function arrange(reason: string, deducted: boolean, receipts: 'none' | 'daily' |
     const source = trashItem(reason, deducted);
     const ded = { source: { at: deletedAtOf(reason), cod: 7, dod: 2, count: 1 } };
     store = { [H]: {}, [T]: { source }, [R]: { [CODE]: true },
-        [D]: { [DAY]: { codDollar: 7, dodDollar: 2, totalCount: 1, ...(receipts === 'daily' || receipts === 'both' ? { ded } : {}) } },
-        [M]: { '2026-10': { codDollar: 7, dodDollar: 2, totalCount: 1, ...(receipts === 'monthly' || receipts === 'both' ? { ded } : {}) } } };
+        [D]: { [DAY]: { codDollar: 7, dodDollar: 2, totalCount: 1, ...(receipts === 'daily' || receipts === 'both' ? { ded: clone(ded) } : {}) } },
+        [M]: { '2026-10': { codDollar: 7, dodDollar: 2, totalCount: 1, ...(receipts === 'monthly' || receipts === 'both' ? { ded: clone(ded) } : {}) } } };
     dataState.deletedItems = [clone(source)];
     dataState.dailyRevenueData = clone(store[D]); dataState.monthlyRevenueData = clone(store[M]);
 }
@@ -114,7 +114,7 @@ for (const reason of ['returned', 'remove']) {
         await runAutomaticDeletedCleanup();
         const ded = { at: deletedAtOf(reason), cod: 7, dod: 2, count: 1 };
         expect({ day: totals(at(D + '/' + DAY)), month: totals(at(M + '/2026-10')), dayKey: at(D + '/' + DAY + '/ded/source'), monthKey: at(M + '/2026-10/ded/source') })
-            .toEqual({ day: [0, 0, 0], month: [0, 0, 0], dayKey: reason === 'returned' ? null : ded, monthKey: ded });
+            .toEqual({ day: [0, 0, 0], month: [0, 0, 0], dayKey: ded, monthKey: ded });
         expect({ copy: at(T + '/source'), purges: purgeWrites, view: dataState.deletedItems.length }).toEqual({ copy: null, purges: 1, view: 0 });
         await runAutomaticDeletedCleanup();
         expect([totals(at(D + '/' + DAY)), totals(at(M + '/2026-10'))], 'ដកតែម្តង').toEqual([[0, 0, 0], [0, 0, 0]]);
@@ -295,4 +295,61 @@ it('purge ចាស់មិនបន្តក្រោយនាឡិកា Syn
     expect(interrupted).toBe(true);
     expect(purgeWrites).toBe(0);
     expect(at(T + '/source')).not.toBeNull();
+});
+
+it.each([true, false])('ការ purge ជំនាន់ចាស់មិនលុប receipt របស់ trash ID ដែលប្រើឡើងវិញ · deletedAt ដូចគ្នា=%s', async sameAt => {
+    arrange('returned', true, 'both');
+    const original = at(T + '/source');
+    original.trashGeneration = 1;
+    put(T + '/source', original);
+    dataState.deletedItems = [clone(original)];
+    const fresh = { ...original, createdAt: NOW, deletedAt: sameAt ? original.deletedAt : NOW, trashGeneration: 2,
+        cod: 9, dod: 3, price: 12, barcode: 'NEW-LIFECYCLE',
+        barcodes: [{ ...original.barcodes[0], code: 'NEW-LIFECYCLE', createdAt: NOW, cod: 9, dod: 3 }] };
+    const freshDed = { at: fresh.deletedAt, cod: 9, dod: 3, count: 1 };
+    const update = firebaseState.fb.update;
+    firebaseState.fb.update = async (target: any, patch: Record<string, any>) => {
+        await update(target, patch);
+        if (purgesSource(patch, 'source')) {
+            // ឧបករណ៍ B បញ្ចប់ជំនាន់បន្ទាប់ មុនឧបករណ៍ A បន្តការបោសក្រោយ purge។
+            put(T + '/source', fresh);
+            put(R + '/NEW-LIFECYCLE', true);
+            put(D + '/' + DAY + '/ded/source', freshDed);
+            put(M + '/2026-10/ded/source', freshDed);
+            dataState.deletedItems = [clone(fresh)];
+        }
+    };
+    await runAutomaticDeletedCleanup();
+    expect(purgeWrites).toBe(1);
+    expect(at(T + '/source')).toEqual(fresh);
+    expect(dataState.deletedItems).toEqual([fresh]);
+    expect(at(D + '/' + DAY + '/ded/source')).toEqual(freshDed);
+    expect(at(M + '/2026-10/ded/source')).toEqual(freshDed);
+    const deltas: any[] = [];
+    await restoreLedgerKeyFor(fresh, 'source', deltas);
+    expect(deltas).toEqual([{ scanDate: DAY, bucket: 'daily', cod: 9, dod: 3, count: 1 }, { scanDate: DAY, bucket: 'monthly', cod: 9, dod: 3, count: 1 }]);
+});
+
+it('purge បញ្ចប់ដោយរក្សា deduction receipt ដើម ទោះ metadata write មិនអាចប្រើបាន', async () => {
+    arrange('returned', true, 'both');
+    const expectedDay = clone(at(D + '/' + DAY));
+    const expectedMonth = clone(at(M + '/2026-10'));
+    const update = firebaseState.fb.update;
+    const transaction = firebaseState.fb.runTransaction;
+    let metadataWrites = 0;
+    firebaseState.fb.update = async (target: any, patch: Record<string, any>) => {
+        if (Object.keys(patch).some(path => path.includes('/ded/'))) { metadataWrites++; throw new Error('unsafe metadata pruning'); }
+        return update(target, patch);
+    };
+    firebaseState.fb.runTransaction = (target: any, callback: any) => {
+        if (target.path.includes('/ded/')) { metadataWrites++; return Promise.reject(new Error('unsafe metadata pruning')); }
+        return transaction(target, callback);
+    };
+    await runAutomaticDeletedCleanup();
+    expect(purgeWrites).toBe(1);
+    expect(at(T + '/source')).toBeNull();
+    expect(dataState.deletedCleanupInFlight).toBe(false);
+    expect(at(D + '/' + DAY)).toEqual(expectedDay);
+    expect(at(M + '/2026-10')).toEqual(expectedMonth);
+    expect(metadataWrites).toBe(0);
 });

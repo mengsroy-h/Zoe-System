@@ -2,7 +2,7 @@ import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
 import { getServerNow, resetServerClock } from '../src/core/clock';
-import { beginCleanupOperation, releaseCleanupOperation, claimAndCleanupItem, claimCleanupTrashSlot, cleanupInFlight, cleanupJournalLive, cleanupLedgerKeyOf, cleanupPartialTrashId, markCleanupJournalLive, noteCleanupJournalEntry, readCleanupJournal, releaseCleanupJournalLive, resumeCleanupJournalEntry } from '../src/domain/cleanup';
+import { beginCleanupOperation, releaseCleanupOperation, claimAndCleanupItem, claimCleanupTrashSlot, cleanupInFlight, cleanupJournalLive, cleanupPartialTrashId, markCleanupJournalLive, noteCleanupJournalEntry, readCleanupJournal, releaseCleanupJournalLive, resumeCleanupJournalEntry } from '../src/domain/cleanup';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { ABANDON_AGE_MS, TWO_HOURS_MS } from '../src/features/session';
 import { CLEANUP_JOURNAL_KEY } from '../src/core/storage-keys';
@@ -654,8 +654,7 @@ describe('cleanupPartialTrashId ៖ one claim = one trash id on every device · 
         const trash: any = trashCopiesOf('A')[0];
         expect(trash.id.startsWith('id_')).toBe(true);
         expect(getAt(DAILY + '/' + DAY).ded[trash.id].at).toBe(trash.deletedAt);
-        dataState.dailyRevenueData = clone(getAt(DAILY));
-        expect(cleanupLedgerKeyOf(trash)).toEqual({ scanDate: DAY });
+        expect(getAt(MONTHLY)[MONTH].ded[trash.id]).toEqual(getAt(DAILY + '/' + DAY).ded[trash.id]);
     }, 20000);
 });
 

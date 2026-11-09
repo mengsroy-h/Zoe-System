@@ -596,11 +596,18 @@ export function ledgerDeltaIntent(bucket, key, cod, dod, count, companion?) {
     return intent;
 }
 
+function captureLedgerSession() {
+    const operationDb = firebaseState.db;
+    const operationAuth = firebaseState.authGeneration;
+    return () => firebaseState.db === operationDb && firebaseState.authGeneration === operationAuth;
+}
+
 export function commitDailyRevenueDelta(scanDateStr, codToAdd, dodToAdd, countToAdd, appliedDelta, serverOnly?, companion?) {
+    const operationIsCurrent = captureLedgerSession();
     const applied = appliedDelta || { cod: ledgerNumber(codToAdd), dod: ledgerNumber(dodToAdd), count: ledgerNumber(countToAdd) };
     const recordRef = serverOnly ? null : dataState.dailyRevenueData[scanDateStr];
     const rollbackMemory = () => {
-        if (recordRef && dataState.dailyRevenueData[scanDateStr] === recordRef && !ledgerMemoryCompensationClaimed(applied)) {
+        if (operationIsCurrent() && recordRef && dataState.dailyRevenueData[scanDateStr] === recordRef && !ledgerMemoryCompensationClaimed(applied)) {
             revertLedgerRecordInMemory(recordRef, applied);
             refreshCurrentHistoryView();
         }
@@ -624,22 +631,23 @@ export function commitDailyRevenueDelta(scanDateStr, codToAdd, dodToAdd, countTo
         if (result && result.committed && result.txAppliedDelta) return result.txAppliedDelta;
         if (!result || !result.committed || !serverBefore || !serverAfter) {
             rollbackMemory();
-            showToast("⚠️ បរាជ័យក្នុងការ Save Daily Revenue!");
+            if (operationIsCurrent()) showToast("⚠️ បរាជ័យក្នុងការ Save Daily Revenue!");
             return null;
         }
         return ledgerAppliedDelta(serverBefore, serverAfter);
     }, (error) => {
         rollbackMemory();
-        showToast("⚠️ បរាជ័យក្នុងការ Save Daily Revenue!");
+        if (operationIsCurrent()) showToast("⚠️ បរាជ័យក្នុងការ Save Daily Revenue!");
         return ledgerRejectionVerdict(error);
     });
 }
 
 export function commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd, appliedDelta, serverOnly?, companion?) {
+    const operationIsCurrent = captureLedgerSession();
     const applied = appliedDelta || { cod: ledgerNumber(codToAdd), dod: ledgerNumber(dodToAdd), count: ledgerNumber(countToAdd) };
     const recordRef = serverOnly ? null : dataState.monthlyRevenueData[ymKey];
     const rollbackMemory = () => {
-        if (recordRef && dataState.monthlyRevenueData[ymKey] === recordRef && !ledgerMemoryCompensationClaimed(applied)) {
+        if (operationIsCurrent() && recordRef && dataState.monthlyRevenueData[ymKey] === recordRef && !ledgerMemoryCompensationClaimed(applied)) {
             revertLedgerRecordInMemory(recordRef, applied);
         }
     };
@@ -664,7 +672,7 @@ export function commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd,
         if (result && result.committed && result.txAppliedDelta) return result.txAppliedDelta;
         if (!result || !result.committed || !serverBefore || !serverAfter) {
             rollbackMemory();
-            showToast("⚠️ បរាជ័យក្នុងការ Save Monthly Revenue!");
+            if (operationIsCurrent()) showToast("⚠️ បរាជ័យក្នុងការ Save Monthly Revenue!");
             return null;
         }
         const storedMonths = result.snapshot ? result.snapshot.val() : null;
@@ -673,7 +681,7 @@ export function commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd,
         return ledgerAppliedDelta(serverBefore, storedMonth);
     }, (error) => {
         rollbackMemory();
-        showToast("⚠️ បរាជ័យក្នុងការ Save Monthly Revenue!");
+        if (operationIsCurrent()) showToast("⚠️ បរាជ័យក្នុងការ Save Monthly Revenue!");
         return ledgerRejectionVerdict(error);
     });
 }

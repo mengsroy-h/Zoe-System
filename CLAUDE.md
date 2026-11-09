@@ -79,8 +79,8 @@ are evidence about that session; resolve today's authorization from the active c
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.190` (`zoew-v454`) | `zoew` |
-| **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes · devices per shop) · **separate Firebase project** | `2.24.37` (`zoekeygen-v148`) | `zoekeygen` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.191` (`zoew-v455`) | `zoew` |
+| **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes · devices per shop) · **separate Firebase project** | `2.24.38` (`zoekeygen-v149`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
   and builds to `ZoeW/dist/`. Where this file says `ZoeW/app.js` · `index.html` · `sw.js`, the code is `src/**` · JSX ·
@@ -757,6 +757,7 @@ pickedUpPhones   = count per value        ← derived mirror
 - Before the first cleanup debit, capture authoritative server witnesses and verify the intent is durably journaled. Never refresh prior witnesses during ledger recovery; keep unresolved entries across restarts, cap the stored retry counter and suppress repeated warnings rather than clearing unproven work. Later resume events may retry; this is not a total-attempt ceiling or backoff. Guard: `ZoeW/tests/three-device-recovery.test.ts`.
 - Cleanup receipts record the actual clamped COD, DOD and count separately in daily and monthly buckets. Restore reads both authoritative receipts, matches the lifecycle stamp, and credits each bucket only its own applied deduction; a completed receipt credits zero on replay.
 - Trash requiring deduction proof must remain held when either receipt is absent or pruned; never reconstruct proof from parcel face values.
+- Purging a trash row does not authorize deleting its ledger deduction proof. Reused IDs and equal timestamps do not prove generation ownership; retain the proof until an atomic generation-bound retirement contract exists. Guard: `ZoeW/tests/purge-deduction-pending.test.ts`.
 - Deploy receipt-accepting Business rules and Supabase migrations before releasing the client, and require every client to update before relying on monthly proof: old writers may erase it. Never treat a partial client rollout as protocol safety.
 
 Tools: `ledger-clamp-symmetry-test` · `ledger-failed-apply-revert-test` · `emu/ledger-revert-emu-test` ·
@@ -1410,6 +1411,7 @@ Scan Management ➜ Arrival Scan ➜ a Waybill (`POST https://aargus-api.ztoglob
 - SheetJS is vendored (`ZoeW/public/vendor/xlsx.full.min.js`) ⛔ no CDN ⛔ no plaintext `IMPORT_PASSWORD` in storage.
 - `zto-import/` (standalone, writes) and `zto-import/google-sheets-api/` (bound, reads) are separate projects with separate
   `CacheService`; `Code.gs` fails closed without ScriptProperty `API_KEY`.
+- Folder imports persist a destination-scoped file intent before effects. Pending, unknown or corrupt receipts never replay; completed imports retry movement only. Retire completed markers only after confirmed movement away, and preserve unresolved evidence. Modification time, script versions and elapsed time cannot authorize another import. Guard: `zto-import/test.js`.
 - PDF export uses browser print-to-PDF ⛔ no jsPDF (can't shape Khmer).
 - Phones and barcodes are TEXT: `XLSX.writeFile(..., { bookSST: true })` + `forceExportTextCells()`
   (`EXPORT_TEXT_COLUMN_INDEXES = [1, 2]`); check the emitted XML.

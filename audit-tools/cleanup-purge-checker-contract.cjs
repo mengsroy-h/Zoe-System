@@ -75,7 +75,7 @@ async function cleanupPurgeOwnerContract(source, currentSource) {
         vm.createContext(context);
         const work = vm.runInContext(currentSource + '\n' + source + '\nrunAutomaticDeletedCleanup();', context, { timeout: 1000 });
         const completed = await Promise.race([Promise.resolve(work).then(() => true), new Promise(resolve => { timer = setTimeout(() => resolve(false), 1000); })]);
-        return completed && valid && calls === 2 && settled === 1 && released === 1
+        return completed && valid && calls === 2 && settled === 1 && released === 0
             && data.deletedItems.length === 0 && !data.deletedCleanupInFlight && context.deletedCleanupOwner === null;
     } catch (_) { return false; }
     finally { clearTimeout(timer); }

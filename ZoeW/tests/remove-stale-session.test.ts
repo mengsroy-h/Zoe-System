@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../src/core/state';
 import { removeSingleBarcode } from '../src/features/barcode-ops';
 import { confirmScannedRemoval } from '../src/features/scan-remove';
-import { cleanupInFlight, cleanupJournalLive } from '../src/domain/cleanup';
+import { cleanupInFlight, cleanupJournalLive, readCleanupJournal } from '../src/domain/cleanup';
 
 const DAY = '2026-10-07';
 type Pending = { path: string; fn: any; resolve: (v: any) => void };
@@ -174,5 +174,56 @@ describe('U1 ៖ remove mode is never left locked by a removal that leaves no la
         const result = await run;
         expect({ result, lock: uiState.scanRemoveInFlight, moved: dataState.scanHistory[0].barcodes.map((b: any) => b.code) })
             .toEqual({ result: true, lock: null, moved: ['ZTX0002'] });
+    });
+});
+
+describe('ការឆ្លើយ trash ចាស់មិនលុបទិដ្ឋភាពហាងថ្មី', () => {
+    it('វគ្គដដែល៖ trash write បរាជ័យ ស្ដារកញ្ចប់ដើមវិញដោយមិនកាត់លុយ', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const originalTransaction = firebaseState.fb.runTransaction;
+        let rejectTrash!: (reason: any) => void;
+        firebaseState.fb.runTransaction = (ref: any, fn: any) => String(ref.path).startsWith('zoew_recently_deleted_cod_dod/')
+            ? new Promise((_resolve, reject) => { rejectTrash = reject; }) : originalTransaction(ref, fn);
+        const running = removeSingleBarcode('item1', 'ZTX0001');
+        await flush(20);
+        expect(dataState.deletedItems).toHaveLength(1);
+        rejectTrash(Object.assign(new Error('trash write refused'), { noRetry: true }));
+        await flush(30);
+        expect(await running).toBe('failed');
+        expect(dataState.scanHistory[0].barcodes.map((entry: any) => entry.code).sort()).toEqual(['ZTX0001', 'ZTX0002']);
+        expect(dataState.deletedItems).toEqual([]);
+        expect(ledgerPending).toHaveLength(0);
+        expect(ledgerDocs.zoew_daily_revenue_cod_dod[DAY]).toEqual({ codDollar: 8, dodDollar: 0, totalCount: 2 });
+        expect(ledgerDocs.zoew_monthly_revenue_cod_dod['2026-10']).toEqual({ codDollar: 8, dodDollar: 0, totalCount: 2 });
+        expect(readCleanupJournal()).toEqual([]);
+    });
+    it.each([true, false])('រក្សា trash ហាងថ្មីក្រោយ rejection របស់ហាងចាស់ · id ដូចគ្នា=%s', async sameId => {
+        const originalTransaction = firebaseState.fb.runTransaction;
+        let rejectTrash!: (reason: any) => void;
+        let heldPath = '';
+        firebaseState.fb.runTransaction = (ref: any, fn: any) => {
+            if (String(ref.path).startsWith('zoew_recently_deleted_cod_dod/')) {
+                heldPath = ref.path;
+                return new Promise((_resolve, reject) => { rejectTrash = reject; });
+            }
+            return originalTransaction(ref, fn);
+        };
+        const running = removeSingleBarcode('item1', 'ZTX0001');
+        await flush(20);
+        expect(heldPath).toMatch(/^zoew_recently_deleted_cod_dod\//);
+        expect(dataState.scanHistory[0].barcodes.map((entry: any) => entry.code)).toEqual(['ZTX0002']);
+        const nextRow: any = { id: sameId ? heldPath.split('/').at(-1)! : 'new-shop-item', phone: '011000000',
+            scanDate: DAY, createdAt: Date.now(), deletedAt: Date.now(), barcodes: [{ code: 'NEXT-SHOP', cod: 7, dod: 0 }] };
+        firebaseState.authGeneration++;
+        firebaseState.db = { name: 'next-db', app: { options: { databaseURL: 'https://next-shop.firebaseio.com' } } } as any;
+        dataState.deletedItems = [nextRow];
+        const newView = dataState.deletedItems;
+        rejectTrash(Object.assign(new Error('old shop connection closed'), { noRetry: true }));
+        await flush(30);
+        await running;
+        expect(dataState.deletedItems).toBe(newView);
+        expect(dataState.deletedItems).toEqual([nextRow]);
+        expect(ledgerPending).toHaveLength(0);
+        expect(readCleanupJournal().some(entry => entry.trashItem.id === heldPath.split('/').at(-1))).toBe(true);
     });
 });

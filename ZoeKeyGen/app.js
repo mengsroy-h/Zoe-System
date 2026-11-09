@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.37';
+const APP_VERSION = '2.24.38';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -242,6 +242,7 @@ let db = null;
 let authUnsubscribe = null;
 let authRecoveryTimeout = null;
 let authGeneration = 0;
+let keygenLoginOwner = null;
 let sensitiveSessionGeneration = 0;
 let pendingRoleRecheck = false;
 let isDatabaseConnected = false;
@@ -1665,6 +1666,9 @@ function saveFirebaseConfig() {
 
 function showLoginModalWithPrefill() {
     invalidateSensitiveSession();
+    keygenLoginOwner = null;
+    const loginBtn = document.getElementById('loginBtn');
+    if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'ចូលប្រព័ន្ធ'; }
     const losingUncopiedKeypair = hasUncopiedKeypair();
     keypairPrivateCopied = false;
     isGeneratingKey = false;
@@ -1737,6 +1741,19 @@ function showLoginModalWithPrefill() {
     if (rememberCb) rememberCb.checked = !!savedEmail;
 }
 
+function keygenLoginBackendIsReady() {
+    if (isInitializingFirebase || firebaseSdkUnavailable) return false;
+    try {
+        const config = JSON.parse(safeStoreGet(appLocalStore, 'zoew_firebase_config'));
+        const options = auth && auth.app && auth.app.options;
+        return !!(config && options && typeof config.apiKey === 'string' && config.apiKey
+            && typeof config.databaseURL === 'string' && config.databaseURL
+            && FIREBASE_CONFIG_KEYS.every((key) => config[key] === options[key]));
+    } catch (e) {
+        return false;
+    }
+}
+
 async function doLogin() {
     const emailIn = document.getElementById('loginEmailInput');
     const passIn = document.getElementById('loginPasswordInput');
@@ -1744,29 +1761,51 @@ async function doLogin() {
     const email = emailIn ? emailIn.value.trim() : '';
     const password = passIn ? passIn.value : '';
     if (!email || !password) { alert("សូមបញ្ចូលអ៊ីមែល និងពាក្យសម្ងាត់!"); return; }
+    if (!keygenLoginBackendIsReady()) {
+        showToast('⚠️ ការភ្ជាប់ Server មិនទាន់រួចរាល់ — សូមរង់ចាំ ឬ Refresh ទំព័រ។');
+        return;
+    }
 
+    const scope = safeStoreGet(appLocalStore, 'zoew_firebase_config');
+    if (keygenLoginOwner && keygenLoginOwner.auth === auth && keygenLoginOwner.fb === fb
+        && keygenLoginOwner.scope === scope && keygenLoginOwner.generation === authGeneration) return;
+    const owner = { auth: auth, fb: fb, scope: scope, generation: authGeneration };
+    keygenLoginOwner = owner;
+    const isCurrent = () => keygenLoginOwner === owner && auth === owner.auth && fb === owner.fb
+        && safeStoreGet(appLocalStore, 'zoew_firebase_config') === owner.scope && keygenLoginBackendIsReady();
+    const rememberMe = !!(rememberCb && rememberCb.checked);
     const loginBtn = document.getElementById('loginBtn');
-    const originalBtnText = loginBtn ? loginBtn.textContent : '';
+    const originalBtnText = loginBtn && !loginBtn.disabled ? loginBtn.textContent : 'ចូលប្រព័ន្ធ';
     if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = 'កំពុងចូល...'; }
     try {
-        if (!fb || !auth) { fb = await waitForFirebaseSDK(); }
-        const generationAtLogin = authGeneration;
+        if (!owner.fb || !owner.auth) {
+            const loaded = await waitForFirebaseSDK();
+            if (!isCurrent() || authGeneration !== owner.generation) return;
+            owner.fb = loaded;
+            fb = loaded;
+        }
         await enforceSessionOnlyAuthPersistence();
-        const cred = await withTimeout(fb.signInWithEmailAndPassword(auth, email, password), 15000, 'Login timed out');
-        if (rememberCb && rememberCb.checked) appLocalStore.setItem('remembered_email', email);
+        if (!isCurrent() || authGeneration !== owner.generation) return;
+        const cred = await withTimeout(owner.fb.signInWithEmailAndPassword(owner.auth, email, password), 15000, 'Login timed out');
+        if (!isCurrent() || (authGeneration !== owner.generation && (!cred || owner.auth.currentUser !== cred.user))) return;
+        if (rememberMe) appLocalStore.setItem('remembered_email', email);
         else appLocalStore.removeItem('remembered_email');
-        if (authGeneration === generationAtLogin && cred && cred.user) {
+        if (authGeneration === owner.generation && cred && cred.user) {
             authGeneration++;
             verifyAdminRoleThenProceed(cred.user, authGeneration);
         }
     } catch (e) {
+        if (!isCurrent() || authGeneration !== owner.generation) return;
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'doLogin' });
         alert(e && e.message === 'Login timed out'
             ? "អស់ពេល (Timeout)! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត។"
             : "ចូលប្រព័ន្ធមិនបានទេ! សូមពិនិត្យអ៊ីមែល/ពាក្យសម្ងាត់ម្តងទៀត។");
     } finally {
-        if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = originalBtnText; }
-        if (passIn) passIn.value = '';
+        if (keygenLoginOwner === owner) {
+            if (isCurrent() && passIn && passIn.value === password) passIn.value = '';
+            keygenLoginOwner = null;
+            if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = originalBtnText; }
+        }
     }
 }
 

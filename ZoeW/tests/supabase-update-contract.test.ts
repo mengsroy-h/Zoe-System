@@ -116,7 +116,6 @@ const CALLERS: Record<string, string> = {
     'services/zto-shop-sweep.ts#markZtoShopSweep': 'IDEMPOTENT ៖ { activeAt · completeAt } តម្លៃដាច់ខាត ផ្លូវ ≤ ២',
     'services/native-write-recovery.ts#createNativeWriteRecovery': 'BOUNDED ៖ Firebase ប៉ុណ្ណោះ ៖ ការសរសេររបស់អ្នកហៅ + receipt ១ (អ្នកហៅចាត់ថ្នាក់រួច) · purgeReceipts { receipt: null } ≤ NATIVE_RECEIPT_PURGE_MAX',
     'features/restore.ts#finalizeClaimedRestore': 'BOUNDED ៖ របង + ធុងសំរាម + consumption ១ + marker ២ + increment ledger ៣ ក្នុងមួយថ្ងៃ/ខែនៃធាតុមួយ + សោដក ១ ➜ ត្រូវ atomic',
-    'domain/cleanup.ts#releaseCleanupLedgerKeys': 'IDEMPOTENT ៖ { day/ded/id: null } សោដកនៃធុងសំរាមដែល purge រួច · បរាជ័យ ➜ សោនៅសល់ (មិនប៉ះលុយ)',
     'domain/registry.ts#releaseRegistryKeys': 'IDEMPOTENT ៖ { key: null } · ការបរាជ័យ ➜ ជួរ retry ដែលពិនិត្យ registryReleaseVerdict ម្តងទៀត',
     'domain/collected.ts#commitCollectedMarks': 'IDEMPOTENT ៖ { day/key: {c,d} | null } តម្លៃដាច់ខាត · reconcileCollectedHistory() ព្យាបាល',
     'domain/collected.ts#runAutomaticCollectedCleanup': 'IDEMPOTENT ៖ { day: null } ថ្ងៃចាស់',
@@ -192,8 +191,8 @@ describe('SUPABASE-6 ៖ អ្នកហៅ fb.update( គ្រប់កន្�
     });
 
     it.each([
-        ['sdk', 'releaseCleanupLedgerKeys'], ['api', 'releaseCleanupLedgerKeys'],
-        ['sdk', 'cleanupLedgerKeyOf'], ['api', 'cleanupLedgerKeyOf']
+        ['sdk', 'cleanupEventAt'], ['api', 'cleanupEventAt'],
+        ['sdk', 'cleanupScanDateOf'], ['api', 'cleanupScanDateOf']
     ])('mutation ៖ %s.increment ក្នុង %s ត្រូវបានរកឃើញ ហើយមិនទទួលជា BOUNDED', (receiver, caller) => {
         const file = 'domain/cleanup.ts', original = fs.readFileSync(path.join(SRC, file), 'utf8');
         const declaration = original.indexOf('export function ' + caller + '(');

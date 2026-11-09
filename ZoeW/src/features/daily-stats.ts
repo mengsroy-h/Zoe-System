@@ -113,6 +113,7 @@ export function submitManualBarcode() {
 
 export function stopCurrentStream() {
     scanState.cameraRequestId++;
+    scanState.isCameraStarting = false;
     scanState.isCameraScanning = false;
     scanState.nativeLoopActive = false;
     scanState.zxingLoopActive = false;

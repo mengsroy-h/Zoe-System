@@ -4,7 +4,7 @@
 //
 // ⛔ មុនកែ ៖ chunk ស្ថិតក្នុង `CORE_SHELL` ➜ SW ទាញវាពេល install លើ **គ្រប់** ឧបករណ៍ (ហាង Firebase ក៏ទាញ) រាល់ `CACHE_VERSION`។
 // ⛔ ទិសផ្ទុយដែលត្រូវរក្សា ៖ ហាង Supabase បើក **ក្រៅបណ្តាញ** បាន ➜ ពេលប្រើលើកដំបូង chunk ចូល cache · កំណែក្រោយ install វា
-//    **ក្នុងក្រុម install តែមួយ** (មិនរង់ចាំការបើក App លើកក្រោយ) · cache ចាស់មុនកែ (គ្មានសញ្ញាគ្រោងថ្មី) ដែលមាន chunk ➜ រក្សាវា ១ ដង ។
+//    **ក្នុងក្រុម install តែមួយ** (មិនរង់ចាំការបើក App លើកក្រោយ) · ត្រូវមាន backend-use marker ក្នុង cache ដើម្បីបញ្ជាក់ថាឧបករណ៍ប្រើ Supabase ។
 // វាស់លើ Chromium ពិត + `sw.js` ពិត (build) ៖ ទំព័រតេស្តទទេ (មិនមែន App) ចុះឈ្មោះ SW ➜ ការ update ធ្វើត្រាប់ដោយប្តូរ `CACHE_VERSION`
 // ក្នុង `sw.js` ដែល server ផ្តល់ · «ក្រៅបណ្តាញ» = server បិទ socket ។
 'use strict';

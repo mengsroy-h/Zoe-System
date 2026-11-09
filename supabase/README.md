@@ -254,7 +254,7 @@ Lock រង់ចាំអតិបរមា៥វិនាទី និង stat
 
 Environment variables ៖ `SUPABASE_URL` · `SUPABASE_PUBLISHABLE_KEY` ➜ «ទាញបញ្ជីកញ្ចប់ពី ZTO» ស្គាល់សាខារបស់ហាងពី token Supabase (`my_account()`) ·
 «📲 ជូនដំណឹងលើទូរស័ព្ទ» ស្គាល់ហាងពី token ដដែល (ការជូនដំណឹងចងនឹងគណនីហាង)។
-⛔ កុំដាក់ Secret key ក្នុង Netlify។ ការស្កេនធម្មតាមិនត្រូវការ env ទាំងនេះទេ។
+⛔ កុំដាក់ Secret key ក្នុង Netlify។ ការស្កេន/បញ្ចូលដោយដៃ និង Lookup local/Sheet មិនត្រូវការ env Netlify ទាំងនេះទេ។ សម្រាប់ ZTO Lookup របស់ហាង Supabase ដែលកំណត់ `ZTO_DETAIL_IDENTITY=require` ត្រូវមាន `SUPABASE_URL` និង `SUPABASE_PUBLISHABLE_KEY` ដើម្បីផ្ទៀងគណនី; ខ្វះវា ➜ `503 ZTO_CONFIG_INVALID` (`idtoken:supabase-unset`) មុនអាន ZTO។
 ព្រំដែន ZTO proxy, cache សិទ្ធិ និងការសាកច្រើនហាង ➜ [ការរៀបចំ ZTO](../ZoeW/ZTO-SETUP-KH.md#ព្រំដែនពេលបន្ថែមហាង-និងឧបករណ៍)។
 
 ### ជំហានទី ៥ — ហាងដំបូង (ZoeKeyGen)

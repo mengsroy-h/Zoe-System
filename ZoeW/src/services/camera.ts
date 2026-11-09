@@ -18,10 +18,9 @@ export function requestCameraPermission() {
         return;
     }
     warmZtoLookupProxyNow();
-    scanState.isCameraStarting = true;
-
     stopCurrentStream();
     const requestId = scanState.cameraRequestId;
+    scanState.isCameraStarting = true;
 
     const constraints = {
         video: {
@@ -36,7 +35,6 @@ export function requestCameraPermission() {
         .then(stream => {
             if (requestId !== scanState.cameraRequestId) {
                 stream.getTracks().forEach(track => track.stop());
-                scanState.isCameraStarting = false;
                 return;
             }
 
@@ -77,8 +75,8 @@ export function requestCameraPermission() {
             }
         })
         .catch(err => {
-            scanState.isCameraStarting = false;
             if (requestId !== scanState.cameraRequestId) return;
+            scanState.isCameraStarting = false;
             let msg = "មិនអាចបើកកាមេរ៉ាបានទេ៖ សូមពិនិត្យមើលសិទ្ធិកាមេរ៉ា ឬ HTTPS ។";
             if (err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
                 msg = "កាមេរ៉ាត្រូវបានបិទសិទ្ធិ! សូមចូលទៅ Settings > Safari (ឬកម្មវិធីនេះ) ហើយអនុញ្ញាតកាមេរ៉ា រួចព្យាយាមម្តងទៀត។";

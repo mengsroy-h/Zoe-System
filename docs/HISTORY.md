@@ -58,6 +58,7 @@
 
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
+- ⏳ **Deep audit 2026-11-09 · ZoeW 2.50.191 / ZoeKeyGen 2.24.38**៖ branch `audit/deep-audit-20261109` ពី `c30b3f996eaaa04196d5cb4ae851fbc7fdcb9ef2`; ជុំទី១ Audit 1238 និងជុំបន្ត Audit 1239។ ម្ចាស់អនុញ្ញាត commit/push ក្រោយ audit/fix និង local checks; CI strict ៤ shards + ZTO/native evidence លើ SHA ចុងក្រោយត្រូវតាមរហូត terminal state។ Apps Script 6 ត្រូវ owner-reviewed manual rollout; Supabase register ត្រូវ deployment ដាច់ដោយឡែក។ Hosted backends, ZTO និង physical devices នៅ NOT VERIFIED។
 - 🧾 **សកម្មភាពដោយដៃ ជុំ A496–A520**៖ (១) Supabase គ្រប់ project ៖ អនុវត្ត `20261103090000_zoe_tombstone_external_delete.sql` (merge ➜ GitHub integration · ឬ SQL Editor) · (២) Apps Script «ZTO Import» ៖ បិទភ្ជាប់ `Watch.gs` `Code.gs` `Index.html` ថ្មីលើ Sheet សាកល្បងមុន · (៣) Netlify `FIREBASE_PROJECT_IDS` ៖ ធាតុគ្មានសាខា ➜ `projectId:branch` រួចមើល `?diag=1` · (៤) APK លើទូរស័ព្ទពិត ៖ beep ពេលពាក់កាស/Bluetooth មិនលើក volume · 📷 Sign បើកកាមេរ៉ាលើ Android 11+ · (៥) GitHub Actions Backup ៖ run បន្ទាប់គ្មាន `[FAIL]`។
 - 🧾 **សកម្មភាពដោយដៃ F03 (A523–A525)**៖ (១) Supabase គ្រប់ project ៖ អនុវត្ត `20261103230000_zoe_purge_slot_expand.sql` · `20261103230500_zoe_eval_fold.sql` មុន រួច `20261104095910_zoe_rules.sql` (GitHub integration អនុវត្តតាមលំដាប់ឈ្មោះ · SQL Editor ៖ paste តាមលំដាប់ ហើយ `migration repair`) ⛔ កុំអនុវត្ត rules តែឯងមុន migration ពង្រីក ៖ purge ទាំងអស់ (client ចាស់ និងថ្មី) នឹងត្រូវបដិសេធ ហើយឧបករណ៍ជាប់ «សរសេររង់ចាំ» (២) Firebase គ្រប់ project ៖ `node supabase/scripts/generate-rules-sql.mjs` (artifact ស្រាប់) រួច `node tools/firebase-provision/provision.js rules --all --dry-run` លើ project ពិតមួយ (Firebase វាស់ដែន 256 KB និង parser ពិតជាលើកដំបូង) រួច `deploy-rules.cmd` ឬ Console ➜ Rules ➜ paste ខ្លឹមសារ `firebase-database.rules.min.json` ទាំងមូល ➜ Publish (⛔ កុំ paste `firebase-database.rules.json` ៖ 268,935 bytes) (៣) merge ហើយ update ឧបករណ៍ទាំងអស់ភ្លាម ៖ ឧបករណ៍ Firebase ចាស់ purge មិនបានរហូតដល់ update (ធុងសំរាមនៅរង់ចាំលើសរយៈ · permission_denied គ្មាន effect · journal មិនជាប់ · ប្រាក់មិនប្រែ) · ឧបករណ៍ Supabase ចាស់ purge បានដូចមុន។ ឧបករណ៍ចាស់ដែលអាន G មាន certificate (id ធុងសំរាមដែលប្រើឡើងវិញ) ផ្អាក Restore/Delete/cleanup លើ id នោះរហូតដល់ update (fail-safe)។ ⛔ កុំ force reload ឬលុប storage។
 - 🧾 **សកម្មភាពដោយដៃ ជុំ A532–A541**៖ (១) Firebase គ្រប់ project អាជីវកម្ម ៖ Publish `firebase-database.rules.min.json` មុនចេញ App (rules លុបភស្តុតាងចាស់ ៦០ ថ្ងៃ + `.indexOn`) · (២) Supabase គ្រប់ project ៖ `20261105000000_zoe_tombstone_retro_resync.sql` (ឧបករណ៍នីមួយៗទាញពេញម្តង) រួច `20261105010507_zoe_rules.sql` និង `20261105011000_zoe_evidence_candidates.sql` (GitHub integration តាមលំដាប់ឈ្មោះ) · (៣) ផ្ទៀងលើបណ្តាញពិតថា Firebase ភ្ជាប់តាម WebSocket បាន (CSP លែងទទួល JSONP long-polling ➜ បណ្តាញដែលបិទ WebSocket ភ្ជាប់មិនបាន) · (៤) ផ្ទៀង OpenCode លើ thread ដែលមាន comment របស់ bot (App ដែលបានដំឡើង ទទួល · អ្នកក្រៅក្រុម បដិសេធ)។
@@ -121,6 +122,19 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ archive ផ្នែក ៩ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.191] · ZoeKeyGen [2.24.38] — 2026-11-09 · ម្ចាស់កាមេរ៉ា ការងារហាង និងសំណើចូលប្រើ
+
+**ZoeW** (`zoew-v454` ➜ `zoew-v455`) និង **ZoeKeyGen** (`zoekeygen-v148` ➜ `zoekeygen-v149`)។ ការកែទាំងនេះនៅ local branch សម្រាប់ review មិនទាន់ចេញប្រើ។
+
+- បិទកាមេរ៉ាពេលសុំសិទ្ធិកំពុងរង់ចាំ រួចអាចបើកម្ដងទៀត; សំណើចាស់ដែលមកយឺតឈប់ stream របស់ខ្លួន ហើយមិនដោះសោសំណើថ្មី។
+- ការដកកញ្ចប់ដែល trash write បដិសេធក្រោយប្ដូរហាង មិនលាក់ជួរធុងសំរាមហាងថ្មីដែលមាន ID ដូចគ្នា។ Journal របស់ការងារចាស់នៅសម្រាប់សង្គ្រោះ។
+- Ledger daily/monthly rollback និងសារបរាជ័យធ្វើតែក្នុង session ដែលបានចាប់ផ្ដើម; committed/unknown evidence នៅត្រឡប់តាម contract ដើម។
+- Trash purge មិនលុប ledger deduction proof តាម ID/timestamp ទៀត ដើម្បីរក្សាភស្តុតាងជំនាន់ថ្មី និងការផ្ទៀង Restore។ Daily deduction metadata រក្សាទុកដោយគ្មានការកាត់អាយុថ្មី; monthly retention ដដែល។
+- ZoeKeyGen ចងសំណើ Login ទៅ SDK/Auth/Config និងជំនាន់គណនី; ការប្ដូរបរិបទមិនផ្ញើ credentials ឬប្ដូរទិដ្ឋភាពរបស់សំណើថ្មី។
+- Checker បដិសេធ baseline ដែលមិនមាន/មិនមែនថត/ទទេ មុន build; relative path គិតពីថតអ្នកហៅ។ ភស្តុតាង និង commands នៅ Audit 1238។
+- Server/tools ជុំបន្ត៖ backup រក្សា partial file ដែលមិនមែនរបស់ខ្លួន; probe Login របស់ registration សម្អាត late session តាម client របស់វា; Apps Script 6 រក្សា intent មុន import និងមិននាំចូល file ចាស់ឡើងវិញពេលផ្លាស់ទីបរាជ័យ។
+- **សកម្មភាពដោយដៃ**៖ គ្មាន rules/migration ថ្មីសម្រាប់ជុំនេះ។ CI strict ៤ shards តាមការអនុញ្ញាត commit/push របស់ម្ចាស់; ផ្ទៀង cancel/reopen កាមេរ៉ាលើ Android/iPhone និងប្ដូរ Config ពេល Login កំពុងរង់ចាំ។ ក្រោម deployment authorization ដាច់ដោយឡែក៖ redeploy Supabase `register`; rollout Apps Script 6 តាម README ដោយពិនិត្យ/ដាក់ដាច់ pre-existing Inbox ដែលអាចបាន import រួច មុនបើក watcher។
 
 ### [2.50.190] — 2026-11-09 · ផ្ទៀង session API និងសោ ZTO
 
@@ -2001,6 +2015,80 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-11-09 — Audit 1239៖ បន្ត deep audit ទៅ deduction proof, file ownership និង import recovery
+
+**Scope និងសិទ្ធិ**៖ បន្តលើ branch/base ដដែល ក្រោយម្ចាស់ស្នើឱ្យកែតាម prompt រហូតចប់ ហើយ commit/push ក្រោយការផ្ទៀង local។ មិនមាន authorization សម្រាប់ merge/deploy, IAM/RLS/rules changes, production mutation ឬ real ZTO Sign។ ជុំទី១នៅខាងក្រោមជាភស្តុតាងមុនការបន្ត; baseline patch/hash របស់វារក្សានៅ `/tmp/zoe-audit-round1.patch` និង `/tmp/zoe-audit-round1.evidence.json`។
+
+| Finding | មូលហេតុ និងផលប៉ះពាល់ដែលវាស់បាន | ការកែ និងភស្តុតាង |
+|---|---|---|
+| Ledger proof ក្រោយ purge · P1 | `ZoeW/src/domain/cleanup.ts` បន្ទាប់ពី purge ជំនាន់ចាស់ អាច blind-delete daily `ded/<id>` ដែលឧបករណ៍ B ទើបសរសេរសម្រាប់ជំនាន់ថ្មី។ New trash និង monthly proof នៅ តែ daily proof បាត់ ហើយ Restore មិនអាចផ្ទៀងបាន | Full-flow baseline បរាជ័យលើ new-generation receipt assertion។ At-only CAS ត្រូវបានបដិសេធក្រោយ same-deletedAt counterexample; ដក early-release helper/caller ដែលមិនមាន atomic generation proof។ ទុក daily/monthly receipt និង trash purge/money totals ដដែល; `purge-deduction-pending.test.ts` វាស់ same/different-at និងការផ្ទៀង Restore |
+| Backup partial ownership · P2 | `firebase-backup/crypt.js` seal/open និង `backup.js` catch លុប path `.partial` ទោះ exclusive create បានបដិសេធដោយ EEXIST; partial evidence មុនបាត់ | Shared writer ប្រើ `openSync(wx,0600)`, descriptor/fstat dev+ino, close និង cleanup តែ inode របស់ខ្លួន។ Full checker baseline ១៥៣ PASS/៩ FAIL → ១៦២ PASS។ Mutations ចាប់ foreign cleanup ៩ FAIL, publish replacement ៣ FAIL, owned cleanup omission ៦ FAIL |
+| Late Auth probe session · P2 | `supabase/functions/_shared/admin-deps.ts` outer timeout ត្រឡប់ UNKNOWN មុន SDK response; response មកយឺតបង្កើត session តែ cleanup មិនរត់ | Attach fulfillment cleanup ទៅ exact fresh probe, local signOut និង bounded EdgeRuntime.waitUntil keeper ក្នុងថវិកា sign-in+logout ដើម។ Caller UNKNOWN នៅ timeout ដើម។ Actual installed SDK ជាមួយ synthetic fetch baseline ៤ FAIL/៦ PASS → ១០ PASS; related account/auth ៧ suites/៩៨ tests និង strict Edge typecheck ៧ files PASS។ មិនមាន admin-client/global logout |
+| Watcher នាំចូល file ចាស់ស្ទួន · P1 | `zto-import/Watch.gs` នាំចូល old.csv រួចផ្លាស់ទី quota-fail ប៉ុន្តែ new.csv ជោគជ័យ+ចាកចេញ; trigger ទី២ old នៅ Inbox ហើយសរសេរ COD ៩៩→៥។ Replace បាត់ NEW-ONLY និងនាំ OLD-ONLY ត្រឡប់ | Real worker និង real sheet-writing code បរាជ័យទាំង upsert/replace ខណៈ existing ២៦២ assertions នៅបៃតង។ Script 6 persist scoped pending receipt មុន effects, done មុនចាកចេញ/បន្តfileថ្មី; retry fileដែល done ផ្លាស់ទីតែប៉ុណ្ណោះ។ Pending/unknown/corrupt/schema/scope mismatch នៅ HOLD; pinned Sheet/tab ទប់ Config-switch seam; unknown proof មិនលុបទោះfileចូល Failed |
+
+**បម្រែបម្រួល checker ជាក់លាក់**៖ mutation anchor របស់ `supabase-functions-test` ផ្លាស់ទៅ statement `signIn` ពិត ដោយ forbidden shared-admin behavior ដដែល។ `write-stall-guard-test`, `returned-trash-retention-test`, `restore-marker-hygiene-test` និង `cleanup-purge-checker-contract.cjs` ប្ដូរ contract ដែលធ្លាប់ទាមទារ unsafe early deduction deletion ទៅ retained proof/no early write; real purge/marker hang scenarios, timeout និង effect floors ត្រូវរក្សា។ គ្មាន assertion/lock/guard បន្ថយដើម្បីឱ្យបៃតង។ Stale comment របស់ `sw-backend-chunk-test` កែឱ្យស្រប marker-only install policy ដោយគ្មាន runtime/assertion change។
+
+**Tradeoff ដែលមិនលាក់**៖ daily deduction proof មិនស្ថិតក្នុង `EVIDENCE_ROOTS` នៃ ៦០ថ្ងៃទេ; ដូច្នេះការកែ purge នេះរក្សា daily metadata យូរជាងមុនដោយមិនមាន automatic prune ថ្មី។ Monthly retention នៅដដែល។ ការកាត់ proof ត្រូវការពិធីការ retirement ដែល atomic និង generation-bound ដាច់ដោយឡែក; ID/timestamp/local absence មិនគ្រប់គ្រាន់។ មិនអះអាងថាបានកែ uniqueness protocol របស់ ledger events គ្រប់ផ្លូវ ឬបានវាស់ metadata growth នៅ scale ទេ។ Legacy queued ded-delete ដែល client ចាស់បានចេញរួចមិនអាចទប់ដោយការដក caller ថ្មីតែមួយមុខ; មុន rollout ត្រូវ backup, ផ្អាក mixed-version operations និងវាយតម្លៃ pending writes ជាមួយ persisted proof ដោយមិនលុប unknown journals ដើម្បីឱ្យបៃតង។
+
+**Local verification ចុងក្រោយជុំបន្ត**៖ `ZoeW/tests/supabase-probe-session-cleanup.test.ts` ១០ PASS; purge/generation/restore ១០ suites/៣៦៤ tests PASS និង update-contract១០ PASS។ Measurement guards write-stall៤៩, returned-retention២៧, restore-marker៣០, cleanup-clock២០ PASS; ដាក់ unsafe source ចាស់ក្នុង shadow ឱ្យ៤ behavioral failures/៣២ PASS ខណៈ fixed shadow៣៦/៣៦ PASS។ Watcher final៣២៦ assertions PASS; pre-receipt sourceជាមួយ final casesរបស់ agent២៧៣ PASS/៤២ FAIL, pinned-target control២ FAIL និង lost-delete-ACK control២ FAIL មុនកែ។ Final unknown-message control៣២៤ PASS/២ FAIL មុនប្ដូរ prefixទៅ⏸️ ហើយ៣២៦ PASSក្រោយកែ។ Watcher shadow mutations១០/១០ ចាប់បានតាម assertions។ Backup១៦២ PASS និង probe-related៧ suites/៩៨ tests PASS។ Root final regression/lock៧ files/៨៧ tests និង mode/oracle៤ files/៤៦១ tests PASS។ ចំនួនអាច overlap; no full-local-suite claim។ Syntax/diff និង real Edge typecheck PASS; public Apps Script surface ដដែល ហើយ helpers ថ្មីនៅ private; Google APIs ទាំងអស់ជាក្លែងនៅក្នុង watcher tests។
+
+**Expanded verification និងសម្មតិកម្មដែលត្រូវបដិសេធ**៖ network/listener/tenant-switch recovery ១៨ files/១១៤ Vitest PASS; SW ៣ files/៤៧ Vitest, cache-failure ៤៤ និង synthetic abort ១៧ PASS។ Actual Chromium បង្ហាញថា streaming-body abort ក្រោយ headers បិទ upstream ក្នុង២–៦ms និងមិនបន្ថែម bytes; សម្មតិកម្ម leak ត្រូវបានបដិសេធ។ Abort មុន headers តាម SW ពឹង timeout ដើម២០វិនាទី និងបិទនៅ២០,០០១ms; មិនទាមទារការកែ។ Evidence `/tmp/zoe-sw-abort-body/` និង runtime follow-up logs។ គ្មាន actual hosted calls ឬ physical-device proof ក្នុងលទ្ធផលនេះ។
+
+**Markdown/usage review**៖ ពង្រីកការអាន provisioning, backup/migration, Cookie sync Windows/Termux, Apps Script, Android release/rollback, runner setup និង app usage។ កែ៥ឯកសារ៖ setup backup ឱ្យត្រូវ dedicated RTDB Viewer, ZTO Supabase identity=require config, Revoke ដែលអាស្រ័យលើ server verification និង offline grace ៣ថ្ងៃ, branch provenance Firebase/Supabase។ Inventory២៥ Markdown/២៣៥ local links គ្មាន missing targets និង១៩ anchors គ្មាន missing targets។ Raw Palm catalog/full archives និងរាល់កថាខណ្ឌ reference មិនត្រូវអះអាងថា semantic-audited ពេញទេ។
+
+**Dead-code inventory**៖ source reachability tool អាន២៨០ source files/២៤២១ functions; ទាំងអស់ retained, candidate០, `complete:false`/exit២ ដោយ dynamic evaluation/import-glob/reflection ក្នុង audit exposure module។ នេះមិនបញ្ជាក់ថាគ្មាន dead code ទេ ហើយគ្មានអ្វីត្រូវបានលុបដោយការស្មាន។ Unsafe purge helper២ និង caller ត្រូវបានដកតែក្រោយ caller/action/HTML/native/tool inventory និង behavioral failure proof ដាច់ដោយឡែក។ JSON៖ `/tmp/zoe-audit-function-reachability.json`។
+
+**Publication និង CI**៖ ពិនិត្យថា base SHA `c30b3f99` មាន completed Audit run `42579288409` ដែល strict៤ shards និង ZTO/native evidence ជោគជ័យ; វាមិនជំនួស changed-tree validation ទេ។ Local final checks ត្រូវចប់មុន commit/push branch audit ហើយ workflow ត្រូវរត់លើ exact pushed SHA។ កុំ merge/deploy ដោយផ្អែកលើ branch CI។ Runtime/seed/clock និង NOT VERIFIED matrix នៅ Audit 1238; hosted backends, real ZTO/push, physical devices, Google trigger/deployment និង production scale នៅតែត្រូវការការផ្ទៀងដាច់ដោយឡែក។
+
+### 2026-11-09 — Audit 1238៖ ការប្ដូរម្ចាស់ការងារ និង baseline ដែលមិនត្រឹមត្រូវ
+
+**Revision និងសិទ្ធិ**៖ `audit/deep-audit-20261109` ចាប់ពី `origin/main` = `c30b3f996eaaa04196d5cb4ae851fbc7fdcb9ef2` តាមជម្រើសម្ចាស់។ Checkout ដើម `b57f2fea` ចាស់ជាង ៤២ commits ហើយស្អាត; លទ្ធផលលើ checkout ដើមមិនយកមកអះអាងលើ changed tree ទេ។ ការកែ និង tests នៅ local ដោយគ្មាន commit/push/PR/merge/deploy, rules/migration publication, external account mutation ឬ ZTO Sign ពិត។ Locked gesture/ZTO files និង hash locks មិនប្រែ។
+
+| Finding · severity | ផ្លូវ និងសេណារីយ៉ូបរាជ័យលើ pre-fix | មូលហេតុ និងការកែ | ភស្តុតាងមុន/ក្រោយ |
+|---|---|---|---|
+| កាមេរ៉ាជាប់ · P2 | `ZoeW/src/services/camera.ts:12` និង `features/daily-stats.ts:114`៖ getUserMedia មិនឆ្លើយ → បិទ → បើកវិញមិនបាន; callback ចាស់ដោះសោ request ថ្មី | Stop បង្កើន request ID តែមិនដោះ `isCameraStarting`; ផ្ទេរសោតាម request ថ្មី និងឱ្យ stale callback ឈប់តែ stream របស់វា | `camera-acquisition-owner` baseline ៣ FAIL/៣ PASS → ៦ PASS; affected camera suites ១៨ PASS និង caller suites ២៤ PASS។ Shadow mutations ៤/៤ ចាប់បានដោយ behavioral assertions |
+| Trash view ឆ្លងហាង · P2 | `ZoeW/src/features/barcode-ops.ts:249`៖ Remove នៅ A រង់ចាំ trash write → ប្ដូរ B មាន trash ID ដូចគ្នា → A បដិសេធ លាក់ row របស់ B | Catch splice តាម ID មុន owner guard; ផ្លាស់ guard មុន local mutation។ Backend row របស់ B មិនដែលត្រូវបានលុបដោយ bug នេះ | Whole-flow regression baseline ១ FAIL; final same/different-ID និង same-session recovery controls ឆ្លង។ Shadow ordering ចាស់ → ១ FAIL/៧ PASS; journal ចាស់នៅសម្រាប់ recovery |
+| Ledger notice/rollback ចាស់ · P2 | `ZoeW/src/domain/ledger.ts:599` និង `:638`៖ daily/monthly reject ឬ noncommit ក្រោយប្ដូរ database/auth generation បង្ហាញ warning នៅ session ថ្មី | Fence តាម captured DB/auth generation មុន local rollback និង toast; return branches សម្រាប់ committed delta និង unknown verdict រក្សាដដែល | `ledger-late-session-notice` baseline ៨ FAIL/៤ PASS → ១២ PASS; shadow ដក fence → ៨ FAIL/៤ PASS |
+| Login ខុស Auth context · P2 | `ZoeKeyGen/app.js` → `doLogin`៖ ប្ដូរ Config/Auth ពេល SDK/persistence រង់ចាំ ផ្ញើ credentials ទៅ project ថ្មី; ចាប់ Login ពេល init មិនរួចអាចប្រើ Auth project ចាស់ | Capture owner/SDK/Auth/Config/generation, snapshot remember choice, reject duplicate និង fence continuations; readiness ត្រូវស្រប saved Config និង `auth.app.options` មុនផ្ញើ credentials | Exact-base baseline ១០ FAIL/៣ PASS។ Independent review បន្ថែម admission baseline ៩ FAIL/១៥ PASS លើ source hash `c2970f1f4a58f96b1679e1d6ad223004d6c4d061cba2a09586e8b1905c73d81d`។ Final ២៤ PASS; shadow mutations ដក persistence/init/config guards ធ្លាក់តាម assertions |
+| Baseline ត្រូវរំលង · P2 | `audit-tools/run-all.sh:16`៖ missing/file/empty argument ក្លាយជារត់ current tree ដោយគ្មាន comparison; relative path ប្រើថត repo | បដិសេធ invalid argument មុន build និង normalize តាម caller ជា absolute path; ការពារ `CDPATH` និង literal `-` | Runner baseline ២៣២ PASS/៥ FAIL → final ២៣៩ PASS; additional path controls ធ្លាក់មុន hardening។ Actual invalid invocations exit ២ មុន build |
+
+**Business contracts និង boundaries ដែលផ្ទៀងពី source**៖ Delete រក្សាតម្លៃ; Remove បញ្ច្រាសតែ barcode ដែលមាន settled deduction តែម្តង; Restore បញ្ច្រាសតែ proven deduction ដោយ keyed receipt/generation។ Local Close មិនបញ្ជាក់ upstream Sign ឬ Return។ Authority ដើរតាម intent → backend request → committed record/receipt → UI projection → journal recovery; updater callback, local queue និង cached listener មិនជាភស្តុតាង commit។ Config ជ្រើស Firebase ឬ Supabase តែមួយ មិនមាន dual-write ថ្មី។ Firebase ឯករាជ្យតាម customer project; Supabase តាម tenant/RPC/RLS; ZoeKeyGen ជា app/project ដាច់ដោយឡែក។ Action registry, scan/history/registry/ledger/pickup/collected, license/admin, Netlify/ZTO, Apps Script/tools, SW និង Capacitor បានធ្វើ inventory; ការមាន inventory មិនស្មើអានគ្រប់ branch នៃ source ទេ។
+
+| Backend × lookup | Policy ដែលផ្ទៀងពី source | ការវាស់ក្នុងជុំនេះ |
+|---|---|---|
+| Firebase × Palm | Cleanup តាម real Sign ≥២ម៉ោង; trash Restore ត្រូវបដិសេធ | Synthetic SDK/mode matrix ឆ្លង; hosted rules និង real ZTO នៅ NOT VERIFIED |
+| Supabase × Palm | Policy ដូចគ្នា; shared-shop Palm មានអាទិភាព | Synthetic adapter/mock RPC ឆ្លង; hosted RLS/RPC នៅ NOT VERIFIED |
+| Firebase × Cookie | Cleanup តាម local Close ≥២ម៉ោង; Restore ត្រូវ fresh upstream unsigned evidence | Synthetic mode/failure matrix ឆ្លង; real upstream/backend នៅ NOT VERIFIED |
+| Supabase × Cookie | Contract ដូចគ្នាតាម backend ដែល Config ជ្រើស | Synthetic mode/failure matrix ឆ្លង; real upstream/backend នៅ NOT VERIFIED |
+| ទាំងពីរ × sheet/manual/local | Lookup ដែលមិនមែន ZTO ជា local policy; cleanup >២ម៉ោងពី closedAt; shared-shop Palm/Cookie អាចលើក mode | Scan/duplicate/remove/restore/lost-ACK និង shared mode priority/expiry/withdrawal ជា synthetic tests។ មិនចាត់ “simple” ជា policy ដាច់ថ្មី |
+
+**ការផ្ទៀងលើ source ចុងក្រោយ**៖ money/recovery ១៨ files/៣០៦ tests; mode/business និង independent money oracle ៤ files/៤៦១ tests/០ skip; KeyGen ៦ files/១៣១ tests, session-security ៣៦៩ assertions និង PIN ១៨។ ចំនួនទាំងនេះអាចមាន test overlap មិនត្រូវបូកជាចំនួន unique។ Money regressions វាស់ same-session compensation, unknown/no-retry, native retry identity, foreign-op, restore terminal/prepared recovery និង session switch; oracle ប្រើ expected records ឯករាជ្យ មិនហៅ production reducer ដើម្បីគណនា expected។ New ledger dates គ្រាន់តែ bucket keys មិនមែន age fixtures ដែលនឹងផុតកំណត់។
+
+App tests ជា real source ជាមួយ synthetic SDK/VM/happy-dom; shadow mutations ដែលបានរាយសុទ្ធតែដល់ behavioral assertion មិនរាប់ syntax/startup/timeout ជា detection។ Ledger shadow ដំបូងមាន transform-cache contamination ត្រូវបានបោះបង់ភស្តុតាង ហើយសាកឡើងវិញជាមួយ source/cache root ដាច់; fixed shadow ២០/២០ PASS។ Wrong-root/missing-NODE_PATH invocations ក៏ត្រូវចាត់ជាបញ្ហា harness មិនមែន product bug ហើយមិនបានបន្ធូរ assertion ដើម្បីឱ្យឆ្លង។ Final duplication guard ចាប់ captured-session setup ស្ទួន ២កន្លែង; រួមទៅ private `captureLedgerSession()` ហើយ affected ៨ suites/៨៣ tests ឆ្លង មិនបន្ថែម allowlist។ Doc index ខ្វះ new tests ៣ជួរ ត្រូវបានបន្ថែមតាមផ្នែកពិត។
+
+**ការផ្ទៀងបញ្ចប់**៖ focused regression និង lock suites ៦ files/៧៧ tests PASS; typecheck, lint, production build, strip-comments (៣៣៤ files/០សល់), doc:check, Android static (១៣៥ assertions) និង diff/syntax ឆ្លង។ Chromium `155.0.8059.79` ផ្ទុក production build ឆ្លង smoke ដោយគ្មាន runtime rejection; Config Firebase ទាញ SDK ៣ requests ហើយ Supabase ០។ Audit browser ប្រើ app functions ពិត + HTMLVideoElement + canvas synthetic MediaStream ឆ្លង១៨ checks ក្នុង១.២១៥វិនាទី; external requests ត្រូវបាន abort ដោយចេតនា ហើយគ្មាន pageerror។ នេះជាភស្តុតាង browser/synthetic camera មិនមែន physical camera។ Bundle hash របស់ browser run និង cleanup evidence នៅ `/tmp/zoe-camera-acquisition/browser-camera-result.json`។
+
+Runtime៖ Node `24.22.1`, npm `11.9.0`, Vitest `5.0.5`, Chromium `155.0.8059.79`; Linux x86_64។ ប្រើ seeds/default clock fixtures របស់ focused suites មិនមាន custom fuzz seed ឬ load run ថ្មី។ Source/checker builds regenerate ក្រោយ source edit ចុងក្រោយ។ Final doc-scope ១១៩, duplication ១៤ និង repository-file-coverage ១០ assertions PASS។
+
+Focused measurement-root checks៖ version alignment និង version scope (២០), secret hygiene (២៨៣), camera resume (៣១), money reality/freshness (៩៣) និង KeyGen session security (៣៦៩) PASS។ Source checker probes៖ final runall-runner (២៣៩) និង hang-guard (១៦) PASS។ Apps Script (២៦២) និង backup synthetic/loopback checker (១១៧) PASS។ ទាំងនេះគ្មាន partial/skip ក្នុងការហៅដែលរាយ; full runner/checker-coverage/exit-code-integrity/money-guardian និង CI ពេញមិនបានរត់។
+
+**Markdown និងការចេញកំណែ**៖ inventory ២៥ tracked Markdown files ក្រៅ vendors/dependencies; relative local-file link targets ខ្វះ ០ លើ chosen base។ មិនបានផ្ទៀង anchors/remote URLs ឬអាន semantic គ្រប់ឯកសារទេ។ ពិនិត្យ pending HISTORY, architecture/development និងឯកសារតាមផ្នែក; កែ current-version claims និង release feed តាម shipped behavior ពិត។ លេខកំណែ ZoeW `2.50.191`/cache `zoew-v455`, ZoeKeyGen `2.24.38`/cache `zoekeygen-v149`; new tests មាន repository coverage mapping។ Regenerate `money:core` តាម source ដោយ generator; output ៣៣ functions/constants នៅស្រស់ មិនកែ generated code ដោយដៃ។
+
+**Commands និងការបន្ត**៖ រត់ពី repo root លើ revision ខាងលើ និង local diff; focused Vitest ត្រូវដំណើរការក្នុង `ZoeW` ដើម្បីប្រើ setup/config ត្រឹមត្រូវ។
+
+```bash
+npm --prefix ZoeW run typecheck
+npm --prefix ZoeW run lint
+cd ZoeW
+./node_modules/.bin/vitest run tests/camera-acquisition-owner.test.ts tests/ledger-late-session-notice.test.ts tests/remove-stale-session.test.ts tests/keygen-login-ownership.test.ts --maxWorkers=1 --fileParallelism=false
+```
+
+ពី root៖ `ZOEW_TEST_BROWSER=/usr/bin/chromium npm --prefix ZoeW run money:core`; `ZOEW_TEST_BROWSER=/usr/bin/chromium ZOE_MEASURE_ONLY=1 bash audit-tools/run-all.sh` បង្កើត `ZoeW/dist-audit/measure-root`។ Generated-app checkers ត្រូវរត់ក្នុង root វាស់ជាមួយ `NODE_PATH=<repo>/ZoeW/node_modules`; doc-scope ប្រើ `ZOE_REPO_ROOT=<repo>`, version scope ប្រើ `VERSIONSCOPE_GIT_DIR=<repo>` និង base SHA ខាងលើ។ Commands/flags CI ពេញ និង lifecycle emulator នៅ Runbook; selected local checks មិនជំនួស ៤ strict shards។ Logs នៃជុំនេះនៅ `/tmp/zoe-audit-*`, `/tmp/zoe-money-*`, `/tmp/zoe-camera-acquisition/`, `/tmp/zoe-keygen-login-*` និង `/tmp/zoe-runall-baseline-input-final.log` ក្នុង executor នេះ។
+
+**NOT VERIFIED / residual scope**៖ CI strict ៤ shards លើ changed tree មិនបានរត់ដោយគ្មាន publication authorization។ គ្មាន prepared RTDB JAR ឬ Supabase dependencies សម្រាប់ real-backend matrix; មិនបាន install/start backend emulator/Postgres។ Hosted Firebase/Supabase/rules/RLS parity, real ZTO Sign/Return/Palm/Cookie expiry, actual push delivery, Android/iPhone និង physical camera នៅមិនទាន់សាក។ Cold-reload/device D oracle, mixed-version import/migration/backup recovery ពេញលេញ, clock/timezone boundary matrix ទាំងមូល និង security/history scan ពេញក៏មិនត្រូវចាត់ថា complete ដែរ។ Existing pending/HOLD evidence និង manual rollout items នៅដដែល។
+
+**ផែនការ scale ដែលមិនទាន់រត់**៖ isolated synthetic backend data ៨ហាង × ៣ឧបករណ៍, ១,០០០ barcodes/ហាង, ១០នាទី និង cold device D ក្រោយ reconnect; A=Palm/B=Cookie/C=local តាម shared-mode contract និង tenants ដាច់គ្នា។ Inject before/after commit, lost/late ACK, duplicate, restart និង tenant/backend switch។ កំណត់ acceptance មុនរត់៖ money/barcode/receipt divergence និង duplicate effect =០; non-injected errors =០; initial planned p95 ≤២វិនាទី/p99 ≤៥វិនាទី និង recovery ≤៦០វិនាទី។ រាយ hardware/runtime, request/listener/timer/memory/queue peaks, concurrency/duration, p50/p95/p99 និង error rate ពិត។ នេះជាផែនការ មិនមែនភស្តុតាង ៨ ឬ ១,០០០ tenants ដំណើរការស្របគ្នាបានទេ។
 
 ### 2026-11-09 — Audit 1237៖ បែងចែកភស្តុតាងចលនា និងកំហុស fixture
 
@@ -4797,6 +4885,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/breadcrumb-redaction-copy.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/browser-clock-fixture-contract.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/build-checker-freshness.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/camera-acquisition-owner.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/chrome-autohide-intent.test.tsx` | — | ផ្នែក ៨ |
 | `ZoeW/tests/cleanup-applied-foreign-op.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-applied-ownership.test.ts` | ផ្នែក ២ | ផ្នែក ៨ · ផ្នែក ៩ |
@@ -4863,9 +4952,11 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/item-level-rows-gone.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/keyboard-tabbar.test.tsx` | — | ផ្នែក ៨ |
 | `ZoeW/tests/keygen-calendar.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/keygen-login-ownership.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/label-image.test.tsx` | — | ផ្នែក ៨ · ផ្នែក ៩ |
 | `ZoeW/tests/label-print.test.tsx` | ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/late-commit-stale-session.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
+| `ZoeW/tests/ledger-late-session-notice.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/ledger-native-retry-identity.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/ledger-not-applied-retry.test.ts` | — | ផ្នែក ៧ · ផ្នែក ៨ |
 | `ZoeW/tests/ledger-op-ring.test.ts` | ផ្នែក ១ | ផ្នែក ៨ |
@@ -5037,6 +5128,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/supabase-own-keys.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-pickup-reset-paired-sdk.pg.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-poll-starvation.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/supabase-probe-session-cleanup.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-pull-paging.test.ts` | — | ផ្នែក ៧ |
 | `ZoeW/tests/supabase-realtime-race.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/supabase-realtime-ws.test.ts` | — | ផ្នែក ៧ |

@@ -65,12 +65,11 @@ HTTPS/OAuth REST ➜ **គ្មាន third-party dependency**។
 
 សម្រាប់ Firebase Project នីមួយៗដែលចង់ Backup (ជំនួញនីមួយៗ + Project License របស់ ZoeKeyGen)៖
 
-1. ចូល [Firebase Console](https://console.firebase.google.com) → ជ្រើសរើស Project → ⚙️ **Project
-   Settings** → **Service accounts**
-2. ចុច **Generate new private key** → ទាញយក File JSON
+1. ចូល [Google Cloud Console](https://console.cloud.google.com) → ជ្រើសរើស Project ដដែល → **IAM & Admin → Service Accounts → Create service account**។ បង្កើតគណនីដាច់សម្រាប់ backup។
+2. ផ្ដល់ Role តែ **`Firebase Realtime Database Viewer`** ប៉ុណ្ណោះ (កុំដាក់ Owner, Editor ឬ Firebase Admin) → **Keys → Add key → Create new key → JSON** → ទាញយក File JSON។ មិនប្រើសោរបស់ Firebase Admin SDK ដែលមានសិទ្ធិសរសេរជំនួសទេ។
 3. ដាក់ File នេះទុកក្នុង folder `firebase-backup/secrets/` (Folder នេះមិនត្រូវបាន Commit ចូល Git ទេ
    ដោយសារ `.gitignore` — សូមកុំផ្លាស់ប្តូរ `.gitignore` ដើម្បីអនុញ្ញាតវា Key ទាំងនេះជា Credential ពិត
-   មិនមែន Firebase Config ធម្មតាទេ — បើលេចធ្លាយ អាចអានសរសេរទិន្នន័យទាំងអស់បាន)
+   មិនមែន Firebase Config ធម្មតាទេ — បើលេចធ្លាយ អ្នកកាន់សោអាចអានទិន្នន័យអតិថិជនបាន ទោះមិនអាចសរសេរ ឬលុបក៏ដោយ)
 
 **Supabase (secret key)** ៖ Supabase Dashboard ➜ **Project Settings ➜ API Keys ➜ Secret keys** ➜ បង្កើតសោថ្មី **សម្រាប់ backup តែប៉ុណ្ណោះ**
 (ឧ. `zoe-backup`) ➜ ដាក់វាក្នុង File មួយក្នុង `secrets/` (ឧ. `secrets/supabase-secret.key` · បន្ទាត់តែមួយ)។ ⛔ Publishable key ប្រើមិនបាន
@@ -242,10 +241,7 @@ paste Firebase Config **របស់ខ្លួន** ➜ ទិន្នន័�
   **ទំនុកចិត្ត** មិនមែនបច្ចេកទេស — អ្នកនឹងកាន់ទិន្នន័យអតិថិជនគេ។ បើធ្វើ សូម
   ស្នើសោ **អានតែម្យ៉ាង** (ខាងក្រោម) និងប្រាប់អតិថិជនឲ្យដឹងជាមុន។
 
-**សោអានតែម្យ៉ាង (សូមប្រើជានិច្ចសម្រាប់ backup)** ៖ ក្នុង Google Cloud Console
-➜ **IAM & Admin ➜ Service Accounts ➜ Create** ➜ ដាក់ Role តែ
-**`Firebase Realtime Database Viewer`** ប៉ុណ្ណោះ (កុំដាក់ Owner/Editor) ➜
-**Keys ➜ Add key ➜ JSON**។ សោបែបនេះ **អាន** បាន តែ **សរសេរ ឬលុបមិនបាន**។ បើវាលេចធ្លាយ អ្នកដទៃអាចអានទិន្នន័យអតិថិជនបាន ➜ ត្រូវដកសោនោះ និងបង្កើតសោថ្មី។ សិទ្ធិអានតែម្យ៉ាងកាត់បន្ថយការកែ/លុបខុស ប៉ុន្តែមិនការពារការលេចទិន្នន័យទេ។
+**សោអានតែម្យ៉ាង (សូមប្រើជានិច្ចសម្រាប់ backup)** ៖ ប្រើគណនីដាច់ដែលមានតែ Role **`Firebase Realtime Database Viewer`** តាមជំហានទី ២។ សោបែបនេះ **អាន** បាន តែ **សរសេរ ឬលុបមិនបាន**។ បើវាលេចធ្លាយ អ្នកដទៃអាចអានទិន្នន័យអតិថិជនបាន ➜ ត្រូវដកសោនោះ និងបង្កើតសោថ្មី។ សិទ្ធិអានតែម្យ៉ាងកាត់បន្ថយការកែ/លុបខុស ប៉ុន្តែមិនការពារការលេចទិន្នន័យទេ។
 
 **២. កូតាទំហំរបស់ GitHub Actions។** ពិនិត្យកូតា និងការប្រើ artifact/cache/minutes ពិតក្នុង **Settings ➜ Billing and plans ➜ Plans and usage** របស់គណនី។ តម្លៃអាស្រ័យលើ plan និង runner ដែលប្រើ; កុំយកកូតាគំរូជាតម្លៃថេរសម្រាប់គណនីទាំងអស់។ រូបមន្តប៉ាន់ទំហំ៖
 

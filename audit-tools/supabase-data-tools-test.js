@@ -1163,7 +1163,7 @@ const JS_MUTATIONS = [
         to: 'const RETRYABLE_STATUS = new Set([401, 408, 425, 429, 500, 502, 503, 504]);', run: 'auth' },
     { name: 'export មិនលុប doc ដែលមាន tombstone', file: 'firebase-backup/supabase.js', from: 'delete bucket[row.k];', to: '', run: 'chain' },
     { name: 'export មិនបញ្ជូន tombstones_after', file: 'firebase-backup/supabase.js', from: 'p_tombstones_after: threshold', to: 'p_tombstones_after: null', run: 'chain' },
-    { name: 'ci-config សរសេរសោដោយ mode លំនាំដើម', file: 'firebase-backup/ci-config.js', from: "fs.writeFileSync(keyPath, key + '\\n', { mode: 0o600 });",
+    { name: 'ci-config សរសេរសោដោយ mode លំនាំដើម', file: 'firebase-backup/ci-config.js', from: "writePrivateAtomicFile(keyPath, key + '\\n');",
         to: "fs.writeFileSync(keyPath, key + '\\n');", run: 'chain' },
     { name: 'backup ដាក់ហាងទាំងអស់ក្នុងថតតែមួយ', file: 'firebase-backup/backup.js', from: 'path.join(outDir, tenant.id)', to: 'outDir', run: 'chain' }
 ];

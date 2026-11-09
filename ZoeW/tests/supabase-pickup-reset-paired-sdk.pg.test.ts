@@ -4,6 +4,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
+import { runInNewContext } from 'node:vm';
 
 const root = path.resolve(__dirname, '../..');
 const hash = (file: string) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
@@ -14,6 +15,36 @@ const ids = [
     'receipt-replacement-HOLD', 'concurrent-reset', 'old-session-receipt-only', 'public-storage-denied',
     'paired-native-archive-actor-preservation', 'independent-context-fixed-cas', 'independent-context-unknown-restart'
 ];
+
+it('paired Reset Web Locks fixture keeps ordinary writers exclusive and try-lock recovery nonblocking', async () => {
+    const source = fs.readFileSync(path.join(root, 'audit-tools/supabase-pickup-reset-paired-sdk-test.cjs'), 'utf8');
+    const start = source.indexOf('function locks() {'), end = source.indexOf('\nfunction requestHttp(', start);
+    expect(start).toBeGreaterThanOrEqual(0); expect(end).toBeGreaterThan(start);
+    const coordinator = runInNewContext(source.slice(start, end) + '\nlocks()');
+    expect(await coordinator.api.request('overload', () => 'ordinary')).toBe('ordinary');
+    const events: string[] = [];
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const first = coordinator.api.request('same', async (lock: { name: string; mode: string }) => {
+        expect(lock).toEqual({ name: 'same', mode: 'exclusive' }); events.push('first'); await gate; events.push('released'); return 1;
+    });
+    const second = coordinator.api.request('same', {}, async () => { events.push('second'); return 2; });
+    const third = coordinator.api.request('same', async () => { events.push('third'); return 3; });
+    expect(await coordinator.api.request('same', { ifAvailable: true }, (lock: null) => { expect(lock).toBeNull(); return 'busy'; })).toBe('busy');
+    expect(await coordinator.api.request('other', () => 'independent')).toBe('independent');
+    expect(events).toEqual(['first']); expect(coordinator.held.has('same')).toBe(true);
+    release(); expect(await Promise.all([first, second, third])).toEqual([1, 2, 3]);
+    expect(events).toEqual(['first', 'released', 'second', 'third']); expect(coordinator.held.size).toBe(0);
+    await expect(coordinator.api.request('failure', () => { throw new Error('synthetic callback failure'); })).rejects.toThrow('synthetic callback failure');
+    expect(await coordinator.api.request('failure', { ifAvailable: true }, (lock: unknown) => !!lock)).toBe(true);
+    let rejectHolder!: (error: Error) => void;
+    const rejected = coordinator.api.request('rejected', () => new Promise((_resolve, reject) => { rejectHolder = reject; }));
+    const observed = expect(rejected).rejects.toThrow('synthetic rejected holder');
+    const successor = coordinator.api.request('rejected', () => 'successor');
+    rejectHolder(new Error('synthetic rejected holder')); await observed;
+    expect(await successor).toBe('successor'); expect(coordinator.held.size).toBe(0);
+    await expect(coordinator.api.request('unsupported', { mode: 'shared' }, () => true)).rejects.toThrow();
+});
 
 it('Supabase SDK ៖ paired Reset19 ប្រើ native seed ដូចគ្នា និង authoritative SQL outcomes', () => {
     const driver = path.join(root, 'audit-tools/supabase-pickup-reset-paired-sdk-test.cjs');
@@ -30,11 +61,27 @@ it('Supabase SDK ៖ paired Reset19 ប្រើ native seed ដូចគ្ន�
     const manifest = { count: files.length, latest: files.at(-1)!.name, latestRules: files.filter(file => file.name.endsWith('_zoe_rules.sql')).at(-1)!.name, first62Hash, files };
     const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-paired-reset19-'));
     const resultFile = path.join(scratch, 'result.json');
+    let passed = false;
     try {
+        if (process.env.F09_PAIRED_SDK_EVIDENCE_FILE) {
+            for (const suffix of ['', '.stdout.log', '.stderr.log']) fs.rmSync(process.env.F09_PAIRED_SDK_EVIDENCE_FILE + suffix, { force: true });
+        }
         const run = spawnSync(process.execPath, [driver], { cwd: scratch, encoding: 'utf8', timeout: 170000, maxBuffer: 8 * 1024 * 1024,
             env: { ...process.env, SUPABASE_RESET_PAIRED_APP_DIR: root, ZOE_REPO_ROOT: root, SUPABASE_RESET_PAIRED_OUT: scratch,
                 SUPABASE_RESET_PAIRED_RESULT: resultFile, SUPABASE_RESET_PAIRED_CASE: '' } });
-        const output = String(run.stdout || '') + String(run.stderr || '');
+        let output = String(run.stdout || '') + String(run.stderr || '');
+        if (process.env.F09_PAIRED_SDK_EVIDENCE_FILE) {
+            const evidence = process.env.F09_PAIRED_SDK_EVIDENCE_FILE;
+            if (fs.existsSync(resultFile)) fs.copyFileSync(resultFile, evidence);
+            fs.writeFileSync(evidence + '.stdout.log', String(run.stdout || ''));
+            fs.writeFileSync(evidence + '.stderr.log', String(run.stderr || ''));
+        }
+        if (run.status !== 0 && fs.existsSync(resultFile)) {
+            try {
+                const failed = JSON.parse(fs.readFileSync(resultFile, 'utf8'));
+                output += '\n' + JSON.stringify({ errors: failed.errors, cleanupErrors: failed.cleanupErrors });
+            } catch { output += '\nOwned driver result could not be parsed: ' + resultFile; }
+        }
         expect(run.error, output).toBeUndefined(); expect(run.signal, output).toBeNull(); expect(run.status, output).toBe(0);
         expect(output).not.toMatch(/^\s*(?:FAIL|SKIP|SKIPPED)\b/m);
         const result = JSON.parse(fs.readFileSync(resultFile, 'utf8'));
@@ -71,6 +118,9 @@ it('Supabase SDK ៖ paired Reset19 ប្រើ native seed ដូចគ្ន�
         expect(result.cleanup.ownedPgChildren.every((row: { exitCode: number | null; signalCode: string | null }) => row.exitCode !== null || row.signalCode !== null)).toBe(true);
         for (const [file, expected] of Object.entries(result.sourceFiles)) expect(hash(file)).toBe(expected);
         expect(preserved.map(file => [file, hash(file)])).toEqual(before);
-        if (process.env.F09_PAIRED_SDK_EVIDENCE_FILE) fs.writeFileSync(process.env.F09_PAIRED_SDK_EVIDENCE_FILE, JSON.stringify(result, null, 2) + '\n');
-    } finally { fs.rmSync(scratch, { recursive: true, force: true }); }
+        passed = true;
+    } finally {
+        if (passed) fs.rmSync(scratch, { recursive: true, force: true });
+        else console.error('Failed paired Reset evidence preserved:', scratch);
+    }
 }, 175000);

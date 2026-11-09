@@ -52,6 +52,8 @@ function serve(dir) {
     });
 }
 
+const { setBrowserScenarioTime } = require('./browser-clock-fixture.cjs');
+
 const LICENSE_STUB = `window.ZoeLicense = {
     getStatus: function () { return Promise.resolve({ state: 'active' }); },
     setServerTimeOffset: function () {},
@@ -135,7 +137,7 @@ const FAKE_SDK = function (seed) {
         signOut: () => Promise.resolve(),
         setPersistence: () => Promise.resolve(),
         browserLocalPersistence: {}, browserSessionPersistence: {},
-        getIdTokenResult: () => Promise.resolve({ authTime: new Date().toISOString(), claims: {} }),
+        getIdTokenResult: () => Promise.resolve({ authTime: new Date(window.__fixtureAuthTime === undefined ? Date.now() : window.__fixtureAuthTime).toISOString(), claims: {} }),
         getDatabase: app => ({ app, fake: true }),
         ref: (d, p) => ({ path: p === undefined ? '' : String(p),
             toString: () => p === undefined || p === '' || /^zoew_daily_pickup_cod_dod(?:\/|$)/.test(String(p))
@@ -1491,9 +1493,9 @@ function seedData() {
 
         // --- លុបប្រវត្តិទាំងអស់ ត្រូវយកច្បាប់ចម្លងរបស់ server មិនមែនរបស់សតិ ---
         if (app === 'ZoeW') {
-            const realDateNow = await page.evaluateHandle(() => Date.now);
             try {
-                await page.evaluate((now) => { Date.now = () => now; }, Date.parse(seed._dateKey + 'T16:59:59.000Z'));
+                await page.evaluate(setBrowserScenarioTime, Date.parse(seed._dateKey + 'T16:58:00.000Z'));
+                await page.waitForFunction(() => window.serverClockIsTrustworthy() && window.sessionExpiryCheck === 'live' && !window.sessionExpiryCheckInFlight);
                 await page.evaluate(() => {
                     Object.keys(window.__fakeStore.zoew_scan_history_cod_dod).forEach((k) => {
                         delete window.__fakeStore.zoew_scan_history_cod_dod[k];
@@ -1505,7 +1507,7 @@ function seedData() {
                 });
                 await page.waitForTimeout(300);
                 await page.evaluate((dk) => {
-                    const now = Date.now();
+                    const now = window.getServerNow();
                     const mk = (id, phone, code, cod) => ({
                         id, phone, scanDate: dk, createdAt: now - 200, cod, dod: 0, price: cod, count: 1,
                         barcode: code, time: '20:00', isClosed: false,
@@ -1519,11 +1521,14 @@ function seedData() {
                 }, seed._dateKey);
                 await page.waitForTimeout(400);
 
+                await page.evaluate(setBrowserScenarioTime, Date.parse(seed._dateKey + 'T16:59:00.000Z'));
+                await page.waitForFunction(() => window.serverClockIsTrustworthy() && window.sessionExpiryCheck === 'live' && !window.sessionExpiryCheckInFlight);
                 await page.evaluate(() => window.filterDataByDate('today'));
                 const clearIdsBeforeMidnight = await page.evaluate(() => window.getFilteredDataByDate().map((item) => item.id).sort());
                 check(JSON.stringify(clearIdsBeforeMidnight) === JSON.stringify(['id_cl_a', 'id_cl_b', 'id_cl_c']),
                     'ZoeW: មុនអធ្រាត្រកម្ពុជា ➜ តម្រងថ្ងៃនេះជ្រើស fixture ទាំងបី', JSON.stringify(clearIdsBeforeMidnight));
-                await page.evaluate((now) => { Date.now = () => now; }, Date.parse(seed._dateKey + 'T17:00:01.000Z'));
+                await page.evaluate(setBrowserScenarioTime, Date.parse(seed._dateKey + 'T17:00:01.000Z'));
+                await page.waitForFunction(() => window.serverClockIsTrustworthy() && window.sessionExpiryCheck === 'live' && !window.sessionExpiryCheckInFlight);
                 const clearIdsAfterMidnight = await page.evaluate(() => window.getFilteredDataByDate().map((item) => item.id));
                 check(clearIdsAfterMidnight.length === 0,
                     'ZoeW: ក្រោយអធ្រាត្រកម្ពុជា ➜ fixture មិនមែនថ្ងៃនេះទៀត', JSON.stringify(clearIdsAfterMidnight));
@@ -1544,9 +1549,9 @@ function seedData() {
                     delete S.id_cl_b;
                     S.id_cl_new = {
                         id: 'id_cl_new', phone: '0655111444', scanDate: window.__fakeStore._dateKey,
-                        createdAt: Date.now(), cod: 4, dod: 0, price: 4, count: 1, barcode: 'CL9',
+                        createdAt: window.getServerNow(), cod: 4, dod: 0, price: 4, count: 1, barcode: 'CL9',
                         time: '20:05', isClosed: false,
-                        barcodes: [{ code: 'CL9', time: '20:05', cod: 4, dod: 0, locker: 'Q9', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: Date.now() }]
+                        barcodes: [{ code: 'CL9', time: '20:05', cod: 4, dod: 0, locker: 'Q9', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: window.getServerNow() }]
                     };
                     window.clearHistory();
                 });
@@ -1579,8 +1584,8 @@ function seedData() {
                     'ZoeW: លុបទាំងអស់ ➜ ចំណូលមិនប្រែសោះ (គោលការណ៍ លុប)',
                     JSON.stringify(revCl0) + ' ➜ ' + JSON.stringify(clState.rev));
             } finally {
-                await page.evaluate((originalNow) => { Date.now = originalNow; }, realDateNow);
-                await realDateNow.dispose();
+                await page.evaluate(setBrowserScenarioTime, null);
+                await page.waitForFunction(() => window.serverClockIsTrustworthy() && window.sessionExpiryCheck === 'live' && !window.sessionExpiryCheckInFlight);
             }
         }
 

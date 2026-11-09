@@ -89,7 +89,7 @@ function adapter(pending, hooks = {}) {
     };
 }
 const SOURCE = fs.readFileSync(path.join(ROOT, 'ZoeW', 'app.js'), 'utf8');
-const protocolRuntime = moduleRuntime(ROOT, SOURCE, [{ path: 'src/core/clock.ts', expose: ['serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'captureClockOperation', 'getServerClockBounds', 'acceptServerClockOffset', 'resetServerClock'] }, 'src/core/session-verification.ts', 'src/domain/scan-protocol.ts', { path: 'src/domain/registry-purge-proof.ts', expose: ['REGISTRY_RELEASES_ROOT', 'REGISTRY_PURGE_MAX_WRITES', 'registryPurgeReceiptValid', 'registryPurgeReceiptMatches', 'registryPurgeIntent'] }, { path: 'src/services/registry-purge.ts', expose: ['purgeTrashWithRegistry'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations'] }]);
+const protocolRuntime = moduleRuntime(ROOT, SOURCE, [{ path: 'src/core/clock.ts', expose: ['getServerNow', 'serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'captureClockOperation', 'getServerClockBounds', 'acceptServerClockOffset', 'resetServerClock'] }, 'src/core/session-verification.ts', 'src/domain/scan-protocol.ts', { path: 'src/domain/registry-purge-proof.ts', expose: ['REGISTRY_RELEASES_ROOT', 'REGISTRY_PURGE_MAX_WRITES', 'registryPurgeReceiptValid', 'registryPurgeReceiptMatches', 'registryPurgeIntent'] }, { path: 'src/services/registry-purge.ts', expose: ['purgeTrashWithRegistry'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations'] }]);
 const declarations = modulePrograms(SOURCE, path.join(ROOT, 'ZoeW', 'app.js'), { ecmaVersion: 'latest' }).flatMap(program => program.body);
 const FNS = declarations.filter((node) => node.type === 'FunctionDeclaration');
 const NEEDED_CONSTANTS = new Set(['restoreCancellationInFlight', 'restoreRecoveryHolds', 'RESTORE_RECOVERY_REQUIRED_TEXT', 'RESTORE_INTENTS_KEY', 'CLEANUP_STAGE_SLOT', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_UNDO', 'CLEANUP_STAGE_COLLECTED', 'TRASH_REASON_META', 'CLEANUP_LEDGER_KEYED', 'CLEANUP_LEDGER_RETRY_MAX', 'CLEANUP_NO_PRIOR', 'CLEANUP_LIVE_LOCK_PREFIX', 'cleanupJournalLive', 'cleanupResumeBarrier', 'DB_OP_TIMEOUT_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'RESTORE_CLAIM_LEASE_MS',
@@ -102,7 +102,25 @@ const NEEDED_CONSTANTS = new Set(['restoreCancellationInFlight', 'restoreRecover
 const CONSTANTS = declarations.filter((node) => node.type === 'VariableDeclaration')
     .flatMap((node) => node.declarations.filter((decl) => NEEDED_CONSTANTS.has(decl.id.name))
         .map((decl) => 'const ' + SOURCE.slice(decl.start, decl.end) + ';'));
-function tab(suffix, hooks) {
+// នាឡិកា scenario កករហូតតេស្តផ្លាស់ពេល៖ bounds និង timestamps ប្រើ sample ដូចគ្នា។
+function restoreScenarioClock(initial) {
+    let epoch = initial, monotonic = 0;
+    return {
+        Date: class extends Date {
+            constructor(...args) { super(...(args.length ? args : [epoch])); }
+            static now() { return epoch; }
+        },
+        performance: { now: () => monotonic },
+        sample(at = epoch) {
+            if (!Number.isSafeInteger(at) || at < epoch) throw new Error('Invalid fixture time');
+            monotonic += at - epoch;
+            epoch = at;
+            return Object.freeze({ epochMs: epoch, wallMs: epoch, monotonicMs: monotonic, uncertaintyMs: 0 });
+        }
+    };
+}
+function tab(suffix, hooks, fixedTime = false) {
+    const scenarioClock = fixedTime ? restoreScenarioClock(NOW) : null;
     const pending = new Set();
     const fb = adapter(pending, hooks);
     const toasts = [];
@@ -110,7 +128,7 @@ function tab(suffix, hooks) {
     const context = vm.createContext({
         console: { log() {}, warn() {}, error() {} },
         setTimeout: (fn, ms) => setTimeout(fn, ms < 10000 ? 0 : ms), clearTimeout,
-        Date, Math, JSON, Promise, WeakMap, queueMicrotask, performance: require('node:perf_hooks').performance, crypto: require('node:crypto').webcrypto, window: {}, navigator: {},
+        Date: scenarioClock ? scenarioClock.Date : Date, Math, JSON, Promise, WeakMap, queueMicrotask, performance: scenarioClock ? scenarioClock.performance : require('node:perf_hooks').performance, crypto: require('node:crypto').webcrypto, window: {}, navigator: {},
         document: { getElementById: (id) => id === 'editBcCodInput' ? { value: '4' } : id === 'editBcDodInput' ? { value: '2' } : null },
         db: { app: { options: { databaseURL: 'https://restore-emulator-fixture.invalid' } } },
         auth: { currentUser: { uid: 'audit-user' } }, sessionExpiryCheck: 'live', serverClockTrusted: false, isInitializingFirebase: false, dataState: { pickupPendingVersion: 0 }, dailyPickupData: {},
@@ -133,13 +151,19 @@ function tab(suffix, hooks) {
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
     vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', context);
     Object.assign(context, {
-        getServerNow: () => NOW, getFormattedDate: () => DATE,
+        getFormattedDate: () => DATE,
         generateUniqueId: () => suffix + '_' + (++seq),
         showToast: (message) => toasts.push(message), closeModal() {}, openViewListModal() {},
         openRecentlyDeletedModal() {}, refreshCurrentHistoryView() {}, updateRecentPhonesList() {}, renderRecentlyDeleted() {},
         viewListModalShowing: () => false
     });
-    context.acceptServerClockOffset(0, Object.freeze({ epochMs: NOW, wallMs: Date.now(), monotonicMs: context.performance.now(), uncertaintyMs: 0 }));
+    if (!scenarioClock) context.getServerNow = () => NOW;
+    const setTime = (at) => {
+        if (!scenarioClock) throw new Error('Fixed fixture clock required');
+        if (!context.acceptServerClockOffset(0, scenarioClock.sample(at))) throw new Error('Fixture clock rejected');
+    };
+    if (scenarioClock) setTime(NOW);
+    else context.acceptServerClockOffset(0, Object.freeze({ epochMs: NOW, wallMs: Date.now(), monotonicMs: context.performance.now(), uncertaintyMs: 0 }));
     context.sessionExpiryCheck = 'live';
     const settle = async () => {
         for (let round = 0; round < 80; round++) {
@@ -157,7 +181,7 @@ function tab(suffix, hooks) {
         context.monthlyRevenueData = state.zoew_monthly_revenue_cod_dod || {};
         context.dailyCollectedData = state.zoew_daily_collected_cod_dod || {};
     };
-    return { context, pending, toasts, settle, sync };
+    return { context, pending, toasts, settle, sync, setTime };
 }
 function seedItem() {
     return {
@@ -362,7 +386,7 @@ async function retentionScenario(mode) {
         zoew_daily_revenue_cod_dod: { [DATE]: deductedLedger(trash, 10, 0, 1) },
         zoew_monthly_revenue_cod_dod: { [MONTH]: deductedLedger(trash, 10, 0, 1) }
     }, true));
-    const client = tab('retention');
+    const client = tab('retention', undefined, true);
     client.context.pendingRestoreId = 'id_restore';
     await client.context.executeRestoreItem();
     await client.settle();
@@ -386,13 +410,13 @@ async function retentionScenario(mode) {
         mode + '៖ មិនកាត់ប្រាក់របស់ barcode ដែលទើបស្តារ', daily);
     const restoredRow = live.find((item) => item.barcodes.some((b) => b.code === 'RESTORE_BC'));
     if (!restoredRow) { check(false, mode + '៖ មិនអាចសាកព្រំដែន៧ថ្ងៃ ព្រោះ barcode បាត់'); return; }
-    client.context.getServerNow = () => NOW + 7 * 24 * 60 * 60 * 1000;
+    client.setTime(NOW + 7 * 24 * 60 * 60 * 1000);
     await client.context.claimAndCleanupItem(restoredRow.id, 'abandon');
     await client.settle();
     const boundary = accepted(await request('GET', '/zoew_scan_history_cod_dod'));
     check(Object.values(boundary || {}).some((item) => item.barcodes.some((b) => b.code === 'RESTORE_BC')),
         mode + '៖ restored barcode នៅគ្រប់៧ថ្ងៃគត់ មិនទាន់ចូល «ត្រឡប់»');
-    client.context.getServerNow = () => NOW + 7 * 24 * 60 * 60 * 1000 + 1;
+    client.setTime(NOW + 7 * 24 * 60 * 60 * 1000 + 1);
     await client.context.claimAndCleanupItem(restoredRow.id, 'abandon');
     await client.settle();
     const afterAbandon = accepted(await request('GET', '/', undefined, true));

@@ -22,6 +22,12 @@
 //    ដើមដែលទិដ្ឋភាពប្រកាសជា `let` កម្រិតកំពូលរួចហើយ ហើយ checker ផ្គត់ផ្គង់វាក្នុង sandbox ផ្ទាល់ខ្លួន។
 'use strict';
 
+// ប្រភពមាន dependency នៅ ZoeW/node_modules; run-all ចងវានៅ root វាស់។
+// ជ្រើសរើសរបស់គម្រោងជាមុន ដូច audit-module-ast មិនពឹងតែ NODE_PATH របស់ shell ទេ។
+function auditAcorn() {
+    return require(require.resolve('acorn', { paths: [require('path').join(__dirname, '../ZoeW'), __dirname] }));
+}
+
 function appCodeLabel(root, app) {
     if (app === 'ZoeW' && require('fs').existsSync(require('path').join(root, app, 'audit-module-views.json'))) {
         return 'ZoeW/src/** ➜ app.js (ទិដ្ឋភាព build វាស់ក្នុង dist-audit មិនមែនប្រភព)';
@@ -67,7 +73,7 @@ function scanEvidenceRuntime(root, src) {
 // lists. Global accessors expose the same live sets/maps used by these functions,
 // so lock and journal assertions cannot accidentally inspect a disconnected copy.
 function moduleRuntime(root, src, modulePaths) {
-    const fs = require('fs'), path = require('path'), acorn = require('acorn');
+    const fs = require('fs'), path = require('path'), acorn = auditAcorn();
     const views = JSON.parse(fs.readFileSync(path.join(root, 'ZoeW', 'audit-module-views.json'), 'utf8'));
     const names = new Set(), functionNames = new Set(), variableNames = new Set();
     const parts = modulePaths.map((entry) => {
@@ -144,7 +150,7 @@ function memoryStorage(initial = {}) {
 //    `src/app/flush.ts` · `src/platform/document-io.ts`) — ពួកវាជា «ច្រកចេញ» ដែលជំនួសការប៉ះ DOM ផ្ទាល់របស់
 //    `app.js` ដើម (`byId(x).value` · `el.style.display = …` · `document.createElement('canvas')` …)
 function wrappedTransactionCallSites(sources) {
-    const acorn = require('acorn');
+    const acorn = auditAcorn();
     const sites = [];
     const namesOf = (node, out = []) => {
         if (!node) return out;
@@ -294,7 +300,7 @@ const REACT_CONSTS = ['appLocalStore', 'appSessionStore', 'REF_NAMES', 'TEXT_BLA
     'FIREBASE_WEBSOCKET_WAIT_MS', 'FIREBASE_WEBSOCKET_RECHECK_MS', 'FIREBASE_WEBSOCKET_BLOCKED_TEXT'];
 
 function sliceConst(src, name) {
-    const acorn = require('acorn');
+    const acorn = auditAcorn();
     const m = new RegExp('^( *)const ' + name + ' = ', 'm').exec(src);
     if (!m) return null;
     const at = m.index + m[1].length + ('const ' + name + ' = ').length;
@@ -347,7 +353,7 @@ const LITERAL_INIT_KEPT = ['a', 'b', 'c', 'd', 'e', 'k', 'l'];
 
 /** ⛔ self-check ៖ literal ជាជាន់ៗនៅដដែល · មិនមែន literal (សូម្បីតែជ្រៅខាងក្នុង) ➜ `undefined` */
 function literalInitSelfCheck() {
-    const acorn = require('acorn');
+    const acorn = auditAcorn();
     const probe = acorn.parseExpressionAt(LITERAL_INIT_PROBE, 0, { ecmaVersion: 'latest' });
     for (const p of probe.properties) {
         const got = literalInit(p.value, LITERAL_INIT_PROBE);
@@ -358,7 +364,7 @@ function literalInitSelfCheck() {
 
 /** `const <ឃ្លាំង> = createStore('<ឃ្លាំង>', {...})` ទាំងអស់ក្នុងទិដ្ឋភាព ➜ អត្ថបទ (តម្លៃ literal តែប៉ុណ្ណោះ) */
 function storeDefinitions(src) {
-    const acorn = require('acorn');
+    const acorn = auditAcorn();
     literalInitSelfCheck();
     const out = [];
     const re = /^ *const (\w+) = createStore\('(\w+)', \{/gm;
@@ -627,7 +633,7 @@ function renderedElement(root, ctx, rel, exportName, id) {
  * ⛔ រកមិនឃើញ ➜ `null` (checker ត្រូវធ្លាក់ មិនមែនសន្មត)
  */
 function jsxHandler(root, id, prop) {
-    const acorn = require('acorn');
+    const acorn = auditAcorn();
     const text = require('fs').readFileSync(require('path').join(root, 'ZoeW', 'react-render.cjs'), 'utf8');
     const at = text.indexOf('id: ' + JSON.stringify(id) + ',');
     if (at === -1) return null;
@@ -662,7 +668,7 @@ function jsxHandler(root, id, prop) {
  * asset តាម hash (`./assets/index-<hash>.js`) ➜ checker ដែលធ្លាប់ចាក់ `./app.js` · `./style.css` ត្រូវដេរីវេពីទីនេះ។
  */
 function swShell(root, app) {
-    const acorn = require('acorn');
+    const acorn = auditAcorn();
     const src = require('fs').readFileSync(require('path').join(root, app || 'ZoeW', 'sw.js'), 'utf8');
     const out = {};
     for (const st of acorn.parse(src, { ecmaVersion: 'latest' }).body) {
@@ -722,7 +728,7 @@ function auditModuleSources(appDir, js) {
 function actionUsages(appDir, js) {
     const fs = require('fs');
     const path = require('path');
-    const acorn = require('acorn');
+    const acorn = auditAcorn();
     const compPath = path.join(appDir, 'components.js');
     if (!fs.existsSync(compPath)) return null;
     const comp = fs.readFileSync(compPath, 'utf8');
@@ -772,7 +778,7 @@ async function waitAuditBridge(page, name = 'initScanEngine', budgetMs = AUDIT_B
 }
 
 module.exports = {
-    appCodeLabel, readAppCode, scanEvidenceRuntime, scanRecoveryRuntime, moduleRuntime, memoryStorage, wrappedTransactionCallSites, swShell, auditModuleSourceRanges, auditModuleSources, actionUsages, waitAuditBridge, AUDIT_BRIDGE_WAIT_MS,
+    auditAcorn, appCodeLabel, readAppCode, scanEvidenceRuntime, scanRecoveryRuntime, moduleRuntime, memoryStorage, wrappedTransactionCallSites, swShell, auditModuleSourceRanges, auditModuleSources, actionUsages, waitAuditBridge, AUDIT_BRIDGE_WAIT_MS,
     REACT_HELPERS, REACT_CONSTS, sliceFunction, sliceConst, storeDefinitions, reactRuntime,
     renderComponent, renderFromContext, renderedContainer, renderedElement, topLevelElements, elementById, jsxHandler
 };

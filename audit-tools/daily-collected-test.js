@@ -398,6 +398,9 @@ const DAILY = 'zoew_daily_revenue_cod_dod';
 const MONTHLY = 'zoew_monthly_revenue_cod_dod';
 const PICKUP = 'zoew_daily_pickup_cod_dod';
 function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
+    let clockAdvanceMs = 0;
+    const clockDate = class extends Date { static now() { return Date.now() + clockAdvanceMs; } };
+    const clockPerformance = { now: () => performance.now() + clockAdvanceMs };
     const server = sharedStore || clone(initial);
     const calls = [];
     const messages = [];
@@ -425,7 +428,7 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
     }
     function snap(p) { const value = clone(read(p)); return { exists: () => value !== null, val: () => clone(value) }; }
     const box = {
-        crypto: require('crypto').webcrypto, console, queueMicrotask, Date, Intl, setTimeout, clearTimeout, Promise, Set, Map, WeakMap, performance: require('node:perf_hooks').performance,
+        crypto: require('crypto').webcrypto, console, queueMicrotask, Date: clockDate, Intl, setTimeout, clearTimeout, Promise, Set, Map, WeakMap, performance: clockPerformance,
         db: { app: { options: { databaseURL: 'https://collected-fixture.invalid' } } },
         auth: { currentUser: { uid: 'fixture-user' } }, sessionExpiryCheck: 'live', serverClockTrusted: false, serverTimeOffsetMs: 0, isDatabaseConnected: true, isInitializingFirebase: false, dataState: { pickupPendingVersion: 0 },
         authGeneration: 0, dbRefHistory: { path: HISTORY }, dbRefDeleted: { path: TRASH },
@@ -486,9 +489,9 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
         probeDatabaseLiveness: () => Promise.resolve(null)
     });
     vm.runInContext(protocolRuntime.code, box);
-    box.acceptServerClockOffset(0, Object.freeze({ epochMs: now, wallMs: Date.now(), monotonicMs: box.performance.now(), uncertaintyMs: 0 }));
+    box.acceptServerClockOffset(0, Object.freeze({ epochMs: now, wallMs: box.Date.now(), monotonicMs: box.performance.now(), uncertaintyMs: 0 }));
     box.sessionExpiryCheck = 'live';
-    return { box, server, calls, messages, read, write, sync() {
+    return { box, server, calls, messages, read, write, advanceClock(ms) { now += ms; clockAdvanceMs += ms; }, sync() {
         box.scanHistory = Object.values(clone(server[HISTORY] || {}));
         box.deletedItems = Object.values(clone(server[TRASH] || {}));
         box.dailyCollectedData = clone(server[COLLECTED] || {});
@@ -987,7 +990,6 @@ async function testCollectedClockFixture() {
     for (const day of ['2026-09-05', '2026-09-06', '2026-09-07']) {
         await operationScenario('៣៦. កែតម្លៃជាប់ cleanup តាមព្រំដែនរក្សាទុក — ' + day, async () => {
             const s = makeOperationSandbox(retentionFixture(day));
-            s.box.cleanupClockIsTrustworthy = () => true;
             const held = holdNextCollectedWrite(s);
             editOperation(s, 24.5, 1.75);
             await operationTicks();
@@ -1014,10 +1016,8 @@ async function testCollectedClockFixture() {
     for (const late of [false, true]) {
         await operationScenario('៣៧. កែតម្លៃឆ្លងអធ្រាត្រ ខណៈ cleanup បានលុបថ្ងៃដើម — ' + late, async () => {
             const day = '2026-09-06';
-            let now = Date.UTC(2026, 8, 12, 16, 59, 59);
+            const now = Date.UTC(2026, 8, 12, 16, 59, 59);
             const s = makeOperationSandbox(retentionFixture(day), now);
-            s.box.getServerNow = () => now;
-            s.box.cleanupClockIsTrustworthy = () => true;
             if (late) s.box.DB_OP_TIMEOUT_MS = 10;
             const held = holdNextCollectedWrite(s);
             editOperation(s, 24.5, 1.75);
@@ -1025,7 +1025,9 @@ async function testCollectedClockFixture() {
             ok('ជាន់អប្បបរមា៖ សំណើត្រូវបានទប់ ខណៈថ្ងៃដើមនៅក្នុង retention',
                 !!held.pending && s.box.collectedRetentionCutoffKey(now) === day, { held: !!held.pending, cutoff: s.box.collectedRetentionCutoffKey(now) });
             if (!held.pending) return;
-            now = Date.UTC(2026, 8, 12, 17, 0, 1);
+            s.advanceClock(2000);
+            ok('ជាន់អប្បបរមា៖ clock owner ពិតឆ្លងអធ្រាត្រ ហើយនៅទុកចិត្តបាន',
+                s.box.cleanupClockIsTrustworthy() && s.box.collectedRetentionCutoffKey(s.box.getServerClockBounds().lowerMs) === '2026-09-07');
             s.box.runAutomaticCollectedCleanup(); await operationTicks(late ? 25 : 2);
             ok('ក្រោយអធ្រាត្រ server បានលុបថ្ងៃដែលទើបហួសអាយុ', !s.read(COLLECTED + '/' + day + '/FIXTURE1'), s.read(COLLECTED));
             await s.box.fb.update(s.box.dbRefDailyCollected, { ['2026-09-13/FRESH2']: { c: 3.5, d: 1 } });
@@ -1042,7 +1044,6 @@ async function testCollectedClockFixture() {
         initial[COLLECTED]['2026-09-06'] = { KEEP1: { c: 6, d: 0.5 } };
         initial[COLLECTED]['មិនមែនថ្ងៃ'] = { META: { c: 0, d: 0 } };
         const s = makeOperationSandbox(initial);
-        s.box.cleanupClockIsTrustworthy = () => true;
         const beforeMoney = moneySources(s);
         const held = holdNextCollectedWrite(s);
         s.box.runAutomaticCollectedCleanup(); await operationTicks(2);
@@ -1059,7 +1060,6 @@ async function testCollectedClockFixture() {
     for (const late of [false, true]) {
         await operationScenario('៣៩. cleanup ត្រូវបដិសេធ ហើយអាចសាកឡើងវិញ — ' + late, async () => {
             const s = makeOperationSandbox(retentionFixture('2026-09-05'));
-            s.box.cleanupClockIsTrustworthy = () => true;
             if (late) s.box.DB_OP_TIMEOUT_MS = 10;
             const beforeMoney = moneySources(s);
             const held = holdNextCollectedWrite(s);
@@ -1079,7 +1079,6 @@ async function testCollectedClockFixture() {
     for (const change of ['auth', 'database']) {
         await operationScenario('៤០. cleanup ដែលបដិសេធក្រោយប្ដូរ session — ' + change, async () => {
             const s = makeOperationSandbox(retentionFixture('2026-09-05'));
-            s.box.cleanupClockIsTrustworthy = () => true;
             const reports = [];
             s.box.ZoeErrors = { capture: (error, context) => reports.push(context) };
             const held = holdNextCollectedWrite(s);
@@ -1098,9 +1097,13 @@ async function testCollectedClockFixture() {
     for (const gate of ['clock', 'listener']) {
         await operationScenario('៤១. មិនដាក់ការផុតអាយុថ្មី បើ cleanup មិនបានលុបពិត — ' + gate, async () => {
             const s = makeOperationSandbox(retentionFixture('2026-09-05'));
-            s.box.cleanupClockIsTrustworthy = () => gate !== 'clock';
+            if (gate === 'clock') s.box.resetServerClock();
             if (gate === 'listener') s.box.dbListenerFailedPaths.add(s.box.DB_LISTENER_KEY_DAILY_COLLECTED);
             s.box.runAutomaticCollectedCleanup(); await operationTicks(2);
+            if (gate === 'clock') {
+                s.box.acceptServerClockOffset(0, Object.freeze({ epochMs: NOW_B, wallMs: s.box.Date.now(), monotonicMs: s.box.performance.now(), uncertaintyMs: 0 }));
+                s.box.sessionExpiryCheck = 'live';
+            }
             editOperation(s, 24.5, 1.75); await operationTicks();
             ok('កែតម្លៃកំណត់ត្រាដែលនៅមាន ដោយមិនលុបតាមអាយុនៅក្នុងផ្លូវកែតម្លៃ — ' + gate,
                 s.read(COLLECTED + '/2026-09-05/FIXTURE1/c') === 24.5 && collectedTotal(s.server) === 26.25, s.read(COLLECTED));
@@ -1123,7 +1126,6 @@ async function testCollectedClockFixture() {
         const initial = editFixture();
         initial[COLLECTED]['2026-09-05'] = { EXPIRED2: { c: 3.5, d: 1 } };
         const s = makeOperationSandbox(initial);
-        s.box.cleanupClockIsTrustworthy = () => true;
         const held = holdNextCollectedWrite(s);
         editOperation(s, 24.5, 1.75);
         for (let index = 0; !held.pending && index < 30; index++) await operationTicks(1);

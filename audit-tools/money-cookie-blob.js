@@ -211,29 +211,57 @@ async function networkGate(ctx, backend, expectedTenant) {
 }
 
 // នេះសាកច្បាប់ timestamp ទល់នឹង clock input របស់ App មិនសាក clock estimator ខ្លួនវា។
+// ស្ពាន audit បង្ខំ React commit ពេលហៅ wrapper; អានតែម្ចាស់ដើម ហើយ marker ខូចមិនអាច fallback។
 function installMoneyClockWitness() {
     if (window.__moneyClockWitness) return;
     const wallNow = Date.now;
     const witness = window.__moneyClockWitness = { min: Infinity, max: -Infinity };
+    let recording = false;
     Date.now = () => {
-        const now = wallNow(), offset = window.serverTimeOffsetMs;
-        if (Number.isFinite(offset)) {
-            witness.min = Math.min(witness.min, now + offset);
-            witness.max = Math.max(witness.max, now + offset);
-        }
-        return now;
+        try {
+            const now = wallNow();
+            if (!recording && typeof window.getServerNow === 'function') {
+                recording = true;
+                try {
+                    const clock = window.getServerNow;
+                    const owner = Object.getOwnPropertyDescriptor(clock, '__auditOrig');
+                    const raw = owner ? owner.value : !('__auditOrig' in clock) && !Object.prototype.hasOwnProperty.call(clock, 'toString') ? clock : null;
+                    const serverNow = typeof raw === 'function' && (!owner || raw !== clock) ? raw.call(window) : NaN;
+                    if (Number.isFinite(serverNow)) {
+                        witness.min = Math.min(witness.min, serverNow);
+                        witness.max = Math.max(witness.max, serverNow);
+                    } else { witness.min = NaN; witness.max = NaN; }
+                } finally { recording = false; }
+            } else if (!recording && Number.isFinite(witness.min)) {
+                witness.min = NaN; witness.max = NaN;
+            }
+            return now;
+        } catch (error) { witness.min = NaN; witness.max = NaN; throw error; }
     };
 }
 
 async function confirmWithClockWindow() {
     const wallNow = Date.now;
     let before = Infinity, after = -Infinity;
-    // RPC អាចកែ offset កណ្ដាល confirm; កត់ពេលដែល App អាចអាន ដោយមិនប្ដូរតម្លៃនាឡិកា។
+    let recording = false;
+    // RPC អាចកែ anchor កណ្ដាល confirm; អាន clock input ពិត មិនគណនា wall + offset ជំនួស។
     Date.now = () => {
-        const now = wallNow();
-        const serverNow = now + window.serverTimeOffsetMs;
-        before = Math.min(before, serverNow); after = Math.max(after, serverNow);
-        return now;
+        try {
+            const now = wallNow();
+            if (!recording) {
+                recording = true;
+                try {
+                    const clock = window.getServerNow;
+                    const owner = typeof clock === 'function' ? Object.getOwnPropertyDescriptor(clock, '__auditOrig') : null;
+                    const raw = owner ? owner.value : typeof clock === 'function' && !('__auditOrig' in clock) && !Object.prototype.hasOwnProperty.call(clock, 'toString') ? clock : null;
+                    const serverNow = typeof raw === 'function' && (!owner || raw !== clock) ? raw.call(window) : NaN;
+                    if (Number.isFinite(serverNow)) {
+                        before = Math.min(before, serverNow); after = Math.max(after, serverNow);
+                    } else { before = NaN; after = NaN; }
+                } finally { recording = false; }
+            }
+            return now;
+        } catch (error) { before = NaN; after = NaN; throw error; }
     };
     try {
         Date.now(); await window.confirmPhone(); Date.now();

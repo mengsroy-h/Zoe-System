@@ -24,7 +24,8 @@ const fs = require('fs'), http = require('http'), path = require('path');
 // នៅថ្ងៃមុន ខណៈ App នៅថ្ងៃបន្ទាប់ ➜ ជួរដេកដែល seed មិនត្រូវនឹងតម្រង
 // «ថ្ងៃនេះ» ➜ គ្មានជួរដេកបង្ហាញ ➜ waitForFunction timeout។
 const APP_ZONE = 'Asia/Phnom_Penh';
-const FIXTURE_NOW = Date.now();
+// ថ្ងៃថេរម៉ោង១៣កម្ពុជា៖ seed និង clock ដើររួមគ្នា ដោយមិនឆ្លងអធ្រាត្រកណ្ដាលការវាស់។
+const FIXTURE_NOW = Date.UTC(2026, 8, 22, 6);
 function zoneDateKey(ms, dayOffset) {
     const p = new Intl.DateTimeFormat('en-CA', {
         timeZone: APP_ZONE, year: 'numeric', month: '2-digit', day: '2-digit'
@@ -105,10 +106,11 @@ const BOOT = function (seed) {
 
 function pinPanelFixtureClock(now) {
     const NativeDate = globalThis.Date;
-    const wallNow = () => now;
+    const started = performance.now();
+    const wallNow = () => now + Math.floor(performance.now() - started);
     globalThis.Date = new Proxy(NativeDate, {
-        apply: () => new NativeDate(now).toString(),
-        construct: (target, args, newTarget) => Reflect.construct(target, args.length ? args : [now], newTarget),
+        apply: () => new NativeDate(wallNow()).toString(),
+        construct: (target, args, newTarget) => Reflect.construct(target, args.length ? args : [wallNow()], newTarget),
         get: (target, key, receiver) => key === 'now' ? wallNow : Reflect.get(target, key, receiver)
     });
 }

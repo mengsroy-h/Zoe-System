@@ -157,12 +157,14 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
             Date.now = () => realNow() + skew;
             window.__zoeSkew = (ms) => { skew += ms; };
         }, JSON.stringify(config));
+        // ⛔ ការអាន settings ឯករាជ្យផ្តល់ sample ពី RPC ពិត មុនផ្ទៀងផ្ទាត់អាយុវគ្គ។ កុំដោះ pull ដែលកាន់ទុកដើម្បីយក clock ឬបង្ខំ trust។
         // ⛔ ផ្នែក ជ តែប៉ុណ្ណោះ (sessionStorage `__zoeExpiryRace` ➜ ការផ្ទុកមួយដង) ៖ ការពិនិត្យ ៤ ម៉ោង (`fb.getIdTokenResult`) រង់ចាំរហូត `zoe_pull` ចេញពីទំព័រ (ពិដាន ១០ វិ.)
         await ctx.addInitScript(() => {
             let armed = false;
             try { armed = sessionStorage.getItem('__zoeExpiryRace') === '1'; if (armed) sessionStorage.removeItem('__zoeExpiryRace'); } catch (e) {}
             if (!armed) return;
-            const st = { pullSent: false, waitedMs: -1, wrapped: 0 };
+            const st = { pullSent: false, waitedMs: -1, wrapped: 0, clockRead: false, clockTrusted: false, clockReadStartedAt: 0, clockReadFinishedAt: 0 };
+            let clockRead = null;
             window.__zoeExpiryRace = st;
             const realFetch = window.fetch;
             window.fetch = function (input) {
@@ -179,6 +181,15 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
                     const w0 = Date.now();
                     while (!st.pullSent && Date.now() - w0 < 10000) await new Promise((r) => setTimeout(r, 20));
                     st.waitedMs = Date.now() - w0;
+                    if (st.pullSent && !clockRead) {
+                        st.clockReadStartedAt = Date.now();
+                        clockRead = fb.get(fb.ref(window.firebaseState.db, 'zoew_settings/exchange_rate')).then(() => {
+                            st.clockRead = true;
+                            st.clockTrusted = window.firebaseState.serverClockTrusted === true;
+                            st.clockReadFinishedAt = Date.now();
+                        }, () => { st.clockReadFinishedAt = Date.now(); });
+                    }
+                    if (clockRead) await clockRead;
                     return orig.apply(this, arguments);
                 };
                 fb.__zoeExpiryRace = true;
@@ -306,17 +317,33 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         //    (១) ទំព័រថ្មី (តែការផ្ទុកនេះ) ៖ `getIdTokenResult()` រង់ចាំរហូត `zoe_pull` ចេញពីទំព័រ ➜ ការសម្រេចផុតកំណត់ធ្លាក់ចំពេលការទាញកំពុងរត់ (២) server ៖ ចម្លើយការទាញនោះរង់ចាំរហូតការចាកចេញ
         // ⛔ «ចេញមុនការចាកចេញ» សម្រេចពេលការទាញ **មកដល់** (`before`) មិនមែនពេល `after` ទេ ៖ ការចាកចេញក្នុងឧបករណ៍មិនពឹងបណ្តាញ (G4) ➜ logout អាចមកដល់
         //    ចន្លោះ `before` និង `after` ➜ ចម្លើយមកក្រោយ logout ពិត តែ hook ចាស់មើលមិនឃើញ (CI ៖ `pullHeld:false`)
-        const race = { pullBeforeLogout: false, pullHeld: false, pullReleasedAfterLogout: false, pullSettled: false };
+        const race = { pullBeforeLogout: false, pullHeld: false, pullReleasedAfterLogout: false, pullSettled: false, requestIndex: -1, pSince: 0, pullReceivedAt: 0, pullHeldAt: 0, pullReleasedAt: 0, logoutReceivedAt: 0, clockReads: [] };
+        let selectedPullBody = null;
         const loggedOut = () => fake.requests.slice(reloadMark).some((r) => /\/auth\/v1\/logout/.test(r.path));
         const newPageRefreshed = () => fake.requests.slice(reloadMark).some((r) => /grant_type=refresh_token/.test(r.search || ''));
-        fake.setRpcHook(async ({ fn, phase }) => {
-            if ((fn === 'zoe_pull' || fn === 'zoe_pull_delta') && phase === 'before' && !race.pullBeforeLogout && newPageRefreshed() && !loggedOut()) race.pullBeforeLogout = true;
-            if ((fn === 'zoe_pull' || fn === 'zoe_pull_delta') && phase === 'after' && race.pullBeforeLogout && !race.pullHeld) {
+        fake.setRpcHook(async ({ fn, phase, body, result }) => {
+            if (fn === 'zoe_read' && phase === 'before' && body?.p_root === 'zoew_settings' && body?.p_key === 'exchange_rate') {
+                const t0 = Date.now();
+                while (!race.pullBeforeLogout && Date.now() - t0 < 10000) await sleep(20);
+            }
+            if (fn === 'zoe_read' && phase === 'after' && body?.p_root === 'zoew_settings' && body?.p_key === 'exchange_rate') {
+                race.clockReads.push({ requestIndex: fake.requests.findIndex(r => r.body === body), at: Date.now(), now: result?.[0]?.r?.now });
+            }
+            if ((fn === 'zoe_pull' || fn === 'zoe_pull_delta') && phase === 'before' && Number(body?.p_since) > 0 && !race.pullBeforeLogout && newPageRefreshed() && !loggedOut()) {
+                selectedPullBody = body;
+                race.pullBeforeLogout = true;
+                race.requestIndex = fake.requests.findIndex(r => r.body === body);
+                race.pSince = Number(body.p_since);
+                race.pullReceivedAt = Date.now();
+            }
+            if ((fn === 'zoe_pull' || fn === 'zoe_pull_delta') && phase === 'after' && body === selectedPullBody && race.pullBeforeLogout && !race.pullHeld) {
                 race.pullHeld = true;
+                race.pullHeldAt = Date.now();
                 const t0 = Date.now();
                 while (!loggedOut() && Date.now() - t0 < 15000) await sleep(100);
                 await sleep(300);
                 race.pullReleasedAfterLogout = loggedOut();
+                race.pullReleasedAt = Date.now();
                 race.pullSettled = true;
             }
             return null;
@@ -325,6 +352,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         //     មុនដំណាក់កាល `after` (run-all ពេញ ៖ `pullHeld:false`) ➜ ពេលវេលាលែងសម្រេចលំដាប់
         fake.setAuthHook(async ({ path }) => {
             if (path !== '/auth/v1/logout' || !race.pullBeforeLogout) return;
+            race.logoutReceivedAt = Date.now();
             const t0 = Date.now();
             while (!race.pullHeld && Date.now() - t0 < 15000) await sleep(50);
         });
@@ -341,7 +369,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         const pullsAroundExpiry = pullsOf(reloadMark);
         const refreshed = fake.requests.slice(reloadMark).filter((r) => /grant_type=refresh_token/.test(r.search || '')).length;
         check(expiredAt >= 0 && refreshed >= 1 && logoutAt >= 0, 'លក្ខខណ្ឌចាំបាច់ ៖ token ផុត ➜ refresh ➜ ការផុតកំណត់ ៤ ម៉ោងចាកចេញ ➜ ប្រអប់ចូលលេច', { expiredAt, refreshed, logoutAt });
-        check(pullsAroundExpiry.some((since) => since > 0) && race.pullReleasedAfterLogout, 'លក្ខខណ្ឌចាំបាច់ ៖ ការទាញ delta ពី cache (`p_since > 0`) ចេញមុនការចាកចេញ ហើយចម្លើយមកដល់ក្រោយការចាកចេញ (ស្ថានភាពដែលផ្នែកនេះវាស់)', { pulls: pullsAroundExpiry, race, requests: fake.requests.slice(reloadMark).map((r) => r.path.replace('/rest/v1/rpc/', '') + (r.search || '')) });
+        check(pullsAroundExpiry.some((since) => since > 0) && race.pSince > 0 && race.pullReleasedAfterLogout
+            && race.page?.clockRead === true && race.page?.clockTrusted === true
+            && race.clockReads.some(read => read.requestIndex !== race.requestIndex && Number.isFinite(read.now) && read.now > 0 && read.at <= race.logoutReceivedAt), 'លក្ខខណ្ឌចាំបាច់ ៖ ការទាញ delta ពី cache (`p_since > 0`) ចេញមុនការចាកចេញ ហើយចម្លើយមកដល់ក្រោយការចាកចេញ (ស្ថានភាពដែលផ្នែកនេះវាស់)', { pulls: pullsAroundExpiry, race, requests: fake.requests.slice(reloadMark).map((r) => r.path.replace('/rest/v1/rpc/', '') + (r.search || '')) });
         fake.setAuthAge(0);
         const prefilled = await page.evaluate(() => ({ email: document.getElementById('loginEmailInput').value, pw: (document.getElementById('loginPasswordInput').value || '').length }));
         check(prefilled.email === 'sokha' && prefilled.pw > 0, 'ប្រអប់ចូលបំពេញឈ្មោះ និងពាក្យសម្ងាត់ដែលចងចាំ', prefilled);

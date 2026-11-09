@@ -6,7 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const { moduleRuntime } = require('../react-view');
+const { auditAcorn, moduleRuntime } = require('../react-view');
 const http = require('http');
 const { isDeepStrictEqual } = require('util');
 const { emuNamespace } = require('./ns.js');
@@ -53,8 +53,8 @@ const extractConst = (src, n) => { const m = new RegExp('\\n\\s*const ' + n + ' 
 const src = fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, '\n');
 let SANDBOX_SOURCE = '';
 let acorn = null;
-try { acorn = require('acorn'); } catch (e) {}
-const FNS = ['getZtoPickupVerdict', 'ztoVerdictCandidate', 'ztoImportLegacyValid', 'readDurableZtoImportLegacy', 'clearHistoryClaimValid', 'rawSnapshotToItemList', 'txCanonical', 'txSameValue', 'txDelay', 'dbListenerViewIsStale', 'barcodeEntriesOf', 'recalcItemMoneyFromBarcodes', 'normalizeBarcodesOf', 'ensureBarcodeArrayForItem', 'stripHistoryOnlyMarkers', 'trashClaimPolicy', 'newTrashClaimToken', 'trashClaimAge', 'trashClaimHeldByOther', 'ownLeftoverTrashClaim', 'trashClaimOwned', 'stripTrashClaim', 'itemHasLiveTrashClaim', 'trashClaimRecords', 'writeTrashClaimRecords', 'noteTrashClaim', 'forgetTrashClaim', 'pendingTrashClaims', 'trashClaimOwner', 'trashClaimOwnerIsCurrent', 'claimTrashBarcodes', 'releaseTrashClaims', 'beginTrashClaim', 'releaseLeftoverTrashClaims', 'itemHasRestoreMarkers', 'dropStaleRestoreMarkers',
+try { acorn = auditAcorn(); } catch (e) {}
+const FNS = ['resolveZtoPickupSignTime', 'trashClaimMayBeLive', 'getZtoPickupVerdict', 'ztoVerdictCandidate', 'ztoImportLegacyValid', 'readDurableZtoImportLegacy', 'clearHistoryClaimValid', 'rawSnapshotToItemList', 'txCanonical', 'txSameValue', 'txDelay', 'dbListenerViewIsStale', 'barcodeEntriesOf', 'recalcItemMoneyFromBarcodes', 'normalizeBarcodesOf', 'ensureBarcodeArrayForItem', 'stripHistoryOnlyMarkers', 'trashClaimPolicy', 'newTrashClaimToken', 'trashClaimAge', 'trashClaimHeldByOther', 'ownLeftoverTrashClaim', 'trashClaimOwned', 'stripTrashClaim', 'itemHasLiveTrashClaim', 'trashClaimRecords', 'writeTrashClaimRecords', 'noteTrashClaim', 'forgetTrashClaim', 'pendingTrashClaims', 'trashClaimOwner', 'trashClaimOwnerIsCurrent', 'claimTrashBarcodes', 'releaseTrashClaims', 'beginTrashClaim', 'releaseLeftoverTrashClaims', 'itemHasRestoreMarkers', 'dropStaleRestoreMarkers',
     'barcodeSignBasis', 'ztoAutoCloseEnabled', 'ztoFastModeIsOn', 'flushPendingRegistryReleases', 'ownedRegistryKeys', 'registryKeyIsOwned', 'registryReleaseVerdict', 'releaseRegistryKeys', 'queueRegistryReleaseRetry',
     'runAutomaticCollectedCleanup', 'staleCollectedDays', 'reapplyPickupMarks', 'revertPickupMarks', 'healPickupKeysLeftRow',
     'getZtoTrashMode', 'ztoTrashModeOf', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'sameShop', 'lookupApiIsZto', 'lookupApiIsPalm', 'stampTrashPolicy',
@@ -453,6 +453,22 @@ async function clearOrphanBeforeRetry(w, label) {
             console.log('   បន្ថែមវាក្នុង `FNS` ឬក្នុង context របស់ `makeSandbox()`។');
             process.exit(1);
         }
+        const clockWorld = makeSandbox({}, 1700000000000);
+        vm.runInContext("ztoPickupStatus.set('SMOKE_SIGN', { closed: true, signedAtPending: 1699999999000 });", clockWorld.ctx);
+        const signed = clockWorld.ctx.api.getZtoPickupVerdict('SMOKE_SIGN');
+        check(signed && signed.signedAt === 1699999999000 && signed.signedAtExact === true && !('signedAtPending' in signed),
+            'sandbox៖ verdict ពិតដោះ signedAtPending តាម private helper និង clock owner');
+        const liveClaim = { trashClaim: 'foreign_claim', trashClaimAt: 1700000000000 };
+        const staleClaim = { ...liveClaim, trashClaimAt: 1700000000000 - 2 * 24 * 60 * 60 * 1000 };
+        check(clockWorld.ctx.api.trashClaimHeldByOther(liveClaim, 'our_claim', 1700000000000)
+            && !clockWorld.ctx.api.trashClaimHeldByOther(staleClaim, 'our_claim', 1700000000000),
+            'sandbox៖ private claim helper បែងចែក live និង stale តាម bounds ពិត');
+        clockWorld.ctx.resetServerClock();
+        vm.runInContext("ztoPickupStatus.set('SMOKE_SIGN', { closed: true, signedAtPending: 1699999999000 });", clockWorld.ctx);
+        const untrusted = clockWorld.ctx.api.getZtoPickupVerdict('SMOKE_SIGN');
+        check(untrusted && untrusted.signedAtPending === 1699999999000 && !untrusted.signedAt
+            && clockWorld.ctx.api.trashClaimHeldByOther(staleClaim, 'our_claim', 1700000000000),
+            'sandbox៖ clock មិនទុកចិត្ត រក្សា pending Sign និង claim មិនសន្មតថាផុតអាយុ');
         const purgeRow = parcel('preflight_purge', [bc('PREFLIGHT_PURGE', 1, false)], { deletedAt: Date.now() - 1000, trashGeneration: 1 });
         const purgeMoney = { codDollar: 7, dodDollar: 2, totalCount: 1 };
         const purgeWorld = makeSandbox({ zoew_scan_history_cod_dod: {}, zoew_recently_deleted_cod_dod: { [purgeRow.id]: clone(purgeRow) },

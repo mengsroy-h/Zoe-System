@@ -1994,6 +1994,23 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-11-09 — Audit 1234៖ កែការវាស់ clock/session និង callback ដោយមិនប្ដូរ App
+
+ផ្ទៀង head `ec77aaaeb3a6753165c9c9cff868de975fc8c107` និង tree `7669c54fc2cd38b477c823f3a9c658468ff08031`។ CI checker កម្រិតលើ ២២២ជាប់/២១ធ្លាក់/០ skip/០ partial; មិនមែនកំហុសផលិតផល២១ទេ។ Candidate នេះកែតែ tests, audit fixtures និងឧបករណ៍វាស់។ មិនប្ដូរ business rules, session/clock authority, UI/motion, App/cache version, LOCK ឬ production data។
+
+- Money witness អាន monotonic clock owner ពិត ជំនួស wall+offset ដើម្បីកុំឱ្យ timestamp ត្រឹមត្រូវខុស១ms។ បង្អួចនៅបដិសេធ ±១ms ដែលនៅក្រៅព្រំ។ Independent review ចាប់បានការហៅ audit wrapper ដែលបង្ខំ React commit; regression ប្រើ wrapper និង store ពិត ហើយ witness ជ្រើស raw owner ដោយមិនបង្ខំ render។ Truthfulness VM ត្រូវដោះ dependency តាម target root ពិត។
+- `app-lock` និង `sheet-import` fixture ត្រូវផ្ដល់ token authTime ថេរនៅពេល boot ដល់ auth/session owner ពិត។ Token ខ្វះ/បដិសេធ, clock មិនទុកចិត្ត និងអាយុលើស៤ម៉ោងនៅតែបិទ។ Local login-time sentinel និង browser assertions ដើមនៅដដែល។
+- `panel-motion` និង native history fixture មិនបង្កកតែ Date ខណៈ monotonic ដើរទៀត។ React input/action guard ពិតបង្ហាញការធ្លាក់មុនកែ; seed និង clock ចាប់នៅថ្ងៃថេរម៉ោង១៣កម្ពុជា ដើម្បីកុំឆ្លងអធ្រាត្រកណ្ដាលការវាស់។ មិនកែ CSS, animation ឬ scroll code។ Broad source run រកឃើញ unit contract ចាស់ដែលរំពឹង Date កក; ប្ដូរទៅព្រំដែលវាស់ពី monotonic ពិតដោយគ្មាន epsilon ហើយរក្សា constructor/parse/UTC និង native timer/rAF/performance identity។ Fixture កកដើមនៅធ្លាក់លើ contract ថ្មី។
+- `ui-flow`, `daily-collected` និង `restore-mutation` ប្ដូរពេល fixture ដោយរក្សា clock coordinates/verification ពិត។ `ledger-clamp-symmetry` បើក fault មុន boot cleanup មិនមែនក្រោយការសរសេរចប់; floor ថ្មីទាមទារ trash write បដិសេធពិត ហើយ barcode, day និងmonth នៅត្រឹមត្រូវ។
+- Firebase network fixture បំបែកពេល server ពី device wall skew ដូច្នេះ reload មិនបម្លែង journal ទៅអនាគតក្លែង។ Supabase fixture ផ្ដល់ clock តាម RPC read ពិតដាច់ពី held delta; request identity, clock-before-logout និង response-after-logout ត្រូវមានភស្តុតាង។ Missing/invalid clock, sibling response និង reversed arrival controls នៅតែធ្លាក់។ មិនប្ដូរ recovery authority ឬបោះបង់ unknown outcome។
+- Parser របស់ audit helper ដោះស្រាយតាម ZoeW dependency ឬ measured-root layout ពិត មិនពឹង ambient NODE_PATH។ Regression ថ្មីផ្ទៀង parser provenance; VM consumers ផ្ដល់ dirname ពិតដោយរក្សា assertions ដើម។
+- `trash-modal` រក្សា async ពេលស្រង់ function; `connection-recovery` និង `crud-rules-flow` ផ្ទុក clock/private dependencies ពិត។ Static recovery predicates មិនពឹងចម្ងាយអក្សរ ហើយទិសផ្ទុយចាប់ unreachable callback, shadow binding និង pending-set ដែលត្រូវលុប។ `write-stall-guard` រត់ callback ជាមួយម្ចាស់ដើមពិត ហើយបដិសេធ db/sdk/auth/shop/lease/trust ដែលផ្លាស់ និងអាយុស្មើព្រំ ក្នុងការហៅដំបូង/settle/retry។
+
+Final supported source suite៖ ៩១១១ជាប់/៣ ZTO LOCK ធ្លាក់/០ pending ក្នុង៤៦៨ឯកសារ; ដកតែ Chromium-dependent files៤ និង PostgreSQL files៥ដែល runtime មិនមាន។ មុនប្ដូរ legacy frozen-clock unit contract មាន៩១១០ជាប់/៤ធ្លាក់; updated contract បដិសេធ frozen baseline ហើយ list+entry១៩/១៩ជាប់។ Money final១៧៨/១៧៨, related៤៩៦/៤៩៦, truthfulness២២០/២២០; merged fixture៩៨/៩៨, static contract២០/២០, adjacent consumers១០៣/១០៣ និង source-input write-stall៤៨/៤៨ជាប់។ Typecheck/lint/build និង static checks ជាប់; ចំនួន focused ត្រួតគ្នា មិនបូកជាចំនួនតេស្តថ្មីទេ។
+
+ការវាស់ source-only ប្រើ owning modules, generated source/JSX stages និង transport fixtures ដែលបានបញ្ជាក់។ មិនបង្កើត rendered HTML ក្លែង និងមិនអះអាងថា full browser/backend Audit បានជាប់។ Browser, Firebase/Postgres E2E និង physical iPhone/Android នៅត្រូវផ្ទៀងលើ exact candidate។ `function-surface-test` រក្សា wrapper តាមវិសាលភាពដែលម្ចាស់បានកំណត់; ZTO hash mismatches ៣រក្សាឱ្យក្រហម មិន refresh LOCK ដើម្បីឱ្យបៃតង។
+
+
 ### 2026-11-09 — Audit 1233៖ ផ្ទៀង fixture និងការវាស់ដោយមិនបន្ថយ guard
 
 ម្ចាស់អនុញ្ញាតជាក់លាក់ឱ្យកែការផ្ទុកប្រវត្តិបន្ថែមក្រោយ session ផ្ទៀង ដោយមិនប្តូរ animation ឬភាពរលូននៃ scroll។ `history-observer-session-recovery.test.tsx` ប្រើ React component និង action/session guard ពិត៖ baseline recovery ២ករណីធ្លាក់នៅ៥០ជួរ ខណៈ positive/manual controls ជាប់។ Review រកឃើញ callback ដែលសល់ក្រោយ disconnect; negative controls ៣ធ្លាក់មុនកែ cleanup។ Effect ថ្មីតាម readiness ហើយ cleanup បិទ latch ចាស់មុន disconnect; physical device validation នៅមិនទាន់រត់។

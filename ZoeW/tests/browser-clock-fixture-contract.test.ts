@@ -2,11 +2,18 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { parse } from 'acorn';
+import { createElement } from 'react';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { attachInfoListeners, detachInfoListeners } from '../src/services/connection';
 import { firebaseState } from '../src/core/state';
 import { captureClockOperation, getServerNow, resetServerClock, serverClockIsTrustworthy } from '../src/core/clock';
 import { sessionUserActionAllowed } from '../src/core/session-verification';
+import { getFirebaseSessionVerdict, FOUR_HOURS_MS } from '../src/features/session';
+import { setupAuthListener } from '../src/features/auth';
+import * as license from '../src/features/license';
+import { AppLockScreen } from '../src/app/components/AppLockScreen';
+import { viewState } from '../src/core/view-state';
+import { mount, unmount } from './native/react-harness';
 
 // កំណត់ផ្លូវនេះទៅ snapshot ដើម ដើម្បីវាស់ថា checker ចាប់ fixture ចាស់បានពិត។
 const root = path.resolve(process.env.BROWSER_FIXTURE_ROOT || '..');
@@ -55,8 +62,72 @@ beforeEach(() => {
             goOnline: vi.fn(), goOffline: vi.fn(), signOut: vi.fn(async () => {}) } });
 });
 afterEach(() => {
+    unmount(); firebaseState.authUnsubscribe?.(); firebaseState.authUnsubscribe = null;
+    viewState.appLockOpen = false;
     detachInfoListeners(); resetServerClock(); delete window.ZoeLicense;
     vi.clearAllTimers(); vi.useRealTimers(); vi.restoreAllMocks();
+});
+
+const authFiles = ['app-lock-test.js', 'sheet-import-test.js'];
+async function authFixture(file: string) {
+    const filename = path.join(root, 'audit-tools', file);
+    const source = readFileSync(filename, 'utf8');
+    const ast: any = parse(source, { ecmaVersion: 'latest' });
+    const declaration = ast.body.flatMap((node: any) => node.declarations || []).find((node: any) => node.id.name === 'FAKE_SDK');
+    expect(declaration?.init.type).toBe('FunctionExpression');
+    new Function('return (' + source.slice(declaration.init.start, declaration.init.end) + ');')()();
+    const sdk = (window as any).firebaseSDK;
+    const api = fixture('audit-tools/' + file);
+    Object.assign(firebaseState, { fb: sdk, auth: sdk.getAuth(), db: sdk.getDatabase(),
+        firebaseConfig: { databaseURL: 'https://auth-fixture.invalid' }, sessionExpiryCheck: 'pending',
+        authGeneration: firebaseState.authGeneration + 1 });
+    firebaseState.dbRefConnected = sdk.ref(firebaseState.db, '.info/connected');
+    firebaseState.dbRefServerTimeOffset = sdk.ref(firebaseState.db, '.info/serverTimeOffset');
+    expect(await api.syncServerTime()).toBe(true);
+    expect(attachInfoListeners()).toBe(true); await turn();
+    expect(serverClockIsTrustworthy()).toBe(true);
+    vi.spyOn(license, 'proceedAfterLogin').mockResolvedValue(undefined);
+    return sdk;
+}
+
+it.each(authFiles)('%s៖ auth listener និង session owner ពិត បើកផ្ទាំង PIN និងសកម្មភាពក្រោយភស្តុតាង token', async file => {
+    const sdk = await authFixture(file);
+    localStorage.setItem('zoew_login_time', '1700000000000');
+    expect((await sdk.get(sdk.ref(firebaseState.db, 'unrelated'))).val()).toBeNull();
+    setupAuthListener(); await vi.advanceTimersByTimeAsync(10); await turn();
+    viewState.appLockOpen = true;
+    mount(createElement(AppLockScreen));
+    expect(firebaseState.sessionExpiryCheck).toBe('live');
+    expect(document.querySelector('[data-session-verification]')).toBeNull();
+    expect(document.getElementById('appLockPinInput')?.closest('.app-lock-card')?.classList.contains('hidden')).toBe(false);
+    expect(sessionUserActionAllowed('submitAppLockForm')).toBe(true);
+    expect(sessionUserActionAllowed('drawerSheetImportFlow')).toBe(true);
+    expect(localStorage.getItem('zoew_login_time')).toBe('1700000000000');
+});
+
+it.each(authFiles)('%s៖ token របស់ fixture មិនបង្កើត authTime ថ្មីរាល់ការអាន', async file => {
+    const sdk = await authFixture(file);
+    expect(await getFirebaseSessionVerdict(firebaseState.auth.currentUser)).toBe('live');
+    const first = await sdk.getIdTokenResult(firebaseState.auth.currentUser);
+    mono += FOUR_HOURS_MS + 1; vi.setSystemTime(START + FOUR_HOURS_MS + 1);
+    expect((await sdk.getIdTokenResult(firebaseState.auth.currentUser)).authTime).toBe(first.authTime);
+    expect(await getFirebaseSessionVerdict(firebaseState.auth.currentUser)).toBe('expired');
+});
+
+it.each(authFiles.flatMap(file => ['missing-token', 'token-rejected', 'missing-clock'].map(defect => [file, defect])))(
+'%s៖ %s នៅផ្ទាំងផ្ទៀងផ្ទាត់ មិនមែន PIN', async (file, defect) => {
+    const sdk = await authFixture(file);
+    if (defect === 'missing-token') delete sdk.getIdTokenResult;
+    if (defect === 'token-rejected') sdk.getIdTokenResult = async () => { throw new Error('fixture token rejected'); };
+    if (defect === 'missing-clock') { detachInfoListeners(); resetServerClock(); }
+    setupAuthListener(); await vi.advanceTimersByTimeAsync(10); await turn();
+    viewState.appLockOpen = true;
+    mount(createElement(AppLockScreen));
+    expect(firebaseState.sessionExpiryCheck).toBe('unverified');
+    expect(document.querySelector('[data-session-verification]')).not.toBeNull();
+    expect(document.getElementById('appLockPinInput')?.closest('.app-lock-card')?.classList.contains('hidden')).toBe(true);
+    expect(sessionUserActionAllowed('submitAppLockForm')).toBe(false);
+    expect(sessionUserActionAllowed('drawerSheetImportFlow')).toBe(false);
 });
 it.each(files)('%s៖ fixture ពិតផ្តល់ sample ក្រោយ sync ប៉ុណ្ណោះ ហើយ bridge ពិតទទួលយក', async file => {
     const api = fixture(file);

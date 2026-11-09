@@ -198,11 +198,13 @@ const LICENSE_STUB = `window.ZoeLicense = {
 
 const FAKE_SDK = function () {
     const noop = () => {};
+    const authTime = new Date().toISOString();
     window.firebaseSDK = {
         initializeApp: () => ({}),
         getApps: () => [],
         deleteApp: () => Promise.resolve(),
         getAuth: () => ({ currentUser: { uid: 'u1', email: 'a@b.c' } }),
+        getIdTokenResult: () => Promise.resolve({ authTime, claims: {} }),
         onAuthStateChanged: (a, cb) => { setTimeout(() => cb(a.currentUser), 10); return noop; },
         signInWithEmailAndPassword: () => Promise.resolve({ user: { uid: 'u1' } }),
         signOut: () => Promise.resolve(),

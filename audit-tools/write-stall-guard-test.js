@@ -31,6 +31,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { auditModuleSourceRanges, memoryStorage, moduleRuntime } = require('./react-view.js');
+const { cleanupPurgeOwnerContract } = require('./cleanup-purge-checker-contract.cjs');
 
 let acorn;
 try { acorn = require('acorn'); } catch (e) {
@@ -460,8 +461,9 @@ async function testClockAdmissionFixture() {
                 bare.length === 0, bare);
 
             const purgeBody = extractFn(src, 'runAutomaticDeletedCleanup') || '';
+            const purgeCurrentBody = extractFn(src, 'deletedCleanupCurrent') || '';
             const transport = extractFn(src, 'purgeTrashWithRegistry') || '';
-            ok('សម្អាតស្វ័យប្រវត្តិប្រើ atomic purge ជាមួយម្ចាស់ដដែល', /purgeTrashWithRegistry\(candidate\.source, current\)/.test(purgeBody));
+            ok('សម្អាតស្វ័យប្រវត្តិប្រើ atomic purge ជាមួយម្ចាស់ដដែល', await cleanupPurgeOwnerContract(purgeBody, purgeCurrentBody));
             ok('ពិដានត្រូវចាប់មុនសំណើក្នុងជុំ', /await dbOp\(Promise\.resolve\(\)\.then\(async/.test(purgeBody));
             ok('ចម្លើយចាស់មិនដោះសោម្ចាស់ថ្មី', /finally[\s\S]*deletedCleanupOwner === owner/.test(purgeBody));
             ok('សំណើ atomic purge ឆ្លងពិដាន និងត្រូវផ្ទៀង receipt ក្រោយសរសេរ',

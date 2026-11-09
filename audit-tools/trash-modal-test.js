@@ -13,7 +13,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { cleanupSelection } = require('./static-checker-contracts.cjs');
-const { reactRuntime, renderComponent, renderFromContext } = require('./react-view');
+const { reactRuntime, renderComponent, renderFromContext, sliceFunction } = require('./react-view');
 
 const ROOT = process.env.TRASH_APP_DIR || path.join(__dirname, '..');
 let pass = 0, fail = 0;
@@ -23,14 +23,7 @@ function ok(cond, label, got) {
 }
 
 function sliceFn(src, name) {
-    const start = src.indexOf('function ' + name + '(');
-    if (start === -1) return '';
-    let depth = 0, i = src.indexOf('{', start), started = false;
-    for (; i < src.length; i++) {
-        if (src[i] === '{') { depth++; started = true; }
-        else if (src[i] === '}') { depth--; if (started && depth === 0) { i++; break; } }
-    }
-    return src.slice(start, i);
+    return sliceFunction(src, name) || '';
 }
 
 function sliceConst(src, name) {

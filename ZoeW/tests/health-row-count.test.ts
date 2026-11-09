@@ -80,7 +80,7 @@ describe('ចំនួនជួរសុខភាពពី checker ពិត', (
 
 describe('ព្រំដែន module ពិតរបស់ audit inventory', () => {
     const helperModule = { exports: {} as any };
-    runInNewContext(readFileSync(resolve('../audit-tools/react-view.js'), 'utf8'), { require, module: helperModule });
+    runInNewContext(readFileSync(resolve('../audit-tools/react-view.js'), 'utf8'), { require, __dirname: resolve('../audit-tools'), module: helperModule });
     const helpers = helperModule.exports;
     function withView(run: (dir: string) => void) {
         const dir = mkdtempSync(resolve(tmpdir(), 'zoe-inventory-modules-'));

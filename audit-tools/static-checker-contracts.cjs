@@ -159,3 +159,61 @@ function sharedClockContract(clockModule, zoewFunction, keygenFunction) {
     } catch (_) { return false; }
 }
 module.exports.sharedClockContract = sharedClockContract;
+
+function infoListenerRecoveryContract(source) {
+    const fn = parse(source).body.find(node => node.type === 'FunctionDeclaration' && node.id.name === 'attachInfoListeners');
+    const result = { pending: false, connected: false, offset: false };
+    if (!fn) return result;
+    const harmless = node => node.type === 'EmptyStatement' || node.type === 'ExpressionStatement'
+        && node.expression.type === 'UnaryExpression' && node.expression.operator === 'void' && node.expression.argument.type === 'Literal';
+    const body = fn.body.body.filter(node => !harmless(node));
+    const protectedNames = new Set(['fb', 'dbRefConnected', 'dbRefServerTimeOffset', 'infoListenerFailedPaths',
+        'handleInfoListenerError', 'INFO_LISTENER_KEY_CONNECTED', 'INFO_LISTENER_KEY_OFFSET']);
+    let shadowed = false;
+    walk(fn, node => {
+        const patterns = node.type === 'VariableDeclarator' ? [node.id]
+            : /Function/.test(node.type) ? [node.id, ...(node.params || [])]
+                : node.type === 'ClassDeclaration' ? [node.id] : node.type === 'CatchClause' ? [node.param]
+                    : node.type === 'AssignmentExpression' ? [node.left] : node.type === 'UpdateExpression' ? [node.argument] : [];
+        if (patterns.flatMap(bindingNames).some(name => protectedNames.has(name))) shadowed = true;
+    });
+    if (shadowed) return result;
+    const registrations = body.filter(node => node.type === 'ExpressionStatement' && node.expression.type === 'CallExpression'
+        && same(node.expression.callee, expression('fb.onValue')));
+    const first = body.indexOf(registrations[0]);
+    const clear = body.findIndex(node => same(node, statement('infoListenerFailedPaths.clear();')));
+    const tail = body.slice(body.indexOf(registrations[1]) + 1);
+    result.pending = registrations.length === 2 && ['dbRefConnected', 'dbRefServerTimeOffset'].every(name => registrations.some(node => node.expression.arguments[0]?.name === name))
+        && !body.slice(0, first).some(node => ['ReturnStatement', 'ThrowStatement'].includes(node.type))
+        && tail.length > 0 && same(tail.at(-1), statement('return true;'))
+        && tail.every(node => same(node, statement('return true;')) || same(node, statement('if (native) observeNativeTime();')))
+        && clear >= 0 && first === clear + 3
+        && body.indexOf(registrations[1]) === first + 1
+        && same(body[clear + 1], statement('infoListenerFailedPaths.add(INFO_LISTENER_KEY_CONNECTED);'))
+        && same(body[clear + 2], statement('infoListenerFailedPaths.add(INFO_LISTENER_KEY_OFFSET);'));
+    const currentBindings = body.flatMap(node => node.type === 'VariableDeclaration' ? node.declarations : [])
+        .filter(node => node.id.name === 'current');
+    let currentRebound = false;
+    walk(fn, node => {
+        if (node.type === 'AssignmentExpression' && bindingNames(node.left).includes('current')
+            || node.type === 'UpdateExpression' && bindingNames(node.argument).includes('current')) currentRebound = true;
+    });
+    const currentIsOwned = !currentRebound && currentBindings.length === 1 && same(currentBindings[0].init,
+        expression('() => listenerGeneration === infoListenerGeneration && database === db && sdk === fb'));
+    for (const [key, ref, flag] of [['connected', 'dbRefConnected', 'INFO_LISTENER_KEY_CONNECTED'], ['offset', 'dbRefServerTimeOffset', 'INFO_LISTENER_KEY_OFFSET']]) {
+        const matching = registrations.filter(node => node.expression.arguments[0]?.name === ref);
+        if (matching.length !== 1) continue;
+        const callback = matching[0].expression.arguments[2];
+        if (!callback || !['ArrowFunctionExpression', 'FunctionExpression'].includes(callback.type)
+            || callback.params.length !== 1 || callback.params[0].type !== 'Identifier' || callback.body.type !== 'BlockStatement') continue;
+        const ownerNames = new Set(['current', 'listenerGeneration', 'infoListenerGeneration']);
+        if ([callback.id?.name, callback.params[0].name].some(name => ownerNames.has(name))) continue;
+        const statements = callback.body.body.filter(node => !harmless(node));
+        result[key] = statements.length === 2
+            && (currentIsOwned && same(statements[0], statement('if (!current()) return;'))
+                || same(statements[0], statement('if (listenerGeneration !== infoListenerGeneration) return;')))
+            && same(statements[1], statement('handleInfoListenerError(' + callback.params[0].name + ', ' + flag + ');'));
+    }
+    return result;
+}
+module.exports.infoListenerRecoveryContract = infoListenerRecoveryContract;

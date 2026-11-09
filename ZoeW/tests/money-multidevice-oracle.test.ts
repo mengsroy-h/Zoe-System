@@ -1,7 +1,14 @@
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { runInNewContext } from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
+import { acceptServerClockOffset, getServerNow, resetServerClock } from '../src/core/clock';
+import { firebaseState } from '../src/core/state';
+import { commitNow } from '../src/app/flush';
+import { createStore, registerStore } from '../src/core/store';
 
 const require = createRequire(import.meta.url);
 const { invariant, invariantBroken } = require('../../audit-tools/money-multidevice-core.js');
@@ -159,6 +166,275 @@ describe('អ្នកយាមលុយផ្ទៀងអត្តសញ្ញ�
 });
 
 const { createRevenueExpectation, scanDayForCheckpoint, confirmWithClockWindow } = require('../../audit-tools/money-cookie-blob.js');
+
+// ស្រង់ wrapper ដែល compile ពីម្ចាស់ audit bridge ពិត; commitNow និង store មិនមែន stub។
+const bridgeSource = readFileSync(require.resolve('../src/expose-globals.ts'), 'utf8');
+const compiledBridge = require('esbuild').transformSync(bridgeSource, { loader: 'ts', format: 'esm' }).code;
+const bridgeAst = require('acorn').parse(compiledBridge, { ecmaVersion: 'latest', sourceType: 'module' });
+const bridgeOwner = bridgeAst.body.filter(node => node.type === 'FunctionDeclaration' && node.id.name === 'exposeGlobals');
+expect(bridgeOwner).toHaveLength(1);
+const wrapperParts = ['NO_WRAP', 'depth', 'settle', 'wrap'].map(name => {
+    const statements = bridgeOwner[0].body.body.filter(node => node.type === 'VariableDeclaration'
+        && node.declarations.some(declaration => declaration.id.name === name));
+    expect(statements).toHaveLength(1); return statements[0];
+});
+const wrapStart = wrapperParts[0].start, wrapEnd = wrapperParts.at(-1).end;
+expect(wrapStart).toBeGreaterThan(0); expect(wrapEnd).toBeGreaterThan(wrapStart);
+const auditWrap = runInNewContext(compiledBridge.slice(wrapStart, wrapEnd) + '\nwrap;', { commitNow });
+
+describe('clock witness មិនបង្ខំ React commit តាម audit bridge', () => {
+    it('ស្ពាន audit ផ្តល់ម្ចាស់ clock ដើម និងបង្ខំ store flush ពេលហៅ wrapper', () => {
+        const store = registerStore(createStore('money-clock-bridge-control', { value: 0 }));
+        const notifications = vi.fn(); const unsubscribe = store.subscribe(notifications);
+        const wrapped = auditWrap('getServerNow', getServerNow);
+        expect(Object.getOwnPropertyDescriptor(wrapped, '__auditOrig')?.value).toBe(getServerNow);
+        expect(wrapped.toString()).toBe(Function.prototype.toString.call(getServerNow));
+        try {
+            (store as any).value = 1;
+            expect(notifications).not.toHaveBeenCalled();
+            wrapped();
+            expect(notifications).toHaveBeenCalledTimes(1);
+        } finally { unsubscribe(); }
+    });
+    it.each([['witness', true], ['confirm', true], ['witness', false], ['confirm', false]])(
+    '%s៖ Date.now មិនបញ្ជូន pending store មុន microtask · bridge=%s', async (method, bridged) => {
+        const store = registerStore(createStore('money-clock-passive-' + method, { value: 0 }));
+        const notifications = vi.fn(); const unsubscribe = store.subscribe(notifications);
+        const originalNow = Date.now;
+        vi.stubGlobal('window', { getServerNow: bridged ? auditWrap('getServerNow', getServerNow) : getServerNow,
+            serverTimeOffsetMs: 0, confirmPhone: async () => {} });
+        let pending: Promise<unknown> | undefined;
+        try {
+            (store as any).value = 1;
+            originalNow(); expect(notifications).not.toHaveBeenCalled();
+            if (method === 'witness') { require('../../audit-tools/money-cookie-blob.js').installMoneyClockWitness(); Date.now(); }
+            else pending = confirmWithClockWindow();
+            expect(notifications).not.toHaveBeenCalled();
+        } finally { await pending; Date.now = originalNow; unsubscribe(); vi.unstubAllGlobals(); }
+    });
+
+    it.each(['witness', 'confirm'].flatMap(method => ['missing', 'undefined', 'null', 'object', 'inherited', 'accessor', 'self']
+        .map(defect => [method, defect])))(
+    '%s៖ marker %s មិនជំនួសដោយ wrapper ដែល flush ឬ marker ដែលមិនបានផ្ទៀង', async (method, defect) => {
+        const epoch = Date.parse('2026-10-31T17:00:00Z');
+        const originalNow = vi.spyOn(Date, 'now').mockReturnValue(epoch);
+        const raw = vi.fn(() => epoch), markerRead = vi.fn(() => raw);
+        const wrapped = auditWrap('getServerNow', raw);
+        if (defect === 'missing') delete wrapped.__auditOrig;
+        if (defect === 'undefined') wrapped.__auditOrig = undefined;
+        if (defect === 'null') wrapped.__auditOrig = null;
+        if (defect === 'object') wrapped.__auditOrig = {};
+        if (defect === 'self') wrapped.__auditOrig = wrapped;
+        if (defect === 'inherited') { delete wrapped.__auditOrig; Object.setPrototypeOf(wrapped, { __auditOrig: raw }); }
+        if (defect === 'accessor') Object.defineProperty(wrapped, '__auditOrig', { get: markerRead });
+        const win: any = { getServerNow: wrapped, serverTimeOffsetMs: 0, confirmPhone: async () => {} };
+        vi.stubGlobal('window', win);
+        try {
+            let bounds;
+            if (method === 'witness') {
+                require('../../audit-tools/money-cookie-blob.js').installMoneyClockWitness(); Date.now();
+                bounds = { before: win.__moneyClockWitness.min, after: win.__moneyClockWitness.max };
+            } else bounds = await confirmWithClockWindow();
+            expect(raw).not.toHaveBeenCalled(); expect(markerRead).not.toHaveBeenCalled();
+            expect(() => scanDayForCheckpoint({ createdAt: epoch, scanDate: '2026-11-01' }, bounds)).toThrow();
+        } finally { Date.now = originalNow; vi.unstubAllGlobals(); vi.restoreAllMocks(); }
+    });
+
+    it.each(['witness', 'confirm'].flatMap(method => ['missing', 'nonfinite', 'marker'].map(defect => [method, defect])))(
+    '%s៖ clock %s ខូចកណ្ដាល operation មិនអាចយក envelope ចាស់ធ្វើភស្តុតាង', async (method, defect) => {
+        const epoch = Date.parse('2026-10-31T17:00:00Z');
+        const originalNow = vi.spyOn(Date, 'now').mockReturnValue(epoch);
+        const good = auditWrap('getServerNow', () => epoch);
+        const bad = defect === 'missing' ? undefined : defect === 'nonfinite' ? () => NaN : auditWrap('getServerNow', () => epoch);
+        if (defect === 'marker') bad.__auditOrig = null;
+        const win: any = { getServerNow: good, serverTimeOffsetMs: 0, confirmPhone: async () => {
+            win.getServerNow = bad; Date.now(); win.getServerNow = good; Date.now();
+        } };
+        vi.stubGlobal('window', win);
+        try {
+            let bounds;
+            if (method === 'witness') {
+                require('../../audit-tools/money-cookie-blob.js').installMoneyClockWitness(); Date.now();
+                expect(win.__moneyClockWitness).toEqual({ min: epoch, max: epoch });
+                await win.confirmPhone();
+                bounds = { before: win.__moneyClockWitness.min, after: win.__moneyClockWitness.max };
+            } else bounds = await confirmWithClockWindow();
+            expect(() => scanDayForCheckpoint({ createdAt: epoch, scanDate: '2026-11-01' }, bounds)).toThrow();
+        } finally { Date.now = originalNow; vi.unstubAllGlobals(); vi.restoreAllMocks(); }
+    });
+
+    it.each(['witness', 'confirm', 'nested'].flatMap(method => ['raw', 'getter'].map(kind => [method, kind])))(
+    '%s៖ App ចាប់ exception របស់ clock %s ក៏មិនស្ដារ envelope ចាស់', async (method, kind) => {
+        const epoch = Date.parse('2026-10-31T17:00:00Z');
+        const originalNow = vi.spyOn(Date, 'now').mockReturnValue(epoch);
+        const error = new Error('clock owner failed');
+        const good = auditWrap('getServerNow', () => epoch);
+        const bad = auditWrap('getServerNow', () => { throw error; });
+        let caught: unknown;
+        const win: any = { getServerNow: good, serverTimeOffsetMs: 0, confirmPhone: async () => {
+            if (kind === 'getter') Object.defineProperty(win, 'getServerNow', { configurable: true, get: () => { throw error; } });
+            else win.getServerNow = bad;
+            try { Date.now(); } catch (failure) { caught = failure; }
+            Object.defineProperty(win, 'getServerNow', { configurable: true, writable: true, value: good }); Date.now();
+        } };
+        vi.stubGlobal('window', win);
+        try {
+            if (method !== 'confirm') require('../../audit-tools/money-cookie-blob.js').installMoneyClockWitness();
+            const installedNow = Date.now;
+            Date.now();
+            if (method !== 'confirm') expect(win.__moneyClockWitness).toEqual({ min: epoch, max: epoch });
+            let bounds;
+            if (method === 'witness') {
+                await win.confirmPhone();
+                bounds = { before: win.__moneyClockWitness.min, after: win.__moneyClockWitness.max };
+            } else bounds = await confirmWithClockWindow();
+            expect(caught).toBe(error);
+            expect(Date.now).toBe(installedNow);
+            expect(() => scanDayForCheckpoint({ createdAt: epoch, scanDate: '2026-11-01' }, bounds)).toThrow();
+        } finally { Date.now = originalNow; vi.unstubAllGlobals(); vi.restoreAllMocks(); }
+    });
+
+    it.each([false, true].flatMap(install => ['raw', 'getter'].map(kind => [install, kind])))(
+    'confirm រក្សា exception ដើម និង Date.now ក្រោយ sampling បោះកំហុស · witness=%s · %s', async (install, kind) => {
+        const originalNow = Date.now, error = new Error('clock sample rejected');
+        const win: any = { getServerNow: auditWrap('getServerNow', () => { throw error; }), confirmPhone: vi.fn() };
+        if (kind === 'getter') Object.defineProperty(win, 'getServerNow', { configurable: true, get: () => { throw error; } });
+        vi.stubGlobal('window', win);
+        try {
+            if (install) require('../../audit-tools/money-cookie-blob.js').installMoneyClockWitness();
+            const installedNow = Date.now;
+            await expect(confirmWithClockWindow()).rejects.toBe(error);
+            expect(Date.now).toBe(installedNow);
+            expect(win.confirmPhone).not.toHaveBeenCalled();
+        } finally { Date.now = originalNow; vi.unstubAllGlobals(); }
+    });
+});
+
+describe('អ្នកវាស់លុយអាន clock owner ពិត', () => {
+    it.each([[1, false], [1, true], [1000, false]])('បង្អួច confirm មិនប្រើ wall clock ជំនួស anchor៖ %s ms · witness=%s', async (wallAhead, install) => {
+        const epoch = Date.parse('2026-10-31T17:00:00Z');
+        let wall = epoch, mono = 1000, createdAt = 0;
+        const date = vi.spyOn(Date, 'now').mockImplementation(() => wall);
+        vi.spyOn(performance, 'now').mockImplementation(() => mono);
+        resetServerClock();
+        const db = firebaseState.db; firebaseState.db = {} as any;
+        vi.stubGlobal('window', { getServerNow, get serverTimeOffsetMs() { return firebaseState.serverTimeOffsetMs; },
+            confirmPhone: async () => { createdAt = getServerNow(); } });
+        try {
+            expect(acceptServerClockOffset(0, Object.freeze({ epochMs: epoch, wallMs: wall, monotonicMs: mono,
+                uncertaintyMs: 0, source: 'nonce', generation: 0 }), true)).toBe(true);
+            wall += Number(wallAhead); mono += 0.5;
+            expect(getServerNow()).toBe(epoch);
+            expect(Date.now() + firebaseState.serverTimeOffsetMs).toBe(epoch + Number(wallAhead));
+            if (install) require('../../audit-tools/money-cookie-blob.js').installMoneyClockWitness();
+            const wrapped = Date.now;
+            const bounds = await confirmWithClockWindow();
+            expect(Date.now).toBe(wrapped);
+            expect(bounds).toEqual({ before: epoch, after: epoch });
+            expect(scanDayForCheckpoint({ createdAt, scanDate: '2026-11-01' }, bounds)).toBe('2026-11-01');
+            for (const stamp of [epoch - 1, epoch + 1, wall])
+                expect(() => scanDayForCheckpoint({ createdAt: stamp, scanDate: '2026-11-01' }, bounds)).toThrow();
+        } finally { Date.now = date; firebaseState.db = db; resetServerClock(); vi.unstubAllGlobals(); vi.restoreAllMocks(); }
+    });
+
+    it.each([-100, 500])('បង្អួចនៅតែឃើញ sample ផ្លាស់ប្ដូរបណ្ដោះអាសន្ន៖ %s ms', async offset => {
+        const epoch = Date.parse('2026-10-31T17:00:00Z');
+        let wall = epoch, mono = 1000, createdAt = 0;
+        const date = vi.spyOn(Date, 'now').mockImplementation(() => wall);
+        vi.spyOn(performance, 'now').mockImplementation(() => mono);
+        resetServerClock(); const db = firebaseState.db; firebaseState.db = {} as any;
+        const accept = (change: number) => expect(acceptServerClockOffset(change, Object.freeze({
+            epochMs: wall + change, wallMs: wall, monotonicMs: mono, uncertaintyMs: 0, source: 'nonce', generation: 0
+        }), true)).toBe(true);
+        vi.stubGlobal('window', { getServerNow, get serverTimeOffsetMs() { return firebaseState.serverTimeOffsetMs; },
+            confirmPhone: async () => {
+                wall += 10; mono += 10; accept(offset); createdAt = getServerNow();
+                await Promise.resolve(); wall += 10; mono += 10;
+                expect(getServerNow()).toBe(epoch + 20 + offset); accept(0);
+            } });
+        try {
+            accept(0);
+            require('../../audit-tools/money-cookie-blob.js').installMoneyClockWitness();
+            const wrapped = Date.now;
+            const bounds = await confirmWithClockWindow();
+            expect(Date.now).toBe(wrapped);
+            expect(bounds).toEqual({ before: epoch + Math.min(0, 10 + offset), after: epoch + Math.max(20, 20 + offset) });
+            expect(scanDayForCheckpoint({ createdAt, scanDate: offset < 0 ? '2026-10-31' : '2026-11-01' }, bounds))
+                .toBe(offset < 0 ? '2026-10-31' : '2026-11-01');
+            for (const stamp of [bounds.before - 1, bounds.after + 1])
+                expect(() => scanDayForCheckpoint({ createdAt: stamp, scanDate: '2026-11-01' }, bounds)).toThrow();
+        } finally { Date.now = date; firebaseState.db = db; resetServerClock(); vi.unstubAllGlobals(); vi.restoreAllMocks(); }
+    });
+
+    it.each([undefined, () => NaN])('clock input បាត់ឬខូច មិនយក wall clock ធ្វើភស្តុតាង', async getServerNow => {
+        const originalNow = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-10-31T17:00:00Z'));
+        vi.stubGlobal('window', { getServerNow, serverTimeOffsetMs: 0, confirmPhone: async () => {} });
+        try {
+            const bounds = await confirmWithClockWindow();
+            expect(Date.now).toBe(originalNow);
+            expect(() => scanDayForCheckpoint({ createdAt: Date.now(), scanDate: '2026-11-01' }, bounds)).toThrow();
+        } finally { vi.unstubAllGlobals(); vi.restoreAllMocks(); }
+    });
+
+    it('witness កត់ anchor ពិត មិនមែន offset ហើយដំឡើងម្តងប៉ុណ្ណោះ', () => {
+        const { installMoneyClockWitness } = require('../../audit-tools/money-cookie-blob.js');
+        const epoch = Date.parse('2026-10-31T17:00:00Z');
+        let wall = epoch, mono = 1000;
+        const date = vi.spyOn(Date, 'now').mockImplementation(() => wall);
+        vi.spyOn(performance, 'now').mockImplementation(() => mono);
+        resetServerClock();
+        const db = firebaseState.db; firebaseState.db = {} as any;
+        const win: any = { getServerNow, get serverTimeOffsetMs() { return firebaseState.serverTimeOffsetMs; } };
+        vi.stubGlobal('window', win);
+        try {
+            expect(acceptServerClockOffset(0, Object.freeze({ epochMs: epoch, wallMs: wall, monotonicMs: mono,
+                uncertaintyMs: 0, source: 'nonce', generation: 0 }), true)).toBe(true);
+            wall++; mono += 0.5;
+            installMoneyClockWitness();
+            expect(Date.now()).toBe(epoch + 1);
+            expect(win.__moneyClockWitness).toEqual({ min: epoch, max: epoch });
+            const wrapped = Date.now; installMoneyClockWitness(); expect(Date.now).toBe(wrapped);
+            wall += 10; mono += 10;
+            expect(Date.now()).toBe(epoch + 11);
+            expect(win.__moneyClockWitness).toEqual({ min: epoch, max: epoch + 10 });
+        } finally { Date.now = date; firebaseState.db = db; resetServerClock(); vi.unstubAllGlobals(); vi.restoreAllMocks(); }
+    });
+});
+
+describe('អ្នកវាស់ truthfulness រត់ module និង dependency ពិត', () => {
+    const root = path.resolve(import.meta.dirname, '../..');
+    const run = (target: string) => spawnSync(process.execPath, [path.join(root, 'audit-tools/money-checker-truthfulness-test.js')], {
+        encoding: 'utf8', timeout: 15000, maxBuffer: 8 * 1024 * 1024,
+        env: { ...process.env, MONEYTRUTH_APP_DIR: target, NODE_PATH: path.join(root, 'ZoeW/node_modules') }
+    });
+    it('អ្នកវាស់ពេញបញ្ចប់ behavioral assertions ដោយគ្មាន browser ឬ DB', () => {
+        const result = run(root);
+        expect(result.error).toBeUndefined();
+        expect(result.status, result.stdout + result.stderr).toBe(0);
+        expect(result.stdout).toMatch(/PASS ([1-9]\d*)\/\1\s*$/);
+        expect(result.stdout).toContain('actual main bounded gateway: ACK-throws');
+    });
+    it.each(['settlement', 'dependency'])('root ជំនួសមិនអាចប្រើ cached helper ល្អលាក់ %s', defect => {
+        const target = mkdtempSync(path.join(tmpdir(), 'zoew-money-owner-'));
+        try {
+            mkdirSync(path.join(target, 'audit-tools/emu'), { recursive: true });
+            for (const file of ['money-multidevice-core.js', 'browser-clock-fixture.cjs', 'emu/money-multidevice-emu-test.js', 'supabase-money-multishop-test.js'])
+                copyFileSync(path.join(root, 'audit-tools', file), path.join(target, 'audit-tools', file));
+            const filename = path.join(target, 'audit-tools', defect === 'settlement' ? 'money-multidevice-core.js' : 'browser-clock-fixture.cjs');
+            const source = readFileSync(filename, 'utf8');
+            const poisoned = defect === 'settlement' ? source.replace('return states.length > 0', 'return true || states.length > 0')
+                : source + '\nthrow new Error("money-clock-dependency-poison");\n';
+            expect(poisoned).not.toBe(source); writeFileSync(filename, poisoned);
+            const result = run(target);
+            expect(result.error).toBeUndefined(); expect(result.status).toBe(1);
+            if (defect === 'settlement') {
+                expect(result.stdout).toMatch(/FAIL [1-9]\d* \/ ok [1-9]\d*\s*$/);
+                expect(result.stdout).toContain('actual main bounded gateway: ACK-false');
+                expect(result.stderr).not.toMatch(/ReferenceError|MODULE_NOT_FOUND/);
+            } else expect(result.stdout + result.stderr).toContain('money-clock-dependency-poison');
+        } finally { rmSync(target, { recursive: true, force: true }); }
+    });
+});
 
 function calendarFixture(scanDay = '2026-10-31') {
     return {
@@ -684,6 +960,7 @@ it('clock witness កត់ supplied server clock ពេល offset ប្ដូ�
     const { installMoneyClockWitness } = require('../../audit-tools/money-cookie-blob.js');
     let raw = 10000;
     const date = { now: () => raw }, win: any = { serverTimeOffsetMs: -500 };
+    win.getServerNow = () => date.now() + win.serverTimeOffsetMs;
     runInNewContext('(' + installMoneyClockWitness.toString() + ')()', { window: win, Date: date });
     expect(date.now()).toBe(10000);
     raw = 11000; win.serverTimeOffsetMs = 1500;
@@ -702,10 +979,12 @@ it('clock evidence ឆ្លង devices និង reopen រក្សា envelop
     expect(first).toBeGreaterThan(0); expect(last).toBeGreaterThan(first);
     const devices = [10, -20].map(offset => {
         let script: any, raw = 1000, win: any = { serverTimeOffsetMs: offset }, date: any = { now: () => raw };
+        const getServerNow = () => date.now() + win.serverTimeOffsetMs;
+        win.getServerNow = getServerNow;
         const page = { evaluate: (fn: any) => runInNewContext('(' + fn.toString() + ')()', { window: win, Date: date }) };
         return { page, ctx: { addInitScript: (fn: any) => { script = fn; } },
             tick(value: number, nextOffset: number) { raw = value; win.serverTimeOffsetMs = nextOffset; date.now(); },
-            reopen() { win = { serverTimeOffsetMs: -50 }; date = { now: () => raw }; return page.evaluate(script); },
+            reopen() { win = { serverTimeOffsetMs: -50, getServerNow }; date = { now: () => raw }; return page.evaluate(script); },
             loseWitness() { delete win.__moneyClockWitness; } };
     });
     const code = '(async () => {' + source.slice(first, last) + '; return { beginClock, captureClock, clockSeen }; })()';

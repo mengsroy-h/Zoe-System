@@ -784,7 +784,7 @@
       "guards": [
         "audit-tools/zoew-suite-test.js"
       ],
-      "evidence": "browser-clock-fixture-contract.test.ts និង sdk-audit-clock-fixture.test.ts រត់ fixture ពិតជាមួយ clock/session guard ពិត; វាស់ sample, drift, generation និងកម្មសិទ្ធិដែលផ្លាស់ប្ដូរ។",
+      "evidence": "browser-clock-fixture-contract, sdk-audit-clock-fixture, browser-time-scenarios, entry-search-fixture-clock និង network fixture tests រត់ fixture ពិតជាមួយ clock/session owner; វាស់ midnight, drift, generation, authTime និងកម្មសិទ្ធិដែលផ្លាស់ប្ដូរ។",
       "limitation": "ជាការវាស់ fixture និង guard ដាច់ដោយឡែក; មិនបញ្ជាក់ browser, emulator ឬប្រតិបត្តិការលុយពេញលេញ។"
     },
     "audit-static-contracts": {
@@ -794,6 +794,15 @@
       ],
       "evidence": "static-checker-contracts.test.ts និង payload-local-cache.test.ts វាស់ source module ពិត និង mutations ដែលដក guard, ប្ដូរ clock provenance, shadow binding ឬបញ្ជូន local object ចេញក្រៅ។",
       "limitation": "ជាកិច្ចសន្យា AST និង owner ដែលមានព្រំដែន; getter exits ដែលកំណត់ជាក់លាក់មិនមែន whole-program taint proof ហើយមិនជំនួស browser/រូបរាង DOM ពិត។"
+    },
+    "audit-purge-owner-contract": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/zoew-suite-test.js",
+        "audit-tools/write-stall-guard-test.js"
+      ],
+      "evidence": "cleanup-purge-checker-contract.test.ts និង write-stall-guard-test រត់ cleanup/current owner ដែលស្រង់ពិត; វាស់ callback ដំបូង/settle/retry ពេល db, sdk, auth, shop, lease, trust និងព្រំអាយុផ្លាស់ប្ដូរ។",
+      "limitation": "ជាកិច្ចសន្យា callback ដាច់ដោយឡែក; មិនជំនួស transport, session lifecycle, browser ឬ backend ពេញលេញ។"
     }
   },
   "files": {
@@ -4989,6 +4998,27 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/history-observer-session-recovery.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/entry-search-fixture-clock.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/cleanup-purge-checker-contract.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "audit-tools/cleanup-purge-checker-contract.cjs": {
+      "policy": "audit-purge-owner-contract"
+    },
+    "ZoeW/tests/network-durable-clock-fixture.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-network-expiry-fixture.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/browser-time-scenarios.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/restore-retention-fixture.test.ts": {
       "policy": "zoew-self-verification"
     }
   }

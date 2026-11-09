@@ -160,6 +160,19 @@ describe('ធុងសំរាម ៖ ធាតុចូលក្រោយគ�
 });
 
 describe('ភស្តុតាង ZTO ក្នុង DB ៖ ការសរសេរដាច់ដោយឡែក', () => {
+    it.each(['sent', 'misplaced', 'left'])('ចម្លើយ %s ចាស់មកយឺត៖ DB រក្សាត្រាត្រឡប់ថ្មី ហើយឧបករណ៍ថ្មីនៅហាមស្តារ', async (kind) => {
+        const latest = Date.now() - 60000;
+        seedTrash([item('late-return', [bc('LATE1')], { trashReason: 'returned', trashMode: 'cookie', deletedAt: latest })]);
+        const before = structuredClone(server[T + 'late-return']);
+        noteZtoReturnedEvidence('LATE1', latest, 'returned');
+        noteZtoReturnedEvidence('LATE1', latest - 60000, kind);
+        expect(await syncZtoFinalMarks()).toBe(1);
+        expect(txPaths).toEqual([T + 'late-return']);
+        expect(server[T + 'late-return']).toEqual({ ...before, barcodes: [{ ...before.barcodes[0], ztoReturnedAt: latest }] });
+        resetZtoFinalMarks();
+        expect(trashRestoreBlockOf(server[T + 'late-return'], true)).toBe('returned');
+    });
+
     it('ម៉ោង Sign ពិតកែត្រាពេលសង្កេតម្តង ហើយមិនប៉ះកញ្ចប់ស្តារជុំថ្មី', () => {
         const current = item('exact', [bc('A', { isClosed: true, ztoSignedAt: 100 }), bc('B', { isClosed: true, ztoSignedAt: 100, restoredAt: 90 })]);
         const updated = applyZtoFinalMarks(current, { A: { signed: 80, signedExact: true }, B: { signed: 80, signedExact: true } }, false);

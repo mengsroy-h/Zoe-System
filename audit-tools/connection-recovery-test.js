@@ -304,6 +304,7 @@ function buildContext(backend = 'supabase') {
         monthlyRevenueData: {},
         dailyPickupData: {},
         exchangeRateRiel: 4100,
+        exchangeRateObservedVersion: 0,
         localStorage: { setItem: () => {}, getItem: () => null },
         generateUniqueId: () => 'id_1',
         parseTimestampFromId: () => 1,

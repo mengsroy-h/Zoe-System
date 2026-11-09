@@ -2293,6 +2293,9 @@
     "ZoeW/tests/backend-switch-late-sdk.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/backup-config-private-files.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/barcode-key-encoding.test.ts": {
       "policy": "zoew-self-verification"
     },
@@ -2426,6 +2429,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/exchange-rate-completion-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/exchange-rate-listener-race.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/exchange-rate-shop-switch.test.ts": {
@@ -2693,6 +2699,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/money-cookie-network-gate.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/money-cookie-readiness.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/money-multidevice-oracle.test.ts": {

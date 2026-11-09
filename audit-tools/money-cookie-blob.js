@@ -704,11 +704,27 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
                 const wanted = stage === 'restore' ? 'restore' : movement === 'delete' ? 'deleteItem' : movement === 'remove' ? 'removeBarcode' : 'sweep';
                 const dev = devices[0];
                 const waitForGate = async () => {
-                    try { await gates[0].hit(); }
+                    try {
+                        if (wanted === 'sweep') {
+                            while (!gates[0].hits) {
+                                const preparation = await dev.page.evaluate(code => {
+                                    const current = window.__moneySweepPreparation;
+                                    return current?.code === code ? current : null;
+                                }, code);
+                                assert.ok(preparation, 'ការចាក់ write ត្រូវមានម្ចាស់ ZTO prerequisite ដដែល');
+                                if (preparation.phase === 'failed') throw new Error(preparation.error);
+                                if (preparation.phase === 'ready') break;
+                                assert.ok(Number.isFinite(preparation.deadline) && Date.now() < preparation.deadline, 'ZTO prerequisite មិនទាន់ត្រៀមក្នុង 15s');
+                                await sleep(20);
+                            }
+                        }
+                        await gates[0].hit();
+                    }
                     catch (error) {
                         const state = await dev.page.evaluate((code) => ({
                             online: navigator.onLine, statusBusy: window.ztoStatusInFlight, marksBusy: window.ztoFinalInFlight,
                             lookupBusy: window.autoLookupInFlight?.size, verdict: window.ztoPickupStatus?.get(code),
+                            preparation: window.__moneySweepPreparation,
                             history: window.scanHistory.filter((it) => Object.values(it.barcodes || {}).some((b) => b.code === code)),
                             operations: window.__operationHistory(), journals: window.__journals(), claims: window.pendingTrashClaims?.(window.liveShopScope?.())
                         }), code).catch((e) => ({ error: String(e.message) }));
@@ -748,10 +764,14 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
                 if (stage === 'move' && movement === 'pickup2h' && authMode === 'palm') assert.ok(Number.isFinite(expectedSignedAt) && expectedSignedAt > 0, 'fixture ត្រូវមានពេល Sign ពិត');
                 const actionClock = await beginClock();
                 const start = (d) => d.page.evaluate((args) => {
-                    if (args.wanted === 'sweep') window.__ops.push((async () => {
+                    if (args.wanted === 'sweep') {
+                        const preparation = { code: args.target.code, phase: 'pending' };
+                        window.__moneySweepPreparation = preparation;
+                        window.__ops.push((async () => {
                         const started = Date.now();
                         let attempts = 0;
                         const deadline = Date.now() + 15000;
+                        preparation.deadline = deadline;
                         const signedReady = () => {
                             const verdict = window.ztoPickupStatus?.get(args.target.code);
                             return verdict?.closed === true && (!args.expectedSignedAt
@@ -777,9 +797,14 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
                             closed: verdict?.closed, signedAt: verdict?.signedAt, signedAtExact: verdict?.signedAtExact, statusBusy: window.ztoStatusInFlight
                         }];
                         if (args.expectSigned && !signedReady()) throw new Error('ZTO Sign មិនទាន់បញ្ជាក់ក្នុង 15s: ' + JSON.stringify(window.__moneySweepResults.at(-1)));
+                        preparation.phase = 'ready';
                         await window.syncZtoFinalMarks();
                         window.runAutomaticCleanupRules();
-                    })());
+                        })().catch(error => {
+                            if (preparation.phase !== 'ready') { preparation.phase = 'failed'; preparation.error = String(error.message || error); }
+                            throw error;
+                        }));
+                    }
                     return [window.__startOp(args), window.__startOp(args)];
                 }, { wanted, pick: 0, target, expectedSignedAt, expectSigned: stage === 'move' && movement === 'pickup2h' && (authMode === 'palm' || signedTrash) });
                 await start(dev); duplicateCalls += 2;

@@ -189,6 +189,74 @@ afterEach(() => {
 
 describe('resume ការសម្អាតដែលត្រូវរំខាន ៖ ប្តូរ session កណ្តាលផ្លូវ', () => {
 
+    it('pass ហាង A ដែលត្រឡប់យឺត មិនដោះ busy របស់ recovery ហាង B', async () => {
+        await install('moved', false);
+        const oldEntry = clone(readCleanupJournal()[0]);
+        const nextId = ID + '_new_shop';
+        let releaseOld = () => {};
+        let releaseNew = () => {};
+        const oldGate = new Promise<void>(resolve => { releaseOld = resolve; });
+        const newGate = new Promise<void>(resolve => { releaseNew = resolve; });
+        const entered = new Set();
+        const sdk = firebaseState.fb as any;
+        const get = sdk.get;
+        sdk.get = async (ref: any) => {
+            if (ref.path === TRASH + '/' + ID && ref.db === DB_A) { entered.add('A'); await oldGate; }
+            if (ref.path === TRASH + '/' + nextId && ref.db === DB_B) { entered.add('B'); await newGate; }
+            return get(ref);
+        };
+        const first = resumeInterruptedCleanups();
+        let second: Promise<void> | undefined;
+        try {
+            await vi.waitFor(() => expect(entered.has('A')).toBe(true));
+            expect(dataState.cleanupResumeInFlight).toBe(true);
+            switchToShopB();
+            noteCleanupJournalEntry({ ...oldEntry, id: nextId, scope: URL_B, trashItem: { ...oldEntry.trashItem, id: nextId } });
+            second = resumeInterruptedCleanups();
+            await vi.waitFor(() => expect(entered.has('B')).toBe(true));
+            releaseOld();
+            await first;
+            expect(dataState.cleanupResumeInFlight, 'ម្ចាស់ចាស់មិនបញ្ចប់សោរបស់ pass ថ្មី').toBe(true);
+            expect(writesTo(DB_B)).toEqual([]);
+        } finally {
+            releaseOld(); releaseNew();
+            await first; await second;
+        }
+        expect(dataState.cleanupResumeInFlight).toBe(false);
+        expect(readCleanupJournal().filter(entry => entry.scope === URL_A)).toHaveLength(1);
+        expect(readCleanupJournal().filter(entry => entry.scope === URL_B)).toEqual([]);
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(93);
+    });
+
+    it('pass ហាង A មិនយក id នៅ tail ទៅបន្ត journal ដូចគ្នារបស់ហាង B', async () => {
+        await install('moved', false);
+        const original = clone(readCleanupJournal()[0]);
+        const sharedId = ID + '_shared_tail';
+        const tail = { ...original, id: sharedId, trashItem: { ...original.trashItem, id: sharedId } };
+        noteCleanupJournalEntry(tail);
+        let release = () => {};
+        const gate = new Promise<void>(resolve => { release = resolve; });
+        let reading = false;
+        const sdk = firebaseState.fb as any;
+        const get = sdk.get;
+        sdk.get = async (ref: any) => {
+            if (ref.path === TRASH + '/' + ID && ref.db === DB_A) { reading = true; await gate; }
+            return get(ref);
+        };
+        const recovering = resumeInterruptedCleanups();
+        try {
+            await vi.waitFor(() => expect(reading).toBe(true));
+            switchToShopB();
+            noteCleanupJournalEntry({ ...tail, scope: URL_B });
+            const before = clone(readCleanupJournal());
+            release();
+            await recovering;
+            expect(writesTo(DB_B)).toEqual([]);
+            expect(readCleanupJournal()).toEqual(before);
+            expect(uiState.toasts).toEqual([]);
+        } finally { release(); await recovering; }
+    });
+
     it.each([['slot', false], ['moved', false], ['slot', true], ['moved', true]] as const)('journal Sign គ្មាន policy stamp · %s · modern=%s ➜ legacy គ្មាន source នៅ HOLD · modern មាន generation ស្តារ', async (stage, modern) => {
         const original = await install(stage, false, { reason: 'close', revenue: null }, modern);
         const signedAt = original.deletedAt - 3 * 3600000;

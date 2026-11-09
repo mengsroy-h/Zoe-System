@@ -705,6 +705,7 @@ export async function executeRestoreItem() {
         if (pickupJournal && !pickupJournal.confirm(pickupMarks.map((mark) => mark.key))) throw new Error('PICKUP_ADMISSION_FAILED');
         if (pickupMarks.length) pickupJournal.note(markPickupBarcodes(revenueScanDate, pickupMarks, false, pickupContext));
         const pickupSaved = await (pickupJournal?.finish() || Promise.resolve(true));
+        stopIfSwitched();
         activeRestoreClaims.delete(restoredId);
         saveRestoreClaim(restoredId, null);
         if (!pickupJournal || pickupSaved) await clearRestoreFinalization(restoredId, token, restoreIsCurrent).catch(() => {});
@@ -716,6 +717,7 @@ export async function executeRestoreItem() {
         if (restoredCollectedKeys.length) {
             await reconcileCollectedHistory(targetId, restoredCollectedKeys).catch(() => null);
         }
+        stopIfSwitched();
         openRecentlyDeletedModal();
         refreshCurrentHistoryView();
         updateRecentPhonesList();

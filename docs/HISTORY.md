@@ -58,7 +58,7 @@
 
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
-- ⏳ **Deep audit rollout · ZoeW 2.50.192 / ZoeKeyGen 2.24.39**៖ branch `audit/deep-audit-20261109` ពី `c30b3f996eaaa04196d5cb4ae851fbc7fdcb9ef2`; evidence នៅ Audit 1238–1240 និង exact-SHA GitHub Actions។ ម្ចាស់អនុញ្ញាត commit/push; merge/deploy មិនទាន់អនុញ្ញាត។ នៅបើក៖ Business rules/Supabase migration សម្រាប់ Restore guard មុន client ថ្មី និង update គ្រប់ឧបករណ៍, Apps Script 6 owner-reviewed rollout និង Inbox review, Supabase register deployment ដាច់ដោយឡែក, backup/វាយតម្លៃ legacy pending ded-delete មុន mixed-version operations។ Hosted metadata មាន read-only evidence; hosted operation matrix, real ZTO/push, physical devices និង production latency/capacity នៅ NOT VERIFIED។
+- ⏳ **Launch audit · ZoeW 2.50.193 / ZoeKeyGen 2.24.39**៖ branch `audit/launch-20261109` ពី `851cbab9216e17cea7f9334c34ee49efd328a2da`; ការកែ និងភស្តុតាងនៅ Audit 1241។ Local money matrices និង bounded hosted probes ឆ្លង (Firebase19/Supabase45); CI លើ tree ថ្មី, sustained hosted parcel workload, ZTO/push ពិត និងទូរស័ព្ទពិតនៅមិនទាន់ផ្ទៀង។ Supabase migrations៦៣ ដល់ `20261109122019` និង Edge Functions v125 ដូច local; deployed Firebase rules ទាំងមូលនៅមិនទាន់ផ្ទៀង។ រក្សាសកម្មភាព rollout របស់ Audit 1238–1240 ដែលនៅបើក និង pending journals; សិទ្ធិ publication/merge/deploy ត្រូវយកពីសន្ទនាបច្ចុប្បន្ន។
 - 🧾 **សកម្មភាពដោយដៃ ជុំ A496–A520**៖ (១) Supabase គ្រប់ project ៖ អនុវត្ត `20261103090000_zoe_tombstone_external_delete.sql` (merge ➜ GitHub integration · ឬ SQL Editor) · (២) Apps Script «ZTO Import» ៖ បិទភ្ជាប់ `Watch.gs` `Code.gs` `Index.html` ថ្មីលើ Sheet សាកល្បងមុន · (៣) Netlify `FIREBASE_PROJECT_IDS` ៖ ធាតុគ្មានសាខា ➜ `projectId:branch` រួចមើល `?diag=1` · (៤) APK លើទូរស័ព្ទពិត ៖ beep ពេលពាក់កាស/Bluetooth មិនលើក volume · 📷 Sign បើកកាមេរ៉ាលើ Android 11+ · (៥) GitHub Actions Backup ៖ run បន្ទាប់គ្មាន `[FAIL]`។
 - 🧾 **សកម្មភាពដោយដៃ F03 (A523–A525)**៖ (១) Supabase គ្រប់ project ៖ អនុវត្ត `20261103230000_zoe_purge_slot_expand.sql` · `20261103230500_zoe_eval_fold.sql` មុន រួច `20261104095910_zoe_rules.sql` (GitHub integration អនុវត្តតាមលំដាប់ឈ្មោះ · SQL Editor ៖ paste តាមលំដាប់ ហើយ `migration repair`) ⛔ កុំអនុវត្ត rules តែឯងមុន migration ពង្រីក ៖ purge ទាំងអស់ (client ចាស់ និងថ្មី) នឹងត្រូវបដិសេធ ហើយឧបករណ៍ជាប់ «សរសេររង់ចាំ» (២) Firebase គ្រប់ project ៖ `node supabase/scripts/generate-rules-sql.mjs` (artifact ស្រាប់) រួច `node tools/firebase-provision/provision.js rules --all --dry-run` លើ project ពិតមួយ (Firebase វាស់ដែន 256 KB និង parser ពិតជាលើកដំបូង) រួច `deploy-rules.cmd` ឬ Console ➜ Rules ➜ paste ខ្លឹមសារ `firebase-database.rules.min.json` ទាំងមូល ➜ Publish (⛔ កុំ paste `firebase-database.rules.json` ៖ 268,935 bytes) (៣) merge ហើយ update ឧបករណ៍ទាំងអស់ភ្លាម ៖ ឧបករណ៍ Firebase ចាស់ purge មិនបានរហូតដល់ update (ធុងសំរាមនៅរង់ចាំលើសរយៈ · permission_denied គ្មាន effect · journal មិនជាប់ · ប្រាក់មិនប្រែ) · ឧបករណ៍ Supabase ចាស់ purge បានដូចមុន។ ឧបករណ៍ចាស់ដែលអាន G មាន certificate (id ធុងសំរាមដែលប្រើឡើងវិញ) ផ្អាក Restore/Delete/cleanup លើ id នោះរហូតដល់ update (fail-safe)។ ⛔ កុំ force reload ឬលុប storage។
 - 🧾 **សកម្មភាពដោយដៃ ជុំ A532–A541**៖ (១) Firebase គ្រប់ project អាជីវកម្ម ៖ Publish `firebase-database.rules.min.json` មុនចេញ App (rules លុបភស្តុតាងចាស់ ៦០ ថ្ងៃ + `.indexOn`) · (២) Supabase គ្រប់ project ៖ `20261105000000_zoe_tombstone_retro_resync.sql` (ឧបករណ៍នីមួយៗទាញពេញម្តង) រួច `20261105010507_zoe_rules.sql` និង `20261105011000_zoe_evidence_candidates.sql` (GitHub integration តាមលំដាប់ឈ្មោះ) · (៣) ផ្ទៀងលើបណ្តាញពិតថា Firebase ភ្ជាប់តាម WebSocket បាន (CSP លែងទទួល JSONP long-polling ➜ បណ្តាញដែលបិទ WebSocket ភ្ជាប់មិនបាន) · (៤) ផ្ទៀង OpenCode លើ thread ដែលមាន comment របស់ bot (App ដែលបានដំឡើង ទទួល · អ្នកក្រៅក្រុម បដិសេធ)។
@@ -122,6 +122,16 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ archive ផ្នែក ៩ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.193] — 2026-11-09 · សិទ្ធិកាន់កាប់ recovery និងលំដាប់ realtime
+
+**ZoeW** (`zoew-v456` ➜ `zoew-v457`)។ **ZoeKeyGen មិនប្រែ**។
+
+- ការសង្គ្រោះ cleanup និងការបញ្ចប់ Restore ឈប់ប៉ះ state/journal ក្រោយប្តូរហាង ឬគណនី; ជុំការងារចាស់មិនដោះ busy របស់ជុំថ្មី។
+- Supabase ផ្ទៀង Web Lock មុនបន្តការសរសេរ ឬសង្គ្រោះ journal; ការទទួលសោបរាជ័យមិនមែនជាភស្តុតាងថាបានកាន់កាប់ប្រតិបត្តិការទេ។
+- អត្រាប្តូរប្រាក់ថ្មីពី listener មិនត្រូវ rollback ដោយសំណើកែចាស់ដែលបរាជ័យ។ ភស្តុតាង ZTO ដែលមកយឺតមិនជំនួស event ថ្មីជាង។
+- Backup tooling សរសេរ secret/config ដោយ atomic replacement និង permission `0600`, ពិនិត្យផ្លូវពិត និងបដិសេធ `secrets` symlink។ Dependencies ដែលមាន advisory ត្រូវ update ដោយ targeted overrides និងផ្ទៀង packager/CLI។
+- **សកម្មភាពដោយដៃ**៖ គ្មាន migration/rules ថ្មីក្នុងការកែជុំនេះ។ មុន release ត្រូវផ្ទៀង prerequisite របស់កំណែមុនលើ backend ពិត, CI លើ source ចុងក្រោយ, staging និងឧបករណ៍ពិត; update PWA/APK គ្រប់ឧបករណ៍ដោយរក្សា pending/unknown journals។ មិន force reload ឬលុប storage។ ការរៀបចំ release នេះមិនមែនភស្តុតាងថាបាន deploy ទេ។
 
 ### [2.50.192] · ZoeKeyGen [2.24.39] — 2026-11-09 · ស្តារស្ថិតិ និងការពារភស្តុតាងជំនាន់
 
@@ -2025,6 +2035,77 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-11-09 — Audit 1241៖ Launch audit, ម្ចាស់ប្រតិបត្តិការ និងការវាស់បន្ទុក
+
+**ប្រភព និងព្រំដែន**៖ fetch `main` ថ្មីពី working tree ស្អាត រួចបង្កើត `audit/launch-20261109` លើ baseline `851cbab9216e17cea7f9334c34ee49efd328a2da`។ Source ចុងក្រោយជា ZoeW `2.50.193` / `zoew-v457`; ZoeKeyGen `2.24.39` មិនប្រែ។ Final Git tree/fingerprints នៅ `final/source-manifest.json` ក្នុង `/workspace/zoe-launch-audit-20261109.tar.gz` ជាមួយ patch និងពាក្យបញ្ជាចុងក្រោយ; មិនអះអាង SHA commit ថ្មីពេលការកែមានតែក្នុង working tree។ មិនមាន rules/migration ថ្មី។ ម្ចាស់អនុញ្ញាត commit/push និង Draft PR សម្រាប់ CI; merge/deploy នៅត្រូវសម្រេចដាច់ដោយឡែក។
+
+**ការរកឃើញ និងការកែដែលមាន regression បរាជ័យមុនកែ**៖
+
+| កម្រិត | មូលហេតុ និងមុនកែ → ក្រោយកែ | ភស្តុតាង |
+|---|---|---|
+| P1 | `supabase-rtdb.ts`៖ `claimRow()` ចាត់ Web Lock error ថាបានសោ; `holdWrite()` មិនរង់ចាំសោមុនបង្ហាញ journal/ផ្ញើ write។ A កែតម្លៃ +5 ហើយ ACK បាត់ → B ធ្វើ compensation ពេល A នៅរស់ → item និង ledger មិនស្មើ។ ឥឡូវ admission ត្រូវទទួលសោពិត, ចង session/tenant epoch ដើម, រក្សាលំដាប់ pending និង rollback optimistic listener ពេលបដិសេធ។ Browser គ្មាន Web Locks API រក្សាផ្លូវ fallback ដែលមានស្រាប់។ | `supabase-cross-tab-journal`៖ baseline regressions RED; final adapter 42 files / 460 PASS។ Mutation recovery ចាប់ 4 assertions និង live-write ចាប់ 5។ Reviewer ឯករាជ្យរកឃើញ listener regression ពីរនៅ patch ដំបូង ហើយផ្ទៀង GREEN ក្រោយកែ។ |
+| P1 | `noteZtoReturnedEvidence()` យក event ចាស់ដែលមកយឺតជំនួសថ្មី → អាចដោះ/បិទសិទ្ធិ Restore ខុស។ ឥឡូវបដិសេធ timestamp ចាស់ជាង, ទទួល event ថ្មី និងការបញ្ជាក់ប្រភេទនៅម៉ោងដដែល។ | Projection/persistence 86 PASS; mutation ដក guard ចាប់ 9 assertion FAIL / 77 control PASS។ ត្រា DB ដែលសរសេរតាម sync ត្រូវបានផ្ទៀងក្រោយសម្អាត cache។ មិនប៉ះ ZTO LOCK bytes។ |
+| P2 | `resumeInterruptedCleanups()` រក្សាបញ្ជី A តែបន្តក្រោម session B និងដោះ busy របស់ជុំថ្មី។ ឥឡូវ capture owner មុន await, ផ្ទៀងម្ចាស់នៅក្នុង loop/callback និងដោះ busy តែ barrier របស់ខ្លួន។ | Regression 2 RED → GREEN; mutation ដក owner fence ចាប់បាន។ មិនមានភស្តុតាងថា A payload ត្រូវសរសេរចូល B ឬដកលុយស្ទួនក្នុងករណីនេះទេ។ |
+| P2 | Restore ក្រោយ await pickup/collected អាចលុប claim របស់ហាងថ្មី ឬបង្ហាញ success ចាស់នៅហាងថ្មី។ ឥឡូវផ្ទៀង owner មុន effects ចុងក្រោយទាំងពីរ។ | Regression 2 RED → GREEN; mutation ចាប់បាន។ Accounting ដែល commit រួច និង pending evidence រក្សាដដែល។ |
+| P2 | `saveExchangeRate()` rollback `previousRate` លើ realtime snapshot ថ្មីក្រោយ write បរាជ័យ/timeout។ ឥឡូវផ្ទៀង session និង `exchangeRateObservedVersion`; សារបរាជ័យមិនអះអាងថាបានត្រឡប់ទៅអត្រាចាស់។ | `ZoeW/tests/exchange-rate-listener-race.test.ts`: Baseline 6 FAIL / 5 controls PASS → final 11 PASS; mutations ដក revision/listener/session fence ចាប់ 6/6/1 assertions។ តម្លៃរៀល, storage និង callback listener ពិតមាន coverage។ |
+| P2 | Backup `ci-config.js` ជាន់ឯកសារ `0644` ដោយរក្សា permission ចាស់ និងអាចសរសេរតាម symlink/hardlink។ ឥឡូវប្រើ private atomic replacement `0600`, ផ្ទៀង canonical checkout boundary និងបដិសេធ `secrets` symlink។ | `ZoeW/tests/backup-config-private-files.test.ts`: Baseline 11 FAIL → 11 PASS; backup checker 162 PASS។ Independent partial-write/consumer probes ឆ្លង។ វាស់ filesystem Linux មិនមែន Windows ពិត។ |
+| P2 | Lockfiles មាន advisory ដើម 3 (`re2js`, `glob`, `minimatch`): ZoeW 26 dependency findings និង Provision 16។ Targeted overrides → `2.8.7`, `14.0.2`, `11.0.1`; legacy minimatch ដែលមិនរង advisory រក្សា។ | Installed audit 0 vulnerabilities; Netlify artifact 9 PASS និង Firebase Provision 205 PASS។ Old-lockfile control 5 FAIL; malformed-version control FAIL។ `re2js` ជា Firestore transitive ដែល app មិន import; glob/minimatch ប្រើក្នុង build/CLI ពិត។ |
+| P2 checker | `money-cookie-blob` ចាប់ write gate 8s មុន prerequisite ZTO Sign ដែលមាន budget 15s។ ឥឡូវរង់ចាំដំណាក់កាល prerequisite ដោយពិដានដើម រួចវាស់ write ពិតដោយ 8s ដដែល។ | `ZoeW/tests/money-cookie-readiness.test.ts`: Controlled callbacks 9s ធ្លាក់មុនកែ; readiness/missing-write/hung-readiness 3 PASS។ Mutation ដក `gate.hit()` ត្រូវ FAIL។ Baseline browser មាន intermittent FAIL 2/ok15; narrowed diagnostic មិន reproduce timing failure ហើយធ្លាក់ random coverage floor ដោយ RUNS1។ Final full matrix PASS17/17; មិនអះអាងថាមូលហេតុ intermittent ទាំងអស់ត្រូវបានបញ្ជាក់។ |
+
+**ផែនទីវិសាលភាព**៖ UI `ACTION_REGISTRY` → features/domain → `fb` adapter → Firebase **ឬ** Supabase → committed records/receipts → listeners → React state។ គ្មានសន្មត dual-write។ Inventory និង named functions មានក្នុង `tooling/module-function-inventory.json`; coverage map បែងចែក read review, unit/fixtures, browser/backend local និង hosted។ តំបន់សំខាន់ដែលបានអាន/វាស់៖ scan admission/month/finalization/recovery; Delete/Remove/Restore/cleanup/purge; barcode registry/pickup/collected; Supabase journal/RPC/RLS/tenant/auth; ZTO import/lookup/time/terminal evidence; listeners/reconnect/SW; secrets/backup/KeyGen/Netlify; runner/negative controls និង Markdown។ Inventory មិនមានន័យថាគ្រប់ function បាន execute ទេ។
+
+**Test matrix — លទ្ធផល local និង hosted ដាច់គ្នា**៖
+
+| Flow/បរិស្ថាន | Firebase local | Supabase local | ដែនកំណត់ |
+|---|---|---|---|
+| Palm/Cookie/Sheet: scan/CRUD/Delete/Remove/Restore/cleanup | PASS: App + SDK + rules ពិតក្នុង RTDB emulator | PASS: App + SDK + PostgreSQL ពិតតាម HTTP harness | ZTO responses ជា fixtures; មិនមែន external ZTO |
+| A/B/C, duplicate calls, stale/offline/reconnect, close/reopen កណ្ដាល write, restore denial | PASS17/17; 3 contexts × 3 runs | PASS14 assertions; 2 shops × 3 contexts | Browser contexts មិនមែនទូរស័ព្ទពិត |
+| UI + DB invariants តាម mode | Sheet80 / Cookie170 / Palm152 checkpoints | Sheet80 / Cookie170 / Palm152 checkpoints | មិនបូកជា test cases មិនស្ទួនជាមួយ unit suites |
+| Restore ដែលត្រូវបដិសេធ | Cookie18 / Palm36 PASS | Cookie18 / Palm36 PASS | Simple/Sheet terminal status = N/A |
+| Timestamp import/scan, UTC+7, invalid dates, timezone ផ្សេង, notifications/reminders | PASS កូដអាជីវកម្ម/backend-neutral | PASS កូដអាជីវកម្ម/backend-neutral | Clock suites 283 PASS ក្រោម `TZ=America/New_York`; push delivery/device clock ពិត NOT TESTED |
+| Cross-shop isolation | Emulator namespace/rules checks PASS | Neighbor snapshots មិនប្រែ និង RLS negative probes PASS | Separate hosted Firebase projects មិនទាន់វាស់ដោយ authenticated clients |
+| Auth/register | Local auth/rules checks PASS | GoTrue ពិត + PG + SDK HTTP: 28 PASS; onboarding 9 PASS | SQL RPC transport ក្នុង harness មិនមែន hosted PostgREST |
+| Lifecycle/SW/cache/account switching | Listener33, SW wiring24/install62/cache-key27 PASS | ផ្លូវ client រួម និង adapter session tests PASS | Hosted old/new installed-client coexistence និង physical devices NOT TESTED |
+| Hosted authenticated read-only | PASS8: Auth/JWT/settings/deny controls លើ `zoew-v1` | PASS9: Auth/exact KC-15 tenant/clock/count/anon denial/local logout204 | មិនទាញ customer payloads; account/activation/role មិនប្រែ |
+| Hosted owned-row operations និងបន្ទុកមានព្រំដែន | PASS19: create/read/replay/CAS/SSE/invalid-shape denial/cleanup; reads300 max20concurrent | PASS45: 3Auth sessions/privateRealtime, replay/CAS/cleanup; reads300 max20concurrent | Row ប្រាក់0 គ្មាន barcode; មិនជំនួស parcel UI/money matrix ឬ hundred-user capacity |
+| CI 4 shards លើ tree ថ្មី | NOT TESTED | NOT TESTED | Local focused/real-runtime checks មិនជំនួស CI ពេញ |
+
+Final local Firebase មាន repeated calls 1,712 និងបិទទំព័រកណ្ដាលប្រតិបត្តិការ 52; random floors offlineReload27, offlineOnline18, sweepRace5, ZTO-return7, concurrent32, restoreRace3/3។ Owned JVM ចប់ និង cleanup=true; គ្មាន FAIL/SKIP ឬ journal ជាប់។ Final Supabase មាន actual PG v2 writes 1,583 និង neighbor isolation ផ្ទៀងក្រោយ checkpoints។ Money unit 1,060 PASS ក្នុង 23 files និង generated cleanup110/tx-outcome149; adapter 460, RLS601, datastore292; ZTO mode suites 558 និង affected persistence86; security final408/7files និង security guard60; client affected87។ ចំនួនតាមក្រុមនេះអាចមាន coverage ជាន់គ្នា ដូច្នេះមិនបូកជាសរុប tests មិនស្ទួនទេ។
+
+**ល្បឿន និងបន្ទុកដែលបានវាស់**៖
+
+- PostgreSQL17 local, Node24, CPU quota4 និង memory cap16GiB; 100 shops × 3 virtual devices, pool16 concurrent SQL transactions។ 3,000 unique writes + 1,200 duplicate replay probes + 300 reconnect pulls + 300 forbidden reads + 300 forbidden writes = 5,100 requests; unexpected errors0, totals ត្រូវ និង cross-tenant writes0។ `fsync`, `full_page_writes`, `synchronous_commit` ទាំងអស់ `on` ក្នុងជុំ durable។ Write p50=411.93ms, p95=633.36ms រាប់ pool wait; SQL-after-pool p95=38.46ms; workload5.48s។ Client peak RSS135,114,752 bytes; pooled backend summed RSS621,888KiB រួម shared pages ដូច្នេះមិនមែន unique memory។
+- នេះជាការ SQL/RPC synthetic ledger load មិនមែន parcel UI operations 300 users, hosted GoTrue/PostgREST/WebSocket fan-out ឬ mobile network load ទេ។ Retry probes ជាចេតនា មិនមែន production retry rate។ Request/response bytes ក្នុង report មិនរួម TLS/protocol overhead។
+- Chromium final 1,200 history rows និង 1,200 trash rows: boot743ms, cold render17ms, listener repaint8ms, trash render/search6ms/6ms; performance guards31/31 PASS។ UI timing ជាមធ្យមតាម repetitions របស់ checker មិនមែន latency percentile ឬការធានាទូរស័ព្ទគ្រប់ប្រភេទ។
+
+**Hosted read-only evidence**៖ Supabase `ZoeW` project មាន migrations63 ដូច local IDs គ្រប់គ្រាប់; `KC-15` active/unexpired។ បានអានតែ aggregate inventory មិនទាញ customer payloads។ Security advisor៖ leaked-password protection disabled (WARN); tables `zoe_ops` និង `private.registration_protocol` ដែល RLS/no-policy ជា deny-by-default ពិត (`anon`/`authenticated` គ្មាន DML privileges)។ Indexes2 ដែល advisor ថាមិនទាន់ប្រើមិនត្រូវលុបដោយសារតែ statistic នោះ។ Firebase config ដំបូង `zoew-z1` ជា License/KeyGen project; login បរាជ័យមួយលើក ហើយម្ចាស់កែទៅ business `zoew-v1` ទើប Auth8checks PASS។ Supabase read-only9checks PASS និង temporary-session logout204។ Register/reset-password deployed v125 source12file comparisons ដូច local។ Firebase anonymous read ត្រូវ401។ Hosted manifest នៅ `2.50.192`, ដូច្នេះមិនមែនការផ្ទៀង deploy នៃ `2.50.193`។ Server-time JSON 10 samples nonce/CORS/no-store ឆ្លង និង Android-origin200/foreign403/duplicate400/method405 ឆ្លង; request គ្មាន nonce400 ជា behavior ត្រឹមត្រូវ។
+
+**Hosted Firebase functional probe**៖ `zoew-v1` ឆ្លង19/19 ក្រោយ current-rules emulator preflight18/18។ ប្រើតែ exact `audit-` IDs ពីរដែលផ្ទៀងថាអវត្តមាន៖ valid zero-money/zero-count row និង invalid-shape control។ ETag CAS បង្កើត/កែ/លុប; simultaneous writes ឈ្នះ200មួយ/412មួយ, SSE4 events, malformed/unknown-field writes និង anonymous read ត្រូវ401។ 300/300 reads max20concurrent, no retries, unexpected errors0/429=0, batch4.287s, p50=209.41ms/p95=1144.96ms រួម network/proxy។ DB requests318 (311GET/7PUT), មិនរាប់ login/SSE; both IDs confirmed absent ក្រោយ exact-value+ETag cleanup។ Direct ledger writes0 និង existing-record requests0។ Empty row ត្រូវ UI loader រំលង ហើយអាចបង្ក transient data/skipped warning; history notification អាចដាស់ normal cleanup/recovery នៅ real app sessions ដែលកំពុងបើក ដូច្នេះមិនអះអាងថាគ្មាន indirect effects លើ session ទាំងនោះ។ First transport attempt មុនបើក Node env proxy បរាជ័យមុន business request ហើយបានរក្សា log ដាច់។
+
+**Hosted Supabase functional probe**៖ actual `KC-15` ឆ្លង45/45 ក្រោយ actual local PG preflight12 និង offline scope guards54។ Auth sessions3 និង private Realtime WebSockets3 ទទួល state changes6 គ្រប់ session = deliveries18។ Exact-owned-row reads300/300 max20concurrent, no retries/unexpected errors0, batch4751.17ms, p50=236.73ms/p95=595.37ms/p99=782.01ms។ RPC8 រួម create, same-op replay, locker CAS4, stale-CAS conflict និង exact-state CAS delete; HTTP333 រួម owned reads313 និង local logout204 ចំនួន3។ Realtime elapsed226.58–813.33ms វាស់ពីមុន write RPC ដល់ event receipt រួម request/proxy/commit/broadcast មិនមែន pure WebSocket latency។ Cleanup ឆ្លង ហើយ clients3 អាន row=null; normal null tombstone/op receipts និង tenant sequence នៅតាម retention របស់ backend។ ដូច Firebase, មិនមាន direct mutation ទៅ existing business rows/ledger; ordinary clients ដែលបើកអាចដំណើរការ cleanup/recovery ក្រោយ notification។ Probe-only WebSocket guard ដំបូងអាច throw ក្នុង rejoin timer; independent offline SDK negative control ចាប់បាន ហើយកែឱ្យ main flow ទទួល fault និង cleanup មុន live run។
+
+**គុណភាព checker និងឯកសារ**៖ runall-runner239 PASS រួម fake green/exit/timeout/SKIP/PARTIAL/stale-resume controls; source/meta unit67 និង tooling baseline78 PASS។ New regressions/mutations រត់លើ source baseline/shadow ដាច់ មិន poison source កំពុងប្រើ។ Markdown tracked25 មាន inventory/structure/version review, local file links មិនបាក់ និង heading links20 ត្រឹមត្រូវ; មិនអះអាង manual review ប្រវត្តិរាប់ម៉ឺនបន្ទាត់គ្រប់បន្ទាត់ទេ។ Reachability280 modules/2,425 named functions មិនផ្តល់ safe-deletion candidate; reflection ក្នុង audit exposure ធ្វើឲ្យ report incomplete (exit2), ដូច្នេះគ្មាន dead-code removal។ Source strip-comments ពិនិត្យ334 files, សម្អាត0។ Existing gesture/ZTO LOCK assertions មិនប្ដូរ។
+
+**ដែនកំណត់/ជំហាន release ដែលនៅខ្វះ**៖ initial snapshot ដែល synthetic SDK ព្យួរ ខណៈ `.info/connected=true` នៅ syncing ក្រោយ5នាទី; មិនមែនភស្តុតាង production transport ព្យួរជារៀងរហូត។ Timeout-only reconnect អាចបំបែកការទាញធំយឺត។ Chromium Reload ផ្ទៀងថា document ថ្មីទាញបាន, history listener1, journal មិនទាន់ដោះស្រាយរក្សា byte ដដែល, writes0/errors0; កុំ clear storage។ ត្រូវវាស់ sustained hosted workload/parcel UI ដែលមិនទាន់រត់, real ZTO/push និងទូរស័ព្ទ iPhone/Android; review leaked-password setting ជាមួយម្ចាស់; CI លើ source ចុងក្រោយ និងផ្ទៀង prerequisite rollout របស់កំណែមុនមុន release។ Rules/migrations ថ្មីមិនមានក្នុង patch នេះ; Supabase target មាន migration prerequisite រួច តែ Firebase ordinary account មិនអាចអាន deployed rules ដើម្បីផ្ទៀង source parity។ Unknown/expired receipt ដែលច្បាប់បច្ចុប្បន្នទុក HOLD មិនត្រូវបង្ខំឲ្យជោគជ័យ ឬលុប journal ដើម្បី launch។ ការបញ្ចប់ local audit មិនមែនអះអាងថា launch gate បានបិទ ឬ app គ្មាន bug គ្រប់ករណីទេ។
+
+**រត់ឡើងវិញ និងភស្តុតាង**៖ session logs មាន `baseline-*`, `final-*`, `money/`, `backend/`, `client/`, `security/`, `zto/`, `tooling/`; baseline failures, environment/setup failures និង mutations រក្សាដាច់ពី final PASS។ npm cache read-only ត្រូវដោះដោយ cache ក្រោម `/tmp`; Chromium paths ត្រូវកំណត់ទៅ installed browser; stale production dist ត្រូវ rebuild មុន smoke (guard បានចាប់ version ចាស់ពិត)។ កុំយកការធ្លាក់ setup ទាំងនេះជាកំហុស App ឬបិទ guard ដើម្បីឲ្យឆ្លង។
+
+```bash
+npm ci --prefix ZoeW
+npm ci --prefix supabase
+npm ci --prefix tools/firebase-provision --ignore-scripts
+npm --prefix ZoeW run typecheck
+npm --prefix ZoeW run lint
+npm --prefix ZoeW run build
+ZOEW_TEST_BROWSER=/usr/bin/chromium npm --prefix ZoeW run smoke
+ZOEW_TEST_BROWSER=/usr/bin/chromium npm --prefix ZoeW run sw:check
+ZOEW_TEST_BROWSER=/usr/bin/chromium npm --prefix ZoeW run native:check
+ZOEW_TEST_BROWSER=/usr/bin/chromium npm --prefix ZoeW run rules:check
+ZOEW_TEST_BROWSER=/usr/bin/chromium ZOE_MEASURE_ONLY=1 bash audit-tools/run-all.sh
+```
+
+Browser/emulator/PG commands និង env ពេញនៅ evidence JSON/summary របស់ក្រុមនីមួយៗ។ ប្រើ Runbook សម្រាប់ owned RTDB checksum/lifecycle; កុំ prestart ឬ adopt JVM របស់ session ផ្សេង។ Load script `backend/load.cjs` និង `load-durable.json` រក្សា workload/settings/limits ដែលត្រូវអានមុនយកលេខទៅប្រៀបធៀប។
 
 ### 2026-11-09 — Audit 1240៖ បំពេញចន្លោះ prompt តាម flow ពិត និងភស្តុតាងឯករាជ្យ
 
@@ -4943,6 +5024,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/backend-modal-ownership.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/backend-switch-detach.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/backend-switch-late-sdk.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/backup-config-private-files.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/barcode-key-encoding.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/barcode-origin.test.tsx` | — | ផ្នែក ៨ |
 | `ZoeW/tests/batch-scan.test.ts` | — | ផ្នែក ៨ |
@@ -4988,6 +5070,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/evidence-retention.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/exchange-rate-backend-switch.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/exchange-rate-completion-race.test.ts` | — | ផ្នែក ៨ |
+| `ZoeW/tests/exchange-rate-listener-race.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/exchange-rate-shop-switch.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/expiry-return-policy.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/expiry-schedule-cap.test.ts` | ផ្នែក ២ | — |
@@ -5057,6 +5140,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/modal-focus-trap.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/modal-keyboard-device-checker.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/modal-keyboard.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
+| `ZoeW/tests/money-cookie-readiness.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/money-multidevice-oracle.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/more-menu-scroll.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/native-durable-write.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |

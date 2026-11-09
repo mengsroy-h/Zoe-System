@@ -29,8 +29,22 @@ for (const [name, floor] of [['source-map-js', '1.2.2'], ['@grpc/grpc-js', '1.13
         versions.length > 0 && versions.every((version) => versionAtLeast(version, floor)), versions);
 }
 
+const re2Versions = Object.entries(packageLock && packageLock.packages || {})
+    .filter(([rel]) => rel.endsWith('/re2js')).map(([, value]) => value.version);
+ok('⛔ re2js ដែល Firestore SDK ទាញមកដល់ patch សុវត្ថិភាព',
+    re2Versions.length > 0 && re2Versions.every(version => versionAtLeast(version, '2.8.7')), re2Versions);
+
 let provisionLock = null;
 try { provisionLock = JSON.parse(fs.readFileSync(path.join(ROOT, 'tools', 'firebase-provision', 'package-lock.json'), 'utf8')); } catch (e) {}
+for (const [label, lock] of [['ZoeW', packageLock], ['Firebase Provision', provisionLock]]) {
+    for (const [name, lower, fixed] of [['glob', '9.0.0', '14.0.2'], ['minimatch', '7.0.0', '11.0.1']]) {
+        const versions = Object.entries(lock && lock.packages || {})
+            .filter(([rel]) => rel.endsWith('/' + name)).map(([, value]) => value.version);
+        ok('⛔ ' + label + ' ៖ ' + name + ' គ្មានកំណែក្នុងជួរដែលរង DoS',
+            versions.length > 0 && versions.every(version => /^\d+\.\d+\.\d+$/.test(String(version))
+                && (!versionAtLeast(version, lower) || versionAtLeast(version, fixed))), versions);
+    }
+}
 for (const [name, floor] of [['basic-ftp', '6.2.1'], ['@opentelemetry/core', '2.8.0'], ['uuid', '11.1.1'], ['@modelcontextprotocol/sdk', '1.32.0'], ['fast-uri', '3.1.9'], ['ip-address', '10.7.4'], ['zod', '4.6.6']]) {
     const versions = Object.entries(provisionLock && provisionLock.packages || {})
         .filter(([rel]) => rel.endsWith('/' + name)).map(([, value]) => value.version);

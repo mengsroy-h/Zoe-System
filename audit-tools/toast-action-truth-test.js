@@ -188,7 +188,7 @@ async function runRateSessionChecks() {
                 const context = vm.createContext({
                     Promise, Error, console: { error() {} }, window: { ZoeErrors: null },
                     authGeneration: 7, auth: { currentUser: { uid: 'u1' } }, db: {}, dbRefExchangeRate: {},
-                    exchangeRateRiel: 4100, exchangeRateSaveInFlight: false,
+                    exchangeRateRiel: 4100, exchangeRateObservedVersion: 0, exchangeRateSaveInFlight: false,
                     fb: { set: () => { writesReached++; return new Promise((resolve, reject) => { resolveWrite = resolve; rejectWrite = reject; }); } },
                     appLocalStore: {},
                     safeStoreSet: (_, key, value) => { effects.push('store:' + value); return true; },

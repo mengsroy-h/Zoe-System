@@ -142,6 +142,8 @@ export function pruneZtoReturnedEvidence() {
 export function noteZtoReturnedEvidence(code, at, kind = 'returned') {
     const key = pickupBarcodeKey(code);
     if (!key || typeof at !== 'number' || !isFinite(at) || at <= 0) return;
+    const prior = ztoReturnedEvidence.get(key);
+    if (prior && prior.at > at) return;
     ztoReturnedEvidence.delete(key);
     const noted = getServerNow();
     ztoReturnedEvidence.set(key, { at: at, noted, ...(serverClockIsTrustworthy() ? {} : { notedPending: true }), kind: kind === 'misplaced' || kind === 'sent' || kind === 'left' ? kind : 'returned' });

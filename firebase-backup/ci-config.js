@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const backup = require('./backup.js');
 const supabase = require('./supabase.js');
+const { writePrivateAtomicFile } = require('./crypt.js');
 
 const TARGETS_ENV = 'ZOE_BACKUP_TARGETS';
 
@@ -58,7 +59,7 @@ function addTarget(entry, outRoot, secretsDir, names) {
         const key = supabase.validateSecretKey(entry.secretKey);
         claimName();
         const keyPath = path.join(secretsDir, `${name}.key`);
-        fs.writeFileSync(keyPath, key + '\n', { mode: 0o600 });
+        writePrivateAtomicFile(keyPath, key + '\n');
         return {
             business: { name, type: 'supabase', url, secretKeyPath: path.join('secrets', `${name}.key`) },
             summary: `${name} -> ${new URL(url).host} (supabase)`
@@ -71,11 +72,11 @@ function addTarget(entry, outRoot, secretsDir, names) {
     const serviceAccount = backup.validateServiceAccount(serviceAccountObject(entry));
     claimName();
     const keyPath = path.join(secretsDir, `${name}.json`);
-    fs.writeFileSync(keyPath, JSON.stringify({
+    writePrivateAtomicFile(keyPath, JSON.stringify({
         client_email: serviceAccount.clientEmail,
         private_key: serviceAccount.privateKey,
         token_uri: serviceAccount.tokenUri
-    }), { mode: 0o600 });
+    }));
     return {
         business: { name, serviceAccountPath: path.join('secrets', `${name}.json`), databaseURL },
         summary: `${name} -> ${new URL(databaseURL).hostname}`
@@ -85,6 +86,7 @@ function addTarget(entry, outRoot, secretsDir, names) {
 function buildRunDirectory(outRoot, targets) {
     const secretsDir = path.join(outRoot, 'secrets');
     fs.mkdirSync(secretsDir, { recursive: true, mode: 0o700 });
+    if (!fs.lstatSync(secretsDir).isDirectory()) throw new Error('Secrets directory must not be a symbolic link.');
     const businesses = [];
     const summary = [];
     const failed = [];
@@ -111,7 +113,7 @@ function buildRunDirectory(outRoot, targets) {
         businesses
     };
     const configPath = path.join(outRoot, 'config.json');
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), { mode: 0o600 });
+    writePrivateAtomicFile(configPath, JSON.stringify(config, null, 2));
     backup.validateBusinesses(config, path.join(outRoot, 'backups'));
     return { configPath, summary, failed, count: businesses.length, total: targets.length };
 }
@@ -125,7 +127,13 @@ function main(argv) {
     if (outRoot === path.resolve(__dirname, '..') || outRoot.startsWith(path.resolve(__dirname, '..') + path.sep)) {
         throw new Error('Refusing to write credentials or backups inside the repository checkout — pass a path outside it (for example $RUNNER_TEMP/zoe-backup).');
     }
-    const result = buildRunDirectory(outRoot, parseTargets(process.env[TARGETS_ENV]));
+    fs.mkdirSync(outRoot, { recursive: true, mode: 0o700 });
+    const realRoot = fs.realpathSync(outRoot);
+    const repoRoot = fs.realpathSync(path.resolve(__dirname, '..'));
+    if (realRoot === repoRoot || realRoot.startsWith(repoRoot + path.sep)) {
+        throw new Error('Refusing to write credentials or backups inside the repository checkout through a symbolic link.');
+    }
+    const result = buildRunDirectory(realRoot, parseTargets(process.env[TARGETS_ENV]));
     for (const line of result.summary) console.log(`[TARGET] ${line}`);
     for (const line of result.failed) console.error(`[FAIL] ${line}`);
     console.log(`\nPrepared ${result.count} of ${result.total} target(s) at ${result.configPath}`);

@@ -284,7 +284,7 @@ function slice(from, to, what) {
 const BOOT_SRC = slice('const BOOT = function (seed) {', 'function seedData()', 'BOOT');
 const SEED_SRC = slice('function seedData()', '// deterministic PRNG', 'seedData');
 const LIC_A = FUZZ.indexOf('const LICENSE_STUB = `');
-const LICENSE_STUB = LIC_A === -1 ? null : FUZZ.slice(LIC_A + 'const LICENSE_STUB = `'.length, FUZZ.indexOf('};`') + 2);
+const LICENSE_STUB = LIC_A === -1 ? null : FUZZ.slice(LIC_A + 'const LICENSE_STUB = `'.length, FUZZ.indexOf('};`') + 2) + require('./browser-clock-fixture.cjs').CLOCK_FIXTURE;
 check(!!(BOOT_SRC && SEED_SRC && LICENSE_STUB), 'ស្រង់ BOOT · seedData · LICENSE_STUB ចេញពី `revenue-fuzz-test.js` (មិនចម្លង)');
 
 function serve(dir) {

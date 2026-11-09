@@ -42,7 +42,7 @@
 
 ## 📌 ការងារដែលនៅសល់ — ការផ្ទៀងផ្ទាត់ដោយអ្នកប្រើ
 
-- 2026-11-08 · Clock/Audit 1232៖ candidate ដាច់ដោយឡែកមានកំណែ ZoeW `2.50.188` និង ZoeKeyGen `2.24.37`; មិនទាន់ផ្សាយ។ ZTO hash ៣នៅក្រហម; rendered ZTO guards, browser/backend/device និង CI លើ commit ចុងក្រោយនៅមិនទាន់បញ្ចប់។
+- 2026-11-09 · Clock/Audit 1233៖ candidate ដាច់ដោយឡែកមានកំណែ ZoeW `2.50.189` និង ZoeKeyGen `2.24.37`; មិនទាន់ផ្សាយ។ ZTO hash ៣នៅក្រហម; rendered ZTO guards, browser/backend និង CI នៅមិនទាន់បញ្ចប់។ ការផ្ទុកប្រវត្តិក្រោយ session ផ្ទៀងត្រូវវាស់លើ iPhone/Android ពិតមុន merge។
 
 - 2026-11-07 · PR393៖ Registration atomic បានបញ្ចូលក្នុង branch រួច។ Audit និង Registration Auth លើ head `a711893b4f3b0d3b48dcdb1801937f4fd8baa732` បានផ្ទៀង; F03 ជាប់ក្រោយរត់ឡើងវិញ ប៉ុន្តែមូលហេតុបរាជ័យដំបូងមិនទាន់បញ្ជាក់។ Hosted migration/backup/restore និងការរង់ចាំ handler ចាស់ឱ្យចប់ នៅមិនទាន់ផ្ទៀង; ការកែ test និងឯកសារថ្មីត្រូវការ CI លើ commit ថ្មី មុន merge។ Dead-code ដែលបានដកចេញពីការកែ នៅមិនទាន់បញ្ចប់។
 
@@ -121,6 +121,16 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ archive ផ្នែក ៩ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.189] — 2026-11-09 · បន្តផ្ទុកប្រវត្តិក្រោយផ្ទៀងវគ្គ
+
+**ZoeW** (`zoew-v452` ➜ `zoew-v453`)។ **ZoeKeyGen មិនប្រែ**។ Candidate សម្រាប់ពិនិត្យដាច់ដោយឡែក មិនទាន់ផ្សាយ។
+
+បញ្ជីប្រវត្តិបន្តការផ្ទុកជួរស្វ័យប្រវត្តិក្រោយ session ផ្ទៀងរួច ទោះជួរ «បង្ហាញបន្ថែម» នៅមើលឃើញជាប់ក៏ដោយ។ Clock/session ដែលមិនទាន់ប្រាកដនៅតែទប់សកម្មភាព; callback ចាស់បន្ទាប់ពីការប្ដូរជួរ ឬបិទផ្ទាំងមិនបញ្ចូលការផ្ទុកស្ទួន។ មិនប្តូរ animation, CSS, scroll API ឬ LOCK។
+
+**អ្នកយាម**៖ `history-observer-session-recovery.test.tsx`, `history-paging.test.tsx` និង `forbidden-zone-lock.test.ts` រួម session/clock tests។ ការរត់រួមចុងក្រោយ ៣០២/៣០២ក្នុង១៤ឯកសារជាប់; independent review ៣៤/៣៤ជាប់ដោយមានករណីបន្ថែម។ ករណី clock recovery និង callback ស្ទួនត្រូវរក្សាក្នុង regression test។ លទ្ធផលទាំងពីរមានករណីត្រួតគ្នា មិនបូកជាចំនួនតេស្តថ្មីទេ។
+
+**សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ មុន merge ត្រូវផ្ទៀងលើ iPhone និង Android ពិតថា history បន្តក្រោយ session verification, អាចទុក sentinel មើលឃើញជាប់ និងចាកចេញ/ត្រឡប់ ដោយមិនប៉ះចលនាដើម។ Browser, backend និង CI លើ commit ចុងក្រោយនៅត្រូវរត់; ZTO LOCK ៣នៅមិនទាន់ប្តូរ។ គ្មាន migration ឬ rules ថ្មី។
 
 ### [2.50.188] · ZoeKeyGen [2.24.37] — 2026-11-08 · ម៉ោងដែលផ្ទៀងបាន និងការស្ដារការងារ
 
@@ -1983,6 +1993,20 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-11-09 — Audit 1233៖ ផ្ទៀង fixture និងការវាស់ដោយមិនបន្ថយ guard
+
+ម្ចាស់អនុញ្ញាតជាក់លាក់ឱ្យកែការផ្ទុកប្រវត្តិបន្ថែមក្រោយ session ផ្ទៀង ដោយមិនប្តូរ animation ឬភាពរលូននៃ scroll។ `history-observer-session-recovery.test.tsx` ប្រើ React component និង action/session guard ពិត៖ baseline recovery ២ករណីធ្លាក់នៅ៥០ជួរ ខណៈ positive/manual controls ជាប់។ Review រកឃើញ callback ដែលសល់ក្រោយ disconnect; negative controls ៣ធ្លាក់មុនកែ cleanup។ Effect ថ្មីតាម readiness ហើយ cleanup បិទ latch ចាស់មុន disconnect; physical device validation នៅមិនទាន់រត់។
+
+ផ្ទៀង commit `3fb95c8` និង tree `e3e6500a` មុនរៀបចំ candidate ដាច់ដោយឡែក។ CI មាន checker កម្រិតលើ ១៩៣ជាប់ និង៥០ធ្លាក់; មិនរាប់ជាកំហុសផលិតផល៥០ទេ។ Fixture browser/native បន្ថែម frozen clock sample តាម sync ពិតរបស់ fixture ហើយ getter មិនបន្ត sample; SDK fixture ប្រើ clock owner ពិត និង reset generation។ ការកែ VM ភ្ជាប់ session/clock owner រួម private state ដើម្បីឱ្យការវាស់ទៅដល់ប្រតិបត្តិការដែលបានកំណត់។ Assertions, operation floors និងពិដានពេលដើមនៅដដែល; network timeout ត្រូវមានសំណើចាប់ផ្ដើម និង abort ពិត មិនមែន ReferenceError មុនសំណើ។
+
+អ្នកយាមថ្មី `browser-clock-fixture-contract.test.ts` និង `sdk-audit-clock-fixture.test.ts` មាន positive admission និង negative controls សម្រាប់ session រង់ចាំ, clock drift, generation និងកម្មសិទ្ធិដែលផ្លាស់ប្ដូរ។ ការវាស់ថ្មី browser ៤៦ និង SDK ១០ជាប់; baseline ដើមធ្លាក់នៅ prerequisite ដែលខ្វះ មិនមែនកំហុសផលិតផលដាច់ពីគ្នាតាមចំនួននោះទេ។ VM source-only ១៤ក្រុមជាប់; ការពុល session, lease, toast, seat និង abort ធ្វើឱ្យ assertion ដែលចង់វាស់ធ្លាក់ពិត។ ការវាស់ទាំងនេះមិនជំនួស browser ឬ backend ពេញលេញ។
+
+អ្នកយាម `static-checker-contracts.test.ts` និង `payload-local-cache.test.ts` មាន ៣៧ករណីជាប់ក្រោយ independent review រកឃើញ និងបិទ Map method replacement, alias escape និង binding shadow រួម destructuring។ Shared clock divergence ត្រូវមាន behavioral contract; payload លើកលែងតែ assignment offsets ដែលមានប្រភព local ផ្ទៀងបាន។ ZTO source-only checker ឆ្លង ៦២៥ assertions ប៉ុន្តែ១១ដែលទាមទារ rendered HTML នៅធ្លាក់; មិនរាយថា full checker ជាប់ទេ។
+
+កែ announcement ឱ្យត្រូវកំណែ App ដែលមានរួច និងបន្ថែមជួរលិបិក្រមដែលខ្វះ។ Vitest លើ candidate metadata/browser/SDK មាន ៨៩៣៧ជាប់, ១៥ធ្លាក់ និង៨៩មិនបានរត់ចប់៖ LOCK ដើម៣, artifact dependency symlink៨ និង Postgres setup៤; browser/PG setup ក៏ទប់សេណារីយ៉ូផ្សេង។ ក្រោយដាក់ dependencies ជាឯកសារពិតដោយមិនកែ source ឬ test, artifact ៩/៩ជាប់។ Chromium និង PostgreSQL មិនមានក្នុងបរិស្ថាននេះ; full audit និង CI លើកំណែថ្មីនៅត្រូវវាស់។ គ្មាន LOCK refresh, business policy edit, timeout increase, push, merge ឬ production write។
+
+Source suite លើ release candidate ដែលមាន history fix និងកំណែថ្មី៖ ៨៩៩២ជាប់/៣ ZTO LOCK ធ្លាក់/០ skip។ ការរត់នេះដកឯកសារ Chromium ៤ និង PostgreSQL ៥ដែលបរិស្ថានមិនគាំទ្រ ដោយបញ្ជាក់ជាមុន; មិនមែន full suite ឬ CI បៃតងទេ។ ក្រោយបន្ថែមតែ negative controls ពី review ពីរករណី ការរត់ focused ១៤ឯកសារ៣០២/៣០២ជាប់។ Typecheck, lint, production build, slot/purity/doc/Android/notice/comments, repository-file-coverage ១០/១០ និង strict version scope ១៨/១៨ជាប់។ Version scope ប្រើ SW ដែល build ពិត ហើយផ្ទៀង byte-equivalence មុនបង្កើតទិដ្ឋភាពអាន; មិនបង្កើត rendered HTML ក្លែង ឬអះអាង browser SW behavior ទេ។
 
 ### 2026-11-08 — Audit 1232៖ បញ្ចូលការកែដែលមានភស្តុតាងក្នុង candidate ដាច់ដោយឡែក
 
@@ -4711,6 +4735,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/biometric-no-device-mode.test.tsx` | ផ្នែក ១ | ផ្នែក ៨ |
 | `ZoeW/tests/born-closed-public-baseline.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/breadcrumb-redaction-copy.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/browser-clock-fixture-contract.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/build-checker-freshness.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/chrome-autohide-intent.test.tsx` | — | ផ្នែក ៨ |
 | `ZoeW/tests/cleanup-applied-foreign-op.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -4760,7 +4785,8 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/health-advice.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/health-no-backend.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/health-runtime-evidence.test.ts` | ផ្នែក ២ | — |
-| `ZoeW/tests/history-paging.test.tsx` | — | ផ្នែក ៧ |
+| `ZoeW/tests/history-observer-session-recovery.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/history-paging.test.tsx` | ផ្នែក ១ | ផ្នែក ៧ |
 | `ZoeW/tests/history-patch-late-commit.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/ios-accessory-focus.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/ios-adjusted-tap-focus.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -4776,6 +4802,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/ios-synthetic-click-focus.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/item-level-rows-gone.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/keyboard-tabbar.test.tsx` | — | ផ្នែក ៨ |
+| `ZoeW/tests/keygen-calendar.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/label-image.test.tsx` | — | ផ្នែក ៨ · ផ្នែក ៩ |
 | `ZoeW/tests/label-print.test.tsx` | ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/late-commit-stale-session.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
@@ -4798,6 +4825,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/lookup-import-race.test.ts` | ផ្នែក ១ | ផ្នែក ៩ |
 | `ZoeW/tests/lookup-key-restore-idb.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/lookup-late-answer-busy.test.ts` | — | ផ្នែក ៨ · ផ្នែក ៩ |
+| `ZoeW/tests/lookup-list-lifecycle.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/lookup-modes-money.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/lookup-plain-header-gone.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/manual-adjust-number-browser.test.ts` | ផ្នែក ១ | — |
@@ -4835,6 +4863,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/notify-removed-seen-live.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/notify-update-check.test.tsx` | — | ផ្នែក ៨ |
 | `ZoeW/tests/orientation-lock.test.ts` | — | ផ្នែក ៨ |
+| `ZoeW/tests/palm-calendar-boundaries.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/palm-sign-camera.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/palm-sign-confirmation-transport.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/palm-sign-journal.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -4844,6 +4873,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/palm-sign-reservation.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/palm-sign-restart.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/password-save-race.test.ts` | — | ផ្នែក ៨ |
+| `ZoeW/tests/payload-local-cache.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/phone-pickup-stale-view.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/phone-suggest-idle-scroll.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/pickup-cleanup-collected-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -4909,6 +4939,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/scanner-focus-after-close.test.tsx` | — | ផ្នែក ៨ |
 | `ZoeW/tests/scanner-modal-queue.test.tsx` | — | ផ្នែក ៨ · ផ្នែក ៩ |
 | `ZoeW/tests/scroll-thumb.test.tsx` | — | ផ្នែក ៧ · ផ្នែក ៨ |
+| `ZoeW/tests/sdk-audit-clock-fixture.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/search-glide-hold.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/secret-pem-redaction.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/seller-notices.test.tsx` | — | ផ្នែក ៧ |
@@ -4923,6 +4954,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/shop-bound-ui-refresh.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/shop-device-note.test.ts` | — | ផ្នែក ៨ · ផ្នែក ៩ |
 | `ZoeW/tests/shop-pending-cleanup.test.tsx` | — | ផ្នែក ៨ |
+| `ZoeW/tests/static-checker-contracts.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-account.test.tsx` | ផ្នែក ២ | ផ្នែក ៧ |
 | `ZoeW/tests/supabase-auth-unavailable.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ |
 | `ZoeW/tests/supabase-auth-write-ownership.test.ts` | — | ផ្នែក ៨ · ផ្នែក ៩ |
@@ -4983,6 +5015,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/zto-abandon-signed-gate.test.tsx` | — | ផ្នែក ៨ · ផ្នែក ៩ |
 | `ZoeW/tests/zto-barcode-shape.test.ts` | ផ្នែក ១ | ផ្នែក ៩ |
 | `ZoeW/tests/zto-born-closed-merge.test.ts` | — | ផ្នែក ៨ |
+| `ZoeW/tests/zto-calendar-validation.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-cookie-life.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/zto-detail-identity.test.ts` | — | ផ្នែក ៨ · ផ្នែក ៩ |
 | `ZoeW/tests/zto-empty-view-refresh.test.ts` | ផ្នែក ២ | — |

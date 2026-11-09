@@ -186,12 +186,12 @@ function makeSandbox(store, now) {
         remove: (ref) => Promise.resolve().then(() => { w.writes.push({ method: 'PUT', path: ref.path, value: null }); set(ref.path, null); })
     };
     const ctx = vm.createContext({ runEvidenceRetentionSweep: async () => 0, ztoState: { ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 }, ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 } }, ZTO_TRASH_MODE_ACTIVE_MS: 7 * 24 * 60 * 60 * 1000, ztoTrashModeSeen: null, serverTimeOffsetMs: 0, hasEverConnectedToDatabase: true, 
-        console, queueMicrotask, setTimeout, clearTimeout, Promise, Math, Date, JSON, Set, Map, URL, TextEncoder, window: { location: { href: 'https://example.invalid/' } }, ZoeErrors: null,
+        console, queueMicrotask, setTimeout, clearTimeout, Promise, Math, Date, performance, JSON, Set, Map, URL, TextEncoder, window: { location: { href: 'https://example.invalid/' } }, ZoeErrors: null,
         navigator: { onLine: true },
         db: { app: { options: { databaseURL: 'https://crud-fixture.invalid' } } }, authGeneration: 0, isInitializingFirebase: false, fb,
         isDatabaseInitialized: true, dbListenersFailed: false, registryReleaseFlushInFlight: false,
         dataState: { pickupPendingVersion: 0 },
-        auth: { currentUser: { uid: 'userA' } },
+        auth: { currentUser: { uid: 'userA' } }, sessionExpiryCheck: 'live',
         dbRefDeleted: fb.ref({}, 'zoew_recently_deleted_cod_dod'),
         dbRefHistory: fb.ref({}, 'zoew_scan_history_cod_dod'),
         dbRefDailyPickup: fb.ref({}, 'zoew_daily_pickup_cod_dod'),
@@ -326,9 +326,11 @@ function makeSandbox(store, now) {
         ...['pickupCopyMarks', 'trashReasonDeducted', 'restorePendingCode'].map((n) => optionalFn(src, n, '')),
         'globalThis.api = { ' + FNS.join(', ') + ' };'
     ].join('\n\n');
-    const runtime = moduleRuntime(ROOT, src, [{ path: 'src/services/scan-import-proof.ts', expose: ['createScanImportProofCache'] }, 'src/domain/scan-protocol.ts', { path: 'src/domain/registry-purge-proof.ts', expose: ['REGISTRY_RELEASES_ROOT', 'REGISTRY_PURGE_MAX_WRITES', 'boundedRegistryPurgeIntent', 'slotRegistryPurgeIntent', 'registryPurgeReceiptValid', 'registryPurgeReceiptMatches', 'registryPurgeIntent'] }, { path: 'src/services/registry-purge.ts', expose: ['purgeTrashWithRegistry'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
+    const runtime = moduleRuntime(ROOT, src, [{ path: 'src/core/clock.ts', expose: ['serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'captureClockOperation', 'getServerClockBounds', 'acceptServerClockOffset', 'resetServerClock'] }, 'src/core/session-verification.ts', { path: 'src/services/scan-import-proof.ts', expose: ['createScanImportProofCache'] }, 'src/domain/scan-protocol.ts', { path: 'src/domain/registry-purge-proof.ts', expose: ['REGISTRY_RELEASES_ROOT', 'REGISTRY_PURGE_MAX_WRITES', 'boundedRegistryPurgeIntent', 'slotRegistryPurgeIntent', 'registryPurgeReceiptValid', 'registryPurgeReceiptMatches', 'registryPurgeIntent'] }, { path: 'src/services/registry-purge.ts', expose: ['purgeTrashWithRegistry'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
     SANDBOX_SOURCE = runtime.code + '\n' + runtime.withoutBindings(assembled);
     new vm.Script(SANDBOX_SOURCE).runInContext(ctx);
+    ctx.acceptServerClockOffset(0, Object.freeze({ epochMs: now, wallMs: Date.now(), monotonicMs: performance.now(), uncertaintyMs: 0 }));
+    ctx.sessionExpiryCheck = 'live';
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
     vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', ctx);
     w.ctx = ctx;

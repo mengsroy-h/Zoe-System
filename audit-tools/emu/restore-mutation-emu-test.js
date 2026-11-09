@@ -89,7 +89,7 @@ function adapter(pending, hooks = {}) {
     };
 }
 const SOURCE = fs.readFileSync(path.join(ROOT, 'ZoeW', 'app.js'), 'utf8');
-const protocolRuntime = moduleRuntime(ROOT, SOURCE, ['src/domain/scan-protocol.ts', { path: 'src/domain/registry-purge-proof.ts', expose: ['REGISTRY_RELEASES_ROOT', 'REGISTRY_PURGE_MAX_WRITES', 'registryPurgeReceiptValid', 'registryPurgeReceiptMatches', 'registryPurgeIntent'] }, { path: 'src/services/registry-purge.ts', expose: ['purgeTrashWithRegistry'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations'] }]);
+const protocolRuntime = moduleRuntime(ROOT, SOURCE, [{ path: 'src/core/clock.ts', expose: ['serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'captureClockOperation', 'getServerClockBounds', 'acceptServerClockOffset', 'resetServerClock'] }, 'src/core/session-verification.ts', 'src/domain/scan-protocol.ts', { path: 'src/domain/registry-purge-proof.ts', expose: ['REGISTRY_RELEASES_ROOT', 'REGISTRY_PURGE_MAX_WRITES', 'registryPurgeReceiptValid', 'registryPurgeReceiptMatches', 'registryPurgeIntent'] }, { path: 'src/services/registry-purge.ts', expose: ['purgeTrashWithRegistry'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations'] }]);
 const declarations = modulePrograms(SOURCE, path.join(ROOT, 'ZoeW', 'app.js'), { ecmaVersion: 'latest' }).flatMap(program => program.body);
 const FNS = declarations.filter((node) => node.type === 'FunctionDeclaration');
 const NEEDED_CONSTANTS = new Set(['restoreCancellationInFlight', 'restoreRecoveryHolds', 'RESTORE_RECOVERY_REQUIRED_TEXT', 'RESTORE_INTENTS_KEY', 'CLEANUP_STAGE_SLOT', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_UNDO', 'CLEANUP_STAGE_COLLECTED', 'TRASH_REASON_META', 'CLEANUP_LEDGER_KEYED', 'CLEANUP_LEDGER_RETRY_MAX', 'CLEANUP_NO_PRIOR', 'CLEANUP_LIVE_LOCK_PREFIX', 'cleanupJournalLive', 'cleanupResumeBarrier', 'DB_OP_TIMEOUT_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'RESTORE_CLAIM_LEASE_MS',
@@ -113,7 +113,7 @@ function tab(suffix, hooks) {
         Date, Math, JSON, Promise, WeakMap, queueMicrotask, performance: require('node:perf_hooks').performance, crypto: require('node:crypto').webcrypto, window: {}, navigator: {},
         document: { getElementById: (id) => id === 'editBcCodInput' ? { value: '4' } : id === 'editBcDodInput' ? { value: '2' } : null },
         db: { app: { options: { databaseURL: 'https://restore-emulator-fixture.invalid' } } },
-        auth: { currentUser: { uid: 'audit-user' } }, isInitializingFirebase: false, dataState: { pickupPendingVersion: 0 }, dailyPickupData: {},
+        auth: { currentUser: { uid: 'audit-user' } }, sessionExpiryCheck: 'live', serverClockTrusted: false, isInitializingFirebase: false, dataState: { pickupPendingVersion: 0 }, dailyPickupData: {},
         authGeneration: 0, fb, dbRefHistory: fb.ref(null, 'zoew_scan_history_cod_dod'), dbRefDeleted: fb.ref(null, 'zoew_recently_deleted_cod_dod'),
         dbRefDailyRevenue: fb.ref(null, 'zoew_daily_revenue_cod_dod'), dbRefMonthlyRevenue: fb.ref(null, 'zoew_monthly_revenue_cod_dod'),
         dbRefDailyCollected: fb.ref(null, 'zoew_daily_collected_cod_dod'), dailyCollectedData: {},
@@ -139,6 +139,8 @@ function tab(suffix, hooks) {
         openRecentlyDeletedModal() {}, refreshCurrentHistoryView() {}, updateRecentPhonesList() {}, renderRecentlyDeleted() {},
         viewListModalShowing: () => false
     });
+    context.acceptServerClockOffset(0, Object.freeze({ epochMs: NOW, wallMs: Date.now(), monotonicMs: context.performance.now(), uncertaintyMs: 0 }));
+    context.sessionExpiryCheck = 'live';
     const settle = async () => {
         for (let round = 0; round < 80; round++) {
             await Promise.allSettled(Array.from(pending));

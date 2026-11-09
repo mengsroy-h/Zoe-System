@@ -1,4 +1,5 @@
 const { modulePrograms } = require('./audit-module-ast');
+const { sharedClockContract } = require('./static-checker-contracts.cjs');
 let acorn;
 try {
     acorn = require('acorn');
@@ -109,6 +110,13 @@ for (const name of shared) {
     const where = Object.keys(fns[name]);
     const uniq = new Set(where.map((a) => fns[name][a]));
     if (uniq.size === 1) { identical++; continue; }
+    if (name === 'getServerNow') {
+        // ZoeW កាន់ sample នាឡិកាអាជីវកម្ម; ZoeKeyGen ផ្ទេរទៅ ZoeLicense។ វាស់ប្រភព និងឥរិយាបថ មិនលើកលែងតាមឈ្មោះទទេ។
+        const viewsPath = path.join(root, 'ZoeW', 'audit-module-views.json');
+        const views = fs.existsSync(viewsPath) ? JSON.parse(fs.readFileSync(viewsPath, 'utf8')) : {};
+        const clock = views['src/core/clock.ts'];
+        if (typeof clock === 'string' && sharedClockContract(clock, fns[name].ZoeW, fns[name].ZoeKeyGen)) continue;
+    }
     if (EXPECTED_DIVERGENT.has(name)) continue;
     unexpected.push(name + '  (' + where.join(', ') + ')');
 }

@@ -55,7 +55,7 @@ const LICENSE_STUB = `window.ZoeLicense = {
     setServerTimeOffset: function () {}, syncServerTime: function () { return Promise.resolve(); },
     activate: function () { return Promise.resolve({ ok: true }); },
     verifyKeyString: function () { return Promise.resolve({ ok: true }); }, clearActivation: function () {}
-};`;
+};` + require('./browser-clock-fixture.cjs').CLOCK_FIXTURE;
 
 // បន្ទុកសត្រូវ — គ្រប់មួយវាយប្រហារជាន់ escape ខុសគ្នា។ Firebase key មិនអាចមាន
 // `.` `#` `$` `[` `]` `/` ទេ ប៉ុន្តែ **អាចមាន** សញ្ញាសម្រង់ backslash និង `<`

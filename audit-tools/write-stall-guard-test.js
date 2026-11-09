@@ -30,7 +30,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const { auditModuleSourceRanges, memoryStorage } = require('./react-view.js');
+const { auditModuleSourceRanges, memoryStorage, moduleRuntime } = require('./react-view.js');
 
 let acorn;
 try { acorn = require('acorn'); } catch (e) {
@@ -109,7 +109,7 @@ function buildWorld(mode) {
     const errorRecorder = { capture: (error, details) => log.captures.push({ message: String(error && error.message || error), details }) };
     const ctx = {
         console: { log: () => {}, error: () => {}, warn: () => {} },
-        Promise, JSON, Object, Array, Number, String, Boolean, Math, Set, Map, Date,
+        Promise, JSON, Object, Array, Number, String, Boolean, Math, Set, Map, Date, performance,
         setTimeout, clearTimeout, isNaN, parseFloat, parseInt,
         navigator: { onLine: true },
         ZoeErrors: errorRecorder,
@@ -133,7 +133,7 @@ let dbRefDeleted = { p: 'del' };
 let deletedItems = [], scanHistory = [];
 let dailyRevenueData = {};
 function getFormattedDate() { return '2027-01-15'; }
-let serverTimeOffsetMs = 0;
+let serverTimeOffsetMs = 0, serverClockTrusted = false, sessionExpiryCheck = 'live', isDatabaseConnected = true;
 const activeRestoreClaims = new Map();
 const pendingRegistryReleases = new Map();
 let registryReleaseFlushInFlight = false;
@@ -184,7 +184,10 @@ globalThis.__notifyIfSlow = notifyIfSlow;
         if (typeof view !== 'string' || !src.includes(view)) throw new Error('missing actual module ' + name);
         return 'Object.assign(globalThis, (() => {' + view + '; return {' + exported.join(',') + '}; })());';
     }).join('\n');
-    vm.runInContext(code + '\n' + modules, ctx);
+    const clock = moduleRuntime(ROOT, src, [{ path: 'src/core/clock.ts', expose: ['serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'captureClockOperation', 'getServerClockBounds', 'acceptServerClockOffset', 'resetServerClock'] }, 'src/core/session-verification.ts']);
+    vm.runInContext(clock.withoutBindings(code) + '\n' + modules + '\n' + clock.code, ctx);
+    ctx.acceptServerClockOffset(0, Object.freeze({ epochMs: Date.now(), wallMs: Date.now(), monotonicMs: performance.now(), uncertaintyMs: 0 }));
+    vm.runInContext("sessionExpiryCheck = 'live';", ctx);
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
     vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', ctx);
 
@@ -261,7 +264,22 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const DB_TIMEOUT = Number((extractConst(src, 'DB_OP_TIMEOUT_MS') || '= 15000').replace(/\D+/g, '')) || 15000;
 const WAIT_AFTER_TIMEOUT = DB_TIMEOUT + 2500;
 
+async function testClockAdmissionFixture() {
+    for (const mode of ['pending', 'untrusted', 'stale']) {
+        const w = buildWorld('ok');
+        w.ctx.__seed([{ id: 'id_clock_a', deletedAt: Date.now() - 40 * 86400000, trashReason: 'delete', barcodes: [{ code: 'CLOCK1' }] }]);
+        if (mode === 'pending') vm.runInContext("sessionExpiryCheck = 'pending';", w.ctx);
+        if (mode === 'untrusted') w.ctx.resetServerClock();
+        const work = w.ctx.__runPurge();
+        if (mode === 'stale') w.ctx.resetServerClock();
+        await work;
+        ok('នាឡិកា/វគ្គមិនទាន់ផ្ទៀង ➜ មិនចេញសំណើសម្អាត — ' + mode,
+            w.log.updates === 0 && w.log.txs === 0 && w.ctx.__trash().length === 1, w.log);
+    }
+}
+
 (async () => {
+    await testClockAdmissionFixture();
     // ── ២. ការសម្អាតធុងសំរាម ៖ សោត្រូវដោះទោះការសរសេរព្យួរ ─────────────────
     console.log('\n== ២. សោសម្អាតធុងសំរាម ក្រោមការសរសេរដែលព្យួរ ==');
     {

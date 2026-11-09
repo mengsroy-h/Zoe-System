@@ -3,6 +3,7 @@ const acorn = require('acorn');
 const fs = require('fs');
 const path = require('path');
 const { actionUsages } = require('./react-view');
+const { walk: walkWithParents, onValueGuarded } = require('./static-checker-contracts.cjs');
 // ថត app អាច override បាន ដើម្បីឲ្យ `run-all.sh <baseline>` និង
 // `checker-coverage.js` បញ្ជាក់បានថា checker នេះពិតជាអានកូដមែន។
 const root = process.env.WIRING_APP_DIR ? path.resolve(process.env.WIRING_APP_DIR) : path.resolve(__dirname, '..');
@@ -87,22 +88,18 @@ for (const app of APPS) {
     }
 
     // --- 4. onValue(dbRefX) guarded ---
-    walk(ast, (n) => {
+    ast.forEach(program => walkWithParents(program, (n, parents) => {
         if (n.type !== 'CallExpression') return;
         const callee = n.callee;
         const isOnValue = (callee.type === 'MemberExpression' && callee.property.name === 'onValue');
         if (!isOnValue || !n.arguments.length) return;
         const a0 = n.arguments[0];
         if (a0.type !== 'Identifier' || !/^dbRef/.test(a0.name)) return;
-        const before = js.slice(Math.max(0, n.start - 1600), n.start);
-        const guarded = new RegExp('if\\s*\\(\\s*' + a0.name + '\\s*\\)').test(before)
-            || new RegExp('if\\s*\\(\\s*!\\s*' + a0.name + '\\s*\\)\\s*return').test(before)
-            || new RegExp('if\\s*\\([^)]*!\\s*' + a0.name + '[^)]*\\)\\s*return').test(before)
-            || new RegExp(a0.name + '\\s*=\\s*(fb|sdk|window\\.firebaseSDK)\\.ref\\(').test(before);
+        const guarded = onValueGuarded(n, parents);
         if (!guarded) {
             bad(app, 'unguarded onValue', a0.name + ' near offset ' + n.start);
         }
-    });
+    }));
 }
 console.log(issues === 0 ? '\n✅ wiring clean' : '\n❌ ' + issues + ' wiring issue(s)');
 process.exit(issues === 0 ? 0 : 1);

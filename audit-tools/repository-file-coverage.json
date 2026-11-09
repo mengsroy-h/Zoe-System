@@ -778,6 +778,22 @@
       ],
       "evidence": "អាន SQL template ពិតតាម CLI និងផ្ទៀង lock, timeout, លំដាប់ freshness/readiness និងគ្មាន cleanup/grant។",
       "limitation": "Static contract មិនបញ្ជាក់ transaction behavior ទេ; registration-auth integration រត់ SQL ពិតជាមួយ GoTrue/Postgres បណ្ដោះអាសន្ន។"
+    },
+    "audit-clock-fixture-contracts": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/zoew-suite-test.js"
+      ],
+      "evidence": "browser-clock-fixture-contract.test.ts និង sdk-audit-clock-fixture.test.ts រត់ fixture ពិតជាមួយ clock/session guard ពិត; វាស់ sample, drift, generation និងកម្មសិទ្ធិដែលផ្លាស់ប្ដូរ។",
+      "limitation": "ជាការវាស់ fixture និង guard ដាច់ដោយឡែក; មិនបញ្ជាក់ browser, emulator ឬប្រតិបត្តិការលុយពេញលេញ។"
+    },
+    "audit-static-contracts": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/zoew-suite-test.js"
+      ],
+      "evidence": "static-checker-contracts.test.ts និង payload-local-cache.test.ts វាស់ source module ពិត និង mutations ដែលដក guard, ប្ដូរ clock provenance, shadow binding ឬបញ្ជូន local object ចេញក្រៅ។",
+      "limitation": "ជាកិច្ចសន្យា AST និង owner ដែលមានព្រំដែន; getter exits ដែលកំណត់ជាក់លាក់មិនមែន whole-program taint proof ហើយមិនជំនួស browser/រូបរាង DOM ពិត។"
     }
   },
   "files": {
@@ -4946,6 +4962,33 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/palm-calendar-boundaries.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/browser-clock-fixture-contract.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/sdk-audit-clock-fixture.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "audit-tools/browser-clock-fixture.cjs": {
+      "policy": "audit-clock-fixture-contracts"
+    },
+    "audit-tools/emu/sdk-clock-fixture.cjs": {
+      "policy": "audit-clock-fixture-contracts"
+    },
+    "audit-tools/static-checker-contracts.cjs": {
+      "policy": "audit-static-contracts"
+    },
+    "audit-tools/payload-local-cache.cjs": {
+      "policy": "audit-static-contracts"
+    },
+    "ZoeW/tests/static-checker-contracts.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/payload-local-cache.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/history-observer-session-recovery.test.tsx": {
       "policy": "zoew-self-verification"
     }
   }

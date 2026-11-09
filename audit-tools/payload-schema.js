@@ -1,4 +1,5 @@
 const { modulePrograms } = require('./audit-module-ast');
+const { localCacheWrites } = require('./payload-local-cache.cjs');
 const fs = require('fs');
 const path = require('path');
 const acorn = require('acorn');
@@ -67,6 +68,9 @@ let problems = 0;
 for (const app of ['ZoeW']) {
     const src = fs.readFileSync(path.join(ROOT, app, 'app.js'), 'utf8');
     const programs = modulePrograms(src, path.join(ROOT, app, 'app.js'), { ecmaVersion: 2022, locations: true });
+
+    const moduleFile = path.join(ROOT, app, 'audit-module-views.json');
+    const cacheWrites = localCacheWrites(src, programs, fs.existsSync(moduleFile) ? JSON.parse(fs.readFileSync(moduleFile, 'utf8')) : {});
 
     const found = { item: new Map(), trash: new Map(), barcode: new Map() };
     const viewModelHits = new Map();
@@ -215,6 +219,7 @@ for (const app of ['ZoeW']) {
                 }
                 obj = null;
             }
+            if (cacheWrites.has(n.start)) obj = null;
             if (ITEM_VARS.has(obj)) bucket = 'item';
             else if (TRASH_VARS.has(obj)) bucket = 'trash';
             else if (BARCODE_VARS.has(obj)) bucket = 'barcode';

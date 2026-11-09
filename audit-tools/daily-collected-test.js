@@ -56,7 +56,7 @@ function scenario(name, fn) {
 function readOr(file) { try { return fs.readFileSync(file, 'utf8'); } catch (_) { return ''; } }
 
 const SRC = readOr(APP_JS);
-const protocolRuntime = moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations'] }]);
+const protocolRuntime = moduleRuntime(ROOT, SRC, [{ path: 'src/core/clock.ts', expose: ['serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'captureClockOperation', 'getServerClockBounds', 'acceptServerClockOffset', 'resetServerClock'] }, 'src/core/session-verification.ts', 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations'] }]);
 const HTML = readOr(INDEX_HTML);
 const RULES = readOr(RULES_JSON);
 
@@ -121,9 +121,9 @@ function makeSandbox(state) {
         STATS_COLLECTED_VIEW_KEYS: readKeyList('STATS_COLLECTED_VIEW_KEYS'),
         dbListenerPendingPaths: new Set(opts.pending || []),
         dbListenerFailedPaths: new Set(opts.failed || []), dbListenerReportedFailures: new Set(),
+        auth: null, sessionExpiryCheck: 'live', serverClockTrusted: false, serverTimeOffsetMs: 0, isDatabaseConnected: true, performance,
         db: {}, authGeneration: 0, dbRefDailyCollected: { __ref: NODE },
         getServerNow: () => opts.now,
-        cleanupClockIsTrustworthy: () => opts.clockOk !== false,
         showToast: (m) => calls.toast.push(String(m)),
         Intl: Intl,
         window: {},
@@ -169,7 +169,10 @@ function makeSandbox(state) {
     vm.runInContext(reactRuntime(SRC, { exclude: WANT, context: box }), box);
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
     vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', box);
-    vm.runInContext(bodies, box);
+    const clock = moduleRuntime(ROOT, SRC, [{ path: 'src/core/clock.ts', expose: ['serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'captureClockOperation', 'getServerClockBounds', 'acceptServerClockOffset', 'resetServerClock'] }, 'src/core/session-verification.ts']);
+    vm.runInContext(clock.withoutBindings(bodies) + '\n' + clock.code, box);
+    box.acceptServerClockOffset(0, Object.freeze({ epochMs: Number.isFinite(opts.now) ? opts.now : Date.now(), wallMs: Date.now(), monotonicMs: performance.now(), uncertaintyMs: 0 }));
+    if (opts.clockOk === false) box.resetServerClock();
     box.__container = renderedContainer(ROOT, box, 'src/app/components/stats/StatsCards.tsx', 'CollectedStatsCards');
     return box;
 }
@@ -424,7 +427,7 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
     const box = {
         crypto: require('crypto').webcrypto, console, queueMicrotask, Date, Intl, setTimeout, clearTimeout, Promise, Set, Map, WeakMap, performance: require('node:perf_hooks').performance,
         db: { app: { options: { databaseURL: 'https://collected-fixture.invalid' } } },
-        auth: { currentUser: { uid: 'fixture-user' } }, isInitializingFirebase: false, dataState: { pickupPendingVersion: 0 },
+        auth: { currentUser: { uid: 'fixture-user' } }, sessionExpiryCheck: 'live', serverClockTrusted: false, serverTimeOffsetMs: 0, isDatabaseConnected: true, isInitializingFirebase: false, dataState: { pickupPendingVersion: 0 },
         authGeneration: 0, dbRefHistory: { path: HISTORY }, dbRefDeleted: { path: TRASH },
         dbRefDailyCollected: { path: COLLECTED }, dbRefDailyPickup: { path: PICKUP },
         dailyCollectedData: clone(server[COLLECTED] || {}), dailyPickupData: clone(server[PICKUP] || {}),
@@ -483,6 +486,8 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
         probeDatabaseLiveness: () => Promise.resolve(null)
     });
     vm.runInContext(protocolRuntime.code, box);
+    box.acceptServerClockOffset(0, Object.freeze({ epochMs: now, wallMs: Date.now(), monotonicMs: box.performance.now(), uncertaintyMs: 0 }));
+    box.sessionExpiryCheck = 'live';
     return { box, server, calls, messages, read, write, sync() {
         box.scanHistory = Object.values(clone(server[HISTORY] || {}));
         box.deletedItems = Object.values(clone(server[TRASH] || {}));
@@ -592,7 +597,25 @@ async function closeOperation(s, method, closed) {
     if (method === 'single') return s.box[name]('fixture_item', 'FIXTURE1', closed, { showModal: false });
     return s.box[name]('fixture_item');
 }
+async function testCollectedClockFixture() {
+    for (const mode of ['untrusted', 'stale']) {
+        const s = makeOperationSandbox({ [HISTORY]: { fixture_item: operationItem(24.5, false) }, [COLLECTED]: {}, [PICKUP]: {} });
+        if (mode === 'untrusted') s.box.resetServerClock();
+        const work = closeOperation(s, 'single', true);
+        if (mode === 'stale') s.box.resetServerClock();
+        await work;
+        ok('នាឡិកា/វគ្គមិនទាន់ផ្ទៀង ➜ មិនបិទ និងមិនបង្កើតចំណូល — ' + mode,
+            s.read(HISTORY + '/fixture_item/barcodes/0/isClosed') === false && collectedTotal(s.server) === 0 && !s.calls.some(call => call.path === HISTORY || call.path.startsWith(HISTORY + '/') || call.path === COLLECTED || call.path.startsWith(COLLECTED + '/')), s.calls);
+    }
+    const pending = makeSandbox({ now: NOW_B, local: { '2020-01-01': { OLD: { c: 1, d: 0 } } }, server: { '2020-01-01': { OLD: { c: 1, d: 0 } } } });
+    pending.auth = { currentUser: { uid: 'fixture-user' } };
+    pending.sessionExpiryCheck = 'pending';
+    pending.runAutomaticCollectedCleanup();
+    ok('វគ្គរង់ចាំផ្ទៀង ➜ មិនសម្អាតចំណូលចាស់', pending.__calls.update.length === 0 && !!pending.__server['2020-01-01']);
+}
+
 (async () => {
+    await testCollectedClockFixture();
     await operationScenario('៨. ការកែទឹកប្រាក់អាន server ពិត ហើយមិនបង្កើតធាតុថ្មី', async () => {
         const initial = { [HISTORY]: { fixture_item: operationItem(8.25, true, NOW_B) },
             [COLLECTED]: { [DAY_B]: { FIXTURE1: { c: 5, d: 0 } } } };

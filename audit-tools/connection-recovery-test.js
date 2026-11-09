@@ -103,7 +103,7 @@ const ELAPSED_HELPER = sliceFn('elapsedSince') ||
             window: { ZoeErrors: { capture: () => {} } },
             document: { getElementById: () => null },
             isDatabaseConnected: true,
-            isDatabaseInitialized: true,
+            isDatabaseInitialized: true, appIsLocked: false, sessionExpiryCheck: 'live',
             queueMicrotask,
             showToast: (m) => state.toasts.push(m)
         };
@@ -161,6 +161,7 @@ const ELAPSED_HELPER = sliceFn('elapsedSince') ||
             'this.__err = handleDbListenerError; this.__online = connectionLooksOnline;';
         try {
             vm.runInContext(src, core);
+            vm.runInContext(moduleRuntime(appRoot, SRC, ['src/core/session-verification.ts', { path: 'src/ui/toast.ts', expose: ['releaseHeldToasts'] }]).code, core);
             core.__err(new Error('permission_denied'));
             ok('ក្រោយ listener ត្រូវបោះបង់ ៖ App មិនត្រូវអះអាងថាភ្ជាប់ Server រួចរាល់',
                 core.__online() === false, core.__online());
@@ -290,7 +291,7 @@ function buildContext() {
         db: {},
         auth: { currentUser: { uid: 'u1' } },
         isDatabaseConnected: true,
-        isDatabaseInitialized: false,
+        isDatabaseInitialized: false, appIsLocked: false, sessionExpiryCheck: 'live',
         dbRefHistory: refs.history,
         dbRefDeleted: refs.deleted,
         showToast: (m) => log.toasts.push(m),
@@ -412,12 +413,27 @@ function buildContext() {
         { path: 'src/services/pickup-reset.ts', expose: ['resumePickupResetOutcomes'] }
     ]);
     vm.runInContext(pickupResetRecovery.code, ctx);
+    vm.runInContext(moduleRuntime(appRoot, SRC, ['src/core/session-verification.ts', { path: 'src/ui/toast.ts', expose: ['releaseHeldToasts'] }]).code, ctx);
     return { ctx, log, clock, advance, listenerCallbacks, listenerHistory, statusDot, statusText, api: ctx.__api, probe: ctx.__probe,
         setConnHistory: ctx.__setConnHistory, connHistory: ctx.__connHistory,
         setInfoRefs: ctx.__setInfoRefs, infoProbe: ctx.__infoProbe };
 }
 
 // ── ១. ការតភ្ជាប់ធម្មតា ─────────────────────────────────────────────
+function testToastAdmissionFixture() {
+    const w = buildContext();
+    let released = 0;
+    w.ctx.releaseHeldToasts = () => { released++; };
+    for (const mode of ['locked', 'pending', 'untrusted', 'live']) {
+        w.ctx.appIsLocked = mode === 'locked';
+        w.ctx.sessionExpiryCheck = mode === 'pending' ? 'pending' : 'live';
+        vm.runInContext('serverClockTrusted = ' + (mode !== 'untrusted') + ';', w.ctx);
+        w.ctx.refreshLiveToasts();
+        ok('toast ដែលរង់ចាំចេញតែពេលដោះសោ និងវគ្គផ្ទៀងរួច — ' + mode, released === (mode === 'live' ? 1 : 0), released);
+    }
+}
+testToastAdmissionFixture();
+
 {
     const t = buildContext();
     t.api.initDatabaseListeners();

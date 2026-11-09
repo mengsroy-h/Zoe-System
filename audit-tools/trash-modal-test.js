@@ -12,6 +12,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { cleanupSelection } = require('./static-checker-contracts.cjs');
 const { reactRuntime, renderComponent, renderFromContext } = require('./react-view');
 
 const ROOT = process.env.TRASH_APP_DIR || path.join(__dirname, '..');
@@ -143,9 +144,7 @@ ok(cleanupFn.indexOf('> ABANDON_AGE_MS') !== -1 && cleanupFn.indexOf('>= ABANDON
     // ⛔ ច្បាប់យករួចរាប់តាម barcode ជាមួយ mode ហាង (Palm គ្មានភស្តុតាង Sign ត្រូវរង់ចាំ) · ជួរគ្មាន `barcodes` មិនចូល App ទេ
     ok(cleanupFn.includes('barcodeCloseIsRipe(b, currentTime, mode)') && !cleanupFn.includes('barcodeCloseIsRipe(item, currentTime, mode)'),
         '⛔ sweep ៖ barcode ប្រើ barcodeCloseIsRipe ជាមួយ mode ហាង · គ្មានច្បាប់តាមវាល item');
-    ok(claimFn.includes('filter(b => barcodeCloseIsRipe(b, getServerNow(), cleanupMode) && claimable(b) && collectedAllows(currentItem, b))') &&
-        claimFn.includes('filter(b => !ripeClosed.includes(b))') &&
-        !claimFn.includes('barcodeCloseIsRipe(currentItem,'),
+    ok(cleanupSelection(claimFn),
         '⛔ claim/kept/whole ៖ barcode ដែលយកចេញ = barcodeCloseIsRipe ∧ claim របស់ប្រតិបត្តិការនេះ ∧ collectedAllows · barcode ដែលនៅ = បញ្ច្រាសពិតប្រាកដ · គ្មានផ្លូវធាតុគ្មាន barcode');
     ok(!/[<>]=? TWO_HOURS_MS/.test(cleanupFn + claimFn),
         '⛔ sweep/claim មិនចម្លងរូបមន្តពីរម៉ោងក្រៅ helper');

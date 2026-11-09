@@ -42,7 +42,7 @@ function ok(l,c,d){ if(c){console.log('  ok    '+l);pass++;} else {console.log('
 function serve(dir){return new Promise((res)=>{const s=http.createServer((rq,rp)=>{let p=decodeURIComponent(rq.url.split('?')[0]);if(p==='/')p='/index.html';
  const f=path.join(dir,p); if(!f.startsWith(dir)||!fs.existsSync(f)||fs.statSync(f).isDirectory()){rp.writeHead(404);return rp.end();}
  rp.writeHead(200,{'Content-Type':TYPES[path.extname(f)]||'text/plain'});rp.end(fs.readFileSync(f));});s.listen(0,'127.0.0.1',()=>res(s));});}
-const LICENSE_STUB = `window.ZoeLicense={getStatus:()=>Promise.resolve({state:'active'}),setServerTimeOffset(){},syncServerTime:()=>Promise.resolve(),activate:()=>Promise.resolve({ok:true}),verifyKeyString:()=>Promise.resolve({ok:true}),clearActivation(){}};`;
+const LICENSE_STUB = `window.ZoeLicense={getStatus:()=>Promise.resolve({state:'active'}),setServerTimeOffset(){},syncServerTime:()=>Promise.resolve(),activate:()=>Promise.resolve({ok:true}),verifyKeyString:()=>Promise.resolve({ok:true}),clearActivation(){}};` + require('./browser-clock-fixture.cjs').CLOCK_FIXTURE;
 const BOOT = function (seed) {
     const store = JSON.parse(JSON.stringify(seed));
     window.__fakeStore = store; window.__toasts = [];

@@ -68,13 +68,13 @@ function loadSeatReleaser(onRequest) {
     const src = fs.readFileSync(path.join(ROOT, 'ZoeKeyGen/app.js'), 'utf8');
     const pendingDecl = (src.match(/^const ADMIN_WRITE_PENDING_TEXT = .*;$/m) || [])[0];
     const releasePendingDecl = (src.match(/^const RELEASE_PENDING_TEXT = .*;$/m) || [])[0] || "const RELEASE_PENDING_TEXT = '(អវត្តមាន RELEASE_PENDING_TEXT)';";
-    const names = ['releaseKeySeat', 'patchLicenseViaRest', 'readKeyReleaseViaRest', 'databaseUrlOf', 'isFirebaseDatabaseHost', 'fetchWithTimeout'];
+    const names = ['releaseKeySeat', 'getTrustedServerNow', 'captureKeygenClock', 'keygenClockIsCurrent', 'patchLicenseViaRest', 'readKeyReleaseViaRest', 'databaseUrlOf', 'isFirebaseDatabaseHost', 'fetchWithTimeout'];
     const fns = names.map((name) => sliceShippedFn(src, name)).filter(Boolean);
     if (!pendingDecl || !fns.length || fns[0].indexOf('releaseKeySeat') === -1) return null;
     const log = { alerts: [], toasts: [], refreshed: 0, sdk: [] };
     const user = { uid: 'adminUid', email: 'admin@example.test', getIdToken: () => Promise.resolve('emu-admin-token') };
     const ctx = {
-        console: { error() {}, log() {}, warn() {} }, Promise, Error, JSON, Object, Array, String, Number, Math, Date, URL, AbortController,
+        console: { error() {}, log() {}, warn() {} }, Promise, Error, JSON, Object, Array, String, Number, Math, Date, performance, URL, AbortController,
         setTimeout, clearTimeout, encodeURIComponent,
         window: {}, ZoeErrors: { capture() {} },
         db: { app: { options: { databaseURL: 'https://licseat-emu.firebaseio.com/' } } },
@@ -107,6 +107,8 @@ function loadSeatReleaser(onRequest) {
         }
     };
     vm.createContext(ctx);
+    vm.runInContext(fs.readFileSync(path.join(ROOT, 'ZoeKeyGen/license-verify.js'), 'utf8'), ctx);
+    ctx.window.ZoeLicense.setServerTimeOffset(0);
     vm.runInContext(pendingDecl + '\n' + releasePendingDecl + '\n' + fns.join('\n\n'), ctx);
     return { ctx, log, pendingText: vm.runInContext('RELEASE_PENDING_TEXT', ctx) };
 }
@@ -173,7 +175,34 @@ const seatPath = (keyId, slot) => '/license_seats/' + APP + '/' + keyId
     + (slot ? '/' + slot : '') + '.json';
 const keyPath = (keyId) => '/license_keys/' + APP + '/' + keyId + '.json';
 
+async function testSeatClockFixture() {
+    for (const mode of ['live', 'untrusted', 'stale']) {
+        const releaser = loadSeatReleaser(async () => {});
+        let patches = 0;
+        const id = 'CLOCKFIXTURE1234567';
+        releaser.ctx.keyListCache = [{ id, paths: [APP], perApp: { [APP]: {} }, maxDevices: 1, seatDevices: [{}] }];
+        if (mode === 'untrusted') releaser.ctx.window.ZoeLicense.resetServerTime();
+        releaser.ctx.fetch = async (url, init) => {
+            if (init && init.method === 'PATCH') {
+                patches++;
+                if (mode === 'stale') {
+                    releaser.ctx.window.ZoeLicense.resetServerTime();
+                    releaser.ctx.window.ZoeLicense.setServerTimeOffset(0);
+                }
+                throw new TypeError('ចម្លើយបាត់');
+            }
+            return { ok: true, status: 200, json: async () => String(url).includes('/releasedAt') ? Date.now() + 10000 : null };
+        };
+        await releaser.ctx.releaseKeySeat(id);
+        check(patches === 1 && releaser.log.sdk.length === 0, 'ចម្លើយបាត់ ➜ PATCH តែមួយ គ្មាន SDK — ' + mode);
+        check(releaser.log.toasts.some(t => t.startsWith('✅')) === (mode === 'live')
+            && (mode === 'live' ? releaser.log.alerts.length === 0 : releaser.log.alerts[0] === releaser.pendingText),
+            'នាឡិកាមិនទុកចិត្ត/ជំនាន់ចាស់ មិនអាចបញ្ជាក់ការដោះពី readback — ' + mode, releaser.log);
+    }
+}
+
 (async () => {
+    await testSeatClockFixture();
     const probe = await owner('GET', '/.json').catch(() => null);
     if (!probe || probe.status >= 500) {
         console.log('SKIP — គ្មាន RTDB emulator នៅ 127.0.0.1:' + BASE.port);

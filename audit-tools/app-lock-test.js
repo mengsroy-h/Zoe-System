@@ -448,7 +448,7 @@ const LICENSE_STUB = `window.ZoeLicense = {
     activate: function () { return Promise.resolve({ ok: true }); },
     verifyKeyString: function () { return Promise.resolve({ ok: true }); },
     clearActivation: function () {}
-};`;
+};` + require('./browser-clock-fixture.cjs').CLOCK_FIXTURE;
 
 const FAKE_SDK = function () {
     const noop = () => {};

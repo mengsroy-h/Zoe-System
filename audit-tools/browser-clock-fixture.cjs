@@ -33,8 +33,8 @@ function installBrowserClockFixture() {
             const anchor = window.__fixtureServerTime;
             const epochMs = anchor ? anchor.epochMs + monotonicMs - anchor.monotonicMs
                 : typeof window.__zoeFixtureServerNow === 'function' ? window.__zoeFixtureServerNow() : wallMs;
-            if (!Number.isFinite(epochMs) || epochMs <= 0 || epochMs > 8640000000000000) return Promise.resolve(false);
-            sample = Object.freeze({ epochMs, wallMs, monotonicMs, uncertaintyMs: 0,
+            if (!Number.isFinite(epochMs) || epochMs < 1 || epochMs > 8640000000000000) return Promise.resolve(false);
+            sample = Object.freeze({ epochMs: Math.floor(epochMs), wallMs, monotonicMs, uncertaintyMs: 0,
                 generation, observation: ++observation, source: 'nonce' });
             return Promise.resolve(true);
         }

@@ -1,9 +1,14 @@
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { parse } from 'acorn';
+import { transformSync } from 'esbuild';
+import { getZoneDateKey } from '../src/core/timezone';
+import { commitNow } from '../src/app/flush';
+import { withTransactionOutcomeResolution } from '../src/services/tx-outcome';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { dataState, firebaseState } from '../src/core/state';
+import { dataState, firebaseState, uiState } from '../src/core/state';
 import * as clock from '../src/core/clock';
 import { sessionUserActionAllowed } from '../src/core/session-verification';
 import { attachInfoListeners, detachInfoListeners } from '../src/services/connection';
@@ -52,14 +57,15 @@ function seed() {
         zoew_monthly_revenue_cod_dod: { [DAY.slice(0, 7)]: { codDollar: 1.5, dodDollar: 0, totalCount: 1 } },
         zoew_daily_pickup_cod_dod: {}, zoew_barcode_registry: {}, zoew_settings: { exchange_rate: 4100 } };
 }
-async function bootSource(file: string, data: any, options?: any) {
+async function bootSource(file: string, data: any, options?: any, owned = false) {
     declaration(file, file === 'ui-flow-test.js' ? 'FAKE_SDK' : 'BOOT')(data, options);
     new Function(declaration(file, 'LICENSE_STUB'))();
-    const sdk = w.firebaseSDK;
+    let sdk = w.firebaseSDK;
     for (const method of ['runTransaction', 'update', 'set']) {
         const original = sdk[method];
         sdk[method] = (...args: any[]) => { trace.push({ method, path: args[0].path, fault: w.__failTrashWrite === true }); return original(...args); };
     }
+    if (owned) sdk = withTransactionOutcomeResolution(sdk);
     const config = { databaseURL: HOST, apiKey: 'k', projectId: 'p' };
     localStorage.setItem('zoew_firebase_config', JSON.stringify(config));
     const app = sdk.initializeApp(config);
@@ -97,7 +103,7 @@ beforeEach(() => {
 });
 afterEach(() => {
     detachInfoListeners(); detachDatabaseListeners(); clock.resetServerClock(); vi.clearAllTimers(); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals();
-    document.body.innerHTML = ''; refTo('customDateInput')(null); delete w.ZoeLicense; delete w.__fixtureAuthTime; delete w.__fixtureServerTime;
+    document.body.innerHTML = ''; refTo('customDateInput')(null); delete w.ZoeLicense; delete w.__fixtureAuthTime; delete w.__fixtureServerTime; delete w.__zoeFixtureServerNow;
 });
 it.each([0, 1500, 30000])('តម្រងឆ្លងអធ្រាត្រ readiness %sms និង clear រក្សា identity និងប្រាក់តាម scenario ពិត', async delay => {
     readinessDelay = delay;
@@ -158,4 +164,83 @@ it('sample ថ្មីមិនបម្លែង pending session ទៅ live �
     vi.setSystemTime(Date.now() + 3000);
     expect(clock.serverClockIsTrustworthy()).toBe(false); expect(current.current()).toBe(false);
     expect(sessionUserActionAllowed('clearHistory')).toBe(false);
+});
+
+// ស្រង់ wrapper ពិត៖ clock getter ក៏ flush store ដូច audit bundle ដែរ។
+function wrapAuditCalls() {
+    const compiled = transformSync(readFileSync(path.join(ROOT, 'ZoeW/src/expose-globals.ts'), 'utf8'), { loader: 'ts', format: 'esm' }).code;
+    const ast: any = parse(compiled, { ecmaVersion: 'latest', sourceType: 'module' });
+    const owner = ast.body.find((n: any) => n.type === 'FunctionDeclaration' && n.id.name === 'exposeGlobals');
+    expect(owner).toBeDefined();
+    const parts = ['NO_WRAP', 'depth', 'settle', 'wrap'].map(name => {
+        const declaration = owner.body.body.find((n: any) => n.type === 'VariableDeclaration' && n.declarations.some((d: any) => d.id.name === name));
+        expect(declaration).toBeDefined(); return declaration;
+    });
+    const wrap = new Function('commitNow', compiled.slice(parts[0].start, parts.at(-1).end) + '; return wrap;')(commitNow);
+    for (const name of ['getServerNow', 'serverClockIsTrustworthy', 'runSessionExpiryCheck', 'filterDataByDate', 'filterDataByCustomDate', 'getFilteredDataByDate', 'clearHistory', 'runAutomaticCleanupRules']) {
+        const raw = w[name]; w[name] = wrap(name, raw);
+        expect(w[name].__auditOrig).toBe(raw);
+    }
+}
+it.each([0, 1500, 30000].flatMap(delay => [0.1, 0.375].map(tick => ({ delay, tick }))))(
+'នាឡិកា browser មានប្រភាគ $tick ms និង readiness $delay ms៖ clock ពិតទទួលថ្ងៃថ្មី និង clear រក្សា identity', async ({ delay, tick }) => {
+    readinessDelay = delay; wrapAuditCalls();
+    // SHA-256 ពិត តែចប់ក្នុង microtask ដើម្បីមិនប្រណាំងជាមួយ fake timers។
+    vi.spyOn(crypto.subtle, 'digest').mockImplementation(async (algorithm, bytes) => {
+        expect(algorithm).toBe('SHA-256');
+        return new Uint8Array(createHash('sha256').update(Buffer.from(bytes as ArrayBuffer)).digest()).buffer;
+    });
+    let reads = 0;
+    const real = performance.now.bind(performance);
+    vi.spyOn(performance, 'now').mockImplementation(() => real() + ++reads * tick);
+    const data = seed(); await bootSource('ui-flow-test.js', data, undefined, true);
+    const checks: any[] = [], observations: any[] = [];
+    const helper = createRequire(path.join(ROOT, 'audit-tools/ui-flow-test.js'))('./browser-clock-fixture.cjs').setBrowserScenarioTime;
+    let requested: number | null;
+    const instrumented = async (epoch: number | null) => { requested = epoch; await helper(epoch); };
+    const observedPage = { ...page, waitForFunction: async (predicate: () => boolean) => {
+        await page.waitForFunction(predicate);
+        const sample = w.ZoeLicense.getServerTimeSample();
+        observations.push({ requested, sample, frozen: Object.isFrozen(sample), effective: clock.getServerNow(),
+            bounds: clock.getServerClockBounds(), filter: uiState.currentFilterMode,
+            trusted: clock.serverClockIsTrustworthy(), session: firebaseState.sessionExpiryCheck });
+    } };
+    const source = block('ui-flow-test.js', 'const clearIdsBeforeMidnight', true);
+    await new Function('page', 'seed', 'check', 'setBrowserScenarioTime', 'return (async () => {' + source + '})()')(observedPage, data,
+        (pass: boolean, label: string, detail: any) => checks.push({ pass, label, detail }), instrumented);
+    const detail = JSON.stringify(observations);
+    expect(checks.length).toBeGreaterThanOrEqual(9); expect(checks.filter(c => !c.pass), detail).toEqual([]);
+    expect(observations).toHaveLength(4);
+    for (const row of observations) {
+        const requested = row.requested === null ? row.sample.wallMs : row.requested;
+        expect(row.sample.epochMs, detail).toBe(requested);
+        expect(row.sample.uncertaintyMs).toBe(0); expect(row.sample.source).toBe('nonce'); expect(row.frozen).toBe(true);
+        expect(row.effective, detail).toBeGreaterThanOrEqual(requested);
+        expect(row.effective, detail).toBeLessThan(requested + delay + 1000);
+        expect(getZoneDateKey(row.effective, 0), detail).toBe(getZoneDateKey(requested, 0));
+        expect(row.bounds.lowerMs, detail).toBeGreaterThanOrEqual(requested);
+        expect(row.bounds.upperMs, detail).toBeLessThan(requested + delay + 1000);
+        expect(row.trusted).toBe(true); expect(row.session).toBe('live');
+    }
+    expect(observations[2].filter).toBe('today');
+});
+it.each([0.25, 0.75])('ទិសផ្ទុយ៖ nonce ប្រភាគ %s និង uncertainty 0 មិនអាចជំនួស clock ពិត', async fraction => {
+    await bootSource('ui-flow-test.js', seed());
+    const sample = w.ZoeLicense.getServerTimeSample();
+    const invalid = Object.freeze({ ...sample, epochMs: Date.parse(DAY + 'T17:00:01.000Z') + fraction,
+        monotonicMs: performance.now(), wallMs: Date.now(), observation: sample.observation + 1 });
+    const before = clock.getServerNow();
+    expect(clock.acceptServerClockOffset(invalid.epochMs - invalid.wallMs, invalid, false)).toBe(false);
+    expect(clock.getServerNow()).toBe(before); expect(clock.serverClockIsTrustworthy()).toBe(true);
+});
+
+it.each([
+    ['undefined', undefined], ['null', null], ['NaN', NaN], ['object', {}], ['array', []],
+    ['sub-ms', 0.75], ['zero', 0], ['negative', -1], ['infinite', Infinity], ['out-of-range', 8640000000000001]
+])('ប្រភព epoch %s៖ sync បដិសេធ ហើយមិនបង្កើតភស្តុតាងថ្មី', async (_name, value) => {
+    await bootSource('ui-flow-test.js', seed());
+    const sample = w.ZoeLicense.getServerTimeSample();
+    w.__zoeFixtureServerNow = () => value;
+    expect(await w.ZoeLicense.syncServerTime()).toBe(false);
+    expect(w.ZoeLicense.getServerTimeSample()).toBe(sample);
 });

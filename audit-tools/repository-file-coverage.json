@@ -5018,6 +5018,9 @@
     "ZoeW/tests/browser-time-scenarios.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/browser-route-isolation.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/restore-retention-fixture.test.ts": {
       "policy": "zoew-self-verification"
     }

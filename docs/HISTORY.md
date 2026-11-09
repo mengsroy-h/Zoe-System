@@ -42,7 +42,7 @@
 
 ## 📌 ការងារដែលនៅសល់ — ការផ្ទៀងផ្ទាត់ដោយអ្នកប្រើ
 
-- 2026-11-09 · Clock/Audit 1233៖ candidate ដាច់ដោយឡែកមានកំណែ ZoeW `2.50.189` និង ZoeKeyGen `2.24.37`; មិនទាន់ផ្សាយ។ ZTO hash ៣នៅក្រហម; rendered ZTO guards, browser/backend និង CI នៅមិនទាន់បញ្ចប់។ ការផ្ទុកប្រវត្តិក្រោយ session ផ្ទៀងត្រូវវាស់លើ iPhone/Android ពិតមុន merge។
+- 2026-11-09 · Clock/Audit៖ CI លើ `3fc2a88e4ba7247dfb3f6e085543f9332815ca97` មាន២៣៨/២៤៣ checker ជាប់; `ui-flow`, `app-lock`, `sheet-import`, wrapper ក្នុង `function-surface` និង ZTO LOCK នៅក្រហម។ ការកែ fixture បន្ទាប់នៅតែ candidate ដាច់ដោយឡែក; ត្រូវផ្ទៀង browser CI លើ commit ថ្មី។ មិន refresh LOCK ដើម្បីបៃតង; ការផ្ទុកប្រវត្តិក្រោយ session ផ្ទៀងត្រូវវាស់លើ iPhone/Android ពិតមុន merge។
 
 - 2026-11-07 · PR393៖ Registration atomic បានបញ្ចូលក្នុង branch រួច។ Audit និង Registration Auth លើ head `a711893b4f3b0d3b48dcdb1801937f4fd8baa732` បានផ្ទៀង; F03 ជាប់ក្រោយរត់ឡើងវិញ ប៉ុន្តែមូលហេតុបរាជ័យដំបូងមិនទាន់បញ្ជាក់។ Hosted migration/backup/restore និងការរង់ចាំ handler ចាស់ឱ្យចប់ នៅមិនទាន់ផ្ទៀង; ការកែ test និងឯកសារថ្មីត្រូវការ CI លើ commit ថ្មី មុន merge។ Dead-code ដែលបានដកចេញពីការកែ នៅមិនទាន់បញ្ចប់។
 
@@ -1993,6 +1993,17 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-11-09 — Audit 1235៖ ព្រំសំណាកនាឡិកា និងការបំបែក service worker ក្នុង fixture
+
+ផ្ទៀង head `3fc2a88e4ba7247dfb3f6e085543f9332815ca97` និង tree `1932ac12f01fcb9f4c02e018378ae59a8bd77b59`។ CI checker កម្រិតលើ២៣៨ជាប់/៥ធ្លាក់/០ skip/០ partial; ក្រុមធ្លាក់ចាស់១៦បានជាប់ ហើយគ្មានក្រុមធ្លាក់ថ្មី។ Vitest ផ្នែកទី២មាន៤៣៣៥ជាប់/៣ធ្លាក់ក្នុង២៣៨ឯកសារ; ធ្លាក់តែ ZTO LOCK ដើម។
+
+- `ui-flow`៖ epoch របស់ fixture ដែលបូក `performance.now()` អាចមានប្រភាគ millisecond ខណៈ uncertainty សូន្យ។ Clock owner ពិតបង្គត់ nonce estimate ហើយបដិសេធវានៅក្រៅ interval ទទឹងសូន្យ; sample ចាស់នៅត្រឹមត្រូវ ប៉ុន្តែថ្ងៃ fixture មិនផ្លាស់។ តេស្តដែលប្រើ monotonic ជាចំនួនគត់មិនឃើញ seam នេះ។ Regression ថ្មីប្រើ audit wrapper, SDK wrapper និង clock owner ពិតជាមួយប្រភាគ និងពេល boot ផ្សេងគ្នា; មិនពង្រីក clock tolerance ឬប្ដូរថ្ងៃក្នុង app។
+- `app-lock` និង `sheet-import`៖ checker អនុញ្ញាត service worker តែ mock `license-verify.js` តាម `page.route`។ Worker ពិត cache អក្សរកូដពី origin ហើយការផ្ទុកឡើងវិញរំលង route mock។ Replay របស់ SW/cache ជាមួយ auth/session និង React ពិតបង្ហាញ session មិនបានផ្ទៀង; PIN និង file action ត្រូវបានបិទត្រឹមត្រូវ។ Fixture ត្រូវបំបែក worker ដើម្បីរក្សាប្រភព license ក្លែងដែលបានកំណត់; មិនបិទ security gate ឬរំលង reload/sessionStorage assertions។
+
+Regression នាឡិកាមុនកែ៧ធ្លាក់/១៩ជាប់ ក្រោយកែ២៦/២៦ជាប់; replay ដោយ reviewer ដែល mount React PageData ពិតឱ្យលទ្ធផលដូចគ្នា។ Shared route regression មុនកែ៤ធ្លាក់/៨ជាប់ ក្រោយកែ១២/១២ជាប់; ដក app-lock context fix មួយឱ្យធ្លាក់១ ហើយដក sheet context fix មួយឱ្យធ្លាក់៣។ Wrong PIN រក្សា ciphertext, XLSX/CSV តាម React input ទៅ payload, server refusal/offline no-request និង token ខ្វះ/បដិសេធ/ផុតកំណត់ ត្រូវបានវាស់ដោយកូដពិត។ Focused integration២១៣/២១៣ក្នុង១០ឯកសារជាប់ គ្មាន pending។ Assertions/scenarios ដើមនៅដដែល; readiness diagnostics ប្រើតែ wait២២០០ms ដើម គ្មាន poll ឬពន្យារពេលបន្ថែម។
+
+ការផ្ទៀង local ជា source/DOM simulation មិនមែន browser ពិត។ Full Audit លើ candidate ថ្មី និង iPhone/Android ពិតនៅមិនទាន់វាស់។ មិនកែ shipped app, business rules, session/clock authority, App/cache version, LOCK ឬ production data; wrapper ដែលនៅក្រៅវិសាលភាពរក្សាដដែល។
 
 ### 2026-11-09 — Audit 1234៖ កែការវាស់ clock/session និង callback ដោយមិនប្ដូរ App
 

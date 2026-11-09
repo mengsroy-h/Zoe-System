@@ -17,6 +17,7 @@
 process.exitCode = 1;
 
 const fs = require('fs');
+const assert = require('assert/strict');
 const os = require('os');
 const path = require('path');
 const http = require('http');
@@ -649,6 +650,38 @@ function slotPurgeVectors(uid) {
     return vectors;
 }
 
+function assertRestoreGuardCaseCoverage(vectors) {
+    const required = ["atomic-finalization-delete-and-guarded-pickup", "atomic-history-reopen-and-guarded-pickup", "atomic-history-birth-change-and-guarded-pickup", "atomic-identical-guard-carry-after-finalization-delete", "race-history-reopened-before-write", "race-history-phone-changed-before-write", "race-history-birth-changed-before-write", "race-finalization-token-changed-before-write", "race-finalization-removed-before-write", "race-consumption-replaced-before-write", "race-reset-after-proof-before-write", "unchanged-guard-carry-after-history-change", "unchanged-guard-carry-after-finalization-change", "unchanged-guard-carry-after-consumption-change", "ordinary-legacy-pickup-write", "ordinary-versioned-pickup-write", "ordinary-write-can-drop-prior-guard", "ordinary-finalization-delete-compatibility", "ordinary-history-reopen-compatibility", "ordinary-history-birth-change-compatibility", "valid-serial-restore-guard", "valid-raw-phone-punctuation-explicit-counter", "valid-khmer-no-number-counter", "valid-empty-raw-phone-counter"];
+    const ids = new Set(vectors.map(vector => vector.id));
+    assert(vectors.length >= 142 && ids.size === vectors.length, 'ជាន់ restoreGuard vectors មិនគ្រប់ ឬ id ស្ទួន');
+    for (const id of required) assert(ids.has(id), 'restoreGuard critical case បាត់៖ ' + id);
+    for (const vector of vectors) {
+        const writes = vector.build().steps.filter(step => !step.owner);
+        assert(writes.length && writes.every(step => typeof step.allowed === 'boolean' && typeof step.path === 'string' && ['PUT', 'PATCH'].includes(step.method)), 'restoreGuard case គ្មាន user write ពិត៖ ' + vector.id);
+        if (vector.group === 'valid-guard') assert(writes.some(step => step.allowed && step.value && Object.prototype.hasOwnProperty.call(step.value, 'restoreGuard')), 'restoreGuard positive គ្មាន guard៖ ' + vector.id);
+    }
+    return true;
+}
+
+async function restorePickupGuardCases(rulesJson, compileRules, rulesSql, label) {
+    const { restorePickupGuardCases: vectorsOf } = require('../restore-pickup-guard-cases.cjs');
+    await pgSetRules(rulesJson, compileRules, rulesSql);
+    const vectors = vectorsOf({ uid: member.sub });
+    check(assertRestoreGuardCaseCoverage(vectors), 'restoreGuard ' + label + '៖ vector ' + vectors.length + ' និង critical cases គ្រប់');
+    const sc = makeScenario('restore-guard-' + label);
+    await sc.loadRules(rulesJson);
+    for (const vector of vectors) {
+        const { seed, steps } = vector.build();
+        await both(sc, 'owner', 'SNAP', '', seed);
+        const write = policyWriter(sc, 'restore-guard-' + label, 'restoreGuard ' + label, 'ការបដិសេធទុក server ទាំងមូលដដែល');
+        for (const step of steps) {
+            if (step.owner) { for (const [location, value] of Object.entries(step.owner)) await both(sc, 'owner', 'PUT', location, value); continue; }
+            await write(step.method, step.path, step.value, !step.allowed, vector.id);
+        }
+        await sc.drop();
+    }
+}
+
 async function slotPurgeCases(rulesJson, compileRules, rulesSql, label) {
     console.log('\n── F03 purge តាម slot (' + label + ') ៖ receipt គ្រប់ slot · certificate ចំនួន · verdict ដូចគ្នា RTDB/Postgres ──');
     await pgSetRules(rulesJson, compileRules, rulesSql);
@@ -1272,10 +1305,12 @@ function capture() {
         await trashModeCases(realRules, compileRules, rulesSql);
         await evidenceRetentionCases(realRules, compileRules, rulesSql);
         await pickupProtocolCases(realRules, compileRules, rulesSql);
+        await restorePickupGuardCases(realRules, compileRules, rulesSql, 'source');
         await slotPurgeCases(realRules, compileRules, rulesSql, 'source');
         const artifactText = fs.readFileSync(path.join(ROOT, 'firebase-database.rules.min.json'), 'utf8');
         check(rulesSql(compileRules(JSON.parse(artifactText))) === rulesSql(compileRules(realRules)), 'artifact publish compile ទៅ SQL ដូចប្រភព');
         await slotPurgeCases(JSON.parse(artifactText), compileRules, rulesSql, 'artifact');
+        await restorePickupGuardCases(JSON.parse(artifactText), compileRules, rulesSql, 'artifact');
         await pgSetRules(realRules, compileRules, rulesSql);
         const cap = await capture();
         check(cap.ok && Array.isArray(cap.data) && cap.data.length === RUNS, 'revenue-fuzz (App ពិត) capture ' + RUNS + ' លំដាប់', cap.tail);

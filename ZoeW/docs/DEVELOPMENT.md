@@ -132,6 +132,19 @@ npm run verify           # ការពិនិត្យ ZoeW រួម; មិ
    (`CLAUDE.md` ច្បាប់ ១០) · migration Supabase ចូល live តាម GitHub integration ពេល merge ចូល `main`
    ([`../../supabase/README.md`](../../supabase/README.md))។
 
+### ការដាក់ប្រើ Restore និង pickup journal
+
+មុនដាក់ client ដែលប្រើ Restore journal `protocol: 3` ត្រូវមានការអនុញ្ញាត deployment ហើយដាក់ backend មុន៖
+
+1. Firebase ប្រើ `firebase-database.rules.min.json` ដែលផ្ទៀងវាល `restoreGuard` នៅ `zoew_daily_pickup_cod_dod/<day>`; Supabase អនុវត្ត migration rules ថ្មីដែល compile ពីប្រភពដូចគ្នា តាមលំដាប់ឈ្មោះ។ ផ្ទៀង backend ដែល Config ជ្រើស មុនបើក Restore។ Rules ចាស់បដិសេធ `restoreGuard`; client រក្សាការងាររង់ចាំ គ្មាន fallback សរសេរដោយគ្មាន guard។ ការសាក local មិនបញ្ជាក់ថាបាន Publish ឬអនុវត្ត migration រួចទេ។
+2. អាប់ដេតគ្រប់ tab/PWA/APK ដែលអាច Restore មុនឱ្យធ្វើការរួមគ្នា រួមឧបករណ៍ចាស់ដែល offline។ Restore journal ថ្មីរក្សាក្រោម prefix `zoew_pickup_journal_v2:` ដដែល ដោយមាន `protocol: 3`, `kind: 'restore'` និង `restorePlan`។ Client ចាស់ដែលស្គាល់តែ protocol ២ បដិសេធការអាន protocol ៣ រក្សា bytes ដើម និងទប់ការទទួល pickup intent ថ្មី; វាមិនមែន upgrade ដែលអាចប្រើកំណែចាស់/ថ្មីលាយដោយស្វ័យប្រវត្តិទេ។ កុំ clear storage, ប្ដូរ prefix/protocol ដោយដៃ ឬ downgrade client ដើម្បីរំលងការរង់ចាំ។
+3. Journal រក្សា UID/ហាង/ថ្ងៃ, Reset epoch ដើម, finalization `zoew_restore_finalizations` (F), consumption `zoew_trash_consumptions` (K) និងអត្តសញ្ញាណ Barcode ដើម។ ការចាប់ផ្ដើមក្រោយបិទ App អាចបន្តតែពេល journal ដើមត្រឹមត្រូវនៅមាន និងការអាន Server ផ្គូផ្គង F/K, កញ្ចប់, ថ្ងៃ, លេខទូរស័ព្ទដើមជាខ្សែអក្សរ និង lifecycle របស់ Barcode។ `phoneKey` ជាអត្តសញ្ញាណក្នុងស្ថិតិ ដាច់ពី raw phone ដែលត្រូវផ្ទៀងដូចតម្លៃក្នុងជួរ; key ដែល sanitize ដូចគ្នាមិនបញ្ជាក់ថាលេខដើមដូចគ្នាទេ។ Raw phone ខ្វះ/មិនមែន string, proof ខ្វះ/ផ្ទុយ, session ប្ដូរ ឬការអានមិនបាន រក្សា HOLD។ Journal protocol ២ ដែលគ្មាន Restore plan មិនត្រូវបម្លែងឬទាយភស្តុតាងឡើងវិញ។
+4. ការបូក pickup របស់ Restore ធ្វើ CAS តាម Barcode មួយៗជាលំដាប់ ដោយផ្ទៀង revision និង Reset epoch។ Server ផ្ទៀង `restoreGuard` ក្នុង transaction ដូចគ្នា ទល់នឹង F/K និង Barcode ក្នុងស្ថានភាពដែលសំណើសរសេរទាំងមូលនឹង commit សូម្បី guard ត្រូវបានទុកដដែលក្នុងការសរសេរបន្ទាប់។ ការប្រែប្រួលក្រោយ client អានមិនអាចប្រើ proof ចាស់ដើម្បីបូកបានទេ។ Guard មាន envelope ១៥ fields និង target តែមួយ ៧ fields; `target.slot` ជាខ្សែអក្សរ `String(index)` របស់ index ដែលជាលេខគត់ត្រឹមត្រូវ និង `scanIntent: ''` ទាមទារថា field នោះអវត្តមានលើ Server។ Ordinary pickup writer មិនយក guard ចាស់មកប្រើឡើងវិញ។ Reset epoch ថ្មីមិនបូកស្ថិតិពីមុន Reset ត្រឡប់; ការបញ្ចប់ត្រូវរក្សាភស្តុតាង `reset-cancelled` តាម contract ដើម។
+
+F មិនត្រូវសម្អាតមុន pickup journal បញ្ចប់ដោយភស្តុតាង; ការសម្អាតផ្ទៀង token ដើម។ K នៅជាភស្តុតាង lifecycle តាម retention ដែលមានស្រាប់; គ្មាន TTL ថ្មីសម្រាប់ដោះ UNKNOWN។ ឧបករណ៍ថ្មីដែល storage ទទេអាចអានស្ថានភាព committed ប៉ុន្តែមិនអាចបង្កើត intent ដែលបាត់ពីឧបករណ៍ដើម ឬសម្រេច Restore ដោយគ្មាន journal/proof បានទេ។ រក្សា journals/receipts និងផ្ទៀង outcome ដាច់ដោយឡែកមុន rollback ឬការសង្គ្រោះដោយដៃ។
+
+ការវាស់ client recovery និង server guard ជាភស្តុតាងដាច់ពីគ្នា៖ [កាតាឡុកអ្នកយាម](../../audit-tools/README.md)។ Hosted rollout, old/new-client operation និងការបិទ/បើកលើឧបករណ៍ពិតនៅត្រូវការការផ្ទៀងក្នុងបរិស្ថានដែលបានអនុញ្ញាត។
+
 ### `src/` ជាប្រភពការពិត
 
 កូដក្នុង `src/**` ជា **ប្រភពការពិតតែមួយ** ហើយកែដោយដៃ — ឯកសារដែលផលិត និងបញ្ជី slot ដែល `doc:check` ·

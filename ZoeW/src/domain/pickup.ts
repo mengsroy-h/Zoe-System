@@ -10,13 +10,14 @@ import { CLEANUP_LEDGER_RETRY_MAX, cleanupJournalEntryKey, cleanupJournalStorage
 import { reconcileCollectedHistory } from './collected';
 import { applyBarcodeCloseState, barcodeEntriesOf, barcodeSignIdentity, barcodeZtoSigned, dropStaleRestoreMarkers, generateUniqueId, itemHasRestoreMarkers, normalizeBarcodesOf } from './barcode';
 import { barcodeRegistryKey } from './registry';
-import { restorePendingCode } from '../features/restore';
+import { clearRestoreFinalization, restorePendingCode } from '../features/restore';
 import { trashReasonDeducted } from '../features/trash';
 import { dbListenerViewIsStale } from '../services/db-listeners';
 import { LOCK_STALL_RELEASE_MS, dbOp, settleLockWithin } from '../services/network';
 import { TX_ROOT_READ_TIMEOUT_MS, txDelay, txReadServerValue, txRestUrl, txSameValue } from '../services/tx-outcome';
 import { showToast } from '../ui/toast';
 import { assertPickupResetApplied, preservePickupResetApplied } from './pickup-reset-proof';
+import { trashConsumptionSame, trashConsumptionValid } from './trash-generation';
 
 export const PICKUP_PHONE_KEY_MAX = 64;
 
@@ -228,35 +229,49 @@ export async function commitPickupMarks(scanDateStr, marks, existingOnly = false
     try {
         const owner = context ? await context : await capturePickupContext(scanDateStr);
         if (!pickupContextIsCurrent(owner) || owner.date !== scanDateStr) return null;
-        if (owner.intent && readPickupJournal().find((entry) => entry.id === owner.intent)?.stage !== 'started') return null;
-        let refusal = 'version-conflict';
-        const ref = owner.sdk.ref(owner.db, `zoew_daily_pickup_cod_dod/${scanDateStr}`);
-        await dbOp(owner.sdk.get(ref));
-        if (!pickupContextIsCurrent(owner)) return null;
-        const result = await owner.sdk.runTransaction(ref, (current) => {
-            if (!pickupContextIsCurrent(owner)) return;
-            const metadata = pickupMetadata(current);
-            if (metadata.epoch !== owner.epoch) { refusal = 'reset-conflict'; return; }
-            if (compareRevision && metadata.revision !== owner.revision || metadata.revision >= PICKUP_PROTOCOL_MAX) return;
-            const set = pickupSetFromRecord(current);
-            const proof = owner.intent ? readPickupJournal().find((entry) => entry.id === owner.intent) : null;
-            if (owner.intent && proof?.stage !== 'started') return;
-            const allowed = (marks || []).filter((mark) => mark && (!keep || keep(mark.key)) && (!mark.closed || !proof || proof.allowedAddKeys?.includes(mark.key)));
-            applyPickupMarksToSet(set, allowed, existingOnly);
-            return buildPickupRecordFromSet(set, { revision: metadata.revision + 1, epoch: metadata.epoch }, current);
-        });
-        if (!pickupContextIsCurrent(owner)) return null;
-        if (result?.committed) {
+        const entry = owner.intent ? readPickupJournal().find(entry => entry.id === owner.intent) : null;
+        if (owner.intent && !pickupJournalStarted(entry)) return null;
+        const restore = entry?.protocol === 3;
+        const proven = restore ? await pickupRestoreProof(entry, owner) : null;
+        if (restore && (!proven || owner.epoch !== entry.pickupResetEpoch)) {
+            if (pickupContextIsCurrent(owner)) patchPickupJournalEntry(owner.intent, { hold: 'recovery-pending' });
+            return null;
+        }
+        const jobs = restore ? (marks || []).map(mark => ({ marks: [mark], guard: proven.guards.find(guard => guard.target.key === mark?.key) })) : [{ marks, guard: null }];
+        if (restore && jobs.some(job => !job.guard || job.marks[0].closed !== true || job.marks[0].phoneKey !== job.guard.phoneKey)) return null;
+        for (const job of jobs) {
+            const currentOwner = restore ? await capturePickupContext(scanDateStr, owner) : owner;
+            if (!pickupContextIsCurrent(currentOwner)) return null;
+            let refusal = 'version-conflict';
+            const ref = currentOwner.sdk.ref(currentOwner.db, `zoew_daily_pickup_cod_dod/${scanDateStr}`);
+            await dbOp(currentOwner.sdk.get(ref));
+            if (!pickupContextIsCurrent(currentOwner)) return null;
+            const result = await currentOwner.sdk.runTransaction(ref, (current) => {
+                if (!pickupContextIsCurrent(currentOwner)) return;
+                const metadata = pickupMetadata(current);
+                if (metadata.epoch !== currentOwner.epoch) { refusal = 'reset-conflict'; return; }
+                if ((compareRevision || restore) && metadata.revision !== currentOwner.revision || metadata.revision >= PICKUP_PROTOCOL_MAX) return;
+                const set = pickupSetFromRecord(current);
+                const proof = currentOwner.intent ? readPickupJournal().find(entry => entry.id === currentOwner.intent) : null;
+                if (currentOwner.intent && (!pickupJournalStarted(proof) || restore && !txSameValue(proof.restorePlan, entry.restorePlan))) return;
+                const allowed = (job.marks || []).filter(mark => mark && (!keep || keep(mark.key)) && (!mark.closed || !proof || proof.allowedAddKeys?.includes(mark.key)));
+                applyPickupMarksToSet(set, allowed, existingOnly);
+                const next: any = buildPickupRecordFromSet(set, { revision: metadata.revision + 1, epoch: metadata.epoch }, current);
+                if (restore) next.restoreGuard = job.guard;
+                return next;
+            });
+            if (!pickupContextIsCurrent(currentOwner)) return null;
+            if (!result?.committed) { if (currentOwner.intent) patchPickupJournalEntry(currentOwner.intent, { hold: refusal }); return null; }
             const saved = result.snapshot.val();
             const visibleMetadata = pickupMetadata(dataState.dailyPickupData[scanDateStr]);
             const savedMetadata = pickupMetadata(saved);
             if (visibleMetadata.epoch <= savedMetadata.epoch && visibleMetadata.revision <= savedMetadata.revision) {
                 dataState.dailyPickupData[scanDateStr] = { ...saved, pickedUpPhones: saved?.pickedUpPhones || {}, pickedUpBarcodes: saved?.pickedUpBarcodes || {} };
             }
-            return true;
         }
-        if (owner.intent) patchPickupJournalEntry(owner.intent, { hold: refusal });
+        return true;
     } catch (e) {
+        if (context?.intent && pickupContextIsCurrent(context)) patchPickupJournalEntry(context.intent, { hold: 'recovery-pending' });
         if (!quiet) showToast("⚠️ ស្ថិតិយកកំពុងរង់ចាំផ្ទៀងផ្ទាត់ — សូមរង់ចាំ Sync។");
     }
     return null;
@@ -280,7 +295,8 @@ export function readPickupJournal() {
             const key = appLocalStore.key(i);
             if (!key?.startsWith(PICKUP_JOURNAL_V2_PREFIX)) continue;
             const entry = JSON.parse(appLocalStore.getItem(key));
-            if (!entry || entry.protocol !== 2 || typeof entry.id !== 'string' || key !== PICKUP_JOURNAL_V2_PREFIX + entry.id || typeof entry.date !== 'string' || !/^[0-9-]+$/.test(entry.date) || !Array.isArray(entry.keys)) throw new Error('PICKUP_JOURNAL_INVALID');
+            if (!entry || ![2, 3].includes(entry.protocol) || typeof entry.id !== 'string' || key !== PICKUP_JOURNAL_V2_PREFIX + entry.id || typeof entry.date !== 'string' || !/^[0-9-]+$/.test(entry.date) || !Array.isArray(entry.keys)
+                || entry.protocol === 3 && !pickupRestoreEntryValid(entry) || entry.protocol === 2 && (entry.kind !== undefined || entry.restorePlan !== undefined)) throw new Error('PICKUP_JOURNAL_INVALID');
             entries.push(entry);
         }
         pickupReadFailed = false;
@@ -379,8 +395,9 @@ export function beginPickupIntent(scanDateStr, keys, itemId?, ownership?) {
     }
     const id = ownership?.id || 'pk' + generateUniqueId().slice(3);
     if (safeStoreGet(appLocalStore, PICKUP_JOURNAL_V2_PREFIX + id) !== null) return null;
-    const entry: any = { id, protocol: 2, stage: 'prepared', owner: pickupPageOwner, locked: ownership?.locked === true, scope, uid, date: scanDateStr, keys: list, at: Date.now() };
+    const entry: any = { id, protocol: ownership?.kind === 'restore' ? 3 : 2, ...(ownership?.kind === 'restore' ? { kind: 'restore' } : {}), stage: 'prepared', owner: pickupPageOwner, locked: ownership?.locked === true, scope, uid, date: scanDateStr, keys: list, at: Date.now() };
     if (pickupJournalItemId(itemId)) entry.item = itemId;
+    if (entry.protocol === 3 && !pickupRestoreEntryValid(entry)) return null;
     if (!writePickupJournal([entry])) return null;
     pickupIntentsLive.add(id);
     pickupOwners.set(id, { db: firebaseState.db, sdk: firebaseState.fb, generation: firebaseState.authGeneration, scope, uid, date: scanDateStr });
@@ -550,6 +567,84 @@ function pickupClosePriorValid(prior) {
 
 function pickupCloseBasisSame(a, b) {
     return !!a && !!b && ['key', 'code', 'birth', 'restored', 'closed', 'closedAt', 'identity', 'prior'].every((key) => a[key] === b[key]);
+}
+
+function pickupRestorePlanValid(entry) {
+    const plan = entry?.restorePlan;
+    if (entry?.protocol !== 3 || entry.kind !== 'restore' || entry.stage !== 'started' || entry.closePlan !== undefined
+        || !plan || typeof plan !== 'object' || Array.isArray(plan) || Object.keys(plan).length !== 6 || plan.v !== 1
+        || !trashConsumptionValid(plan.consumption) || plan.consumption.kind !== 'restore'
+        || plan.consumption.actorUid !== entry.uid || plan.consumption.scope !== entry.scope || plan.consumption.targetId !== entry.item
+        || !plan.finalization || typeof plan.finalization !== 'object' || Array.isArray(plan.finalization) || Object.keys(plan.finalization).length !== 3
+        || plan.finalization.token !== plan.consumption.token || plan.finalization.targetId !== entry.item || !pickupTransitionNumber(plan.finalization.finalizedAt, 1)
+        || typeof plan.phone !== 'string' || plan.phone.length > 2048 || !pickupTransitionText(plan.phoneKey, 256)
+        || !Array.isArray(plan.targets) || !Array.isArray(entry.keys) || plan.targets.length > entry.keys.length) return false;
+    const keys = new Set();
+    return plan.targets.every(target => {
+        if (!target || typeof target !== 'object' || Array.isArray(target) || Object.keys(target).length !== 9 || !pickupTransitionText(target.code, 2048)
+            || target.key !== pickupBarcodeKey(target.code) || !entry.keys.includes(target.key) || keys.has(target.key)
+            || !pickupTransitionNumber(target.birth, 1) || !pickupTransitionNumber(target.restored) || target.closed !== true || !pickupTransitionNumber(target.closedAt, 1)
+            || !pickupTransitionText(target.identity, 8192) || target.prior !== null || target.scanIntent !== null && (typeof target.scanIntent !== 'string' || !/^scan_[a-f0-9]{32}$/.test(target.scanIntent))) return false;
+        keys.add(target.key);
+        return true;
+    });
+}
+
+function pickupRestoreEntryValid(entry) {
+    const fields = ['id', 'protocol', 'kind', 'stage', 'owner', 'locked', 'scope', 'uid', 'date', 'keys', 'at', 'item', 'pickupResetEpoch', 'allowedAddKeys', 'restorePlan', 'transitionKnown', 'pickupDone', 'hold', 'collectedTries', 'existingOnly', 'outcome'];
+    if (entry.kind !== 'restore' || !['prepared', 'started'].includes(entry.stage) || Object.keys(entry).some(key => !fields.includes(key))
+        || !pickupTransitionText(entry.id, 128) || !pickupTransitionText(entry.owner, 128) || typeof entry.locked !== 'boolean'
+        || !pickupTransitionText(entry.scope, 2048) || !pickupTransitionText(entry.uid, 2048) || !/^\d{4}-\d{2}-\d{2}$/.test(entry.date)
+        || !pickupJournalItemId(entry.item) || !pickupTransitionNumber(entry.at, 1) || !entry.keys.length || new Set(entry.keys).size !== entry.keys.length
+        || entry.keys.some(key => !pickupTransitionText(key, 768)) || entry.transitionKnown !== undefined && typeof entry.transitionKnown !== 'boolean'
+        || entry.pickupDone !== undefined && typeof entry.pickupDone !== 'boolean' || entry.existingOnly !== undefined && typeof entry.existingOnly !== 'boolean'
+        || entry.hold !== undefined && !pickupTransitionText(entry.hold, 64) || entry.collectedTries !== undefined && !pickupTransitionNumber(entry.collectedTries)
+        || entry.outcome !== undefined && entry.outcome !== 'not-applied') return false;
+    const captured = entry.pickupResetEpoch !== undefined || entry.allowedAddKeys !== undefined;
+    if ((captured || entry.stage === 'started') && (!pickupTransitionNumber(entry.pickupResetEpoch) || !Array.isArray(entry.allowedAddKeys)
+        || new Set(entry.allowedAddKeys).size !== entry.allowedAddKeys.length || entry.allowedAddKeys.some(key => !entry.keys.includes(key)))) return false;
+    return entry.restorePlan === undefined ? entry.transitionKnown !== true && entry.pickupDone !== true : pickupRestorePlanValid(entry);
+}
+
+function pickupJournalStarted(entry) {
+    return entry?.stage === 'started' && (entry.protocol === 2 && entry.kind === undefined && entry.restorePlan === undefined
+        || entry.protocol === 3 && pickupRestorePlanValid(entry));
+}
+
+async function pickupRestoreProof(entry, context) {
+    if (!pickupContextIsCurrent(context) || !pickupRestorePlanValid(entry) || entry.uid !== context.uid || entry.scope !== context.scope || entry.date !== context.date) return null;
+    const plan = entry.restorePlan;
+    const read = async path => {
+        const ref = context.sdk.ref(context.db, path), url = txRestUrl(ref);
+        const value = url ? await txReadServerValue(url, TX_ROOT_READ_TIMEOUT_MS) : (await dbOp(context.sdk.get(ref))).val();
+        if (!pickupContextIsCurrent(context)) throw new Error('PICKUP_CONTEXT_CHANGED');
+        return value;
+    };
+    const [finalization, consumption] = await Promise.all([read('zoew_restore_finalizations/' + plan.consumption.sourceId), read('zoew_trash_consumptions/' + plan.consumption.sourceId)]);
+    if (!pickupContextIsCurrent(context) || !txSameValue(plan.finalization, finalization) || !trashConsumptionSame(plan.consumption, consumption)) return null;
+    const truth = await readPickupTruthViews();
+    if (!pickupContextIsCurrent(context) || pickupRecoveryRowBusy(entry, truth)) return null;
+    const item = truth.history.find(item => item.id === entry.item);
+    if (plan.targets.length && (!item || item.scanDate !== entry.date || itemHasRestoreMarkers(item) || item.phone !== plan.phone || getPickupPhoneKey(item) !== plan.phoneKey)) return null;
+    const records = [...truth.history, ...truth.trash].flatMap(item => barcodeEntriesOf(item?.barcodes).map(({ barcode, index }) => ({ item, barcode, index })));
+    const guards = [];
+    if (!plan.targets.every(target => {
+        const found = records.filter(({ barcode }) => pickupBarcodeKey(barcode?.code) === target.key);
+        if (found.length !== 1 || found[0].item !== item || !pickupTransitionNumber(found[0].index)
+            || !Object.prototype.hasOwnProperty.call(item.barcodes, String(found[0].index)) || item.barcodes[found[0].index] !== found[0].barcode
+            || (found[0].barcode.scanIntent ?? null) !== target.scanIntent
+            || !pickupCloseBasisSame(pickupCloseBasis(item, found[0].barcode), target)) return false;
+        const consumed = plan.consumption;
+        guards.push({ v: 1, sourceId: consumed.sourceId, token: consumed.token, targetId: consumed.targetId, finalizedAt: plan.finalization.finalizedAt,
+            generation: consumed.generation, deletedAt: consumed.deletedAt, rowBirth: consumed.rowBirth, actorUid: consumed.actorUid, scope: consumed.scope,
+            phone: plan.phone, phoneKey: plan.phoneKey, date: entry.date, epoch: entry.pickupResetEpoch,
+            target: { slot: String(found[0].index), key: target.key, code: target.code, birth: target.birth, restored: target.restored, closedAt: target.closedAt, scanIntent: target.scanIntent ?? '' } });
+        return true;
+    })) return null;
+    const current = readPickupJournal().find(candidate => candidate.id === entry.id);
+    if (!pickupContextIsCurrent(context) || !current || !['id', 'protocol', 'kind', 'stage', 'uid', 'scope', 'date', 'item', 'pickupResetEpoch', 'keys', 'restorePlan']
+        .every(key => txSameValue(current[key], entry[key]))) return null;
+    return { keys: plan.targets.map(target => target.key), truth, guards };
 }
 
 function pickupCloseTimestamp(plan) {
@@ -740,7 +835,7 @@ export function failPickupClose(journal, error, heal) {
     return false;
 }
 
-export function pickupIntentTracker(isCurrent, itemId?) {
+export function pickupIntentTracker(isCurrent, itemId?, kind?) {
     let intent = null;
     let commit = null;
     let pickupCommit = null;
@@ -819,7 +914,7 @@ export function pickupIntentTracker(isCurrent, itemId?) {
             try {
                 const locked = await acquirePickupIntent(id);
                 if (!isCurrent()) { releasePickupIntent(id); return null; }
-                intent = beginPickupIntent(date, keys, itemId, { id, locked });
+                intent = beginPickupIntent(date, keys, itemId, { id, locked, kind });
                 if (!intent) { releasePickupIntent(id); return null; }
                 const captured = await capturePickupContext(date);
                 if (!isCurrent() || !patchPickupJournalEntry(intent, { pickupResetEpoch: captured.epoch, allowedAddKeys: captured.presentKeys.filter((key) => keys.includes(key)), ...(existingOnly ? { existingOnly: true } : {}) })) { removePickupJournalEntry(intent); releasePickupIntent(intent); return null; }
@@ -833,6 +928,15 @@ export function pickupIntentTracker(isCurrent, itemId?) {
             }
         },
         start,
+        bindRestore: (consumption, finalization, item, keys) => {
+            const entry = readPickupJournal().find(candidate => candidate.id === intent);
+            if (!isCurrent() || !pickupContextIsCurrent(context) || !entry || entry.owner !== pickupPageOwner || entry.item !== item?.id || entry.date !== item?.scanDate) return false;
+            const targets = barcodeEntriesOf(item.barcodes).filter(({ barcode }) => keys.includes(pickupBarcodeKey(barcode?.code)))
+                .map(({ barcode }) => ({ ...pickupCloseBasis(item, barcode), scanIntent: barcode.scanIntent ?? null }));
+            const restorePlan = { v: 1, consumption, finalization, phone: item.phone, phoneKey: getPickupPhoneKey(item), targets };
+            return new Set(keys).size === keys.length && targets.length === keys.length && pickupRestorePlanValid({ ...entry, restorePlan })
+                && patchPickupJournalEntry(intent, { restorePlan });
+        },
         confirm: (keys) => {
             const entry = readPickupJournal().find((e) => e.id === intent);
             const saved = !!entry && patchPickupJournalEntry(intent, { transitionKnown: true, allowedAddKeys: [...new Set([...(entry.allowedAddKeys || []), ...keys])] });
@@ -971,8 +1075,8 @@ export async function resumePickupIntents() {
             const pending = withPickupIntentOwnership(entry, async () => {
                 if (!resumeIsCurrent() || !readPickupJournal().some((e) => e.id === entry.id)) return;
                 if (entry.stage === 'prepared') { removePickupJournalEntry(entry.id); return; }
-                if (entry.stage !== 'started' || !Array.isArray(entry.allowedAddKeys) || !Number.isSafeInteger(entry.pickupResetEpoch)) {
-                    patchPickupJournalEntry(entry.id, { hold: 'legacy-proof' });
+                if (!pickupJournalStarted(entry) || !Array.isArray(entry.allowedAddKeys) || !Number.isSafeInteger(entry.pickupResetEpoch)) {
+                    patchPickupJournalEntry(entry.id, { hold: entry.protocol === 3 ? 'recovery-pending' : 'legacy-proof' });
                     return;
                 }
                 let truth = await readPickupTruthViews();
@@ -987,10 +1091,20 @@ export async function resumePickupIntents() {
                 let stored = readPickupJournal().find((e) => e.id === entry.id);
                 if (!resumeIsCurrent() || !stored) return;
                 if (pickupRecoveryRowBusy(stored, truth)) { patchPickupJournalEntry(stored.id, { hold: 'recovery-pending' }); return; }
-                const foreignSatisfied = !resetChanged && stored.transitionKnown !== true
+                const restore = stored.protocol === 3;
+                if (restore) {
+                    const proven = await pickupRestoreProof(stored, context);
+                    if (!resumeIsCurrent()) return;
+                    if (!proven) { patchPickupJournalEntry(stored.id, { hold: 'recovery-pending' }); return; }
+                    truth = proven.truth;
+                    if (!patchPickupJournalEntry(stored.id, { transitionKnown: true, allowedAddKeys: [...new Set([...stored.allowedAddKeys, ...proven.keys])] })) return;
+                    stored = readPickupJournal().find(candidate => candidate.id === stored.id);
+                    if (!stored) return;
+                }
+                const foreignSatisfied = !restore && !resetChanged && stored.transitionKnown !== true
                     && pickupForeignCloseTargets(stored, truth.history, truth.trash) && await pickupForeignCloseSatisfied(stored, context);
                 if (!resumeIsCurrent()) return;
-                if (!foreignSatisfied && (!resetChanged || stored.closePlan !== undefined) && stored.transitionKnown !== true) {
+                if (!restore && !foreignSatisfied && (!resetChanged || stored.closePlan !== undefined) && stored.transitionKnown !== true) {
                     const items = [...truth.history, ...truth.trash];
                     const planned = stored.closePlan !== undefined;
                     let proven = pickupTransitionProofKeys(stored, truth.history, truth.trash);
@@ -1012,7 +1126,8 @@ export async function resumePickupIntents() {
                 const transitionUnknown = stored.transitionKnown !== true && (!resetChanged || stored.closePlan !== undefined);
                 if (transitionUnknown) patchPickupJournalEntry(stored.id, { hold: 'recovery-pending' });
                 const marks = pickupTruthMarks(stored.date, stored.keys, truth.history, truth.trash)
-                    .filter((mark) => (!mark.closed || stored.allowedAddKeys.includes(mark.key)) && (stored.pickupDone !== true || !mark.closed && !pickupKeyAddedSince(mark.key, since)));
+                    .filter((mark) => (!restore || stored.restorePlan.targets.some(target => target.key === mark.key))
+                        && (!mark.closed || stored.allowedAddKeys.includes(mark.key)) && (stored.pickupDone !== true || !mark.closed && !pickupKeyAddedSince(mark.key, since)));
                 if (!resetChanged && !transitionUnknown) {
                     const result = await commitPickupMarks(stored.date, marks, stored.existingOnly === true, true, undefined, context, true);
                     if (!resumeIsCurrent() || result !== true) return;
@@ -1037,8 +1152,9 @@ export async function resumePickupIntents() {
                     }
                     return;
                 }
-                if (resetChanged) completeResetCancelledPickup(stored, day.epoch);
-                else removePickupJournalEntry(stored.id);
+                const retired = resetChanged ? completeResetCancelledPickup(stored, day.epoch) : removePickupJournalEntry(stored.id);
+                if (restore && retired) await clearRestoreFinalization(stored.restorePlan.consumption.sourceId, stored.restorePlan.consumption.token,
+                    () => pickupContextIsCurrent(context)).catch(() => {});
             }).finally(() => {
                 if (pickupOwners.get(entry.id) === entryOwner) releasePickupIntent(entry.id);
             });

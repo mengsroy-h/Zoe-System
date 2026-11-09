@@ -10,6 +10,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../src/core/state';
 import { resetServerClock } from '../src/core/clock';
 import { appLocalStore } from '../src/core/storage';
+import * as storageAdapter from '../src/core/storage';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { getZoneDateKey } from '../src/core/timezone';
 import { barcodeRegistryKey } from '../src/domain/registry';
@@ -17,7 +18,7 @@ import * as cleanup from '../src/domain/cleanup';
 import * as pickup from '../src/domain/pickup';
 import { removeSingleBarcode } from '../src/features/barcode-ops';
 import { deleteSingleItem, toggleCloseStatus } from '../src/features/entry-ops';
-import { activeRestoreClaims, executeRestoreItem, restoreInFlight } from '../src/features/restore';
+import { activeRestoreClaims, executeRestoreItem, restoreInFlight, saveRestoreClaim } from '../src/features/restore';
 
 const HISTORY = 'zoew_scan_history_cod_dod';
 const TRASH = 'zoew_recently_deleted_cod_dod';
@@ -556,4 +557,230 @@ it.each(['exact', 'reset', 'missing-final', 'wrong-final-token', 'wrong-final-ta
     expect([getAt(DAILY), getAt(MONTHLY)]).toEqual(settledMoney);
     expect(pickupKeys()).toEqual(proof === 'exact' ? [key('ACK0001')] : []);
     expect(finalized).toBe(1); expect(proofReads).toBeGreaterThan(0);
+});
+
+
+it.each(['exact', 'reordered', 'reset', 'missing-final', 'final-token', 'final-target', 'final-at', 'missing-consumption', 'consumption-generation', 'consumption-time', 'consumption-birth', 'consumption-scope', 'consumption-uid', 'consumption-token', 'consumption-target', 'identity-birth', 'identity-restored', 'identity-intent', 'identity-closedAt', 'identity-open', 'identity-phone', 'identity-date', 'identity-duplicate', 'legacy-v2', 'plan-version', 'plan-extra', 'protocol-unknown', 'session-db', 'session-sdk', 'session-uid', 'session-scope', 'session-generation'] as const)('Restore origin restart ៖ %s exact durable proof តែម្ដង · UNKNOWN មិនសន្មត pickup', async fault => {
+    seedItem('origin', ['ORIGIN01', 'ORIGIN02'], ['ORIGIN01']); loadViewsFromServer();
+    expect(await removeSingleBarcode('origin', 'ORIGIN01')).toBe('done'); await sleep(20);
+    const trash = trashItems()[0], sdk: any = firebaseState.fb, originalUpdate = sdk.update, originalGet = sdk.get;
+    let finalWrites = 0, proofBlocked = true, resumeProofReads = 0;
+    sdk.update = async (ref: any, patch: any) => {
+        await originalUpdate(ref, patch);
+        if (!patch['zoew_restore_finalizations/' + trash.id]) return;
+        finalWrites++;
+        throw Object.assign(new Error('financial commit ACK unavailable'), { txOutcome: 'unknown' });
+    };
+    sdk.get = async (ref: any) => {
+        const proof = ref.path === 'zoew_restore_finalizations/' + trash.id || ref.path === 'zoew_trash_consumptions/' + trash.id;
+        if (finalWrites && proof) { if (proofBlocked) throw new Error('financial proof unread until restart'); resumeProofReads++; }
+        return originalGet(ref);
+    };
+    await restore(trash.id);
+    const entry = pickupJournal()[0], journalKey = pickup.PICKUP_JOURNAL_V2_PREFIX + entry.id;
+    expect(entry).toMatchObject({ protocol: 3, kind: 'restore', stage: 'started', allowedAddKeys: [] });
+    expect(entry.restorePlan.consumption).toEqual(getAt('zoew_trash_consumptions/' + trash.id));
+    expect(entry.restorePlan.finalization).toEqual(getAt('zoew_restore_finalizations/' + trash.id));
+    expect(pickupKeys()).toEqual([]); expect(revenueDay()).toEqual([100, 10, 10]); expect(finalWrites).toBe(1);
+    const rowId = entry.item, originalReceipt = getAt('zoew_restore_finalizations/' + trash.id), originalConsumption = getAt('zoew_trash_consumptions/' + trash.id);
+    if (fault === 'missing-final') setAt('zoew_restore_finalizations/' + trash.id, null);
+    if (fault.startsWith('final-')) { const field = { 'final-token': 'token', 'final-target': 'targetId', 'final-at': 'finalizedAt' }[fault]; setAt('zoew_restore_finalizations/' + trash.id, { ...originalReceipt, [field]: field === 'finalizedAt' ? originalReceipt[field] + 1 : 'foreign' }); }
+    if (fault === 'missing-consumption') setAt('zoew_trash_consumptions/' + trash.id, null);
+    if (fault.startsWith('consumption-')) { const field = { 'consumption-generation': 'generation', 'consumption-time': 'deletedAt', 'consumption-birth': 'rowBirth', 'consumption-scope': 'scope', 'consumption-uid': 'actorUid', 'consumption-token': 'token', 'consumption-target': 'targetId' }[fault]; setAt('zoew_trash_consumptions/' + trash.id, { ...originalConsumption, [field]: typeof originalConsumption[field] === 'number' ? originalConsumption[field] + 1 : 'foreign' }); }
+    if (fault === 'reordered') { setAt('zoew_restore_finalizations/' + trash.id, Object.fromEntries(Object.entries(originalReceipt).reverse())); setAt('zoew_trash_consumptions/' + trash.id, Object.fromEntries(Object.entries(originalConsumption).reverse())); }
+    if (fault.startsWith('identity-')) {
+        const row = getAt(HISTORY + '/' + rowId), barcode = row.barcodes.find((b: any) => b.code === 'ORIGIN01');
+        if (fault === 'identity-birth') barcode.createdAt++;
+        if (fault === 'identity-restored') barcode.restoredAt = 1;
+        if (fault === 'identity-intent') barcode.scanIntent = 'scan_' + 'a'.repeat(32);
+        if (fault === 'identity-closedAt') barcode.closedAt++;
+        if (fault === 'identity-open') { barcode.isClosed = false; delete barcode.closedAt; }
+        if (fault === 'identity-phone') row.phone = '099999999';
+        if (fault === 'identity-date') row.scanDate = '2026-10-04';
+        setAt(HISTORY + '/' + rowId, row);
+        if (fault === 'identity-duplicate') setAt(HISTORY + '/duplicate', { ...row, id: 'duplicate', barcodes: [barcode] });
+    }
+    if (fault === 'reset') setAt(PICKUP + '/' + DAY, { packagesPickedUp: 0, pickupRevision: 20, pickupResetEpoch: 1 });
+    const edited = clone(entry);
+    if (fault === 'legacy-v2') { edited.protocol = 2; delete edited.kind; delete edited.restorePlan; }
+    if (fault === 'plan-version') edited.restorePlan.v = 2;
+    if (fault === 'plan-extra') edited.restorePlan.extra = true;
+    if (fault === 'protocol-unknown') edited.protocol = 4;
+    if (fault === 'legacy-v2' || fault.startsWith('plan-') || fault === 'protocol-unknown') appLocalStore.setItem(journalKey, JSON.stringify(edited));
+    const rawBefore = appLocalStore.getItem(journalKey), stableMoney = [getAt(DAILY), getAt(MONTHLY)];
+    proofBlocked = false; crashAndReload();
+    let switched = false;
+    const read = sdk.get;
+    sdk.get = async (ref: any) => {
+        const value = await read(ref);
+        if (!switched && fault.startsWith('session-') && ref.path === 'zoew_restore_finalizations/' + trash.id) {
+            switched = true;
+            if (fault === 'session-db') firebaseState.db = { name: 'foreign' } as any;
+            if (fault === 'session-sdk') firebaseState.fb = { ...sdk };
+            if (fault === 'session-uid') firebaseState.auth.currentUser.uid = 'foreign';
+            if (fault === 'session-scope') appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://foreign.firebaseio.com' }));
+            if (fault === 'session-generation') firebaseState.authGeneration++;
+        }
+        return value;
+    };
+    await pickup.resumePickupIntents();
+    const succeeds = ['exact', 'reordered', 'reset'].includes(fault);
+    expect(pickupKeys()).toEqual(fault === 'exact' || fault === 'reordered' ? [key('ORIGIN01')] : []);
+    expect([getAt(DAILY), getAt(MONTHLY)]).toEqual(stableMoney); expect(finalWrites).toBe(1);
+    if (succeeds) { expect(pickupJournal()).toEqual([]); expect(getAt(MIRROR + '/' + DAY + '/' + key('ORIGIN01'))).toEqual({ c: 4, d: 1 }); expect(getAt('zoew_restore_finalizations/' + trash.id)).toBeNull(); }
+    else { expect(appLocalStore.getItem(journalKey)).not.toBeNull(); if (fault.startsWith('plan-') || fault === 'protocol-unknown' || fault.startsWith('session-')) expect(appLocalStore.getItem(journalKey)).toBe(rawBefore); }
+    if (fault.startsWith('session-')) expect(switched).toBe(true);
+    if (!fault.startsWith('plan-') && fault !== 'protocol-unknown' && fault !== 'legacy-v2') expect(resumeProofReads).toBeGreaterThan(0);
+});
+
+it.each(['admission', 'ready'] as const)('Restore v3 journal persistence %s បរាជ័យ មិនបញ្ចប់ហិរញ្ញវត្ថុ', async stage => {
+    seedItem('persist', ['PERSIST1', 'PERSIST2'], ['PERSIST1']); loadViewsFromServer();
+    expect(await removeSingleBarcode('persist', 'PERSIST1')).toBe('done'); await sleep(20);
+    const trash = trashItems()[0], money = [getAt(DAILY), getAt(MONTHLY)], original = storageAdapter.safeStoreSet;
+    let denied = 0;
+    vi.spyOn(storageAdapter, 'safeStoreSet').mockImplementation((store, name, value) => {
+        if (name.startsWith(pickup.PICKUP_JOURNAL_V2_PREFIX)) { const entry = JSON.parse(String(value)); if (entry.protocol === 3 && (stage === 'admission' || entry.restorePlan)) { denied++; return false; } }
+        return original(store, name, value);
+    });
+    await restore(trash.id);
+    expect(denied, JSON.stringify({ journal: pickupJournal(), source: getAt(TRASH + '/' + trash.id), toasts: uiState.toasts.map(row => row.msg) })).toBeGreaterThan(0); expect([getAt(DAILY), getAt(MONTHLY)]).toEqual(money);
+    expect(getAt('zoew_restore_finalizations/' + trash.id)).toBeNull(); expect(getAt('zoew_trash_consumptions/' + trash.id)).toBeNull(); expect(pickupKeys()).toEqual([]);
+    expect(getAt(TRASH + '/' + trash.id)).toBeTruthy();
+    if (stage === 'admission') { expect(getAt(TRASH + '/' + trash.id + '/restoreClaim')).toBeNull(); expect(serverBarcode('persist', 'PERSIST1')).toBeNull(); }
+    else expect(pickupJournal()[0]).toMatchObject({ protocol: 3, stage: 'started', kind: 'restore' });
+});
+
+it.each(['unchanged', 'phone', 'birth', 'finalization', 'consumption'] as const)('Restore atomic guard→server denial ៖ %s រក្សា UNKNOWN journal ដោយមិនមាន fallback', async change => {
+    seedItem('race', ['RACE0001', 'RACE0002'], ['RACE0001']); loadViewsFromServer();
+    expect(await removeSingleBarcode('race', 'RACE0001')).toBe('done'); await sleep(20);
+    const trash = trashItems()[0], sdk: any = firebaseState.fb, originalUpdate = sdk.update, originalGet = sdk.get;
+    let finalized = 0;
+    sdk.update = async (ref: any, patch: any) => {
+        await originalUpdate(ref, patch);
+        if (patch['zoew_restore_finalizations/' + trash.id]) { finalized++; throw Object.assign(new Error('financial ACK lost'), { txOutcome: 'unknown' }); }
+    };
+    sdk.get = async (ref: any) => {
+        if (finalized && (ref.path === 'zoew_restore_finalizations/' + trash.id || ref.path === 'zoew_trash_consumptions/' + trash.id)) throw new Error('initial proof read outage');
+        return originalGet(ref);
+    };
+    await restore(trash.id); expect(finalized).toBe(1); expect(pickupKeys()).toEqual([]);
+    expect(pickupJournal()[0]).toMatchObject({ protocol: 3, kind: 'restore' });
+    sdk.update = originalUpdate; sdk.get = originalGet; crashAndReload();
+    const money = [getAt(DAILY), getAt(MONTHLY)], finalPath = 'zoew_restore_finalizations/' + trash.id, consumptionPath = 'zoew_trash_consumptions/' + trash.id;
+    const transaction = sdk.runTransaction; let entered = 0;
+    sdk.runTransaction = async (ref: any, updater: any) => {
+        if (ref.path === PICKUP + '/' + DAY && !entered) {
+            entered++;
+            if (change === 'phone') setAt(HISTORY + '/race/phone', '0999999999');
+            if (change === 'birth') { const row = getAt(HISTORY + '/race'); row.barcodes.find((b: any) => b.code === 'RACE0001').createdAt++; setAt(HISTORY + '/race', row); }
+            if (change === 'finalization') setAt(finalPath, { ...getAt(finalPath), token: 'foreign' });
+            if (change === 'consumption') setAt(consumptionPath, { ...getAt(consumptionPath), generation: 2, token: 'foreign' });
+        }
+        return transaction(ref, (current: any) => {
+            const next = updater(current);
+            if (ref.path === PICKUP + '/' + DAY && next !== undefined) {
+                expect(next.restoreGuard).toMatchObject({ v: 1, sourceId: trash.id, targetId: 'race', actorUid: 'm5-pickup', phone: PHONE, phoneKey: PHONE, date: DAY, epoch: 0,
+                    target: { slot: '1', key: key('RACE0001'), code: 'RACE0001', scanIntent: '' } });
+                expect(Object.keys(next.restoreGuard)).toHaveLength(15); expect(Object.keys(next.restoreGuard.target)).toHaveLength(7);
+                if (change !== 'unchanged') throw Object.assign(new Error('server denied stale Restore companion'), { code: 'PERMISSION_DENIED' });
+            }
+            return next;
+        });
+    };
+    await pickup.resumePickupIntents();
+    expect(entered).toBe(1); expect([getAt(DAILY), getAt(MONTHLY)]).toEqual(money);
+    expect(pickupKeys()).toEqual(change === 'unchanged' ? [key('RACE0001')] : []);
+    if (change === 'unchanged') expect(pickupJournal()).toEqual([]);
+    else { expect(pickupJournal()).toHaveLength(1); expect(pickupJournal()[0].hold).toBe('recovery-pending'); expect(getAt(finalPath)).toBeTruthy(); }
+});
+
+it.each(['complete', 'second-denied', 'reset-between', 'second-unknown'] as const)('Restore v3 serial guards ៖ %s កញ្ចប់ពីរមាន witness/CAS ដាច់ដោយឡែក', async fault => {
+    seedItem('multi', ['MULTI001', 'MULTI002', 'MULTI003'], ['MULTI001', 'MULTI002']);
+    const whole = getAt(HISTORY + '/multi'), restoring = whole.barcodes.slice(0, 2).map((b: any) => ({ ...b, isDeducted: true }));
+    const trash = { ...whole, id: 'multi_trash', barcodes: restoring, count: 2, cod: 9, dod: 2, price: 11, isClosed: true,
+        deletedAt: NOW - 1000, trashGeneration: 1, trashReason: 'remove', trashMode: 'local', isFromDeletion: false };
+    setAt(TRASH + '/' + trash.id, trash); setAt(HISTORY + '/multi', { ...whole, barcodes: whole.barcodes.slice(2), count: 1, cod: 6, dod: 1, price: 7, barcode: 'MULTI003' });
+    setAt(PICKUP + '/' + DAY, { packagesPickedUp: 0, pickupRevision: 3, pickupResetEpoch: 0 }); setAt(MIRROR, null);
+    for (const [root, bucket] of [[DAILY, DAY], [MONTHLY, MONTH]]) setAt(root + '/' + bucket, { codDollar: 91, dodDollar: 8, totalCount: 8, ded: { [trash.id]: { at: trash.deletedAt, cod: 9, dod: 2, count: 2 } } });
+    loadViewsFromServer(); const sdk: any = firebaseState.fb, transaction = sdk.runTransaction; let blocked = 0;
+    sdk.runTransaction = (ref: any, updater: any) => transaction(ref, (current: any) => {
+        const next = updater(current);
+        if (ref.path === PICKUP + '/' + DAY && next?.restoreGuard) { blocked++; throw Object.assign(new Error('guarded server write unavailable'), { code: 'PERMISSION_DENIED' }); }
+        return next;
+    });
+    await restore(trash.id); expect(blocked).toBe(1); expect(pickupKeys()).toEqual([]); expect(pickupJournal()[0].restorePlan.targets).toHaveLength(2); expect(revenueDay()).toEqual([100, 10, 10]);
+    sdk.runTransaction = transaction; crashAndReload(); const seen: any[] = [];
+    sdk.runTransaction = async (ref: any, updater: any) => {
+        const result = await transaction(ref, (current: any) => {
+            const next = updater(current);
+            if (ref.path === PICKUP + '/' + DAY && next?.restoreGuard) {
+                const guard = next.restoreGuard; seen.push(clone(guard));
+                expect(Object.keys(guard)).toHaveLength(15); expect(Object.keys(guard.target)).toHaveLength(7); expect(guard.epoch).toBe(0);
+                if (seen.length === 1) expect(Object.keys(next.pickedUpBarcodes)).toEqual([key('MULTI001')]);
+                if (seen.length === 2 && fault === 'second-denied') throw Object.assign(new Error('server rejected changed second target'), { code: 'PERMISSION_DENIED' });
+            }
+            return next;
+        });
+        if (ref.path === PICKUP + '/' + DAY && result.committed && seen.length === 1 && fault === 'reset-between') setAt(PICKUP + '/' + DAY, { packagesPickedUp: 0, pickupRevision: result.snapshot.val().pickupRevision + 1, pickupResetEpoch: 1 });
+        if (ref.path === PICKUP + '/' + DAY && result.committed && seen.length === 2 && fault === 'second-unknown') throw Object.assign(new Error('second committed ACK unavailable'), { txOutcome: 'unknown' });
+        return result;
+    };
+    await pickup.resumePickupIntents();
+    expect(seen.map(guard => guard.target.code)).toEqual(fault === 'reset-between' ? ['MULTI001'] : ['MULTI001', 'MULTI002']);
+    expect(revenueDay()).toEqual([100, 10, 10]);
+    expect(pickupKeys()).toEqual(fault === 'reset-between' ? [] : fault === 'second-denied' ? [key('MULTI001')] : [key('MULTI001'), key('MULTI002')]);
+    if (fault === 'complete') expect(pickupJournal()).toEqual([]);
+    else { expect(pickupJournal()).toHaveLength(1); expect(getAt('zoew_restore_finalizations/' + trash.id)).toBeTruthy(); }
+    if (fault === 'second-unknown' || fault === 'reset-between') {
+        sdk.runTransaction = transaction; loadViewsFromServer(); await pickup.resumePickupIntents();
+        expect(pickupJournal()).toEqual([]); expect(revenueDay()).toEqual([100, 10, 10]);
+        expect(pickupKeys()).toEqual(fault === 'reset-between' ? [] : [key('MULTI001'), key('MULTI002')]);
+    }
+});
+
+it.each(['096 000-7345', '+855 (96) 0007345', '9'.repeat(80), 'គ្មានលេខ'])('Restore guard ៖ raw phone %s ខុសពី pickup key តែទាំងពីរត្រូវរក្សា', async phone => {
+    seedItem('phone_guard', ['PHONEG01', 'PHONEG02'], ['PHONEG01']); const row = getAt(HISTORY + '/phone_guard'); row.phone = phone; setAt(HISTORY + '/phone_guard', row); loadViewsFromServer();
+    expect(await removeSingleBarcode('phone_guard', 'PHONEG01')).toBe('done'); await sleep(20); const trash = trashItems()[0];
+    const sdk: any = firebaseState.fb, transaction = sdk.runTransaction; let observed: any = null;
+    sdk.runTransaction = (ref: any, updater: any) => transaction(ref, (current: any) => { const next = updater(current); if (next?.restoreGuard) observed = clone(next.restoreGuard); return next; });
+    await restore(trash.id); expect(observed?.phone).toBe(phone); expect(observed?.phoneKey).toBe(pickup.getPickupPhoneKey(getAt(HISTORY + '/' + observed.targetId)));
+    expect(getAt(PICKUP + '/' + DAY + '/pickedUpBarcodes/' + key('PHONEG01'))).toBe(observed.phoneKey); expect(pickupJournal()).toEqual([]); expect(revenueDay()).toEqual([100, 10, 10]);
+});
+
+it('Restore guard រួច F អស់ ៖ normal Close និង Reset canonical record មិនយក guard ចាស់មកប្រើ', async () => {
+    seedItem('canonical', ['CANON001', 'CANON002'], ['CANON001']); loadViewsFromServer();
+    expect(await removeSingleBarcode('canonical', 'CANON001')).toBe('done'); await sleep(20); const trash = trashItems()[0];
+    await restore(trash.id); loadViewsFromServer(); expect(getAt(PICKUP + '/' + DAY + '/restoreGuard')).toBeTruthy(); expect(getAt('zoew_restore_finalizations/' + trash.id)).toBeNull();
+    const sdk: any = firebaseState.fb, transaction = sdk.runTransaction; let plainWrites = 0;
+    sdk.runTransaction = (ref: any, updater: any) => transaction(ref, (current: any) => {
+        const next = updater(current);
+        if (ref.path === PICKUP + '/' + DAY && next !== undefined) { plainWrites++; expect(next.restoreGuard).toBeUndefined(); }
+        return next;
+    });
+    const closed = await toggleCloseStatus('canonical'); expect(closed, JSON.stringify({ server: getAt(HISTORY), local: dataState.scanHistory, journals: pickupJournal(), toasts: uiState.toasts.map(row => row.msg) })).toBe(true); await waitForState(() => expect(pickupKeys()).toEqual([key('CANON001'), key('CANON002')])); loadViewsFromServer();
+    expect(plainWrites).toBeGreaterThan(0); expect(pickupKeys()).toEqual([key('CANON001'), key('CANON002')]); expect(getAt(PICKUP + '/' + DAY + '/restoreGuard')).toBeNull();
+    expect(pickup.pickupResetRecord({ ...getAt(PICKUP + '/' + DAY), restoreGuard: { stale: true } }).restoreGuard).toBeUndefined();
+    expect(revenueDay()).toEqual([100, 10, 10]);
+});
+
+
+it('Restore targets ទទេក្រោយ lost codes ៖ exact F/K បញ្ចប់ journal ដោយ zero pickup CAS មិនបូកប្រាក់ម្ដងទៀត', async () => {
+    seedItem('lost', ['LOST0001'], ['LOST0001']); loadViewsFromServer();
+    expect(await removeSingleBarcode('lost', 'LOST0001')).toBe('done'); await sleep(20); const trash = trashItems()[0], token = 'restore_lost_original', targetId = 'restore_empty';
+    setAt(TRASH + '/' + trash.id + '/restoreClaim', { token, targetId, claimedAt: NOW });
+    const prepared = { ...getAt(TRASH + '/' + trash.id), id: targetId, barcodes: [], count: 0, cod: 0, dod: 0, price: 0,
+        restoreClaimId: trash.id, restoreClaimToken: token, restoreAddedCodes: JSON.stringify(['LOST0001']) };
+    for (const field of ['deletedAt', 'trashGeneration', 'trashReason', 'trashMode', 'isFromDeletion', 'restoreClaim']) delete prepared[field];
+    setAt(HISTORY + '/' + targetId, prepared);
+    saveRestoreClaim(trash.id, { token, targetId }); loadViewsFromServer();
+    const sdk: any = firebaseState.fb, update = sdk.update, get = sdk.get; let financial = 0, blocked = true;
+    sdk.update = async (ref: any, patch: any) => { await update(ref, patch); if (patch['zoew_restore_finalizations/' + trash.id]) { financial++; throw new Error('financial ACK unavailable'); } };
+    sdk.get = async (ref: any) => { if (financial && blocked && (ref.path === 'zoew_restore_finalizations/' + trash.id || ref.path === 'zoew_trash_consumptions/' + trash.id)) throw new Error('proof unavailable'); return get(ref); };
+    await restore(trash.id); expect(financial).toBe(1); expect(revenueDay()).toEqual([100, 10, 10]);
+    expect(pickupJournal()[0].restorePlan.targets).toEqual([]); expect(getAt(HISTORY + '/' + targetId)).toBeNull(); expect(pickupKeys()).toEqual([]);
+    const counter = getAt(PICKUP + '/' + DAY), money = [getAt(DAILY), getAt(MONTHLY)], transaction = sdk.runTransaction; let pickupWrites = 0;
+    sdk.runTransaction = (ref: any, updater: any) => { if (ref.path === PICKUP + '/' + DAY) pickupWrites++; return transaction(ref, updater); };
+    blocked = false; crashAndReload(); await pickup.resumePickupIntents();
+    expect(pickupWrites).toBe(0); expect(getAt(PICKUP + '/' + DAY)).toEqual(counter); expect([getAt(DAILY), getAt(MONTHLY)]).toEqual(money); expect(financial).toBe(1);
+    expect(pickupJournal()).toEqual([]); expect(getAt('zoew_restore_finalizations/' + trash.id)).toBeNull();
 });

@@ -243,6 +243,7 @@ bash audit-tools/emu/rules.sh
 | `returned-trash-retention-test.js` | ថេររក្សាទុក ២ ថ្ងៃ / ៣០ ថ្ងៃ និង `DB_OP_TIMEOUT_MS` មិនត្រូវឃ្លាតពីគ្នា | `RETURNEDTRASH_APP_DIR` |
 | `restore-marker-hygiene-test.js` | marker របស់ប្រវត្តិ មិនធ្លាក់ចូលធុងសំរាម · ការសម្អាតមិនដណ្តើមធាតុដែលកំពុងស្តារ | `MARKER_APP_DIR` |
 | `pickup-ledger-test.js` | អតិថិជនយក ↔ កញ្ចប់យក រាប់លើ **មូលដ្ឋានតែមួយ** | `PICKUP_APP_DIR` |
+| `restore-pickup-guard-cases.cjs` | helper fixture សម្រាប់ `emu/scan-operation-rules-test.js` និង `emu/supabase-rules-parity-test.js` មិនមែន checker ដាច់ដោយឡែក។ Payload `restoreGuard` មានទិសទទួល/បដិសេធ៖ រូបរាងវាល · F/K · raw phone និង phoneKey · Barcode/lifecycle/slot · Reset epoch/revision · stale read និង guard ដែលទុកដដែល។ Native checker ផ្ញើ payload ទៅ RTDB emulator ពិតលើ canonical rules និង artifact; parity checker ផ្ញើទៅ RTDB និង PostgreSQL ពិត ហើយការបដិសេធត្រូវទុក Server ទាំងមូលដដែល។ លទ្ធផល source/helper តែមួយមិនជំនួសការរត់ backend ទាំងនេះ ឬ hosted/device proof ទេ។ | — |
 | `pickup-reset-test.js` | Reset ស្ថិតិយក ៖ node នៅមានជាមួយ `0` · គោរពតម្រង · មិនប៉ះលុយ | `PICKUPRESET_APP_DIR` |
 | `pickup-barcode-identity-test.js` | ស្ថិតិយករាប់តាម **សំណុំ barcode** ៖ ឧបករណ៍ ២ ចែក store តែមួយ · rules ពិត · ការចូជួរក្រៅបណ្តាញ | `PICKUPID_APP_DIR` |
 | `revenue-fuzz-test.js` | invariant ចំណូល/ស្ថិតិ លើលំដាប់ចៃដន្យ (rules ពិត · អថេរ registry និងធុងសំរាម · `ledgerBlip` ៖ ledger ចុះ/មិនដល់ + ឧបករណ៍ផ្សេង + `disconnect`) · `FUZZ_CAPTURE=<file>` ➜ សរសេរការសរសេរទាំងអស់ដែល fake ទទួល (សម្រាប់ `emu/app-writes-rules-test.js`) | `FUZZ_APP_DIR` · `FUZZ_CAPTURE` |

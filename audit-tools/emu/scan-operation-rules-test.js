@@ -61,10 +61,10 @@ async function check(label, tree, location, body, allow, method = 'PATCH', actor
         let before = await rootTree();
         if (interleave) { await interleave(before); before = await rootTree(); }
         const result = await req(method, location, body, actor);
+        const after = await rootTree();
+        if (result.status !== 200) assert.deepEqual(after, before, 'ការបដិសេធត្រូវទុកទិន្នន័យដដែល');
         if (!allow) assert.equal(result.status, 401, 'ត្រូវជាការបដិសេធ rules មិនមែន infrastructure៖ ' + result.text);
         assert.equal(result.status === 200, allow, 'status=' + result.status + ' ' + result.text.slice(0, 500));
-        const after = await rootTree();
-        if (!allow) assert.deepEqual(after, before, 'ការបដិសេធត្រូវទុកទិន្នន័យដដែល');
         pass++; console.log('  ok    ' + label);
         return after;
     } catch (error) { fail++; console.log('  FAIL  ' + label + '\n        ' + error.message.slice(0, 1000)); return null; }
@@ -72,6 +72,70 @@ async function check(label, tree, location, body, allow, method = 'PATCH', actor
 function isPostgresRulesDenial(result) {
     return result?.error?.code === '42501' && result.error.message === 'permission_denied';
 }
+function assertRestoreGuardRuleScope(compiled) {
+    const beforeSql = fs.readFileSync(path.join(ROOT, 'supabase', 'migrations', '20261105010507_zoe_rules.sql'), 'utf8');
+    const before = JSON.parse(beforeSql.split('$zoe_rules_json$')[1]);
+    const changed = new Set(['c/zoew_daily_pickup_cod_dod/x/r/v', 'c/zoew_daily_pickup_cod_dod/x/r/c/pickedUpBarcodes/x/r/v']);
+    const added = 'c/zoew_daily_pickup_cod_dod/x/r/c/restoreGuard';
+    let writes = 0, validates = 0;
+    const walk = (old, next, location = '') => {
+        if (changed.has(location)) return;
+        if (old === null || typeof old !== 'object' || Array.isArray(old)) { assert.deepEqual(next, old, 'rules AST ប្រែ៖ ' + location); return; }
+        const keys = Object.keys(next).filter(key => location + '/' + key !== added);
+        assert.deepEqual(keys, Object.keys(old), 'rules shape ប្រែ៖ ' + location);
+        for (const key of Object.keys(old)) {
+            walk(old[key], next[key], location ? location + '/' + key : key);
+        }
+    };
+    walk(before, compiled);
+    const count = node => { if (Object.prototype.hasOwnProperty.call(node, 'w')) writes++; if (Object.prototype.hasOwnProperty.call(node, 'v')) validates++; for (const child of Object.values(node.c || {})) count(child); if (node.x) count(node.x.r); };
+    count(before);
+    const guard = compiled.c.zoew_daily_pickup_cod_dod.x.r.c.restoreGuard;
+    assert(guard, 'restoreGuard schema បាត់');
+    const noWrite = node => { if (!node || typeof node !== 'object') return; assert(!Object.prototype.hasOwnProperty.call(node, 'w'), 'guard មិនបន្ថែម write permission'); for (const child of Object.values(node)) noWrite(child); };
+    noWrite(guard);
+    assert(writes >= 48 && validates >= 300, 'ជាន់ AST coverage មិនគ្រប់៖ ' + writes + '/' + validates);
+    pass++; console.log('  ok    restoreGuard៖ .write AST ' + writes + ' និង .validate ចាស់ ' + validates + ' ដូច migration មុន; ប្រែតែរបង pickup');
+}
+
+function assertRestoreGuardCaseCoverage(vectors) {
+    const required = ["atomic-finalization-delete-and-guarded-pickup", "atomic-history-reopen-and-guarded-pickup", "atomic-history-birth-change-and-guarded-pickup", "atomic-identical-guard-carry-after-finalization-delete", "race-history-reopened-before-write", "race-history-phone-changed-before-write", "race-history-birth-changed-before-write", "race-finalization-token-changed-before-write", "race-finalization-removed-before-write", "race-consumption-replaced-before-write", "race-reset-after-proof-before-write", "unchanged-guard-carry-after-history-change", "unchanged-guard-carry-after-finalization-change", "unchanged-guard-carry-after-consumption-change", "ordinary-legacy-pickup-write", "ordinary-versioned-pickup-write", "ordinary-write-can-drop-prior-guard", "ordinary-finalization-delete-compatibility", "ordinary-history-reopen-compatibility", "ordinary-history-birth-change-compatibility", "valid-serial-restore-guard", "valid-raw-phone-punctuation-explicit-counter", "valid-khmer-no-number-counter", "valid-empty-raw-phone-counter"];
+    const ids = new Set(vectors.map(vector => vector.id));
+    assert(vectors.length >= 142 && ids.size === vectors.length, 'ជាន់ restoreGuard vectors មិនគ្រប់ ឬ id ស្ទួន');
+    for (const id of required) assert(ids.has(id), 'restoreGuard critical case បាត់៖ ' + id);
+    for (const vector of vectors) {
+        const writes = vector.build().steps.filter(step => !step.owner);
+        assert(writes.length && writes.every(step => typeof step.allowed === 'boolean' && typeof step.path === 'string' && ['PUT', 'PATCH'].includes(step.method)), 'restoreGuard case គ្មាន user write ពិត៖ ' + vector.id);
+        if (vector.group === 'valid-guard') assert(writes.some(step => step.allowed && step.value && Object.prototype.hasOwnProperty.call(step.value, 'restoreGuard')), 'restoreGuard positive គ្មាន guard៖ ' + vector.id);
+    }
+    return true;
+}
+
+async function restorePickupGuardCases() {
+    const { restorePickupGuardCases: vectorsOf } = require('../restore-pickup-guard-cases.cjs');
+    const vectors = vectorsOf({ uid });
+    assertRestoreGuardCaseCoverage(vectors);
+    for (const [label, file] of [['source', RULES], ['artifact', process.env.SCANRULES_ARTIFACT_FILE || path.join(ROOT, 'firebase-database.rules.min.json')]]) {
+        const uploaded = await req('PUT', '/.settings/rules.json', JSON.parse(fs.readFileSync(file, 'utf8')));
+        assert.equal(uploaded.status, 200, 'restoreGuard rules មិនបាន load៖ ' + uploaded.text);
+        for (const vector of vectors) {
+            let { seed: current, steps } = vector.build();
+            for (const step of steps) {
+                if (step.owner) {
+                    for (const [location, value] of Object.entries(step.owner)) {
+                        const parts = location.split('/'); let node = current;
+                        for (const part of parts.slice(0, -1)) node = node[part] ||= {};
+                        if (value === null) delete node[parts.at(-1)]; else node[parts.at(-1)] = copy(value);
+                    }
+                    continue;
+                }
+                const after = await check('restoreGuard ' + label + '៖ ' + vector.id, current, at(step.path), step.value, step.allowed, step.method);
+                if (after) current = after;
+            }
+        }
+    }
+}
+
 async function setupPostgres() {
     const { createPgHarness } = require('../supabase-pg.js');
     const { pathToFileURL } = require('url');
@@ -85,6 +149,7 @@ async function setupPostgres() {
     for (const migration of migrations) await pgConnection.query(fs.readFileSync(path.join(ROOT, 'supabase', 'migrations', migration), 'utf8'));
     const { compileRules, rulesSql } = await import(pathToFileURL(path.join(ROOT, 'supabase', 'scripts', 'rtdb-rules.mjs')).href);
     const canonical = JSON.parse(fs.readFileSync(path.join(ROOT, 'firebase-database.rules.json'), 'utf8'));
+    if (canonical.rules.zoew_daily_pickup_cod_dod.$date.restoreGuard) assertRestoreGuardRuleScope(compileRules(canonical));
     const newest = migrations.filter(name => name.endsWith('_zoe_rules.sql')).at(-1);
     assert.equal(fs.readFileSync(path.join(ROOT, 'supabase', 'migrations', newest), 'utf8'), rulesSql(compileRules(canonical)), 'migration ត្រូវ byte-exact canonical');
     const tenant = (await pgConnection.query("insert into public.tenants (name, branch_code, expires_at) values ('scan-rules', '100001', now() + interval '30 days') returning id")).rows[0].id;
@@ -602,6 +667,7 @@ async function run() {
         await check('ការកែតម្លៃ ៖ history ➜ settled committed តាម leaf update', historyTree, '/.json',
             { [H + '/' + target + '/pricePending/phase']: 'settled', [H + '/' + target + '/pricePending/outcome']: 'committed' }, true);
     }
+    await restorePickupGuardCases();
     console.log('\n' + backend + ' scan rules: ' + pass + ' PASS, ' + fail + ' FAIL; វាស់តែ backend ដែលបង្ហាញនេះ។');
     process.exitCode = fail ? 1 : 0;
 }

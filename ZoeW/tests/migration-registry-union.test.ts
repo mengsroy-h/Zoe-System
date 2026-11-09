@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import { randomBytes } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -63,6 +64,7 @@ afterEach(() => {
 });
 
 function migrationFixture() {
+    const syntheticSecret = 'sb_secret_' + randomBytes(24).toString('base64url');
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-migration-empty-'));
     temporaryInputs.push(dir);
     const tenant = '00000000-0000-4000-8000-0000000000aa';
@@ -108,7 +110,7 @@ function migrationFixture() {
         if (replace) args.push('--replace');
         if (apply) args.push('--apply');
         if (skipInvalid) args.push('--skip-invalid');
-        return run(args, { ZOE_SUPABASE_URL: 'https://synthetic-migration.invalid', ZOE_SUPABASE_SECRET_KEY: 'sb_secret_syntheticvalue123456789' });
+        return run(args, { ZOE_SUPABASE_URL: 'https://synthetic-migration.invalid', ZOE_SUPABASE_SECRET_KEY: syntheticSecret });
     };
     return { execute, tree, initial, fetch, writes, logs, dir };
 }

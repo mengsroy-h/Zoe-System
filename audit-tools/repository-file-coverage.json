@@ -803,6 +803,16 @@
       ],
       "evidence": "cleanup-purge-checker-contract.test.ts និង write-stall-guard-test រត់ cleanup/current owner ដែលស្រង់ពិត; វាស់ callback ដំបូង/settle/retry ពេល db, sdk, auth, shop, lease, trust និងព្រំអាយុផ្លាស់ប្ដូរ។",
       "limitation": "ជាកិច្ចសន្យា callback ដាច់ដោយឡែក; មិនជំនួស transport, session lifecycle, browser ឬ backend ពេញលេញ។"
+    },
+    "restore-pickup-guard": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/emu/scan-operation-rules-test.js",
+        "audit-tools/supabase-scan-rules-test.js",
+        "audit-tools/emu/supabase-rules-parity-test.js"
+      ],
+      "evidence": "វ៉ិចទ័រ restoreGuard រួមរត់លើ rules source និង artifact ពិត ក្នុង RTDB និង PostgreSQL RPC; ពិនិត្យបដិសេធដោយ server ទាំងមូលមិនប្រែ ពេល receipt ឬ lifecycle ប្រែ និងពេល fanout ក្នុង write ដូចគ្នា។ AST កិច្ចសន្យា .write ចាស់ប្រៀប migration មុនដដែល។",
+      "limitation": "Fixture បង្កើតទិន្នន័យសាក មិនមែន checker ឯករាជ្យ។ ភស្តុតាង backend មានតែ runtime ដែលរត់ពិត; skip ឬ source-only មិនជំនួស native engine ទេ។"
     }
   },
   "files": {
@@ -5038,6 +5048,12 @@
     },
     "ZoeW/tests/keygen-auth-recovery-owner.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "audit-tools/restore-pickup-guard-cases.cjs": {
+      "policy": "restore-pickup-guard"
+    },
+    "supabase/migrations/20261109122019_zoe_rules.sql": {
+      "policy": "supabase-rules-generator"
     }
   }
 }

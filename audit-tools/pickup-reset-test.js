@@ -166,7 +166,7 @@ const pickupRuntime = moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'sr
     'src/domain/pickup.ts',
     { path: 'src/services/tx-outcome.ts', expose: ['executeNativePickupReset', 'nativePickupResetStatus'] },
     { path: 'src/services/pickup-reset.ts', expose: ['PICKUP_RESET_PENDING_TEXT', 'PICKUP_RESET_UNAVAILABLE_TEXT', 'pickupResetPendingState', 'runPickupResetBatch'] },
-    'src/domain/collected.ts']);
+    'src/domain/collected.ts', { path: 'src/features/restore.ts', expose: ['clearRestoreFinalization'] }]);
 const toastRuntime = moduleRuntime(ROOT, SRC, [{ path: 'src/ui/toast.ts', expose: ['toastKindOf'] }]);
 
 function makeCtx(opts) {

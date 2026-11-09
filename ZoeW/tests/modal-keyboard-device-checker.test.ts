@@ -199,3 +199,53 @@ it.each(['cancel-throws', 'cancel-noop', 'read-throws', 'unfinished', 'no-finish
     if (['unfinished', 'no-finish-event', 'cancelled', 'multiple', 'removed'].includes(mutation)) expect(calls).toEqual([]);
     else expect(calls).toContain('cancel');
 });
+
+// Audit1237 ៖ ចន្លោះស៊ុមដូចគ្នាអាចលាក់ខ្សែកោងរលូន ឬចលនាជាជំហាន។
+// ម៉ូដែលខាងក្រោមមិនអះអាងថា compositor បានគូរស៊ុមដែលមិនបានថតទេ។
+const landscapeTrace = { frames: [[13, 33], [29, 33], [163, 33], [313, 57.1], [396, 59.7], [413, 59.9], [496, 60], [563, 60]].map(([t, top]) => ({ t, top, pan: 0, scroll: 0 })), running: 0 };
+const landscapeOrigin = 162.92;
+const landscapeTop = (t: number) => Math.round((33 + 27 * progress((t - landscapeOrigin) / duration)) * 10) / 10;
+const landscapeDense = () => ({ running: 0, frames: Array.from({ length: 35 }, (_, i) => {
+    const t = 13 + i * 1000 / 60;
+    return { t, top: landscapeTop(t), pan: 0, scroll: 0 };
+}) });
+const landscapeVerdict = (record: any, effectProbe = probe(33, 60)) => evaluate(closePredicate, {
+    up: { start: 60, end: 33 }, down: evaluate('glideOf(record)', { record }),
+    downRecord: { ...record, effectProbe }, wantMs: duration, wantEasing: easing
+});
+
+it('Audit1237 ៖ live mid មួយនៅតែមិនគ្រប់ ទោះ predicate ផ្សេងនិង effect ត្រឹមត្រូវ', () => {
+    const g = evaluate('glideOf(record)', { record: landscapeTrace });
+    expect(g).toEqual({ start: 33, end: 60, dist: 27, maxStep: 24, ahead: 0, mid: 1, back: 0, over: 0, span: 233, running: 0, frames: 8 });
+    expect(evaluate('smooth(g)', { g: { ...g, mid: 2 } })).toBe(true);
+    expect(evaluate('createdGlideOk(value,33,60,duration,easing)', { value: probe(33, 60), duration, easing })).toBe(true);
+    expect(landscapeVerdict(landscapeTrace)).toBe(false);
+});
+it('Audit1237 ៖ ខ្សែកោងពិតផ្គូផ្គងគ្រប់ sample តែស៊ុមក្រាស់ប៉ុណ្ណោះឆ្លង', () => {
+    expect(landscapeTrace.frames.map(f => landscapeTop(f.t))).toEqual(landscapeTrace.frames.map(f => f.top));
+    const dense = landscapeDense();
+    expect(evaluate('glideOf(record).mid', { record: dense })).toBe(11);
+    expect(landscapeVerdict(dense)).toBe(true);
+    expect(landscapeVerdict(landscapeTrace)).toBe(false);
+});
+it('Audit1237 ៖ ជំហានធំដែល sample ខ្វះលាក់បាននៅតែធ្លាក់ពេលថតគ្រប់', () => {
+    const staircase = (t: number) => {
+        let top = landscapeTrace.frames[0].top;
+        for (const frame of landscapeTrace.frames) if (frame.t <= t) top = frame.top;
+        return top;
+    };
+    expect(landscapeTrace.frames.map(f => staircase(f.t))).toEqual(landscapeTrace.frames.map(f => f.top));
+    const dense = landscapeDense();
+    dense.frames.forEach(f => { f.top = staircase(f.t); });
+    const g = evaluate('glideOf(record)', { record: dense });
+    expect(g.mid).toBeGreaterThanOrEqual(2);
+    expect(g.ahead).toBeGreaterThan(0.1);
+    expect(landscapeVerdict(dense)).toBe(false);
+    expect(landscapeVerdict(landscapeTrace)).toBe(false);
+});
+it('Audit1237 ៖ លោតពេញផ្លូវមួយស៊ុមមិនអាចជំនួសដោយ effect ល្អ', () => {
+    const jump = landscapeDense();
+    jump.frames.forEach(f => { f.top = f.t <= 163 ? 33 : 60; });
+    expect(evaluate('glideOf(record).mid', { record: jump })).toBe(0);
+    expect(landscapeVerdict(jump)).toBe(false);
+});

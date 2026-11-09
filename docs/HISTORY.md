@@ -42,7 +42,7 @@
 
 ## 📌 ការងារដែលនៅសល់ — ការផ្ទៀងផ្ទាត់ដោយអ្នកប្រើ
 
-- 2026-11-09 · Clock/Audit៖ CI លើ `ba034d6400d09d6eefe25cb7c10c69047b4561ce` មាន២៤១/២៤៣ checker ជាប់; នៅសល់ unused session wrapper និង ZTO LOCK ៣។ Candidate ZoeW `2.50.190`/`zoew-v454` នៅដាច់ដោយឡែក មិនទាន់ផ្សាយ; ត្រូវផ្ទៀង CI លើ commit ថ្មី។ ការផ្ទុកប្រវត្តិក្រោយ session ផ្ទៀងត្រូវវាស់លើ iPhone/Android ពិតមុន merge។
+- 2026-11-09 · Clock/Audit៖ CI លើ `2afe5f24b4e6ce47b0dca6212960edbbf2c24b38` មាន២៤០/២៤៣ checker ជាប់; helper និង ZTO LOCK បានឆ្លង។ នៅសល់ keyboard live trace មិនគ្រប់ស៊ុម, nested daily-checker budget និង announcement feed មិនស៊ីកំណែ។ Candidate audit/feed បន្ទាប់នៅដាច់ដោយឡែក មិនទាន់ផ្សាយ; ត្រូវផ្ទៀង CI លើ commit ថ្មី។ ការផ្ទុកប្រវត្តិក្រោយ session ផ្ទៀងត្រូវវាស់លើ iPhone/Android ពិតមុន merge។
 
 - 2026-11-07 · PR393៖ Registration atomic បានបញ្ចូលក្នុង branch រួច។ Audit និង Registration Auth លើ head `a711893b4f3b0d3b48dcdb1801937f4fd8baa732` បានផ្ទៀង; F03 ជាប់ក្រោយរត់ឡើងវិញ ប៉ុន្តែមូលហេតុបរាជ័យដំបូងមិនទាន់បញ្ជាក់។ Hosted migration/backup/restore និងការរង់ចាំ handler ចាស់ឱ្យចប់ នៅមិនទាន់ផ្ទៀង; ការកែ test និងឯកសារថ្មីត្រូវការ CI លើ commit ថ្មី មុន merge។ Dead-code ដែលបានដកចេញពីការកែ នៅមិនទាន់បញ្ចប់។
 
@@ -2001,6 +2001,16 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-11-09 — Audit 1237៖ បែងចែកភស្តុតាងចលនា និងកំហុស fixture
+
+Head `2afe5f24b4e6ce47b0dca6212960edbbf2c24b38` មាន២៤០/២៤៣ checker ជាប់ គ្មាន skip/partial។ `function-surface` និង ZTO LOCK ដែលធ្លាប់ក្រហមបានឆ្លង; ក្រុមធ្លាក់ថ្មី៣ត្រូវបានពិនិត្យដាច់ពីគ្នា។
+
+- Keyboard៖ tablet ផ្តេក `lookupApiConfigModal` ពេលបិទ keyboard មាន live sample កណ្តាលតែ១ ជំនួសជាន់អប្បបរមា២។ ចន្លោះ១៣៤/១៥០ms អាចលាក់បានទាំងចលនារលូន និងចលនាជាជំហាន; effect ២៨៥ms ត្រឹមត្រូវក្រោយចប់មិនជំនួសភស្តុតាង live ទេ។ Exact-trace controls ប្រើ curve និង predicate ពិត បញ្ជាក់ភាពមិនអាចបែងចែកនេះ និងរក្សា sparse trace ឱ្យធ្លាក់។ មិនកែ motion, checker predicate, timeout ឬ workflow; មូលហេតុ frames ខ្វះនៅមិនទាន់បញ្ជាក់ ហើយករណីនេះមិនត្រូវបានហៅថា fixed ឬ harmless flake។
+- Daily checker៖ nested operation runner មានពិដាន child៤០វិនាទី និង test៥០វិនាទី; CI ទទួល status null នៅ៤០.០៨៣វិនាទី ខណៈចូល scenario database ចុងក្រោយ។ Artifact មិនបានរក្សា error code/signal ដោយសារ assertion ដំបូងឈប់មុន។ Profile local បង្ហាញការត្រៀម source ដដែលស៊ី២២.៦៩ក្នុង២៥.៧២វិនាទី ខណៈ VM execution០.៣៦វិនាទី។ Controlled same-CPU load បង្កើត timeout៤០.០៦៤វិនាទីជាមួយ `ETIMEDOUT`/`SIGTERM`; មិនមែនភស្តុតាងថា scenario database មាន bug ទេ។ ក្រោយរៀបចំ immutable source string តែម្តង ពេលធម្មតា២.៤៩វិនាទី និងក្រោម load ដូចគ្នា៤.៨៥១វិនាទី; child/test timeout និង១១០ assertions ដដែល។ Sandbox នីមួយៗនៅតែបង្កើតនិងរត់កូដថ្មី ដោយ clock lease, tokens និង store ដាច់គ្នា។ Clock-reset mutation នៅទាំងមុន/ក្រោយឱ្យ៣ធ្លាក់/១០៧ជាប់; exit-code poison ឱ្យ១១០ធ្លាក់/០ជាប់ ដោយអះអាងចប់គ្រប់ករណី។
+- Announcement៖ release bookkeeping មុនទុក feed នៅ `2.50.189` ខណៈ app បានឡើង `2.50.190`; notification contract ចាប់បាន២ធ្លាក់/៣២ជាប់។ កែ id/version និងអត្ថបទ Khmer ដែលពិពណ៌នាឥរិយាបថ session បច្ចុប្បន្ន។ អ្នកដែលបានអានឬបិទ entry ចាស់ឃើញ entry ថ្មី unread មួយ; app `2.50.190` មិនបង្ហាញថាមានកំណែថ្មីជាងទៀត។ Feed ជា network-only data ដែលមិនទាមទារ app/cache bump ថ្មី។
+
+ការផ្ទៀង local លើ candidate បញ្ចូលគ្នា៖ focused tests ២១១/២១១ ក្នុង១៣ឯកសារ, typecheck, lint, doc:check និង comment/diff checks ជាប់។ Independent replay នៃ patches ដាច់ដោយឡែកមាន១០៥/១០៥; keyboard negative controls នៅតែចាប់ការបន្ថយជាន់ live frame និង effect bypass។ ការងារនេះមិនកែ production business/clock/session/motion code, LOCK, version/cache ឬ scheduler។ Full CI លើ candidate ថ្មី, standalone daily checker ១៨១ assertions និង doc/version checkers ដែលត្រូវការ rendered measure-root នៅមិនទាន់រត់។ Keyboard live verification មិនទាន់បិទ; ការផ្ទៀងឧបករណ៍ពិតពីមុននៅដដែល។
 
 ### 2026-11-09 — Audit 1236៖ ផ្ទៀងសោ ZTO និង session wrapper
 

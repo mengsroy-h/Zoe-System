@@ -390,6 +390,8 @@ scenario('១៣. ⛔ UI ៖ ប៊ូតុង · ប្រអប់ · កា�
 // ស្រង់មុខងារពិតតាម AST ដើម្បីវាស់ស្នាមភ្ជាប់ close/delete/restore ជាមួយគ្នា។
 const operationDeclarations = modulePrograms(SRC, path.join(ROOT, 'ZoeW', 'app.js'), { ecmaVersion: 'latest' }).flatMap(program => program.body);
 const fnCode = operationDeclarations.filter(node => node.type === 'FunctionDeclaration').map(node => SRC.slice(node.start, node.end)).join('\n');
+const operationModuleCode = moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts', 'src/services/row-operation-lock.ts']).code;
+const operationFunctionCode = protocolRuntime.withoutBindings(fnCode);
 const clone = value => value == null ? value : JSON.parse(JSON.stringify(value));
 const HISTORY = 'zoew_scan_history_cod_dod';
 const TRASH = 'zoew_recently_deleted_cod_dod';
@@ -468,8 +470,8 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
     box.window = box;
     box.globalThis = box;
     vm.createContext(box);
-    vm.runInContext(require('./react-view').moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts', 'src/services/row-operation-lock.ts']).code, box);
-    vm.runInContext(protocolRuntime.withoutBindings(fnCode), box);
+    vm.runInContext(operationModuleCode, box);
+    vm.runInContext(operationFunctionCode, box);
     for (const name of ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'PICKUP_PHONE_KEY_MAX',
         'RESTORE_INTENTS_KEY', 'CLEANUP_LIVE_LOCK_PREFIX', 'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX',
         'CLEANUP_STAGE_SLOT', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_UNDO',

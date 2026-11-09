@@ -182,12 +182,53 @@ it('daily checker រត់សេណារីយ៉ូ operation ទាំងអ
         const result = spawnSync(process.execPath, ['--require', path.join(root, 'audit-tools/runall-exit-guard.cjs'), file], {
             cwd: root, env: { ...process.env, COLLECTED_APP_DIR: fixtureRoot, ZOE_RUNALL_EXIT_GUARD: '1' }, encoding: 'utf8', timeout: 40000
         });
-        expect(result.status, result.stdout + result.stderr).toBe(0);
+        const outcome = JSON.stringify({ status: result.status, signal: result.signal, error: (result.error as NodeJS.ErrnoException)?.code });
+        expect(result.status, outcome + '\n' + result.stdout + result.stderr).toBe(0);
         expect(result.signal).toBeNull();
         const summary = /✅ ចំណូលប្រចាំថ្ងៃ — ok (\d+)/.exec(result.stdout);
         expect(Number(summary?.[1])).toBe(110);
     } finally { fs.rmSync(file, { force: true }); }
 }, 50000);
+
+it('daily checker រៀបចំប្រភពតែម្តង ហើយ sandbox នីមួយៗរក្សាស្ថានភាពដាច់គ្នា', () => {
+    const source = checkerSource('daily-collected-test.js');
+    const setup = parse(source).body.filter((node: any) => ['VariableDeclaration', 'FunctionDeclaration'].includes(node.type))
+        .map((node: any) => source.slice(node.start, node.end)).join('\n');
+    const { context } = checkerContext({ COLLECTED_APP_DIR: fixtureRoot });
+    const preparation = { runtime: 0, bindings: 0 };
+    context.require = (name: string) => {
+        const module = require(name);
+        if (name !== './react-view') return module;
+        return { ...module, moduleRuntime: (...args: unknown[]) => {
+            preparation.runtime++;
+            const runtime = module.moduleRuntime(...args);
+            return { ...runtime, withoutBindings: (code: string) => {
+                preparation.bindings++;
+                return runtime.withoutBindings(code);
+            } };
+        } };
+    };
+    vm.runInContext(setup + '\nglobalThis.fixture = { makeOperationSandbox, editFixture };', context);
+    const prepared = { ...preparation };
+    const first = context.fixture.makeOperationSandbox(context.fixture.editFixture());
+    const second = context.fixture.makeOperationSandbox(context.fixture.editFixture());
+    expect(preparation).toEqual(prepared);
+    expect(preparation.runtime).toBeGreaterThan(0);
+    expect(preparation.bindings).toBe(1);
+    expect(first.box.serverClockIsTrustworthy()).toBe(true);
+    expect(second.box.serverClockIsTrustworthy()).toBe(true);
+    const secondClock = second.box.captureClockOperation();
+    first.box.resetServerClock();
+    expect(first.box.serverClockIsTrustworthy()).toBe(false);
+    expect(second.box.serverClockIsTrustworthy()).toBe(true);
+    expect(secondClock.current()).toBe(true);
+    first.box.livePriceTokens.add('first-only');
+    first.box.priceOperationSeen.set('first-only', 1);
+    expect(second.box.livePriceTokens.has('first-only')).toBe(false);
+    expect(second.box.priceOperationSeen.has('first-only')).toBe(false);
+    first.write('zoew_scan_history_cod_dod/fixture_item/price', 99);
+    expect(second.read('zoew_scan_history_cod_dod/fixture_item/price')).toBe(13.25);
+}, 10000);
 
 it.each([
     ['early-return', 'handleInfoListenerError(err, INFO_LISTENER_KEY_OFFSET);', 'return; handleInfoListenerError(err, INFO_LISTENER_KEY_OFFSET);', 'offset'],

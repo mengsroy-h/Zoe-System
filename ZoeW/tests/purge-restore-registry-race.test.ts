@@ -320,7 +320,7 @@ it('atomic purge ៖ context ប្រែក្រោយ request ចេញមិ
     expect(batches).toHaveLength(1); expect(receipts()).toHaveLength(1); expect(at(T + '/source')).toBeNull();
 });
 
-it.each(['known', 'unknown'])('atomic purge ៖ auto %s ដោះ ledger key តែក្រោយ receipts', async kind => {
+it.each(['known', 'unknown'])('atomic purge ៖ auto %s រក្សា ledger proof ទោះ purge បញ្ចប់ ឬចម្លើយមិនច្បាស់', async kind => {
     store[T].source.deletedAt = NOW - 31 * 86400000; store[T].source.trashReason = 'returned'; store[T].source.isFromDeletion = false;
     store[T].source.barcodes[0].isDeducted = true;
     for (const path of [D + '/' + DAY, M + '/2026-10']) put(path, { codDollar: 0, dodDollar: 0, totalCount: 0, ded: { source: { at: store[T].source.deletedAt, cod: 7, dod: 0, count: 1 } } });
@@ -328,8 +328,10 @@ it.each(['known', 'unknown'])('atomic purge ៖ auto %s ដោះ ledger key ត
     if (kind === 'unknown') beforeWrite = (_target, patch) => { if (Object.keys(patch).some(path => path.startsWith('zoew_registry_releases/'))) throw new Error('disconnect'); };
     await runAutomaticDeletedCleanup();
     expect(at(D + '/' + DAY + '/codDollar')).toBe(0);
-    if (kind === 'known') { expect(at(D + '/' + DAY + '/ded/source')).toBeNull(); expect(at(T + '/source')).toBeNull(); }
-    else { expect(at(D + '/' + DAY + '/ded/source')).not.toBeNull(); expect(at(T + '/source')).not.toBeNull(); }
+    expect(at(D + '/' + DAY + '/ded/source')).toEqual({ at: NOW - 31 * 86400000, cod: 7, dod: 0, count: 1 });
+    expect(at(M + '/2026-10/ded/source')).toEqual(at(D + '/' + DAY + '/ded/source'));
+    if (kind === 'known') expect(at(T + '/source')).toBeNull();
+    else expect(at(T + '/source')).not.toBeNull();
 });
 
 it('atomic purge ៖ auto completion ចាស់មិនដោះ inFlight របស់ owner ថ្មី', async () => {
@@ -435,10 +437,11 @@ it.each(['ack', 'unknown', 'native-proof'])('Restore final %s ៖ consumption �
         codDollar: 0, dodDollar: 0, totalCount: 0, ded: { source: { at: row.deletedAt, cod: 7, dod: 0, count: 1 } }
     };
     dataState.deletedItems = [clone(row)]; dataState.dailyRevenueData = clone(store[D]); dataState.monthlyRevenueData = clone(store[M]);
-    let finalWrites = 0;
+    let finalWrites = 0, unknownProofReads = 0;
     afterWrite = (_target, patch) => {
         if (patch[TRASH_CONSUMPTIONS_ROOT + '/source']?.kind !== 'restore') return;
         finalWrites++;
+        if (mode === 'unknown') readHook = path => { if (path === 'zoew_restore_finalizations/source') { unknownProofReads++; throw new Error('authoritative financial receipt unavailable'); } };
         if (mode !== 'ack') throw new Error('final ACK unavailable');
     };
     let sdk: any = null;
@@ -459,6 +462,7 @@ it.each(['ack', 'unknown', 'native-proof'])('Restore final %s ៖ consumption �
         }
         expect(uiState.toasts.some(toast => /បានស្តារទិន្នន័យ/.test(toast.msg))).toBe(mode !== 'unknown');
         expect(Boolean(storedRestoreClaims().source)).toBe(mode === 'unknown');
+        if (mode === 'unknown') expect(unknownProofReads).toBeGreaterThan(0);
         const before = money(); uiState.pendingRestoreId = 'source'; await executeRestoreItem();
         expect(money()).toEqual(before); expect(finalWrites).toBe(1);
     } finally { if (sdk) await sdk.deleteApp(firebaseState.db.app); }

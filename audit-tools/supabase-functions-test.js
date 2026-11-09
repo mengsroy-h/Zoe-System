@@ -896,7 +896,7 @@ const MUTATIONS = [
     ['account-core.ts', 'Auth មិនដឹង ➜ username-taken', "    if (userId === undefined) return reply(502, 'registration-unknown');", "    if (userId === undefined) return reply(409, 'username-taken');"],
     ['account-core.ts', 'បន្តរួចលុបគណនីពេល finish បដិសេធ', "    return reply(...FINISH_REPLY[reason]);\n}\n\nasync function resumeRegistration",
         "    await deps.deleteUser(userId);\n    return reply(...FINISH_REPLY[reason]);\n}\n\nasync function resumeRegistration"],
-    ['admin-deps.ts', 'ផ្ទៀងពាក្យសម្ងាត់លើ admin client រួម', 'await withTimeout(probe.auth.signInWithPassword({ email, password })', 'await withTimeout(client.auth.signInWithPassword({ email, password })'],
+    ['admin-deps.ts', 'ផ្ទៀងពាក្យសម្ងាត់លើ admin client រួម', 'const signIn = probe.auth.signInWithPassword({ email, password });', 'const signIn = client.auth.signInWithPassword({ email, password });'],
     ['admin-deps.ts', 'មិនរាំង probe ជា admin client', '                if (probe === client) return undefined;\n', ''],
     ['admin-deps.ts', 'កំហុស sign-in ទាំងអស់ ➜ null', 'if (error) return SIGN_IN_REFUSED_CODES.has(errorCode(error)) ? null : undefined;', 'if (error) return null;'],
     ['admin-deps.ts', 'មិនផ្តាច់ session ផ្ទៀងផ្ទាត់', "                if (data && data.session) await withTimeout(probe.auth.signOut({ scope: 'local' }), timeoutMs, 'timeout').catch(() => null);\n", ''],

@@ -266,9 +266,11 @@ describe('Lookup ទាំងបី៖ ប្រាក់ និងអត្ត�
         expect(dataState.deletedItems[0].barcodes[0].isDeducted).toBe(true);
         await restore(removed); expectMoney(10, 2, 1); expectIdentities([CODE], []);
         await restore(removed); expectMoney(10, 2, 1); expectIdentities([CODE], []);
+        vi.setSystemTime(Date.now() + 1);
         id = currentItem().id;
         await Promise.all([deleteSingleItem(id), deleteSingleItem(id)]); sync();
         expectMoney(10, 2, 1); expectIdentities([], [CODE]); const deleted = trashId();
+        expect(dataState.deletedItems[0]).toMatchObject({ trashGeneration: 2, deletedAt: NOW + 1 });
         expect(dataState.deletedItems[0].barcodes[0].isDeducted).toBe(false);
         await restore(deleted); expectMoney(10, 2, 1); expectIdentities([CODE], []);
         await restore(deleted); expectMoney(10, 2, 1); expectIdentities([CODE], []);
@@ -669,8 +671,10 @@ it.each((['firebase', 'supabase'] as const).flatMap(backend =>
         await restore(removed); await restore(removed);
         expectMoney(1.25, 0.5, 1); expectIdentities([CODE], []); expectRegistryOwner();
         expect(lab.rootAckLostCount).toBe(1);
+        vi.setSystemTime(Date.now() + 1);
         await deleteSingleItem(currentItem().id, { confirmed: true, quiet: true }); sync();
         expectMoney(1.25, 0.5, 1); expectIdentities([], [CODE]);
+        expect(dataState.deletedItems[0]).toMatchObject({ trashGeneration: 2, deletedAt: NOW + 1 });
         const deleted = trashId();
         await restore(deleted); await restore(deleted);
         expectMoney(1.25, 0.5, 1); expectIdentities([CODE], []); expectRegistryOwner();

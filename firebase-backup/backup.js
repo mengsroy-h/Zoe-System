@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const supabase = require('./supabase.js');
+const { writePrivateAtomicFile } = require('./crypt.js');
 
 const DEFAULT_TOKEN_URI = 'https://oauth2.googleapis.com/token';
 const FIREBASE_SCOPES = [
@@ -232,17 +233,8 @@ function writeBackup(outDir, data, keepCount) {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const nonce = crypto.randomBytes(3).toString('hex');
     const outFile = path.join(outDir, `${timestamp}-${nonce}.json.gz`);
-    const tmpFile = `${outFile}.${process.pid}.partial`;
-    try {
-        const json = JSON.stringify(data === null ? {} : data);
-        fs.writeFileSync(tmpFile, zlib.gzipSync(json), { flag: 'wx', mode: 0o600 });
-        fs.renameSync(tmpFile, outFile);
-    } catch (writeError) {
-        if (fs.existsSync(tmpFile)) {
-            try { fs.unlinkSync(tmpFile); } catch (cleanupError) {}
-        }
-        throw writeError;
-    }
+    const json = JSON.stringify(data === null ? {} : data);
+    writePrivateAtomicFile(outFile, zlib.gzipSync(json));
     pruneOldBackups(outDir, keepCount);
     return outFile;
 }

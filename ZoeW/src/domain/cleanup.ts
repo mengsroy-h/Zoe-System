@@ -515,28 +515,6 @@ export function runCleanupLedgerKeySweep() {
     }
 }
 
-export function cleanupLedgerKeyOf(item) {
-    if (!item || item.trashReason !== 'returned' || typeof item.id !== 'string' || !/^[a-zA-Z0-9_-]{1,64}$/.test(item.id)) return null;
-    const at = cleanupEventAt(item);
-    const scanDate = cleanupScanDateOf(item);
-    if (!at || typeof scanDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(scanDate)) return null;
-    const days = dataState.dailyRevenueData && typeof dataState.dailyRevenueData === 'object' ? dataState.dailyRevenueData : {};
-    const entry = ledgerDedOf(days[scanDate], item.id);
-    return entry && entry.at === at ? { scanDate } : null;
-}
-
-export function releaseCleanupLedgerKeys(list, operationCurrent?: () => boolean) {
-    const updates = {};
-    (Array.isArray(list) ? list : []).forEach((candidate) => {
-        if (candidate && candidate.ledgerKey) updates[`zoew_daily_revenue_cod_dod/${candidate.ledgerKey.scanDate}/ded/${candidate.id}`] = null;
-    });
-    if (!Object.keys(updates).length || !firebaseState.fb || !firebaseState.db) return Promise.resolve();
-    return dbOp(Promise.resolve().then(() => {
-        if (operationCurrent && !operationCurrent()) return;
-        return firebaseState.fb.update(firebaseState.fb.ref(firebaseState.db), updates);
-    })).catch(() => {});
-}
-
 export async function cleanupHistoryForRecovery(sourceId, trashItem?, db?, restoreReceipt?) {
     if (typeof sourceId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(sourceId)) return null;
     const recoveryDatabase = db || firebaseState.db;
@@ -1242,11 +1220,12 @@ export async function prepareCleanupTrashGeneration(trashItem, operation, owner 
             if (!targetId || targetId === trashItem.id || await readSlot(targetId) !== null) return false;
         }
         if (!clock.current()) return false;
-        const generation = await allocateTrashGeneration(targetId, owner);
+        const deletedAt = operation.deletedAt || getServerNow();
+        const generation = await allocateTrashGeneration(targetId, owner, deletedAt);
         if (generation === null || !trashGenerationOwnerCurrent(owner) || !clock.current()) return false;
         operation.trashTargetId = targetId;
         operation.trashGeneration = generation;
-        if (!operation.deletedAt) operation.deletedAt = getServerNow();
+        operation.deletedAt = deletedAt;
         return true;
     } catch (error) { return false; }
 }
@@ -1770,7 +1749,7 @@ export async function runAutomaticDeletedCleanup() {
             if (activeRestoreClaims.has(item.id)) return;
             staleClaim = true;
         }
-        candidates.push({ id: item.id, source: JSON.parse(JSON.stringify(item)), staleClaim, ledgerKey: cleanupLedgerKeyOf(item) });
+        candidates.push({ id: item.id, source: JSON.parse(JSON.stringify(item)), staleClaim });
     });
 
     if (!candidates.length) return;
@@ -1806,13 +1785,11 @@ export async function runAutomaticDeletedCleanup() {
                             if (!current()) return;
                             if (done === null) notePurgeDeductionHeld(owner, candidate.source);
                             else if (done) purgeDeductionWaits.delete(purgeDeductionWaitKey(candidate.source));
-                            if (done && candidate.source.trashReason === 'returned') candidate.ledgerKey = { scanDate: day };
                         }
                     }
                     if (!done) { if (done !== null) held = true; continue; }
                     const captured = JSON.stringify(candidate.source);
                     dataState.deletedItems = dataState.deletedItems.filter(item => item.id !== candidate.id || JSON.stringify(item) !== captured);
-                    await releaseCleanupLedgerKeys([candidate], current);
                 } catch (error) { held = true; }
             }
             if (held && current()) showToast('⏳ ធុងសំរាមចាស់ខ្លះមិនទាន់បានផ្ទៀងការលុប។ ទិន្នន័យនៅរង់ចាំ Sync។');

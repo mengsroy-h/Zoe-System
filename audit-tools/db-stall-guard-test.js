@@ -333,7 +333,7 @@ function runResetPickup(mode, opts) {
         'src/domain/pickup.ts',
         { path: 'src/services/tx-outcome.ts', expose: ['executeNativePickupReset', 'nativePickupResetStatus'] },
         { path: 'src/services/pickup-reset.ts', expose: ['PICKUP_RESET_PENDING_TEXT', 'PICKUP_RESET_UNAVAILABLE_TEXT', 'pickupResetPendingState', 'runPickupResetBatch'] },
-        'src/domain/collected.ts']);
+        'src/domain/collected.ts', { path: 'src/features/restore.ts', expose: ['clearRestoreFinalization'] }]);
     const rawSdk = box.fb;
     const owner = current => ({ tenant: config.projectId, actorUid: box.auth.currentUser.uid,
         tokenRealm: async () => config.projectId, sessionCurrent: current });
@@ -572,7 +572,7 @@ function runAbandonCleanup(mode) {
         parts.push(body);
     }
     parts.push('globalThis.__inflight = () => cleanupInFlight.size;');
-    const protocol = moduleRuntime(ROOT, zoewSrc, [{ path: 'src/core/session-verification.ts', expose: ['sessionVerificationRequired'] }, { path: 'src/core/clock.ts', expose: ['captureClockOperation', 'serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'getServerClockBounds'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations'] }]);
+    const protocol = moduleRuntime(ROOT, zoewSrc, [{ path: 'src/core/session-verification.ts', expose: ['sessionVerificationRequired'] }, { path: 'src/core/clock.ts', expose: ['captureClockOperation', 'serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'getServerClockBounds'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations', 'clearRestoreFinalization'] }]);
     ctx.__storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://fixture-db-stall-guard-test.invalid' }) });
     ctx.auth = { currentUser: { uid: 'fixture-user' } };
     ctx.dataState = { pickupPendingVersion: 0 };

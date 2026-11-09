@@ -2,7 +2,7 @@ import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
-import { prepareCleanupTrashGeneration, claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, cleanupLedgerKeyOf, noteCleanupJournalEntry, readCleanupJournal, resumeCleanupJournalEntry } from '../src/domain/cleanup';
+import { prepareCleanupTrashGeneration, claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, noteCleanupJournalEntry, readCleanupJournal, resumeCleanupJournalEntry } from '../src/domain/cleanup';
 import { deleteSingleItem } from '../src/features/entry-ops';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { ABANDON_AGE_MS, TWO_HOURS_MS } from '../src/features/session';
@@ -200,8 +200,7 @@ describe('cleanup of an item recreated under an id whose trash slot holds anothe
         expect(readCleanupJournal().length).toBe(0);
         expect(cleanupJournalLive.size).toBe(0);
         expect(dataState.deletedItems.filter((t) => t && t.id === copies[0].id).length).toBe(1);
-        dataState.dailyRevenueData = clone(getAt(DAILY));
-        expect(cleanupLedgerKeyOf(copies[0])).toEqual({ scanDate: DAY });
+        expect(getAt(MONTHLY)[MONTH].ded[copies[0].id]).toEqual(getAt(DAILY + '/' + DAY).ded[copies[0].id]);
     }, 20000);
 
     it('2. close (2 hours) · trash/<id> = the old returned copy ➜ C lands in trash «pickup» · money untouched · the old copy untouched', async () => {

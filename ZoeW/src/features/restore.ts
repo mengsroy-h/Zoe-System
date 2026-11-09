@@ -1,4 +1,4 @@
-import { TRASH_CONSUMPTIONS_ROOT, trashConsumptionOf, trashConsumptionValid, trashGenerationOf, trashSourceUnconsumed, type TrashConsumption } from '../domain/trash-generation';
+import { TRASH_CONSUMPTIONS_ROOT, trashConsumptionOf, trashConsumptionSame, trashConsumptionValid, trashGenerationOf, trashSourceUnconsumed, type TrashConsumption } from '../domain/trash-generation';
 import { captureTrashGenerationOwner, readTrashConsumption, trashGenerationOwnerCurrent } from '../services/trash-generation';
 import { rowOperationActive } from '../services/row-operation-lock';
 import { setModalDisplay } from '../core/modals';
@@ -468,16 +468,19 @@ export async function restoreLedgerKeyFor(item, trashId, revenueDeltas) {
     return keys;
 }
 
-export async function finalizeClaimedRestore(sourceId, token, targetId, revenueDeltas, ledgerKey?, callPatch?, dropTarget?, consumption?: TrashConsumption) {
+export async function finalizeClaimedRestore(sourceId, token, targetId, revenueDeltas, ledgerKey?, callPatch?, dropTarget?, consumption?: TrashConsumption, finalization?) {
     const owner = captureTrashGenerationOwner();
     if (!owner || !trashConsumptionValid(consumption) || consumption.kind !== 'restore' || consumption.sourceId !== sourceId
         || consumption.token !== token || consumption.targetId !== targetId || consumption.actorUid !== owner.uid || consumption.scope !== owner.scope) throw new Error('RESTORE_GENERATION_HOLD');
     const clockOperation = captureClockOperation();
     if (!clockOperation.current()) throw new Error('RESTORE_CLOCK_UNTRUSTED');
     const target = `zoew_scan_history_cod_dod/${targetId}`;
+    finalization = finalization || { token, targetId, finalizedAt: getServerNow() };
+    if (typeof finalization !== 'object' || Array.isArray(finalization) || Object.keys(finalization).length !== 3 || finalization.token !== token || finalization.targetId !== targetId
+        || !Number.isSafeInteger(finalization.finalizedAt) || finalization.finalizedAt <= 0) throw new Error('RESTORE_GENERATION_HOLD');
     const updates = {
         [`${TRASH_CONSUMPTIONS_ROOT}/${sourceId}`]: consumption,
-        [`zoew_restore_finalizations/${sourceId}`]: { token, targetId, finalizedAt: getServerNow() },
+        [`zoew_restore_finalizations/${sourceId}`]: finalization,
         [`zoew_recently_deleted_cod_dod/${sourceId}`]: null,
         ...(dropTarget ? { [target]: null } : { [`${target}/restoreClaimId`]: null, [`${target}/restoreClaimToken`]: null, [`${target}/restoreAddedCodes`]: null })
     };
@@ -510,7 +513,19 @@ export async function finalizeClaimedRestore(sourceId, token, targetId, revenueD
                 throw error;
             }
             stopIfSwitched();
-            if (!trashSnapshot.exists()) throw Object.assign(new Error('RESTORE_FINAL_UNKNOWN'), { cause: error });
+            if (!trashSnapshot.exists()) {
+                try {
+                    const [receipt, settled] = await Promise.all([
+                        readRestoreServerNode(owner.sdk, finalizeDb, `zoew_restore_finalizations/${sourceId}`),
+                        readTrashConsumption(sourceId, owner)
+                    ]);
+                    stopIfSwitched();
+                    if (receipt && typeof receipt === 'object' && !Array.isArray(receipt) && Object.keys(receipt).length === 3
+                        && Object.keys(finalization).every(key => receipt[key] === finalization[key])
+                        && settled.ok && trashConsumptionSame(consumption, settled.value)) return;
+                } catch (proofError) { stopIfSwitched(); }
+                throw Object.assign(new Error('RESTORE_FINAL_UNKNOWN'), { cause: error });
+            }
             const currentTrash = trashSnapshot.val();
             const currentClaim = currentTrash && currentTrash.restoreClaim;
             if (!currentClaim || currentClaim.token !== token || currentClaim.targetId !== targetId) throw new Error('RESTORE_CLAIM_LOST');
@@ -580,7 +595,7 @@ export async function executeRestoreItem() {
         const previewPickupKeys = trashReasonDeducted(previewItem) ? barcodeEntriesOf(previewItem.barcodes)
             .filter(({ barcode }) => barcode?.isClosed).map(({ barcode }) => pickupBarcodeKey(barcode.code)).filter(Boolean) : [];
         if (previewPickupKeys.length) {
-            pickupJournal = pickupIntentTracker(restoreIsCurrent, targetId);
+            pickupJournal = pickupIntentTracker(restoreIsCurrent, targetId, 'restore');
             pickupContext = await pickupJournal.prepare(previewItem.scanDate || getFormattedDate(), previewPickupKeys, false);
             if (!pickupContext || !pickupJournal.start()) throw new Error('PICKUP_ADMISSION_FAILED');
             stopIfSwitched();
@@ -681,15 +696,18 @@ export async function executeRestoreItem() {
             : [];
         if (pickupJournal && !pickupJournal.setItem(targetId)) throw new Error('PICKUP_ADMISSION_FAILED');
         if (pickupMarks.length && (!pickupJournal || !pickupJournal.add(revenueScanDate, pickupMarks.map((mark) => mark.key)))) throw new Error('PICKUP_ADMISSION_FAILED');
+        const consumption = trashConsumptionOf(claimedSource, 'restore', restoreOwner, token, targetId);
+        const finalization = { token, targetId, finalizedAt: getServerNow() };
+        if (pickupJournal && !pickupJournal.bindRestore(consumption, finalization, prepared.item, pickupMarks.map(mark => mark.key))) throw new Error('PICKUP_ADMISSION_FAILED');
         await finalizeClaimedRestore(restoredId, token, targetId, appliedRevenueDeltas, restoredLedgerKey, callPatch, lostCodes.size > 0 && !barcodeEntriesOf(prepared.item.barcodes).length,
-            trashConsumptionOf(claimedSource, 'restore', restoreOwner, token, targetId));
+            consumption, finalization);
         stopIfSwitched();
         if (pickupJournal && !pickupJournal.confirm(pickupMarks.map((mark) => mark.key))) throw new Error('PICKUP_ADMISSION_FAILED');
         if (pickupMarks.length) pickupJournal.note(markPickupBarcodes(revenueScanDate, pickupMarks, false, pickupContext));
         const pickupSaved = await (pickupJournal?.finish() || Promise.resolve(true));
         activeRestoreClaims.delete(restoredId);
         saveRestoreClaim(restoredId, null);
-        await clearRestoreFinalization(restoredId, token, restoreIsCurrent).catch(() => {});
+        if (!pickupJournal || pickupSaved) await clearRestoreFinalization(restoredId, token, restoreIsCurrent).catch(() => {});
         stopIfSwitched();
         const restoredCollectedKeys = (Array.isArray(itemToRestore.barcodes) ? itemToRestore.barcodes : [])
             .filter((restoredBc) => restoredBc && !lostCodes.has(restoredBc.code))

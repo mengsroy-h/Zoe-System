@@ -70,7 +70,7 @@ function sliceFn(name) {
     return null;
 }
 
-const protocolRuntime = moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts']);
+const protocolRuntime = moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', { path: 'src/features/restore.ts', expose: ['clearRestoreFinalization'] }]);
 
 console.log('\n=== ០. ជាន់អប្បបរមា (checker នេះត្រូវអាចធ្លាក់បាន) ===');
 ok('ZoeW/app.js មិនទទេ (>= 4000 បន្ទាត់)', SRC.split('\n').length >= 4000, SRC.split('\n').length);
@@ -80,7 +80,7 @@ const REQUIRED_FNS = [
     'ledgerNumber', 'ledgerAppliedDelta', 'ledgerDeltaWithClamp', 'revertLedgerRecordInMemory',
     'applyLedgerBucketDelta', 'commitRevenueBucketDelta',
     'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'ledgerMemoryCompensationClaimed', 'alignMonthlyLedgerToDaily', 'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual',
-    'addRevenueToDailyAndMonthlyRecord', 'runLedgerTransaction', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerLatestMonths', 'ledgerMonthTrimmed', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
+    'addRevenueToDailyAndMonthlyRecord', 'runLedgerTransaction', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerLatestMonths', 'ledgerMonthTrimmed', 'captureLedgerSession', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
     'ledgerTokenSeen', 'ledgerRecordTokens', 'ledgerTotalsOf', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged', 'ledgerDeltaIntent', 'ledgerDeltaCompanion', 'ledgerCompanionState',
     'barcodeRegistryKey', 'pickupBarcodeKey', 'pickupSetSize', 'tallyPickupPhones',
     'pickupSetFromRecord', 'buildPickupRecordFromSet', 'applyPickupMarksToSet',
@@ -393,6 +393,7 @@ function makeSandbox(seed) {
         + fnSrc.ledgerDedValue + '\n'
         + fnSrc.ledgerCarryDed + '\n'
         + fnSrc.ledgerLatestMonths + '\n'
+        + fnSrc.captureLedgerSession + '\n'
         + fnSrc.commitDailyRevenueDelta + '\n'
         + fnSrc.commitMonthlyRevenueDelta + '\n'
         + fnSrc.alignMonthlyLedgerToDaily + '\n'

@@ -1155,6 +1155,71 @@ async function sectionSix() {
         { jBad, jOne, j16 });
 }
 
+function sectionBaselineInput() {
+    console.log('\n=== មែកធាងមុនកែ ៖ ផ្លូវខុសមិនអាចក្លាយជាការរត់ធម្មតា ===');
+    const start = runall.indexOf('zoe_measure_root() '), end = runall.indexOf('runall_tree_hash() ');
+    const stop = runall.indexOf('\nfor d in node_modules');
+    let startup = runall.slice(0, stop);
+    startup = startup.slice(0, start) + 'zoe_measure_root() { return 0; }\n' + startup.slice(end);
+    const buildStart = startup.indexOf('zoe_build_audit() {'), buildEnd = startup.indexOf('if [ -z "$ZOE_MEASURE_ROOT" ]');
+    startup = startup.slice(0, buildStart) + 'zoe_build_audit() { printf \'%s\\n\' "$1" >> "$FX_BUILD_LOG"; }\n' + startup.slice(buildEnd);
+    const forward = '    exec bash "$MEASURE/audit-tools/run-all.sh" ${BASE_MEASURE:+"$BASE_MEASURE"}';
+    const extracted = start > 0 && end > start && stop > end && buildStart > 0 && buildEnd > buildStart && startup.includes(forward);
+    ok('ស្រង់ច្រកចូល និងការបញ្ជូនមែកធាងពិតបាន ដោយជំនួសតែការបង្កើត artifact', extracted);
+    if (!extracted) return;
+    startup = startup.replace(forward, '    printf \'FORWARDED_BASE=%s\\n\' "$BASE_MEASURE"\n    exit 0');
+    const dir = path.join(TMP, 'baseline-input'), repo = path.join(dir, 'repo'), caller = path.join(dir, 'caller');
+    fs.mkdirSync(path.join(repo, 'audit-tools'), { recursive: true });
+    fs.mkdirSync(path.join(repo, 'ZoeW', 'src'), { recursive: true });
+    for (const name of ['vite', 'playwright-core']) fs.mkdirSync(path.join(repo, 'ZoeW', 'node_modules', name), { recursive: true });
+    fs.writeFileSync(path.join(repo, 'ZoeW', 'src', 'main.tsx'), '');
+    fs.mkdirSync(path.join(caller, 'baseline with spaces'), { recursive: true });
+    fs.mkdirSync(path.join(caller, '-'));
+    fs.mkdirSync(path.join(dir, 'cdpath', 'baseline with spaces'), { recursive: true });
+    fs.mkdirSync(path.join(repo, 'baseline with spaces'));
+    fs.mkdirSync(path.join(repo, 'repo-only'));
+    fs.writeFileSync(path.join(caller, 'not-directory'), 'fixture');
+    cp.spawnSync('git', ['init', '-q'], { cwd: repo });
+    const script = path.join(repo, 'audit-tools', 'run-all.sh');
+    fs.writeFileSync(script, startup);
+    let probeNo = 0;
+    const probe = (args, extra) => {
+        const log = path.join(dir, 'build-' + (++probeNo));
+        const result = cp.spawnSync('bash', [script, ...args], {
+            cwd: caller, encoding: 'utf8', timeout: 10000,
+            env: harnessEnv(dir, { RUNALL_STATE: '', ZOE_MEASURE_ONLY: '0', ZOE_MEASURE_ROOT: '', FX_BUILD_LOG: log, ...extra })
+        });
+        const builds = fs.existsSync(log) ? fs.readFileSync(log, 'utf8').trim().split('\n') : [];
+        const forwarded = /^FORWARDED_BASE=(.*)$/m.exec(String(result.stdout || ''));
+        return { code: result.status, builds, forwarded: forwarded && forwarded[1], out: String(result.stdout || '') + String(result.stderr || '') };
+    };
+    for (const [label, args] of [
+        ['ផ្លូវមិនមាន', [path.join(caller, 'missing')]],
+        ['ឯកសារជំនួសថត', [path.join(caller, 'not-directory')]],
+        ['argument ទទេ', ['']],
+        ['ផ្លូវទាក់ទងមានតែក្នុង repo', ['repo-only']]
+    ]) {
+        const result = probe(args);
+        ok(label + ' ត្រូវបដិសេធ exit 2 មុន build ឬការបញ្ជូនបន្ត',
+            result.code === 2 && result.builds.length === 0 && result.forwarded === null && /FAIL/.test(result.out), result);
+    }
+    const none = probe([]);
+    ok('គ្មាន baseline នៅរត់មែកធាងបច្ចុប្បន្នម្តង ដោយគ្មានការបដិសេធខុស',
+        none.code === 0 && none.builds.length === 1 && none.builds[0] === repo && none.forwarded === '', none);
+    const existing = path.join(caller, 'baseline with spaces');
+    for (const [label, arg] of [['ដាច់ខាត', existing], ['ទាក់ទងពីថតអ្នកហៅ', 'baseline with spaces']]) {
+        const result = probe([arg]);
+        ok('baseline ' + label + ' ដែលមានពិត ត្រូវបញ្ជូនថតត្រឹមត្រូវ ទោះ repo មានឈ្មោះដូចគ្នា',
+            result.code === 0 && result.builds.length === 1 && result.builds[0] === repo && result.forwarded === existing, result);
+    }
+    const cdpath = probe(['baseline with spaces'], { CDPATH: path.join(dir, 'cdpath') });
+    ok('CDPATH មិនអាចប្តូរ baseline ឬបញ្ចូល output របស់ cd ក្នុងផ្លូវ',
+        cdpath.code === 0 && cdpath.forwarded === existing && cdpath.builds.length === 1, cdpath);
+    const dash = probe(['-'], { OLDPWD: path.join(dir, 'cdpath') });
+    ok('ថតឈ្មោះ - ត្រូវប្រើថតអ្នកហៅ មិនមែន OLDPWD',
+        dash.code === 0 && dash.forwarded === path.join(caller, '-') && dash.builds.length === 1, dash);
+}
+
 // ═══ ៨. សោ root វាស់ ៖ build ទី ២ ខណៈ run-all កំពុងរត់ ➜ បដិសេធ (មិនលុប ZoeW/dist-audit ពីក្រោម checker) ═══
 //    វាស់ `run-all.sh` ពិតលើ repo fixture (React ៖ `ZoeW/src/main.tsx` · គ្មាន `ZoeW/app.js`) ៖ សោកាន់ ➜ exit 2 + សារ · សោទំនេរ ➜ ឆ្លងច្រកទ្វារ
 function sectionLock() {
@@ -1270,6 +1335,7 @@ async function sectionOwnedRuntime() {
     await sectionProgress();
     await sectionFive();
     await sectionSix();
+    sectionBaselineInput();
     sectionLock();
     console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')' : '✅ ជោគជ័យ ' + pass));
     process.exitCode = fail ? 1 : 0;

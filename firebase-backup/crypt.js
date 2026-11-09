@@ -70,6 +70,31 @@ function decryptBuffer(sealed, passphrase) {
     }
 }
 
+function writePrivateAtomicFile(outFile, contents) {
+    const tmpFile = `${outFile}.${process.pid}.partial`;
+    let owned;
+    try {
+        const fd = fs.openSync(tmpFile, 'wx', 0o600);
+        try {
+            owned = fs.fstatSync(fd);
+            fs.writeFileSync(fd, contents);
+        } finally {
+            fs.closeSync(fd);
+        }
+        const current = fs.lstatSync(tmpFile);
+        if (current.dev !== owned.dev || current.ino !== owned.ino) throw new Error('Temporary backup file ownership changed.');
+        fs.renameSync(tmpFile, outFile);
+    } catch (writeError) {
+        if (owned) {
+            try {
+                const current = fs.lstatSync(tmpFile);
+                if (current.dev === owned.dev && current.ino === owned.ino) fs.unlinkSync(tmpFile);
+            } catch (cleanupError) {}
+        }
+        throw writeError;
+    }
+}
+
 function encryptFile(inFile, outFile, passphrase) {
     const plain = fs.readFileSync(inFile);
     const sealed = encryptBuffer(plain, passphrase);
@@ -77,31 +102,13 @@ function encryptFile(inFile, outFile, passphrase) {
     if (!verified.equals(plain)) {
         throw new Error(`Verification failed for ${inFile} — the encrypted copy did not decrypt back to the original.`);
     }
-    const tmpFile = `${outFile}.${process.pid}.partial`;
-    try {
-        fs.writeFileSync(tmpFile, sealed, { flag: 'wx', mode: 0o600 });
-        fs.renameSync(tmpFile, outFile);
-    } catch (writeError) {
-        if (fs.existsSync(tmpFile)) {
-            try { fs.unlinkSync(tmpFile); } catch (cleanupError) {}
-        }
-        throw writeError;
-    }
+    writePrivateAtomicFile(outFile, sealed);
     return { bytesIn: plain.length, bytesOut: sealed.length };
 }
 
 function decryptFile(inFile, outFile, passphrase) {
     const plain = decryptBuffer(fs.readFileSync(inFile), passphrase);
-    const tmpFile = `${outFile}.${process.pid}.partial`;
-    try {
-        fs.writeFileSync(tmpFile, plain, { flag: 'wx', mode: 0o600 });
-        fs.renameSync(tmpFile, outFile);
-    } catch (writeError) {
-        if (fs.existsSync(tmpFile)) {
-            try { fs.unlinkSync(tmpFile); } catch (cleanupError) {}
-        }
-        throw writeError;
-    }
+    writePrivateAtomicFile(outFile, plain);
     return { bytesIn: fs.statSync(inFile).size, bytesOut: plain.length };
 }
 
@@ -201,5 +208,6 @@ module.exports = {
     encryptFile,
     main,
     requirePassphrase,
-    runSeal
+    runSeal,
+    writePrivateAtomicFile
 };

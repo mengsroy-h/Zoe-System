@@ -247,13 +247,13 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
             `⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងរក្សាទុកការដក (${barcodeCode})… សូមកុំបិទ App។`).then(() => {
             trashSaved = true;
         }).catch(async (trashErr) => {
-            const staleIdx = dataState.deletedItems.findIndex(i => i.id === itemToTrash.id);
-            if (staleIdx !== -1) dataState.deletedItems.splice(staleIdx, 1);
-            console.error('Trash write permanently failed for removeSingleBarcode of', itemId, trashErr);
             if (!removeIsCurrent()) {
                 noteRemoveSessionSwitch(itemToTrash.id);
                 return;
             }
+            const staleIdx = dataState.deletedItems.findIndex(i => i.id === itemToTrash.id);
+            if (staleIdx !== -1) dataState.deletedItems.splice(staleIdx, 1);
+            console.error('Trash write permanently failed for removeSingleBarcode of', itemId, trashErr);
             if (trashErr?.message === 'TRASH_GENERATION_HOLD') { showToast('⏳ ការដកកំពុងរង់ចាំការផ្ទៀងជំនាន់ធុងសំរាម។'); return; }
             if (window.ZoeErrors) ZoeErrors.capture(trashErr, { zone: 'money', context: 'removeSingleBarcode trash write failed after retries', itemId });
             let restoreOk = false;

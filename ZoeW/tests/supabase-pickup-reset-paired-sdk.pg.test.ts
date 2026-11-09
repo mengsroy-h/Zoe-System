@@ -16,11 +16,19 @@ const ids = [
 ];
 
 it('Supabase SDK ៖ paired Reset19 ប្រើ native seed ដូចគ្នា និង authoritative SQL outcomes', () => {
-    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-paired-reset19-'));
     const driver = path.join(root, 'audit-tools/supabase-pickup-reset-paired-sdk-test.cjs');
     const native = path.join(root, 'audit-tools/emu/pickup-reset-applied-sdk-test.js');
     const preserved = [path.join(root, 'audit-tools/supabase-pickup-reset-applied-test.cjs'), path.join(__dirname, 'supabase-pickup-reset-applied.pg.test.ts')];
     const before = preserved.map(file => [file, hash(file)]);
+    const migrationDir = path.join(root, 'supabase/migrations');
+    const files = fs.readdirSync(migrationDir).filter(name => /^\d{14}_[a-z0-9_]+\.sql$/.test(name)).sort()
+        .map(name => ({ name, sha256: hash(path.join(migrationDir, name)) }));
+    const first62Hash = createHash('sha256').update(JSON.stringify(files.slice(0, 62).map(file => [file.name, file.sha256]))).digest('hex');
+    expect(files.length).toBeGreaterThanOrEqual(62);
+    expect(first62Hash).toBe('c4f2eb06b4d6b0f43e9a23ae5d955445b7b01eca8d1838ed2ecf89a85c9a3aa2');
+    expect(files.map(file => file.name)).toContain('20261109122019_zoe_rules.sql');
+    const manifest = { count: files.length, latest: files.at(-1)!.name, latestRules: files.filter(file => file.name.endsWith('_zoe_rules.sql')).at(-1)!.name, first62Hash, files };
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-paired-reset19-'));
     const resultFile = path.join(scratch, 'result.json');
     try {
         const run = spawnSync(process.execPath, [driver], { cwd: scratch, encoding: 'utf8', timeout: 170000, maxBuffer: 8 * 1024 * 1024,
@@ -31,7 +39,13 @@ it('Supabase SDK ៖ paired Reset19 ប្រើ native seed ដូចគ្ន�
         expect(output).not.toMatch(/^\s*(?:FAIL|SKIP|SKIPPED)\b/m);
         const result = JSON.parse(fs.readFileSync(resultFile, 'utf8'));
         expect(result).toMatchObject({ status: 'PASS_ACTUAL_SDK_HTTP_PG_19_SCENARIOS_18_COMPARABLE_1_SDK_SPECIFIC', full: true, fail: 0, errors: [], cleanupErrors: [], outboundViolations: [], inputDrift: [],
-            driverHash: hash(driver), nativeSourceHash: hash(native), sharedFixtureHash: hash(path.join(root, 'audit-tools/fixtures/pickup-reset-parity-fixture.cjs')), nativeEngine: 'UNRUN_BY_THIS_CHECKER', migrationCount: 62, authPasswordOrRevocationMutation: false });
+            driverHash: hash(driver), nativeSourceHash: hash(native), sharedFixtureHash: hash(path.join(root, 'audit-tools/fixtures/pickup-reset-parity-fixture.cjs')), nativeEngine: 'UNRUN_BY_THIS_CHECKER', migrationCount: manifest.count, authPasswordOrRevocationMutation: false });
+        expect(result.migrationManifest).toEqual(manifest);
+        expect(result.migrationRules).toMatchObject({ canonicalSha256: hash(path.join(root, 'firebase-database.rules.json')),
+            compilerSha256: hash(path.join(root, 'supabase/scripts/rtdb-rules.mjs')), expressionSha256: hash(path.join(root, 'supabase/scripts/rtdb-expression.cjs')),
+            latestRulesSha256: hash(path.join(migrationDir, manifest.latestRules)), latestRulesSqlFresh: true,
+            restoreGuardPresent: true, dayValidationReferencesGuard: true, installedCanonicalEqual: true });
+        expect(result.migrationRules.compiledSha256).toMatch(/^[a-f0-9]{64}$/);
         expect(result.comparison).toEqual({ comparableScenarios: 18, providerSpecificScenarios: ['native-strict-cas-cold'], identicalOutcomeClaim: false });
         expect(result.cases.filter((row: { sharedFixture: { profile: string } }) => row.sharedFixture.profile === 'imported-native-day').map((row: { id: string }) => row.id))
             .toEqual(['native-drop-proof-rejected', 'native-malformed-proof-rejected', 'old-client-failclosed-after-proof']);

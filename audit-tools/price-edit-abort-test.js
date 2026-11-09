@@ -82,7 +82,7 @@ const NEEDED = [
     'ledgerNumber', 'ledgerAppliedDelta', 'ledgerDeltaWithClamp', 'revertLedgerRecordInMemory',
     'recalcItemMoneyFromBarcodes', 'applyLedgerBucketDelta', 'commitRevenueBucketDelta',
     'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'ledgerMemoryCompensationClaimed', 'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual',
-    'addRevenueToDailyAndMonthlyRecord', 'runLedgerTransaction', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerLatestMonths', 'ledgerMonthTrimmed', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'alignMonthlyLedgerToDaily',
+    'addRevenueToDailyAndMonthlyRecord', 'runLedgerTransaction', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerLatestMonths', 'ledgerMonthTrimmed', 'captureLedgerSession', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'alignMonthlyLedgerToDaily',
     'ledgerTokenSeen', 'ledgerRecordTokens', 'ledgerTotalsOf', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged', 'ledgerDeltaIntent', 'ledgerDeltaCompanion', 'ledgerCompanionState',
     'normalizeBarcodesOf', 'ensureBarcodeArrayForItem', 'barcodeEntriesOf', 'sanitizeInput', 'formatScanStamp',
     'openViewListModal', 'closeModal', 'openModalHelper', 'viewListModalShowing',

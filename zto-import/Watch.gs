@@ -3,6 +3,7 @@ var WATCH_INTERVAL_MINUTES = 5;
 var WATCH_MAX_FILES_PER_RUN = 10;
 var WATCH_MAX_FILES_SCANNED = 200;
 var WATCH_HEADER_SCAN_ROWS = 12;
+var WATCH_RECEIPT_PREFIX = 'ZTO_WATCH_RECEIPT_V1_';
 
 var CONVERTIBLE_MIME_TYPES = [
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -77,20 +78,41 @@ function watchInboxFolder_() {
         var files = oldestInboxFiles_(inbox, WATCH_MAX_FILES_PER_RUN);
         for (var f = 0; f < files.length; f++) {
             var file = files[f];
+            var receipt = readWatchReceipt_(file, inboxId);
+            if (receipt.state === 'done') {
+                report.push('✅ ' + file.getName() + ' — បាននាំចូលរួច · សាកផ្លាស់ទីតែប៉ុណ្ណោះ' + moveCompletedWatchFile_(file, done, receipt, inboxId));
+                continue;
+            }
+            if (receipt.state !== 'new') {
+                report.push('⏸️ ' + file.getName() + ' — HOLD៖ ភស្តុតាងនាំចូលត្រូវការម្ចាស់ផ្ទៀងផ្ទាត់ · មិននាំចូលឡើងវិញ');
+                continue;
+            }
             if (CONVERTIBLE_MIME_TYPES.indexOf(file.getMimeType()) === -1 &&
                 file.getMimeType() !== MimeType.GOOGLE_SHEETS) {
                 report.push('❌ ' + file.getName() + ' — មិនមែនឯកសារ Excel · CSV · Google Sheets ទេ' + moveWatchFile_(file, failed));
                 continue;
             }
+            if (!writeWatchReceipt_(receipt, 'pending')) {
+                report.push('⏸️ ' + file.getName() + ' — រក្សាទុក intent មិនបាន · គ្មានការនាំចូល ឬផ្លាស់ទី');
+                break;
+            }
             var result;
             try {
-                result = importDriveFile_(file);
+                result = importDriveFile_(file, receipt.value);
             } catch (err) {
-                report.push('❌ ' + file.getName() + ' — ' + err.message + moveWatchFile_(file, failed));
+                if (!writeWatchReceipt_(receipt, 'unknown')) {
+                    report.push('⏸️ ' + file.getName() + ' — លទ្ធផលមិនទាន់បានផ្ទៀង · រក្សា pending សម្រាប់ម្ចាស់ · មិននាំចូលឡើងវិញ');
+                    break;
+                }
+                report.push('⏸️ ' + file.getName() + ' — ' + err.message + ' · លទ្ធផលសរសេរមិនទាន់បានផ្ទៀង — សូមពិនិត្យ Sheet មុននាំចូលម្ដងទៀត' + moveWatchFile_(file, failed));
                 continue;
             }
+            if (!writeWatchReceipt_(receipt, 'done')) {
+                report.push('⏸️ ' + file.getName() + ' — នាំចូលឆ្លើយរួច តែរក្សាទុកលទ្ធផលមិនបាន · រក្សា pending សម្រាប់ម្ចាស់');
+                break;
+            }
             report.push('✅ ' + file.getName() + ' — បន្ថែម ' + result.added +
-                ' · កែ ' + result.updated + ' · ដដែល ' + result.unchanged + moveWatchFile_(file, done));
+                ' · កែ ' + result.updated + ' · ដដែល ' + result.unchanged + moveCompletedWatchFile_(file, done, receipt, inboxId));
         }
         if (report.length) {
             Logger.log(report.join('\n'));
@@ -98,6 +120,60 @@ function watchInboxFolder_() {
         }
     } finally {
         lock.releaseLock();
+    }
+}
+
+function readWatchReceipt_(file, inboxId) {
+    try {
+        var fileId = file.getId();
+        var sheetId = readProp_(PROP_SHEET_ID);
+        if (typeof fileId !== 'string' || !/^[A-Za-z0-9_-]{1,200}$/.test(fileId) || !sheetId) return { state: 'hold' };
+        var value = { version: 1, fileId: fileId, sheetId: sheetId,
+            sheetName: readProp_(PROP_SHEET_NAME) || DEFAULT_SHEET_NAME, inboxId: inboxId, state: 'pending' };
+        var key = WATCH_RECEIPT_PREFIX + fileId;
+        var raw = scriptProps_().getProperty(key);
+        if (raw === null) return { key: key, value: value, raw: null, state: 'new' };
+        var saved = JSON.parse(raw);
+        if (!saved || saved.version !== value.version || saved.fileId !== fileId || saved.sheetId !== value.sheetId ||
+            saved.sheetName !== value.sheetName || saved.inboxId !== inboxId ||
+            ['pending', 'unknown', 'done'].indexOf(saved.state) === -1) return { state: 'hold' };
+        return { key: key, value: saved, raw: raw, state: saved.state };
+    } catch (err) {
+        return { state: 'hold' };
+    }
+}
+
+function writeWatchReceipt_(receipt, state) {
+    try {
+        var props = scriptProps_();
+        if (props.getProperty(receipt.key) !== receipt.raw) return false;
+        var value = Object.assign({}, receipt.value, { state: state });
+        var raw = JSON.stringify(value);
+        props.setProperty(receipt.key, raw);
+        if (props.getProperty(receipt.key) !== raw) return false;
+        receipt.value = value;
+        receipt.raw = raw;
+        receipt.state = state;
+        return true;
+    } catch (err) {
+        return false;
+    }
+}
+
+function moveCompletedWatchFile_(file, folder, receipt, inboxId) {
+    var warning = moveWatchFile_(file, folder);
+    if (warning || folder.getId() === inboxId) return warning;
+    try {
+        var props = scriptProps_();
+        if (props.getProperty(receipt.key) !== receipt.raw) throw new Error('receipt changed');
+        props.deleteProperty(receipt.key);
+        if (props.getProperty(receipt.key) !== null) throw new Error('receipt remains');
+        return '';
+    } catch (err) {
+        try {
+            if (props && props.getProperty(receipt.key) === null) props.setProperty(receipt.key, receipt.raw);
+        } catch (restoreErr) {}
+        return ' · ⚠️ សម្អាត receipt មិនបាន — សូមម្ចាស់ផ្ទៀងផ្ទាត់ Script Properties';
     }
 }
 
@@ -120,7 +196,7 @@ function moveWatchFile_(file, folder) {
     }
 }
 
-function importDriveFile_(file) {
+function importDriveFile_(file, owner) {
     var values = readFileAsValues_(file);
     if (!values.length) {
         throw new Error('ឯកសារទទេ');
@@ -139,7 +215,11 @@ function importDriveFile_(file) {
     if (rows.length > MAX_IMPORT_ROWS) {
         throw new Error('ជួរដេកច្រើនជាង ' + MAX_IMPORT_ROWS);
     }
-    return writeToSheet_(rows, found.mode, found.mapping);
+    if (owner && (readProp_(PROP_SHEET_ID) !== owner.sheetId ||
+        (readProp_(PROP_SHEET_NAME) || DEFAULT_SHEET_NAME) !== owner.sheetName || readProp_(PROP_INBOX) !== owner.inboxId)) {
+        throw new Error('គោលដៅនាំចូលបានប្ដូរ — សូមម្ចាស់ផ្ទៀងផ្ទាត់');
+    }
+    return writeToSheet_(rows, found.mode, found.mapping, owner);
 }
 
 function pickMappedRow_(row, mapping) {

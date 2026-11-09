@@ -121,10 +121,16 @@ export function adminDeps(client: SupabaseClient, timeoutMs = ADMIN_CALL_TIMEOUT
             try {
                 const probe = openProbe();
                 if (probe === client) return undefined;
-                const { data, error } = await withTimeout(probe.auth.signInWithPassword({ email, password }), timeoutMs, 'timeout');
+                const signIn = probe.auth.signInWithPassword({ email, password });
+                const cleanup = signIn.then(async ({ data }) => {
+                    if (data && data.session) await withTimeout(probe.auth.signOut({ scope: 'local' }), timeoutMs, 'timeout').catch(() => null);
+                }, () => null).catch(() => null);
+                const runtime = globalThis as typeof globalThis & { EdgeRuntime?: { waitUntil(task: Promise<unknown>): void } };
+                if (runtime.EdgeRuntime) runtime.EdgeRuntime.waitUntil(withTimeout(cleanup, timeoutMs * 2, 'timeout').catch(() => null));
+                const { data, error } = await withTimeout(signIn, timeoutMs, 'timeout');
                 if (error) return SIGN_IN_REFUSED_CODES.has(errorCode(error)) ? null : undefined;
                 const id = data && data.user ? data.user.id : '';
-                if (data && data.session) await withTimeout(probe.auth.signOut({ scope: 'local' }), timeoutMs, 'timeout').catch(() => null);
+                await cleanup;
                 return id || undefined;
             } catch {
                 return undefined;

@@ -65,7 +65,8 @@ const FNS = ['resolveZtoPickupSignTime', 'trashClaimMayBeLive', 'getZtoPickupVer
     'markCollectedRevenue', 'reconcileCollectedHistory', 'reconcileCollectedPriceState', 'collectedSetFromRecord', 'commitCollectedMarks',
     'getZoneDateKey', 'appZoneParts', 'statsMoney', 'statsPositive', 'ledgerNumber',
     'saveSingleDeletedItemToFirebase',
-    'restoreClaimedItemToScanHistory', 'clearStaleRestoreMarkers', 'releaseStaleRestoreClaimForPurge',
+    // Extract the real standalone token CAS; a moduleRuntime descriptor includes every restore UI entry point.
+    'restoreClaimedItemToScanHistory', 'clearStaleRestoreMarkers', 'releaseStaleRestoreClaimForPurge', 'clearRestoreFinalization',
     'cleanupTrashCodes', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'settleCleanupDeduction', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'collectedSettleHolds', 'collectedSettleHeld', 'beginCleanupOperation', 'releaseCleanupOperation', 'claimAndCleanupItem', 'runAutomaticCleanupRules', 'deleteSingleItem', 'removeSingleBarcode',
     'resumeInterruptedCleanups', 'resumeCleanupJournalEntry', 'cleanupCollectedKept', 'cleanupDropsMirror', 'dropCleanupCollected', 'remarkCleanupCollectedKept', 'finishCleanupCollected', 'cleanupStoredOutcome', 'trashReasonOf', 'collectedRetentionCutoffKey', 'withCleanupEntryOwnership',
     'buildClearHistoryTrashItem', 'trashEntryIsFinal', 'serverClockOffsetIsFromServer', 'holdCollectedSettle', 'toggleIndividualBarcodeClose', 'applyBarcodeCloseChange', 'barcodeSignIdentity',
@@ -453,6 +454,13 @@ async function clearOrphanBeforeRetry(w, label) {
             console.log('   បន្ថែមវាក្នុង `FNS` ឬក្នុង context របស់ `makeSandbox()`។');
             process.exit(1);
         }
+        const finalizationWorld = makeSandbox({ zoew_restore_finalizations: { source: { token: 'own', targetId: 'target', finalizedAt: 1 } } }, Date.now());
+        await finalizationWorld.ctx.api.clearRestoreFinalization('source', 'other');
+        check(finalizationWorld.store.zoew_restore_finalizations.source.token === 'own' && finalizationWorld.writes.length === 0,
+            'sandbox៖ clearRestoreFinalization ពិតរក្សាភស្តុតាងរបស់ token ផ្សេង');
+        await finalizationWorld.ctx.api.clearRestoreFinalization('source', 'own');
+        check(!finalizationWorld.store.zoew_restore_finalizations && finalizationWorld.writes.some(write => write.path === 'zoew_restore_finalizations/source' && write.value === null),
+            'sandbox៖ clearRestoreFinalization ពិតដកតែភស្តុតាង token ដែលបានបញ្ជាក់');
         const clockWorld = makeSandbox({}, 1700000000000);
         vm.runInContext("ztoPickupStatus.set('SMOKE_SIGN', { closed: true, signedAtPending: 1699999999000 });", clockWorld.ctx);
         const signed = clockWorld.ctx.api.getZtoPickupVerdict('SMOKE_SIGN');

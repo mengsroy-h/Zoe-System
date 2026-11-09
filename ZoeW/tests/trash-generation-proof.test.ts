@@ -14,7 +14,7 @@ it.each([null, false, true, '0', -1, 1.5, NaN, Infinity, TRASH_GENERATION_MAX + 
 it('generation ៖ absent និង explicit0 ជា legacy តែ max មានព្រំដែន', () => {
     expect(trashGenerationOf(source())).toBe(0); expect(trashGenerationOf(source(0))).toBe(0); expect(trashGenerationOf(source(TRASH_GENERATION_MAX))).toBe(TRASH_GENERATION_MAX);
     expect(trashSourceUnconsumed(source(), null)).toBe(true); expect(trashSourceUnconsumed(source(1), null)).toBe(true); expect(trashSourceUnconsumed(source(2), null)).toBe(false);
-    expect(trashSourceUnconsumed(source(0), undefined)).toBe(false); expect(trashSourceUnconsumed(source(1), receipt(0))).toBe(true);
+    expect(trashSourceUnconsumed(source(0), undefined)).toBe(false); expect(trashSourceUnconsumed(source(1), receipt(0))).toBe(false); expect(trashSourceUnconsumed({ ...source(1), deletedAt: 101 }, receipt(0))).toBe(true);
     expect(trashSourceUnconsumed(source(0), receipt(0))).toBe(false); expect(trashSourceUnconsumed(source(3), receipt(1))).toBe(false);
     expect(trashSourceUnconsumed(source(TRASH_GENERATION_MAX), receipt(TRASH_GENERATION_MAX))).toBe(false);
 });
@@ -64,4 +64,22 @@ it.each(['db', 'sdk', 'uid', 'scope', 'authGeneration'])('generation ៖ read �
         if (kind === 'authGeneration') firebaseState.authGeneration++;
     };
     expect(await readTrashConsumption('source', captured)).toEqual({ ok: false });
+});
+
+
+it('generation ៖ proposed event time ត្រូវលើស authoritative consumption ហើយ read unknown មិនជា clock proof', async () => {
+    const captured = captureTrashGenerationOwner()!;
+    value = receipt(4);
+    expect(await allocateTrashGeneration('source', captured, 100)).toBeNull();
+    expect(await allocateTrashGeneration('source', captured, 99)).toBeNull();
+    expect(await allocateTrashGeneration('source', captured, 101)).toBe(5);
+    for (const invalid of [null, 0, -1, 1.5, NaN, Infinity, '101']) expect(await allocateTrashGeneration('source', captured, invalid as any)).toBeNull();
+    fail = true; expect(await allocateTrashGeneration('source', captured, 101)).toBeNull();
+});
+
+
+it('generation ៖ prior consumption មិនបញ្ជាក់ event identity សម្រាប់ same-at/rollback source ជំនាន់ថ្មី', () => {
+    for (const deletedAt of [undefined, 99, 100]) expect(trashSourceUnconsumed({ ...source(2), deletedAt }, receipt(1))).toBe(false);
+    expect(trashSourceUnconsumed({ ...source(2), deletedAt: 101 }, receipt(1))).toBe(true);
+    expect(trashSourceUnconsumed({ ...source(1), deletedAt: 101 }, receipt(1))).toBe(false);
 });

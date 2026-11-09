@@ -1,4 +1,4 @@
-var SCRIPT_VERSION = 5;
+var SCRIPT_VERSION = 6;
 var DEFAULT_SHEET_NAME = 'Customers';
 var MAX_IMPORT_ROWS = 20000;
 var MAX_SAVED_MAPPINGS = 12;
@@ -60,12 +60,12 @@ function requirePassword_(password) {
     }
 }
 
-function targetSheet_() {
-    var id = readProp_(PROP_SHEET_ID);
+function targetSheet_(owner) {
+    var id = owner ? owner.sheetId : readProp_(PROP_SHEET_ID);
     if (!id) {
         throw new Error('SHEET_ID មិនទាន់កំណត់ក្នុង Script Properties — មើលជំហានទី ២ ក្នុង README.md');
     }
-    var name = readProp_(PROP_SHEET_NAME) || DEFAULT_SHEET_NAME;
+    var name = owner ? owner.sheetName : readProp_(PROP_SHEET_NAME) || DEFAULT_SHEET_NAME;
     var ss = SpreadsheetApp.openById(id);
     var sheet = ss.getSheetByName(name);
     if (!sheet) {
@@ -456,8 +456,8 @@ function writtenError_(err) {
     return out;
 }
 
-function writeToSheet_(rows, mode, mapping) {
-    var sheet = targetSheet_();
+function writeToSheet_(rows, mode, mapping, owner) {
+    var sheet = targetSheet_(owner);
     var normalized = normalizeRecords_(rows);
     if (!normalized.records.length) {
         throw new Error('រកមិនឃើញជួរដេកណាដែលមាន Barcode ទេ — សូមពិនិត្យការផ្គូផ្គង Column');

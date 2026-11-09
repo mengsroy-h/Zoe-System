@@ -20,6 +20,45 @@ const concurrencyEvidence = [];
 const callCounts = { execute: 0, status: 0 };
 const sha = value => crypto.createHash('sha256').update(value, 'utf8').digest('hex');
 const clone = value => JSON.parse(JSON.stringify(value));
+function currentMigrationManifest(files) {
+    const entries = files.map(name => ({ name, sha256: sha(fs.readFileSync(path.join(ROOT, 'supabase/migrations', name))) }));
+    const first62Hash = sha(JSON.stringify(entries.slice(0, 62).map(entry => [entry.name, entry.sha256])));
+    if (files.length < 62 || files.some((name, index) => index > 0 && name <= files[index - 1])
+        || first62Hash !== 'c4f2eb06b4d6b0f43e9a23ae5d955445b7b01eca8d1838ed2ecf89a85c9a3aa2'
+        || !files.includes('20261109122019_zoe_rules.sql')) throw new Error('F09 migration manifest changed outside the reviewed append-only history');
+    return { count: files.length, latest: files.at(-1), latestRules: files.filter(name => /_zoe_rules\.sql$/.test(name)).at(-1), first62Hash, files: entries };
+}
+function f09PolicyHash(value, keepFoldHints = false) {
+    const canonical = entry => Array.isArray(entry) ? entry.map(canonical) : entry && typeof entry === 'object'
+        ? Object.fromEntries(Object.keys(entry).sort().filter(key => keepFoldHints || key !== 'f' || entry.t !== 'm' || !['child', 'parent'].includes(entry.n))
+            .map(key => [key, canonical(entry[key])])) : entry;
+    return sha(JSON.stringify(canonical(value)));
+}
+function f09PolicyProjection(current, legacy) {
+    const day = current?.x?.r, oldDay = legacy?.x?.r;
+    const leaf = day?.c?.pickedUpBarcodes?.x?.r, oldLeaf = oldDay?.c?.pickedUpBarcodes?.x?.r;
+    if (day?.v?.t !== '&&' || leaf?.v?.t !== '&&'
+        || !isDeepStrictEqual(day.v.l, oldDay?.v) || !isDeepStrictEqual(leaf.v.l, oldLeaf?.v)
+        || day.v.r?.t !== '||' || leaf.v.r?.t !== '||' || !day.c.restoreGuard)
+        throw new Error('F09 guard must retain both exact legacy validator branches');
+    // Pin only the reviewed additive guard, never a replacement hash for the whole legacy policy.
+    const deltaHashes = { dayGuard: f09PolicyHash(day.v.r, true), barcodeGuard: f09PolicyHash(leaf.v.r, true), guardSchema: f09PolicyHash(day.c.restoreGuard, true) };
+    if (!isDeepStrictEqual(deltaHashes, {
+        dayGuard: '48fcf9322ab21a1197e7d4deb11c5338ed1dd7177ce1bb6b46285758f05de185',
+        barcodeGuard: 'f1379676de8789fdc683cc1525796cc61301c2901310827abf0671fc7f63464e',
+        guardSchema: '66d78a5a9dd39cb2521d5d4dc2bbc0bf04f74ecdfabd181c690b5b4472c5ee2d'
+    })) throw new Error('F09 restoreGuard delta differs from the reviewed exact guard ASTs');
+    const projected = clone(current);
+    projected.x.r.v = clone(oldDay.v);
+    projected.x.r.c.pickedUpBarcodes.x.r.v = clone(oldLeaf.v);
+    delete projected.x.r.c.restoreGuard;
+    if (!isDeepStrictEqual(projected, legacy)) throw new Error('F09 projection changed an existing permission, validator or child');
+    const legacyPolicyHash = f09PolicyHash(legacy), projectedPolicyHash = f09PolicyHash(projected);
+    if (legacyPolicyHash !== 'c3280874e9c28bb0b01a97b7c82d892c88ce434428fcc4b9142607e1087d2049' || projectedPolicyHash !== legacyPolicyHash)
+        throw new Error('F09 immutable legacy policy hash changed');
+    return { legacyPolicyHash, projectedPolicyHash, deltaHashes, deltaHashesIncludeFoldHints: true,
+        exactLegacyBranches: true, exactLegacyProjection: true, reviewedGuardPresent: true };
+}
 function check(label, condition, detail) {
     cases.push({ label, pass: !!condition, kind: 'behavior' });
     if (condition) { passed++; console.log('  ok    ' + label); }
@@ -45,6 +84,7 @@ async function main() {
     const { c, name: dbName } = await H.freshDb('no-default-grants');
     try {
         const files = fs.readdirSync(path.join(ROOT, 'supabase/migrations')).filter(name => /^\d{14}_[a-z0-9_]+\.sql$/.test(name)).sort();
+        const migrationManifest = currentMigrationManifest(files);
         const catalog = async () => ({
             relations: (await c.query(`select n.nspname as schema,c.relname as name,c.relkind as kind,c.relrowsecurity as rls,
                 c.relforcerowsecurity as forced_rls,c.relacl::text as acl,
@@ -438,21 +478,18 @@ async function main() {
             && catalogEvidence.existingResetTables.includes('public.member_reset_codes'), catalogEvidence);
         // F09 native-day composition regression begin.
         {
-            const nativeRules = files.filter(name => /_zoe_rules\.sql$/.test(name)).at(-1);
+            const nativeRules = migrationManifest.latestRules;
             const { compileRules, rulesSql } = await import(require('url').pathToFileURL(path.join(ROOT, 'supabase/scripts/rtdb-rules.mjs')).href);
             const compiledRules = compileRules(JSON.parse(fs.readFileSync(path.join(ROOT, 'firebase-database.rules.json'), 'utf8')));
-            const canonicalTree = value => Array.isArray(value) ? value.map(canonicalTree) : value && typeof value === 'object'
-                ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonicalTree(value[key])])) : value;
-            const withoutFoldHints = value => Array.isArray(value) ? value.map(withoutFoldHints) : value && typeof value === 'object'
-                ? Object.fromEntries(Object.keys(value).filter(key => key !== 'f').map(key => [key, withoutFoldHints(value[key])])) : value;
-            const policyHash = value => sha(JSON.stringify(canonicalTree(withoutFoldHints(value))));
+            const legacyRules = JSON.parse(fs.readFileSync(path.join(ROOT, 'supabase/migrations', '20261105010507_zoe_rules.sql'), 'utf8').split('$zoe_rules_json$')[1]);
+            const guardProjection = f09PolicyProjection(compiledRules.c.zoew_daily_pickup_cod_dod, legacyRules.c.zoew_daily_pickup_cod_dod);
             const installedRules = (await c.query('select private.zoe_rules() as value')).rows[0].value;
-            const composition = { migrationCount: files.length, nativeRules,
+            const composition = { migrationCount: files.length, migrationManifest, nativeRules,
                 nativeRulesHash: sha(fs.readFileSync(path.join(ROOT, 'supabase/migrations', nativeRules))),
                 canonicalGeneratedFresh: fs.readFileSync(path.join(ROOT, 'supabase/migrations', nativeRules), 'utf8') === rulesSql(compiledRules),
                 installedCanonicalEqual: isDeepStrictEqual(installedRules, compiledRules),
-                f03LegacyPolicyHash: policyHash(compiledRules.c.zoew_registry_releases),
-                f09DailyPolicyHash: policyHash(compiledRules.c.zoew_daily_pickup_cod_dod),
+                f03LegacyPolicyHash: f09PolicyHash(compiledRules.c.zoew_registry_releases),
+                f09DailyPolicyHash: f09PolicyHash(compiledRules.c.zoew_daily_pickup_cod_dod), guardProjection,
                 nativeEngine: 'UNRUN', rawCasImmutable: true, observations: [] };
             codecEvidence.composition = composition;
             check('composition uses all current migrations including native-day compiled preservation', files.includes(nativeRules)
@@ -461,7 +498,8 @@ async function main() {
                 && files.length >= 50 && nativeRules > '20261101222215_zoe_rules.sql'
                 && composition.canonicalGeneratedFresh && composition.installedCanonicalEqual
                 && composition.f03LegacyPolicyHash === '9dacfafd574466ed623c36eaf3b595b182abae648ded6428ef4f2bec5f343e33'
-                && composition.f09DailyPolicyHash === 'c3280874e9c28bb0b01a97b7c82d892c88ce434428fcc4b9142607e1087d2049', composition);
+                && guardProjection.projectedPolicyHash === 'c3280874e9c28bb0b01a97b7c82d892c88ce434428fcc4b9142607e1087d2049'
+                && guardProjection.exactLegacyBranches && guardProjection.exactLegacyProjection && guardProjection.reviewedGuardPresent, composition);
             const composedFixture = async (basis, label) => {
                 const name = 'compose_' + (++serial), actor = await H.makeAuthUser(c, name + '@u.zoe.test');
                 const tenant = (await c.query("insert into public.tenants(name,branch_code,expires_at) values($1,$2,now()+interval '30 days') returning id", [name, name])).rows[0].id;

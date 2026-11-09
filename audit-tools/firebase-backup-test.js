@@ -59,12 +59,20 @@ function response(status, value, jsonError) {
 // លើគ្រប់ OS ហើយវាស់ permission លើឯកសារពិតបន្ថែមលើ POSIX។
 function captureWrites() {
     const original = fs.writeFileSync;
+    const originalOpen = fs.openSync;
     const writes = [];
+    let writing = 0;
     fs.writeFileSync = function(file, data, options) {
-        writes.push({ file: path.resolve(String(file)), mode: options && options.mode });
-        return original.apply(this, arguments);
+        if (typeof file !== 'number') writes.push({ file: path.resolve(String(file)), mode: options && options.mode });
+        writing++;
+        try { return original.apply(this, arguments); } finally { writing--; }
     };
-    return { writes, restore() { fs.writeFileSync = original; } };
+    fs.openSync = function(file, flags, mode) {
+        const fd = originalOpen.apply(this, arguments);
+        if (!writing) writes.push({ file: path.resolve(String(file)), mode });
+        return fd;
+    };
+    return { writes, restore() { fs.writeFileSync = original; fs.openSync = originalOpen; } };
 }
 
 function privateFile(label, file, writes, writtenPath) {
@@ -74,6 +82,100 @@ function privateFile(label, file, writes, writtenPath) {
     if (process.platform !== 'win32') {
         const actual = fs.statSync(file).mode & 0o777;
         ok(label + ' មាន permission 0600 លើ POSIX', actual === 0o600, actual.toString(8));
+    }
+}
+
+function atomicFileOwnershipScenarios(tempRoot, crypt, passphrase) {
+    const savedPass = process.env.ZOE_BACKUP_PASSPHRASE;
+    process.env.ZOE_BACKUP_PASSPHRASE = passphrase;
+    try {
+        for (const writer of ['backup', 'seal', 'open']) for (const stage of [
+            'collision', 'write-failure', 'rename-failure', 'replaced-after-write', 'replaced-on-rename-failure'
+        ]) {
+            const dir = path.join(tempRoot, 'ownership-' + writer + '-' + stage);
+            fs.mkdirSync(dir);
+            const plain = zlib.gzipSync(JSON.stringify({ synthetic: true, amount: 7 }));
+            const input = path.join(dir, writer === 'open' ? 'input.json.gz.enc' : 'input.json.gz');
+            fs.writeFileSync(input, writer === 'open' ? crypt.encryptBuffer(plain, passphrase) : plain);
+            const inputBefore = fs.readFileSync(input);
+            const sibling = path.join(dir, 'unrelated.partial');
+            const foreign = Buffer.from('SYNTHETIC_FOREIGN_PENDING_EVIDENCE');
+            const finalBefore = Buffer.from('SYNTHETIC_EXISTING_FINAL');
+            fs.writeFileSync(sibling, foreign);
+            const original = { open: fs.openSync, write: fs.writeFileSync, rename: fs.renameSync };
+            const descriptors = new Map();
+            let partial, final, moved, writeReached = false, renameReached = false, replaced = false, error;
+            const observe = file => {
+                if (typeof file !== 'string' || !file.startsWith(dir) || !file.endsWith('.partial')) return false;
+                if (!partial) {
+                    partial = file;
+                    final = file.slice(0, -('.' + process.pid + '.partial').length);
+                    original.write(final, finalBefore);
+                    if (stage === 'collision') original.write(partial, foreign, { flag: 'wx' });
+                }
+                return file === partial;
+            };
+            const replace = () => {
+                moved = path.join(dir, 'owned-preserved.partial');
+                original.rename(partial, moved);
+                original.write(partial, foreign, { flag: 'wx' });
+                replaced = true;
+            };
+            fs.openSync = function(file) {
+                const target = observe(file);
+                const fd = original.open.apply(this, arguments);
+                if (target) descriptors.set(fd, file);
+                return fd;
+            };
+            fs.writeFileSync = function(file, data, options) {
+                const target = typeof file === 'number' ? descriptors.get(file) === partial : observe(file);
+                if (target && stage === 'write-failure') {
+                    original.write.call(this, file, Buffer.from('SYNTHETIC_OWNED_FRAGMENT'), options);
+                    writeReached = true;
+                    throw Object.assign(new Error('Synthetic partial write failure.'), { code: 'WRITE_PROBE' });
+                }
+                const result = original.write.apply(this, arguments);
+                if (target) {
+                    writeReached = true;
+                    if (stage === 'replaced-after-write') replace();
+                }
+                return result;
+            };
+            fs.renameSync = function(from) {
+                if (from === partial) {
+                    renameReached = true;
+                    if (stage === 'rename-failure' || stage === 'replaced-on-rename-failure') {
+                        if (stage === 'replaced-on-rename-failure') replace();
+                        throw Object.assign(new Error('Synthetic rename failure.'), { code: 'RENAME_PROBE' });
+                    }
+                }
+                return original.rename.apply(this, arguments);
+            };
+            try {
+                if (writer === 'backup') backup.writeBackup(path.join(dir, 'destination'), { synthetic: true }, 2);
+                else if (writer === 'seal') crypt.runSeal(dir);
+                else crypt.main(['node', 'crypt.js', 'open', input, path.join(dir, 'opened.json.gz')]);
+            } catch (caught) { error = caught; }
+            finally { fs.openSync = original.open; fs.writeFileSync = original.write; fs.renameSync = original.rename; }
+            const label = writer + ' / ' + stage;
+            const foreignPartial = stage === 'collision' || stage.startsWith('replaced-');
+            const reached = !!partial && (stage === 'collision' ? error && error.code === 'EEXIST'
+                : stage === 'write-failure' ? writeReached
+                    : stage === 'replaced-after-write' ? replaced : renameReached);
+            ok(label + ' ឈានដល់ failure នៅស្រទាប់ឯកសារពិត', reached);
+            ok(label + ' បរាជ័យដោយរក្សាប្រភព លទ្ធផលចាស់ និង partial ដែលមិនមែនខ្លួន',
+                !!error && fs.existsSync(input) && fs.readFileSync(input).equals(inputBefore)
+                && !!final && fs.existsSync(final) && fs.readFileSync(final).equals(finalBefore)
+                && fs.readFileSync(sibling).equals(foreign)
+                && (foreignPartial ? fs.existsSync(partial) && fs.readFileSync(partial).equals(foreign) : !fs.existsSync(partial))
+                && (!replaced || fs.existsSync(moved)), { code: error && error.code, partialExists: !!partial && fs.existsSync(partial) });
+            ok(label + ' មិនបន្សល់ file descriptor បើកក្រោយ failure', [...descriptors.keys()].every(fd => {
+                try { fs.fstatSync(fd); return false; } catch (closed) { return closed.code === 'EBADF'; }
+            }));
+        }
+    } finally {
+        if (savedPass === undefined) delete process.env.ZOE_BACKUP_PASSPHRASE;
+        else process.env.ZOE_BACKUP_PASSPHRASE = savedPass;
     }
 }
 
@@ -445,6 +547,7 @@ async function credentialRedirectScenario(kind, status) {
             expectThrow('⛔ ពាក្យសម្ងាត់ខ្លីពេកត្រូវប្រាប់ចំនួនតួដែលវាយ និងចំនួនដែលត្រូវការ',
                 () => crypt.requirePassphrase('short-key'), /got 9 characters, need at least 16/);
             ok('ពិដានប្រវែងពាក្យសម្ងាត់យ៉ាងតិច ១៦ តួ', crypt.MIN_PASSPHRASE_LENGTH >= 16);
+            atomicFileOwnershipScenarios(tempRoot, crypt, PASS_A);
 
             const sealRoot = path.join(tempRoot, 'seal-run');
             const bizDir = path.join(sealRoot, 'biz-a');

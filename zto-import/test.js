@@ -3,6 +3,7 @@ const path = require('path');
 const vm = require('vm');
 
 const root = process.env.ZTO_IMPORT_APP_DIR ? path.resolve(process.env.ZTO_IMPORT_APP_DIR) : __dirname;
+const scriptPropertyStore = {};
 const sandbox = {
     console,
     Date,
@@ -36,9 +37,10 @@ const sandbox = {
     PropertiesService: {
         getScriptProperties() {
             return {
-                store: {},
+                store: scriptPropertyStore,
                 getProperty(key) { return this.store[key] || null; },
-                setProperty(key, value) { this.store[key] = value; }
+                setProperty(key, value) { this.store[key] = String(value); },
+                deleteProperty(key) { delete this.store[key]; }
             };
         }
     },
@@ -423,13 +425,13 @@ function zoewSheetImportConst(name) {
         ['ZT000001', '012000111', 5]
     ]);
     check('Watch ៖ ជួរចំណងជើង (Barcode តែម្ដង) មិនឈ្នះជួរ header ពិត', found && found.headerRow === 1 && found.mapping.cod === 2 && found.mapping.phone === 1, JSON.stringify(found));
-    const file = (name, created, mime) => ({ getName: () => name, getDateCreated: () => new Date(created), getMimeType: () => mime || 'text/csv', moved: null, moveTo(folder) { this.moved = folder; } });
+    const file = (name, created, mime) => ({ getId: () => name.replace(/\./g, '-'), getName: () => name, getDateCreated: () => new Date(created), getMimeType: () => mime || 'text/csv', moved: null, moveTo(folder) { this.moved = folder.getId(); } });
     const files = [file('new.csv', 3000), file('photo.png', 1000, 'image/png'), file('old.csv', 2000)];
     const inbox = { getFiles() { let i = 0; return { hasNext: () => i < files.length, next: () => files[i++] }; } };
     equal('Watch ៖ ឯកសារចាស់មុន ថ្មីក្រោយ (ថ្មីឈ្នះ)', watch.oldestInboxFiles_(inbox, 10).map((f) => f.getName()), ['photo.png', 'old.csv', 'new.csv']);
-    watch.readProp_ = (name) => ({ INBOX_FOLDER_ID: 'in', DONE_FOLDER_ID: 'done', FAILED_FOLDER_ID: 'failed' })[name] || '';
+    watch.readProp_ = (name) => ({ SHEET_ID: 'target', INBOX_FOLDER_ID: 'in', DONE_FOLDER_ID: 'done', FAILED_FOLDER_ID: 'failed' })[name] || '';
     watch.LockService = { getScriptLock: () => ({ tryLock: () => true, releaseLock() {} }) };
-    watch.DriveApp = { getFolderById: (id) => (id === 'in' ? inbox : id) };
+    watch.DriveApp = { getFolderById: (id) => (id === 'in' ? inbox : { getId: () => id }) };
     const imported = [];
     watch.importDriveFile_ = (f) => { imported.push(f.getName()); if (f.getName() === 'old.csv') { f.moveTo = () => { throw new Error('quota'); }; } return { added: 1, updated: 0, unchanged: 0 }; };
     let mail = '';
@@ -544,7 +546,8 @@ function watcherAccessFixture(handlers, options) {
             service('properties');
             return {
                 getProperty: (key) => properties[key] || null,
-                setProperty(key, value) { state.effects.push('property'); properties[key] = value; }
+                setProperty(key, value) { state.effects.push('property'); properties[key] = String(value); },
+                deleteProperty(key) { state.effects.push('property-delete'); delete properties[key]; }
             };
         } },
         LockService: { getScriptLock() {
@@ -828,6 +831,226 @@ async function webMoneyTests() {
     const markSets = [['5,50', '20'], ['15.5', '1,234,567'], ['1.234', '20'], ['5,50', '5.50'], ['1.234,50'], [3, '', '7']];
     check('Web ↔ Code.gs ៖ moneyDecimalMark() ដូចគ្នា', typeof pageMark === 'function' && markSets.every((cells) => pageMark(cells) === markOf(cells)),
         JSON.stringify(markSets.map((cells) => [typeof pageMark === 'function' ? pageMark(cells) : 'missing', markOf(cells)])));
+}
+
+function watcherReceiptFixture(mode, options) {
+    const settings = options || {};
+    const header = ['Barcode', 'DOD', 'COD', 'Phone'];
+    const props = { SHEET_ID: 'target', INBOX_FOLDER_ID: 'in', DONE_FOLDER_ID: 'done', FAILED_FOLDER_ID: 'failed' };
+    const state = { rows: [header.slice()], otherRows: [header.slice(), ['FOREIGN-ROW', 0, 777, '000']],
+        writes: 0, writtenTargets: [], clears: 0, moves: [], logs: [], releases: 0, properties: props };
+    const files = [];
+    const receiptKey = id => 'ZTO_WATCH_RECEIPT_V1_' + id;
+    const propertyService = {
+        getProperty(key) {
+            if (settings.failRead && key.startsWith('ZTO_WATCH_RECEIPT_')) throw new Error('synthetic-property-read');
+            return props[key] === undefined ? null : props[key];
+        },
+        setProperty(key, value) {
+            const receipt = key.startsWith('ZTO_WATCH_RECEIPT_') ? JSON.parse(value) : null;
+            if (receipt && settings.failState === receipt.state) throw new Error('synthetic-property-quota');
+            if (receipt && settings.dropState === receipt.state) return;
+            props[key] = String(value);
+            if (receipt && settings.failAfterState === receipt.state) throw new Error('synthetic-property-reply-lost');
+        },
+        deleteProperty(key) {
+            if (settings.failDelete) throw new Error('synthetic-property-delete');
+            delete props[key];
+            if (settings.failDeleteAfterApply) throw new Error('synthetic-property-delete-reply-lost');
+        }
+    };
+    const rowCount = rows => {
+        let end = rows.length;
+        while (end && !rows[end - 1].some(value => value !== '')) end--;
+        return end;
+    };
+    const lastRow = () => rowCount(state.rows);
+    const sheetFor = (id, name) => ({
+        getName: () => name, getLastRow: () => rowCount(id === 'target' ? state.rows : state.otherRows), getMaxRows: () => 100,
+        getRange(start, col, count, width) {
+            const rows = id === 'target' ? state.rows : state.otherRows;
+            return {
+                getValues: () => Array.from({ length: count }, (_, i) => (rows[start - 1 + i] || ['', '', '', '']).slice(col - 1, col - 1 + width)),
+                setNumberFormat() {},
+                setValues(values) {
+                    state.writes++;
+                    state.writtenTargets.push([id, name]);
+                    values.forEach((row, i) => { rows[start - 1 + i] = Array.from(row); });
+                    if (settings.failWriteAfterApply) throw new Error('synthetic-write-reply-lost');
+                },
+                clearContent() { state.clears++; for (let i = 0; i < count; i++) rows[start - 1 + i] = ['', '', '', '']; }
+            };
+        }
+    });
+    const add = (id, amount, created, extra) => {
+        const file = {
+            folder: 'in', modified: created,
+            rows: [header.slice(), ['SHARED-123', 0, amount, '000'], [extra, 0, 1, '001']],
+            getId: () => id, getName: () => id + '.sheet', getDateCreated: () => new Date(created), getLastUpdated() { return new Date(this.modified); },
+            getMimeType: () => 'application/vnd.google-apps.spreadsheet',
+            moveTo(folder) {
+                state.moves.push([id, folder.getId()]);
+                if (settings.failMoveIds?.includes(id)) throw new Error('synthetic-move-quota');
+                this.folder = folder.getId();
+            }
+        };
+        files.push(file);
+        return file;
+    };
+    const old = add('old-file', 5, 1, 'OLD-ONLY');
+    const newer = settings.single ? null : add('new-file', 99, 2, 'NEW-ONLY');
+    const folders = Object.fromEntries(['in', 'done', 'failed'].map(id => [id, { getId: () => id, getFiles() {
+        const pending = files.filter(file => file.folder === 'in'); let index = 0;
+        return { hasNext: () => index < pending.length, next: () => pending[index++] };
+    } }]));
+    const context = vm.createContext({
+        PropertiesService: { getScriptProperties: () => propertyService },
+        LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock() { state.releases++; } }) },
+        DriveApp: { getFolderById: id => folders[id] }, MimeType: { GOOGLE_SHEETS: 'application/vnd.google-apps.spreadsheet' },
+        Utilities: { DigestAlgorithm: { SHA_256: 'SHA_256' }, Charset: { UTF_8: 'UTF_8' },
+            computeDigest(_a, text) { return Array.from(require('crypto').createHash('sha256').update(text).digest(), byte => byte > 127 ? byte - 256 : byte); } },
+        Logger: { log: value => state.logs.push(String(value)) },
+        SpreadsheetApp: {
+            openById(id) {
+                if (id === 'target' || id === 'other-target') return { getSheetByName: name => sheetFor(id, name) };
+                const file = files.find(candidate => candidate.getId() === id);
+                if (!file) throw new Error('synthetic-source-missing');
+                return { getSheets: () => [{ getLastRow: () => file.rows.length, getLastColumn: () => 4, getRange: () => ({ getValues: () => file.rows.map(row => row.slice()) }) }] };
+            },
+            flush() { if (settings.failFlush) throw new Error('synthetic-flush-reply-lost'); }
+        }
+    });
+    for (const name of ['Code.gs', 'Watch.gs']) vm.runInContext(fs.readFileSync(path.join(root, name), 'utf8'), context, { filename: name });
+    if (mode === 'replace') context.rememberMapping_(context.mappingSignature_(header), { barcode: 0, dod: 1, cod: 2, phone: 3 }, mode);
+    if (settings.flipTargetAtLookup) {
+        const actualTargetSheet = context.targetSheet_;
+        context.targetSheet_ = function (...args) {
+            props.SHEET_ID = 'other-target'; props.SHEET_NAME = 'Other';
+            return actualTargetSheet(...args);
+        };
+    }
+    const seed = (stateName, changes) => {
+        const receipt = Object.assign({ version: 1, fileId: old.getId(), sheetId: props.SHEET_ID,
+            sheetName: props.SHEET_NAME || 'Customers', inboxId: props.INBOX_FOLDER_ID, state: stateName }, changes);
+        props[receiptKey(old.getId())] = JSON.stringify(receipt);
+        return props[receiptKey(old.getId())];
+    };
+    return { context, state, props, settings, old, newer, files, add, seed, key: receiptKey(old.getId()), run: () => context.watchInboxFolder_(),
+        rows: () => state.rows.slice(0, lastRow()).map(row => row.slice()) };
+}
+
+for (const mode of ['upsert', 'replace']) {
+    const f = watcherReceiptFixture(mode, { failMoveIds: ['old-file'] });
+    f.run();
+    const first = f.rows(), writes = f.state.writes;
+    check('Watch ' + mode + ' ៖ ជុំដំបូងបន្តទៅ file ថ្មីទោះ move ចាស់បរាជ័យ', first.find(row => row[0] === 'SHARED-123')[2] === 99 && f.newer.folder === 'done');
+    f.run();
+    equal('Watch ' + mode + ' ៖ ជុំទីពីរមិនសរសេរ file ចាស់ជាន់ថ្មី', f.rows(), first);
+    check('Watch ' + mode + ' ៖ ជុំទីពីរសាកតែ move និងរក្សា receipt', f.state.writes === writes && f.old.folder === 'in' && !!f.props[f.key]);
+    check('Watch ' + mode + ' ៖ ដោះ script lock រាល់ជុំ', f.state.releases === 2);
+}
+for (const fault of ['failRead', 'pending', 'pending-readback', 'pending-reply-lost']) {
+    const options = { single: true };
+    if (fault === 'failRead') options.failRead = true;
+    else if (fault === 'pending') options.failState = 'pending';
+    else if (fault === 'pending-readback') options.dropState = 'pending';
+    else options.failAfterState = 'pending';
+    const f = watcherReceiptFixture('replace', options); f.run();
+    check('Watch receipt ' + fault + ' ៖ មុន intent durable មិនសរសេរ ឬផ្លាស់ទី', f.state.writes === 0 && f.state.moves.length === 0);
+    if (fault === 'pending-reply-lost') {
+        const pending = f.props[f.key]; f.settings.failAfterState = ''; f.run();
+        check('Watch receipt pending reply បាត់ ៖ ជុំបន្ទាប់ HOLD មិនសន្មតថាមិនធ្លាប់សរសេរ', !!pending && f.props[f.key] === pending && f.state.writes === 0 && f.state.moves.length === 0);
+    }
+}
+{
+    const f = watcherReceiptFixture('replace', { failAfterState: 'done', failMoveIds: ['old-file'] }); f.run();
+    check('Watch done reply បាត់ ៖ មិនបន្ត file ថ្មីនៅជុំដែលមិនទាន់ផ្ទៀង', f.state.writes === 1 && f.newer.folder === 'in');
+    f.settings.failAfterState = ''; f.run(); const latest = f.rows(), writes = f.state.writes; f.run();
+    check('Watch done reply បាត់ ៖ receipt ដែលចុះពិតអនុញ្ញាតតែ move', latest.find(row => row[0] === 'SHARED-123')[2] === 99 && f.state.writes === writes);
+}
+{
+    const f = watcherReceiptFixture('replace', { single: true, failWriteAfterApply: true, failState: 'unknown' }); f.run();
+    const raw = f.props[f.key], written = f.rows();
+    check('Watch unknown receipt សរសេរមិនបាន ៖ រក្សា pending និង file ដើម', !!raw && JSON.parse(raw).state === 'pending' && f.old.folder === 'in');
+    f.settings.failState = ''; f.settings.failWriteAfterApply = false; f.run();
+    equal('Watch unknown receipt សរសេរមិនបាន ៖ ជុំបន្ទាប់មិន replay ផលប៉ះពាល់ដើម', f.rows(), written);
+    check('Watch unknown receipt សរសេរមិនបាន ៖ មិនបំផ្លាញ pending', f.props[f.key] === raw && f.state.writes === 1);
+}
+{
+    const f = watcherReceiptFixture('replace', { failState: 'done' }); f.run();
+    const pending = f.props[f.key];
+    check('Watch receipt done រក្សាទុកមិនបាន ៖ ផ្អាកមុន file ថ្មី និងរក្សា pending', f.state.writes === 1 && f.newer.folder === 'in' && !!pending && JSON.parse(pending).state === 'pending');
+    f.settings.failState = ''; f.run(); const latest = f.rows(), writes = f.state.writes;
+    f.run();
+    check('Watch receipt pending ក្រោយ write ៖ មិន replay ហើយ file ថ្មីនៅឈ្នះ', latest.find(row => row[0] === 'SHARED-123')[2] === 99 && f.state.writes === writes && f.props[f.key] === pending);
+}
+for (const stateName of ['pending', 'unknown', 'done']) {
+    const f = watcherReceiptFixture('replace', { single: true, failMoveIds: ['old-file'] });
+    const saved = f.seed(stateName); f.state.rows = [['Barcode', 'DOD', 'COD', 'Phone'], ['AFTER-CRASH', 0, 123, '000']];
+    const before = f.rows(); f.run();
+    equal('Watch ' + stateName + ' ក្រោយ restart ៖ មិនសរសេរឡើងវិញ', f.rows(), before);
+    check('Watch ' + stateName + ' ក្រោយ restart ៖ រក្សា receipt ដើម', f.props[f.key] === saved && f.state.writes === 0);
+    check('Watch ' + stateName + ' ក្រោយ restart ៖ សាក move តែ known done', f.state.moves.length === (stateName === 'done' ? 1 : 0));
+}
+for (const malformed of ['json', 'schema', 'state', 'sheet', 'tab', 'inbox', 'identity']) {
+    const f = watcherReceiptFixture('replace', { single: true });
+    f.seed('done'); const receipt = JSON.parse(f.props[f.key]);
+    if (malformed === 'schema') receipt.version = 99;
+    if (malformed === 'state') receipt.state = 'applied-maybe';
+    if (malformed === 'sheet') receipt.sheetId = 'foreign-sheet';
+    if (malformed === 'tab') receipt.sheetName = 'foreign-tab';
+    if (malformed === 'inbox') receipt.inboxId = 'foreign-inbox';
+    if (malformed === 'identity') receipt.fileId = 'foreign-file';
+    f.props[f.key] = malformed === 'json' ? '{' : JSON.stringify(receipt);
+    const raw = f.props[f.key]; f.run();
+    check('Watch receipt ' + malformed + ' ៖ HOLD មិនលុប evidence ឬប៉ះ Sheet/file', f.props[f.key] === raw && f.state.writes === 0 && f.state.moves.length === 0);
+}
+for (const failMove of [false, true]) {
+    const f = watcherReceiptFixture('replace', { single: true, failWriteAfterApply: true, failMoveIds: failMove ? ['old-file'] : [] });
+    f.run();
+    check('Watch write reply បាត់ ៖ សាររក្សាលទ្ធផលជាមិនទាន់ផ្ទៀង មិនប្រកាសបរាជ័យ · move បរាជ័យ=' + failMove,
+        f.state.logs.some(line => line.startsWith('⏸️ ') && line.includes('មិនទាន់បានផ្ទៀង')) && !f.state.logs.some(line => line.startsWith('❌ ')));
+    check('Watch write reply បាត់ ទោះ written:false ៖ រក្សា unknown · move បរាជ័យ=' + failMove,
+        f.state.writes === 1 && !!f.props[f.key] && JSON.parse(f.props[f.key]).state === 'unknown');
+    const raw = f.props[f.key], written = f.rows(); f.old.folder = 'in'; f.settings.failWriteAfterApply = false; f.run();
+    equal('Watch write reply បាត់ ៖ មិន replay ក្នុងជុំក្រោយ · move បរាជ័យ=' + failMove, f.rows(), written);
+    check('Watch write reply បាត់ ៖ unknown evidence មិនលុប · move បរាជ័យ=' + failMove, f.props[f.key] === raw && f.state.writes === 1);
+}
+{
+    const f = watcherReceiptFixture('replace', { single: true, failFlush: true }); f.run();
+    check('Watch flush បរាជ័យក្រោយសរសេរ ៖ unknown មិនអះអាងគ្មាន effect', f.state.writes === 1 && !!f.props[f.key] && JSON.parse(f.props[f.key]).state === 'unknown');
+}
+{
+    const f = watcherReceiptFixture('replace', { failMoveIds: ['old-file'] }); f.run();
+    f.context.SCRIPT_VERSION += 100; f.old.modified += 86400000;
+    const writes = f.state.writes, first = f.rows(); f.run();
+    equal('Watch version/modified time ប្រែ ៖ មិនអនុញ្ញាត replay file ID ដដែល', f.rows(), first);
+    check('Watch version/modified time ប្រែ ៖ សូន្យ write ថ្មី', f.state.writes === writes);
+    f.add('copy-file', 123, 3, 'COPY-ONLY'); f.run();
+    check('Watch upload/copy ID ថ្មី ៖ អាចនាំចូល ទោះ file ចាស់នៅរង់ចាំ move', f.rows().find(row => row[0] === 'SHARED-123')[2] === 123 && f.files.at(-1).folder === 'done');
+}
+{
+    const f = watcherReceiptFixture('replace', { single: true, failDelete: true }); f.run();
+    check('Watch move រួច តែលុប receipt បរាជ័យ ៖ រក្សា known done', f.old.folder === 'done' && !!f.props[f.key] && JSON.parse(f.props[f.key]).state === 'done');
+    const writes = f.state.writes; f.settings.failDelete = false; f.old.folder = 'in'; f.run();
+    check('Watch receipt ចាស់ក្រោយ move ៖ សាក move តែម្ដង និងសម្អាតបន្ទាប់ពីបញ្ជាក់ចេញ Inbox', f.state.writes === writes && f.old.folder === 'done' && !f.props[f.key]);
+}
+{
+    const f = watcherReceiptFixture('replace', { single: true, failDeleteAfterApply: true }); f.run();
+    check('Watch delete receipt reply បាត់ ៖ ស្ដារ known done ក្រោយ read ថាខ្វះ', f.old.folder === 'done' && !!f.props[f.key] && JSON.parse(f.props[f.key]).state === 'done');
+    const writes = f.state.writes; f.settings.failDeleteAfterApply = false; f.old.folder = 'in'; f.run();
+    check('Watch delete receipt reply បាត់ ៖ evidence ដែលរក្សាអនុញ្ញាតតែ move', f.state.writes === writes && f.old.folder === 'done');
+}
+{
+    const f = watcherReceiptFixture('replace', { single: true }); f.props.DONE_FOLDER_ID = 'in'; f.run();
+    const writes = f.state.writes; f.run();
+    check('Watch Done=Inbox ៖ មិនលុប receipt ឬនាំចូលម្តងទៀត', f.old.folder === 'in' && f.state.writes === writes && !!f.props[f.key]);
+}
+{
+    const f = watcherReceiptFixture('replace', { single: true, flipTargetAtLookup: true });
+    const foreign = f.state.otherRows.map(row => row.slice()); f.run();
+    check('Watch ប្តូរ Script Properties ក្រោយ guard ៖ មិនសរសេរចូល Sheet/tab ថ្មី', f.state.writtenTargets.every(([id, tab]) => id === 'target' && tab === 'Customers'));
+    equal('Watch target lookup race ៖ ទិន្នន័យ Sheet ថ្មីនៅដដែល', f.state.otherRows, foreign);
 }
 
 webMoneyTests().catch((error) => check('Web money tests ៖ រត់ចប់ដោយគ្មាន exception', false, error && error.stack)).then(() => {

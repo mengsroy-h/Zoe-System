@@ -241,8 +241,48 @@ describe('Postgres scan bridge៖ rules denial ខុសពី infrastructure', 
         const migration = readFileSync('../supabase/migrations/20261025025905_zoe_quota_cleanup.sql', 'utf8');
         expect(migration).toContain("raise exception 'permission_denied' using errcode = '42501', detail = array_to_string(loc_path, '/')");
         expect(file).toContain("if (!isPostgresRulesDenial(result)) throw new Error('Postgres មិនមែន rules denial:");
-        expect(file).toContain("if (!allow) assert.deepEqual(after, before,");
-        expect(file).toContain("assert.equal(result.status === 200, allow,");
+        const unchanged = file.indexOf("if (result.status !== 200) assert.deepEqual(after, before,");
+        const verdict = file.indexOf("assert.equal(result.status === 200, allow,");
+        expect(unchanged).toBeGreaterThan(0);
+        expect(verdict).toBeGreaterThan(unchanged);
+    });
+
+    it('actual denial ពិនិត្យ world មុនសាលក្រម ទោះ positive control ត្រូវបានបដិសេធ', async () => {
+        const file = readFileSync('../audit-tools/emu/scan-operation-rules-test.js', 'utf8');
+        const ast = require('acorn').parse(file, { ecmaVersion: 'latest' });
+        const node = ast.body.find((entry: { type: string; id?: { name: string } }) => entry.type === 'FunctionDeclaration' && entry.id?.name === 'check');
+        expect(node).toBeTruthy();
+        const original = file.slice(node.start, node.end);
+        const nativeAssert: typeof import('node:assert/strict') = require('node:assert/strict');
+        async function exercise(status: number, allow: boolean, changed: boolean, source = original) {
+            const events: string[] = [], output: string[] = [];
+            let reads = 0;
+            const outcome = await runInNewContext(`let pass = 0, fail = 0; ${source}\n(async () => { const value = await check('fixture', {}, '/', {}, expectedAllow); return { pass, fail, value }; })();`, {
+                uid: 'fixture-user', expectedAllow: allow,
+                seed: async () => {}, rootTree: async () => ({ value: reads++ === 0 || !changed ? 1 : 2 }),
+                req: async () => ({ status, text: 'fixture response' }),
+                assert: {
+                    deepEqual: (...args: Parameters<typeof nativeAssert.deepEqual>) => { events.push('unchanged'); nativeAssert.deepEqual(...args); },
+                    equal: (...args: Parameters<typeof nativeAssert.equal>) => { events.push('verdict'); nativeAssert.equal(...args); }
+                },
+                console: { log: (line: string) => output.push(line) }
+            }) as { pass: number; fail: number; value: unknown };
+            return { ...outcome, events, output: output.join('\n') };
+        }
+        expect(await exercise(200, true, true)).toMatchObject({ pass: 1, fail: 0, events: ['verdict'] });
+        expect(await exercise(401, false, false)).toMatchObject({ pass: 1, fail: 0, events: ['unchanged', 'verdict', 'verdict'] });
+        expect(await exercise(401, true, false)).toMatchObject({ pass: 0, fail: 1, events: ['unchanged', 'verdict'] });
+        for (const allow of [false, true]) {
+            const result = await exercise(401, allow, true);
+            expect(result).toMatchObject({ pass: 0, fail: 1, value: null, events: ['unchanged'] });
+            expect(result.output).toContain('ការបដិសេធត្រូវទុកទិន្នន័យដដែល');
+        }
+        const infrastructure = await exercise(500, false, false);
+        expect(infrastructure).toMatchObject({ pass: 0, fail: 1, events: ['unchanged', 'verdict'] });
+        expect(infrastructure.output).toContain('ត្រូវជាការបដិសេធ rules មិនមែន infrastructure');
+        const oldOracle = original.replace('if (result.status !== 200) assert.deepEqual', 'if (!allow) assert.deepEqual');
+        expect(oldOracle).not.toBe(original);
+        expect(await exercise(401, true, true, oldOracle)).toMatchObject({ pass: 0, fail: 1, events: ['verdict'] });
     });
 });
 

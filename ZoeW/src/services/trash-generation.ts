@@ -31,9 +31,11 @@ export async function readTrashConsumption(sourceId: string, owner: TrashGenerat
     } catch (error) { return { ok: false }; }
 }
 
-export async function allocateTrashGeneration(sourceId: string, owner: TrashGenerationOwner): Promise<number | null> {
+export async function allocateTrashGeneration(sourceId: string, owner: TrashGenerationOwner, deletedAt?: number): Promise<number | null> {
+    if (deletedAt !== undefined && (!Number.isSafeInteger(deletedAt) || deletedAt <= 0 || deletedAt > TRASH_GENERATION_MAX)) return null;
     const result = await readTrashConsumption(sourceId, owner);
     if (!result.ok || !trashGenerationOwnerCurrent(owner)) return null;
     if (result.value === null) return 1;
+    if (deletedAt !== undefined && deletedAt <= result.value.deletedAt) return null;
     return result.value.generation < TRASH_GENERATION_MAX ? result.value.generation + 1 : null;
 }

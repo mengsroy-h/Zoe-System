@@ -47,7 +47,7 @@ if (!fs.existsSync(FILE)) {
     return;
 }
 const SRC = fs.readFileSync(FILE, 'utf8');
-const protocolRuntime = moduleRuntime(ROOT, SRC, [{ path: 'src/core/session-verification.ts', expose: ['sessionVerificationRequired'] }, { path: 'src/core/clock.ts', expose: ['captureClockOperation', 'serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'getServerClockBounds'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations'] }]);
+const protocolRuntime = moduleRuntime(ROOT, SRC, [{ path: 'src/core/session-verification.ts', expose: ['sessionVerificationRequired'] }, { path: 'src/core/clock.ts', expose: ['captureClockOperation', 'serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'getServerClockBounds'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations', 'clearRestoreFinalization'] }]);
 
 function sliceFrom(src, name) {
     let start = src.indexOf('function ' + name + '(');
@@ -74,7 +74,7 @@ const FNS = ['appZoneParts', 'getZoneDateKey', 'getFormattedDate', 'elapsedSince
     'recalcItemMoneyFromBarcodes', 'armLateCommit', 'notifyIfSlow', 'settleLockWithin',
     'ledgerNumber', 'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'alignMonthlyLedgerToDaily', 'correctRevenueLedgerToActual',
     'ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'revertLedgerRecordInMemory', 'ledgerMemoryCompensationClaimed',
-    'applyLedgerBucketDelta', 'runLedgerTransaction', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
+    'applyLedgerBucketDelta', 'runLedgerTransaction', 'captureLedgerSession', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
     'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged', 'ledgerDeltaIntent', 'ledgerDeltaCompanion', 'ledgerCompanionState', 
     'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed',
     'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMonthTrimmed', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep',

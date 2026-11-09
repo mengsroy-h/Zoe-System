@@ -22,7 +22,7 @@ const SQL_LABELS = [["actual-root-not-subscribed","original-cas-applied-once","e
 const SOURCE = { files: {} };
 const fixtureControls = [];
 const results = [], records = [], errors = [], cleanupErrors = [], frames = new Set(), httpTasks = new Set(), sockets = new Set();
-let H, c, pool, fake, Window, bundleBytes, bundleHash, active, serial = 0, currentCase;
+let H, c, pool, fake, Window, bundleBytes, bundleHash, active, serial = 0, currentCase, appliedMigrationManifest, migrationRules;
 const ownedPgChildren = [], outboundViolations = [];
 function outside(reason, target) { outboundViolations.push({ reason, target: String(target) }); throw new Error(reason); }
 const hash = value => crypto.createHash('sha256').update(value).digest('hex'), clone = value => JSON.parse(JSON.stringify(value));
@@ -89,7 +89,7 @@ async function build() {
     fs.writeFileSync(path.join(OUT, 'BUNDLE-SOURCE-INPUTS.json'), JSON.stringify(used, null, 2) + '\n');
     for (const row of used) SOURCE.files[row.resolvedFile] = row.sha256;
     SOURCE.files[SHARED_FILE] = hash(fs.readFileSync(SHARED_FILE));
-    for (const file of [__filename, path.join(ROOT, 'audit-tools/emu/pickup-reset-applied-sdk-test.js'), ...migrationFiles().map(name => path.join(ROOT, 'supabase/migrations', name)), path.join(ROOT,'audit-tools/supabase-pg.js'), path.join(ROOT,'audit-tools/supabase-fake-server.js')]) SOURCE.files[file] = hash(fs.readFileSync(file));
+    for (const file of [__filename, path.join(ROOT, 'audit-tools/emu/pickup-reset-applied-sdk-test.js'), ...migrationFiles().map(name => path.join(ROOT, 'supabase/migrations', name)), path.join(ROOT, 'firebase-database.rules.json'), path.join(ROOT, 'supabase/scripts/rtdb-rules.mjs'), path.join(ROOT, 'supabase/scripts/rtdb-expression.cjs'), path.join(ROOT,'audit-tools/supabase-pg.js'), path.join(ROOT,'audit-tools/supabase-fake-server.js')]) SOURCE.files[file] = hash(fs.readFileSync(file));
 }
 function evaluate(label, coordinator, store = memory(), session = memory()) {
     const dom = new Window({ url: 'https://f09-context-' + label.toLowerCase() + '.invalid' });
@@ -173,6 +173,20 @@ async function closeFrame(frame) {
     await bounded(frame.dom.happyDOM.abort(), 'abort own DOM'); frame.closed = true; frames.delete(frame);
 }
 async function bootstrap() {
+    appliedMigrationManifest = readMigrationManifest();
+    const canonicalFile = path.join(ROOT, 'firebase-database.rules.json');
+    const compilerFile = path.join(ROOT, 'supabase/scripts/rtdb-rules.mjs');
+    const expressionFile = path.join(ROOT, 'supabase/scripts/rtdb-expression.cjs');
+    const { compileRules, rulesSql } = await import(pathToFileURL(compilerFile).href);
+    const canonicalBytes = fs.readFileSync(canonicalFile), canonical = JSON.parse(canonicalBytes);
+    const compiledRules = compileRules(canonical), pickupDay = canonical.rules[PICKUP]?.$date;
+    const latestRulesBytes = fs.readFileSync(path.join(ROOT, 'supabase/migrations', appliedMigrationManifest.latestRules));
+    migrationRules = { canonicalSha256: hash(canonicalBytes), compilerSha256: hash(fs.readFileSync(compilerFile)),
+        expressionSha256: hash(fs.readFileSync(expressionFile)), latestRulesSha256: hash(latestRulesBytes),
+        compiledSha256: hash(JSON.stringify(compiledRules)), latestRulesSqlFresh: latestRulesBytes.toString('utf8') === rulesSql(compiledRules),
+        restoreGuardPresent: !!pickupDay?.restoreGuard, dayValidationReferencesGuard: typeof pickupDay?.['.validate'] === 'string' && pickupDay['.validate'].includes("child('restoreGuard')"),
+        installedCanonicalEqual: false };
+    if (!migrationRules.latestRulesSqlFresh || !migrationRules.restoreGuardPresent || !migrationRules.dayValidationReferencesGuard) throw new Error('current Restore guard rules missing or stale');
     const { createPgHarness } = require(path.join(ROOT, 'audit-tools/supabase-pg.js'));
     const config = fs.readFileSync(path.join(ROOT, 'supabase/config.toml'), 'utf8');
     H = createPgHarness({ depsDirs: [path.join(ROOT, 'supabase/node_modules')], shimDir: path.join(ROOT, 'audit-tools/supabase-shim'), wantMajor: Number(config.match(/^major_version\s*=\s*(\d+)/m)[1]) });
@@ -181,13 +195,14 @@ async function bootstrap() {
     try { cp.spawn = function (...args) { const child = Reflect.apply(originalSpawn, this, args); ownedPgChildren.push(child); return child; }; await H.start(); }
     finally { cp.spawn = originalSpawn; }
     const database = await H.freshDb('no-default-grants'); c = database.c;
-    const migrations = migrationFiles();
-    if (migrations.length !== 62) throw new Error('ចំនួន migration ពិតមិនស្មើ ៦២');
+    const migrations = appliedMigrationManifest.files.map(file => file.name);
     for (const name of migrations) await c.query(fs.readFileSync(path.join(ROOT, 'supabase/migrations', name), 'utf8'));
+    migrationRules.installedCanonicalEqual = isDeepStrictEqual((await c.query('select private.zoe_rules() as value')).rows[0].value, compiledRules);
+    if (!migrationRules.installedCanonicalEqual) throw new Error('installed rules differ from current canonical compiler output');
     pool = new H.PG.Pool({ host: '127.0.0.1', port: c.connectionParameters.port, user: 'postgres', database: database.name, max: 4 });
     fake = await require(path.join(ROOT, 'audit-tools/supabase-fake-server.js')).startFakeSupabase({ pool });
     fake.setRpcHook(event => active?.hook?.(event));
-    console.log('READY owned HTTP PostgreSQL ' + H.pgBin.version + ' migrations62; two independent VM production-source evaluations');
+    console.log('READY owned HTTP PostgreSQL ' + H.pgBin.version + ' migrations' + appliedMigrationManifest.count + '; two independent VM production-source evaluations');
 }
 async function snapshot(tenant) { return (await c.query(`select jsonb_build_object('state',(select to_jsonb(s) from public.zoe_tenant_state s where tenant_id=$1),
     'docs',(select coalesce(jsonb_agg(to_jsonb(d) order by root,key),'[]') from public.zoe_docs d where tenant_id=$1),
@@ -238,6 +253,13 @@ function identityCanaries(a, b) {
         listeners: listener && a.api.dbListenerPendingPaths !== b.api.dbListenerPendingPaths && first.a === 1 && first.b === 0 && counts.a === 1 && counts.b === 1 };
 }
 function migrationFiles() { return fs.readdirSync(path.join(ROOT, 'supabase/migrations')).filter(name => /^\d{14}_[a-z0-9_]+\.sql$/.test(name)).sort(); }
+function readMigrationManifest() {
+    const files = migrationFiles().map(name => ({ name, sha256: hash(fs.readFileSync(path.join(ROOT, 'supabase/migrations', name))) }));
+    const first62Hash = hash(JSON.stringify(files.slice(0, 62).map(file => [file.name, file.sha256])));
+    if (files.length < 62 || first62Hash !== 'c4f2eb06b4d6b0f43e9a23ae5d955445b7b01eca8d1838ed2ecf89a85c9a3aa2'
+        || !files.some(file => file.name === '20261109122019_zoe_rules.sql')) throw new Error('unreviewed paired migration manifest');
+    return { count: files.length, latest: files.at(-1).name, latestRules: files.filter(file => file.name.endsWith('_zoe_rules.sql')).at(-1)?.name, first62Hash, files };
+}
 function loadNativeContract() {
     const file = path.join(ROOT, 'audit-tools/emu/pickup-reset-applied-sdk-test.js'), source = fs.readFileSync(file, 'utf8');
     const sourceHash = crypto.createHash('sha256').update(source).digest('hex');
@@ -594,14 +616,17 @@ async function cleanup() {
     finally {
         await cleanup();
         const drift = Object.entries(SOURCE.files).filter(([file, expected]) => hash(fs.readFileSync(file)) !== expected).map(([file]) => file);
+        try { if (appliedMigrationManifest && !equal(readMigrationManifest(), appliedMigrationManifest)) drift.push('supabase/migrations manifest'); }
+        catch (error) { drift.push('supabase/migrations manifest'); }
         const full = !process.env.SUPABASE_RESET_PAIRED_CASE;
         const success = records.length === selected.length && new Set(records.map(row => row.id)).size === selected.length && records.every(row => row.status === 'PASS' && row.assertions.length > 0)
             && results.length > 0 && results.every(row => row.pass) && outboundViolations.length === 0 && !errors.length && !cleanupErrors.length && !drift.length && (!full || fixtureControls.length === 5 && fixtureControls.every(row => row.pass));
         const report = { status: success ? full ? 'PASS_ACTUAL_SDK_HTTP_PG_19_SCENARIOS_18_COMPARABLE_1_SDK_SPECIFIC' : 'PASS_FOCUSED_ACTUAL_PROFILE' : 'FAIL', full, selectedCases: selected,
             expectedCases: PLAN, expectedSqlLabels: SQL_LABELS, cases: records, assertions: results, pass: results.filter(row => row.pass).length, fail: results.filter(row => !row.pass).length,
             errors, cleanupErrors, outboundViolations, inputDrift: drift, fixtureControls, nativeSourceHash: NATIVE.sourceHash, nativePlan: NATIVE.plan,
-            commonSeed: SEED, sharedFixtureHash: hash(fs.readFileSync(SHARED_FILE)), bundleHash, sourceFiles: SOURCE.files, driverHash: hash(fs.readFileSync(__filename)), migrationCount: migrationFiles().length,
-            layers: 'actual production SDK/transport/public service + owned loopback HTTP gateway + actual PostgreSQL17 canonical60 migrations; separately evaluated VM source contexts',
+            commonSeed: SEED, sharedFixtureHash: hash(fs.readFileSync(SHARED_FILE)), bundleHash, sourceFiles: SOURCE.files, driverHash: hash(fs.readFileSync(__filename)),
+            migrationCount: appliedMigrationManifest?.count ?? null, migrationManifest: appliedMigrationManifest ?? null, migrationRules: migrationRules ?? null,
+            layers: 'actual production SDK/transport/public service + owned loopback HTTP gateway + actual PostgreSQL17 canonical' + (appliedMigrationManifest?.count ?? 'unknown') + ' migrations; separately evaluated VM source contexts',
             limitations: 'HappyDOM/memory local+session stores/fake GoTrue setup/deterministic Web Locks; no actual native engine/device/browser lock/process-crash proof. Native-specific callback and receipt availability differences labelled in case records.',
             nativeEngine: 'UNRUN_BY_THIS_CHECKER', comparison: { comparableScenarios: 18, providerSpecificScenarios: ['native-strict-cas-cold'], identicalOutcomeClaim: false }, authPasswordOrRevocationMutation: false,
             cleanup: { frames: frames.size, httpTasks: httpTasks.size, sockets: sockets.size, pgStopRequested: !!H, ownedPgChildren: ownedPgChildren.map(child => ({ pid: child.pid, exitCode: child.exitCode, signalCode: child.signalCode })) } };

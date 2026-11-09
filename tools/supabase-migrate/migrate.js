@@ -506,6 +506,10 @@ async function run(argv, env) {
     say('  ' + 'total'.padEnd(34) + String(totalDocs).padStart(7) + ' records  ' + sizeText(totalBytes));
     const errorCount = printProblems(problems.problems);
     const kept = problems.docs.filter((d) => !d.invalid);
+    if (!kept.length) {
+        say((opts.apply ? 'REFUSED: ' : 'REFUSED (on --apply): ') + 'no record of the input passes the checks, so nothing would be imported and --replace would only delete. --skip-invalid leaves out bad records, never the whole input. Check that this is the right file.');
+        return EXIT.FAIL;
+    }
     const skippedDocs = new Set(problems.docs.filter((d) => d.invalid).map((d) => d.root + '/' + d.key));
     const skippedRoots = new Set(problems.skippedRoots);
     const inputCopySkipped = (d) => skippedRoots.has(d.root) || skippedDocs.has(d.root + '/' + d.key);

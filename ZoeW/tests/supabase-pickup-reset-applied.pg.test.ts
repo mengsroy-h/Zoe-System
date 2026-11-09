@@ -4,18 +4,27 @@ import path from 'node:path';
 import os from 'node:os';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
+import { runInNewContext } from 'node:vm';
+import { isDeepStrictEqual } from 'node:util';
 
 const root = path.resolve(__dirname, '../..');
 const migration = '20261101151500_zoe_pickup_reset_applied.sql';
 const hash = (file: string) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+const require = createRequire(import.meta.url);
 
 it('Supabase ៖ Reset រក្សា original CAS និង proof ដោយ atomic effects និង read-only recovery', () => {
     const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-reset-applied-pg-'));
     const driver = path.join(root, 'audit-tools/supabase-pickup-reset-applied-test.cjs');
     const migrationFile = path.join(root, 'supabase/migrations', migration);
     const codec = path.join(root, 'ZoeW/src/domain/pickup-reset-proof.ts');
-    const sourceFiles = [driver, codec, ...fs.readdirSync(path.join(root, 'supabase/migrations'))
-        .filter(name => /^\d{14}_[a-z0-9_]+\.sql$/.test(name)).sort().map(name => path.join(root, 'supabase/migrations', name)),
+    const migrations = fs.readdirSync(path.join(root, 'supabase/migrations')).filter(name => /^\d{14}_[a-z0-9_]+\.sql$/.test(name)).sort();
+    const entries = migrations.map(name => ({ name, sha256: hash(path.join(root, 'supabase/migrations', name)) }));
+    const manifest = { count: migrations.length, latest: migrations.at(-1), latestRules: migrations.filter(name => /_zoe_rules\.sql$/.test(name)).at(-1),
+        first62Hash: createHash('sha256').update(JSON.stringify(entries.slice(0, 62).map(entry => [entry.name, entry.sha256]))).digest('hex'), files: entries };
+    expect(manifest.first62Hash).toBe('c4f2eb06b4d6b0f43e9a23ae5d955445b7b01eca8d1838ed2ecf89a85c9a3aa2');
+    expect(migrations).toContain('20261109122019_zoe_rules.sql');
+    const sourceFiles = [driver, codec, ...migrations.map(name => path.join(root, 'supabase/migrations', name)),
         path.join(root, 'firebase-database.rules.json'), path.join(root, 'supabase/scripts/rtdb-rules.mjs'),
         path.join(root, 'supabase/scripts/rtdb-expression.cjs'), path.join(root, 'supabase/scripts/rtdb-canonical-key.cjs')];
     const before = sourceFiles.map(file => [file, hash(file)]);
@@ -80,12 +89,17 @@ it('Supabase ៖ Reset រក្សា original CAS និង proof ដោយ at
             expect(entry.activity.query).toMatch(/^\s*select public\.zoe_pickup_reset_execute_v1\(/);
         }
         expect(summary.codecEvidence.composition).toMatchObject({
-            nativeRules: '20261105010507_zoe_rules.sql', nativeEngine: 'UNRUN', canonicalGeneratedFresh: true, installedCanonicalEqual: true,
+            nativeRules: manifest.latestRules, nativeEngine: 'UNRUN', canonicalGeneratedFresh: true, installedCanonicalEqual: true,
             f03LegacyPolicyHash: '9dacfafd574466ed623c36eaf3b595b182abae648ded6428ef4f2bec5f343e33',
-            f09DailyPolicyHash: 'c3280874e9c28bb0b01a97b7c82d892c88ce434428fcc4b9142607e1087d2049'
+            guardProjection: { legacyPolicyHash: 'c3280874e9c28bb0b01a97b7c82d892c88ce434428fcc4b9142607e1087d2049',
+                projectedPolicyHash: 'c3280874e9c28bb0b01a97b7c82d892c88ce434428fcc4b9142607e1087d2049',
+                deltaHashesIncludeFoldHints: true, exactLegacyBranches: true, exactLegacyProjection: true, reviewedGuardPresent: true }
         });
-        expect(summary.codecEvidence.composition.migrationCount).toBe(62);
-        expect(summary.codecEvidence.composition.nativeRulesHash).toBe(hash(path.join(root, 'supabase/migrations', '20261105010507_zoe_rules.sql')));
+        expect(summary.codecEvidence.composition.migrationManifest).toEqual(manifest);
+        expect(summary.codecEvidence.composition.migrationCount).toBe(manifest.count);
+        expect(summary.codecEvidence.composition.nativeRulesHash).toBe(hash(path.join(root, 'supabase/migrations', manifest.latestRules!)));
+        expect(summary.codecEvidence.composition.f09DailyPolicyHash).toMatch(/^[a-f0-9]{64}$/);
+        expect(summary.codecEvidence.composition.f09DailyPolicyHash).not.toBe(summary.codecEvidence.composition.guardProjection.legacyPolicyHash);
         expect(summary.codecEvidence.sourceHash).toBe(hash(codec));
         expect(summary.codecEvidence.vectors).toHaveLength(3);
         expect(summary.codecEvidence.vectors.map((entry: { name: string; goldenId: string; goldenSQLHash: string; casTextHash: string }) => ({
@@ -122,3 +136,43 @@ it('Supabase ៖ Reset រក្សា original CAS និង proof ដោយ at
         else console.error('F09 SQL evidence retained at ' + scratch);
     }
 }, 110000);
+
+it('F09 projection រក្សា old AST និង hash ដោយដកតែ reviewed restoreGuard delta', () => {
+    const source = fs.readFileSync(path.join(root, 'audit-tools/supabase-pickup-reset-applied-test.cjs'), 'utf8');
+    const ast = require('acorn').parse(source, { ecmaVersion: 'latest' }) as { body: { type: string; id?: { name: string }; start: number; end: number }[] };
+    const helpers = ['f09PolicyHash', 'f09PolicyProjection'].map(name => {
+        const node = ast.body.find(entry => entry.type === 'FunctionDeclaration' && entry.id?.name === name);
+        if (!node) throw new Error('missing actual driver helper ' + name);
+        return source.slice(node.start, node.end);
+    }).join('\n');
+    const { f09PolicyHash, f09PolicyProjection } = runInNewContext(helpers + '\n({ f09PolicyHash, f09PolicyProjection });', {
+        sha: (value: string) => createHash('sha256').update(value).digest('hex'),
+        clone: (value: unknown) => JSON.parse(JSON.stringify(value)), isDeepStrictEqual
+    });
+    const rules = (name: string) => JSON.parse(fs.readFileSync(path.join(root, 'supabase/migrations', name), 'utf8').split('$zoe_rules_json$')[1]).c.zoew_daily_pickup_cod_dod;
+    const legacy = rules('20261105010507_zoe_rules.sql'), current = rules('20261109122019_zoe_rules.sql');
+    const before = JSON.stringify(current);
+    expect(f09PolicyProjection(current, legacy)).toMatchObject({ exactLegacyBranches: true, exactLegacyProjection: true, reviewedGuardPresent: true,
+        projectedPolicyHash: 'c3280874e9c28bb0b01a97b7c82d892c88ce434428fcc4b9142607e1087d2049' });
+    expect(JSON.stringify(current)).toBe(before);
+    const mutations = [
+        (value: typeof current) => { value.x.r.v.l = { t: 'l', v: true }; },
+        (value: typeof current) => { value.x.r.c.pickedUpBarcodes.x.r.v.l = { t: 'l', v: true }; },
+        (value: typeof current) => { value.x.r.w = { t: 'l', v: true }; },
+        (value: typeof current) => { value.x.r.c.f = { v: { t: 'l', v: true } }; },
+        (value: typeof current) => { value.x.r.v.r.r = { t: 'l', v: true }; },
+        (value: typeof current) => { value.x.r.v.r.l.e.o.f = { b: 'R', l: ['unexpected_fold_path'] }; },
+        (value: typeof current) => { value.x.r.c.pickedUpBarcodes.x.r.v.r.l = { t: 'l', v: true }; },
+        (value: typeof current) => { value.x.r.c.restoreGuard.c.f = { v: { t: 'l', v: true } }; },
+        (value: typeof current) => { delete value.x.r.c.restoreGuard; },
+        (value: typeof current) => { value.x.r.c.packagesPickedUp.v = { t: 'l', v: true }; }
+    ];
+    for (const mutate of mutations) {
+        const changed = JSON.parse(before); mutate(changed);
+        expect(() => f09PolicyProjection(changed, legacy)).toThrow(/F09/);
+    }
+    const changedLegacy = JSON.parse(JSON.stringify(legacy)), changedCurrent = JSON.parse(before);
+    for (const value of [changedLegacy, changedCurrent]) value.x.r.c.f = { v: { t: 'l', v: true } };
+    expect(f09PolicyHash(changedLegacy)).not.toBe(f09PolicyHash(legacy));
+    expect(() => f09PolicyProjection(changedCurrent, changedLegacy)).toThrow(/immutable legacy policy hash/);
+});

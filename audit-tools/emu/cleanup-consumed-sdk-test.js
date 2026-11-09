@@ -58,7 +58,7 @@ const bounded = (promise, label) => Promise.race([promise, pause(12000).then(() 
     Object.defineProperty(globalThis, 'crypto', { value: require('crypto').webcrypto, configurable: true });
     globalThis.ZoeErrors = window.ZoeErrors = { capture: (error, detail) => console.log('fixture captured', error?.message, detail?.context) };
     const built = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-trash-generation-sdk-')), 'source.cjs');
-    buildSync({ absWorkingDir: ROOT, stdin: { contents: `export { capturePickupContext } from './ZoeW/src/domain/pickup';
+    buildSync({ absWorkingDir: ROOT, stdin: { contents: `export { capturePickupContext, readPickupJournal, resumePickupIntents } from './ZoeW/src/domain/pickup';
 export { addOrUpdateEntry } from './ZoeW/src/features/scan-action';
 export { removeSingleBarcode } from './ZoeW/src/features/barcode-ops';
 export { deleteSingleItem } from './ZoeW/src/features/entry-ops';
@@ -70,7 +70,7 @@ export { liveShopScope } from './ZoeW/src/core/shop-scope';
 export { firebaseState, dataState, uiState, ztoState } from './ZoeW/src/core/state';`, resolveDir: ROOT }, bundle: true, platform: 'node', format: 'cjs', outfile: built, logLevel: 'error', define: { 'import.meta.env': '{}' } });
     const api = require(built);
     const bundleHash = require('crypto').createHash('sha256').update(fs.readFileSync(built)).digest('hex');
-    for (const warmFinalization of [true, false]) for (const scenario of ['exact', 'different-target', 'missing', 'old-generation']) {
+    for (const warmFinalization of [true, false]) for (const scenario of ['exact', 'different-target', 'missing', 'old-generation', 'cold-pickup']) {
         localStorage.clear(); sessionStorage.clear(); api.firebaseState.authGeneration++;
         const ns = 'demo-trash-generation-' + process.pid + '-' + scenario + '-' + warmFinalization;
         const endpoint = 'http://127.0.0.1:' + port + '/?ns=' + ns;
@@ -88,14 +88,22 @@ export { firebaseState, dataState, uiState, ztoState } from './ZoeW/src/core/sta
         const token = createMockUserToken({ sub: uid, user_id: uid }, 'demo-trash-generation');
         const auth = { app, currentUser: { uid, getIdToken: async () => token } };
         let gate = null;
+        const pickupCallbacks = [];
         const raw = { ...database, getAuth: () => auth, getDatabase: () => db, deleteApp,
             runTransaction: async (ref, updater, options) => {
                 if (gate && !gate.used && String(ref).includes('/' + P + '/')) {
                     gate.used = true; gate.entered(); await gate.wait;
-                    const result = await database.runTransaction(ref, updater, options);
+                    gate.revisions = [];
+                    const result = await database.runTransaction(ref, current => {
+                        gate.revisions.push(current?.pickupRevision ?? null);
+                        return updater(current);
+                    }, options);
                     gate.outcome = result.committed; return result;
                 }
-                const result = await database.runTransaction(ref, updater, options);
+                const result = await database.runTransaction(ref, current => {
+                    if (String(ref).includes('/' + P + '/')) pickupCallbacks.push(current?.pickupRevision ?? null);
+                    return updater(current);
+                }, options);
                 return result;
             } };
         const sdk = api.withTransactionOutcomeResolution(raw); sdk.getAuth(app); sdk.getDatabase(app);
@@ -109,11 +117,16 @@ export { firebaseState, dataState, uiState, ztoState } from './ZoeW/src/core/sta
         const mapping = { dbRefHistory: H, dbRefDeleted: T, dbRefDailyRevenue: D, dbRefMonthlyRevenue: M,
             dbRefDailyPickup: 'zoew_daily_pickup_cod_dod', dbRefDailyCollected: 'zoew_daily_collected_cod_dod' };
         for (const [field, node] of Object.entries(mapping)) api.firebaseState[field] = sdk.ref(db, node);
-        const unsubscribers = [];
+        const unsubscribers = [], pickupUnsubscribers = [];
         await Promise.all([...(warmFinalization ? [['zoew_restore_finalizations', 'fixtureFinalizations', false]] : []), [H, 'scanHistory', true], [T, 'deletedItems', true], [D, 'dailyRevenueData', false], [M, 'monthlyRevenueData', false]].map(([node, field, list]) => new Promise((resolve, reject) => {
             let first = true;
             unsubscribers.push(database.onValue(database.ref(db, node), snapshot => { api.dataState[field] = list ? Object.values(snapshot.val() || {}) : snapshot.val() || {}; if (first) { first = false; resolve(); } }, reject));
         })));
+        const attachPickupListeners = () => Promise.all([[P, 'dailyPickupData'], [C, 'dailyCollectedData']].map(([node, field]) => new Promise((resolve, reject) => {
+            let first = true;
+            pickupUnsubscribers.push(database.onValue(database.ref(db, node), snapshot => { api.dataState[field] = snapshot.val() || {}; if (first) { first = false; resolve(); } }, reject));
+        })));
+        if (scenario !== 'cold-pickup') await attachPickupListeners();
         const birth = Date.now() - 3600000;
         const barcode = { code, cod: 5, dod: 0, createdAt: birth, isClosed: true, closedAt: birth + 1000 };
         const sibling = { code: 'GENSDK000002', cod: 5, dod: 0, createdAt: birth, isClosed: false };
@@ -138,13 +151,32 @@ export { firebaseState, dataState, uiState, ztoState } from './ZoeW/src/core/sta
             await owner(H + '/restore_peer', 'PUT', { ...old, id: 'restore_peer', barcode: 'PEER70002', barcodes: [{ ...sibling, code: 'PEER70002' }] });
             await pause(50);
         }
+        pickupCallbacks.length = 0;
         api.uiState.pendingRestoreId = trashId; await bounded(api.executeRestoreItem(), 'public Restore');
         let server = await owner();
+        if (scenario === 'cold-pickup') {
+            assert.ok(pickupCallbacks.includes(null), 'actual cold SDK callback cannot establish the original pickup revision');
+            const heldPickup = api.readPickupJournal(); assert.equal(heldPickup.length, 1);
+            assert.equal(heldPickup[0].protocol, 3); assert.equal(heldPickup[0].hold, 'version-conflict');
+            assert.deepEqual(heldPickup[0].restorePlan.finalization, server.zoew_restore_finalizations[trashId]);
+            assert.deepEqual(heldPickup[0].restorePlan.consumption, server[G][trashId]);
+            const retainedConsumption = copy(server[G][trashId]);
+            assert.equal(server[P][day].pickupRevision, 1); assert.equal(server[P][day].packagesPickedUp, 1);
+            await attachPickupListeners();
+            await bounded(api.resumePickupIntents(), 'cold SDK pickup recovery');
+            server = await owner();
+            assert.deepEqual(server[G][trashId], retainedConsumption);
+            assert.equal(api.readPickupJournal().length, 0);
+        }
         for (let n = 0; n < 100 && server.zoew_restore_finalizations?.[trashId]; n++) { await pause(20); server = await owner(); }
         const receipt = server[G][trashId];
         assert.equal(receipt.kind, 'restore'); assert.equal(receipt.generation, 1);
         assert.equal(server[T]?.[trashId] ?? null, null);
         assert.equal(server.zoew_restore_finalizations?.[trashId] ?? null, null);
+        assert.equal(server[P][day].pickupRevision, 2); assert.equal(server[P][day].pickupResetEpoch, 0);
+        assert.equal(server[P][day].restoreGuard.sourceId, trashId);
+        assert.equal(server[P][day].restoreGuard.token, receipt.token);
+        assert.equal(server[P][day].restoreGuard.targetId, receipt.targetId);
         const money = [copy(server[D]), copy(server[M])];
         assert.equal(server[P][day].packagesPickedUp, 1);
         if (scenario === 'missing') await owner(G + '/' + trashId, 'DELETE');
@@ -157,6 +189,7 @@ export { firebaseState, dataState, uiState, ztoState } from './ZoeW/src/core/sta
         const held = gate; release();
         for (let n = 0; n < 100 && held.outcome === undefined; n++) await pause(20);
         assert.equal(held.outcome, false, 'actual SDK refuses obsolete pickup revision against server-synchronized state');
+        assert.ok(held.revisions.includes(2), 'the actual delayed updater observes the committed Restore revision');
         gate = null;
         for (let n = 0; n < 100 && api.cleanupJournalLive.has(trashId); n++) await pause(20);
         await bounded(api.resumeCleanupJournalEntry(trashId), 'collected consumed recovery');
@@ -173,10 +206,11 @@ export { firebaseState, dataState, uiState, ztoState } from './ZoeW/src/core/sta
         await bounded(api.resumeCleanupJournalEntry(trashId), 'repeat recovery');
         assert.equal(JSON.stringify(api.readCleanupJournal()), journalBytes);
         assert.deepEqual(await owner(), server);
-        results.push({ scenario, warmFinalization, actualOldPickupCommitted: held.outcome, targetId: receipt.targetId, pickup: server[P][day].packagesPickedUp, dailyMoney: server[D][day].codDollar, monthlyMoney: server[M][month].codDollar, collectedPresent: true, journalHeld: expectedHeld, repeatedResumeUnchanged: true });
-        for (const unsubscribe of unsubscribers) unsubscribe(); await sdk.deleteApp(app); api.firebaseState.authGeneration++; await owner('', 'DELETE');
+        results.push({ scenario, warmFinalization, actualOldPickupCommitted: held.outcome, actualOldPickupRevision: held.revisions, coldPickupHoldRecovered: scenario === 'cold-pickup', targetId: receipt.targetId, pickup: server[P][day].packagesPickedUp, dailyMoney: server[D][day].codDollar, monthlyMoney: server[M][month].codDollar, collectedPresent: true, journalHeld: expectedHeld, repeatedResumeUnchanged: true });
+        for (const unsubscribe of [...unsubscribers, ...pickupUnsubscribers]) unsubscribe(); await sdk.deleteApp(app); api.firebaseState.authGeneration++; await owner('', 'DELETE');
     }
-    assert.equal(results.length, 8);
+    assert.equal(results.filter(result => result.scenario !== 'cold-pickup').length, 8);
+    assert.equal(results.filter(result => result.scenario === 'cold-pickup').length, 2);
     console.log(JSON.stringify({ actualSdkAndCanonicalRtdb: true, sourceBundleHash: bundleHash, delayedOriginalPickupSubmission: true, warmAndColdFinalization: true, sourceHashes: Object.fromEntries(['ZoeW/src/domain/cleanup.ts', 'ZoeW/src/features/restore.ts', 'firebase-database.rules.json'].map(file => [file, require('crypto').createHash('sha256').update(fs.readFileSync(path.join(ROOT, file))).digest('hex')])), cases: results }, null, 2));
     await window.happyDOM.close();
     console.log('cleanup consumed SDK: ' + results.length + ' PASS, 0 FAIL');

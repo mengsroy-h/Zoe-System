@@ -32,7 +32,7 @@ const APPS = [
 
 function buildContext(app) {
     const clock = { now: 0, seq: 0, timers: [] };
-    const log = { toasts: [], signOuts: 0, gets: [], loginModalShown: 0, dbInit: 0, alerts: [], rest: [] };
+    const log = { toasts: [], signIns: [], signOuts: 0, gets: [], loginModalShown: 0, dbInit: 0, alerts: [], rest: [] };
     let configJson = '{"apiKey":"k","databaseURL":"https://demo-default-rtdb.firebaseio.com/"}';
 
     function fakeFetch(url, opts) {
@@ -61,7 +61,7 @@ function buildContext(app) {
     // inside firebase@12.19.0, which these apps load from gstatic):
     //   const currentUid = this.currentUser?.uid ?? null;
     //   if (this.lastNotifiedUid !== currentUid) { ...authStateSubscription.next(...) }
-    const auth = { currentUser: null, lastNotifiedUid: undefined, listeners: [] };
+    const auth = { app: { options: JSON.parse(configJson) }, currentUser: null, lastNotifiedUid: undefined, listeners: [] };
     function notifyAuthListeners() {
         const currentUid = auth.currentUser ? auth.currentUser.uid : null;
         if (auth.lastNotifiedUid !== currentUid) {
@@ -81,6 +81,7 @@ function buildContext(app) {
     const fb = {
         onAuthStateChanged(a, cb) { a.listeners.push(cb); cb(a.currentUser); return () => {}; },
         signInWithEmailAndPassword(a, email) {
+            log.signIns.push({ auth: a, email });
             a.currentUser = makeUser(email);
             notifyAuthListeners();
             return Promise.resolve({ user: a.currentUser });
@@ -156,6 +157,9 @@ function buildContext(app) {
 
     const preamble = `
         var authGeneration = 0;
+        var keygenLoginOwner = null;
+        var isInitializingFirebase = false;
+        var firebaseSdkUnavailable = false;
         var pendingRoleRecheck = false;
         var lastRoleRestOutcome = '';
         var isDatabaseConnected = true;
@@ -189,7 +193,6 @@ function buildContext(app) {
         function openModal(id) { if (id === 'loginModal') __log.loginModalShown++; }
         function updateSigningKeyBadge() {}
         function requestSessionSigningKeyRestoreIfEligible() {}
-        function enforceSessionOnlyAuthPersistence() { return Promise.resolve(); }
         function waitForFirebaseSDK() { return Promise.resolve(fb); }
         var currentUserEmail = null;
         var cameraStoppedByVisibility = false;
@@ -211,8 +214,11 @@ function buildContext(app) {
     vm.runInContext(preamble, ctx);
     const wanted = ['withTimeout', 'readDatabaseUrlFromConfig', 'readUserRoleViaRest', 'readUserRole',
         'connectionLooksOnline', 'liveToastState', 'showLiveToast',
-        'retryPendingRoleCheck', app.verify, app.login];
+        'retryPendingRoleCheck', 'enforceSessionOnlyAuthPersistence', 'keygenLoginBackendIsReady', app.verify, app.login];
     const appSrc = fs.readFileSync(path.join(appRoot, app.file), 'utf8');
+    const configKeys = appSrc.match(/^const FIREBASE_CONFIG_KEYS = .*;$/m);
+    if (!configKeys) throw new Error('not found: FIREBASE_CONFIG_KEYS in ' + app.file);
+    vm.runInContext(configKeys[0], ctx);
     if (appSrc.indexOf('function isFirebaseDatabaseHost(') !== -1) {
         wanted.splice(2, 0, 'isFirebaseDatabaseHost');
     }
@@ -481,6 +487,32 @@ async function run(app) {
     } else {
         ok('ហើយមិនបើក listener ស្ទួនទេ', h.log.dbInit === 1, h.log.dbInit);
     }
+
+    console.log('-- ១៣. Login ទទួលតែ Auth ដែលភ្ជាប់ Config រួចរាល់ --');
+    for (const condition of ['initializing', 'sdk-unavailable', 'config-mismatch']) {
+        h = buildContext(app);
+        h.ctx.document.getElementById('loginEmailInput').value = 'a@x.com';
+        h.ctx.document.getElementById('loginPasswordInput').value = 'synthetic-password';
+        if (condition === 'initializing') vm.runInContext('isInitializingFirebase = true;', h.ctx);
+        if (condition === 'sdk-unavailable') vm.runInContext('firebaseSdkUnavailable = true;', h.ctx);
+        if (condition === 'config-mismatch') h.setConfig('{"apiKey":"other-key","databaseURL":"https://other-default-rtdb.firebaseio.com/"}');
+        await vm.runInContext(app.login + '();', h.ctx);
+        await drain();
+        ok(condition + ' ៖ មិនផ្ញើ credentials ឬត្រួតពិនិត្យ role', h.log.signIns.length === 0 && h.log.gets.length === 0,
+            { signIns: h.log.signIns.length, roles: h.log.gets.length });
+        ok(condition + ' ៖ រក្សា password សម្រាប់សាកម្ដងទៀត', h.els.loginPasswordInput.value === 'synthetic-password');
+        ok(condition + ' ៖ បង្ហាញថាការភ្ជាប់មិនទាន់រួច', h.log.toasts.some((text) => text.indexOf('មិនទាន់រួចរាល់') !== -1), h.log.toasts);
+    }
+    h = buildContext(app);
+    h.ctx.document.getElementById('loginEmailInput').value = 'a@x.com';
+    h.ctx.document.getElementById('loginPasswordInput').value = 'synthetic-password';
+    await vm.runInContext(app.login + '();', h.ctx);
+    await drain();
+    ok('Auth និង Config ត្រូវគ្នា ៖ ចូលដោយ Auth ដើម និងត្រួតពិនិត្យ role', h.log.signIns.length === 1
+        && h.log.signIns[0].auth === h.auth && h.log.gets.length === 1);
+    h.log.gets[0].resolve({ val: () => app.role });
+    await drain();
+    ok('Auth និង Config ត្រូវគ្នា ៖ ចូលបាន ហើយលុប password', h.log.dbInit === 1 && h.els.loginPasswordInput.value === '');
 }
 
 (async () => {

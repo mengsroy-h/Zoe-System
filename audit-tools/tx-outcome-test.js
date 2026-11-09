@@ -74,7 +74,7 @@ const APP_FNS = ['appZoneParts', 'getZoneDateKey', 'getFormattedDate', 'elapsedS
     'recalcItemMoneyFromBarcodes', 'armLateCommit', 'notifyIfSlow', 'settleLockWithin',
     'ledgerNumber', 'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'alignMonthlyLedgerToDaily', 'correctRevenueLedgerToActual',
     'ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'revertLedgerRecordInMemory', 'ledgerMemoryCompensationClaimed',
-    'applyLedgerBucketDelta', 'commitRevenueBucketDelta', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
+    'applyLedgerBucketDelta', 'commitRevenueBucketDelta', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'captureLedgerSession', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
     'addRevenueToDailyAndMonthlyRecord', 'revertRevenueLedgerDelta', 'restoreClaimedItemToScanHistory', 'runLedgerTransaction',
     'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged', 'ledgerDeltaIntent', 'ledgerDeltaCompanion', 'ledgerCompanionState',
     'noteCleanupJournalEntry', 'markCleanupJournalStage', 'clearCleanupJournalEntry',

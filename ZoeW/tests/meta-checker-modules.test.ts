@@ -107,11 +107,11 @@ describe('meta-checker៖ ម៉ូឌុល .mjs មិនរអិលចេញ
         } finally { fs.rmSync(empty, { recursive: true, force: true }); }
     });
 
-    it('ពុល .mjs ក្រោយការអះអាងពិត៖ 34 តេស្តបញ្ចប់ ហើយ exit មិនសូន្យ', () => {
+    it('ពុល .mjs ក្រោយការអះអាងពិត៖ 68 តេស្តបញ្ចប់ ហើយ exit មិនសូន្យ', () => {
         const baseline = execute(modulePath);
         expect(baseline.code).toBe(0);
-        expect(baseline.output).toMatch(/^# tests 34$/m);
-        expect(baseline.output).toMatch(/^# pass 34$/m);
+        expect(baseline.output).toMatch(/^# tests 68$/m);
+        expect(baseline.output).toMatch(/^# pass 68$/m);
         expect(baseline.output).toMatch(/^# fail 0$/m);
         const poisoned = poison(moduleSource);
         expect(poisoned).not.toBeNull();
@@ -121,9 +121,9 @@ describe('meta-checker៖ ម៉ូឌុល .mjs មិនរអិលចេញ
             const result = execute(shadow);
             expect(result.code).toBe(1);
             expect(result.output).toContain('ZOE_EXITCODE_POISON_REACHED');
-            expect(result.output).toMatch(/^# tests 34$/m);
+            expect(result.output).toMatch(/^# tests 68$/m);
             expect(result.output).toMatch(/^# pass 0$/m);
-            expect(result.output).toMatch(/^# fail 34$/m);
+            expect(result.output).toMatch(/^# fail 68$/m);
             expect(result.output).toMatch(/^# cancelled 0$/m);
             expect(result.output).not.toMatch(/SyntaxError|ReferenceError|ERR_MODULE_NOT_FOUND/);
         } finally {

@@ -2061,6 +2061,10 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 | CI លើ commit preview ថ្មី | អាន SHA និងលទ្ធផល workflow ទាំង ៣ / jobs ទាំង ១០ តាម PR400 និងរបាយការណ៍បន្ថែម; CI របស់ `61db3ff2` មិនគ្របការកែនេះ |
 | Production deploy | Hosting readback បញ្ជាក់ published deploy IDs និង commit នៅ `851cbab9216e17cea7f9334c34ee49efd328a2da`; មិនបាន publish client ថ្មីទៅ production |
 
+**Hosted preview លើ `a22cde85`**៖ deploy ទាំង ២ READY លើ commit នេះ; Browser ៤ fresh contexts / ៧៤ checks PASS រួម PIN UI, automatic/manual trusted time, Service Worker, offline rejection និង online recovery។ HTTP clock ១៤ cases និង assets ៨ ឆ្លង; script bytes ដូច source, runtime Node24/API2។ គ្មាន Login/Activate ឬ business-data writes ក្នុងការសាកនេះ។
+
+**CI ដំបូងលើ `a22cde85`**៖ ៨ jobs ជោគជ័យ / ២ បរាជ័យ។ Audit shard ៣ ធ្លាក់តែ `meta-checker-modules.test.ts` ដែលនៅរំពឹង TAP count ៣៤ ទោះ checker ពិតឆ្លង ៦៨; Vitest half នោះមាន ៥០៣១ PASS / ១ FAIL។ កែចំនួនរំពឹង និង poison control ទៅ ៦៨ ដោយរក្សា exit code, PASS ០, FAIL ៦៨ និង cancelled ០; គ្មានការបន្ធូរលក្ខខណ្ឌ។ F03 JVM512 លំដាប់ `251,249,250` ឆ្លង controlled atomic ទាំង ៣ ប៉ុន្តែ case `postgc-absent` លើសពិដាន ១៥ វិនាទី៖ ACK មកដល់ 15310.681ms ក្រោយ public start។ Readback ផ្ទៀង effects ទាំង ៧៦៣ និង receipt, cleanup រួច; កំណត់ត្រារក្សា FAIL/incomplete (៣៦ entries PASS / ១ FAIL / ៥៥ UNRUN)។ Source hashes ទាំង ៧៥ និង driver ដូច `61db3ff2`; មាន full GC ប៉ុន្តែមិនអះអាងថាជាមូលហេតុ ដោយខ្វះ UTC anchor របស់ case។ មិនកែ heap ឬ timeout; លទ្ធផល CI លើ commit បន្ទាប់ត្រូវអានពីភស្តុតាងថ្មី មិនជំនួស failed attempt នេះ។
+
 **ភស្តុតាង**៖ `/tmp/zoe-preview-fix/20261110/` រក្សា hosting/browser diagnostics និង `clock/`; version/docs lane នៅ `docs/`។ កំណត់ត្រានេះមិនផ្ទុក token ឬ credentials។ ការផ្ទៀង preview shell និង clock មិនជំនួស physical iPhone/Android, hosted capacity ឬ real ZTO mutation coverage។
 
 ### 2026-11-09 — Audit 1241៖ Launch audit, ម្ចាស់ប្រតិបត្តិការ និងការវាស់បន្ទុក

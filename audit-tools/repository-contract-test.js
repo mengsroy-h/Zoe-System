@@ -1003,12 +1003,16 @@ scenario('audit៖ scale តាមសំណើដោយដៃ មិនកាត
     const block = (step.match(/^        run: \|\r?\n([\s\S]*)/m) || [])[1];
     const script = block ? block.split('\n').map((line) => line.replace(/^          /, '')).join('\n')
         : ((step.match(/^        run: (.+)$/m) || [])[1] || 'exit 91');
-    const invoke = (event, scale) => cp.spawnSync('bash', ['-e', '-o', 'pipefail', '-c',
+    const invoke = (event, scale) => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-audit-scale-'));
+        try { return cp.spawnSync('bash', ['-e', '-o', 'pipefail', '-c',
         'bash() { printf \'%s|%s|%s|%s\\n\' "$RUNALL_ONLY" "$RUNALL_SHARD" "$SBMONEY_SHOPS" "$SBMONEY_DEVICES"; }\n' + script], {
         cwd: ROOT, encoding: 'utf8', timeout: 10000,
         env: { ...process.env, RUNALL_ONLY: '', RUNALL_SHARD: '1/4', SBMONEY_SHOPS: '', SBMONEY_DEVICES: '',
+            AUDIT_LOG: path.join(dir, 'audit.log'),
             ZOE_MULTISHOP_SCALE: String(evaluate(mode, event, scale) || false) }
-    });
+        }); } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+    };
     const scaled = invoke('workflow_dispatch', true), regular = invoke('pull_request', false), ignored = invoke('push', true);
     check('scale រត់ checker ពិត៨ហាង×៣devices ដោយគ្មាន shard filter', scaled.status === 0
         && scaled.stdout.trim() === 'supabase-money-multishop-test||8|3', scaled.stdout + scaled.stderr);
@@ -1037,55 +1041,67 @@ scenario('workers Vitest៖ zoew-suite ផ្ញើ CLI flag ពិត និង
         for (const dir of ['src', 'node_modules/vite', 'node_modules/typescript']) fs.mkdirSync(path.join(app, dir), { recursive: true });
         fs.writeFileSync(path.join(app, 'src/main.tsx'), '');
         fs.writeFileSync(path.join(app, 'package.json'), JSON.stringify(json('ZoeW/package.json')));
-        const invoke = (workers, reportMode = 'passed') => {
-            const calls = [], logs = [], reports = [], env = { ZOEWSUITE_APP_DIR: temp };
-            if (workers !== undefined) env.ZOEWSUITE_TEST_WORKERS = workers;
-            const processFake = { env, argv: ['node', 'zoew-suite-test.js'], exitCode: 1 };
-            const requireReal = createRequire(path.join(ROOT, 'audit-tools/zoew-suite-test.js'));
-            vm.runInNewContext(read('audit-tools/zoew-suite-test.js'), {
-                __dirname: path.join(ROOT, 'audit-tools'), process: processFake, console: { log: (line) => logs.push(line) },
-                require: (name) => name === 'child_process' ? { spawnSync: (command, args) => {
-                    calls.push({ command, args: Array.from(args) });
-                    if (args[2] === 'test') {
-                        const option = args.find((arg) => arg.startsWith('--outputFile.json='));
-                        if (option && reportMode !== 'missing') {
-                            const output = option.slice('--outputFile.json='.length); reports.push(output);
-                            const skipped = reportMode === 'skipped' || reportMode === 'unfinished';
-                            const empty = reportMode === 'empty';
-                            const report = {
-                                success: true, startTime: Date.now(), numTotalTests: empty ? 0 : 1,
-                                numPassedTests: empty || skipped ? 0 : 1, numFailedTests: 0,
-                                numPendingTests: skipped ? 1 : 0, numTodoTests: 0,
-                                testResults: empty ? [] : [{ status: 'passed', assertionResults: [{ status: skipped ? 'skipped' : 'passed' }] }]
-                            };
-                            if (reportMode === 'stale') report.startTime = 1;
-                            if (reportMode === 'unfinished') report.testResults[0].assertionResults[0].status = 'pending';
-                            if (reportMode === 'wrong-count') report.numTotalTests = 2;
-                            if (reportMode === 'failed') { report.success = false; report.numFailedTests = 1; }
-                            fs.writeFileSync(output, reportMode === 'malformed' ? '{' : JSON.stringify(report));
-                        }
-                    }
-                    return { status: 0, stdout: '', stderr: '' };
-                } } : requireReal(name)
-            });
-            return { calls, code: processFake.exitCode, logs: logs.join("\n"), reports };
+        const bin = path.join(temp, 'bin'), callLog = path.join(temp, 'calls.jsonl');
+        fs.mkdirSync(bin);
+        fs.writeFileSync(path.join(bin, 'npm'), '#!' + process.execPath + '\n' + `
+const fs = require('fs');
+const args = process.argv.slice(2), mode = process.env.ZOE_SUITE_FIXTURE_MODE;
+fs.appendFileSync(process.env.ZOE_SUITE_FIXTURE_CALLS, JSON.stringify({ command: 'npm', args }) + '\\n');
+if (args[2] === 'test') {
+    const option = args.find(arg => arg.startsWith('--outputFile.json='));
+    if (option && mode !== 'missing') {
+        const skipped = mode === 'skipped' || mode === 'unfinished', empty = mode === 'empty';
+        const report = {
+            success: true, startTime: Date.now(), numTotalTests: empty ? 0 : 1,
+            numPassedTests: empty || skipped ? 0 : 1, numFailedTests: 0,
+            numPendingTests: skipped ? 1 : 0, numTodoTests: 0,
+            testResults: empty ? [] : [{ status: 'passed', assertionResults: [{ status: skipped ? 'skipped' : 'passed' }] }]
         };
+        if (mode === 'stale') report.startTime = 1;
+        if (mode === 'unfinished') report.testResults[0].assertionResults[0].status = 'pending';
+        if (mode === 'wrong-count') report.numTotalTests = 2;
+        if (mode === 'failed') { report.success = false; report.numFailedTests = 1; }
+        fs.writeFileSync(option.slice('--outputFile.json='.length), mode === 'malformed' ? '{' : JSON.stringify(report));
+    }
+}
+`, { mode: 0o755 });
+        const invoke = (workers, reportMode = 'passed') => {
+            fs.writeFileSync(callLog, '');
+            const env = { ...process.env, ZOEWSUITE_APP_DIR: temp, PATH: bin + path.delimiter + process.env.PATH,
+                ZOE_SUITE_FIXTURE_MODE: reportMode, ZOE_SUITE_FIXTURE_CALLS: callLog };
+            delete env.ZOEWSUITE_TEST_WORKERS;
+            if (workers !== undefined) env.ZOEWSUITE_TEST_WORKERS = workers;
+            const result = cp.spawnSync(process.execPath, [path.join(ROOT, 'audit-tools/zoew-suite-test.js')],
+                { env, encoding: 'utf8', timeout: 20000 });
+            const calls = fs.readFileSync(callLog, 'utf8').trim().split('\n').filter(Boolean).map(line => JSON.parse(line));
+            const reports = calls.flatMap(call => call.args.filter(arg => arg.startsWith('--outputFile.json='))
+                .map(arg => arg.slice('--outputFile.json='.length)));
+            return { calls, code: result.status, logs: result.stdout + result.stderr, reports,
+                error: result.error, signal: result.signal };
+        };
+        const expectedSteps = ['typecheck', 'lint', 'slot:check', 'purity:check', 'test', 'doc:check', 'android:check',
+            'build:only', 'notice:check', 'sw:check', 'smoke', 'native:check', 'rules:check'];
         const capped = invoke('2'), automatic = invoke('auto'), missing = invoke(undefined);
-        const rawTestArgs = (result) => (result.calls.find((call) => call.command === 'npm' && call.args[2] === 'test') || {}).args;
+        const rawTestArgs = (result) => (result.calls.find((call) => call.command === 'npm' && call.args[2] === 'test') || { args: [] }).args;
         const testArgs = (result) => {
             const args = rawTestArgs(result).filter((arg) => !arg.startsWith('--reporter=') && !arg.startsWith('--outputFile.json='));
             if (args[args.length - 1] === '--') args.pop();
             return args;
         };
-        check('Vitest ទទួល --maxWorkers=2 តែ test step', capped.code === 0 && capped.calls.length >= 10
+        check('Vitest ទទួល --maxWorkers=2 តែ test step', capped.code === 0 && !capped.error && !capped.signal
+            && same(capped.calls.map(call => call.args[2]), expectedSteps)
             && same(testArgs(capped), ['run', '-s', 'test', '--', '--maxWorkers=2'])
             && capped.calls.filter((call) => call.args[2] !== 'test').every((call) => call.args.length === 3));
-        check('auto/មិនកំណត់ នៅប្រើ Vitest defaults ដើម', automatic.code === 0 && missing.code === 0
-            && same(testArgs(automatic), ['run', '-s', 'test']) && same(testArgs(missing), ['run', '-s', 'test']));
-        check('worker value ខុស មិនបៃតងដោយស្ងាត់', invoke('0').code !== 0 && invoke('lots').code !== 0);
+        check('auto/មិនកំណត់ ផ្ញើ worker budget ដែលបានគណនាច្បាស់ទៅ Vitest', automatic.code === 0 && missing.code === 0
+            && /^--maxWorkers=[1-8]$/.test(testArgs(automatic).at(-1))
+            && same(testArgs(automatic).slice(0, -1), ['run', '-s', 'test', '--'])
+            && same(testArgs(automatic), testArgs(missing)));
+        check('worker value ខុស មិនបៃតងដោយស្ងាត់ និងមិនបើក child', ['0', 'lots'].every(value => {
+            const result = invoke(value); return result.code === 1 && !result.error && !result.signal && result.calls.length === 0;
+        }));
         for (const mode of ['missing', 'empty', 'malformed', 'wrong-count', 'failed', 'stale', 'unfinished']) {
             const result = invoke('2', mode);
-            check('Vitest exit 0 + report ' + mode + ' មិនមែន PASS', result.code !== 0, result.logs);
+            check('Vitest exit 0 + report ' + mode + ' មិនមែន PASS', result.code === 1 && !result.error && !result.signal && same(result.calls.map(call => call.args[2]), expectedSteps), result.logs);
         }
         const skipped = invoke('2', 'skipped');
         check('Vitest រំលងទាំងអស់ រាយ SKIP ជំនួស PASS', /^SKIP /m.test(skipped.logs), skipped.logs);
@@ -1139,7 +1155,7 @@ function auditCacheWiring(audit, compose, preparation, runner, owner) {
     const workflow = active(audit), shell = active(preparation), runall = active(runner);
     const command = mode => new RegExp('^\\s*(?:run:\\s*)?bash tools/actions-runners/prepare-audit-cache\\.sh ' + mode + '(?:\\s+#.*)?\\s*$', 'm').exec(workflow);
     const init = command('init'), chromium = command('chromium'), database = command('database');
-    const download = /^\s*PW_VERSION=/m.exec(workflow), execute = /^\s*bash audit-tools\/run-all\.sh\s*$/m.exec(workflow);
+    const download = /^\s*PW_VERSION=/m.exec(workflow), execute = /^\s*bash audit-tools\/run-all\.sh(?: 2>&1 \| tee "\$AUDIT_LOG")?\s*$/m.exec(workflow);
     const mode = name => { const start = shell.indexOf('\n  ' + name + ')'); const end = shell.indexOf('\n    ;;', start); return start >= 0 && end > start ? shell.slice(start, end) : ''; };
     const locked = name => name === 'chromium'
         ? /^\s*flock "\$CACHE\/\.chromium\.lock" npx --no-install playwright install chromium\s*$/m.test(mode(name))

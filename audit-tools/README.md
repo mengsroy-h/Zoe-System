@@ -271,7 +271,7 @@ bash audit-tools/emu/rules.sh
 | `registry-orphan-list-test.js` | **អ្នកយាមរបស់ឧបករណ៍ខាងលើ** ៖ រត់ឧបករណ៍ពិតជា process ដាច់ដោយឡែក លើ dump ក្លែង រួច **អានឯកសារលទ្ធផលពិត**។ ការអះអាងស្នូល ៖ ⛔ **កូនសោដែលមានម្ចាស់ មិនត្រូវចូលបញ្ជីលុបដាច់ខាត** (រួម barcode ក្នុងធុងសំរាម · barcodes ជា object · កូនសោអក្សរតូច)។ ⛔ ទិសផ្ទុយ ៖ barcode ពិតដែល *មើលទៅដូច* hash (អក្សរធំ) មិនត្រូវបដិសេធ | `REGORPHANTEST_APP_DIR` |
 | `registry-release-test.js` | កូនសោ `zoew_barcode_registry` កំព្រា ➜ barcode ជាប់អន្ទាក់ · ជួរដោះត្រូវមានច្រកចេញទី ២ | `REGISTRY_APP_DIR` |
 | `money-checker-truthfulness-test.js` | ផ្ទៀងច្រកទទួលលទ្ធផលរបស់ money matrix ក្នុង VM៖ blocked និងកំហុសអាន settled មិនអាចជាជោគជ័យ; return/sweep race ត្រូវចាប់ផ្ដើមគ្រប់ឧបករណ៍ ហើយគ្រប់ហាងត្រូវមាន return/offline-online/offline-reload ពិត; ការចាក់ network failure ដែលបរាជ័យមិនអាចលាក់។ មិនជំនួស matrix browser/database ពិត | `MONEYTRUTH_APP_DIR` |
-| `money-guardian-test.js` | ⛔ **«សំណុំបៃតង» មិនមែនភស្តុតាង** — បំបែកតក្កវិជ្ជាលុយ រួចទាមទារថាអ្នកយាមយ៉ាងតិច ១ ក្រហម · អ្នកយាមរត់ស្របគ្នា (ក្នុងពិដានរបស់ `run-all.sh`) | `MONEYGUARD_APP_DIR` · `MONEYGUARD_JOBS` |
+| `money-guardian-test.js` | ⛔ **«សំណុំបៃតង» មិនមែនភស្តុតាង** — បំបែកតក្កវិជ្ជាលុយ រួចទាមទារថាអ្នកយាមយ៉ាងតិច ១ ក្រហម · អ្នកយាមរត់ស្របគ្នា (ក្នុងពិដានរបស់ `run-all.sh`) · `--part=k/4` បែង mutation ជា ៤ ផ្នែកមិនខ្វះឬស្ទួន ហើយអ្នកយាមលើ tree ស្អាតរត់គ្រប់ផ្នែក | `MONEYGUARD_APP_DIR` · `MONEYGUARD_JOBS` |
 | `price-edit-abort-test.js` | ⛔ transaction ដែល **បោះបង់** ➜ ការបញ្ច្រាសលុយត្រូវរត់ដដែល · ការ **ព្យួរ** ≠ ការបរាជ័យ | `PRICEABORT_APP_DIR` |
 | `stale-write.js` | គ្មានការសរសេរ item ទាំងមូលពីសតិ | `STALEWRITE_APP_DIR` |
 | `compensation-order.js` | `.then(A).catch(B)` ដែល B ជាការសង្គ្រោះ | `COMP_APP_DIR` |

@@ -559,8 +559,11 @@ declare -A RUNALL_LABEL_HINTS=(
     ["modal-keyboard-device 2/4 (browser ពិត · keyboard លេខ · ចុចកន្លែងវាយ Barcode · ម៉ាស៊ីនស្កេន · zoom)"]=171
     ["modal-keyboard-device 3/4 (browser ពិត · ប្រអប់រអិលតាម keyboard ៖ ស៊ុមម្តងៗ)"]=175
     ["modal-keyboard-device 4/4 (browser ពិត · iPhone ៖ ចុច + keyboard លោតហួស ➜ រអិលតែម្តង · ∨/∧ មិនរំកិលទំព័រ · keyboard លោត ➜ មិនទាញ document · ស្កេនដក ➜ លើក #appPages)"]=207
-    ["money-guardian 1/2"]=242
-    ["money-guardian 2/2"]=227
+    # ថវិកាបែងចែកប៉ាន់ស្មានសម្រាប់ផ្នែក mutation ថ្មី មិនមែនពិដាន checker។
+    ["money-guardian 1/4"]=242
+    ["money-guardian 2/4"]=242
+    ["money-guardian 3/4"]=242
+    ["money-guardian 4/4"]=242
     ["zoew-suite 1/5 (ZoeW React ៖ tsc · lint · vitest 1/4 · android)"]=210
     ["zoew-suite 2/5 (ZoeW React ៖ build · sw · smoke · native · rules)"]=215
     ["zoew-suite 3/5 (ZoeW React ៖ vitest 2/4)"]=192
@@ -1079,8 +1082,10 @@ run "emu/supabase-adapter-parity" node audit-tools/emu/supabase-adapter-parity-t
 # ⛔ «សំណុំបៃតង» មិនមែនភស្តុតាង — ឧបករណ៍នេះបំបែកតក្កវិជ្ជាលុយដោយចេតនា
 # រួចទាមទារថា **អ្នកយាមយ៉ាងតិច ១ ត្រូវក្រហម**។ បើអ្នកយាមចុងក្រោយងងឹត
 # វាធ្លាក់ **មុន** កំហុសលុយបន្ទាប់ ship។
-run "money-guardian 1/2" node audit-tools/money-guardian-test.js --part=1/2
-run "money-guardian 2/2" node audit-tools/money-guardian-test.js --part=2/2
+run "money-guardian 1/4" node audit-tools/money-guardian-test.js --part=1/4
+run "money-guardian 2/4" node audit-tools/money-guardian-test.js --part=2/4
+run "money-guardian 3/4" node audit-tools/money-guardian-test.js --part=3/4
+run "money-guardian 4/4" node audit-tools/money-guardian-test.js --part=4/4
 run "money-reality" node audit-tools/money-reality-test.js
 run "repository-file-coverage" node audit-tools/repository-file-coverage.js
 run "module-runtime-scope" node audit-tools/module-runtime-scope-test.js

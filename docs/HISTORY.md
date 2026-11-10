@@ -2044,6 +2044,13 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-11-10 — CI៖ ភស្តុតាង CAS និង audit bridge ដោយមិនប្ដូរលទ្ធផល
+
+- [Audit #1272](https://github.com/mengsroy-h/Zoe-System/actions/runs/42825409691) លើ `a076d642` មាន 247/249 PASS៖ Firebase/Sheet concurrent Delete ទុក barcode សាកនៅ history និង trash; tablet audit bridge មិនរួចមុនការវាស់ keyboard។ Owned JVM acquisition/cleanup ជាប់។ ម៉ូដែល CAS ដែលប្រើ functions ពិតក្នុងលំដាប់ប្រាំមួយ និង cold-null retry មិនបង្ក duplicate ឡើងវិញ; មិនជំនួស SDK/rules/browser ឬ prelude ពេញទេ។ គ្មានការកែ app តាមសម្មតិកម្ម។
+- `money-operation-trace` បន្ថែមតែភស្តុតាង passive របស់ fixture `sheet_flow_firebase_0_1`៖ action, CAS-hash presence, digest នៃ base/proposal និង claim aliases ដែលប្រៀបធៀបឆ្លង context ក្នុង process ដូចគ្នា។ រក្សា request/socket identity និង server pushes ដោយបំបែក snapshot/merge/query; មិនជំនួស callback/updater/promise, មិនបន្ថែម write ឬ receipt និងមិនយក ACK ជាភស្តុតាង app settlement។ Tokens/values ឆៅមិនចេញក្នុង fields ថ្មី។
+- `modal-keyboard-device-test` រក្សា DOMContentLoaded + 900ms និង predicate ដើម; ពេល bridge ធ្លាក់ បង្ហាញ helper types និង bounded page/local-asset errors ដោយមិនអាន message/stack/payload/headers។ គ្មាន wait/retry ឬ late-success conversion; ដកតែ observers របស់ខ្លួន។ `ZoeW/tests/modal-keyboard-device-checker.test.ts` មាន 8 FAIL/56 PASS មុនកែ និង 67 PASS ក្រោយកែ; actual-function before/after controls 12/12 ជាប់។
+- Tests ប្រើ recorder/function ពិតជាមួយ transport/page សំយោគ និង negative controls សម្រាប់ privacy, correlation និង verdict ដើម។ Chromium ក្នុងបរិស្ថាន local មិនអាចបើក singleton socket ហើយមិនមាន prepared RTDB JAR; គ្មាន browser/backend reproduction ថ្មី។ មូលហេតុ CI ទាំងពីរ និង observer timeout នៅមិនទាន់បញ្ជាក់; ការកែនេះបន្ថែមភស្តុតាង មិនបន្ថយ assertions, deadlines, workload ឬប្ដូរ self-hosted/resources ទេ។
+
 ### 2026-11-10 — F03៖ ភស្តុតាង probe និងដំណាក់កាល cleanup
 
 - Diagnostic [42813017148](https://github.com/mengsroy-h/Zoe-System/actions/runs/42813017148) និង [42818306267](https://github.com/mengsroy-h/Zoe-System/actions/runs/42818306267) មាន checker 598 PASS ប៉ុន្តែ metrics ខ្វះមួយដោយ `jstat` timeout។ មូលហេតុ launch/scheduling/collection/exit មិនទាន់បញ្ជាក់។ Probe ឥឡូវរក្សាពេលចាប់ផ្ដើម/ចប់, elapsed និង schedule lateness, exit status, error/signal តាមបញ្ជីអនុញ្ញាត, ចំនួន bytes និងថាមាន counter row ត្រឹមត្រូវឬអត់ ដោយមិនបង្ហាញ stdout/stderr ឆៅ។ Timeout ឬ spawn error នៅ `gc:null` ទោះមាន row ពេញ និង exit0។

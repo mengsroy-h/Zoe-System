@@ -5,13 +5,18 @@ import vm from 'node:vm';
 import { parse } from 'acorn';
 import { simple } from 'acorn-walk';
 import ts from 'typescript';
+import { EventEmitter } from 'node:events';
 
 // រត់ predicate ពិតពី checker។ WAAPI/DOM ខាងក្រោមជាម៉ូដែលតែប៉ុណ្ណោះ;
 // មិនមែនភស្តុតាងថា browser បានគូរស៊ុមរលូនទេ។
 const source = readFileSync(path.resolve('../audit-tools/modal-keyboard-device-test.js'), 'utf8');
 const declarations: Record<string, string> = {};
+const bridgeFunctions: string[] = [];
 let openPredicate = '', closePredicate = '';
 simple(parse(source, { ecmaVersion: 'latest' }), {
+    FunctionDeclaration(node: any) {
+        if (['observeAuditBridge', 'openApp'].includes(node.id.name)) bridgeFunctions.push(source.slice(node.start, node.end));
+    },
     VariableDeclarator(node: any) {
         if (['curve', 'glideOf', 'smooth', 'createdGlideOk', 'RECORD', 'PROBE_CREATED_GLIDE'].includes(node.id.name)) declarations[node.id.name] = source.slice(node.init.start, node.init.end);
     },
@@ -248,4 +253,156 @@ it('Audit1237 ៖ លោតពេញផ្លូវមួយស៊ុមមិ�
     jump.frames.forEach(f => { f.top = f.t <= 163 ? 33 : 60; });
     expect(evaluate('glideOf(record).mid', { record: jump })).toBe(0);
     expect(landscapeVerdict(jump)).toBe(false);
+});
+
+// ព្រឹត្តិការណ៍ និងនាឡិកាក្លែងរត់ openApp ពិត; មិនមែន browser ឬការបន្តពូជកំហុស tablet ទេ។
+async function runBridge(options: { readyAt?: number; missing?: string; helperValues?: Record<string, unknown>; failureAt?: string; events?: (page: any) => void } = {}) {
+    let now = 0;
+    const globals: Record<string, unknown> = {};
+    const calls: any[] = [], output: string[] = [];
+    const originalError = new Error('កំហុសក្លែង');
+    const page: any = new EventEmitter();
+    const previous = () => {};
+    page.on('pageerror', previous);
+    const install = () => {
+        if (now >= (options.readyAt ?? 0)) for (const name of ['openModalHelper', 'closeModal', 'openModalIds']) {
+            if (name !== options.missing) globals[name] = () => {};
+        }
+        Object.assign(globals, options.helperValues);
+    };
+    const phase = (name: string) => {
+        calls.push([name]);
+        if (options.failureAt === name) throw originalError;
+    };
+    page.route = async () => { phase('route'); };
+    page.addInitScript = async () => { phase('init'); };
+    page.goto = async (url: string, settings: unknown) => {
+        calls.push(['goto', url, settings, ['pageerror', 'requestfailed', 'response'].map(name => page.listenerCount(name))]);
+        now = 10;
+        options.events?.(page);
+        phase('navigation');
+        install();
+    };
+    page.waitForTimeout = async (ms: number) => { calls.push(['wait', ms]); now += ms; phase('wait'); install(); };
+    page.evaluate = async (fn: () => unknown) => {
+        phase('evaluate');
+        return vm.runInNewContext('(' + fn.toString() + ')()', globals);
+    };
+    const ctx = { newPage: async () => page };
+    const browser = { newContext: async (settings: unknown) => { calls.push(['context', settings]); return ctx; } };
+    const open = vm.runInNewContext(bridgeFunctions.join('\n') + '\nopenApp', {
+        OPEN_MODAL_DETAILS: () => {}, URL, Date: { now: () => now }, console: { log: (value: string) => output.push(value) }
+    });
+    let result: any, error: unknown;
+    try { result = await open(browser, 12345, { w: 800, h: 1280 }, [() => {}], { userAgent: 'Android' }); }
+    catch (caught) { error = caught; }
+    const atReturn = now;
+    now = 1000;
+    install();
+    return { result, error, originalError, calls, output, page, previous, ctx, atReturn, globals };
+}
+const requestAsset = (url: unknown) => ({ url: () => url });
+const responseAsset = (url: unknown, status = 503) => ({ url: () => url, status: () => status });
+const diagnostic = (output: string[]) => {
+    expect(output).toHaveLength(1);
+    return JSON.parse(output[0].slice(output[0].indexOf('{')));
+};
+const expectBridgeCleanup = ({ page, previous }: any) => {
+    expect(page.listeners('pageerror')).toEqual([previous]);
+    expect(page.listenerCount('requestfailed')).toBe(0);
+    expect(page.listenerCount('response')).toBe(0);
+};
+
+it.each([
+    ['រួចមុន', 0, undefined, true], ['រួចនៅព្រំដែន', 910, undefined, true],
+    ['រួចយឺត', 950, undefined, false], ['មិនរួច', Infinity, undefined, false],
+    ['ខ្វះបើក', 0, 'openModalHelper', false], ['ខ្វះបិទ', 0, 'closeModal', false], ['ខ្វះបញ្ជី', 0, 'openModalIds', false]
+] as const)('bridge %s រក្សា verdict និងការវាស់តែមួយក្រោយ 900ms', async (_label, readyAt, missing, ready) => {
+    const run = await runBridge({ readyAt, missing });
+    expect(run.error).toBeUndefined();
+    expect(run.result).toEqual({ ctx: run.ctx, page: run.page, ready });
+    expect(run.atReturn).toBe(910);
+    expect(run.calls.filter(call => call[0] === 'wait')).toEqual([['wait', 900], ['wait']]);
+    expect(run.calls.filter(call => call[0] === 'evaluate')).toHaveLength(1);
+    expect(run.calls.find(call => call[0] === 'goto')).toEqual(['goto', 'http://127.0.0.1:12345/', { waitUntil: 'domcontentloaded', timeout: 20000 }, [2, 1, 1]]);
+    expectBridgeCleanup(run);
+    if (ready) expect(run.output).toEqual([]);
+    else {
+        const info = diagnostic(run.output);
+        expect(info.helpers).toEqual(Object.fromEntries(['openModalHelper', 'closeModal', 'openModalIds'].map(name => [name, readyAt <= 910 && missing !== name ? 'function' : 'undefined'])));
+        expect(info.events).toEqual([]);
+        if (readyAt === 950) expect(typeof run.globals.openModalHelper).toBe('function');
+        expect(run.result.ready).toBe(false);
+    }
+});
+
+it('bridge រាយការណ៍ typeof នីមួយៗ ដោយមិនចេញតម្លៃ helper', async () => {
+    const run = await runBridge({ helperValues: { openModalHelper: { secret: 'private-secret' }, closeModal: 42, openModalIds: 'private-secret' } });
+    expect(run.result.ready).toBe(false);
+    expect(diagnostic(run.output).helpers).toEqual({ openModalHelper: 'object', closeModal: 'number', openModalIds: 'string' });
+    expect(run.output.join('')).not.toMatch(/private-secret|42/);
+    expectBridgeCleanup(run);
+});
+
+it('bridge កត់តែព្រឹត្តិការណ៍សុវត្ថិភាពមុន navigation ដោយលុប query/hash', async () => {
+    const run = await runBridge({ readyAt: Infinity, events(page) {
+        page.emit('pageerror', { name: 'TypeError', get message() { throw new Error('មិនត្រូវអាន'); }, get stack() { throw new Error('មិនត្រូវអាន'); } });
+        page.emit('pageerror', { name: 'private-secret' });
+        page.emit('requestfailed', { ...requestAsset('http://127.0.0.1:12345/assets/../assets/expose-globals-Ab12.js?token=private-secret#private-secret'), failure() { throw new Error('មិនត្រូវអាន'); } });
+        page.emit('response', responseAsset('http://127.0.0.1:12345/firebase-loader.js?private-secret', 404));
+    } });
+    expect(diagnostic(run.output)).toEqual({ helpers: { openModalHelper: 'undefined', closeModal: 'undefined', openModalIds: 'undefined' }, events: [
+        { kind: 'pageerror', atMs: 10, name: 'TypeError' }, { kind: 'pageerror', atMs: 10, name: 'Error' },
+        { kind: 'requestfailed', atMs: 10, path: '/assets/expose-globals-Ab12.js' }, { kind: 'response', atMs: 10, path: '/firebase-loader.js', status: 404 }
+    ], dropped: 0 });
+    expect(run.output.join('')).not.toMatch(/private-secret|token|127\.0\.0\.1/);
+    expectBridgeCleanup(run);
+});
+
+it('bridge មិនកត់ប្រភពក្រៅ ផ្លូវមិនមែន asset ឬ response ជោគជ័យ', async () => {
+    const run = await runBridge({ readyAt: Infinity, events(page) {
+        for (const url of [
+            'https://private-secret.example/assets/app.js', 'http://127.0.0.1:12346/assets/app.js',
+            'http://127.0.0.1:12345.private-secret.example/assets/app.js', 'http://private-secret@127.0.0.1:12345/assets/app.js',
+            'http://127.0.0.1:12345/api/private-secret', 'http://127.0.0.1:12345/assets/private%20secret.js',
+            'http://127.0.0.1:12345/assets/' + 'x'.repeat(300) + '.js', 'data:private-secret', '/assets/app.js', undefined, null, NaN, {}, []
+        ]) { page.emit('requestfailed', requestAsset(url)); page.emit('response', responseAsset(url)); }
+        for (const status of [200, 204, 299, NaN, -1, 0, 600, 'private-secret']) page.emit('response', responseAsset('http://127.0.0.1:12345/assets/app.js', status as number));
+    } });
+    expect(diagnostic(run.output).events).toEqual([]);
+    expect(run.output.join('')).not.toContain('private');
+    expectBridgeCleanup(run);
+});
+
+it('bridge មានពិដានព្រឹត្តិការណ៍ និងបញ្ឈប់ observer ក្រោយលទ្ធផល', async () => {
+    const run = await runBridge({ readyAt: Infinity, events(page) {
+        for (let i = 0; i < 25; i++) page.emit('requestfailed', requestAsset('http://127.0.0.1:12345/assets/app.js'));
+    } });
+    const info = diagnostic(run.output);
+    expect(info.events).toHaveLength(20);
+    expect(info.dropped).toBe(5);
+    const saved = run.output.slice();
+    run.page.emit('requestfailed', requestAsset('http://127.0.0.1:12345/assets/late.js'));
+    expect(run.output).toEqual(saved);
+    expectBridgeCleanup(run);
+});
+
+it.each(['route', 'init', 'navigation', 'wait', 'evaluate'])('bridge បញ្ហា %s នៅតែ throw កំហុសដើម និងដក observer', async failureAt => {
+    const run = await runBridge({ failureAt });
+    expect(run.result).toBeUndefined();
+    expect(run.error).toBe(run.originalError);
+    expectBridgeCleanup(run);
+});
+
+it('bridge payload ខូចមិនប្ដូរ verdict ឬបញ្ឈប់ព្រឹត្តិការណ៍បន្ទាប់', async () => {
+    const run = await runBridge({ events(page) {
+        for (const event of ['pageerror', 'requestfailed', 'response']) {
+            for (const payload of [undefined, null, NaN, {}, [], { url() { throw new Error('កំហុសក្លែង'); } }]) expect(() => page.emit(event, payload)).not.toThrow();
+        }
+        page.emit('pageerror', { get name() { throw new Error('កំហុសក្លែង'); } });
+        page.emit('response', { url: () => 'http://127.0.0.1:12345/assets/app.js', status() { throw new Error('កំហុសក្លែង'); } });
+    } });
+    expect(run.result.ready).toBe(true);
+    expect(run.output).toEqual([]);
+    expectBridgeCleanup(run);
 });

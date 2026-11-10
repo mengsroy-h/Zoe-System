@@ -401,3 +401,70 @@ it.each(['trash-modal-test.js', 'empty-state-truth-test.js', 'restore-race-test.
         expect(call({ code: 'KH123', createdAt: 300, ztoSentOutAt: 310 }, {})).toBe('sent');
         expect(call({ code: 'KH123', createdAt: 300, ztoMisplacedAt: 310 }, {})).toBe('misplaced');
     });
+
+it('ផ្នែក money-guardian វាស់គ្រប់គូ mutation/អ្នកយាម និងចប់ក្នុងថវិកា CPU ពីរ', async () => {
+    const source = readFileSync(path.resolve(process.cwd(), '../audit-tools/money-guardian-test.js'), 'utf8');
+    const runall = readFileSync(path.resolve(process.cwd(), '../audit-tools/run-all.sh'), 'utf8');
+    const ast: any = parse(source, { ecmaVersion: 'latest' });
+    const declarations = ['GUARDS', 'MUTATIONS', 'PART', 'MINE'].map(name => ast.body.find((node: any) =>
+        node.type === 'VariableDeclaration' && node.declarations.some((d: any) => d.id.name === name)));
+    const pool = ast.body.find((node: any) => node.type === 'FunctionDeclaration' && node.id.name === 'runPool');
+    let assembly: any;
+    simple(ast, { ExpressionStatement(node: any) {
+        if (source.slice(node.start, node.end).startsWith('mutants.forEach((entry,')) assembly = node;
+    } });
+    expect(declarations.every(Boolean) && pool && assembly).toBeTruthy();
+    const parts = [...runall.matchAll(/^run "money-guardian [^"]+" node audit-tools\/money-guardian-test\.js --part=(\d+)\/(\d+)$/gm)];
+    expect(parts.length).toBeGreaterThan(0);
+    const ceiling = Number(/CHECKER_TIMEOUT="?\$\{CHECKER_TIMEOUT:-(\d+)\}/.exec(runall)?.[1]) * 1000;
+    expect(ceiling).toBe(300000);
+    const seen: string[] = [];
+    let matrix: string[] = [];
+    for (const part of parts) {
+        let now = 0;
+        const pending: { at: number; resolve: () => void }[] = [];
+        const calls: string[] = [];
+        // ពេលវាស់អ្នកយាមស្អាត៖ tx ~៤០ វិ. · cleanup ~២៣ វិ. · អ្នកផ្សេងតិចជាង។
+        const duration = (file: string) => file === 'tx-outcome-test.js' ? 40000
+            : file === 'cleanup-interrupt-atomicity-test.js' ? 23000 : 3000;
+        const context = vm.createContext({
+            process: { argv: ['node', 'money-guardian-test.js', `--part=${part[1]}/${part[2]}`] },
+            JOBS: 2, tasks: [],
+            runGuard: (guard: { file: string }, dir: string) => {
+                calls.push(`${dir}:${guard.file}`);
+                return new Promise<void>(resolve => pending.push({ at: now + duration(guard.file), resolve }));
+            }
+        });
+        vm.runInContext(declarations.map(node => source.slice(node.start, node.end)).join('\n')
+            + '\n' + source.slice(pool.start, pool.end)
+            + '\nglobalThis.guards = GUARDS; globalThis.all = MUTATIONS; globalThis.mine = MINE;', context);
+        expect(context.guards.length).toBeGreaterThanOrEqual(8);
+        expect(context.all.length).toBeGreaterThanOrEqual(18);
+        const drain = async (promise: Promise<unknown>) => {
+            let done = false;
+            promise.then(() => { done = true; });
+            for (let steps = 0; !done && steps < 1000; steps++) {
+                for (let tick = 0; tick < 10; tick++) await Promise.resolve();
+                if (done) break;
+                pending.sort((a, b) => a.at - b.at);
+                const next = pending.shift();
+                expect(next).toBeTruthy();
+                now = next!.at;
+                next!.resolve();
+            }
+            expect(done).toBe(true);
+            await promise;
+        };
+        await drain(context.runPool(context.guards.map((guard: any) => () => context.runGuard(guard, 'clean'))));
+        expect(calls).toEqual(context.guards.map((guard: any) => `clean:${guard.file}`));
+        context.alive = context.guards;
+        context.mutants = context.mine.map((m: any) => ({ m, dir: String(context.all.indexOf(m)) }));
+        vm.runInContext(source.slice(assembly.start, assembly.end), context);
+        await drain(context.runPool(context.tasks.map((task: any) => task.run)));
+        seen.push(...calls.filter(call => !call.startsWith('clean:')));
+        matrix = context.all.flatMap((_: unknown, i: number) => context.guards.map((guard: any) => `${i}:${guard.file}`));
+        expect(now, `ផ្នែក ${part[1]}/${part[2]}`).toBeLessThan(ceiling);
+    }
+    expect(seen.sort()).toEqual(matrix.sort());
+    expect(new Set(seen).size).toBe(seen.length);
+});

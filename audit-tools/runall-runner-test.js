@@ -379,7 +379,7 @@ ok('ទិសផ្ទុយ ៖ hash tree ដែលអានបាន ចេញ
 const coverageKeys = ['FUZZ_RUN0', 'FUZZ_RUNS', 'FUZZ_OPS', 'FUZZ_APPS', 'CFUZZ_RUN0', 'CONNFUZZ_OPS',
     'MFUZZ_RUNS', 'APPWRITES_RUNS', 'MONEYMD_RUN0', 'SBMONEY_SHOPS', 'SBPARITY_SEED', 'ZTOBANNER_FUZZ_RUNS',
     'FBPROVISION_MUTATIONS', 'SBDATA_MUTATIONS', 'SCANREMOVE_STATIC_ONLY', 'SCANSDK_MONTH_WIRE',
-    'KHMERTZ_PROBE', 'EXITCODE_CHILD', 'CI', 'NODE_ENV',
+    'KHMERTZ_PROBE', 'EXITCODE_CHILD', 'CI', 'GITHUB_ACTIONS', 'RUNNER_ENVIRONMENT', 'NODE_ENV',
     'CHECKER_TIMEOUT', 'EXITCODE_TIMEOUT_MS', 'ZOEWSUITE_STEP_TIMEOUT_MS'];
 const externalKeys = ['FUZZ_APP_DIR', 'ZOE_REPO_ROOT', 'VERSIONSCOPE_BASE', 'SCANRULES_RULES_FILE', 'LICENSE_JS',
     'CHROMIUM_PATH', 'PLAYWRIGHT_BROWSERS_PATH', 'SUPABASE_MIGRATION_BASE', 'KEYLIST_APP_JS', 'PURITY_SRC',
@@ -532,36 +532,39 @@ ok('ពិដានរួម ≤ RUNALL_JOBS (៤) ហើយនៅតែស្�
     maxOverlap(lane.events));
 
 // Vitest មាន workers ផ្ទាល់ខ្លួន ហើយ build/browser បើកក្នុង child scripts៖ គ្រប់ផ្នែកត្រូវនៅម្នាក់ឯង។
-for (const part of [1, 2, 3]) {
+const suiteParts = [...runall.matchAll(/\bnode\s+audit-tools\/zoew-suite-test\.js\s+--part=(\d+\/\d+)/g)].map(match => match[1]);
+ok('⛔ ផ្នែក suite ពិតមានគ្រប់ មិនស្ទួន ហើយមានយ៉ាងតិច ៣', suiteParts.length >= 3 && new Set(suiteParts).size === suiteParts.length
+    && suiteParts.every((part, index) => part === (index + 1) + '/' + suiteParts.length), suiteParts);
+for (const part of suiteParts) {
     const suiteCase = newCase([
         ['audit-tools/zoew-suite-test.js', { ms: 900 }],
         ['audit-tools/supabase-money-multishop-test.js', { ms: 900 }]
     ]);
     const suiteRun = runHarness(suiteCase,
-        'run "suite" node audit-tools/zoew-suite-test.js --part=' + part + '/3\n'
+        'run "suite" node audit-tools/zoew-suite-test.js --part=' + part + '\n'
         + 'run "money" node audit-tools/supabase-money-multishop-test.js',
         { RUNALL_JOBS: '2', RUNALL_BROWSER_JOBS: '1' });
     const ranges = intervals(suiteRun.events);
-    ok('⛔ zoew-suite ' + part + '/3 រត់ម្នាក់ឯង ទោះមាន money checker រង់ចាំ',
+    ok('⛔ zoew-suite ' + part + ' រត់ម្នាក់ឯង ទោះមាន money checker រង់ចាំ',
         suiteRun.rc === 0 && ranges.length === 2 && ranges.every((x) => ranges.every((other) => other === x
             || other.end <= x.start || other.start >= x.end)),
         { rc: suiteRun.rc, ranges });
 }
 
 // Money guardian មាន child pool ផ្ទាល់ខ្លួន៖ checker ធ្ងន់ផ្សេងមិនត្រូវចែក CPU ក្នុងពិដានរបស់វា។
-for (const [part, wrapped] of [[1, false], [2, false], [1, true]]) {
+for (const [part, wrapped] of [[1, false], [2, false], [3, false], [4, false], [1, true]]) {
     const guardianCase = newCase([
         ['audit-tools/money-guardian-test.js', { ms: 900, ownedProbe: true }],
         ['audit-tools/supabase-money-multishop-test.js', { ms: 900, browser: true }],
         [EMU + 'fx-guardian-neighbor.js', { ms: 900, ownedProbe: true }]
     ]);
     const guardianRun = runHarness(guardianCase,
-        'run "guardian" node ' + (wrapped ? '--require ./audit-tools/runall-exit-guard.cjs ' : '') + 'audit-tools/money-guardian-test.js --part=' + part + '/2\n'
+        'run "guardian" node ' + (wrapped ? '--require ./audit-tools/runall-exit-guard.cjs ' : '') + 'audit-tools/money-guardian-test.js --part=' + part + '/4\n'
         + 'run "money" node audit-tools/supabase-money-multishop-test.js\n'
         + 'run "emulator" node ' + EMU + 'fx-guardian-neighbor.js',
         { RUNALL_JOBS: '2', RUNALL_BROWSER_JOBS: '1' });
     const ranges = intervals(guardianRun.events), guardian = ranges.find(x => x.name === 'audit-tools/money-guardian-test.js');
-    ok('⛔ money-guardian ' + part + '/2' + (wrapped ? ' មាន preload' : '') + ' រត់ម្នាក់ឯង ទោះមាន money/browser និង emulator រង់ចាំ',
+    ok('⛔ money-guardian ' + part + '/4' + (wrapped ? ' មាន preload' : '') + ' រត់ម្នាក់ឯង ទោះមាន money/browser និង emulator រង់ចាំ',
         guardianRun.rc === 0 && ranges.length === 3 && guardian && ranges.every(other => other === guardian
             || other.end <= guardian.start || other.start >= guardian.end),
         { rc: guardianRun.rc, ranges });
@@ -569,6 +572,29 @@ for (const [part, wrapped] of [[1, false], [2, false], [1, true]]) {
     ok('money-guardian និង emulator នៅរក្សា owned scopes ដាច់ដោយឡែក',
         guardianRun.rc === 0 && owners.length === 2 && owners.every(value => /^\d+$/.test(value.owner)) && new Set(owners.map(value => value.owner)).size === 2,
         owners);
+}
+
+// ស៊ុមចលនា live ត្រូវការពេល CPU ដាច់ពី browser និង emulator ផ្សេង; ផ្នែក geometry នៅតែស្របគ្នា។
+const modalDeviceScript = 'audit-tools/modal-keyboard-device-test.js';
+for (const [part, wrapped, isolated] of [['3/4', false, true], ['4/4', false, true], ['', false, true], ['3/4', true, true], ['1/4', false, false], ['2/4', false, false]]) {
+    const modalCase = newCase([
+        [modalDeviceScript, { ms: 500, browser: true }],
+        ['audit-tools/fx-modal-browser.js', { ms: 500, browser: true }],
+        [EMU + 'fx-modal-emulator.js', { ms: 500, ownedProbe: true }],
+        ['audit-tools/fx-modal-cpu.js', { ms: 500 }]
+    ]);
+    const modalRun = runHarness(modalCase,
+        'run "modal" node ' + (wrapped ? '--require ./audit-tools/runall-exit-guard.cjs ' : '') + modalDeviceScript + (part ? ' --part=' + part : '') + '\n'
+        + 'run "browser" node audit-tools/fx-modal-browser.js\n'
+        + 'run "emulator" node ' + EMU + 'fx-modal-emulator.js\n'
+        + 'run "cpu" node audit-tools/fx-modal-cpu.js',
+        { RUNALL_JOBS: '4', RUNALL_BROWSER_JOBS: '2' });
+    const ranges = intervals(modalRun.events), modal = ranges.find(x => x.name === modalDeviceScript);
+    const overlaps = ranges.filter(other => other !== modal && modal && other.start < modal.end && other.end > modal.start);
+    ok('⛔ modal device ' + (part || 'ទាំងអស់') + (wrapped ? ' មាន preload' : '') + (isolated ? ' វាស់ស៊ុមម្នាក់ឯង' : ' geometry នៅស្របគ្នា'),
+        modalRun.rc === 0 && ranges.length === 4 && !!modal && (isolated ? overlaps.length === 0 : overlaps.length === 3),
+        { rc: modalRun.rc, ranges, overlaps: overlaps.length });
+    ok('browser · emulator · CPU នៅស្របគ្នាក្រៅពេលវាស់ស៊ុម', maxOverlap(modalRun.events, name => name !== modalDeviceScript) === 3);
 }
 
 // ═══ ៣. ការព្យួរ ➜ FAIL ដែលមានឈ្មោះ · checker ដទៃមិនរង ═══
@@ -755,12 +781,18 @@ async function sectionSix() {
         const h = path.join(dir, 'plan.sh');
         fs.writeFileSync(h, 'cd ' + JSON.stringify(ROOT) + ' || exit 1\n' + block + '\n'
             + runall.slice(listAt, listEnd).replace(/^#@runner-end$/m, '') + '\n'
-            + 'for i in "${!J_KIND[@]}"; do eval "set -- ${J_CMD[$i]}"; owned=0; runall_needs_rtdb "$@" && owned=1; printf \'%s\\t%s\\t%s\\t%s\\t%s\\n\' "${J_KIND[$i]}" "${J_LABEL[$i]}" "${J_ID[$i]}" "${J_LANE[$i]}" "$owned"; done\n'
+            + 'for i in "${!J_KIND[@]}"; do eval "set -- ${J_CMD[$i]}"; owned=0; runall_needs_rtdb "$@" && owned=1; printf \'%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n\' "${J_KIND[$i]}" "${J_LABEL[$i]}" "${J_ID[$i]}" "${J_LANE[$i]}" "$owned" "${J_CMD[$i]}"; done\n'
             + 'for h in $RUNALL_HINTS; do printf \'hint\\t%s\\t%s\\t-\\n\' "${h%%:*}" "${h##*:}"; done\n');
         const r = cp.spawnSync('bash', [h], { encoding: 'utf8', timeout: 60000, env: harnessEnv(dir) });
         plan = String(r.stdout || '').split('\n').filter(Boolean).map((l) => l.split('\t'))
-            .filter((p) => p[0] !== 'hdr').map(([kind, label, id, laneName, owned]) => ({ kind, label, id, lane: laneName, owned }));
+            .filter((p) => p[0] !== 'hdr').map(([kind, label, id, laneName, owned, command]) => ({ kind, label, id, lane: laneName, owned, command }));
     }
+    const modalJobs = plan.filter(j => j.kind === 'job' && j.id === 'modal-keyboard-device-test');
+    ok('⛔ modal device រក្សាផ្នែក 1/4 ដល់ 4/4 ម្តងគត់; geometry នៅ browser · ស៊ុម live នៅ excl',
+        modalJobs.length === 4 && [1, 2, 3, 4].every(part => {
+            const rows = modalJobs.filter(j => new RegExp('--part=' + part + '/4(?:\\s|$)').test(j.command || ''));
+            return rows.length === 1 && rows[0].lane === (part <= 2 ? 'browser' : 'excl');
+        }), modalJobs);
     const hintRows = plan.filter((p) => p.kind === 'hint');
     plan = plan.filter((p) => p.kind !== 'hint');
     const jobs = plan.filter((p) => p.kind === 'job');
@@ -841,10 +873,12 @@ async function sectionSix() {
         const emu = j.id.indexOf('emu/') === 0 || EMU_EVIDENCE.test(c);
         const browser = src.indexOf(BROWSER_MARK) !== -1;
         const isolatedPurge = j.id === F03.slice('audit-tools/'.length, -3) && c.includes('controlledDeadlinePass(');
-        const isolatedSuite = j.id === 'zoew-suite-test' && /\bcp\.spawnSync\s*\(\s*['"]npm['"]\s*,\s*args\b/.test(c)
+        const isolatedSuite = j.id === 'zoew-suite-test' && /\bcp\.spawn(?:Sync)?\s*\(/.test(c) && c.includes("'npm'")
             && c.includes("'--maxWorkers='");
         const isolatedGuardian = j.id === 'money-guardian-test' && /\bexecFile\s*\(\s*process\.execPath\b/.test(c)
             && c.includes('await runPool(tasks.map(');
+        const isolatedModal = j.id === 'modal-keyboard-device-test' && browser && c.includes('requestAnimationFrame(tick)')
+            && c.includes('smooth(') && /--part=[34]\/4(?:\s|$)/.test(j.command || '');
         if (j.lane === 'excl') exclN++;
         if (j.lane === 'emu') emuN++;
         if (j.lane === 'browser') browserN++;
@@ -852,9 +886,10 @@ async function sectionSix() {
         if (isolatedPurge && j.lane !== 'excl') wrong.push(j.id + ' ៖ F03 វាស់ deadline តែ lane=' + j.lane + ' (ត្រូវ excl)');
         if (isolatedSuite && j.lane !== 'excl') wrong.push(j.id + ' ៖ Vitest workers ក្នុង npm child តែ lane=' + j.lane + ' (ត្រូវ excl)');
         if (isolatedGuardian && j.lane !== 'excl') wrong.push(j.id + ' ៖ mutation child pool តែ lane=' + j.lane + ' (ត្រូវ excl)');
+        if (isolatedModal && j.lane !== 'excl') wrong.push(j.id + ' ៖ វាស់ស៊ុម live តែ lane=' + j.lane + ' (ត្រូវ excl)');
         if (emu && j.lane !== 'emu' && j.lane !== 'excl') wrong.push(j.id + ' ៖ ប្រើ emulator តែ lane=' + j.lane + ' (ត្រូវ emu)');
-        if (!poison && !emu && browser && j.lane !== 'browser') wrong.push(j.id + ' ៖ បើក browser តែ lane=' + j.lane);
-        if (j.lane === 'excl' && !poison && !isolatedPurge && !isolatedSuite && !isolatedGuardian) unjustified.push(j.id + ' ៖ excl គ្មានភស្តុតាង .tmp-poison-* ឬ F03 deadline ឬ Vitest child ឬ mutation child pool');
+        if (!poison && !emu && !isolatedModal && browser && j.lane !== 'browser') wrong.push(j.id + ' ៖ បើក browser តែ lane=' + j.lane);
+        if (j.lane === 'excl' && !poison && !isolatedPurge && !isolatedSuite && !isolatedGuardian && !isolatedModal) unjustified.push(j.id + ' ៖ excl គ្មានភស្តុតាង .tmp-poison-* ឬ F03 deadline ឬ Vitest child ឬ mutation child pool ឬស៊ុម live');
         if (j.lane === 'emu' && !emu) unjustified.push(j.id + ' ៖ emu គ្មានភស្តុតាង emulator');
         if (j.lane === 'browser' && !browser) unjustified.push(j.id + ' ៖ browser គ្មាន ' + BROWSER_MARK);
     }
@@ -904,10 +939,10 @@ async function sectionSix() {
         && jobs.length >= 150 && ownershipMatches(jobs)
         && jobs.filter(job => job.owned === '1').length >= 26, ownershipMismatches);
     const guardianJobs = jobs.filter(job => job.id === 'money-guardian-test');
-    ok('money-guardian ទាំងពីរផ្នែកនៅតែត្រូវការ owned RTDB ទោះរត់ម្នាក់ឯង',
-        guardianJobs.length === 2 && guardianJobs.every(job => job.lane === 'excl' && expectedOwned(job)) && ownershipMatches(guardianJobs), guardianJobs);
+    ok('money-guardian ទាំងបួនផ្នែកនៅតែត្រូវការ owned RTDB ទោះរត់ម្នាក់ឯង',
+        guardianJobs.length === 4 && guardianJobs.every(job => job.lane === 'excl' && expectedOwned(job)) && ownershipMatches(guardianJobs), guardianJobs);
     ok('ទិសផ្ទុយ ៖ ដក owned scope ពី money-guardian ត្រូវបានចាប់ ទោះ lane នៅ excl',
-        guardianJobs.length === 2 && guardianJobs.every(target => !ownershipMatches(jobs.map(job => job === target ? { ...job, owned: '0' } : job))));
+        guardianJobs.length === 4 && guardianJobs.every(target => !ownershipMatches(jobs.map(job => job === target ? { ...job, owned: '0' } : job))));
     const base = runall.slice(runall.search(/^if \[ -n "\$BASE" \]/m));
     const baseCommands = [...base.matchAll(/^\s*([A-Z0-9_]+_APP_DIR)="\$BASE" (runall_owned )?node (audit-tools\/[A-Za-z0-9_/-]+\.js)/gm)];
     const requiredBase = entry => entry[3].startsWith(EMU) || ['money-guardian-test.js', 'money-checker-truthfulness-test.js', 'exit-code-integrity.js', 'supabase-scan-rules-test.js'].some(name => entry[3] === 'audit-tools/' + name);

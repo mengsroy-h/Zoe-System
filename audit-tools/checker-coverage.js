@@ -292,7 +292,14 @@ function workflowRunsAll(source) {
             }
             script = body.join(script[0] === '>' ? ' ' : '\n');
         }
-        if (/^[ \t]*bash[ \t]+audit-tools\/run-all\.sh[ \t]*(?:#.*)?$/m.test(script)) return true;
+        let pipefail = false;
+        for (const command of script.split(/\r?\n/)) {
+            if (/^[ \t]*set[ \t]+-o[ \t]+pipefail[ \t]*(?:#.*)?$/.test(command)) pipefail = true;
+            if (/^[ \t]*set[ \t]+\+o[ \t]+pipefail[ \t]*(?:#.*)?$/.test(command)) pipefail = false;
+            if (/^[ \t]*bash[ \t]+audit-tools\/run-all\.sh[ \t]*(?:#.*)?$/.test(command)) return true;
+            // បំពង់ log ត្រូវរក្សាសាលក្រម runner មុននឹងរាប់ជាការរត់ suite ពិត។
+            if (pipefail && /^[ \t]*bash[ \t]+audit-tools\/run-all\.sh[ \t]+2>&1[ \t]*\|[ \t]*tee[ \t]+"\$AUDIT_LOG"[ \t]*(?:#.*)?$/.test(command)) return true;
+        }
     }
     return false;
 }
@@ -347,6 +354,10 @@ console.log('\n=== ២ខ. CI មិនត្រូវរត់ checker ដែ�
         ['run មួយបន្ទាត់', '  run: bash audit-tools/run-all.sh', true],
         ['run literal block', '  run: |\n    export RUNALL_ONLY=""\n    bash audit-tools/run-all.sh', true],
         ['step run shorthand', '  - run: bash audit-tools/run-all.sh', true],
+        ['បំពង់ log រក្សាសាលក្រម', '  run: |\n    set -o pipefail\n    bash audit-tools/run-all.sh 2>&1 | tee "$AUDIT_LOG"', true],
+        ['បំពង់ log គ្មាន pipefail', '  run: bash audit-tools/run-all.sh 2>&1 | tee "$AUDIT_LOG"', false],
+        ['បិទ pipefail មុនរត់', '  run: |\n    set -o pipefail\n    set +o pipefail\n    bash audit-tools/run-all.sh 2>&1 | tee "$AUDIT_LOG"', false],
+        ['បំពង់ log លាក់សាលក្រម', '  run: |\n    set -o pipefail\n    bash audit-tools/run-all.sh 2>&1 | tee "$AUDIT_LOG" || true', false],
         ['comment មិនមែន run', '  # run: bash audit-tools/run-all.sh', false],
         ['block comment មិនមែន command', '  run: |\n    # bash audit-tools/run-all.sh', false],
         ['echo មិនមែន command', '  run: |\n    echo bash audit-tools/run-all.sh', false],

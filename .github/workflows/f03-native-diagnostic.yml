@@ -5,6 +5,8 @@ on:
     paths:
       - '.github/workflows/f03-native-diagnostic.yml'
       - 'ZoeW/tests/f03-heap-diagnostic.test.ts'
+      - 'audit-tools/run-all.sh'
+      - 'audit-tools/owned-rtdb-command.js'
       - 'audit-tools/emu/registry-purge-atomic-sdk-test.js'
       - 'audit-tools/emu/ns.js'
       - 'audit-tools/supabase-pg.js'
@@ -42,7 +44,7 @@ jobs:
       max-parallel: 1
       matrix:
         order: ['249,250,251', '251,249,250']
-        heap_mib: [512, 1024]
+        heap_mib: ${{ fromJSON(vars.ZOE_RUNNER_MODE == 'github' && '[1024]' || '[512, 1024]') }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -139,6 +141,12 @@ jobs:
               if (names.length !== values.length || names.some(name => !allowed.has(name)) || values.some(value => !/^(?:\d+(?:\.\d+)?|-)$/.test(value))) return null;
               return Object.fromEntries(names.map((name, index) => [name, values[index] === '-' ? null : Number(values[index])]));
           }
+          function probeCounters(probe) {
+              const gc = probe.status === 0 ? counters(probe.stdout) : null;
+              const outcome = gc ? 'OBSERVED' : probe.error?.code === 'ETIMEDOUT' ? 'TIMEOUT'
+                  : probe.error ? 'SPAWN_ERROR' : probe.status !== 0 ? 'NONZERO_EXIT' : 'INVALID_COUNTERS';
+              return { gc, gcProbe: { outcome } };
+          }
           function verifyConstruction() {
               const owner = { start: '100', jar: '/owned/emulator.jar', gcLog: '/owned/jvm-gc.log', port: 19001, maxHeapMiB: 512 };
               const args = ['java', ...javaArguments(owner)];
@@ -205,9 +213,9 @@ jobs:
                       const observed = current(owner);
                       if (!observed) { fs.appendFileSync(output, JSON.stringify({ utc: new Date().toISOString(), status: 'OWNED_PROCESS_ENDED' }) + '\n'); break; }
                       const probe = cp.spawnSync(owner.jstat, ['-gc', '-t', String(owner.pid)], { encoding: 'utf8', timeout: 750, maxBuffer: 16384 });
-                      const gc = probe.status === 0 ? counters(probe.stdout) : null; unavailable ||= !gc;
+                      const { gc, gcProbe } = probeCounters(probe); unavailable ||= !gc;
                       fs.appendFileSync(output, JSON.stringify({ utc: new Date().toISOString(), pid: owner.pid, start: owner.start,
-                          status: gc ? 'OBSERVED' : 'GC_COUNTERS_UNAVAILABLE', ...observed.stat, gc }) + '\n');
+                          status: gc ? 'OBSERVED' : 'GC_COUNTERS_UNAVAILABLE', ...observed.stat, gc, gcProbe }) + '\n');
                       samples++; nextSample += 1000; await delay(Math.max(0, nextSample - Number(process.hrtime.bigint()) / 1e6));
                   }
                   fs.writeFileSync(path.join(directory, 'sampler-result.json'), JSON.stringify({ samples, unavailable, passiveObservationHasOverhead: true }) + '\n');
@@ -258,7 +266,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$F03_EXPECTED_HEAD"
-          printf 'F03 capacity hypothesis only; checkout=%s; order=%s; heapMiB=%s; ordinary JVM512 gate unchanged\n' "$F03_EXPECTED_HEAD" "$F03_DIAGNOSTIC_ORDER" "$F03_DIAGNOSTIC_HEAP_MIB"
+          printf 'F03 capacity hypothesis only; checkout=%s; order=%s; heapMiB=%s; ordinary heap profile depends on verified runner environment\n' "$F03_EXPECTED_HEAD" "$F03_DIAGNOSTIC_ORDER" "$F03_DIAGNOSTIC_HEAP_MIB"
           sha256sum audit-tools/emu/registry-purge-atomic-sdk-test.js firebase-database.rules.json
           PORT=$(node "$F03_DIAG_DIR/owned-jvm.cjs" port "$F03_DIAG_DIR")
           JAR=$(realpath "${ZOE_RTDB_JAR:?RTDB JAR unavailable}")

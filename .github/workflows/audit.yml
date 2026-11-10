@@ -227,6 +227,7 @@ jobs:
       - name: run-all.sh (ផ្នែក ${{ matrix.shard }}/4)
         id: audit
         env:
+          AUDIT_LOG: ${{ runner.temp }}/zoe-audit-${{ matrix.shard }}.log
           RUNALL_STRICT: '1'
           RUNALL_STATE: ''
           RUNALL_JOBS: '2'
@@ -242,11 +243,21 @@ jobs:
           SUPABASE_STRICT: '1'
           FBPROVISION_STRICT: '1'
         run: |
+          set -o pipefail
           if [ "$ZOE_MULTISHOP_SCALE" = 'true' ]; then
             export RUNALL_SHARD='' RUNALL_ONLY='supabase-money-multishop-test'
             export SBMONEY_SHOPS='8' SBMONEY_DEVICES='3'
           fi
-          bash audit-tools/run-all.sh
+          bash audit-tools/run-all.sh 2>&1 | tee "$AUDIT_LOG"
+
+      - name: រក្សា log របស់ audit គ្រប់ផ្នែក
+        if: always() && steps.audit.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          name: audit-log-${{ matrix.shard }}
+          path: ${{ runner.temp }}/zoe-audit-${{ matrix.shard }}.log
+          if-no-files-found: error
+          retention-days: 14
 
       - name: រក្សាភស្តុតាង ZoeW suite ពេលធ្លាក់
         if: failure()

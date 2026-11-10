@@ -19,6 +19,34 @@ visit(main);
 if (!loop) throw new Error('Missing provider loop');
 const body = loop.getText(ast);
 
+it('native trace ចង UTC ជាមួយព្រំ monotonic ហើយមិនប្រែពេល wall clock លោត', () => {
+    const declaration = ast.statements.find(n => ts.isClassDeclaration(n) && n.name?.text === 'NativeWireTrace');
+    if (!declaration) throw new Error('Missing actual NativeWireTrace');
+    let monotonic = 1000000000n, wall = Date.UTC(2026, 10, 10, 6);
+    const wallStart = new Date(wall).toISOString();
+    class ClockDate extends Date {
+        constructor() { super(wall); monotonic += 2000000n; }
+    }
+    const Trace = vm.runInNewContext(declaration.getText(ast) + '\nNativeWireTrace', {
+        Date: ClockDate, process: { memoryUsage: () => ({ heapUsed: 1, rss: 2 }) }
+    });
+    const trace = new Trace(new URL('http://127.0.0.1:9000'), 'demo-f03-purge-anchor', () => monotonic);
+    monotonic = 1005000000n;
+    wall -= 86400000;
+    trace.note('public-purge-start');
+    const report = trace.summary();
+    expect(report.timeAnchor).toEqual({ wallUtc: wallStart, monotonicBeforeMs: 0, monotonicAfterMs: 2 });
+    expect(report.events[0].ms).toBe(5);
+    monotonic = 16000000000n;
+    wall += 172800000;
+    trace.note('case-failed', { timedOut: true });
+    expect(trace.summary().timeAnchor).toEqual(report.timeAnchor);
+    expect(trace.summary().events[1].ms).toBe(15000);
+    expect(trace.summary().events[1].timedOut).toBe(true);
+    report.timeAnchor.wallUtc = 'changed copy';
+    expect(trace.summary().timeAnchor.wallUtc).toBe(wallStart);
+});
+
 async function simulate(options: { failedProvider?: string; failure?: unknown; different?: boolean; providersDiffer?: boolean; missingLogical?: boolean } = {}) {
     const checks: { label: string; pass: boolean }[] = [];
     const results: { provider: string; error: string | null; pass: boolean }[] = [];

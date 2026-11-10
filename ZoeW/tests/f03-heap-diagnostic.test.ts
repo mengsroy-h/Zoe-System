@@ -113,7 +113,7 @@ it('sampler រក្សា GC_COUNTERS_UNAVAILABLE និង failure ពេល 
             const observed = { stat: { state: 'S' } }, output = '/owned/samples';
             ${probeBlock}
             unavailable;
-        `, { process, require: (name: string) => name === 'fs' ? { appendFileSync: (_file: string, data: string) => { sample = data; } }
+        `, { process: { env: {}, hrtime: process.hrtime }, require: (name: string) => name === 'fs' ? { appendFileSync: (_file: string, data: string) => { sample = data; } }
             : name === 'child_process' ? { spawnSync: () => probe } : realRequire(name) });
         const row = JSON.parse(sample);
         expect(result).toBe(probe.status !== 0);
@@ -172,7 +172,7 @@ it('sampler កត់ពេលចាប់ផ្ដើម ចប់ និងយ
         let unavailable = false; const nextSample = 1000;
         const owner = { pid: 123, start: '100', jstat: '/owned/jstat' }, observed = { stat: { state: 'S' } }, output = '/owned/samples';
         ${probeBlock}
-    `, { process: { hrtime: { bigint: () => BigInt(now) * 1000000n } }, require: (name: string) => name === 'fs'
+    `, { process: { env: {}, hrtime: { bigint: () => BigInt(now) * 1000000n } }, require: (name: string) => name === 'fs'
         ? { appendFileSync: (_file: string, data: string) => { sample = data; } } : name === 'child_process'
             ? { spawnSync: (...args: unknown[]) => { calls.push(args); now += 1100; return { status: null, error: { code: 'ETIMEDOUT' }, stdout: 'Timestamp YGC\n1.5 2\n' }; } }
             : realRequire(name) });
@@ -275,18 +275,28 @@ it.each([['proc', null], ['argv', false], ['start', true], ['zombie', true]] as 
     expect(result.cleanup).toMatchObject({ gatePassed: true, ownedProcessTerminated: terminated, ownedPortClosed: true, metricsComplete: true });
 });
 
-it('sampler ពិតរក្សា cadence មួយវិនាទី និង failure ទោះ probe យូរជាង cadence', async () => {
-    const realRequire = createRequire(import.meta.url), rows: string[] = [], waits: number[] = [], probes: unknown[][] = [];
+type SamplerProbe = { status: number | null; stdout?: string; stderr?: string; error?: { code: string } };
+const hostedObserverEnv = { GITHUB_ACTIONS: 'true', RUNNER_ENVIRONMENT: 'github-hosted' };
+const observerFlag = '-J-XX:TieredStopAtLevel=1';
+const completeProbe = { status: 0, stdout: 'Timestamp YGC\n1.5 2\n' };
+
+async function sampleFixture(env: unknown, firstProbe: SamplerProbe = { ...completeProbe, error: { code: 'ETIMEDOUT' } }, observationMs = 0) {
+    const realRequire = createRequire(import.meta.url), rows: string[] = [], waits: number[] = [], probes: unknown[][] = [], clocks: number[] = [];
     const files = new Map<string, string>();
     const binding = { ...owner(1024), pid: 123, jstat: '/owned/jstat' };
+    const targetArgs = ['-Xmx1024m', '-Xlog:gc*:file=/owned/jvm-gc.log:utctime,uptimemillis,level,tags:filecount=1,filesize=8M',
+        '-jar', '/owned/emulator.jar', '--port', '19001', '--host', '127.0.0.1'];
     let now = 1000;
-    const fakeProcess = { argv: ['node', '/owned/owned-jvm.cjs', 'sample', '/owned'], pid: 456, exitCode: 0,
-        hrtime: { bigint: () => BigInt(now) * 1000000n } };
+    const fakeProcess = { argv: ['node', '/owned/owned-jvm.cjs', 'sample', '/owned'], pid: 456, exitCode: 0, env,
+        hrtime: { bigint: () => { clocks.push(now); return BigInt(now) * 1000000n; } } };
     const fakeFs = {
         readFileSync(file: string) {
             if (file === '/owned/owner.json') return JSON.stringify(binding);
-            if (file.endsWith('/stat')) { const fields = Array<string>(22).fill('0'); fields[0] = 'S'; fields[19] = '100'; return '123 (java) ' + fields.join(' '); }
-            if (file === '/proc/123/cmdline') return ['java', ...helpers.javaArguments(binding)].join('\0') + '\0';
+            if (file.endsWith('/stat')) {
+                if (file === '/proc/123/stat') now += observationMs;
+                const fields = Array<string>(22).fill('0'); fields[0] = 'S'; fields[19] = '100'; return '123 (java) ' + fields.join(' ');
+            }
+            if (file === '/proc/123/cmdline') return ['java', ...targetArgs].join('\0') + '\0';
             if (file === '/proc/456/cmdline') return fakeProcess.argv.join('\0') + '\0';
             throw new Error('Unexpected fixture path');
         },
@@ -298,16 +308,71 @@ it('sampler ពិតរក្សា cadence មួយវិនាទី និ�
         process: fakeProcess, setTimeout: (done: () => void, ms: number) => { waits.push(ms); now += ms; done(); return 0; },
         require: (name: string) => name === 'fs' ? fakeFs : name === 'child_process' ? {
             spawnSync(...args: unknown[]) { probes.push(args); now += [1100, 50, 20][probes.length - 1];
-                return { status: 0, stdout: 'Timestamp YGC\n1.5 2\n', ...(probes.length === 1 ? { error: { code: 'ETIMEDOUT' } } : {}) }; },
+                return probes.length === 1 ? firstProbe : completeProbe; },
         } : realRequire(name),
     });
+    expect(helpers.javaArguments(binding)).toEqual(targetArgs);
+    return { probes, waits, rows: rows.map(row => JSON.parse(row)), result: JSON.parse(files.get('sampler-result.json')!), exitCode: fakeProcess.exitCode, clocks };
+}
+
+it('sampler ពិតរក្សា cadence មួយវិនាទី និង failure ទោះ probe យូរជាង cadence', async () => {
+    const { probes, waits, rows, result, exitCode } = await sampleFixture({});
     expect(probes).toEqual(Array.from({ length: 3 }, () => ['/owned/jstat', ['-gc', '-t', '123'], { encoding: 'utf8', timeout: 750, maxBuffer: 16384 }]));
     expect(waits).toEqual([0, 850, 980]);
-    expect(rows.map(row => { const value = JSON.parse(row); return [value.status, value.gcProbe.elapsedMs, value.gcProbe.scheduleLatenessMs]; }))
+    expect(rows.map(value => [value.status, value.gcProbe.elapsedMs, value.gcProbe.scheduleLatenessMs]))
         .toEqual([['GC_COUNTERS_UNAVAILABLE', 1100, 0], ['OBSERVED', 50, 100], ['OBSERVED', 20, 0]]);
-    expect(JSON.parse(rows[0]).gc).toBeNull();
-    expect(JSON.parse(files.get('sampler-result.json')!)).toEqual({ samples: 3, unavailable: true, passiveObservationHasOverhead: true });
-    expect(fakeProcess.exitCode).toBe(1);
+    expect(rows[0].gc).toBeNull();
+    expect(result).toEqual({ samples: 3, unavailable: true, passiveObservationHasOverhead: true });
+    expect(exitCode).toBe(1);
+});
+
+it.each([
+    ['github-hosted', hostedObserverEnv, true],
+    ['self-hosted', { GITHUB_ACTIONS: 'true', RUNNER_ENVIRONMENT: 'self-hosted' }, false],
+    ['local', {}, false],
+    ['undefined', undefined, false],
+    ['null', null, false],
+    ['array', [], false],
+    ['string', 'PRIVATE', false],
+    ['number', 1, false],
+    ['NaN', NaN, false],
+    ['missing-actions', { RUNNER_ENVIRONMENT: 'github-hosted' }, false],
+    ['missing-runner', { GITHUB_ACTIONS: 'true' }, false],
+    ['false-actions', { ...hostedObserverEnv, GITHUB_ACTIONS: 'false' }, false],
+    ['boolean-actions', { ...hostedObserverEnv, GITHUB_ACTIONS: true }, false],
+    ['uppercase-actions', { ...hostedObserverEnv, GITHUB_ACTIONS: 'TRUE' }, false],
+    ['spaced-actions', { ...hostedObserverEnv, GITHUB_ACTIONS: 'true ' }, false],
+    ['uppercase-runner', { ...hostedObserverEnv, RUNNER_ENVIRONMENT: 'GITHUB-HOSTED' }, false],
+    ['spaced-runner', { ...hostedObserverEnv, RUNNER_ENVIRONMENT: 'github-hosted ' }, false],
+    ['unknown-runner', { ...hostedObserverEnv, RUNNER_ENVIRONMENT: 'PRIVATE' }, false],
+    ['extra-env', { ...hostedObserverEnv, JSTAT_ARGS: 'PRIVATE', OBSERVER_PROFILE: 'PRIVATE' }, true],
+] as const)('sampler %s ជ្រើស observer តាម environment ពិត ហើយភស្តុតាងត្រូវនឹង args', async (_label, env, tier1) => {
+    const { probes, rows, result, exitCode } = await sampleFixture(env, completeProbe);
+    const args = [...(tier1 ? [observerFlag] : []), '-gc', '-t', '123'];
+    expect(probes).toEqual(Array.from({ length: 3 }, () => ['/owned/jstat', args, { encoding: 'utf8', timeout: 750, maxBuffer: 16384 }]));
+    expect(rows).toHaveLength(3);
+    expect(rows.map(row => row.gcProbe.observerProfile)).toEqual(Array(3).fill(tier1 ? 'github-hosted-tier1' : 'default'));
+    expect(rows.every(row => row.status === 'OBSERVED')).toBe(true);
+    expect(result).toEqual({ samples: 3, unavailable: false, passiveObservationHasOverhead: true });
+    expect(exitCode).toBe(0);
+    expect(JSON.stringify({ rows, result, probes })).not.toContain('PRIVATE');
+});
+
+it.each([
+    ['timeout-exit0', { ...completeProbe, error: { code: 'ETIMEDOUT' } }, 'TIMEOUT'],
+    ['unsupported-flag', { status: 1, stderr: 'PRIVATE unsupported option' }, 'NONZERO_EXIT'],
+] as const)('GitHub observer %s រក្សា failure និង epoch ដំបូង ដោយគ្មាន retry ឬ fallback', async (_label, probe, outcome) => {
+    const { probes, waits, rows, result, exitCode, clocks } = await sampleFixture(hostedObserverEnv, probe, 25);
+    expect(probes).toEqual(Array.from({ length: 3 }, () => ['/owned/jstat', [observerFlag, '-gc', '-t', '123'], { encoding: 'utf8', timeout: 750, maxBuffer: 16384 }]));
+    expect(clocks[0]).toBe(1000);
+    expect(waits).toEqual([0, 800, 955]);
+    expect(rows.map(row => row.gcProbe.scheduleLatenessMs)).toEqual([25, 150, 25]);
+    expect(rows[0]).toMatchObject({ status: 'GC_COUNTERS_UNAVAILABLE', gc: null,
+        gcProbe: { outcome, observerProfile: 'github-hosted-tier1', exitStatus: probe.status, elapsedMs: 1100 } });
+    expect(rows.slice(1).map(row => row.status)).toEqual(['OBSERVED', 'OBSERVED']);
+    expect(result).toEqual({ samples: 3, unavailable: true, passiveObservationHasOverhead: true });
+    expect(exitCode).toBe(1);
+    expect(JSON.stringify({ rows, result })).not.toContain('PRIVATE');
 });
 
 it('cleanup artifact នៅក្នុងបញ្ជីរក្សាភស្តុតាងពេលជំហានមុនបរាជ័យ', () => {

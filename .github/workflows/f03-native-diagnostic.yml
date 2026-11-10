@@ -145,6 +145,10 @@ jobs:
                   || values.some(value => !/^(?:\d+(?:\.\d+)?|-)$/.test(value) || (value !== '-' && !Number.isFinite(Number(value))))) return null;
               return Object.fromEntries(names.map((name, index) => [name, values[index] === '-' ? null : Number(values[index])]));
           }
+          function observerArguments(pid, env) {
+              const tier1 = env?.GITHUB_ACTIONS === 'true' && env?.RUNNER_ENVIRONMENT === 'github-hosted';
+              return [...(tier1 ? ['-J-XX:TieredStopAtLevel=1'] : []), '-gc', '-t', String(pid)];
+          }
           function probeCounters(probe) {
               const row = counters(probe.stdout), gc = !probe.error && !probe.signal && probe.status === 0 ? row : null;
               const outcome = gc ? 'OBSERVED' : probe.error?.code === 'ETIMEDOUT' ? 'TIMEOUT'
@@ -276,10 +280,12 @@ jobs:
                       const observed = current(owner);
                       if (!observed) { fs.appendFileSync(output, JSON.stringify({ utc: new Date().toISOString(), status: 'OWNED_PROCESS_ENDED' }) + '\n'); break; }
                       const probeStartedMs = Number(process.hrtime.bigint()) / 1e6, probeStartedUtc = new Date().toISOString();
-                      const probe = cp.spawnSync(owner.jstat, ['-gc', '-t', String(owner.pid)], { encoding: 'utf8', timeout: 750, maxBuffer: 16384 });
+                      const probeArgs = observerArguments(owner.pid, process.env);
+                      const probe = cp.spawnSync(owner.jstat, probeArgs, { encoding: 'utf8', timeout: 750, maxBuffer: 16384 });
                       const probeEndedMs = Number(process.hrtime.bigint()) / 1e6, probeEndedUtc = new Date().toISOString();
                       const { gc, gcProbe } = probeCounters(probe); unavailable ||= !gc;
-                      Object.assign(gcProbe, { startedUtc: probeStartedUtc, endedUtc: probeEndedUtc,
+                      Object.assign(gcProbe, { observerProfile: probeArgs[0] === '-J-XX:TieredStopAtLevel=1' ? 'github-hosted-tier1' : 'default',
+                          startedUtc: probeStartedUtc, endedUtc: probeEndedUtc,
                           elapsedMs: probeEndedMs - probeStartedMs, scheduleLatenessMs: Math.max(0, probeStartedMs - nextSample) });
                       fs.appendFileSync(output, JSON.stringify({ utc: new Date().toISOString(), pid: owner.pid, start: owner.start,
                           status: gc ? 'OBSERVED' : 'GC_COUNTERS_UNAVAILABLE', ...observed.stat, gc, gcProbe }) + '\n');

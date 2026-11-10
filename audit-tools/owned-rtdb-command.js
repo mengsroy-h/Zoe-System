@@ -23,7 +23,18 @@ function listenerMatches(texts, descriptors, port = PORT) {
             && ['0100007F', '0000000000000000FFFF00000100007F'].includes(local[0]) && sockets.has(cells[9]);
     }));
 }
-function javaArguments(jar) { return ['-Xmx512m', '-jar', jar, '--port', String(PORT), '--host', '127.0.0.1']; }
+function heapForCommand(args, env, cwd) {
+    const guarded = args.length === 4 && args[1] === '--require'
+        && path.resolve(cwd, args[2]) === path.join(cwd, 'audit-tools/runall-exit-guard.cjs');
+    const script = guarded ? args[3] : args.length === 2 ? args[1] : null;
+    const f03 = script && /^(?:node|node\.exe)$/.test(path.basename(args[0]))
+        && path.resolve(cwd, script) === path.join(cwd, 'audit-tools/emu/registry-purge-atomic-sdk-test.js');
+    return f03 && env.GITHUB_ACTIONS === 'true' && env.RUNNER_ENVIRONMENT === 'github-hosted' ? 1024 : 512;
+}
+function javaArguments(jar, maxHeapMiB = 512) {
+    if (![512, 1024].includes(maxHeapMiB)) throw new Error('Unsupported owned JVM heap');
+    return ['-Xmx' + maxHeapMiB + 'm', '-jar', jar, '--port', String(PORT), '--host', '127.0.0.1'];
+}
 function javaEnvironment(env) {
     const clean = { ...env }; for (const key of ['JAVA_TOOL_OPTIONS', 'JDK_JAVA_OPTIONS', '_JAVA_OPTIONS']) delete clean[key]; return clean;
 }
@@ -101,9 +112,9 @@ function validateSource(env, cwd) {
 }
 function productionAdapters(sinks = { stdout: process.stdout, stderr: process.stderr }) {
     return { validateSource, now: Date.now, delay, verifyJar, portFree, identity: processIdentity, ownsListener, readyRead,
-        launch: (jar, env, log) => {
+        launch: (jar, env, log, maxHeapMiB) => {
             const fd = fs.openSync(log, 'wx'); let handle;
-            try { handle = spawnProcess('java', javaArguments(jar), { env: javaEnvironment(env), stdio: ['ignore', fd, fd] }); }
+            try { handle = spawnProcess('java', javaArguments(jar, maxHeapMiB), { env: javaEnvironment(env), stdio: ['ignore', fd, fd] }); }
             finally { fs.closeSync(fd); }
             return handle;
         },
@@ -183,13 +194,13 @@ async function runOwnedCommand(options, adapters = productionAdapters()) {
             if (report.childResult.code !== 0 || report.childResult.error || report.childResult.outputPresent !== true || report.childResult.failureLine) throw new Error('Original construction-only command failed');
             unrun = true;
         } else {
-        const childEnv = childEnvironment(env), jar = adapters.verifyJar(env, cwd);
+        const childEnv = childEnvironment(env), jar = adapters.verifyJar(env, cwd), maxHeapMiB = heapForCommand(args, env, cwd);
         await adapters.portFree();
         if (signal?.aborted) throw new Error('Owned command interrupted');
-        engine = adapters.launch(jar.jar, env, path.join(directory, 'emulator.log')); await engine.spawned;
+        engine = adapters.launch(jar.jar, env, path.join(directory, 'emulator.log'), maxHeapMiB); await engine.spawned;
         const seen = adapters.identity(engine.child.pid);
-        owner = { ...seen, jar: jar.jar, jarSHA256: jar.sha256, expectedArgs: javaArguments(jar.jar), maxHeapMiB: 512 };
-        report.owner = { pid: owner.pid, start: owner.start, executable: owner.exe, jarSHA256: jar.sha256, maxHeapMiB: 512, port: PORT };
+        owner = { ...seen, jar: jar.jar, jarSHA256: jar.sha256, expectedArgs: javaArguments(jar.jar, maxHeapMiB), maxHeapMiB };
+        report.owner = { pid: owner.pid, start: owner.start, executable: owner.exe, jarSHA256: jar.sha256, maxHeapMiB, port: PORT };
         fs.writeFileSync(path.join(directory, 'owner.json'), JSON.stringify(owner) + '\n', { flag: 'wx' }); acquired = true;
         if (owner.args.length !== owner.expectedArgs.length + 1 || !owner.expectedArgs.every((value, index) => owner.args[index + 1] === value)) throw new Error('Owned JVM argv mismatch');
         await waitReady(engine, owner, adapters, signal); report.ownedRuntimeStarted = true;
@@ -239,5 +250,5 @@ async function main() {
         process.exitCode = result.code;
     } finally { for (const event of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.removeListener(event, stop); }
 }
-module.exports = { runOwnedCommand, identityMatches, listenerMatches, listenerTables, javaArguments, javaEnvironment, childEnvironment, verifyJar, waitReady, productionAdapters, strictResult, validateSource };
+module.exports = { runOwnedCommand, identityMatches, listenerMatches, listenerTables, heapForCommand, javaArguments, javaEnvironment, childEnvironment, verifyJar, waitReady, productionAdapters, strictResult, validateSource };
 if (require.main === module) main().catch(error => { console.error('FAIL owned RTDB command: ' + String(error.message || error)); process.exitCode = 1; });

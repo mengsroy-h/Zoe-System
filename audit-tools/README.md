@@ -130,7 +130,7 @@ cat "$(git rev-parse --absolute-git-dir)/zoe-runall-state.tsv"               # �
 មិនសរសេរទៅហាងផលិតកម្ម ហើយមិនជំនួស CI ពេញទេ។ ទុក checkbox បិទ ➜ dispatch ធម្មតា និង PR/push រត់ shard ទាំង ៤ ដដែល។
 Scale run មាន concurrency group ដាច់ ដូច្នេះវាមិន cancel full run របស់ branch ដដែល។
 
-សម្រាប់វាស់ purge លើ JVM ថ្មី៖ workflow `F03 native fresh JVM` រត់ស្វ័យប្រវត្តិលើ PR ដែលប៉ះ input ដែលវាតាមដាន។ Job នីមួយៗបើក emulator JVM ផ្ទាល់ដោយ heap512MiB និង loopback port ផ្ទាល់; លំដាប់ចំនួន barcode គឺ `249,250,251` និង `251,249,250`។ Fresh JVM មិនធានា fresh host លើ self-hosted runner ទេ។ វាកត់ passive GC/heap counters និង original-effect readback ពេលបរាជ័យ ដោយមិន replay ឬបោស pending evidence។ Deadline15s និង atomic-effect checks នៅដដែល; late complete ឬ HOLD មិនក្លាយជា PASS។ លទ្ធផលនេះមិនជំនួស Audit ទាំង៤ shards ទេ។ `F03_TIMING_ORDER` ទទួលតែលំដាប់ទាំងពីរនេះ; runtime/cleanup/measurement ខ្វះត្រូវ FAIL។
+សម្រាប់វាស់ purge លើ JVM ថ្មី៖ workflow `F03 native fresh JVM` រត់ស្វ័យប្រវត្តិលើ PR ដែលប៉ះ input ដែលវាតាមដាន។ Job នីមួយៗបើក emulator JVM និង loopback port ផ្ទាល់; GitHub mode វាស់ heap1024MiB ទាំងពីរលំដាប់ ហើយ self-hosted រក្សា matrix heap512/1024MiB ដដែល; លំដាប់ចំនួន barcode គឺ `249,250,251` និង `251,249,250`។ Fresh JVM មិនធានា fresh host លើ self-hosted runner ទេ។ វាកត់ passive GC/heap counters និង original-effect readback ពេលបរាជ័យ ដោយមិន replay ឬបោស pending evidence។ Deadline15s និង atomic-effect checks នៅដដែល; late complete ឬ HOLD មិនក្លាយជា PASS។ លទ្ធផលនេះមិនជំនួស Audit ទាំង៤ shards ទេ។ `F03_TIMING_ORDER` ទទួលតែលំដាប់ទាំងពីរនេះ; runtime/cleanup/measurement ខ្វះត្រូវ FAIL។
 
 ### ៣. រត់តែមួយ
 
@@ -151,7 +151,7 @@ cd "$M" && node audit-tools/policy-test.js
 
 ### ៥. Firebase RTDB runtime និង standalone rules diagnostics
 
-⛔ **Prepared JAR និង owned lifecycle របស់ ordinary run-all រស់នៅ [`../CLAUDE.md`](../CLAUDE.md) ➜ Runbook ជំហានទី ០ តែមួយកន្លែង។** ការណែនាំនេះមិនផ្តល់សិទ្ធិ install/start local runtime ដោយខ្លួនឯងទេ; ការរត់ត្រូវតាម scope ដែលបានអនុញ្ញាត។ STRICT runtime/ownership/cleanup ខ្វះត្រូវ FAIL; source/fake-process checks មិនជំនួស actual JVM CI។ Startup/cleanup ប្រើ outer budget ដើម; helper មិនពង្រីក heap ឬ deadline ហើយមិន replay UNKNOWN។
+⛔ **Prepared JAR និង owned lifecycle របស់ ordinary run-all រស់នៅ [`../CLAUDE.md`](../CLAUDE.md) ➜ Runbook ជំហានទី ០ តែមួយកន្លែង។** ការណែនាំនេះមិនផ្តល់សិទ្ធិ install/start local runtime ដោយខ្លួនឯងទេ; ការរត់ត្រូវតាម scope ដែលបានអនុញ្ញាត។ STRICT runtime/ownership/cleanup ខ្វះត្រូវ FAIL; source/fake-process checks មិនជំនួស actual JVM CI។ Startup/cleanup ប្រើ outer budget ដើម; helper រក្សា deadline ហើយមិន replay UNKNOWN។ ក្នុង GitHub-hosted CI តែ canonical F03 command ប្រើ heap1024MiB; checker ផ្សេង និង self-hosted/បរិស្ថានដែលមិនផ្ទៀង នៅ heap512MiB។ Heap ដែលជ្រើសត្រូវចងនឹង argv និង owner record; គ្មានការប្ដូរ container/WSL limits ឬចំនួន workers។
 
 សម្រាប់ **standalone** `emu/rules.sh` ឬ direct individual checker ប៉ុណ្ណោះ៖ ត្រូវមាន external emulator ដែលម្ចាស់វាផ្ទៀង ownership/readiness រួច។ ផ្លូវនេះមិនមែន fallback របស់ normal CI ហើយមិនត្រូវរត់ជាមួយ normal run-all លើ port ដូចគ្នា។ បន្ទាប់មក៖
 

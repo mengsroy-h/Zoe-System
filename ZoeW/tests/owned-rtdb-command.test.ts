@@ -15,7 +15,7 @@ const temporaryPaths: string[] = [];
 afterEach(() => { for (const dir of temporaryPaths.splice(0)) fs.rmSync(dir, { recursive: true, force: true }); });
 function temporary() { const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-owned-unit-')); temporaryPaths.push(dir); return dir; }
 function fakeRuntime(options: Record<string, any> = {}) {
-    let clock = 0, active = 0, serial = 10, jarChecks = 0; const events: any[] = [];
+    let clock = 0, active = 0, serial = 10, jarChecks = 0, launchedHeap = 512; const events: any[] = [];
     const handles: any[] = [];
     function handle(kind: string) {
         let resolve: any; const h: any = { child: { pid: ++serial }, kind, done: false, spawned: Promise.resolve(), ended: () => h.done };
@@ -27,8 +27,8 @@ function fakeRuntime(options: Record<string, any> = {}) {
         now: () => clock, delay: async (ms: number) => { clock += ms; },
         verifyJar() { if (options.jarMissing) { const e: any = new Error('Prepared RTDB JAR unavailable'); e.code = 'OWNED_RUNTIME_UNAVAILABLE'; throw e; } return { jar: '/verified/emulator.jar', sha256: (++jarChecks > 1 && options.jarDrift ? 'b' : 'a').repeat(64) }; },
         portFree: async () => { if (options.foreign || active) throw new Error('EADDRINUSE foreign or live engine'); },
-        launch: () => { events.push(['launch']); const h = handle('engine'); active++; return h; },
-        identity: (pid: number) => ({ pid, start: options.changed ? 'changed' : '100', state: 'S', exe: '/java', args: ['java', ...helper.javaArguments('/verified/emulator.jar')] }),
+        launch: (_jar: string, _env: unknown, _log: string, heap = 512) => { launchedHeap = options.forceHeap || heap; events.push(['launch']); const h = handle('engine'); active++; return h; },
+        identity: (pid: number) => ({ pid, start: options.changed ? 'changed' : '100', state: 'S', exe: '/java', args: ['java', ...helper.javaArguments('/verified/emulator.jar', launchedHeap)] }),
         ownsListener: () => options.listener !== false,
         readyRead: async () => { if (options.changeAfterRead) options.changed = true; return options.ready !== false; },
         command: (args: string[], env: Record<string, string>) => { events.push(['command', args, env]); const h = handle('command'); queueMicrotask(() => h.finish(options.code || 0)); return h; },
@@ -203,4 +203,78 @@ it('actual child tee preserves backpressure rather than accumulating all output 
     const script = "process.stdout.write('ok '+ 'x'.repeat(4*1024*1024)+'\\n')";
     const result = await helper.runOwnedCommand({ stateDir: temporary(), args: [process.execPath, '-e', script], env: { RUNALL_STRICT: '1' } }, fake.adapter);
     await new Promise<void>(resolve => sink.end(resolve)); expect(result.code).toBe(0); expect(bytes).toBe(4 * 1024 * 1024 + 4); expect(maxQueued).toBeLessThanOrEqual(maxChunk);
+});
+
+const f03Args = ['node', 'audit-tools/emu/registry-purge-atomic-sdk-test.js'];
+const hostedCI = { RUNALL_STRICT: '1', GITHUB_ACTIONS: 'true', RUNNER_ENVIRONMENT: 'github-hosted' };
+it('F03 តែមួយប្រើ heap1024 លើ GitHub-hosted CI ហើយ owner ចងទំហំដូច JVM', async () => {
+    const fake = fakeRuntime();
+    const result = await helper.runOwnedCommand({ stateDir: temporary(), args: f03Args, env: hostedCI, cwd: repo }, fake.adapter);
+    expect(result.code).toBe(0); expect(result.report.owner.maxHeapMiB).toBe(1024);
+    const owner = JSON.parse(fs.readFileSync(path.join(result.directory, 'owner.json'), 'utf8'));
+    expect(owner.args).toContain('-Xmx1024m'); expect(owner.expectedArgs).toContain('-Xmx1024m');
+    expect(fake.events.filter(event => event[0] === 'command')).toHaveLength(1); expect(fake.active()).toBe(0);
+});
+it.each([
+    {}, { RUNNER_ENVIRONMENT: 'github-hosted' }, { GITHUB_ACTIONS: 'true' },
+    { GITHUB_ACTIONS: 'true', RUNNER_ENVIRONMENT: 'self-hosted' },
+    { GITHUB_ACTIONS: 'false', RUNNER_ENVIRONMENT: 'github-hosted' }
+])('F03 មិនបន្ថែម heap លើ self-hosted ឬ runtime ដែលមិនផ្ទៀង៖ %j', async env => {
+    const fake = fakeRuntime();
+    const result = await helper.runOwnedCommand({ stateDir: temporary(), args: f03Args, env: { RUNALL_STRICT: '1', ...env }, cwd: repo }, fake.adapter);
+    expect(result.code).toBe(0); expect(result.report.owner.maxHeapMiB).toBe(512);
+});
+it.each([
+    ['node', 'audit-tools/emu/fake.js'], ['node', 'audit-tools/checker-coverage.js'],
+    ['node', 'audit-tools/exit-code-integrity.js'], ['node', '-e', f03Args[1]],
+    ['bash', f03Args[1]], ['node', '/foreign/audit-tools/emu/registry-purge-atomic-sdk-test.js'],
+    ['node', f03Args[1], '--fixtures-only']
+])('គ្មាន heap1024 ជ្រាបទៅ command ផ្សេង៖ %j', async (...args) => {
+    const fake = fakeRuntime();
+    const result = await helper.runOwnedCommand({ stateDir: temporary(), args, env: hostedCI, cwd: repo }, fake.adapter);
+    expect(result.code).toBe(0); expect(result.report.owner.maxHeapMiB).toBe(512);
+});
+it('F03 បដិសេធ JVM ដែល heap មិនដូចការជ្រើស មុនចាប់ checker', async () => {
+    const fake = fakeRuntime({ forceHeap: 512 });
+    const result = await helper.runOwnedCommand({ stateDir: temporary(), args: f03Args, env: hostedCI, cwd: repo }, fake.adapter);
+    expect(result.code).toBe(1); expect(result.report.commandStarted).toBe(false);
+    expect(result.report.errors).toContain('Owned JVM argv mismatch'); expect(fake.active()).toBe(0);
+});
+it.each([0, 513, 2048, '1024', '1024m', null, NaN])('បដិសេធ heap ក្រៅកិច្ចសន្យា៖ %s', value => {
+    expect(() => helper.javaArguments('/verified/jar', value)).toThrow();
+});
+
+it('F03 ក្នុង scheduler ទទួល preload របស់ run-all ពិតដោយរក្សា heap1024', async () => {
+    const fake = fakeRuntime(), args = ['node', '--require', path.join(repo, 'audit-tools/runall-exit-guard.cjs'), f03Args[1]];
+    const result = await helper.runOwnedCommand({ stateDir: temporary(), args, env: hostedCI, cwd: repo }, fake.adapter);
+    expect(result.code).toBe(0); expect(result.report.owner.maxHeapMiB).toBe(1024);
+    expect(fake.events.find(event => event[0] === 'command')[1]).toEqual(args);
+    expect(helper.heapForCommand(['node', '--require', '/foreign/runall-exit-guard.cjs', f03Args[1]], hostedCI, repo)).toBe(512);
+    expect(helper.heapForCommand(['node', '--eval', 'x', f03Args[1]], hostedCI, repo)).toBe(512);
+});
+
+it.each([512, 1024])('launch ពិតផ្ញើ heap%s ទៅ spawn ដោយដក Java options និងបិទ log descriptor', async heap => {
+    const cp = require('node:child_process'), { EventEmitter } = require('node:events');
+    const originalSpawn = cp.spawn, calls: any[] = [], log = path.join(temporary(), 'emulator.log');
+    cp.spawn = (command: string, args: string[], options: any) => {
+        calls.push({ command, args, options });
+        expect(fs.fstatSync(options.stdio[1]).isFile()).toBe(true);
+        const child = new EventEmitter(); child.pid = 123; child.exitCode = null; child.signalCode = null;
+        queueMicrotask(() => { child.emit('spawn'); child.exitCode = 0; child.emit('close', 0, null); });
+        return child;
+    };
+    const env = { KEEP: 'yes', JAVA_TOOL_OPTIONS: '-Xmx2g', JDK_JAVA_OPTIONS: '-Xmx3g', _JAVA_OPTIONS: '-Xmx4g' };
+    try {
+        const handle = helper.productionAdapters().launch('/verified/emulator.jar', env, log, heap);
+        await handle.spawned; expect(await handle.exit).toEqual({ code: 0, signal: null });
+        expect(calls).toHaveLength(1);
+        expect(calls[0].command).toBe('java');
+        expect(calls[0].args).toEqual(['-Xmx' + heap + 'm', '-jar', '/verified/emulator.jar', '--port', '9000', '--host', '127.0.0.1']);
+        expect(calls[0].options.env).toEqual({ KEEP: 'yes' });
+        expect(calls[0].options.shell).toBe(false); expect(calls[0].options.detached).toBe(false);
+        expect(calls[0].options.stdio[0]).toBe('ignore');
+        expect(calls[0].options.stdio[1]).toBe(calls[0].options.stdio[2]);
+        expect(() => fs.fstatSync(calls[0].options.stdio[1])).toThrow();
+        expect(env.JAVA_TOOL_OPTIONS).toBe('-Xmx2g');
+    } finally { cp.spawn = originalSpawn; }
 });

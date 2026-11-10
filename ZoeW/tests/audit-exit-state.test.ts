@@ -157,7 +157,8 @@ describe('poison child៖ exit និង pipe មានពិដានដាច�
         const run = runInNewContext(source + '\nrunPoisonedChild;', {
             cp: { spawn: () => { if (spawnThrows) throw new Error('spawn ENOENT'); return child; } }, process: { execPath: 'node', env: {}, platform }, fs: procFs, Buffer, ROOT: '.',
             EXIT_GUARD_ARGS: [], OUT_CAP: 4096, EXIT_TO_CLOSE_GRACE_MS: 2000, HARD_GRACE_MS: 5000,
-            liveChildren, Date, setTimeout, clearTimeout
+            liveChildren, Date, setTimeout, clearTimeout,
+            observeChildProc: (pid: number, live: () => boolean) => require('../../audit-tools/child-proc-diagnostic.cjs').observeChildProc(pid, live, platform, procFs)
         });
         const verdictSource = guard.slice(guard.indexOf('function poisonVerdict('), guard.indexOf('\n{\n', guard.indexOf('function poisonVerdict(')));
         const verdict = runInNewContext(verdictSource + '\npoisonVerdict;', {});
@@ -302,7 +303,7 @@ describe('poison child៖ exit និង pipe មានពិដានដាច�
             const procFs = {
                 openSync: (file: string) => { events.push('read'); return file; },
                 readSync: (file: string, buffer: Buffer, offset: number, size: number) => {
-                    const value = file.endsWith('/stat') ? '12345 (private command) S 1 2 3' : 'futex_wait_queue';
+                    const value = file.endsWith('/stat') ? '12345 (private command) S ' + Array(18).fill('0').join(' ') + ' 123 0' : 'futex_wait_queue';
                     expect(size).toBe(file.endsWith('/stat') ? 1024 : 64);
                     return buffer.write(value, offset, size);
                 },
@@ -318,10 +319,10 @@ describe('poison child៖ exit និង pipe មានពិដានដាច�
             await vi.advanceTimersByTimeAsync(5100);
             const result = await pending;
             expect(events.at(-1)).toBe('kill');
-            expect(closed).toHaveLength(17);
+            expect(closed).toHaveLength(35);
             expect(result.lifecycle.proc).toMatchObject({ status: 'available', state: 'S', threadsStatus: 'bounded' });
             expect(result.lifecycle.proc.threads).toHaveLength(16);
-            expect(result.lifecycle.proc.threads[0]).toEqual({ tid: 12345, wchan: 'futex_wait_queue' });
+            expect(result.lifecycle.proc.threads[0]).toEqual({ tid: 12345, name: null, kind: 'main', wchan: 'futex_wait_queue' });
             expect(JSON.stringify(result.lifecycle)).not.toContain('private');
             expect(JSON.stringify(result.lifecycle).length).toBeLessThan(2048);
         } finally { vi.useRealTimers(); }
@@ -348,7 +349,8 @@ it('កូន Node ពិត៖ marker · hang · stdout ដែលចៅកា�
     const run = runInNewContext(source + '\nrunPoisonedChild;', {
         cp: require('node:child_process'), process, fs: require('node:fs'), Buffer, ROOT: dir,
         EXIT_GUARD_ARGS: [], OUT_CAP: 4096, EXIT_TO_CLOSE_GRACE_MS: 2000, HARD_GRACE_MS: 5000,
-        liveChildren, Date, setTimeout, clearTimeout
+        liveChildren, Date, setTimeout, clearTimeout,
+        observeChildProc: require('../../audit-tools/child-proc-diagnostic.cjs').observeChildProc
     });
     try {
         for (const mode of ['exit', 'hang', 'pipe']) {

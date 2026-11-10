@@ -14,6 +14,154 @@ const newSocket = () => Object.assign(new EventEmitter(), { url: () => 'ws://127
 function wire(context: any) { const page = new EventEmitter(), socket = newSocket(); context.emit('page', page); page.emit('websocket', socket); return socket; }
 const send = (socket: any, r: number, path: string, value: any) => socket.emit('framesent', { payload: JSON.stringify({ t: 'd', d: { r, a: 'p', b: { p: '/' + path, d: value } } }) });
 const ack = (socket: any, r: number, status = 'ok') => socket.emit('framereceived', { payload: JSON.stringify({ t: 'd', d: { r, b: { s: status, d: 'PRIVATE_BODY' } } }) });
+const fixtureId = 'sheet_flow_firebase_0_1';
+const fixtureHistory = 'zoew_scan_history_cod_dod/' + fixtureId;
+const fixtureTrash = 'zoew_recently_deleted_cod_dod/' + fixtureId;
+const fixtureRow = (token = 'PRIVATE_CLAIM') => ({ phone: 'PRIVATE_PHONE', barcodes: [{ code: '900000000001201', trashClaim: token, cod: 10 }] });
+const frame = (socket: any, direction: 'framesent' | 'framereceived', data: any) => socket.emit(direction, { payload: JSON.stringify({ t: 'd', d: data }) });
+
+it('ភ្ជាប់ action និង CAS hash ទៅសំណើនិង ACK របស់ជួរដែលវាស់ ដោយមិនរក្សាតម្លៃដើម', () => {
+    const context = ctx(), recorder = trace(context), socket = wire(context);
+    frame(socket, 'framesent', { r: 1, a: 'p', b: { p: '/' + fixtureHistory, d: fixtureRow(), h: 'PRIVATE_BASE_HASH' } }); ack(socket, 1, 'datastale');
+    frame(socket, 'framesent', { r: 2, a: 'p', b: { p: '/' + fixtureHistory, d: null, h: '' } }); ack(socket, 2);
+    send(socket, 3, fixtureTrash, fixtureRow()); ack(socket, 3);
+    const [proposal, stale, deletion, deleted, trash, trashed] = recorder.snapshot().events;
+    expect(proposal).toMatchObject({ action: 'p', casHashPresent: true, casHashEmpty: false, baseHashDigest: expect.stringMatching(/^[a-f0-9]{32}$/),
+        fixtureOperations: [{ path: fixtureHistory, shape: { kind: 'object' }, valueDigest: expect.stringMatching(/^[a-f0-9]{32}$/), claimAliases: [expect.stringMatching(/^claim-[a-f0-9]{32}$/)] }] });
+    expect(stale).toMatchObject({ phase: 'ws-ack', request: 1, socket: proposal.socket, status: 'datastale', baseHashDigest: proposal.baseHashDigest, fixtureOperations: proposal.fixtureOperations });
+    expect(deletion).toMatchObject({ action: 'p', casHashPresent: true, casHashEmpty: true, baseHashDigest: expect.stringMatching(/^[a-f0-9]{32}$/), fixtureOperations: [{ shape: { kind: 'null' }, claimAliases: [] }] });
+    expect(deletion.baseHashDigest).not.toBe(proposal.baseHashDigest);
+    expect(deleted).toMatchObject({ status: 'ok', fixtureOperations: deletion.fixtureOperations });
+    expect(trash).toMatchObject({ casHashPresent: false, casHashEmpty: false, baseHashDigest: null });
+    expect(trashed).toMatchObject({ request: 3, status: 'ok', fixtureOperations: trash.fixtureOperations });
+    expect(recorder.snapshot().websocketBoundary).toBe('server-wire-not-app-settlement');
+    expect(JSON.stringify(recorder.snapshot())).not.toMatch(/PRIVATE|900000000001201|"cod":|"phone":|"trashClaim":/);
+});
+it('ចាប់ server push ដែលគ្មានលេខសំណើ ហើយប្រៀបធៀប digest និង alias ជាមួយសំណើឆ្លង context', () => {
+    const a = ctx(), b = ctx(), ra = trace(a), rb = trace(b), sa = wire(a), sb = wire(b), row = fixtureRow();
+    send(sa, 11, fixtureHistory, row);
+    frame(sb, 'framereceived', { a: 'd', b: { p: '/' + fixtureHistory, d: { barcodes: row.barcodes, phone: row.phone } } });
+    frame(sb, 'framereceived', { a: 'd', b: { p: '/' + fixtureHistory, d: null } });
+    const proposal = ra.snapshot().events[0].fixtureOperations?.[0], [push, deletion] = rb.snapshot().events;
+    expect(push).toMatchObject({ phase: 'ws-push', action: 'd', socket: 1, fixtureOperations: [{ path: fixtureHistory, valueDigest: proposal?.valueDigest, claimAliases: proposal?.claimAliases }] });
+    expect(push).not.toHaveProperty('request'); expect(push).not.toHaveProperty('status');
+    expect(deletion.fixtureOperations[0]).toMatchObject({ shape: { kind: 'null' }, claimAliases: [] });
+    expect(deletion.fixtureOperations[0].valueDigest).not.toBe(proposal.valueDigest);
+    expect(rb.snapshot().pendingRequests).toBe(0);
+});
+it('បំបែក p និង m រួមទាំងផ្លូវមេនិងផ្លូវរង ដោយកំណត់ព័ត៌មានលម្អិតត្រឹមជួរគោលដៅ', () => {
+    const context = ctx(), recorder = trace(context), socket = wire(context), row = fixtureRow();
+    frame(socket, 'framesent', { r: 1, a: 'm', b: { p: '/', d: { [fixtureHistory]: row, 'zoew_scan_history_cod_dod/other': fixtureRow('OTHER_CLAIM') } } });
+    frame(socket, 'framereceived', { a: 'd', b: { p: '/zoew_scan_history_cod_dod', d: { [fixtureId]: row, other: fixtureRow('OTHER_CLAIM') } } });
+    frame(socket, 'framereceived', { a: 'm', b: { p: '/zoew_scan_history_cod_dod', d: { [fixtureId + '/barcodes/0/trashClaim']: 'PRIVATE_CLAIM', 'other/barcodes/0/trashClaim': 'OTHER_CLAIM' } } });
+    frame(socket, 'framesent', { r: 2, a: 'm', b: { p: '/' + fixtureHistory, d: { 'barcodes/0/trashClaim': 'PRIVATE_CLAIM' } } });
+    const [write, full, push, patch] = recorder.snapshot().events;
+    expect(write).toMatchObject({ action: 'm', casHashPresent: false, fixtureOperations: [{ path: fixtureHistory }] });
+    expect(write.fixtureOperations).toHaveLength(1);
+    expect(full.fixtureOperations).toEqual(write.fixtureOperations);
+    expect(push).toMatchObject({ phase: 'ws-push', action: 'm', fixtureOperations: [{ path: fixtureHistory + '/barcodes/0/trashClaim', claimAliases: write.fixtureOperations[0].claimAliases }] });
+    expect(patch.fixtureOperations).toEqual(push.fixtureOperations);
+    expect(JSON.stringify(recorder.snapshot())).not.toMatch(/PRIVATE|OTHER_CLAIM/);
+});
+it('មិនបង្កើតភាពអវត្តមានពី merge របស់ជួរផ្សេង ហើយមិនអាន credential ជាទិន្នន័យ fixture', () => {
+    const context = ctx(), recorder = trace(context), socket = wire(context);
+    frame(socket, 'framesent', { r: 1, a: 'auth', b: { cred: 'PRIVATE_CREDENTIAL', p: '/' + fixtureHistory, d: fixtureRow(), h: 'PRIVATE_HASH' } });
+    frame(socket, 'framesent', { r: 2, a: 'p', b: { p: '/zoew_scan_history_cod_dod/other', d: fixtureRow(), h: 'PRIVATE_HASH' } }); ack(socket, 2);
+    for (const action of ['d', 'm']) frame(socket, 'framereceived', { a: action, b: { p: '/zoew_scan_history_cod_dod/other', d: fixtureRow() } });
+    frame(socket, 'framereceived', { a: 'm', b: { p: '/zoew_scan_history_cod_dod', d: { other: fixtureRow() } } });
+    const result = recorder.snapshot(); expect(result.events).toHaveLength(2);
+    for (const event of result.events) { expect(event).not.toHaveProperty('fixtureOperations'); expect(event).not.toHaveProperty('baseHashDigest'); }
+    expect(JSON.stringify(result)).not.toMatch(/PRIVATE|900000000001201|valueDigest|claimAliases/);
+});
+it('រំលង merge ខូចនិង body បាត់ ដោយមិនបម្លែងវាជាការលុបជួរ ឬស្នើ ACK', () => {
+    const context = ctx(), recorder = trace(context), socket = wire(context);
+    for (const value of [undefined, null, 1, false, 'PRIVATE', []]) {
+        frame(socket, 'framesent', { r: 1, a: 'm', b: { p: '/' + fixtureHistory, d: value } });
+        frame(socket, 'framereceived', { a: 'm', b: { p: '/' + fixtureHistory, d: value } });
+    }
+    frame(socket, 'framesent', { r: 2, a: 'p', b: { p: '/' + fixtureHistory } });
+    frame(socket, 'framereceived', { a: 'd', b: { p: '/' + fixtureHistory } });
+    ack(socket, 1); ack(socket, 2);
+    expect(recorder.snapshot()).toMatchObject({ events: [], pendingRequests: 0, diagnosticErrors: 0 });
+});
+it('server snapshot ពេញលេញរក្សាភាពអវត្តមាននៃជួរគោលដៅ ប៉ុន្តែ merge មិនលុបស្ថានភាពដោយសន្និដ្ឋាន', () => {
+    const context = ctx(), recorder = trace(context), socket = wire(context);
+    frame(socket, 'framereceived', { a: 'm', b: { p: '/zoew_scan_history_cod_dod', d: {} } });
+    expect(recorder.snapshot().events).toEqual([]);
+    frame(socket, 'framereceived', { a: 'd', b: { p: '/zoew_scan_history_cod_dod', d: { other: fixtureRow() } } });
+    expect(recorder.snapshot().events).toMatchObject([{ phase: 'ws-push', fixtureOperations: [{ path: fixtureHistory, shape: { kind: 'null' }, claimAliases: [] }] }]);
+});
+it('query មាន tag មិនបញ្ជាក់ថាជួរបាត់ពី server ទាំងមូល ហើយដានមិនរក្សា tag ដើម', () => {
+    const context = ctx(), recorder = trace(context), socket = wire(context);
+    frame(socket, 'framereceived', { a: 'd', b: { p: '/zoew_scan_history_cod_dod', d: { other: fixtureRow() }, t: 'PRIVATE_TAG' } });
+    expect(recorder.snapshot().events).toEqual([]);
+    frame(socket, 'framereceived', { a: 'd', b: { p: '/zoew_scan_history_cod_dod', d: { [fixtureId]: fixtureRow() }, t: 7 } });
+    frame(socket, 'framereceived', { a: 'd', b: { p: '/' + fixtureHistory, d: null, t: 7 } });
+    frame(socket, 'framereceived', { a: 'd', b: { p: '/' + fixtureHistory, d: null } });
+    expect(recorder.snapshot().events.map((event: any) => event.queryTagged)).toEqual([true, true, false]);
+    expect(recorder.snapshot().events[1].fixtureOperations[0]).toMatchObject({ shape: { kind: 'null' } });
+    expect(JSON.stringify(recorder.snapshot())).not.toMatch(/PRIVATE|"tag":|"t":/);
+});
+it('ផ្លូវឫសប្រៀបធៀបប្រវត្តិនិងធុងសំរាមដាច់ដោយឡែក ហើយ alias បែងចែក token ផ្សេង', () => {
+    const context = ctx(), recorder = trace(context), socket = wire(context), root = {
+        zoew_scan_history_cod_dod: { [fixtureId]: fixtureRow('PRIVATE_A'), other: fixtureRow('PRIVATE_OTHER') },
+        zoew_recently_deleted_cod_dod: { [fixtureId]: fixtureRow('PRIVATE_B') },
+        credentials: { token: 'PRIVATE_CREDENTIAL' }
+    };
+    frame(socket, 'framesent', { r: 1, a: 'p', b: { p: '/', d: root } });
+    frame(socket, 'framereceived', { a: 'd', b: { p: '/', d: root } });
+    frame(socket, 'framereceived', { a: 'd', b: { p: '/', d: null } });
+    const [write, push, empty] = recorder.snapshot().events;
+    expect(write.fixtureOperations.map((op: any) => op.path)).toEqual([fixtureHistory, fixtureTrash]);
+    expect(push.fixtureOperations).toEqual(write.fixtureOperations);
+    expect(write.fixtureOperations[0].claimAliases[0]).not.toBe(write.fixtureOperations[1].claimAliases[0]);
+    expect(empty.fixtureOperations).toHaveLength(2);
+    for (const op of empty.fixtureOperations) expect(op).toMatchObject({ shape: { kind: 'null' }, claimAliases: [] });
+    expect(recorder.snapshot().digestScope).toBe('node-process');
+    expect(JSON.stringify(recorder.snapshot())).not.toMatch(/PRIVATE|credentials/);
+});
+it('កំណត់ដានថ្មីតាមចំនួនព្រឹត្តិការណ៍ ផ្លូវនិង claim ហើយរាយការណ៍ការកាត់', () => {
+    const context = ctx(), recorder = trace(context), socket = wire(context), values: Record<string, any> = {};
+    for (let i = 0; i < 20; i++) values[fixtureHistory + '/barcodes/' + i + '/trashClaim'] = 'PRIVATE_' + i;
+    frame(socket, 'framereceived', { a: 'm', b: { p: '/', d: values } });
+    expect(recorder.snapshot().events[0]).toMatchObject({ truncatedFixtureOperations: 4 });
+    expect(recorder.snapshot().events[0].fixtureOperations).toHaveLength(16);
+    send(socket, 1, fixtureHistory, { barcodes: Array.from({ length: 20 }, (_, i) => ({ trashClaim: 'PRIVATE_' + i })) });
+    expect(recorder.snapshot().events[1].fixtureOperations[0]).toMatchObject({ truncatedClaims: 4 });
+    expect(recorder.snapshot().events[1].fixtureOperations[0].claimAliases).toHaveLength(16);
+    for (let i = 0; i < 400; i++) frame(socket, 'framereceived', { a: 'd', b: { p: '/' + fixtureHistory, d: null } });
+    expect(recorder.snapshot()).toMatchObject({ limit: 256, droppedEvents: 146 });
+    expect(recorder.snapshot().events).toHaveLength(256);
+    expect(JSON.stringify(recorder.snapshot())).not.toMatch(/PRIVATE/);
+});
+it('មិនភ្ជាប់ ACK ទៅសំណើដែលលេខបាត់ ស្ទួន ឬត្រូវបានប្រើសម្រាប់ credential', () => {
+    const context = ctx(), recorder = trace(context), socket = wire(context);
+    frame(socket, 'framesent', { a: 'p', b: { p: '/' + fixtureHistory, d: null } }); ack(socket, 0);
+    send(socket, 7, fixtureHistory, fixtureRow()); send(socket, 7, fixtureHistory, null); ack(socket, 7); ack(socket, 7);
+    send(socket, 8, fixtureHistory, null); frame(socket, 'framesent', { r: 8, a: 'auth', b: { cred: 'PRIVATE_CREDENTIAL' } }); ack(socket, 8);
+    const result = recorder.snapshot(), acks = result.events.filter((e: any) => e.phase === 'ws-ack');
+    expect(result.events[0]).toMatchObject({ phase: 'ws-write', request: null, correlation: 'missing-id' });
+    expect(acks).toHaveLength(2);
+    for (const event of acks) { expect(event).toMatchObject({ status: 'ok', correlation: 'duplicate-id' }); expect(event).not.toHaveProperty('fixtureOperations'); expect(event).not.toHaveProperty('operations'); }
+    expect(result).toMatchObject({ pendingRequests: 0, duplicateRequestIds: 2, missingRequestIds: 1 });
+    expect(JSON.stringify(result)).not.toMatch(/PRIVATE/);
+});
+it('ការសង្កេត frame រក្សា payload អ្នកស្តាប់ callback និង promise ដើម ទោះ JSON ខូច', async () => {
+    const context = ctx(), socket = wire(context), otherPage = new EventEmitter();
+    context.pages = () => [otherPage];
+    let resolve!: (value: string) => void;
+    const promise = new Promise<string>(yes => { resolve = yes; }), callback = vi.fn((_event: { payload: string | Buffer }) => promise);
+    socket.on('framesent', callback);
+    const recorder = trace(context); otherPage.emit('websocket', socket);
+    const payload = Buffer.from(JSON.stringify({ t: 'd', d: { r: 1, a: 'p', b: { p: '/' + fixtureHistory, d: fixtureRow() } } })), before = Buffer.from(payload), event = Object.freeze({ payload });
+    socket.emit('framesent', event);
+    expect(callback.mock.calls[0][0]).toBe(event); expect(callback.mock.results[0].value).toBe(promise);
+    expect(payload).toEqual(before); expect(socket.listeners('framesent')[0]).toBe(callback);
+    expect(recorder.snapshot().events[0]).toHaveProperty('fixtureOperations');
+    socket.emit('framesent', Object.freeze({ payload: '{invalid' })); expect(callback).toHaveBeenCalledTimes(2);
+    expect(recorder.snapshot().unparsedFrames).toBe(1);
+    resolve('done'); await expect(promise).resolves.toBe('done');
+});
 
 it('សង្កេតវដ្ត HTTP ដោយមិនរក្សាប៉ារ៉ាម៉ែត្រ URL ព័ត៌មានសម្ងាត់ ឬតួសំណើ', () => {
     const context = ctx(), recorder = trace(context), req = request();

@@ -1,4 +1,4 @@
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -33,7 +33,7 @@ function fakeRuntime(options: Record<string, any> = {}) {
         readyRead: async () => { if (options.changeAfterRead) options.changed = true; return options.ready !== false; },
         command: (args: string[], env: Record<string, string>) => { events.push(['command', args, env]); const h = handle('command'); queueMicrotask(() => h.finish(options.code || 0)); return h; },
         signal: (h: any, signal: string) => { events.push(['signal', h.child.pid, signal]); if (!options.unsettled) h.finish(null, signal); },
-        within: async (p: Promise<any>) => { if (options.unsettled) throw new Error('forced cleanup deadline'); return p; }
+        within: async (p: Promise<any>, _ms: number, _label: string) => { if (options.unsettled) throw new Error('forced cleanup deadline'); return p; }
     };
     return { adapter, events, handles, active: () => active };
 }
@@ -277,4 +277,228 @@ it.each([512, 1024])('launch ពិតផ្ញើ heap%s ទៅ spawn ដោយ
         expect(() => fs.fstatSync(calls[0].options.stdio[1])).toThrow();
         expect(env.JAVA_TOOL_OPTIONS).toBe('-Xmx2g');
     } finally { cp.spawn = originalSpawn; }
+});
+
+const startBudget = Number(/START_MS = (\d+)/.exec(fs.readFileSync(path.join(repo, 'audit-tools/owned-rtdb-command.js'), 'utf8'))![1]);
+const stopBudget = Number(/STOP_MS = (\d+)/.exec(fs.readFileSync(path.join(repo, 'audit-tools/owned-rtdb-command.js'), 'utf8'))![1]);
+function runControlled(fake: ReturnType<typeof fakeRuntime>, signal?: AbortSignal, state = temporary()) {
+    return helper.runOwnedCommand({ stateDir: state, args: ['node', 'audit-tools/emu/fake.js'], env: { RUNALL_STRICT: '1' }, signal }, fake.adapter);
+}
+function identitySequence(fake: ReturnType<typeof fakeRuntime>, change: (seen: any, read: number) => any) {
+    const identity = fake.adapter.identity; let reads = 0;
+    fake.adapter.identity = pid => change(identity(pid), ++reads);
+    return () => reads;
+}
+async function expectBlocked(state: string) {
+    const next = fakeRuntime(), result = await runControlled(next, undefined, state);
+    expect(result.code).toBe(1); expect(next.events).toEqual([]);
+}
+it('argv ទទេដំបូងអាចផ្ទៀងលើ PID/start/exe ដដែល មុន checker ម្តង និង cleanup', async () => {
+    const fake = fakeRuntime(); identitySequence(fake, (seen, read) => read === 1 ? { ...seen, args: [] } : seen);
+    const result = await runControlled(fake);
+    expect(result.code).toBe(0); expect(result.report.cleanup).toBe(true); expect(fake.active()).toBe(0);
+    expect(fake.events.map(event => event[0])).toEqual(['launch', 'command', 'signal']);
+    expect(result.report.acquisition).toMatchObject({ state: 'VERIFIED', emptyReads: 1, attempts: 2 });
+});
+it('argv ទទេជាប់ មិន dispatch ឬ signal ហើយបិទ scope បន្ទាប់', async () => {
+    const fake = fakeRuntime(), state = temporary(); identitySequence(fake, seen => ({ ...seen, args: [] }));
+    const result = await runControlled(fake, undefined, state);
+    expect(result.code).toBe(1); expect(result.report.cleanup).toBe(false); expect(fake.events.map(event => event[0])).toEqual(['launch']);
+    expect(fake.adapter.now()).toBe(startBudget); expect(result.report.acquisition).toMatchObject({ state: 'PROVISIONAL', argv: 'EMPTY', stage: 'ACQUIRE' });
+    await expectBlocked(state);
+});
+it.each(['pid', 'start', 'exe'])('anchor %s ប្រែពេល argv ទទេ មិនអាចផ្ទៀង ឬ signal', async field => {
+    const fake = fakeRuntime(), state = temporary();
+    const reads = identitySequence(fake, (seen, read) => read === 1 ? { ...seen, args: [] } : { ...seen, [field]: field === 'pid' ? seen.pid + 1 : 'changed' });
+    const result = await runControlled(fake, undefined, state);
+    expect(result.code).toBe(1); expect(result.report.cleanup).toBe(false); expect(fake.events.map(event => event[0])).toEqual(['launch']);
+    expect(reads()).toBe(2); expect(result.report.acquisition.changed).toEqual([field]); await expectBlocked(state);
+});
+it('PID ដំបូងត្រូវតែជាកូនដែល launch', async () => {
+    const fake = fakeRuntime(); identitySequence(fake, seen => ({ ...seen, pid: seen.pid + 1 }));
+    const result = await runControlled(fake); expect(result.code).toBe(1); expect(result.report.cleanup).toBe(false);
+    expect(fake.events.map(event => event[0])).toEqual(['launch']);
+});
+const wrongArguments = [
+    (args: string[]) => args.map(x => x === '-Xmx512m' ? '-Xmx1024m' : x),
+    (args: string[]) => args.map(x => x === '/verified/emulator.jar' ? '/wrong.jar' : x),
+    (args: string[]) => args.map(x => x === '127.0.0.1' ? '0.0.0.0' : x),
+    (args: string[]) => args.map(x => x === '9000' ? '9001' : x),
+    (args: string[]) => [...args, 'synthetic-private-argv-canary']
+];
+it.each(wrongArguments.map((mutate, index) => ({ mutate, index })))('argv ខុសមានទិន្នន័យ មិន retry ឬ checker៖ $index', async ({ mutate }) => {
+    for (const emptyFirst of [false, true]) {
+        const fake = fakeRuntime(); identitySequence(fake, (seen, read) => ({ ...seen, args: emptyFirst && read === 1 ? [] : mutate(seen.args) }));
+        const result = await runControlled(fake);
+        expect(result.code).toBe(1); expect(result.report.errors).toContain('Owned JVM argv mismatch');
+        expect(fake.events.map(event => event[0])).toEqual(['launch', 'signal']); expect(fake.active()).toBe(0);
+        expect(result.report.acquisition).toMatchObject({ argv: 'NONEMPTY_MISMATCH', attempts: emptyFirst ? 2 : 1 });
+        const evidence = fs.readdirSync(result.directory).filter(file => file.endsWith('.json')).map(file => fs.readFileSync(path.join(result.directory, file), 'utf8')).join('\n');
+        expect(evidence).not.toContain('synthetic-private-argv-canary');
+    }
+});
+it.each(['first', 'cleanup'])('identity reader បោះ error នៅ %s មិន signal ដោយគ្មានភស្តុតាង', async when => {
+    const fake = fakeRuntime(), state = temporary();
+    identitySequence(fake, (seen, read) => { if (when === 'first' && read === 1 || when === 'cleanup' && fake.events.some(event => event[0] === 'command')) throw new Error('synthetic-private-identity-canary'); return seen; });
+    const result = await runControlled(fake, undefined, state);
+    expect(result.code).toBe(1); expect(result.report.cleanup).toBe(false); expect(fake.events.filter(event => event[0] === 'signal')).toEqual([]);
+    expect(JSON.stringify(result.report)).not.toContain('synthetic-private-identity-canary'); await expectBlocked(state);
+});
+it.each(['before', 'acquire', 'command'])('abort នៅ %s មិនអាចបាត់ ឬ PASS', async when => {
+    const fake = fakeRuntime(), controller = new AbortController();
+    if (when === 'before') controller.abort();
+    if (when === 'acquire') { identitySequence(fake, seen => ({ ...seen, args: [] })); const delay = fake.adapter.delay; fake.adapter.delay = async ms => { await delay(ms); controller.abort(); }; }
+    if (when === 'command') { const command = fake.adapter.command; fake.adapter.command = (...args) => { const handle = command(...args); controller.abort(); return handle; }; }
+    const result = await runControlled(fake, controller.signal);
+    expect(result.code).toBe(1); expect(result.report.errors).toContain('Owned command interrupted');
+    expect(fake.events.filter(event => event[0] === 'command')).toHaveLength(when === 'command' ? 1 : 0);
+    expect(fake.events.filter(event => event[0] === 'signal')).toHaveLength(when === 'command' ? 1 : 0);
+});
+it('startup ប្រើ budget តែមួយសម្រាប់ acquisition និង readiness', async () => {
+    const fake = fakeRuntime({ ready: false });
+    identitySequence(fake, (seen, read) => read === 1 ? { ...seen, args: [] } : seen);
+    const delay = fake.adapter.delay; let first = true;
+    fake.adapter.delay = async ms => { await delay(first ? startBudget - 100 : ms); first = false; };
+    const result = await runControlled(fake);
+    expect(result.code).toBe(1); expect(fake.adapter.now()).toBe(startBudget); expect(result.report.commandStarted).toBe(false);
+});
+it('readiness ឆ្លើយតបក្រោយ budget មិនចាប់ checker', async () => {
+    const fake = fakeRuntime(); fake.adapter.readyRead = async () => { await fake.adapter.delay(startBudget); return true; };
+    const result = await runControlled(fake); expect(result.code).toBe(1); expect(result.report.commandStarted).toBe(false);
+});
+it('engine exit137 មុន checker ចប់ មិនអាច PASS', async () => {
+    const fake = fakeRuntime(), command = fake.adapter.command;
+    fake.adapter.command = (...args) => { const child = command(...args); fake.handles[0].finish(137); return child; };
+    const result = await runControlled(fake); expect(result.code).toBe(1); expect(result.report.status).toBe('FAIL'); expect(result.report.cleanup).toBe(true);
+});
+it('TERM exit ប៉ុន្តែ close មិនមក ត្រូវចប់ cleanup តាម budget', async () => {
+    const fake = fakeRuntime(); let finish: any, closeExpired = false, rescued = false; const budgets: number[] = [];
+    const launch = fake.adapter.launch;
+    fake.adapter.launch = (...args) => { const handle = launch(...args); handle.exit = new Promise(resolve => { finish = resolve; }); return handle; };
+    fake.adapter.signal = (handle, signal) => { fake.events.push(['signal', handle.child.pid, signal]); handle.done = true; };
+    fake.adapter.within = async (_promise, ms) => { budgets.push(ms); closeExpired = true; throw new Error('synthetic close deadline'); };
+    const run = runControlled(fake);
+    const timer = setTimeout(() => { rescued = true; finish({ code: 0, signal: null }); }, 150);
+    try { const result = await run; expect(closeExpired).toBe(true); expect(rescued).toBe(false); expect(result.code).toBe(1); expect(result.report.cleanup).toBe(false); expect(budgets.every(ms => ms <= stopBudget)).toBe(true); }
+    finally { clearTimeout(timer); finish({ code: 0, signal: null }); }
+});
+it.each(wrongArguments.map((mutate, index) => ({ mutate, index })))('argv ប្រែក្រោយ readiness មិន signal៖ $index', async ({ mutate }) => {
+    const fake = fakeRuntime(), state = temporary();
+    identitySequence(fake, seen => fake.events.some(event => event[0] === 'command') ? { ...seen, args: mutate(seen.args) } : seen);
+    const result = await runControlled(fake, undefined, state); expect(result.code).toBe(1); expect(result.report.cleanup).toBe(false);
+    expect(fake.events.filter(event => event[0] === 'signal')).toEqual([]); await expectBlocked(state);
+});
+it('Node child ពិតជំនួស JVM សាក argv ទទេដំបូង ហើយ wrapper ចេញដោយខ្លួនឯង', () => {
+    const directory = temporary(), identityFile = path.join(directory, 'engine.json');
+    const readIdentity = (pid: number) => { const fs = require('node:fs'); const stat = fs.readFileSync('/proc/' + pid + '/stat', 'utf8'); const fields = stat.slice(stat.lastIndexOf(')') + 2).split(/\s+/); return { pid, start: fields[19], exe: fs.realpathSync('/proc/' + pid + '/exe'), args: fs.readFileSync('/proc/' + pid + '/cmdline', 'utf8').split('\0').filter(Boolean) }; };
+    const script = `const fs=require('fs'),helper=require(${JSON.stringify(process.env.OWNED_HELPER_SOURCE_FILE || path.join(repo, 'audit-tools/owned-rtdb-command.js'))});
+const real=helper.productionAdapters({stdout:{write(){}},stderr:{write(){}}}),readIdentity=${readIdentity.toString()};let engine,reads=0;
+const adapters={...real,validateSource(){},verifyJar:()=>({jar:'/synthetic.jar',sha256:'a'.repeat(64)}),portFree:async()=>{},ownsListener:()=>true,readyRead:async()=>true,
+launch(){engine=real.command([process.execPath,'-e','setInterval(()=>{},1000)'],process.env,process.cwd());engine.spawned=engine.spawned.then(()=>fs.writeFileSync(${JSON.stringify(identityFile)},JSON.stringify(readIdentity(engine.child.pid))));return engine;},
+identity(pid){const identity=readIdentity(pid);return {...identity,args:++reads===1?[]:['java',...helper.javaArguments('/synthetic.jar')]};}};
+helper.runOwnedCommand({stateDir:${JSON.stringify(path.join(directory, 'state'))},args:[process.execPath,'-e',"console.log('ok original checker')"],env:{RUNALL_STRICT:'1'}},adapters).then(result=>{console.log(JSON.stringify(result.report));process.exitCode=result.code;});`;
+    let result: ReturnType<typeof spawnSync>;
+    try { result = spawnSync(process.execPath, ['-e', script], { encoding: 'utf8', timeout: 2500 }); }
+    finally {
+        if (fs.existsSync(identityFile)) {
+            const launched = JSON.parse(fs.readFileSync(identityFile, 'utf8'));
+            let current; try { current = readIdentity(launched.pid); } catch { /* កូនបានបិទរួច។ */ }
+            if (current && helper.identityMatches(launched, current)) process.kill(launched.pid, 'SIGKILL');
+        }
+    }
+    expect(result.error).toBeUndefined(); expect(result.status, String(result.stderr)).toBe(0);
+    const report = JSON.parse(String(result.stdout).trim()); expect(report.status).toBe('PASS'); expect(report.cleanup).toBe(true);
+});
+
+it('argv0 មិនត្រូវនឹង Java មិនអាចផ្ទៀង ឬចាប់ checker', async () => {
+    const fake = fakeRuntime(); identitySequence(fake, seen => ({ ...seen, args: ['synthetic-private-argv0', ...seen.args.slice(1)] }));
+    const result = await runControlled(fake); expect(result.code).toBe(1); expect(result.report.commandStarted).toBe(false);
+    expect(result.report.cleanup).toBe(true); expect(JSON.stringify(result.report)).not.toContain('synthetic-private-argv0');
+});
+it('identity បាត់បន្ទាប់ពី argv ទទេ មិន retry ទៀត ឬ signal', async () => {
+    const fake = fakeRuntime(), state = temporary();
+    const reads = identitySequence(fake, (seen, read) => { if (read > 1) throw new Error('synthetic-private-identity-canary'); return { ...seen, args: [] }; });
+    const result = await runControlled(fake, undefined, state); expect(result.code).toBe(1); expect(result.report.cleanup).toBe(false);
+    expect(reads()).toBe(2); expect(fake.events.map(event => event[0])).toEqual(['launch']); await expectBlocked(state);
+});
+it('abort កំពុងរង់ចាំ command spawn ត្រូវ cleanup checker និង engine', async () => {
+    const fake = fakeRuntime(), controller = new AbortController(), command = fake.adapter.command;
+    fake.adapter.command = (...args) => { const child = command(...args); child.spawned = new Promise(() => {}); queueMicrotask(() => controller.abort()); return child; };
+    const run = runControlled(fake, controller.signal);
+    let rescued = false;
+    const timer = setTimeout(() => { rescued = true; }, 150);
+    try {
+        const result: any = await Promise.race([run, new Promise(resolve => setTimeout(() => resolve(null), 200))]);
+        expect(result).not.toBeNull(); expect(rescued).toBe(false); expect(result.code).toBe(1); expect(result.report.cleanup).toBe(true);
+    } finally { clearTimeout(timer); }
+});
+it('engine exit ពេល checker pending ត្រូវបញ្ឈប់ checker ដោយមិនរង់ចាំវា PASS', async () => {
+    const fake = fakeRuntime(), command = fake.adapter.command;
+    fake.adapter.command = (...args) => {
+        const child = command(...args); child.done = false; child.exit = new Promise(resolve => { child.finish = (code: number | null, signal: string | null = null) => { if (code === 0 && !signal) return; child.done = true; resolve({ code, signal, outputPresent: true }); }; });
+        queueMicrotask(() => fake.handles[0].finish(137)); return child;
+    };
+    const run = runControlled(fake);
+    const result: any = await Promise.race([run, new Promise(resolve => setTimeout(() => resolve(null), 200))]);
+    expect(result).not.toBeNull(); expect(result.code).toBe(1); expect(result.report.commandCompleted).toBe(false);
+    expect(fake.events.filter(event => event[0] === 'signal').map(event => event[1])).toEqual([fake.handles[1].child.pid]);
+});
+it('production adapter ស្គាល់ exit មុន close ដើម្បីកុំទុក checker pending', async () => {
+    const cp = require('node:child_process'), { EventEmitter } = require('node:events'), originalSpawn = cp.spawn;
+    let child: any;
+    cp.spawn = () => { child = new EventEmitter(); child.pid = 123; child.exitCode = null; child.signalCode = null; queueMicrotask(() => child.emit('spawn')); return child; };
+    try {
+        const handle = helper.productionAdapters().launch('/verified.jar', {}, path.join(temporary(), 'engine.log'), 512);
+        await handle.spawned; child.exitCode = 137; child.emit('exit', 137, null);
+        expect(handle.stopped).toBeInstanceOf(Promise); expect(await handle.stopped).toEqual({ code: 137, signal: null });
+        child.emit('close', 137, null); expect(await handle.exit).toEqual({ code: 137, signal: null });
+    } finally { cp.spawn = originalSpawn; }
+});
+it('abort listener ត្រូវដកចេញបន្ទាប់ពី scope ចប់', async () => {
+    const controller = new AbortController(), listeners = new Set<unknown>(), signal: any = {
+        get aborted() { return controller.signal.aborted; },
+        addEventListener(type: string, listener: any, options: any) { listeners.add(listener); controller.signal.addEventListener(type, listener, options); },
+        removeEventListener(type: string, listener: any) { listeners.delete(listener); controller.signal.removeEventListener(type, listener); }
+    };
+    const result = await runControlled(fakeRuntime(), signal); expect(result.code).toBe(0); expect(listeners.size).toBe(0);
+});
+
+it.each(['drift', 'throw'])('identity ក្រោយ HTTP %s ម្តងហើយត្រឡប់ធម្មតា ក៏មិនអាច PASS', async mode => {
+    const fake = fakeRuntime();
+    identitySequence(fake, (seen, read) => { if (read !== 3) return seen; if (mode === 'throw') throw new Error('synthetic-private-identity-canary'); return { ...seen, start: 'changed' }; });
+    const result = await runControlled(fake); expect(result.code).toBe(1); expect(result.report.commandStarted).toBe(false);
+});
+it('owner callback រត់ក្រោយផ្ទៀងតែប៉ុណ្ណោះ ហើយការបោះ error មិនចាប់ checker', async () => {
+    for (const wrong of [false, true]) {
+        const fake = fakeRuntime(); let calls = 0;
+        if (wrong) identitySequence(fake, seen => ({ ...seen, args: wrongArguments[0](seen.args) }));
+        (fake.adapter as any).ownerAcquired = () => { calls++; throw new Error('synthetic-private-callback-canary'); };
+        const result = await runControlled(fake); expect(result.code).toBe(1); expect(result.report.commandStarted).toBe(false); expect(result.report.cleanup).toBe(true);
+        expect(calls).toBe(wrong ? 0 : 1); expect(JSON.stringify(result.report)).not.toContain('synthetic-private-callback-canary');
+    }
+});
+
+it.each(['launch', 'readiness'])('abort នៅ %s មិនទុក startup timer ឲ្យ wrapper នៅរស់', async stage => {
+    vi.useFakeTimers();
+    try {
+        const fake = fakeRuntime(), controller = new AbortController();
+        if (stage === 'launch') { const launch = fake.adapter.launch; fake.adapter.launch = (...args) => { const child = launch(...args); child.spawned = new Promise(() => {}); Promise.resolve().then(() => controller.abort()); return child; }; }
+        else fake.adapter.readyRead = () => { Promise.resolve().then(() => controller.abort()); return new Promise(() => {}); };
+        const result = await runControlled(fake, controller.signal);
+        expect(result.code).toBe(1); expect(result.report.commandStarted).toBe(false); expect(vi.getTimerCount()).toBe(0);
+    } finally { vi.clearAllTimers(); vi.useRealTimers(); }
+});
+
+it('abort ក្នុង identity ដែលផ្ទៀង មិនហៅ callback ឬចាប់ checker', async () => {
+    const fake = fakeRuntime(), controller = new AbortController(); let callbacks = 0;
+    identitySequence(fake, seen => { controller.abort(); return seen; });
+    (fake.adapter as any).ownerAcquired = () => { callbacks++; };
+    const result = await runControlled(fake, controller.signal);
+    expect(result.code).toBe(1); expect(callbacks).toBe(0); expect(result.report.commandStarted).toBe(false);
+    expect(fs.existsSync(path.join(result.directory, 'owner.json'))).toBe(false); expect(result.report.cleanup).toBe(true);
+});
+it('diagnostics.changed ទទួលតែឈ្មោះ identity field ដែលកំណត់', async () => {
+    const fake = fakeRuntime(); fake.adapter.validateSource = () => { const error: any = new Error('synthetic failure'); error.changed = ['args', 'synthetic-private-changed-canary', { private: 'synthetic-private-changed-canary' }]; throw error; };
+    const result = await runControlled(fake); expect(result.code).toBe(1);
+    expect(result.report.diagnostics[0].changed).toEqual(['args']); expect(JSON.stringify(result.report)).not.toContain('synthetic-private-changed-canary');
 });

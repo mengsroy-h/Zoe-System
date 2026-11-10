@@ -2263,6 +2263,9 @@
     "ZoeW/tests/async-settle.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/audit-child-diagnostics.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/audit-checker-outcomes.test.ts": {
       "policy": "zoew-self-verification"
     },
@@ -4076,6 +4079,9 @@
     },
     "audit-tools/money-core.js": {
       "policy": "guard-5"
+    },
+    "audit-tools/child-proc-diagnostic.cjs": {
+      "policy": "zoew-self-verification"
     },
     "audit-tools/money-guardian-test.js": {
       "policy": "guard-1"

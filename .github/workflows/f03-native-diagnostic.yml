@@ -83,6 +83,7 @@ jobs:
           'use strict';
           const fs = require('fs'), path = require('path'), net = require('net'), cp = require('child_process');
           const { createHash } = require('crypto');
+          const { Buffer } = require('buffer');
           const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
           const sha = bytes => createHash('sha256').update(bytes).digest('hex');
           function statFields(text) {
@@ -134,18 +135,31 @@ jobs:
               } catch (_) { return false; }
           }
           function counters(output) {
+              if (Buffer.isBuffer(output)) output = output.toString('utf8');
+              if (typeof output !== 'string') return null;
               const lines = output.trim().split('\n');
               if (lines.length !== 2) return null;
               const names = lines[0].trim().split(/\s+/), values = lines[1].trim().split(/\s+/);
               const allowed = new Set(['Timestamp','S0C','S1C','S0U','S1U','EC','EU','OC','OU','MC','MU','CCSC','CCSU','YGC','YGCT','FGC','FGCT','CGC','CGCT','GCT']);
-              if (names.length !== values.length || names.some(name => !allowed.has(name)) || values.some(value => !/^(?:\d+(?:\.\d+)?|-)$/.test(value))) return null;
+              if (names.length !== values.length || new Set(names).size !== names.length || names.some(name => !allowed.has(name))
+                  || values.some(value => !/^(?:\d+(?:\.\d+)?|-)$/.test(value) || (value !== '-' && !Number.isFinite(Number(value))))) return null;
               return Object.fromEntries(names.map((name, index) => [name, values[index] === '-' ? null : Number(values[index])]));
           }
+          function observerArguments(pid, env) {
+              const tier1 = env?.GITHUB_ACTIONS === 'true' && env?.RUNNER_ENVIRONMENT === 'github-hosted';
+              return [...(tier1 ? ['-J-XX:TieredStopAtLevel=1'] : []), '-gc', '-t', String(pid)];
+          }
           function probeCounters(probe) {
-              const gc = probe.status === 0 ? counters(probe.stdout) : null;
+              const row = counters(probe.stdout), gc = !probe.error && !probe.signal && probe.status === 0 ? row : null;
               const outcome = gc ? 'OBSERVED' : probe.error?.code === 'ETIMEDOUT' ? 'TIMEOUT'
-                  : probe.error ? 'SPAWN_ERROR' : probe.status !== 0 ? 'NONZERO_EXIT' : 'INVALID_COUNTERS';
-              return { gc, gcProbe: { outcome } };
+                  : probe.error ? 'SPAWN_ERROR' : probe.status !== 0 || probe.signal ? 'NONZERO_EXIT' : 'INVALID_COUNTERS';
+              const errors = ['ETIMEDOUT', 'ENOENT', 'EACCES', 'EPERM', 'EAGAIN', 'ENOMEM', 'ENOBUFS', 'EIO', 'ESRCH'];
+              const signals = ['SIGTERM', 'SIGKILL', 'SIGABRT', 'SIGSEGV', 'SIGBUS', 'SIGILL', 'SIGPIPE', 'SIGINT', 'SIGHUP', 'SIGXCPU', 'SIGXFSZ'];
+              const bytes = value => typeof value === 'string' || Buffer.isBuffer(value) ? Buffer.byteLength(value) : 0;
+              return { gc, gcProbe: { outcome, exitStatus: Number.isSafeInteger(probe.status) ? probe.status : null,
+                  errorCode: probe.error ? (errors.includes(probe.error.code) ? probe.error.code : 'OTHER') : null,
+                  signal: probe.signal ? (signals.includes(probe.signal) ? probe.signal : 'OTHER') : null,
+                  stdoutBytes: bytes(probe.stdout), stderrBytes: bytes(probe.stderr), counterRowPresent: row !== null } };
           }
           function verifyConstruction() {
               const owner = { start: '100', jar: '/owned/emulator.jar', gcLog: '/owned/jvm-gc.log', port: 19001, maxHeapMiB: 512 };
@@ -204,6 +218,59 @@ jobs:
                       }
                   }
               }
+              if (mode === 'stop') {
+                  const cleanup = { startedUtc: new Date().toISOString(), stopRequested: null, samplerStopped: null,
+                      ownedProcessTerminated: null, ownedPortClosed: null, metricsComplete: null, gatePassed: false };
+                  let cleanupFailed = false;
+                  try {
+                      const owner = JSON.parse(fs.readFileSync(ownerFile, 'utf8'));
+                      let samplerStopped = false, stopRequested = false, observer = null;
+                      try {
+                          observer = JSON.parse(fs.readFileSync(path.join(directory, 'sampler-owner.json'), 'utf8'));
+                          cleanup.stopRequested = false;
+                          try { fs.writeFileSync(path.join(directory, 'STOP'), 'stop\n'); stopRequested = true; } catch (_) {}
+                          cleanup.stopRequested = stopRequested;
+                          for (let attempt = 0; attempt < 40 && observerCurrent(observer, directory); attempt++) await delay(100);
+                          samplerStopped = !observerCurrent(observer, directory);
+                          cleanup.samplerStopped = samplerStopped;
+                      } catch (_) {}
+                      if (!current(owner)) throw new Error('Owned Java identity ended before explicit cleanup');
+                      cleanup.ownedProcessTerminated = false;
+                      process.kill(owner.pid, 'SIGTERM');
+                      for (let attempt = 0; attempt < 100 && current(owner); attempt++) await delay(100);
+                      if (current(owner)) throw new Error('Owned Java process did not terminate');
+                      try {
+                          const stat = statFields(fs.readFileSync('/proc/' + owner.pid + '/stat', 'utf8'));
+                          cleanup.ownedProcessTerminated = stat.start !== owner.start || stat.state === 'Z';
+                      } catch (error) { cleanup.ownedProcessTerminated = error.code === 'ENOENT' ? true : null; }
+                      let portClosed = false;
+                      for (let attempt = 0; attempt < 50 && !portClosed; attempt++) {
+                          const server = net.createServer();
+                          try {
+                              await new Promise((resolve, reject) => { server.once('error', reject); server.listen(owner.port, '127.0.0.1', resolve); });
+                              portClosed = true; await new Promise(resolve => server.close(resolve)); cleanup.ownedPortClosed = true;
+                          } catch (error) { if (error.code !== 'EADDRINUSE') throw error; cleanup.ownedPortClosed = false; await delay(200); }
+                      }
+                      if (!portClosed) throw new Error('Owned port did not close after the owned process ended');
+                      if (observer && !samplerStopped) {
+                          try {
+                              for (let attempt = 0; attempt < 30 && observerCurrent(observer, directory); attempt++) await delay(100);
+                              samplerStopped = !observerCurrent(observer, directory);
+                              cleanup.samplerStopped = samplerStopped;
+                          } catch (_) {}
+                      }
+                      if (!samplerStopped || !stopRequested) throw new Error('Owned sampler did not stop cleanly');
+                      const result = JSON.parse(fs.readFileSync(path.join(directory, 'sampler-result.json'), 'utf8'));
+                      cleanup.metricsComplete = Boolean(result.samples && !result.unavailable);
+                      if (!result.samples || result.unavailable) throw new Error('Passive JVM measurements incomplete');
+                      cleanup.gatePassed = true;
+                      console.log(JSON.stringify({ ownedProcessTerminated: cleanup.ownedProcessTerminated, ownedPortClosed: cleanup.ownedPortClosed, samples: result.samples })); return;
+                  } catch (error) { cleanupFailed = true; throw error; }
+                  finally {
+                      try { fs.writeFileSync(path.join(directory, 'cleanup-result.json'), JSON.stringify({ ...cleanup, completedUtc: new Date().toISOString() }) + '\n'); }
+                      catch (error) { if (!cleanupFailed) throw error; console.error('Owned cleanup evidence could not be saved; original failure retained'); }
+                  }
+              }
               const owner = JSON.parse(fs.readFileSync(ownerFile, 'utf8'));
               if (mode === 'ready') { if (!current(owner) || !ownsListener(owner)) throw new Error('Owned Java listener not ready'); return; }
               if (mode === 'sample') {
@@ -212,8 +279,14 @@ jobs:
                   while (!fs.existsSync(path.join(directory, 'STOP'))) {
                       const observed = current(owner);
                       if (!observed) { fs.appendFileSync(output, JSON.stringify({ utc: new Date().toISOString(), status: 'OWNED_PROCESS_ENDED' }) + '\n'); break; }
-                      const probe = cp.spawnSync(owner.jstat, ['-gc', '-t', String(owner.pid)], { encoding: 'utf8', timeout: 750, maxBuffer: 16384 });
+                      const probeStartedMs = Number(process.hrtime.bigint()) / 1e6, probeStartedUtc = new Date().toISOString();
+                      const probeArgs = observerArguments(owner.pid, process.env);
+                      const probe = cp.spawnSync(owner.jstat, probeArgs, { encoding: 'utf8', timeout: 750, maxBuffer: 16384 });
+                      const probeEndedMs = Number(process.hrtime.bigint()) / 1e6, probeEndedUtc = new Date().toISOString();
                       const { gc, gcProbe } = probeCounters(probe); unavailable ||= !gc;
+                      Object.assign(gcProbe, { observerProfile: probeArgs[0] === '-J-XX:TieredStopAtLevel=1' ? 'github-hosted-tier1' : 'default',
+                          startedUtc: probeStartedUtc, endedUtc: probeEndedUtc,
+                          elapsedMs: probeEndedMs - probeStartedMs, scheduleLatenessMs: Math.max(0, probeStartedMs - nextSample) });
                       fs.appendFileSync(output, JSON.stringify({ utc: new Date().toISOString(), pid: owner.pid, start: owner.start,
                           status: gc ? 'OBSERVED' : 'GC_COUNTERS_UNAVAILABLE', ...observed.stat, gc, gcProbe }) + '\n');
                       samples++; nextSample += 1000; await delay(Math.max(0, nextSample - Number(process.hrtime.bigint()) / 1e6));
@@ -221,38 +294,6 @@ jobs:
                   fs.writeFileSync(path.join(directory, 'sampler-result.json'), JSON.stringify({ samples, unavailable, passiveObservationHasOverhead: true }) + '\n');
                   if (!samples || unavailable) process.exitCode = 1;
                   return;
-              }
-              if (mode === 'stop') {
-                  let samplerStopped = false, stopRequested = false, observer = null;
-                  try {
-                      observer = JSON.parse(fs.readFileSync(path.join(directory, 'sampler-owner.json'), 'utf8'));
-                      try { fs.writeFileSync(path.join(directory, 'STOP'), 'stop\n'); stopRequested = true; } catch (_) {}
-                      for (let attempt = 0; attempt < 40 && observerCurrent(observer, directory); attempt++) await delay(100);
-                      samplerStopped = !observerCurrent(observer, directory);
-                  } catch (_) {}
-                  if (!current(owner)) throw new Error('Owned Java identity ended before explicit cleanup');
-                  process.kill(owner.pid, 'SIGTERM');
-                  for (let attempt = 0; attempt < 100 && current(owner); attempt++) await delay(100);
-                  if (current(owner)) throw new Error('Owned Java process did not terminate');
-                  let portClosed = false;
-                  for (let attempt = 0; attempt < 50 && !portClosed; attempt++) {
-                      const server = net.createServer();
-                      try {
-                          await new Promise((resolve, reject) => { server.once('error', reject); server.listen(owner.port, '127.0.0.1', resolve); });
-                          portClosed = true; await new Promise(resolve => server.close(resolve));
-                      } catch (error) { if (error.code !== 'EADDRINUSE') throw error; await delay(200); }
-                  }
-                  if (!portClosed) throw new Error('Owned port did not close after the owned process ended');
-                  if (observer && !samplerStopped) {
-                      try {
-                          for (let attempt = 0; attempt < 30 && observerCurrent(observer, directory); attempt++) await delay(100);
-                          samplerStopped = !observerCurrent(observer, directory);
-                      } catch (_) {}
-                  }
-                  if (!samplerStopped || !stopRequested) throw new Error('Owned sampler did not stop cleanly');
-                  const result = JSON.parse(fs.readFileSync(path.join(directory, 'sampler-result.json'), 'utf8'));
-                  if (!result.samples || result.unavailable) throw new Error('Passive JVM measurements incomplete');
-                  console.log(JSON.stringify({ ownedProcessTerminated: true, ownedPortClosed: true, samples: result.samples })); return;
               }
               throw new Error('Unknown owned JVM command');
           }
@@ -295,18 +336,15 @@ jobs:
         if: always()
         run: |
           set -euo pipefail
-          if [ -n "${F03_DIAG_DIR:-}" ] && [ -f "$F03_DIAG_DIR/owner.json" ]; then
+          if [ -n "${F03_DIAG_DIR:-}" ] && { [ -f "$F03_DIAG_DIR/owner.json" ] || [ -f "$F03_DIAG_DIR/launch-attempt.json" ]; }; then
             node "$F03_DIAG_DIR/owned-jvm.cjs" stop "$F03_DIAG_DIR"
-          elif [ -n "${F03_DIAG_DIR:-}" ] && [ -f "$F03_DIAG_DIR/launch-attempt.json" ]; then
-            echo '::error::Java launch did not persist ownership; launch cleanup must not be reported PASS'
-            exit 1
           fi
       - name: រក្សាភស្តុតាង JVM ដោយគ្មាន payload ឬ credentials
         if: always()
         run: |
           set -euo pipefail
           if [ -n "${F03_DIAG_DIR:-}" ]; then
-            for file in owner.json sampler-owner.json jvm-samples.jsonl sampler-result.json jvm-gc.log; do
+            for file in owner.json sampler-owner.json jvm-samples.jsonl sampler-result.json cleanup-result.json jvm-gc.log; do
               if [ -f "$F03_DIAG_DIR/$file" ]; then
                 printf '\nF03 diagnostic %s\n' "$file"
                 tail -n 350 "$F03_DIAG_DIR/$file"
@@ -325,6 +363,7 @@ jobs:
             ${{ env.F03_DIAG_DIR }}/sampler-owner.json
             ${{ env.F03_DIAG_DIR }}/jvm-samples.jsonl
             ${{ env.F03_DIAG_DIR }}/sampler-result.json
+            ${{ env.F03_DIAG_DIR }}/cleanup-result.json
             ${{ env.F03_DIAG_DIR }}/jvm-gc.log
             ${{ env.F03_DIAG_DIR }}/jvm-gc.log.0
             ${{ env.F03_DIAG_DIR }}/parity.json

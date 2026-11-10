@@ -12,8 +12,24 @@ function processIdentity(pid) {
         args: fs.readFileSync('/proc/' + pid + '/cmdline', 'utf8').split('\0').filter(Boolean) };
 }
 function identityMatches(owner, seen) {
-    return !!seen && owner.pid === seen.pid && owner.start === seen.start && owner.exe === seen.exe
-        && owner.args.length === seen.args.length && owner.args.every((value, index) => value === seen.args[index]);
+    return !!owner && !!seen && owner.pid === seen.pid && owner.start === seen.start && owner.exe === seen.exe
+        && Array.isArray(owner.args) && Array.isArray(seen.args) && owner.args.length === seen.args.length && owner.args.every((value, index) => value === seen.args[index]);
+}
+function identityChanged(owner, seen, includeArgs = true) {
+    return ['pid', 'start', 'exe', ...(includeArgs ? ['args'] : [])].filter(field => field === 'args'
+        ? !identityMatches(owner, { ...owner, args: seen?.args }) : owner[field] !== seen?.[field]);
+}
+function identityError(message, changed = []) {
+    const error = new Error(message); error.changed = changed; return error;
+}
+function readIdentity(pid, adapters) {
+    let seen;
+    try { seen = adapters.identity(pid); } catch (_) { throw identityError('Owned process identity unavailable'); }
+    if (!seen || !Number.isSafeInteger(seen.pid) || typeof seen.start !== 'string' || !seen.start
+        || typeof seen.exe !== 'string' || !seen.exe || !Array.isArray(seen.args) || seen.args.some(value => typeof value !== 'string')) {
+        throw identityError('Owned process identity unavailable');
+    }
+    return { ...seen, args: seen.args.slice() };
 }
 function listenerMatches(texts, descriptors, port = PORT) {
     const sockets = new Set(descriptors.map(value => /^socket:\[(\d+)\]$/.exec(value)?.[1]).filter(Boolean));
@@ -72,7 +88,11 @@ function observeChild(child) {
         child.once('close', (code, signal) => resolve({ code, signal }));
         child.once('error', error => resolve({ code: null, signal: null, error: error.message }));
     });
-    return { child, exit, ended: () => child.exitCode !== null || child.signalCode !== null };
+    const stopped = new Promise(resolve => {
+        child.once('exit', (code, signal) => resolve({ code, signal }));
+        exit.then(resolve);
+    });
+    return { child, exit, stopped, ended: () => child.exitCode !== null || child.signalCode !== null };
 }
 function spawnProcess(command, args, options) {
     const child = cp.spawn(command, args, { ...options, shell: false, detached: false });
@@ -101,9 +121,15 @@ async function readyRead(namespace) {
         request.on('error', error => { clearTimeout(timer); reject(error); }); request.on('timeout', () => request.destroy(new Error('Readiness timed out')));
     });
 }
-async function within(promise, ms, label) {
-    let timer; try { return await Promise.race([promise, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(label)), ms); })]); }
-    finally { clearTimeout(timer); }
+async function within(promise, ms, label, signal) {
+    let timer, abort;
+    try {
+        return await Promise.race([promise, new Promise((_, reject) => {
+            timer = setTimeout(() => reject(new Error(label)), ms);
+            abort = () => reject(new Error('Owned command interrupted'));
+            signal?.addEventListener('abort', abort, { once: true }); if (signal?.aborted) abort();
+        })]);
+    } finally { clearTimeout(timer); signal?.removeEventListener('abort', abort); }
 }
 function validateSource(env, cwd) {
     const root = path.resolve(env.ZOE_REPO_ROOT || cwd);
@@ -151,28 +177,64 @@ function productionAdapters(sinks = { stdout: process.stdout, stderr: process.st
         },
         signal: (handle, name) => handle.child.kill(name), within };
 }
-async function waitReady(handle, owner, adapters, signal) {
-    const deadline = adapters.now() + START_MS, namespace = 'demo-owned-ready-' + process.pid + '-' + randomBytes(8).toString('hex');
+async function acquireOwner(handle, expectedArgs, adapters, deadline, acquisition, interruptible) {
+    let anchor;
+    while (adapters.now() < deadline) {
+        if (handle.ended()) throw new Error('Owned JVM ended before ownership');
+        acquisition.attempts++;
+        const seen = readIdentity(handle.child.pid, adapters);
+        const changed = identityChanged(anchor || { ...seen, pid: handle.child.pid }, seen, false);
+        if (changed.length) { acquisition.changed = changed; throw identityError('Owned JVM identity changed during acquisition', changed); }
+        anchor ||= { pid: seen.pid, start: seen.start, exe: seen.exe };
+        acquisition.state = 'PROVISIONAL';
+        if (seen.args.length) {
+            acquisition.argv = seen.args[0] === 'java' && seen.args.length === expectedArgs.length + 1 && expectedArgs.every((value, index) => seen.args[index + 1] === value)
+                ? 'EXPECTED' : 'NONEMPTY_MISMATCH';
+            acquisition.state = acquisition.argv === 'EXPECTED' ? 'VERIFIED' : 'OBSERVED';
+            return seen;
+        }
+        acquisition.argv = 'EMPTY'; acquisition.emptyReads++;
+        await interruptible(adapters.delay(Math.max(0, Math.min(100, deadline - adapters.now()))));
+    }
+    throw new Error('Owned JVM acquisition deadline');
+}
+async function waitReady(handle, owner, adapters, signal, deadline = adapters.now() + START_MS) {
+    const namespace = 'demo-owned-ready-' + process.pid + '-' + randomBytes(8).toString('hex');
+    const checkIdentity = () => {
+        const seen = readIdentity(owner.pid, adapters);
+        if (!identityMatches(owner, seen)) throw identityError('Owned JVM ended or identity changed before readiness', identityChanged(owner, seen));
+        if (handle.ended()) throw new Error('Owned JVM ended or identity changed before readiness');
+    };
     while (adapters.now() < deadline) {
         if (signal?.aborted) throw new Error('Owned command interrupted');
-        if (handle.ended() || !identityMatches(owner, adapters.identity(owner.pid))) throw new Error('Owned JVM ended or identity changed before readiness');
-        try {
-            if (adapters.ownsListener(owner) && await adapters.readyRead(namespace)
-                && identityMatches(owner, adapters.identity(owner.pid)) && adapters.ownsListener(owner)) return;
-        } catch (error) { if (!identityMatches(owner, adapters.identity(owner.pid))) throw error; }
-        await adapters.delay(100);
+        checkIdentity();
+        let ready = false;
+        try { ready = adapters.ownsListener(owner) && await within(adapters.readyRead(namespace), Math.max(0, deadline - adapters.now()), 'Owned JVM readiness deadline', signal); }
+        catch (_) {}
+        checkIdentity();
+        if (signal?.aborted) throw new Error('Owned command interrupted');
+        if (ready && adapters.now() < deadline) {
+            try { if (adapters.ownsListener(owner)) return; } catch (_) {}
+        }
+        if (adapters.now() < deadline) await adapters.delay(Math.min(100, deadline - adapters.now()));
     }
     throw new Error('Owned JVM readiness deadline');
 }
-async function stopProcess(handle, owner, adapters, label) {
-    if (!handle || handle.ended()) { if (handle) await adapters.within(handle.exit, STOP_MS, label + ' close deadline'); return; }
-    if (owner && !identityMatches(owner, adapters.identity(owner.pid))) throw new Error(label + ' identity changed; refusing signal');
-    adapters.signal(handle, 'SIGTERM');
+async function stopProcess(handle, owner, adapters, label, requireOwner = false) {
+    if (!handle) return;
+    if (requireOwner && !owner) throw new Error(label + ' ownership unverified; refusing signal');
+    if (handle.ended()) { await adapters.within(handle.exit, STOP_MS, label + ' close deadline'); return; }
+    const checkIdentity = suffix => {
+        if (!owner) return;
+        const seen = readIdentity(owner.pid, adapters);
+        if (!identityMatches(owner, seen)) throw identityError(label + ' identity changed; refusing ' + suffix, identityChanged(owner, seen));
+    };
+    checkIdentity('signal'); adapters.signal(handle, 'SIGTERM');
     try { await adapters.within(handle.exit, STOP_MS, label + ' TERM deadline'); }
     catch (_) {
-        if (handle.ended()) { await handle.exit; return; }
-        if (owner && !identityMatches(owner, adapters.identity(owner.pid))) throw new Error(label + ' identity changed; refusing KILL');
-        adapters.signal(handle, 'SIGKILL'); await adapters.within(handle.exit, STOP_MS, label + ' KILL deadline');
+        if (handle.ended()) { await adapters.within(handle.exit, STOP_MS, label + ' close deadline'); return; }
+        checkIdentity('KILL'); adapters.signal(handle, 'SIGKILL');
+        await adapters.within(handle.exit, STOP_MS, label + ' KILL deadline');
     }
 }
 async function runOwnedCommand(options, adapters = productionAdapters()) {
@@ -180,48 +242,69 @@ async function runOwnedCommand(options, adapters = productionAdapters()) {
     if (!path.isAbsolute(stateDir || '') || !Array.isArray(args) || !args.length || args.some(value => typeof value !== 'string' || !value)) throw new Error('Owned command requires absolute state directory and argv');
     fs.mkdirSync(stateDir, { recursive: true, mode: 0o700 });
     const lock = path.join(stateDir, 'active'), blocked = path.join(stateDir, 'blocked.json');
-    const report = { status: 'FAIL', commandStarted: false, commandCompleted: false, ownedRuntimeStarted: false, cleanup: false, childResult: null, owner: null, errors: [] };
+    const report = { acquisition: null, diagnostics: [], status: 'FAIL', commandStarted: false, commandCompleted: false, ownedRuntimeStarted: false, cleanup: false, childResult: null, owner: null, errors: [] };
     if (fs.existsSync(blocked) || fs.existsSync(lock)) return { code: 1, report: { ...report, errors: ['Prior owned runtime cleanup unproven; command UNRUN'] } };
     fs.mkdirSync(lock, { mode: 0o700 });
     const directory = path.join(stateDir, 'scope-' + process.pid + '-' + randomBytes(8).toString('hex')); fs.mkdirSync(directory, { mode: 0o700 });
-    let engine, command, owner, acquired = false, cleanupError = null, unrun = false;
+    let engine, command, owner, acquired = false, cleanupError = null, unrun = false, stage = 'PREFLIGHT', startedAt = adapters.now();
+    const interrupted = Symbol('interrupted'); let onAbort;
+    const aborted = new Promise(resolve => { onAbort = () => resolve(interrupted); signal?.addEventListener('abort', onAbort, { once: true }); });
+    const checkAbort = () => { if (signal?.aborted) throw new Error('Owned command interrupted'); };
+    const interruptible = async promise => { const result = await Promise.race([promise, aborted]); checkAbort(); if (result === interrupted) throw new Error('Owned command interrupted'); return result; };
+    const diagnostic = (error, failureStage) => ({ stage: failureStage, elapsedMs: Math.max(0, adapters.now() - startedAt),
+        changed: ['pid', 'start', 'exe', 'args'].filter(field => Array.isArray(error.changed) && error.changed.includes(field)) });
+    const recordFailure = error => { report.errors.push(String(error.message || error)); report.diagnostics.push(diagnostic(error, stage)); };
     try {
+        checkAbort();
         adapters.validateSource(env, cwd);
         const noNativeOptIn = !strictResult(env) && env.F03_RUN_NATIVE_ENGINE !== '1' && args.some(value => /(?:^|\/)registry-purge-atomic-sdk-test\.js$/.test(value));
         if (noNativeOptIn) {
-            command = adapters.command(args, env, cwd); await command.spawned; report.commandStarted = true;
-            report.childResult = await command.exit; report.commandCompleted = true;
+            stage = 'COMMAND'; command = adapters.command(args, env, cwd); await interruptible(command.spawned); report.commandStarted = true;
+            report.childResult = await interruptible(command.exit); report.commandCompleted = true;
             if (report.childResult.code !== 0 || report.childResult.error || report.childResult.outputPresent !== true || report.childResult.failureLine) throw new Error('Original construction-only command failed');
             unrun = true;
         } else {
         const childEnv = childEnvironment(env), jar = adapters.verifyJar(env, cwd), maxHeapMiB = heapForCommand(args, env, cwd);
         await adapters.portFree();
         if (signal?.aborted) throw new Error('Owned command interrupted');
-        engine = adapters.launch(jar.jar, env, path.join(directory, 'emulator.log'), maxHeapMiB); await engine.spawned;
-        const seen = adapters.identity(engine.child.pid);
-        owner = { ...seen, jar: jar.jar, jarSHA256: jar.sha256, expectedArgs: javaArguments(jar.jar, maxHeapMiB), maxHeapMiB };
+        stage = 'ACQUIRE'; startedAt = adapters.now(); const deadline = startedAt + START_MS;
+        const acquisition = report.acquisition = { stage, state: 'UNOBSERVED', argv: 'UNAVAILABLE', attempts: 0, emptyReads: 0, changed: [], elapsedMs: 0 };
+        engine = adapters.launch(jar.jar, env, path.join(directory, 'emulator.log'), maxHeapMiB);
+        const engineEnded = Symbol('engine ended'), lostEngine = (engine.stopped || engine.exit).then(() => engineEnded);
+        await interruptible(within(engine.spawned, Math.max(0, deadline - adapters.now()), 'Owned JVM launch deadline', signal));
+        try {
+            const seen = await acquireOwner(engine, javaArguments(jar.jar, maxHeapMiB), adapters, deadline, acquisition, interruptible);
+            owner = { ...seen, jar: jar.jar, jarSHA256: jar.sha256, expectedArgs: javaArguments(jar.jar, maxHeapMiB), maxHeapMiB };
+        } finally { acquisition.elapsedMs = Math.max(0, adapters.now() - startedAt); }
         report.owner = { pid: owner.pid, start: owner.start, executable: owner.exe, jarSHA256: jar.sha256, maxHeapMiB, port: PORT };
+        checkAbort();
+        if (acquisition.state !== 'VERIFIED') throw new Error('Owned JVM argv mismatch');
         fs.writeFileSync(path.join(directory, 'owner.json'), JSON.stringify(owner) + '\n', { flag: 'wx' }); acquired = true;
-        if (owner.args.length !== owner.expectedArgs.length + 1 || !owner.expectedArgs.every((value, index) => owner.args[index + 1] === value)) throw new Error('Owned JVM argv mismatch');
-        await waitReady(engine, owner, adapters, signal); report.ownedRuntimeStarted = true;
-        if (signal?.aborted) throw new Error('Owned command interrupted');
-        command = adapters.command(args, childEnv, cwd); await command.spawned; report.commandStarted = true;
-        const aborted = new Promise((_, reject) => { if (signal) signal.addEventListener('abort', () => reject(new Error('Owned command interrupted')), { once: true }); });
-        report.childResult = await Promise.race([command.exit, aborted]); report.commandCompleted = true;
+        try { adapters.ownerAcquired?.({ ...owner, args: owner.args.slice(), expectedArgs: owner.expectedArgs.slice() }); }
+        catch (_) { throw new Error('Owned JVM ownership observer failed'); }
+        stage = 'READY'; await interruptible(waitReady(engine, owner, adapters, signal, deadline)); report.ownedRuntimeStarted = true;
+        checkAbort(); if (engine.ended()) throw new Error('Owned JVM ended before original command completed');
+        stage = 'COMMAND'; command = adapters.command(args, childEnv, cwd);
+        if (await interruptible(Promise.race([command.spawned, lostEngine])) === engineEnded || engine.ended()) throw new Error('Owned JVM ended before original command completed');
+        report.commandStarted = true;
+        const childResult = await interruptible(Promise.race([command.exit, lostEngine]));
+        if (childResult === engineEnded || engine.ended()) throw new Error('Owned JVM ended before original command completed');
+        report.childResult = childResult; report.commandCompleted = true;
         if (report.childResult.error || report.childResult.code !== 0 || report.childResult.outputPresent !== true || report.childResult.failureLine) throw new Error('Original command failed or produced no evidence');
         if (report.childResult.skipLine && strictResult(env)) throw new Error('STRICT original command was incomplete');
         const after = adapters.verifyJar(env, cwd); if (after.sha256 !== jar.sha256 || after.jar !== jar.jar) throw new Error('Prepared JAR changed during command');
         if (report.childResult.skipLine) unrun = true;
         }
     } catch (error) {
-        report.errors.push(String(error.message || error));
+        recordFailure(error);
         if (!strictResult(env) && !engine && error.code === 'OWNED_RUNTIME_UNAVAILABLE') unrun = true;
     }
     finally {
+        signal?.removeEventListener('abort', onAbort);
         const cleanupFailures = [];
-        for (const [handle, identity, label] of [[command, null, 'Original checker'], [engine, owner, 'Owned JVM']]) {
-            try { if (handle) await stopProcess(handle, identity, adapters, label); }
-            catch (error) { cleanupFailures.push(String(error.message || error)); }
+        for (const [handle, identity, label, requireOwner] of [[command, null, 'Original checker', false], [engine, owner, 'Owned JVM', true]]) {
+            try { if (handle) await stopProcess(handle, identity, adapters, label, requireOwner); }
+            catch (error) { cleanupFailures.push(String(error.message || error)); report.diagnostics.push(diagnostic(error, 'CLEANUP')); }
         }
         try { if (engine) await adapters.portFree(); } catch (error) { cleanupFailures.push(String(error.message || error)); }
         report.cleanup = cleanupFailures.length === 0;

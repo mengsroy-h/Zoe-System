@@ -186,17 +186,67 @@ const OPEN_MODAL_DETAILS = function () {
     document.addEventListener('DOMContentLoaded', openAll);
 };
 
+function observeAuditBridge(page, origin) {
+    const started = Date.now(), events = [];
+    const errorNames = new Set(['Error', 'EvalError', 'RangeError', 'ReferenceError', 'SyntaxError', 'TypeError', 'URIError', 'AggregateError', 'AbortError', 'NetworkError', 'SecurityError']);
+    let dropped = 0, stopped = false;
+    const assetPath = (raw) => {
+        if (typeof raw !== 'string' || raw.length > 4096) return null;
+        const url = new URL(raw);
+        if (url.origin !== origin || url.username || url.password || url.pathname.length > 200) return null;
+        if (url.pathname === '/') return '/index.html';
+        return /^\/(?:assets\/[A-Za-z0-9._-]+\.(?:js|css|wasm|svg|png|webp|woff2?)|vendor\/[A-Za-z0-9._/-]+\.(?:js|wasm)|(?:boot-flags|firebase-loader|license-verify|error-reporting)\.js|index\.html)$/.test(url.pathname) ? url.pathname : null;
+    };
+    const record = (event) => {
+        if (stopped) return;
+        if (events.length < 20) events.push({ ...event, atMs: Math.max(0, Date.now() - started) });
+        else dropped = Math.min(dropped + 1, 1000000);
+    };
+    const listeners = {
+        pageerror(error) {
+            try { const name = error && error.name; record({ kind: 'pageerror', name: errorNames.has(name) ? name : 'Error' }); } catch (_) {}
+        },
+        requestfailed(request) {
+            try { const local = assetPath(request.url()); if (local) record({ kind: 'requestfailed', path: local }); } catch (_) {}
+        },
+        response(response) {
+            try {
+                const local = assetPath(response.url()), status = response.status();
+                if (local && Number.isInteger(status) && status >= 300 && status <= 599) record({ kind: 'response', path: local, status });
+            } catch (_) {}
+        }
+    };
+    for (const [event, listener] of Object.entries(listeners)) page.on(event, listener);
+    return {
+        snapshot: () => ({ events: events.slice(), dropped }),
+        stop() {
+            if (stopped) return;
+            stopped = true;
+            for (const [event, listener] of Object.entries(listeners)) page.off(event, listener);
+        }
+    };
+}
+
 async function openApp(browser, port, size, inits, extra) {
     const ctx = await browser.newContext(Object.assign({ viewport: { width: size.w, height: size.h }, hasTouch: true, isMobile: true, serviceWorkers: 'block' }, extra || {}));
     const page = await ctx.newPage();
     page.on('dialog', (d) => d.dismiss().catch(() => {}));
-    await page.route('**', (r) => r.request().url().startsWith('http://127.0.0.1:' + port) ? r.continue() : r.abort());
-    await page.addInitScript(OPEN_MODAL_DETAILS);
-    for (const init of inits) await page.addInitScript(init);
-    await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
-    await page.waitForTimeout(900);
-    const ready = await page.evaluate(() => typeof openModalHelper === 'function' && typeof closeModal === 'function' && typeof openModalIds === 'function');
-    return { ctx, page, ready };
+    const diagnostics = observeAuditBridge(page, 'http://127.0.0.1:' + port);
+    try {
+        await page.route('**', (r) => r.request().url().startsWith('http://127.0.0.1:' + port) ? r.continue() : r.abort());
+        await page.addInitScript(OPEN_MODAL_DETAILS);
+        for (const init of inits) await page.addInitScript(init);
+        await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
+        await page.waitForTimeout(900);
+        const state = await page.evaluate(() => {
+            const ready = typeof openModalHelper === 'function' && typeof closeModal === 'function' && typeof openModalIds === 'function';
+            return { ready, helpers: ready ? null : { openModalHelper: typeof openModalHelper, closeModal: typeof closeModal, openModalIds: typeof openModalIds } };
+        });
+        if (!state.ready) console.log('        ភស្តុតាង audit bridge ៖ ' + JSON.stringify({ helpers: state.helpers, ...diagnostics.snapshot() }));
+        return { ctx, page, ready: state.ready };
+    } finally {
+        diagnostics.stop();
+    }
 }
 
 async function closeAll(page) {

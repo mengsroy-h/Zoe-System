@@ -460,7 +460,10 @@ function runPoisonedChild(file, budgetMs) {
             if (settled) return;
             settled = true;
             clearTimeout(killTimer); clearTimeout(hardTimer); clearTimeout(graceTimer);
-            if (child) liveChildren.delete(child);
+            if (child) {
+                liveChildren.delete(child);
+                child.stdout.destroy(); child.stderr.destroy();
+            }
             resolve({ code, signal, timedOut, out, ms: Date.now() - t0 });
         };
         const killTimer = setTimeout(() => {
@@ -485,7 +488,9 @@ function runPoisonedChild(file, budgetMs) {
         child.stderr.setEncoding('utf8'); child.stderr.on('data', take);
         child.on('error', (e) => { out += '\n' + String(e && e.message || e); finish(null, null); });
         child.on('exit', (code, signal) => {
+            if (settled) return;
             exited = true; exitCode = code; exitSignal = signal;
+            clearTimeout(killTimer); clearTimeout(hardTimer);
             graceTimer = setTimeout(() => finish(code, signal), EXIT_TO_CLOSE_GRACE_MS);
         });
         child.on('close', (code, signal) => finish(exited ? exitCode : code, exited ? exitSignal : signal));
@@ -535,12 +540,25 @@ async function runPoisonQueues(jobs, width, worker) {
     const isolated = jobs.filter(ISOLATED_LANE);
     const rest = jobs.filter(rel => !ISOLATED_LANE(rel));
     await runPool(isolated, 1, worker);
-    const serial = rest.filter(SERIAL_LANE);
-    const parallel = rest.filter(rel => !SERIAL_LANE(rel));
-    await Promise.all([
-        runPool(parallel, serial.length ? Math.max(1, width - 1) : width, worker),
-        runPool(serial, 1, worker)
-    ]);
+    const pending = rest.slice();
+    const running = new Set();
+    let serialRunning = false;
+    while (pending.length || running.size) {
+        while (running.size < width) {
+            let index = serialRunning ? -1 : pending.findIndex(SERIAL_LANE);
+            if (index < 0) index = pending.findIndex(rel => !SERIAL_LANE(rel));
+            if (index < 0) break;
+            const [rel] = pending.splice(index, 1);
+            const serial = SERIAL_LANE(rel);
+            if (serial) serialRunning = true;
+            const task = Promise.resolve().then(() => worker(rel)).finally(() => {
+                running.delete(task);
+                if (serial) serialRunning = false;
+            });
+            running.add(task);
+        }
+        if (running.size) await Promise.race(running);
+    }
 }
 
 function checkerBrowserDependency(rel, seen = new Set()) {

@@ -545,8 +545,10 @@ declare -A RUNALL_LABEL_HINTS=(
     ["emu/import-native-I100-palm-mixed"]=15
     ["emu/import-native-I100-palm-mixed-same-group"]=15
     ["emu/scan-operation-sdk"]=5
-    ["exit-code-integrity 1/2 (meta)"]=150
-    ["exit-code-integrity 2/2 (meta)"]=140
+    ["exit-code-integrity 1/4 (meta)"]=150
+    ["exit-code-integrity 2/4 (meta)"]=150
+    ["exit-code-integrity 3/4 (meta)"]=150
+    ["exit-code-integrity 4/4 (meta)"]=150
     ["emu/scan-month-coordination-sdk"]=10
     ["emu/scan-month-delay-sdk"]=2
     ["emu/scan-month-reconnect-sdk"]=3
@@ -559,9 +561,11 @@ declare -A RUNALL_LABEL_HINTS=(
     ["modal-keyboard-device 4/4 (browser ពិត · iPhone ៖ ចុច + keyboard លោតហួស ➜ រអិលតែម្តង · ∨/∧ មិនរំកិលទំព័រ · keyboard លោត ➜ មិនទាញ document · ស្កេនដក ➜ លើក #appPages)"]=207
     ["money-guardian 1/2"]=242
     ["money-guardian 2/2"]=227
-    ["zoew-suite 1/3 (ZoeW React ៖ tsc · lint · vitest 1/2 · android)"]=143
-    ["zoew-suite 2/3 (ZoeW React ៖ build · sw · smoke · native · rules)"]=215
-    ["zoew-suite 3/3 (ZoeW React ៖ vitest 2/2)"]=192
+    ["zoew-suite 1/5 (ZoeW React ៖ tsc · lint · vitest 1/4 · android)"]=210
+    ["zoew-suite 2/5 (ZoeW React ៖ build · sw · smoke · native · rules)"]=215
+    ["zoew-suite 3/5 (ZoeW React ៖ vitest 2/4)"]=192
+    ["zoew-suite 4/5 (ZoeW React ៖ vitest 3/4)"]=192
+    ["zoew-suite 5/5 (ZoeW React ៖ vitest 4/4)"]=192
 )
 # ── RUNALL_SHARD=k/n ៖ បែងចែក checker តាមពេលវាស់ មិនមែនតាមចំនួន ───────────────────────
 # ⛔ បញ្ជី + hints ថេរ (script និងស្លាក sub-suite) ជា input តែមួយ ៖ មិនប្រើ state · nproc · RUNALL_JOBS។
@@ -1022,8 +1026,10 @@ done
 run "checker-coverage (meta)" node audit-tools/checker-coverage.js
 run "hang-guard (meta)" node audit-tools/hang-guard.js
 run "runall-runner (meta)" node audit-tools/runall-runner-test.js
-run "exit-code-integrity 1/2 (meta)" node audit-tools/exit-code-integrity.js --part=1/2
-run "exit-code-integrity 2/2 (meta)" node audit-tools/exit-code-integrity.js --part=2/2
+run "exit-code-integrity 1/4 (meta)" node audit-tools/exit-code-integrity.js --part=1/4
+run "exit-code-integrity 2/4 (meta)" node audit-tools/exit-code-integrity.js --part=2/4
+run "exit-code-integrity 3/4 (meta)" node audit-tools/exit-code-integrity.js --part=3/4
+run "exit-code-integrity 4/4 (meta)" node audit-tools/exit-code-integrity.js --part=4/4
 run "version-bump-scope" node audit-tools/version-bump-scope.js
 run "semantic-ui-color" node audit-tools/semantic-ui-color-test.js
 run "user-guide" node audit-tools/user-guide-test.js
@@ -1155,9 +1161,11 @@ run "write-stall-guard" node audit-tools/write-stall-guard-test.js
 run "stall-lock-release" node audit-tools/stall-lock-release-test.js
 run "locker-claim-guard" node audit-tools/locker-claim-guard-test.js
 run "stale-clear-claim" node audit-tools/stale-clear-claim-test.js
-run "zoew-suite 1/3 (ZoeW React ៖ tsc · lint · vitest 1/2 · android)" node audit-tools/zoew-suite-test.js --part=1/3
-run "zoew-suite 2/3 (ZoeW React ៖ build · sw · smoke · native · rules)" node audit-tools/zoew-suite-test.js --part=2/3
-run "zoew-suite 3/3 (ZoeW React ៖ vitest 2/2)" node audit-tools/zoew-suite-test.js --part=3/3
+run "zoew-suite 1/5 (ZoeW React ៖ tsc · lint · vitest 1/4 · android)" node audit-tools/zoew-suite-test.js --part=1/5
+run "zoew-suite 2/5 (ZoeW React ៖ build · sw · smoke · native · rules)" node audit-tools/zoew-suite-test.js --part=2/5
+run "zoew-suite 3/5 (ZoeW React ៖ vitest 2/4)" node audit-tools/zoew-suite-test.js --part=3/5
+run "zoew-suite 4/5 (ZoeW React ៖ vitest 3/4)" node audit-tools/zoew-suite-test.js --part=4/5
+run "zoew-suite 5/5 (ZoeW React ៖ vitest 4/4)" node audit-tools/zoew-suite-test.js --part=5/5
 
 section "== ខ្សែសង្វាក់នាំចូល (zto-import) =="
 # ⚠️ វាធ្លាប់នៅ **ក្រៅ** ឯកសារនេះ ដោយហេតុផលថា «មិនមែនជាផ្នែករបស់ App»។

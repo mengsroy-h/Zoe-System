@@ -532,17 +532,20 @@ ok('ពិដានរួម ≤ RUNALL_JOBS (៤) ហើយនៅតែស្�
     maxOverlap(lane.events));
 
 // Vitest មាន workers ផ្ទាល់ខ្លួន ហើយ build/browser បើកក្នុង child scripts៖ គ្រប់ផ្នែកត្រូវនៅម្នាក់ឯង។
-for (const part of [1, 2, 3]) {
+const suiteParts = [...runall.matchAll(/\bnode\s+audit-tools\/zoew-suite-test\.js\s+--part=(\d+\/\d+)/g)].map(match => match[1]);
+ok('⛔ ផ្នែក suite ពិតមានគ្រប់ មិនស្ទួន ហើយមានយ៉ាងតិច ៣', suiteParts.length >= 3 && new Set(suiteParts).size === suiteParts.length
+    && suiteParts.every((part, index) => part === (index + 1) + '/' + suiteParts.length), suiteParts);
+for (const part of suiteParts) {
     const suiteCase = newCase([
         ['audit-tools/zoew-suite-test.js', { ms: 900 }],
         ['audit-tools/supabase-money-multishop-test.js', { ms: 900 }]
     ]);
     const suiteRun = runHarness(suiteCase,
-        'run "suite" node audit-tools/zoew-suite-test.js --part=' + part + '/3\n'
+        'run "suite" node audit-tools/zoew-suite-test.js --part=' + part + '\n'
         + 'run "money" node audit-tools/supabase-money-multishop-test.js',
         { RUNALL_JOBS: '2', RUNALL_BROWSER_JOBS: '1' });
     const ranges = intervals(suiteRun.events);
-    ok('⛔ zoew-suite ' + part + '/3 រត់ម្នាក់ឯង ទោះមាន money checker រង់ចាំ',
+    ok('⛔ zoew-suite ' + part + ' រត់ម្នាក់ឯង ទោះមាន money checker រង់ចាំ',
         suiteRun.rc === 0 && ranges.length === 2 && ranges.every((x) => ranges.every((other) => other === x
             || other.end <= x.start || other.start >= x.end)),
         { rc: suiteRun.rc, ranges });
@@ -841,7 +844,7 @@ async function sectionSix() {
         const emu = j.id.indexOf('emu/') === 0 || EMU_EVIDENCE.test(c);
         const browser = src.indexOf(BROWSER_MARK) !== -1;
         const isolatedPurge = j.id === F03.slice('audit-tools/'.length, -3) && c.includes('controlledDeadlinePass(');
-        const isolatedSuite = j.id === 'zoew-suite-test' && /\bcp\.spawnSync\s*\(\s*['"]npm['"]\s*,\s*args\b/.test(c)
+        const isolatedSuite = j.id === 'zoew-suite-test' && /\bcp\.spawn(?:Sync)?\s*\(/.test(c) && c.includes("'npm'")
             && c.includes("'--maxWorkers='");
         const isolatedGuardian = j.id === 'money-guardian-test' && /\bexecFile\s*\(\s*process\.execPath\b/.test(c)
             && c.includes('await runPool(tasks.map(');

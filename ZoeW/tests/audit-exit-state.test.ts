@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { runInNewContext } from 'node:vm';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { EventEmitter } from 'node:events';
 
 const require = createRequire(import.meta.url);
 const guard = readFileSync('../audit-tools/exit-code-integrity.js', 'utf8');
@@ -56,6 +57,34 @@ describe('poison queues៖ Postgres ធ្ងន់នៅដាច់ដោយ�
         expect(events.indexOf('start:normal-b')).toBeLessThan(events.indexOf('end:normal-a'));
         expect(jobs).toEqual(['normal-a', 'emu/first', 'supabase-datastore-test.js', 'normal-b', 'emu/second']);
     });
+    it.each([1, 2, 4])('width=%s៖ ប្រើកន្លែងទំនេរ និងគោរពពិដានពេល emu ចប់មុន', async width => {
+        const jobs = ['emu/first', ...Array.from({ length: 6 }, (_, i) => 'normal-' + i), 'emu/second'];
+        const active = new Map<string, () => void>();
+        const seen: string[] = [];
+        const pending = run(jobs, width, (job: string) => new Promise<void>(resolve => {
+            active.set(job, () => { active.delete(job); resolve(); });
+            seen.push(job);
+        }));
+        const flush = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
+        await flush();
+        try {
+            while (active.size) {
+                expect(active.size).toBeLessThanOrEqual(width);
+                expect([...active.keys()].filter(job => job.startsWith('emu/'))).toHaveLength(seen.includes('emu/second') && !active.has('emu/second') ? 0 : 1);
+                const emu = [...active.keys()].find(job => job.startsWith('emu/'));
+                const key = emu || [...active.keys()][0];
+                active.get(key)!();
+                await flush();
+                const remaining = jobs.length - seen.length + active.size;
+                expect(active.size).toBe(Math.min(width, remaining));
+            }
+            await pending;
+            expect([...seen].sort()).toEqual([...jobs].sort());
+        } finally {
+            while (active.size) { for (const done of [...active.values()]) done(); await flush(); }
+            await pending;
+        }
+    });
     it('គ្មាន PG ឬ job ទទេ នៅតែគោរព width និងមិនបង្កើត job ថ្មី', async () => {
         const events: string[] = [];
         await run([], 2, async (job: string) => { events.push(job); });
@@ -88,8 +117,9 @@ describe('poison budget៖ ថវិកាកូនតាម deadline ពិត�
     it('run-all ផ្តល់ deadline របស់ job ទៅ checker ហើយបំបែក meta-checker ជាផ្នែកដែលគ្រប់គ្នា', () => {
         const exec = runall.slice(runall.indexOf('runall_exec() {'), runall.indexOf('runall_judge() {'));
         expect(exec).toContain('export RUNALL_JOB_TIMEOUT="$CHECKER_TIMEOUT" RUNALL_JOB_STARTED_MS="$(runall_now_ms)"');
-        expect(runall).toMatch(/^run "exit-code-integrity 1\/2 \(meta\)" node audit-tools\/exit-code-integrity\.js --part=1\/2$/m);
-        expect(runall).toMatch(/^run "exit-code-integrity 2\/2 \(meta\)" node audit-tools\/exit-code-integrity\.js --part=2\/2$/m);
+        for (let part = 1; part <= 4; part++) {
+            expect(runall).toContain('run "exit-code-integrity ' + part + '/4 (meta)" node audit-tools/exit-code-integrity.js --part=' + part + '/4');
+        }
     });
 });
 
@@ -110,4 +140,118 @@ it('scan SDK cleanup៖ រំលងតែ app ដែល SDK បានលុប�
     await run(false); expect(calls).toEqual([live]);
     await expect(run(true)).rejects.toThrow('real cleanup failure');
     expect(calls).toEqual([live, live]);
+});
+
+
+describe('poison child៖ exit និង pipe មានពិដានដាច់ដោយឡែក', () => {
+    function harness(spawnThrows = false) {
+        const child = Object.assign(new EventEmitter(), {
+            stdout: Object.assign(new EventEmitter(), { setEncoding: vi.fn(), destroy: vi.fn() }),
+            stderr: Object.assign(new EventEmitter(), { setEncoding: vi.fn(), destroy: vi.fn() }),
+            kill: vi.fn()
+        });
+        const liveChildren = new Set();
+        const source = guard.slice(guard.indexOf('function runPoisonedChild('), guard.indexOf('// ⛔⛔ **timeout'));
+        const run = runInNewContext(source + '\nrunPoisonedChild;', {
+            cp: { spawn: () => { if (spawnThrows) throw new Error('spawn ENOENT'); return child; } }, process: { execPath: 'node', env: {} }, ROOT: '.',
+            EXIT_GUARD_ARGS: [], OUT_CAP: 4096, EXIT_TO_CLOSE_GRACE_MS: 2000, HARD_GRACE_MS: 5000,
+            liveChildren, Date, setTimeout, clearTimeout
+        });
+        const verdictSource = guard.slice(guard.indexOf('function poisonVerdict('), guard.indexOf('\n{\n', guard.indexOf('function poisonVerdict(')));
+        const verdict = runInNewContext(verdictSource + '\npoisonVerdict;', {});
+        return { child, liveChildren, run, verdict };
+    }
+    it.each([0, 1])('exit %s មុន deadline ហើយ pipe យឺត មិនក្លាយជា timeout', async code => {
+        vi.useFakeTimers();
+        try {
+            const { child, liveChildren, run, verdict } = harness();
+            const result = run('fixture', 100);
+            child.stdout.emit('data', 'ZOE_EXITCODE_POISON_REACHED\n');
+            await vi.advanceTimersByTimeAsync(90);
+            child.emit('exit', code, null);
+            await vi.advanceTimersByTimeAsync(20);
+            expect(child.kill).not.toHaveBeenCalled();
+            child.emit('close', code, null);
+            const completed = await result;
+            expect(completed).toMatchObject({ code, timedOut: false, signal: null });
+            expect(verdict(completed)).toBe(code === 0 ? 'fake-green' : 'failed');
+            expect(liveChildren.size).toBe(0);
+            expect(vi.getTimerCount()).toBe(0);
+        } finally { vi.useRealTimers(); }
+    });
+    it('pipe មិន close ត្រូវបិទនៅពិដានខ្លួនឯង ហើយមិនទុក handle', async () => {
+        vi.useFakeTimers();
+        try {
+            const { child, run } = harness();
+            const result = run('fixture', 100);
+            child.emit('exit', 1, null);
+            await vi.advanceTimersByTimeAsync(2000);
+            expect(await result).toMatchObject({ code: 1, timedOut: false });
+            expect(child.stdout.destroy).toHaveBeenCalledOnce();
+            expect(child.stderr.destroy).toHaveBeenCalledOnce();
+            expect(vi.getTimerCount()).toBe(0);
+        } finally { vi.useRealTimers(); }
+    });
+    it.each(['throw', 'error'])('spawn %s៖ មិនទុក timer និងមិនរាប់ crash ជាភស្តុតាង', async mode => {
+        vi.useFakeTimers();
+        try {
+            const { child, liveChildren, run, verdict } = harness(mode === 'throw');
+            const result = run('fixture', 100);
+            if (mode === 'error') child.emit('error', new Error('spawn ENOENT'));
+            expect(verdict(await result)).toBe('unverified');
+            expect(liveChildren.size).toBe(0);
+            expect(vi.getTimerCount()).toBe(0);
+        } finally { vi.useRealTimers(); }
+    });
+    it.each([null, 'SIGTERM'])('exit មិនមាន marker ឬ signal=%s៖ នៅតែមិនបានវាស់', async signal => {
+        vi.useFakeTimers();
+        try {
+            const { child, run, verdict } = harness();
+            const result = run('fixture', 100);
+            if (signal) child.stdout.emit('data', 'ZOE_EXITCODE_POISON_REACHED\n');
+            child.emit('exit', 1, signal);
+            child.emit('close', 1, signal);
+            expect(verdict(await result)).toBe('unverified');
+            expect(vi.getTimerCount()).toBe(0);
+        } finally { vi.useRealTimers(); }
+    });
+    it('exit យឺតក្រោយ hard ceiling មិនបង្កើត timer ថ្មី ឬប្ដូរសាលក្រម', async () => {
+        vi.useFakeTimers();
+        try {
+            const { child, run, verdict } = harness();
+            const result = run('fixture', 100);
+            await vi.advanceTimersByTimeAsync(5100);
+            child.stdout.emit('data', 'ZOE_EXITCODE_POISON_REACHED\n');
+            child.emit('exit', 1, null);
+            expect(verdict(await result)).toBe('unverified');
+            expect(vi.getTimerCount()).toBe(0);
+        } finally { vi.useRealTimers(); }
+    });
+    it('គ្មាន exit ឬ close សោះ ត្រូវ settle នៅ hard ceiling និងមិនរាប់ជាភស្តុតាង', async () => {
+        vi.useFakeTimers();
+        try {
+            const { child, liveChildren, run, verdict } = harness();
+            const result = run('fixture', 100);
+            child.stdout.emit('data', 'ZOE_EXITCODE_POISON_REACHED\n');
+            await vi.advanceTimersByTimeAsync(5100);
+            const completed = await result;
+            expect(completed).toMatchObject({ code: null, timedOut: true, signal: 'SIGKILL' });
+            expect(verdict(completed)).toBe('unverified');
+            expect(liveChildren.size).toBe(0);
+            expect(vi.getTimerCount()).toBe(0);
+        } finally { vi.useRealTimers(); }
+    });
+    it('ព្យួរពិត ឬ exit ក្រោយ deadline នៅតែ timeout', async () => {
+        vi.useFakeTimers();
+        try {
+            const { child, run } = harness();
+            const result = run('fixture', 100);
+            await vi.advanceTimersByTimeAsync(100);
+            expect(child.kill).toHaveBeenCalledWith('SIGKILL');
+            child.emit('exit', 1, null);
+            child.emit('close', 1, null);
+            expect(await result).toMatchObject({ code: 1, timedOut: true });
+            expect(vi.getTimerCount()).toBe(0);
+        } finally { vi.useRealTimers(); }
+    });
 });

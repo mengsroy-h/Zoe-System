@@ -28,14 +28,46 @@ const STEP_TIMEOUT_MS = Number(process.env.ZOEWSUITE_STEP_TIMEOUT_MS || 240000);
 const STEPS = ['typecheck', 'lint', 'slot:check', 'purity:check', 'test', 'doc:check', 'android:check',
     'build:only', 'notice:check', 'sw:check', 'smoke', 'native:check', 'rules:check'];
 const TEST_WORKERS = process.env.ZOEWSUITE_TEST_WORKERS || 'auto';
-// ក្រុម build/browser រក្សាពិដានដាច់ពី Vitest។ ផ្នែក test ពីរប្រើ shard ដាច់គ្នា;
+// ក្រុម build/browser រក្សាពិដានដាច់ពី Vitest។ ផ្នែក test បួនប្រើ shard ដាច់គ្នា;
 // គ្មាន --part នៅរត់ជំហានទាំង១៣ដូចធម្មតា។ ទាំង test និង checker រក្សាពិដានដដែល។
 const PART_GROUPS = [
     ['typecheck', 'lint', 'slot:check', 'purity:check', 'test', 'doc:check', 'android:check'],
     ['build:only', 'notice:check', 'sw:check', 'smoke', 'native:check', 'rules:check'],
+    ['test'],
+    ['test'],
     ['test']
 ];
 const TEST_PARTS = PART_GROUPS.map((steps, index) => steps.includes('test') ? index + 1 : 0).filter(Boolean);
+function resolveTestWorkers() {
+    if (!/^(?:auto|[1-8])$/.test(TEST_WORKERS)) throw new Error('ZOEWSUITE_TEST_WORKERS ត្រូវជា auto ឬ 1–8');
+    if (TEST_WORKERS !== 'auto') return Number(TEST_WORKERS);
+    let available = os.availableParallelism();
+    if (!Number.isSafeInteger(available) || available < 1) throw new Error('ចំនួន CPU មិនត្រឹមត្រូវ');
+    if (process.platform === 'linux') {
+        const read = (file) => {
+            try { return fs.readFileSync(file, 'utf8').trim(); }
+            catch (error) { if (error.code === 'ENOENT') return null; throw error; }
+        };
+        const v2 = read('/sys/fs/cgroup/cpu.max');
+        let quota, period;
+        if (v2 !== null) {
+            const fields = v2.split(/\s+/);
+            if (fields.length !== 2) throw new Error('CPU quota មិនត្រឹមត្រូវ');
+            quota = fields[0]; period = Number(fields[1]);
+            if (!Number.isFinite(period) || period <= 0 || quota === '-1') throw new Error('CPU quota មិនត្រឹមត្រូវ');
+        } else {
+            quota = read('/sys/fs/cgroup/cpu/cpu.cfs_quota_us');
+            period = Number(read('/sys/fs/cgroup/cpu/cpu.cfs_period_us'));
+        }
+        if (quota !== null && quota !== 'max' && quota !== '-1') {
+            if (!Number.isFinite(Number(quota)) || Number(quota) <= 0 || !Number.isFinite(period) || period <= 0)
+                throw new Error('CPU quota មិនត្រឹមត្រូវ');
+            available = Math.min(available, Math.max(1, Math.floor(Number(quota) / period)));
+        }
+    }
+    return Math.min(8, available);
+}
+
 const PART = (() => {
     const arg = process.argv.slice(2).find((a) => a.startsWith('--part'));
     if (!arg) return { k: 1, n: 1 };
@@ -52,11 +84,12 @@ function bad(label, detail) {
     console.log('  FAIL  ' + label + (detail ? '\n' + String(detail).split('\n').map((l) => '        ' + l).join('\n') : ''));
 }
 
-if (!/^(?:auto|[1-8])$/.test(TEST_WORKERS)) bad('តម្លៃ ZOEWSUITE_TEST_WORKERS ត្រូវជា auto ឬ 1–8', TEST_WORKERS);
+let testWorkers;
+try { testWorkers = resolveTestWorkers(); } catch (error) { bad('CPU budget មិនត្រឹមត្រូវ', error.message); }
 if (!PART) bad('⛔ --part ត្រូវជា k/' + PART_GROUPS.length, process.argv.slice(2).join(' '));
 {
     const flat = [].concat(...PART_GROUPS);
-    const sameSet = flat.length === STEPS.length + 1 && STEPS.every((s) => flat.filter(value => value === s).length === (s === 'test' ? TEST_PARTS.length : 1));
+    const sameSet = flat.length === STEPS.length + TEST_PARTS.length - 1 && STEPS.every((s) => flat.filter(value => value === s).length === (s === 'test' ? TEST_PARTS.length : 1));
     const inOrder = PART_GROUPS.every((g) => g.every((s, i) => i === 0 || STEPS.indexOf(g[i - 1]) < STEPS.indexOf(s)));
     if (sameSet && inOrder) ok('⛔ ក្រុម --part គ្របជំហានទាំងអស់ ហើយ test បែងជា shard ដាច់គ្នា (' + PART_GROUPS.map((g) => g.length).join(' + ') + ' ការរត់ · scripts ' + STEPS.length + ')');
     else bad('⛔ ក្រុម --part គ្របជំហានទាំងអស់ ហើយ test បែងជា shard ដាច់គ្នា', JSON.stringify(PART_GROUPS));
@@ -134,6 +167,99 @@ function vitestReport(file, started) {
     return report;
 }
 
+// ក្រុមដំណើរការនេះជាកម្មសិទ្ធិរបស់ជំហានតែមួយ។ កុំសម្លាប់តាមឈ្មោះ ឬ PID ដែលរកពីខាងក្រៅ។
+function runStep(command, args, options) {
+    return new Promise((resolve) => {
+        if (process.platform === 'win32') {
+            resolve({ status: null, stdout: '', stderr: '', error: new Error('ជំហាននេះត្រូវការ POSIX process group សម្រាប់សម្អាតកូន') });
+            return;
+        }
+        const child = cp.spawn(command, args, { cwd: options.cwd, env: options.env,
+            detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+        let stdout = '', stderr = '', error = null, settled = false;
+        let aborted = false, cleanupFailed = false, outputBytes = 0;
+        let deadline, cleanupDeadline;
+        const stop = () => {
+            if (!child.pid) return;
+            if (!settled && !cleanupDeadline) cleanupDeadline = setTimeout(() => {
+                cleanupFailed = true;
+                error = Object.assign(new Error('បញ្ជាក់ការសម្អាតកូនមិនបាន'), { code: 'ECLEANUP' });
+                child.stdout.destroy(); child.stderr.destroy(); child.unref();
+                finish(null, null);
+            }, 1000);
+            try {
+                process.kill(-child.pid, 'SIGKILL');
+            } catch (cause) { if (cause.code !== 'ESRCH') { cleanupFailed = true; error = Object.assign(new Error('សម្អាតក្រុមមិនបាន៖ ' + cause.message), { code: 'ECLEANUP' }); } }
+        };
+        const interrupted = (signal) => {
+            aborted = true;
+            error = Object.assign(new Error('ជំហានត្រូវបានបញ្ឈប់៖ ' + signal), { code: signal });
+            stop();
+        };
+        const term = () => interrupted('SIGTERM'), int = () => interrupted('SIGINT');
+        const finish = async (status, signal) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(deadline);
+            clearTimeout(cleanupDeadline);
+            stop();
+            if (child.pid && process.platform === 'linux') {
+                const until = Date.now() + 1000;
+                let running = true;
+                while (running && Date.now() < until) {
+                    try {
+                        running = fs.readdirSync('/proc').filter(name => /^\d+$/.test(name)).some(name => {
+                            try {
+                                const stat = fs.readFileSync('/proc/' + name + '/stat', 'utf8');
+                                const fields = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
+                                return Number(fields[2]) === child.pid && !['Z', 'X'].includes(fields[0]);
+                            } catch (cause) { if (cause.code === 'ENOENT' || cause.code === 'ESRCH') return false; throw cause; }
+                        });
+                    } catch (cause) {
+                        cleanupFailed = true;
+                        error = Object.assign(new Error('ពិនិត្យក្រុមមិនបាន៖ ' + cause.message), { code: 'ECLEANUP' });
+                        break;
+                    }
+                    if (running) await new Promise(done => setTimeout(done, 10));
+                }
+                if (running) { cleanupFailed = true; error = Object.assign(new Error('ក្រុមកូននៅរស់ក្រោយសម្អាត'), { code: 'ECLEANUP' }); }
+            }
+            process.removeListener('SIGTERM', term);
+            process.removeListener('SIGINT', int);
+            resolve({ status, signal, stdout, stderr, error, aborted, cleanupFailed });
+        };
+        process.on('SIGTERM', term);
+        process.on('SIGINT', int);
+        deadline = setTimeout(() => {
+            error = Object.assign(new Error('ជំហានលើសពិដាន'), { code: 'ETIMEDOUT' });
+            stop();
+        }, options.timeout);
+        const collect = (stream, chunk) => {
+            if (settled) return;
+            const bytes = Buffer.from(chunk);
+            const remaining = Math.max(0, options.maxBuffer - outputBytes);
+            const retained = bytes.subarray(0, remaining);
+            outputBytes += retained.length;
+            let text = retained.toString();
+            while (Buffer.byteLength(text) > retained.length) text = text.slice(0, -1);
+            if (stream === 'stdout') stdout += text;
+            else stderr += text;
+            if (bytes.length > remaining) {
+                if (!error) error = Object.assign(new Error('លទ្ធផលលើសព្រំដែន'), { code: 'ENOBUFS' });
+                stop();
+            }
+        };
+        child.stdout.setEncoding?.('utf8');
+        child.stderr.setEncoding?.('utf8');
+        child.stdout.on('data', chunk => collect('stdout', chunk));
+        child.stderr.on('data', chunk => collect('stderr', chunk));
+        child.on('error', cause => { error = cause; finish(null, null); });
+        // exit មកមុន close៖ កូនដែលនៅកាន់ pipe មិនអាចពន្យារការសម្អាតបាន។
+        child.on('exit', () => { if (!settled) { clearTimeout(deadline); stop(); } });
+        child.on('close', finish);
+    });
+}
+
 const pkgFile = path.join(APP, 'package.json');
 let pkg = null;
 try { pkg = JSON.parse(fs.readFileSync(pkgFile, 'utf8')); } catch (e) { pkg = null; }
@@ -151,7 +277,8 @@ if (isReactSource) {
 const hasModules = fs.existsSync(path.join(APP, 'node_modules', 'vite')) && fs.existsSync(path.join(APP, 'node_modules', 'typescript'));
 if (isReactSource && !hasModules) bad('dependency របស់ ZoeW ត្រូវដំឡើង (npm ci --prefix ZoeW)', path.join(APP, 'node_modules'));
 
-if (isReactSource && hasModules && !missing.length) {
+async function main() {
+if (isReactSource && hasModules && !missing.length && !fail) {
     for (const step of MY_STEPS) {
         const failuresBefore = fail;
         const started = Date.now();
@@ -160,11 +287,11 @@ if (isReactSource && hasModules && !missing.length) {
         const reportFile = reportDir && path.join(reportDir, 'vitest.json');
         if (step === 'test') {
             const testArgs = ['--reporter=default', '--reporter=json', '--outputFile.json=' + reportFile];
-            if (/^[1-8]$/.test(TEST_WORKERS)) testArgs.push('--maxWorkers=' + TEST_WORKERS);
+            testArgs.push('--maxWorkers=' + testWorkers);
             if (PART.n > 1) testArgs.push('--shard=' + (TEST_PARTS.indexOf(PART.k) + 1) + '/' + TEST_PARTS.length);
             if (testArgs.length) args.push('--', ...testArgs);
         }
-        const r = cp.spawnSync('npm', args, {
+        const r = await runStep('npm', args, {
             cwd: APP,
             encoding: 'utf8',
             timeout: STEP_TIMEOUT_MS,
@@ -174,7 +301,7 @@ if (isReactSource && hasModules && !missing.length) {
         });
         const secs = ((Date.now() - started) / 1000).toFixed(1);
         if (r.error && r.error.code === 'ETIMEDOUT') bad('npm run ' + step + ' (ព្យួរ លើស ' + STEP_TIMEOUT_MS / 1000 + 's)', 'stdout៖\n' + tail(r.stdout, 20) + '\nstderr៖\n' + tail(r.stderr, 10));
-        else if (r.status !== 0) bad('npm run ' + step + ' (exit ' + r.status + ')', failureDetail(String(r.stdout || '') + '\n' + String(r.stderr || ''), 10));
+        else if (r.error || r.status !== 0) bad('npm run ' + step + ' (exit ' + r.status + ')', failureDetail((r.error ? r.error.message + '\n' : '') + String(r.stdout || '') + '\n' + String(r.stderr || ''), 10));
         else if (step === 'test') {
             try {
                 const report = vitestReport(reportFile, started);
@@ -187,9 +314,13 @@ if (isReactSource && hasModules && !missing.length) {
         } else ok('npm run ' + step + ' · ' + secs + 's');
         const retained = fail > failuresBefore ? preserveFailure(step, r, reportFile) : true;
         if (reportDir && retained) fs.rmSync(reportDir, { recursive: true, force: true });
+        if (r.aborted || r.cleanupFailed) break;
     }
 }
 
 console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')'
     : skippedTests ? 'PARTIAL PASS (' + pass + '; SKIP ' + skippedTests + ')' : '✅ ជោគជ័យ ' + pass));
 process.exitCode = fail ? 1 : 0;
+
+}
+main();

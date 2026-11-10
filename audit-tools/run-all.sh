@@ -496,84 +496,93 @@ runall_select() {  # RUNALL_ONLY · RUNALL_RESUME ➜ J_ST[i] = hdr | queue | do
 # ⛔ ពេលប្រហែល (វិ.) របស់ checker យឺតជាងគេ ៖ ប្រើ (១) ក្នុង `runall_order` តែពេល state គ្មានពេលរបស់វា (session ថ្មីចាប់ផ្តើមពី
 #    clone ស្អាត ➜ គ្មាន `<git-dir>/zoe-runall-state.tsv`) និង (២) ជាពេលសម្រាប់ `RUNALL_SHARD` (sub-suite មានពេលតាមស្លាកខាងក្រោម)។ ប៉ះតែលំដាប់ ·
 #    ការបែងចែក មិនដែលប៉ះសាលក្រម ➜ លេខចាស់ = យឺតជាងបន្តិច មិនខុស។ ឈ្មោះ = id ឯកសារ (audit-tools/<id>.js) · runall-runner-test
-#    ផ្ទៀងថាគ្មានឈ្មោះខ្មោច។ វាស់ ៖ CI CPU ២ (run 40435743512 · commit 836a45ac · checker PASS ពេញទាំង ៤ ផ្នែក · បង្គត់ឡើងទៅវិ.)។
-RUNALL_HINTS="emu/money-multidevice-emu-test:244 money-guardian-test:242 zoew-suite-test:215 modal-keyboard-device-test:207 supabase-money-multishop-test:207
-    exit-code-integrity:182 revenue-fuzz-test:147 layout-check:141 modal-keyboard-test:121 emu/app-writes-rules-test:109
-    supabase-data-tools-test:108 app-lock-test:102 supabase-app-network-e2e-test:98 ui-flow-test:96 sw-install-integrity-test:92
-    emu/supabase-rules-parity-test:88 checker-coverage:78 perf-check:73 emu/app-network-e2e-test:71 gesture-test:62
-    write-stall-guard-test:57 panel-motion-test:56 collected-mirror-fuzz-test:48 supabase-rls-test:44 runall-runner-test:42
-    cleanup-interrupt-atomicity-test:38 fluid-type-focus-test:37 ios-panel-glide-test:37 keygen-modal-scroll-test:35 tx-outcome-test:34
-    firebase-provision-test:33 emu/supabase-adapter-parity-test:32 sheet-import-test:31 supabase-datastore-test:27 ledger-clamp-symmetry-test:24
-    late-commit-test:22 supabase-functions-test:21 storage-blocked-boot-test:19 stale-clear-claim-test:18 zto-budget-test:18
-    collected-value-fuzz-test:15 slow-write-test:15 sdk-offline-boot-test:14 sw-client-wiring-test:14 collected-mirror-lifecycle-test:13
-    listener-leak-test:13 lookup-burst-test:13 hang-guard:12 setup-link-browser-test:12 db-stall-guard-test:11
-    item-money-integrity-test:11 license-seat-test:11 page-nav-test:11 repository-contract-test:11 sw-backend-chunk-test:11
-    zto-sync-banner-test:11 emu/tx-disconnect-emu-test:10 history-menu-dismiss-test:10 scan-remove-mode-test:10 zto-list-sync-test:10
-    boot-runtime:9 connection-recovery-test:9 csp-enforced-test:9 network-pressure-test:9 registry-release-test:9
-    field-shape-test:8 lookup-failure-identity-test:8 scan-engine-test:8 emu/crud-rules-flow:7 lookup-prefetch-test:7
-    toast-action-truth-test:7 zto-cookie-store-test:7 duplicate-money-test:6 duplicate-scan-test:6 health-check-test:6
-    network-timeout-test:6 zto-cookie-session-test:6 empty-state-truth-test:5 inline-handler-xss-test:5 periodic-network-guard-test:5
-    supabase-docs-cache-test:5 sw-cache-key-test:5 sw-revalidate-pressure-test:5 zto-proxy-test:5 boot-animation-test:4
-    doc-scope-test:4 keygen-supabase-admin-test:4 ledger-count-integrity-test:4 phone-search-swipe-test:4 sentry-load-race-test:4
-    stats-collected-truth-test:4 toast-truth-test:4 csp-lazy-resource-test:3 emu/ledger-revert-emu-test:3 emu/restore-mutation-emu-test:3
-    firebase-backup-test:3 layout-thrash:3 lookup-freshness-test:3 sw-shell-latency-test:3 biometric-unlock-test:2
-    comments:2 daily-collected-test:2 function-surface-test:2 history-patch-retry-test:2 loop-termination-test:2
-    money-reality-test:2 offline-shell-test:2 panel-snap-ownership-test:2 pickup-barcode-identity-test:2 price-edit-abort-test:2
-    raw-read-shape-test:2 stall-lock-release-test:2 storage-guard:2 wiring:2 action-binding-test:1
-    adaptive-link-test:1 animation-cost:1 auth-recovery-test:1 barcode-shape-test:1 camera-resume-test:1
-    cleanup-clock-guard-test:1 clear-history-claim-test:1 clear-history-finalization-fence-test:1 clock-basis-test:1 clock-hygiene:1
-    code-duplication-test:1 compensation-order:1 concurrent-scan-test:1 connection-state-fuzz-test:1 css-classes:1
+#    ផ្ទៀងថាគ្មានឈ្មោះខ្មោច។ ប្រើ median នៃ PASS លើ CPU ២ ហើយបង្គត់ឡើងទៅវិ.; ប្រភព និងព្រំដែននៅ docs/HISTORY.md។
+RUNALL_HINTS="emu/money-multidevice-emu-test:534 supabase-money-multishop-test:491 money-guardian-test:292 zoew-suite-test:224 modal-keyboard-device-test:207
+    layout-check:202 revenue-fuzz-test:199 exit-code-integrity:196 supabase-data-tools-test:193 emu/app-writes-rules-test:192
+    supabase-app-network-e2e-test:180 emu/supabase-rules-parity-test:147 supabase-rls-test:131 modal-keyboard-test:125 supabase-datastore-test:124
+    app-lock-test:105 checker-coverage:104 sw-install-integrity-test:99 ui-flow-test:98 firebase-provision-test:94
+    emu/app-network-e2e-test:91 perf-check:75 runall-runner-test:74 gesture-test:66 emu/registry-purge-atomic-sdk-test:64
+    panel-motion-test:62 tx-outcome-test:61 write-stall-guard-test:59 collected-mirror-fuzz-test:44 emu/supabase-adapter-parity-test:42
+    fluid-type-focus-test:41 ios-panel-glide-test:36 keygen-modal-scroll-test:36 emu/scan-month-coordination-sdk-test:35 supabase-functions-test:32
+    sheet-import-test:31 emu/import-paired-ci-runner:28 emu/restore-mutation-emu-test:28 late-commit-test:27 ledger-clamp-symmetry-test:27
+    setup-link-browser-test:26 cleanup-interrupt-atomicity-test:25 collected-value-fuzz-test:23 emu/crud-rules-flow:22 hang-guard:22
+    storage-blocked-boot-test:22 license-time-cors-browser-test:21 repository-contract-test:21 stale-clear-claim-test:19 connection-recovery-test:18
+    emu/cleanup-consumed-sdk-test:18 emu/scan-operation-rules-test:18 zto-budget-test:18 slow-write-test:16 supabase-scan-rules-test:16
+    lookup-burst-test:15 sdk-offline-boot-test:15 collected-mirror-lifecycle-test:14 sw-client-wiring-test:14 item-money-integrity-test:13
+    listener-leak-test:13 db-stall-guard-test:12 emu/trash-generation-sdk-test:12 history-menu-dismiss-test:12 lookup-failure-identity-test:12
+    lookup-prefetch-test:12 page-nav-test:12 emu/pickup-reset-applied-sdk-test:11 emu/tx-disconnect-emu-test:11 license-seat-test:11
+    scan-engine-test:11 scan-remove-mode-test:11 toast-action-truth-test:11 boot-runtime:10 emu/empty-delete-sdk-test:10
+    emu/scan-operation-sdk-test:10 health-check-test:10 registry-release-test:10 sw-backend-chunk-test:10 zto-list-sync-test:10
+    csp-enforced-test:9 field-shape-test:9 network-pressure-test:9 emu/license-seat-rules-test:8 raw-read-shape-test:8
+    zto-sync-banner-test:8 duplicate-money-test:7 empty-state-truth-test:7 emu/restore-deadlock-test:7 sentry-load-race-test:7
+    zto-cookie-store-test:7 daily-collected-test:6 doc-scope-test:6 duplicate-scan-test:6 emu/ledger-revert-emu-test:6
+    import-paired-ci-runner-test:6 inline-handler-xss-test:6 keygen-supabase-admin-test:6 network-timeout-test:6 periodic-network-guard-test:6
+    phone-search-swipe-test:6 supabase-docs-cache-test:6 sw-revalidate-pressure-test:6 toast-truth-test:6 zto-cookie-session-test:6
+    boot-animation-test:5 firebase-backup-test:5 money-checker-truthfulness-test:5 sw-cache-key-test:5 zto-proxy-test:5
+    history-patch-retry-test:4 html-sink-escaping:4 layout-thrash:4 ledger-count-integrity-test:4 lookup-freshness-test:4
+    money-reality-test:4 panel-snap-ownership-test:4 price-edit-abort-test:4 scan-month-fixture-date-test:4 stats-collected-truth-test:4
+    sw-shell-latency-test:4 clock-basis-test:3 code-duplication-test:3 comments:3 csp-lazy-resource-test:3
+    license-clock-trust-test:3 license-network-pressure-test:3 loop-termination-test:3 offline-shell-test:3 payload-schema:3
+    pickup-barcode-identity-test:3 security-guard-test:3 stall-lock-release-test:3 action-binding-test:2 biometric-unlock-test:2
+    camera-resume-test:2 clock-hygiene:2 function-surface-test:2 listener-pending-key-test:2 monotonic-gate-test:2
+    partial-pickup-cleanup-test:2 registry-orphan-list-test:2 shared-fns:2 stale-write:2 stats-measurable-gate-test:2
+    stats-screen-agreement-test:2 storage-guard:2 version-check:2 wiring:2 adaptive-link-test:1
+    animation-cost:1 auth-recovery-test:1 barcode-shape-test:1 cleanup-clock-guard-test:1 clear-history-claim-test:1
+    clear-history-finalization-fence-test:1 compensation-order:1 concurrent-scan-test:1 connection-state-fuzz-test:1 css-classes:1
     css-media-override:1 css-var-test:1 dependency-security-test:1 devtools-guard-test:1 dom-hygiene:1
-    emu/license-seat-rules-test:1 emu/restore-deadlock-test:1 export-cells-test:1 firebase-config-paste-test:1 google-sheets-cache-test:1
-    html-sink-escaping:1 keygen-biometric-test:1 keygen-notice-test:1 keygen-pin-flow-test:1 keygen-session-security-test:1
-    keylist-consistency-test:1 khmer-timezone-test:1 ledger-failed-apply-revert-test:1 license-app-code-test:1 license-clock-rollback-test:1
-    license-clock-trust-test:1 license-time-endpoint-test:1 scan-month-fixture-date-test:1 scan-month-orchestration-test:1 license-grace-test:1 license-network-pressure-test:1 license-record-race-test:1 listener-pending-key-test:1
-    locker-claim-guard-test:1 lookup-config-secret-test:1 monotonic-gate-test:1 monthly-ledger-agreement-test:1 monthly-report-test:1
-    netlify-config-scope-test:1 partial-pickup-cleanup-test:1 payload-schema:1 phone-suggest-test:1 pickup-ledger-test:1
-    pickup-reset-test:1 pin-prompt-test:1 policy-test:1 reconnect-ladder-test:1
-    registry-orphan-list-test:1 repository-file-coverage:1 restore-finalization-fence-test:1 restore-marker-hygiene-test:1 restore-race-test:1
-    returned-trash-retention-test:1 revenue-rules-clamp-test:1 rules-duplicate-keys:1 sdk-surface:1 secret-hygiene:1
-    security-guard-test:1 semantic-ui-color-test:1 setup-link-logout-test:1 setup-link-roundtrip-test:1 shared-fns:1
-    stale-write:1 stall-guard-test:1 state-hygiene:1 stats-measurable-gate-test:1 stats-screen-agreement-test:1
-    sw-abort-propagation-test:1 sw-cache-failure-test:1 trash-modal-test:1 user-guide-test:1 version-bump-scope:1
-    version-check:1 zto-cookie-capture-test:1 zto-cookie-sync-test:1 zto-import/test:1 zto-negative-cache-test:1
-    zto-network-boundaries-test:1 zto-signed-status-test:1"
+    export-cells-test:1 firebase-config-paste-test:1 google-sheets-cache-test:1 keygen-biometric-test:1 keygen-notice-test:1
+    keygen-pin-flow-test:1 keygen-session-security-test:1 keylist-consistency-test:1 khmer-timezone-test:1 ledger-failed-apply-revert-test:1
+    license-app-code-test:1 license-clock-rollback-test:1 license-grace-test:1 license-record-race-test:1 license-time-endpoint-test:1
+    license-time-json-test:1 locker-claim-guard-test:1 lookup-config-secret-test:1 module-runtime-scope-test:1 monthly-ledger-agreement-test:1
+    monthly-report-test:1 netlify-config-scope-test:1 phone-suggest-test:1 pickup-ledger-test:1 pickup-reset-test:1
+    pin-prompt-test:1 policy-test:1 reconnect-ladder-test:1 repository-file-coverage:1 restore-finalization-fence-test:1
+    restore-marker-hygiene-test:1 restore-race-test:1 returned-trash-retention-test:1 revenue-rules-clamp-test:1 rules-duplicate-keys:1
+    scan-month-orchestration-test:1 sdk-surface:1 secret-hygiene:1 semantic-ui-color-test:1 setup-link-logout-test:1
+    setup-link-roundtrip-test:1 stall-guard-test:1 state-hygiene:1 sw-abort-propagation-test:1 sw-cache-failure-test:1
+    trash-modal-test:1 user-guide-test:1 version-bump-scope:1 zto-cookie-capture-test:1 zto-cookie-sync-test:1
+    zto-import/test:1 zto-negative-cache-test:1 zto-network-boundaries-test:1 zto-signed-status-test:1"
 
 # checker ដដែលដែលរត់ជា sub-suite មានពេលខុសគ្នា ៖ ស្លាកពេញជាកូនសោដូច RUNALL_STATE។
 declare -A RUNALL_LABEL_HINTS=(
-    ["emu/import-native-I100-cookie-unsigned"]=15
-    ["emu/import-native-I100-cookie-signed"]=15
-    ["emu/import-native-I100-cookie-mixed"]=15
-    ["emu/import-native-I100-cookie-mixed-same-group"]=15
-    ["emu/import-native-I100-palm-unsigned"]=15
-    ["emu/import-native-I100-palm-signed"]=15
-    ["emu/import-native-I100-palm-mixed"]=15
-    ["emu/import-native-I100-palm-mixed-same-group"]=15
-    ["emu/scan-operation-sdk"]=5
-    ["exit-code-integrity 1/4 (meta)"]=150
-    ["exit-code-integrity 2/4 (meta)"]=150
-    ["exit-code-integrity 3/4 (meta)"]=150
-    ["exit-code-integrity 4/4 (meta)"]=150
-    ["emu/scan-month-coordination-sdk"]=10
-    ["emu/scan-month-delay-sdk"]=2
-    ["emu/scan-month-reconnect-sdk"]=3
-    ["modal-keyboard 1/3 (browser ពិត ៖ ទូរស័ព្ទ ៤ ទំហំ)"]=121
-    ["modal-keyboard 2/3 (browser ពិត ៖ ទូរស័ព្ទផ្តេក · iPad)"]=93
-    ["modal-keyboard 3/3 (browser ពិត ៖ រំកិល · APK · ចុច · toast · សុវត្ថិភាព)"]=104
-    ["modal-keyboard-device 1/4 (browser ពិត · Android APK/PWA · iPhone · iPad ៖ ប្រអប់)"]=175
-    ["modal-keyboard-device 2/4 (browser ពិត · keyboard លេខ · ចុចកន្លែងវាយ Barcode · ម៉ាស៊ីនស្កេន · zoom)"]=171
-    ["modal-keyboard-device 3/4 (browser ពិត · ប្រអប់រអិលតាម keyboard ៖ ស៊ុមម្តងៗ)"]=175
-    ["modal-keyboard-device 4/4 (browser ពិត · iPhone ៖ ចុច + keyboard លោតហួស ➜ រអិលតែម្តង · ∨/∧ មិនរំកិលទំព័រ · keyboard លោត ➜ មិនទាញ document · ស្កេនដក ➜ លើក #appPages)"]=207
-    # ថវិកាបែងចែកប៉ាន់ស្មានសម្រាប់ផ្នែក mutation ថ្មី មិនមែនពិដាន checker។
-    ["money-guardian 1/4"]=242
-    ["money-guardian 2/4"]=242
-    ["money-guardian 3/4"]=242
-    ["money-guardian 4/4"]=242
-    ["zoew-suite 1/5 (ZoeW React ៖ tsc · lint · vitest 1/4 · android)"]=210
-    ["zoew-suite 2/5 (ZoeW React ៖ build · sw · smoke · native · rules)"]=215
-    ["zoew-suite 3/5 (ZoeW React ៖ vitest 2/4)"]=192
-    ["zoew-suite 4/5 (ZoeW React ៖ vitest 3/4)"]=192
-    ["zoew-suite 5/5 (ZoeW React ៖ vitest 4/4)"]=192
+    ["node syntax ៖ ZoeW module view · ZoeKeyGen/app.js"]=1
+    ["rules JSON valid"]=1
+    ["license-verify.js byte-identical ×2"]=1
+    ["error-reporting.js byte-identical ×2"]=1
+    ["គ្មាន trailing whitespace"]=1
+    ["server-time-function-test"]=1
+    ["emu/import-native-I100-cookie-unsigned"]=23
+    ["emu/import-native-I100-cookie-signed"]=28
+    ["emu/import-native-I100-cookie-mixed"]=25
+    ["emu/import-native-I100-cookie-mixed-same-group"]=28
+    ["emu/import-native-I100-palm-unsigned"]=20
+    ["emu/import-native-I100-palm-signed"]=27
+    ["emu/import-native-I100-palm-mixed"]=17
+    ["emu/import-native-I100-palm-mixed-same-group"]=17
+    ["emu/scan-operation-sdk"]=10
+    ["exit-code-integrity 1/4 (meta)"]=100
+    ["exit-code-integrity 2/4 (meta)"]=93
+    ["exit-code-integrity 3/4 (meta)"]=169
+    ["exit-code-integrity 4/4 (meta)"]=196
+    ["emu/scan-month-coordination-sdk"]=35
+    ["emu/scan-month-delay-sdk"]=7
+    ["emu/scan-month-reconnect-sdk"]=7
+    ["modal-keyboard 1/3 (browser ពិត ៖ ទូរស័ព្ទ ៤ ទំហំ)"]=125
+    ["modal-keyboard 2/3 (browser ពិត ៖ ទូរស័ព្ទផ្តេក · iPad)"]=98
+    ["modal-keyboard 3/3 (browser ពិត ៖ រំកិល · APK · ចុច · toast · សុវត្ថិភាព)"]=120
+    ["modal-keyboard-device 1/4 (browser ពិត · Android APK/PWA · iPhone · iPad ៖ ប្រអប់)"]=196
+    ["modal-keyboard-device 2/4 (browser ពិត · keyboard លេខ · ចុចកន្លែងវាយ Barcode · ម៉ាស៊ីនស្កេន · zoom)"]=207
+    ["modal-keyboard-device 3/4 (browser ពិត · ប្រអប់រអិលតាម keyboard ៖ ស៊ុមម្តងៗ)"]=184
+    ["modal-keyboard-device 4/4 (browser ពិត · iPhone ៖ ចុច + keyboard លោតហួស ➜ រអិលតែម្តង · ∨/∧ មិនរំកិលទំព័រ · keyboard លោត ➜ មិនទាញ document · ស្កេនដក ➜ លើក #appPages)"]=206
+    # ពេលបែងចែកនៃផ្នែក mutation នីមួយៗ មិនមែនពិដាន checker។
+    ["money-guardian 1/4"]=292
+    ["money-guardian 2/4"]=262
+    ["money-guardian 3/4"]=212
+    ["money-guardian 4/4"]=211
+    ["zoew-suite 1/5 (ZoeW React ៖ tsc · lint · vitest 1/4 · android)"]=176
+    ["zoew-suite 2/5 (ZoeW React ៖ build · sw · smoke · native · rules)"]=224
+    ["zoew-suite 3/5 (ZoeW React ៖ vitest 2/4)"]=130
+    ["zoew-suite 4/5 (ZoeW React ៖ vitest 3/4)"]=136
+    ["zoew-suite 5/5 (ZoeW React ៖ vitest 4/4)"]=159
 )
 # ── RUNALL_SHARD=k/n ៖ បែងចែក checker តាមពេលវាស់ មិនមែនតាមចំនួន ───────────────────────
 # ⛔ បញ្ជី + hints ថេរ (script និងស្លាក sub-suite) ជា input តែមួយ ៖ មិនប្រើ state · nproc · RUNALL_JOBS។

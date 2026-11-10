@@ -109,6 +109,7 @@ cat "$(git rev-parse --absolute-git-dir)/zoe-runall-state.tsv"               # �
 ```
 
 - ការបែង shards ប្រើពេល checker និងពេលនៃការហៅដែលខុសគ្នា ជាមួយគំរូ CI ថេរ៖ lane ២ · browser ១ · emulator ១ · checker ឯកោ។ ពេលដែលបង្ហាញជាការប៉ាន់ស្មាន; ការវាស់ល្បឿនពិតត្រូវអាន CI លើ commit ថ្មី។
+- ពេលកែការប៉ាន់ស្មាន ប្រើ median នៃ checker ដែល PASS ពី CI ដែលមាន CPU និងករណីត្រូវគ្នា ហើយបង្គត់ឡើងទៅវិនាទី។ ករណីដែលប្ដូរ heap ឬភាពឯកោ ត្រូវប្រើការវាស់ក្រោយការប្ដូរ; កុំយកពេល FAIL ជាថវិកា។ ផ្ទៀងបញ្ជីគ្រប់ checker ម្តងគត់ និង CI ថ្មី មុនអះអាងថាលឿនជាងមុន។
 - **hash របស់ tree** = មាតិកាឯកសារដែល git ឃើញ (tracked + untracked មិន ignore) · `audit-tools/emu/real.rules.json` ·
   ទង់ `*_STRICT` ➜ ការកែឯកសារណាមួយ ឬការប្តូរទង់ STRICT = tree ថ្មី ➜ `RUNALL_RESUME=1` បដិសេធ ហើយត្រូវរត់ពេញ។
 - `RUNALL_ONLY` (គ្មាន RESUME) រត់ឡើងវិញ **ទោះលទ្ធផលមុនជាអ្វីក៏ដោយ** (ឧ. `PARTIAL` ព្រោះ emulator មិនទាន់ឡើង) ហើយ

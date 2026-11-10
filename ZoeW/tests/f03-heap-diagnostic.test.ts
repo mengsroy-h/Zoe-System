@@ -14,6 +14,11 @@ const helpers = vm.runInNewContext(script.split('async function main()')[0]
     + '\n({ javaArguments, identityMatches, verifyConstruction })', { require: createRequire(import.meta.url) });
 const owner = (maxHeapMiB: unknown) => ({ start: '100', jar: '/owned/emulator.jar', gcLog: '/owned/jvm-gc.log', port: 19001, maxHeapMiB });
 
+it.each(['audit-tools/run-all.sh', 'audit-tools/owned-rtdb-command.js'])('ការប្ដូរ runner %s បើក diagnostic ដែលរក្សា gate ដើម', file => {
+    const paths = workflow.split('\nconcurrency:')[0].match(/^ {6}- '([^']+)'$/gm) || [];
+    expect(paths).toContain(`      - '${file}'`);
+});
+
 it.each([512, 1024])('JVM %s៖ ទំហំ heap និង ownership ត្រូវដូចគ្នា', (heap) => {
     const binding = owner(heap), args = ['java', ...helpers.javaArguments(binding)];
     expect(args[1]).toBe('-Xmx' + heap + 'm');

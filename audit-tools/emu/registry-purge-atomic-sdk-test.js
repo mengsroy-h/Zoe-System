@@ -466,6 +466,8 @@ function endNativeFixtureOwner(api, client, trace) {
 class NativeWireTrace {
     constructor(base, namespace, clock = () => process.hrtime.bigint()) {
         this.base = base; this.namespace = namespace; this.clock = clock; this.started = clock();
+        const wallUtc = new Date().toISOString();
+        this.timeAnchor = { wallUtc, monotonicBeforeMs: 0, monotonicAfterMs: Number(clock() - this.started) / 1e6 };
         this.events = []; this.sockets = []; this.connections = 0; this.observerErrors = 0; this.droppedEvents = 0;
     }
     safely(run) { try { return run(); } catch (_) { this.observerErrors++; } }
@@ -542,7 +544,7 @@ class NativeWireTrace {
         return socket;
     }
     summary() {
-        return { events: this.events.slice(), sockets: this.sockets.map(value => ({ ...value })), connections: this.connections, observerErrors: this.observerErrors, droppedEvents: this.droppedEvents,
+        return { timeAnchor: { ...this.timeAnchor }, events: this.events.slice(), sockets: this.sockets.map(value => ({ ...value })), connections: this.connections, observerErrors: this.observerErrors, droppedEvents: this.droppedEvents,
             meaning: 'send-returned is Faye invocation, not server commit; frame-arrived is Faye data before SDK handler, observed is after SDK handler; neither is independent effect proof' };
     }
 }

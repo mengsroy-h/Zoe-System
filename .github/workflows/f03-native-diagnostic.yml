@@ -5,6 +5,8 @@ on:
     paths:
       - '.github/workflows/f03-native-diagnostic.yml'
       - 'ZoeW/tests/f03-heap-diagnostic.test.ts'
+      - 'audit-tools/run-all.sh'
+      - 'audit-tools/owned-rtdb-command.js'
       - 'audit-tools/emu/registry-purge-atomic-sdk-test.js'
       - 'audit-tools/emu/ns.js'
       - 'audit-tools/supabase-pg.js'

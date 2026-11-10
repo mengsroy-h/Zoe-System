@@ -5049,6 +5049,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `rules-duplicate-keys` | — | ផ្នែក ៣ · ផ្នែក ៧ |
 | `runall-runner-test` | ផ្នែក ២ | ផ្នែក ៧ · ផ្នែក ៩ |
 | `scan-engine-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៨ · ផ្នែក ៩ |
+| `scan-month-fixture-date-test` | ផ្នែក ២ | — |
 | `scan-remove-mode-test` | ផ្នែក ២ | ផ្នែក ១ |
 | `sdk-offline-boot-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `sdk-surface` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ · ផ្នែក ៩ |

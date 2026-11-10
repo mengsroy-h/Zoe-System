@@ -1,4 +1,6 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { createRequire } from 'node:module';
 import { runInNewContext } from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
@@ -144,16 +146,16 @@ it('scan SDK cleanup៖ រំលងតែ app ដែល SDK បានលុប�
 
 
 describe('poison child៖ exit និង pipe មានពិដានដាច់ដោយឡែក', () => {
-    function harness(spawnThrows = false) {
+    function harness(spawnThrows = false, platform = 'darwin', procFs = {}) {
         const child = Object.assign(new EventEmitter(), {
             stdout: Object.assign(new EventEmitter(), { setEncoding: vi.fn(), destroy: vi.fn() }),
             stderr: Object.assign(new EventEmitter(), { setEncoding: vi.fn(), destroy: vi.fn() }),
-            kill: vi.fn()
+            pid: 12345, kill: vi.fn(() => true)
         });
         const liveChildren = new Set();
         const source = guard.slice(guard.indexOf('function runPoisonedChild('), guard.indexOf('// ⛔⛔ **timeout'));
         const run = runInNewContext(source + '\nrunPoisonedChild;', {
-            cp: { spawn: () => { if (spawnThrows) throw new Error('spawn ENOENT'); return child; } }, process: { execPath: 'node', env: {} }, ROOT: '.',
+            cp: { spawn: () => { if (spawnThrows) throw new Error('spawn ENOENT'); return child; } }, process: { execPath: 'node', env: {}, platform }, fs: procFs, Buffer, ROOT: '.',
             EXIT_GUARD_ARGS: [], OUT_CAP: 4096, EXIT_TO_CLOSE_GRACE_MS: 2000, HARD_GRACE_MS: 5000,
             liveChildren, Date, setTimeout, clearTimeout
         });
@@ -166,6 +168,7 @@ describe('poison child៖ exit និង pipe មានពិដានដាច�
         try {
             const { child, liveChildren, run, verdict } = harness();
             const result = run('fixture', 100);
+            child.emit('spawn');
             child.stdout.emit('data', 'ZOE_EXITCODE_POISON_REACHED\n');
             await vi.advanceTimersByTimeAsync(90);
             child.emit('exit', code, null);
@@ -173,7 +176,7 @@ describe('poison child៖ exit និង pipe មានពិដានដាច�
             expect(child.kill).not.toHaveBeenCalled();
             child.emit('close', code, null);
             const completed = await result;
-            expect(completed).toMatchObject({ code, timedOut: false, signal: null });
+            expect(completed).toMatchObject({ code, timedOut: false, signal: null, lifecycle: { pid: 12345, spawnMs: 0, markerMs: 0, exitMs: 90, closeMs: 110, finishMs: 110, timeoutMs: null, exitCode: code, exitSignal: null } });
             expect(verdict(completed)).toBe(code === 0 ? 'fake-green' : 'failed');
             expect(liveChildren.size).toBe(0);
             expect(vi.getTimerCount()).toBe(0);
@@ -232,6 +235,7 @@ describe('poison child៖ exit និង pipe មានពិដានដាច�
         try {
             const { child, liveChildren, run, verdict } = harness();
             const result = run('fixture', 100);
+            child.emit('spawn');
             child.stdout.emit('data', 'ZOE_EXITCODE_POISON_REACHED\n');
             await vi.advanceTimersByTimeAsync(5100);
             const completed = await result;
@@ -250,8 +254,128 @@ describe('poison child៖ exit និង pipe មានពិដានដាច�
             expect(child.kill).toHaveBeenCalledWith('SIGKILL');
             child.emit('exit', 1, null);
             child.emit('close', 1, null);
-            expect(await result).toMatchObject({ code: 1, timedOut: true });
+            expect(await result).toMatchObject({ code: 1, timedOut: true, lifecycle: { timeoutMs: 100, exitCode: 1, exitSignal: null, kill: { signal: 'SIGKILL', requestedMs: 100, result: true }, proc: { status: 'non-linux' } } });
             expect(vi.getTimerCount()).toBe(0);
         } finally { vi.useRealTimers(); }
     });
+    it('marker មុនព្យួរ និង signal ពិត នៅរក្សាភស្តុតាងដោយមិនប្ដូរសាលក្រម', async () => {
+        vi.useFakeTimers();
+        try {
+            const { child, run, verdict } = harness();
+            const pending = run('fixture', 100);
+            child.stdout.emit('data', 'ZOE_EXITCODE_POISON_');
+            child.stdout.emit('data', 'REACHED\n');
+            await vi.advanceTimersByTimeAsync(100);
+            child.emit('exit', null, 'SIGKILL');
+            child.emit('close', null, 'SIGKILL');
+            const result = await pending;
+            expect(result.lifecycle).toMatchObject({ markerMs: 0, timeoutMs: 100, exitMs: 100, closeMs: 100, exitCode: null, exitSignal: 'SIGKILL' });
+            expect(verdict(result)).toBe('unverified');
+            const before = JSON.stringify(result);
+            child.emit('exit', 1, null);
+            child.emit('close', 1, null);
+            child.stdout.emit('data', 'private payload');
+            expect(JSON.stringify(result)).toBe(before);
+        } finally { vi.useRealTimers(); }
+    });
+    it('proc lookup បរាជ័យ មិនបង្ហាញ path ឬទិន្នន័យឯកជន និងមិនពន្យារ deadline', async () => {
+        vi.useFakeTimers();
+        try {
+            const open = vi.fn(() => { throw new Error('private path and payload'); });
+            const { child, run } = harness(false, 'linux', { openSync: open });
+            const pending = run('fixture', 100);
+            await vi.advanceTimersByTimeAsync(5100);
+            const result = await pending;
+            expect(result.lifecycle.proc).toEqual({ status: 'unavailable' });
+            expect(JSON.stringify(result.lifecycle)).not.toContain('private');
+            expect(open).toHaveBeenCalledWith('/proc/12345/stat', 'r');
+            expect(child.kill).toHaveBeenCalledOnce();
+        } finally { vi.useRealTimers(); }
+    });
+
+    it('proc មុន kill៖ អានមានព្រំដែន និងរក្សាតែ state និង wchan', async () => {
+        vi.useFakeTimers();
+        try {
+            const events: string[] = [];
+            let entries = 0;
+            const closed: string[] = [];
+            const procFs = {
+                openSync: (file: string) => { events.push('read'); return file; },
+                readSync: (file: string, buffer: Buffer, offset: number, size: number) => {
+                    const value = file.endsWith('/stat') ? '12345 (private command) S 1 2 3' : 'futex_wait_queue';
+                    expect(size).toBe(file.endsWith('/stat') ? 1024 : 64);
+                    return buffer.write(value, offset, size);
+                },
+                closeSync: (file: string) => { closed.push(file); },
+                opendirSync: () => ({
+                    readSync: () => ({ name: String(12345 + entries++) }),
+                    closeSync: vi.fn()
+                })
+            };
+            const { child, run } = harness(false, 'linux', procFs);
+            child.kill.mockImplementation(() => { events.push('kill'); return true; });
+            const pending = run('fixture', 100);
+            await vi.advanceTimersByTimeAsync(5100);
+            const result = await pending;
+            expect(events.at(-1)).toBe('kill');
+            expect(closed).toHaveLength(17);
+            expect(result.lifecycle.proc).toMatchObject({ status: 'available', state: 'S', threadsStatus: 'bounded' });
+            expect(result.lifecycle.proc.threads).toHaveLength(16);
+            expect(result.lifecycle.proc.threads[0]).toEqual({ tid: 12345, wchan: 'futex_wait_queue' });
+            expect(JSON.stringify(result.lifecycle)).not.toContain('private');
+            expect(JSON.stringify(result.lifecycle).length).toBeLessThan(2048);
+        } finally { vi.useRealTimers(); }
+    });
+    it.each([false, 'throw'])('kill=%s មិនបាត់ hard ceiling ឬបង្កើត exit ដែលមិនបានឃើញ', async mode => {
+        vi.useFakeTimers();
+        try {
+            const { child, run } = harness();
+            child.kill.mockImplementation(() => { if (mode === 'throw') throw new Error('private'); return false; });
+            const pending = run('fixture', 100);
+            await vi.advanceTimersByTimeAsync(5100);
+            const result = await pending;
+            expect(result.lifecycle).toMatchObject({ exitMs: null, closeMs: null, exitCode: null, exitSignal: null, finishMs: 5100, kill: { result: mode === 'throw' ? 'threw' : false } });
+            expect(JSON.stringify(result.lifecycle)).not.toContain('private');
+        } finally { vi.useRealTimers(); }
+    });
+
 });
+
+it('កូន Node ពិត៖ marker · hang · stdout ដែលចៅកាន់ក្រោយ exit', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'exit-evidence-'));
+    const liveChildren = new Set();
+    const source = guard.slice(guard.indexOf('function runPoisonedChild('), guard.indexOf('// ⛔⛔ **timeout'));
+    const run = runInNewContext(source + '\nrunPoisonedChild;', {
+        cp: require('node:child_process'), process, fs: require('node:fs'), Buffer, ROOT: dir,
+        EXIT_GUARD_ARGS: [], OUT_CAP: 4096, EXIT_TO_CLOSE_GRACE_MS: 2000, HARD_GRACE_MS: 5000,
+        liveChildren, Date, setTimeout, clearTimeout
+    });
+    try {
+        for (const mode of ['exit', 'hang', 'pipe']) {
+            const file = join(dir, mode + '.cjs');
+            writeFileSync(file, "console.log('ZOE_EXITCODE_POISON_REACHED');\n" + (mode === 'hang'
+                ? 'setInterval(() => {}, 1000);'
+                : mode === 'pipe'
+                    ? "require('node:child_process').spawn(process.execPath, ['-e', 'setTimeout(() => {}, 3000)'], { stdio: ['ignore', 1, 2] }); process.exit(1);"
+                    : 'process.exit(1);'));
+            const result = await run(file, 5000);
+            expect(result.lifecycle.pid).toBeGreaterThan(0);
+            expect(result.lifecycle.spawnMs).toBeGreaterThanOrEqual(0);
+            expect(result.lifecycle.markerMs).toBeGreaterThanOrEqual(0);
+            expect(result.lifecycle.exitMs).not.toBeNull();
+            if (mode === 'hang') {
+                expect(result).toMatchObject({ code: null, signal: 'SIGKILL', timedOut: true });
+                expect(result.lifecycle.kill.result).toBe(true);
+                if (process.platform === 'linux') expect(result.lifecycle.proc.status).toBe('available');
+            } else {
+                expect(result).toMatchObject({ code: 1, signal: null, timedOut: false });
+                expect(result.lifecycle.kill).toBeNull();
+                if (mode === 'pipe') {
+                    expect(result.lifecycle.closeMs).toBeNull();
+                    expect(result.lifecycle.finishMs - result.lifecycle.exitMs).toBeGreaterThanOrEqual(2000);
+                }
+            }
+        }
+        expect(liveChildren.size).toBe(0);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+}, 20000);

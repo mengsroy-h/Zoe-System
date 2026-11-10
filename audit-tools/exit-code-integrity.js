@@ -456,6 +456,48 @@ function runPoisonedChild(file, budgetMs) {
         let out = '', settled = false, timedOut = false, exitCode = null, exitSignal = null, exited = false;
         let graceTimer = null;
         let child;
+        const elapsed = () => Date.now() - t0;
+        const lifecycle = { pid: null, spawnMs: null, markerMs: null, exitMs: null, closeMs: null,
+            timeoutMs: null, finishMs: null, exitCode: null, exitSignal: null, kill: null, proc: null };
+        const snapshot = () => {
+            if (process.platform !== 'linux') return { status: 'non-linux' };
+            if (!Number.isInteger(child?.pid) || child.pid <= 0) return { status: 'unavailable' };
+            const base = '/proc/' + child.pid;
+            const read = (file, size) => {
+                if (settled || exited) throw new Error('unavailable');
+                const handle = fs.openSync(file, 'r');
+                try {
+                    const buffer = Buffer.alloc(size);
+                    const bytesRead = fs.readSync(handle, buffer, 0, size, 0);
+                    return buffer.toString('utf8', 0, bytesRead);
+                } finally { fs.closeSync(handle); }
+            };
+            try {
+                const stat = read(base + '/stat', 1024);
+                const state = /^ ([RSDZTWtXxKPI]) /.exec(stat.slice(stat.lastIndexOf(')') + 1))?.[1];
+                if (!state) return { status: 'unavailable' };
+                const result = { status: 'available', state, threads: [], threadsStatus: 'unavailable' };
+                if (settled || exited) return result;
+                try {
+                    const dir = fs.opendirSync(base + '/task', { bufferSize: 16 });
+                    try {
+                        for (let i = 0; i < 16 && !settled && !exited; i++) {
+                            const entry = dir.readSync();
+                            if (!entry) { result.threadsStatus = 'complete'; break; }
+                            result.threadsStatus = 'bounded';
+                            if (!/^[0-9]{1,10}$/.test(entry.name)) continue;
+                            let wchan = null;
+                            try {
+                                const value = read(base + '/task/' + entry.name + '/wchan', 64).trim();
+                                if (/^[A-Za-z0-9_]{1,63}$/.test(value)) wchan = value;
+                            } catch (e) {}
+                            result.threads.push({ tid: Number(entry.name), wchan });
+                        }
+                    } finally { dir.closeSync(); }
+                } catch (e) {}
+                return result;
+            } catch (e) { return { status: 'unavailable' }; }
+        };
         const finish = (code, signal) => {
             if (settled) return;
             settled = true;
@@ -464,11 +506,15 @@ function runPoisonedChild(file, budgetMs) {
                 liveChildren.delete(child);
                 child.stdout.destroy(); child.stderr.destroy();
             }
-            resolve({ code, signal, timedOut, out, ms: Date.now() - t0 });
+            lifecycle.finishMs = elapsed();
+            resolve({ code, signal, timedOut, out, ms: Date.now() - t0, lifecycle: JSON.parse(JSON.stringify(lifecycle)) });
         };
         const killTimer = setTimeout(() => {
             timedOut = true;
-            try { child.kill('SIGKILL'); } catch (e) {}
+            lifecycle.timeoutMs = elapsed();
+            lifecycle.proc = snapshot();
+            lifecycle.kill = { requestedMs: elapsed(), signal: 'SIGKILL', result: null };
+            try { lifecycle.kill.result = child.kill('SIGKILL'); } catch (e) { lifecycle.kill.result = 'threw'; }
         }, budgetMs);
         const hardTimer = setTimeout(() => finish(exited ? exitCode : null, exited ? exitSignal : 'SIGKILL'),
             budgetMs + HARD_GRACE_MS);
@@ -482,18 +528,34 @@ function runPoisonedChild(file, budgetMs) {
             finish(null, null);
             return;
         }
+        lifecycle.pid = Number.isInteger(child.pid) ? child.pid : null;
         liveChildren.add(child);
-        const take = (chunk) => { if (out.length < OUT_CAP) out += chunk; };
+        child.on('spawn', () => { if (!settled) lifecycle.spawnMs = elapsed(); });
+        let markerTail = '';
+        const take = (chunk) => {
+            if (settled || out.length >= OUT_CAP) return;
+            out += chunk;
+            if (lifecycle.markerMs === null) {
+                const sample = markerTail + chunk;
+                if (/^ZOE_EXITCODE_POISON_REACHED$/m.test(sample)) lifecycle.markerMs = elapsed();
+                markerTail = sample.slice(-('ZOE_EXITCODE_POISON_REACHED'.length + 1));
+            }
+        };
         child.stdout.setEncoding('utf8'); child.stdout.on('data', take);
         child.stderr.setEncoding('utf8'); child.stderr.on('data', take);
         child.on('error', (e) => { out += '\n' + String(e && e.message || e); finish(null, null); });
         child.on('exit', (code, signal) => {
             if (settled) return;
             exited = true; exitCode = code; exitSignal = signal;
+            lifecycle.exitMs = elapsed(); lifecycle.exitCode = code; lifecycle.exitSignal = signal;
             clearTimeout(killTimer); clearTimeout(hardTimer);
             graceTimer = setTimeout(() => finish(code, signal), EXIT_TO_CLOSE_GRACE_MS);
         });
-        child.on('close', (code, signal) => finish(exited ? exitCode : code, exited ? exitSignal : signal));
+        child.on('close', (code, signal) => {
+            if (settled) return;
+            lifecycle.closeMs = elapsed();
+            finish(exited ? exitCode : code, exited ? exitSignal : signal);
+        });
     });
 }
 
@@ -742,6 +804,8 @@ async function poisonOne(rel) {
     }
     if (verdict === 'failed') return;
     if (verdict === 'unverified') {
+        console.log('ZOE_EXITCODE_CHILD_DIAGNOSTIC ' + JSON.stringify({ checker: rel, code: result.code,
+            signal: result.signal, timedOut: result.timedOut, lifecycle: result.lifecycle }));
         const tail = String(result.out || '').trim().split('\n').slice(-14).join(' | ').slice(-1600);
         unverified.push(rel + ' (' + (result.timedOut ? 'ផុតថវិកា ' + budgetMs + 'ms (deadline របស់ job)' : 'signal=' + result.signal + ' code=' + result.code + ' (គ្មានភស្តុតាងពុលដែលបញ្ចប់ដោយគ្មាន uncaught crash)' ) + ') ចុង output ៖ ' + tail);
         return;

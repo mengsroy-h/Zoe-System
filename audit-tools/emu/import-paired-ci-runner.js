@@ -247,7 +247,11 @@ function createSnapshotAdapters(base, options){
  }
  function ensureSnapshot(pid,status){if(!snapshotPromise)snapshotPromise=capture(pid,status).then(value=>{lastReceipt=value;return value;});return snapshotPromise;}
  const adapters={...base,
-  launch(...args){engine=base.launch(...args);const started=engine.spawned;engine.spawned=started.then(()=>{engineIdentity=base.identity(engine.child.pid);});return engine;},
+  launch(...args){engine=base.launch(...args);return engine;},
+  ownerAcquired(identity){
+   if(!engine||engineIdentity||identity?.pid!==engine.child.pid||!Array.isArray(identity.args)||!identity.args.length||!sameIdentity(identity,base.identity(engine.child.pid)))throw reason('OWNER_UNPROVEN');
+   engineIdentity={pid:identity.pid,start:identity.start,exe:identity.exe,args:identity.args.slice()};
+  },
   command(...args){const child=base.command(...args),exit=child.exit;activeChild=child;child.exit=Promise.resolve(exit).catch(()=>({code:null,signal:null,outputPresent:false,failureLine:true,skipLine:false,error:'CHILD_PROCESS_ERROR'})).then(async result=>{
    const status=childStatus(result);lastReceipt=await ensureSnapshot(child.child.pid,status);
    return {...status,failureLine:status.failureLine||lastReceipt.state!=='OBSERVED_POINT_IN_TIME_ONLY',nativeSnapshot:lastReceipt};

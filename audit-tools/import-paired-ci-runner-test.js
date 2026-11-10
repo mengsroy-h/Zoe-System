@@ -135,13 +135,13 @@ const fakeRoot = { zoew_scan_operations: { [fakeOp]: { id:fakeOp,phase:'committe
 let serial=0;
 
 function fakeBase(options,calls,stateDir){
- let nextPid=100, engine, identityVersion='original', listener=true;
+ let nextPid=100, engine, identityVersion='original', listener=true, identityReads=0;
  const identity = pid => ({ pid, start: identityVersion, exe:'/synthetic/java',args:['java',...owner.javaArguments('/synthetic/rtdb.jar')] });
  function handle(kind){let finish;const x={kind,child:{pid:++nextPid},spawned:Promise.resolve(),done:false};
   x.exit=new Promise(resolve=>finish=resolve);x.ended=()=>x.done;x.finish=(code=0)=>{x.done=true;finish({code,signal:null,outputPresent:true,failureLine:false,skipLine:false,...(kind==='command'?options.childFields:{})});};return x;}
  const base={validateSource(){},now:Date.now,delay:async()=>{},verifyJar:()=>({jar:'/synthetic/rtdb.jar',sha256:'a'.repeat(64)}),portFree:async()=>{},
   launch:()=>{calls.push('engine-launch');engine=handle('engine');return engine;},
-  identity:pid=>identity(pid),ownsListener:()=>listener,readyRead:async()=>true,
+  identity:pid=>{const seen=identity(pid);return options.firstEmpty&&++identityReads===1?{...seen,args:[]}:seen;},ownsListener:()=>listener,readyRead:async()=>true,
   command:()=>{calls.push('command');const child=handle('command');
    let marker={schema:1,profile:PROFILE,pid:child.child.pid,namespace:'paired-import-'+child.child.pid+'-ab12cd34'};
    if(options.marker)marker=options.marker(marker);
@@ -222,6 +222,22 @@ function loadClockedSnapshot(){
 }
 
 async function main(){
+ await scenario('argv ទទេដំបូង មិនចាក់សោ snapshot លើ identity ចាស់',{firstEmpty:true,expectPass:true});
+ await scenario('snapshot និង owner ដាច់ពី callback argument ដែលបានកែ',{expectPass:true,factory(base,options){
+  const snapshot=createSnapshotAdapters(base,options),accept=snapshot.adapters.ownerAcquired;
+  snapshot.adapters.ownerAcquired=identity=>{accept(identity);identity.start='changed';identity.args[1]='changed';};return snapshot;
+ }});
+ await scenario('គ្មាន ownership callback មិនអាច snapshot',{noRead:true,factory(base,options){
+  const snapshot=createSnapshotAdapters(base,options);delete snapshot.adapters.ownerAcquired;return snapshot;
+ }});
+ {
+  const calls=[],stateDir=path.join(root,'handoff-'+(++serial)),fake=fakeBase({},calls,stateDir),snapshot=createSnapshotAdapters(fake.base,{stateDir,profile:PROFILE,readRoot:async()=>JSON.stringify(fakeRoot)});
+  assert.throws(()=>snapshot.adapters.ownerAcquired({pid:101,args:[]}),/OWNER_UNPROVEN/);
+  const engine=snapshot.adapters.launch();await engine.spawned;
+  const identity=fake.base.identity(engine.child.pid);
+  for(const value of [{...identity,args:[]},{...identity,pid:identity.pid+1},{...identity,start:'changed'}])assert.throws(()=>snapshot.adapters.ownerAcquired(value),/OWNER_UNPROVEN/);
+  snapshot.adapters.ownerAcquired(identity);assert.throws(()=>snapshot.adapters.ownerAcquired(identity),/OWNER_UNPROVEN/);
+ }
  {const c=new AbortController();c.abort();let n=0;raceSafeSignal(c.signal).addEventListener('abort',()=>n++,{once:true});assert.equal(n,1,'already-aborted signal must be delivered');}
  {let wrapped,aborted=false,n=0;const raw={get aborted(){return aborted;},addEventListener(_type,fn){wrapped=fn;aborted=true;fn({type:'abort'});},removeEventListener(){}};raceSafeSignal(raw).addEventListener('abort',()=>n++,{once:true});wrapped({type:'abort'});assert.equal(n,1,'registration-race abort delivered exactly once');}
  {const c=new AbortController(),safe=raceSafeSignal(c.signal);let n=0;safe.addEventListener('abort',()=>n++,{once:true});c.abort();c.abort();assert.equal(n,1,'later abort delivered exactly once');}
@@ -340,7 +356,7 @@ async function main(){
   const factory=loadMutant('const handle=await io.open(file,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW);','const handle=await io.open(file,fs.constants.O_RDONLY);');
   await assert.rejects(scenario('symlink mutant',{factory,markerSymlink:true,noRead:true}),/symlink mutant/);
  }
- console.log(JSON.stringify({status:'PASS',cases:60,mutants:4,scope:'actual owned wrapper with fake process/HTTP adapters; no backend, network or real signals; synthetic files retained'}));
+ console.log(JSON.stringify({status:'PASS',cases:64,mutants:4,scope:'actual owned wrapper with fake process/HTTP adapters; no backend, network or real signals; synthetic files retained'}));
 }
 let controlDeadline;try{await Promise.race([main(),new Promise((_,reject)=>{controlDeadline=setTimeout(()=>reject(new Error('synthetic snapshot controls did not complete')),5000);})]);}finally{clearTimeout(controlDeadline);}
 

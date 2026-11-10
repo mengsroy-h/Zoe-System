@@ -2044,6 +2044,20 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-11-10 — CI៖ ផ្ទៀងការចាប់ផ្ដើម និង ownership របស់ JVM
+
+**ប្រភព**៖ [Audit #1269](https://github.com/mengsroy-h/Zoe-System/actions/runs/42804166596) លើ merge commit `b2b75c9d0d0f15d0b1227c4ac6bd7e5fe48678b6` មាន checker 248 PASS និង 1 FAIL គ្មាន SKIP/PARTIAL។ `scan-month-fixture-date-test` មិនទាន់ចាប់ផ្ដើមទេ៖ wrapper រាយ `Owned JVM argv mismatch` រួច `Owned JVM identity changed; refusing signal`; cleanup មិនបានផ្ទៀង ហើយ outer deadline 300s បញ្ចប់ job។ Shard1 ចំណាយ30m58s។ Meta ទាំង4ផ្នែក និង F03 ឆ្លង; heap របស់ scope ដែលធ្លាក់នៅ512 MiB ដដែល។ នេះមិនជាភស្តុតាងថា date checker ឬ App ខូចទេ។
+
+**ព្រំដែននៃការស៊ើប**៖ Actual argv ដំបូងមិនមានក្នុង artifact ដូច្នេះមូលហេតុ mismatch របស់ CI មិនទាន់បញ្ជាក់។ Probe ដាច់ដោយឡែកលើ Node24.22.2/libuv1.52.1 និង Debian OpenJDK21.0.13 ចាប់ Java 4100 ដងដោយគ្មាន mismatch ហើយ reap កូនគ្រប់គ្នា; CI ប្រើ Temurin ហើយ probe មិនបានរត់ RTDB JAR ពិត។ Linux source អនុញ្ញាតឱ្យ `/proc` cmdline ទទេក្នុងដំណាក់កាល exec ប៉ុន្តែវាមិនបញ្ជាក់ថា run នេះបានប៉ះចន្លោះនោះទេ។
+
+**ការវាស់រចនាសម្ព័ន្ធ**៖ Helper ពិតជាមួយ Node child ពិត និង snapshot សិប្បនិម្មិត `empty → canonical` បង្ក error ទាំងពីរដូច CI។ Report បញ្ចប់ជា FAIL តែ child ដែលនៅរស់រក្សា wrapper event loop; ក្រោយ supervisor ផ្ទៀង និងបញ្ឈប់តែកូនរបស់ខ្លួន wrapper ចេញ1។ Controls ដាច់ដោយឡែកក៏បង្ហាញ identity read ដំបូង throw អាចទៅ cleanup ដែលគ្មាន snapshot, abort ក្នុង command launch អាចបាត់, JVM ចេញមុន checker អាចនៅ PASS និង post-TERM close wait មានផ្លូវគ្មានព្រំដែន។ ទាំងនេះជាបញ្ហា lifecycle ដែលវាស់បាន មិនមែនការអះអាងថាវាទាំងអស់បង្ក CI #1269 ទេ។
+
+**ការកែដែលវាស់បាន**៖ Retry តែ argv ទទេក្នុងពេល acquisition ដោយចង PID/start/executable ដដែល; nonempty argv ខុស ឬ identity ប្រែបរាជ័យភ្លាម។ Acquisition និង readiness ប្រើ startup deadline ដដែលតែមួយ ហើយ original checker ចាប់តែក្រោយ canonical argv និង listener ត្រូវបានផ្ទៀង។ Ownership ដែលមិនអាចផ្ទៀងនៅ FAIL/blocked ដោយគ្មាន signal ដែលមិនមានភស្តុតាង; មិន force-exit ឬ unref កូនដើម្បីលាក់ការសម្អាតមិនពេញ។ Abort មិនអាចបាត់ក្នុង launch, JVM ដែលចេញមុន checker មិនអាចផ្ដល់ PASS, close wait មានព្រំដែន ហើយ startup timers ត្រូវបិទពេល abort។ Native snapshot ទទួល clone នៃ owner ដែលបានផ្ទៀង ជំនួសការចង argv ដំបូងដោយខ្លួនឯង; public projection ដដែល។
+
+**ភស្តុតាង និងព្រំដែន**៖ Regression ជុំដំបូងលើ helper មុនកែមាន19 FAIL/58 PASS; controls បន្ថែមចាក់ transient identity drift/read error, callback isolation និង startup timer leaks ឱ្យធ្លាក់មុនកែដែរ។ Focused helper90/90 និង snapshot controls64 ជាមួយ mutants4 ឆ្លង។ Diagnostic ថ្មីរាយតែដំណាក់កាល, ពេល, empty/nonempty mismatch និងឈ្មោះ identity fields ដែលប្រែ; មិនបោះ actual argv, environment ឬ payload។ App, self-hosted configuration, heap, deadlines និង checker coverage មិនប្រែ។ នេះមិនជំនួស full CI លើ commit ថ្មី ហើយ failure ដែល ownership នៅមិនអាចផ្ទៀងមិនត្រូវបានបម្លែងទៅ PASS ទេ។
+
+**ការផ្ទៀងមុន publish**៖ Helper និង F03 focused tests សរុប108 ឆ្លងលើ Node24.22.2 ជាមួយ affinity2 CPU; runner guard261 ឆ្លង។ Typecheck, full ESLint, source doc-check, comment/file-coverage guards និង syntax/diff checks ឆ្លង។ Independent review ផ្ទៀង negative controls និង real-child engine-exit failure ម្តងទៀតដោយគ្មាន blocker។ Actual RTDB backend និង CI លើ revision ថ្មីនៅត្រូវផ្ទៀង; កុំយក local controls មកអះអាងថា CI root cause ត្រូវបានបញ្ជាក់រួច។
+
 ### 2026-11-10 — Audit 1243៖ រក្សាពិដាន CI និងសម្អាតកូនរបស់ checker
 
 **ប្រភព និងព្រំដែន**៖ [Audit #1260](https://github.com/mengsroy-h/Zoe-System/actions/runs/42737064512) លើ commit `40ee301c34d9d4e6173a9c6186b1a3e71cc361c7`។ Attempt 1 ធ្លាក់ `exit-code-integrity 1/2`; attempt 2 ធ្លាក់ទាំង `zoew-suite 3/3` និង meta ផ្នែកដដែល។ រក្សាឯកសារដែលអ្នកប្រើកំពុងកែដោយឡែក; ការកែនេះប៉ះតែ audit harness, tests និងឯកសារ។ គ្មានការប្តូរកំណែ App, business rules, backend, CI deadline ឬការបោះពុម្ព។

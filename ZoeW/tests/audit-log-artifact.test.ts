@@ -3,12 +3,32 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { runInNewContext } from 'node:vm';
 
 const workflow = readFileSync(path.resolve(process.cwd(), '../.github/workflows/audit.yml'), 'utf8');
 const steps = workflow.match(/^ {6}-[^\n]*(?:\n(?! {6}-)[^\n]*)*/gm) || [];
 const step = steps.find(value => /- name: run-all\.sh \(ផ្នែក/.test(value)) || '';
 const block = step.match(/^ {8}run: \|\r?\n([\s\S]*)/m)?.[1] || '';
 const script = block.split('\n').map(line => line.replace(/^ {10}/, '')).join('\n');
+const coverage = readFileSync(path.resolve(process.cwd(), '../audit-tools/checker-coverage.js'), 'utf8');
+const parserSource = coverage.match(/^function workflowRunsAll\(source\) \{[\s\S]*?^\}/m)?.[0];
+const workflowRunsAll = runInNewContext(`(${parserSource})`) as (source: string) => boolean;
+
+it('CI coverage ស្គាល់ workflow ពិតដែលរក្សា log និង exit status', () => {
+    expect(workflowRunsAll(workflow)).toBe(true);
+});
+
+it.each([
+    'bash audit-tools/run-all.sh 2>&1 | tee "$AUDIT_LOG"',
+    'bash audit-tools/run-all.sh 2>&1 | tee "$AUDIT_LOG"\nset -o pipefail',
+    'set -o pipefail\nset +o pipefail\nbash audit-tools/run-all.sh 2>&1 | tee "$AUDIT_LOG"',
+    'set -o pipefail\necho bash audit-tools/run-all.sh 2>&1 | tee "$AUDIT_LOG"',
+    'set -o pipefail\n# bash audit-tools/run-all.sh 2>&1 | tee "$AUDIT_LOG"',
+    'set -o pipefail\nbash audit-tools/run-all.sh 2>&1 | tee "$AUDIT_LOG" || true',
+    'set -o pipefail\nbash audit-tools/run-all.sh.bak 2>&1 | tee "$AUDIT_LOG"'
+])('CI coverage មិនទទួល runner ដែលបាត់ verdict ឬមិនរត់ពិត៖ %s', body => {
+    expect(workflowRunsAll('  run: |\n' + body.split('\n').map(line => '    ' + line).join('\n'))).toBe(false);
+});
 
 it.each([0, 7, 124])('CI រក្សា stdout/stderr ដោយមិនប្ដូរសាលក្រម %s', status => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zoe-audit-log-'));

@@ -82,7 +82,7 @@ it('វាស់មូលហេតុ jstat បាត់ ដោយមិនប�
     expect(helpers.probeCounters, 'jstat បាត់មិនមានមូលហេតុដែលអាចផ្ទៀងបាន').toBeTypeOf('function');
     const success = helpers.probeCounters({ status: 0, stdout: 'Timestamp YGC\n1.5 2\n' });
     expect(success.gc.YGC).toBe(2);
-    expect(success.gcProbe).toEqual({ outcome: 'OBSERVED' });
+    expect(success.gcProbe).toMatchObject({ outcome: 'OBSERVED' });
     for (const [probe, outcome] of [
         [{ status: null, signal: 'SIGTERM', error: { code: 'ETIMEDOUT' } }, 'TIMEOUT'],
         [{ status: null, error: { code: 'ENOENT', message: 'PRIVATE' } }, 'SPAWN_ERROR'],
@@ -91,14 +91,15 @@ it('វាស់មូលហេតុ jstat បាត់ ដោយមិនប�
     ]) {
         const result = helpers.probeCounters(probe);
         expect(result.gc).toBeNull();
-        expect(result.gcProbe).toEqual({ outcome });
+        expect(result.gcProbe).toMatchObject({ outcome });
         expect(JSON.stringify(result)).not.toContain('PRIVATE');
     }
 });
 
 
 it('sampler រក្សា GC_COUNTERS_UNAVAILABLE និង failure ពេល probe ខ្វះ', () => {
-    const probeBlock = script!.slice(script!.indexOf('const probe = cp.spawnSync'), script!.indexOf('samples++;'));
+    const probeStart = script!.indexOf('const probeStartedMs');
+    const probeBlock = script!.slice(probeStart < 0 ? script!.indexOf('const probe = cp.spawnSync') : probeStart, script!.indexOf('samples++;'));
     expect(probeBlock).toContain('fs.appendFileSync');
     for (const probe of [
         { status: null, error: { code: 'ETIMEDOUT' } },
@@ -107,18 +108,211 @@ it('sampler រក្សា GC_COUNTERS_UNAVAILABLE និង failure ពេល 
         let sample = '';
         const realRequire = createRequire(import.meta.url);
         const result = vm.runInNewContext(script!.split('async function main()')[0] + `
-            let unavailable = false;
+            let unavailable = false; const nextSample = 200;
             const owner = { pid: 123, start: '100', jstat: '/owned/jstat' };
             const observed = { stat: { state: 'S' } }, output = '/owned/samples';
             ${probeBlock}
             unavailable;
-        `, { require: (name: string) => name === 'fs' ? { appendFileSync: (_file: string, data: string) => { sample = data; } }
+        `, { process, require: (name: string) => name === 'fs' ? { appendFileSync: (_file: string, data: string) => { sample = data; } }
             : name === 'child_process' ? { spawnSync: () => probe } : realRequire(name) });
         const row = JSON.parse(sample);
         expect(result).toBe(probe.status !== 0);
         expect(row.status).toBe(probe.status === 0 ? 'OBSERVED' : 'GC_COUNTERS_UNAVAILABLE');
-        expect(row.gcProbe).toEqual({ outcome: probe.status === 0 ? 'OBSERVED' : 'TIMEOUT' });
+        expect(row.gcProbe).toMatchObject({ outcome: probe.status === 0 ? 'OBSERVED' : 'TIMEOUT' });
     }
     expect(script).toContain("if (!result.samples || result.unavailable) throw new Error('Passive JVM measurements incomplete');");
     expect(script).toContain('if (!samples || unavailable) process.exitCode = 1;');
+});
+
+it.each(['ETIMEDOUT', 'ENOBUFS'])('probe %s មាន exit0 និង row ពេញ នៅមិនមែនជោគជ័យ', code => {
+    const result = helpers.probeCounters({ status: 0, signal: null, error: { code }, stdout: 'Timestamp YGC\n1.5 2\n' });
+    expect(result.gc).toBeNull();
+    expect(result.gcProbe.outcome).toBe(code === 'ETIMEDOUT' ? 'TIMEOUT' : 'SPAWN_ERROR');
+});
+
+it('probe រាប់តែ bytes និងលេខដែលបានផ្ទៀង ទោះ timeout មាន counter row ពេញ', () => {
+    const stdout = 'Timestamp YGC\n1.5 2\n';
+    for (const status of [null, 0]) {
+        const result = helpers.probeCounters({ status, signal: 'SIGTERM', error: { code: 'ETIMEDOUT', message: 'PRIVATE' }, stdout, stderr: 'ខ' });
+        expect(result.gc).toBeNull();
+        expect(result.gcProbe).toEqual({ outcome: 'TIMEOUT', exitStatus: status, errorCode: 'ETIMEDOUT', signal: 'SIGTERM',
+            stdoutBytes: Buffer.byteLength(stdout), stderrBytes: 3, counterRowPresent: true });
+        expect(JSON.stringify(result)).not.toContain('PRIVATE');
+    }
+    const success = helpers.probeCounters({ status: 0, stdout, stderr: '' });
+    expect(success.gc).toEqual({ Timestamp: 1.5, YGC: 2 });
+    expect(success.gcProbe).toEqual({ outcome: 'OBSERVED', exitStatus: 0, errorCode: null, signal: null,
+        stdoutBytes: Buffer.byteLength(stdout), stderrBytes: 0, counterRowPresent: true });
+});
+
+it.each(['ENOBUFS', 'ENOENT', 'EACCES', 'EAGAIN', 'ENOMEM', 'PRIVATE'])('probe error %s មិនបង្ហាញអត្ថបទ ឬក្លាយជាជោគជ័យ', code => {
+    const result = helpers.probeCounters({ status: 0, signal: 'PRIVATE', error: { code, message: 'PRIVATE' },
+        stdout: Buffer.from('Timestamp YGC\n1.5 2\n'), stderr: Buffer.from('ខ') });
+    expect(result.gc).toBeNull();
+    expect(result.gcProbe).toEqual({ outcome: 'SPAWN_ERROR', exitStatus: 0, errorCode: code === 'PRIVATE' ? 'OTHER' : code,
+        signal: 'OTHER', stdoutBytes: 20, stderrBytes: 3, counterRowPresent: true });
+    expect(JSON.stringify(result)).not.toContain('PRIVATE');
+});
+
+it.each([null, undefined, {}, [], 'PRIVATE\n123\n', 'Timestamp YGC\n1 2\nPRIVATE', 'YGC YGC\n1 2\n', `YGC\n${'9'.repeat(400)}\n`])(
+    'probe បដិសេធ stdout ដែលមិនមែនជួរ counters ត្រឹមត្រូវ៖ %s', stdout => {
+        const result = helpers.probeCounters({ status: 0, stdout, stderr: { toString() { throw new Error('PRIVATE'); } } });
+        expect(result.gc).toBeNull();
+        expect(result.gcProbe).toMatchObject({ outcome: 'INVALID_COUNTERS', counterRowPresent: false, stderrBytes: 0 });
+        expect(JSON.stringify(result)).not.toContain('PRIVATE');
+    });
+
+it('sampler កត់ពេលចាប់ផ្ដើម ចប់ និងយឺតតាមកាលវិភាគ ដោយរក្សា probe តែមួយ', () => {
+    const probeStart = script!.indexOf('const probeStartedMs');
+    const probeBlock = script!.slice(probeStart < 0 ? script!.indexOf('const probe = cp.spawnSync') : probeStart, script!.indexOf('samples++;'));
+    let now = 1250, sample = '';
+    const calls: unknown[][] = [];
+    const realRequire = createRequire(import.meta.url);
+    vm.runInNewContext(script!.split('async function main()')[0] + `
+        let unavailable = false; const nextSample = 1000;
+        const owner = { pid: 123, start: '100', jstat: '/owned/jstat' }, observed = { stat: { state: 'S' } }, output = '/owned/samples';
+        ${probeBlock}
+    `, { process: { hrtime: { bigint: () => BigInt(now) * 1000000n } }, require: (name: string) => name === 'fs'
+        ? { appendFileSync: (_file: string, data: string) => { sample = data; } } : name === 'child_process'
+            ? { spawnSync: (...args: unknown[]) => { calls.push(args); now += 1100; return { status: null, error: { code: 'ETIMEDOUT' }, stdout: 'Timestamp YGC\n1.5 2\n' }; } }
+            : realRequire(name) });
+    expect(calls).toEqual([['/owned/jstat', ['-gc', '-t', '123'], { encoding: 'utf8', timeout: 750, maxBuffer: 16384 }]]);
+    const row = JSON.parse(sample);
+    expect(row.gc).toBeNull();
+    expect(row.gcProbe).toMatchObject({ elapsedMs: 1100, scheduleLatenessMs: 250, counterRowPresent: true, outcome: 'TIMEOUT' });
+    expect(row.gcProbe.startedUtc).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/);
+    expect(row.gcProbe.endedUtc).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/);
+    expect(Date.parse(row.gcProbe.endedUtc)).toBeGreaterThanOrEqual(Date.parse(row.gcProbe.startedUtc));
+    expect(script).toContain('samples++; nextSample += 1000; await delay(Math.max(0, nextSample - Number(process.hrtime.bigint()) / 1e6));');
+});
+
+async function stopFixture(failure = '', artifactDenied = false) {
+    const realRequire = createRequire(import.meta.url), events: string[] = [], writes = new Map<string, string>();
+    const binding = { ...owner(1024), pid: 123 };
+    let stopped = false, killed = false;
+    const fault = (code: string) => Object.assign(new Error('PRIVATE'), { code });
+    const stat = (start: string) => { const fields = Array<string>(22).fill('0'); fields[0] = killed && failure === 'zombie' ? 'Z' : 'S'; fields[19] = start; return '123 (java) ' + fields.join(' '); };
+    const fakeFs = {
+        readFileSync(file: string) {
+            if (file === '/owned/owner.json') { if (failure === 'owner') throw fault('EACCES'); return JSON.stringify(binding); }
+            if (file === '/owned/sampler-owner.json') { if (failure === 'observer') throw fault('ENOENT'); return JSON.stringify({ pid: 456, start: '200' }); }
+            if (file === '/owned/sampler-result.json') { if (failure === 'result') throw fault('ENOENT'); return JSON.stringify({ samples: 2, unavailable: failure === 'metrics' }); }
+            if (file.startsWith('/proc/456/')) {
+                if (stopped && failure !== 'sampler') throw fault('ENOENT');
+                return file.endsWith('/stat') ? stat('200') : 'node\0/owned/owned-jvm.cjs\0sample\0/owned\0';
+            }
+            if (file.startsWith('/proc/123/')) {
+                if (killed && !['jvm', 'argv', 'start', 'zombie'].includes(failure)) throw fault(failure === 'proc' ? 'EACCES' : 'ENOENT');
+                return file.endsWith('/stat') ? stat(failure === 'identity' || (killed && failure === 'start') ? '101' : '100')
+                    : killed && failure === 'argv' ? 'PRIVATE\0' : killed && failure === 'zombie' ? '' : ['java', ...helpers.javaArguments(binding)].join('\0') + '\0';
+            }
+            throw new Error('Unexpected fixture path');
+        },
+        writeFileSync(file: string, value: string) {
+            events.push(path.basename(file));
+            if (file === '/owned/STOP') { if (failure === 'stop') throw fault('EACCES'); stopped = true; }
+            if (file === '/owned/cleanup-result.json' && (failure === 'artifact' || artifactDenied)) throw fault('EACCES');
+            writes.set(path.basename(file), value);
+        },
+    };
+    const fakeNet = { createServer() {
+        let onError: (error: Error) => void;
+        return {
+            once(_name: string, listener: (error: Error) => void) { onError = listener; },
+            listen(port: number, host: string, done: () => void) {
+                expect([port, host]).toEqual([19001, '127.0.0.1']); events.push('port');
+                if (failure === 'port' || failure === 'bind') onError(fault(failure === 'port' ? 'EADDRINUSE' : 'EACCES')); else done();
+            },
+            close(done: () => void) { done(); },
+        };
+    } };
+    const context = { require: (name: string) => name === 'fs' ? fakeFs : name === 'net' ? fakeNet : realRequire(name),
+        process: { argv: ['node', '/owned/owned-jvm.cjs', 'stop', '/owned'], kill(pid: number, signal: string) {
+            expect([pid, signal]).toEqual([123, 'SIGTERM']); events.push('kill'); if (failure === 'kill') throw fault('EPERM'); killed = true;
+        } }, setTimeout: (done: () => void) => { done(); return 0; }, console: { log() {}, error() {} } };
+    let error: unknown = null;
+    try { await vm.runInNewContext(script!.slice(0, script!.lastIndexOf('\nmain().catch')) + '\nmain()', context); } catch (caught) { error = caught; }
+    return { error, events, cleanup: writes.has('cleanup-result.json') ? JSON.parse(writes.get('cleanup-result.json')!) : null };
+}
+
+it.each([
+    ['', true, true, true, true, true],
+    ['metrics', true, true, true, true, false],
+    ['owner', null, null, null, null, null],
+    ['identity', true, true, null, null, null],
+    ['kill', true, true, false, null, null],
+    ['jvm', true, true, false, null, null],
+    ['port', true, true, true, false, null],
+    ['bind', true, true, true, null, null],
+    ['sampler', true, false, true, true, null],
+    ['observer', null, null, true, true, null],
+    ['stop', false, false, true, true, null],
+    ['result', true, true, true, true, null],
+] as const)('cleanup %s រក្សាលទ្ធផលគ្រប់ដំណាក់កាលដែលបានវាស់ ទោះបរាជ័យ', async (failure, stopRequested, samplerStopped, ownedProcessTerminated, ownedPortClosed, metricsComplete) => {
+    const result = await stopFixture(failure);
+    expect(Boolean(result.error)).toBe(Boolean(failure));
+    expect(result.cleanup).toMatchObject({ stopRequested, samplerStopped, ownedProcessTerminated, ownedPortClosed, metricsComplete, gatePassed: !failure });
+    expect(JSON.stringify(result.cleanup)).not.toContain('PRIVATE');
+    expect(result.events.at(-1)).toBe('cleanup-result.json');
+    if (failure === 'owner' || failure === 'identity') expect(result.events).not.toContain('kill');
+    if (failure === 'owner' || failure === 'identity' || failure === 'kill' || failure === 'jvm') expect(result.events).not.toContain('port');
+});
+
+it('cleanup មិនអះអាង process បិទពេលអាន proc មិនបាន ហើយ artifact សរសេរមិនបាននៅបរាជ័យ', async () => {
+    const unreadable = await stopFixture('proc');
+    expect(unreadable.cleanup).toMatchObject({ ownedProcessTerminated: null });
+    const denied = await stopFixture('artifact');
+    expect(denied.error).not.toBeNull();
+    expect(denied.cleanup).toBeNull();
+    expect(denied.events.at(-1)).toBe('cleanup-result.json');
+    const primary = await stopFixture('metrics', true);
+    expect((primary.error as Error).message).toBe('Passive JVM measurements incomplete');
+});
+
+it.each([['proc', null], ['argv', false], ['start', true], ['zombie', true]] as const)('cleanup %s បំបែកលទ្ធផល gate ពីភស្តុតាង JVM បិទ', async (failure, terminated) => {
+    const result = await stopFixture(failure);
+    expect(result.error).toBeNull();
+    expect(result.cleanup).toMatchObject({ gatePassed: true, ownedProcessTerminated: terminated, ownedPortClosed: true, metricsComplete: true });
+});
+
+it('sampler ពិតរក្សា cadence មួយវិនាទី និង failure ទោះ probe យូរជាង cadence', async () => {
+    const realRequire = createRequire(import.meta.url), rows: string[] = [], waits: number[] = [], probes: unknown[][] = [];
+    const files = new Map<string, string>();
+    const binding = { ...owner(1024), pid: 123, jstat: '/owned/jstat' };
+    let now = 1000;
+    const fakeProcess = { argv: ['node', '/owned/owned-jvm.cjs', 'sample', '/owned'], pid: 456, exitCode: 0,
+        hrtime: { bigint: () => BigInt(now) * 1000000n } };
+    const fakeFs = {
+        readFileSync(file: string) {
+            if (file === '/owned/owner.json') return JSON.stringify(binding);
+            if (file.endsWith('/stat')) { const fields = Array<string>(22).fill('0'); fields[0] = 'S'; fields[19] = '100'; return '123 (java) ' + fields.join(' '); }
+            if (file === '/proc/123/cmdline') return ['java', ...helpers.javaArguments(binding)].join('\0') + '\0';
+            if (file === '/proc/456/cmdline') return fakeProcess.argv.join('\0') + '\0';
+            throw new Error('Unexpected fixture path');
+        },
+        writeFileSync(file: string, value: string) { files.set(path.basename(file), value); },
+        appendFileSync(_file: string, value: string) { rows.push(value); },
+        existsSync(file: string) { expect(file).toBe('/owned/STOP'); return probes.length === 3; },
+    };
+    await vm.runInNewContext(script!.slice(0, script!.lastIndexOf('\nmain().catch')) + '\nmain()', {
+        process: fakeProcess, setTimeout: (done: () => void, ms: number) => { waits.push(ms); now += ms; done(); return 0; },
+        require: (name: string) => name === 'fs' ? fakeFs : name === 'child_process' ? {
+            spawnSync(...args: unknown[]) { probes.push(args); now += [1100, 50, 20][probes.length - 1];
+                return { status: 0, stdout: 'Timestamp YGC\n1.5 2\n', ...(probes.length === 1 ? { error: { code: 'ETIMEDOUT' } } : {}) }; },
+        } : realRequire(name),
+    });
+    expect(probes).toEqual(Array.from({ length: 3 }, () => ['/owned/jstat', ['-gc', '-t', '123'], { encoding: 'utf8', timeout: 750, maxBuffer: 16384 }]));
+    expect(waits).toEqual([0, 850, 980]);
+    expect(rows.map(row => { const value = JSON.parse(row); return [value.status, value.gcProbe.elapsedMs, value.gcProbe.scheduleLatenessMs]; }))
+        .toEqual([['GC_COUNTERS_UNAVAILABLE', 1100, 0], ['OBSERVED', 50, 100], ['OBSERVED', 20, 0]]);
+    expect(JSON.parse(rows[0]).gc).toBeNull();
+    expect(JSON.parse(files.get('sampler-result.json')!)).toEqual({ samples: 3, unavailable: true, passiveObservationHasOverhead: true });
+    expect(fakeProcess.exitCode).toBe(1);
+});
+
+it('cleanup artifact នៅក្នុងបញ្ជីរក្សាភស្តុតាងពេលជំហានមុនបរាជ័យ', () => {
+    const upload = workflow.slice(workflow.indexOf('uses: actions/upload-artifact@'));
+    expect(upload).toContain('${{ env.F03_DIAG_DIR }}/cleanup-result.json');
+    expect(upload).toContain('if: always()');
+    expect(upload).not.toMatch(/emulator\.log|\*\*/);
 });

@@ -2044,6 +2044,12 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-11-10 — F03៖ ភស្តុតាង probe និងដំណាក់កាល cleanup
+
+- Diagnostic [42813017148](https://github.com/mengsroy-h/Zoe-System/actions/runs/42813017148) និង [42818306267](https://github.com/mengsroy-h/Zoe-System/actions/runs/42818306267) មាន checker 598 PASS ប៉ុន្តែ metrics ខ្វះមួយដោយ `jstat` timeout។ មូលហេតុ launch/scheduling/collection/exit មិនទាន់បញ្ជាក់។ Probe ឥឡូវរក្សាពេលចាប់ផ្ដើម/ចប់, elapsed និង schedule lateness, exit status, error/signal តាមបញ្ជីអនុញ្ញាត, ចំនួន bytes និងថាមាន counter row ត្រឹមត្រូវឬអត់ ដោយមិនបង្ហាញ stdout/stderr ឆៅ។ Timeout ឬ spawn error នៅ `gc:null` ទោះមាន row ពេញ និង exit0។
+- `cleanup-result.json` រក្សាលទ្ធផល STOP, sampler, JVM, port និង metrics ទោះ cleanup បរាជ័យ; ដំណាក់កាលមិនបានវាស់នៅ `null`។ JVM បិទត្រូវមានភស្តុតាង `/proc` ដាច់ដោយឡែកពី gate ដើម; identity មិនត្រូវគ្នា ឬអានមិនបាន មិនក្លាយជា terminated ដោយស្វ័យប្រវត្តិ។ Artifact សរសេរមិនបានមិនលាក់ error ដើម។
+- Checker-first `ZoeW/tests/f03-heap-diagnostic.test.ts`៖ មុនកែ 32 FAIL/18 PASS; ក្រោយកែ និង controls បន្ថែម 55 PASS លើ Node24.22.2។ Full script ជាមួយ clock/process/filesystem សំយោគផ្ទៀង timeout+exit0, bytes ពហុភាសា, probe លើសមួយវិនាទី និង cleanup failure stages។ `spawnSync`, ពិដាន750ms, cadence1s, completeness gate, checker15s/workload, matrix/resources និង self-hosted configuration នៅដដែល; គ្មាន collector/retry ថ្មី ឬ app/version change។ នេះមិនបញ្ជាក់មូលហេតុ timeout ឬ CI លើការកែថ្មីទេ។
+
 ### 2026-11-10 — CI៖ ផ្ទៀងការចាប់ផ្ដើម និង ownership របស់ JVM
 
 **ប្រភព**៖ [Audit #1269](https://github.com/mengsroy-h/Zoe-System/actions/runs/42804166596) លើ merge commit `b2b75c9d0d0f15d0b1227c4ac6bd7e5fe48678b6` មាន checker 248 PASS និង 1 FAIL គ្មាន SKIP/PARTIAL។ `scan-month-fixture-date-test` មិនទាន់ចាប់ផ្ដើមទេ៖ wrapper រាយ `Owned JVM argv mismatch` រួច `Owned JVM identity changed; refusing signal`; cleanup មិនបានផ្ទៀង ហើយ outer deadline 300s បញ្ចប់ job។ Shard1 ចំណាយ30m58s។ Meta ទាំង4ផ្នែក និង F03 ឆ្លង; heap របស់ scope ដែលធ្លាក់នៅ512 MiB ដដែល។ នេះមិនជាភស្តុតាងថា date checker ឬ App ខូចទេ។

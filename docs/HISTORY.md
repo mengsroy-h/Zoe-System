@@ -2063,6 +2063,8 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 
 ### 2026-11-10 — CI៖ ផ្ទៀងការចាប់ផ្ដើម និង ownership របស់ JVM
 
+- **ការសង្កេតកូន checker បន្ថែម**៖ `money-guardian` បញ្ចេញ lifecycle មានព្រំដែនតាម checker ID, mutation index និង control index ដោយមិនរង់ចាំ batch ទាំងមូល; snapshot យឺតមួយនៅពាក់កណ្ដាលថវិកាដើមមិនរក្សា event loop ឬបញ្ឈប់កូនទេ។ `exit-code-integrity` ប្រើ `/proc` helper ដូចគ្នា៖ ផ្ទៀង PID/start-time មុននិងក្រោយអាន, threads អតិបរមា១៦ និងឈ្មោះ Node ដែលអនុញ្ញាតប៉ុណ្ណោះ; មិនបង្ហាញ argv/env/path/output/stack។ Tests មុនកែ១៨ធ្លាក់; real-child/control និង privacy/passivity tests ក្រោយកែឆ្លង។ Commands, concurrency, timeout/signal, verdicts, mutation matrix, owned JVM និង App/version នៅដដែល។ Actual poisoned reconnect មិនកើតឡើងវិញ local; diagnostic មិនបញ្ជាក់ root cause ហើយ CI លើការកែថ្មីនៅត្រូវផ្ទៀង។
+
 **ប្រភព**៖ [Audit #1269](https://github.com/mengsroy-h/Zoe-System/actions/runs/42804166596) លើ merge commit `b2b75c9d0d0f15d0b1227c4ac6bd7e5fe48678b6` មាន checker 248 PASS និង 1 FAIL គ្មាន SKIP/PARTIAL។ `scan-month-fixture-date-test` មិនទាន់ចាប់ផ្ដើមទេ៖ wrapper រាយ `Owned JVM argv mismatch` រួច `Owned JVM identity changed; refusing signal`; cleanup មិនបានផ្ទៀង ហើយ outer deadline 300s បញ្ចប់ job។ Shard1 ចំណាយ30m58s។ Meta ទាំង4ផ្នែក និង F03 ឆ្លង; heap របស់ scope ដែលធ្លាក់នៅ512 MiB ដដែល។ នេះមិនជាភស្តុតាងថា date checker ឬ App ខូចទេ។
 
 **ព្រំដែននៃការស៊ើប**៖ Actual argv ដំបូងមិនមានក្នុង artifact ដូច្នេះមូលហេតុ mismatch របស់ CI មិនទាន់បញ្ជាក់។ Probe ដាច់ដោយឡែកលើ Node24.22.2/libuv1.52.1 និង Debian OpenJDK21.0.13 ចាប់ Java 4100 ដងដោយគ្មាន mismatch ហើយ reap កូនគ្រប់គ្នា; CI ប្រើ Temurin ហើយ probe មិនបានរត់ RTDB JAR ពិត។ Linux source អនុញ្ញាតឱ្យ `/proc` cmdline ទទេក្នុងដំណាក់កាល exec ប៉ុន្តែវាមិនបញ្ជាក់ថា run នេះបានប៉ះចន្លោះនោះទេ។

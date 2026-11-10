@@ -21,6 +21,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execFile } = require('child_process');
+const { observeChildProc } = require('./child-proc-diagnostic.cjs');
 
 const ROOT = process.env.MONEYGUARD_APP_DIR ? path.resolve(process.env.MONEYGUARD_APP_DIR) : path.join(__dirname, '..');
 const APP = path.join(ROOT, 'ZoeW', 'app.js');
@@ -216,21 +217,67 @@ function guardVerdict(result) {
     return 'invalid';
 }
 
-function runNode(args, env) {
+// Diagnostic មិនចាប់ signal និងមិនសម្រេច verdict; ពេលរង់ចាំត្រូវបានគ្រប់គ្រងដោយ execFile ដដែល។
+function observeGuardChild(child, metadata) {
+    const noop = () => {};
+    let timer;
+    try {
+        const checker = GUARDS.some((guard) => guard.file === metadata?.checker) ? metadata.checker : null;
+        const mutation = checker && Number.isInteger(metadata.mutation) && metadata.mutation >= 0 && metadata.mutation <= MUTATIONS.length ? metadata.mutation : null;
+        const control = !checker && Number.isInteger(metadata?.control) && metadata.control >= 1 && metadata.control <= 8 ? metadata.control : null;
+        if ((!checker || mutation === null) && control === null) return noop;
+        const t0 = Date.now(), elapsed = () => Date.now() - t0;
+        let ended = false, finished = false;
+        const lifecycle = { pid: Number.isSafeInteger(child.pid) ? child.pid : null, spawnMs: null, exitMs: null,
+            closeMs: null, finishMs: null, exitCode: null, exitSignal: null, killed: false, error: false, proc: null };
+        let sample = () => ({ status: 'unavailable' });
+        try { sample = observeChildProc(child.pid, () => !ended); } catch (_) {}
+        const emit = (event) => {
+            try { console.log('ZOE_MONEYGUARD_CHILD_DIAGNOSTIC ' + JSON.stringify({ event, checker, mutation, control, budgetMs: 240000, elapsedMs: elapsed(), lifecycle })); } catch (_) {}
+        };
+        emit('start');
+        child.once('spawn', () => { if (!finished) { lifecycle.spawnMs = elapsed(); emit('spawn'); } });
+        child.once('error', () => { ended = true; lifecycle.error = true; clearTimeout(timer); emit('error'); });
+        child.once('exit', (code, signal) => {
+            ended = true;
+            lifecycle.exitMs = elapsed(); lifecycle.exitCode = Number.isInteger(code) ? code : null;
+            lifecycle.exitSignal = signal === null ? null : ['SIGTERM', 'SIGKILL', 'SIGINT', 'SIGHUP', 'SIGABRT', 'SIGSEGV', 'SIGBUS', 'SIGPIPE'].includes(signal) ? signal : 'other';
+            clearTimeout(timer); emit('exit');
+        });
+        child.once('close', () => { ended = true; lifecycle.closeMs = elapsed(); clearTimeout(timer); emit('close'); });
+        // មួយ snapshot ប៉ុណ្ណោះមុនពិដានដើម; unref មិនរក្សាកូន ឬឪពុកឱ្យនៅរស់។
+        timer = setTimeout(() => {
+            if (ended || finished) return;
+            try { lifecycle.proc = sample(); } catch (_) { lifecycle.proc = { status: 'unavailable' }; }
+            emit('slow');
+        }, 120000);
+        timer.unref();
+        return (error) => {
+            finished = true; clearTimeout(timer);
+            lifecycle.finishMs = elapsed(); lifecycle.killed = !!error?.killed;
+            emit('result');
+        };
+    } catch (_) { clearTimeout(timer); return noop; }
+}
+
+function runNode(args, env, metadata) {
     return new Promise((resolve) => {
-        execFile(process.execPath, args,
+        let diagnostic = () => {};
+        const child = execFile(process.execPath, args,
             { env, encoding: 'utf8', timeout: 240000, maxBuffer: 64 * 1024 * 1024 },
             (err, stdout, stderr) => {
+                diagnostic(err);
                 if (!err) { resolve({ code: 0, out: stdout || '' }); return; }
                 resolve({ code: typeof err.code === 'number' ? err.code : 1, interrupted: !!err.killed || !!err.signal || typeof err.code !== 'number', out: (stdout || '') + (stderr || '') });
             });
+        diagnostic = observeGuardChild(child, metadata);
     });
 }
 
-function runGuard(guard, appDir) {
+function runGuard(guard, appDir, mutation = 0) {
     const env = Object.assign({}, process.env, { [guard.env]: appDir });
     if (process.env.MONEYGUARD_NO_EMU === '1') env.LEDGEREMU_PORT = '9099';
-    return runNode([path.join(__dirname, guard.file)], env);
+    return runNode([path.join(__dirname, guard.file)], env, { checker: guard.file, mutation });
 }
 
 async function verifyGuardVerdicts() {
@@ -244,8 +291,8 @@ async function verifyGuardVerdicts() {
         ['assertion បៃតងមានសេចក្តីសង្ខេប ជា PASS', "console.log('  ok    positive control\\n✅ ជោគជ័យ 1')", 'pass'],
         ['startup error ទោះមានសេចក្តីសង្ខេបក៏មិនមែន mutation', "console.log('  FAIL  ReferenceError: missing\\n❌ ធ្លាក់ 1 / ok 0'); process.exitCode = 1", 'invalid']
     ];
-    for (const [label, code, expected] of cases) {
-        const result = await runNode(['-e', code], process.env);
+    for (const [index, [label, code, expected]] of cases.entries()) {
+        const result = await runNode(['-e', code], process.env, { control: index + 1 });
         ok(guardVerdict(result) === expected, '⛔ verdict control ៖ ' + label, result.out);
     }
 }
@@ -322,7 +369,7 @@ const mutants = MINE.map((m) => ({ m, dir: buildMutant(m) }));
 const tasks = [];
 mutants.forEach((entry, mi) => {
     if (!entry.dir) return;
-    alive.forEach((g) => tasks.push({ mi, g, run: () => runGuard(g, entry.dir) }));
+    alive.forEach((g) => tasks.push({ mi, g, run: () => runGuard(g, entry.dir, MUTATIONS.indexOf(entry.m) + 1) }));
 });
 const verdicts = await runPool(tasks.map((t) => t.run));
 const caughtBy = mutants.map(() => []);

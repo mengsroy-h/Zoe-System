@@ -134,7 +134,7 @@ it('browser subprocess wrappers share the browser exclusion while ordinary check
 it('a real killed guard cannot count as a detected money mutation; assertion failures can', async () => {
     const source = readFileSync(path.resolve(process.cwd(), '../audit-tools/money-guardian-test.js'), 'utf8');
     const ast: any = parse(source, { ecmaVersion: 'latest' });
-    const runners = ['runNode', 'runGuard', 'guardVerdict'].map(name => ast.body.find((n: any) => n.type === 'FunctionDeclaration' && n.id.name === name));
+    const runners = ['runNode', 'runGuard', 'guardVerdict', 'observeGuardChild'].map(name => ast.body.find((n: any) => n.type === 'FunctionDeclaration' && n.id.name === name));
     let classifier: any;
     simple(ast, { ExpressionStatement(n: any) { if (source.slice(n.start, n.end).startsWith('tasks.forEach(')) classifier = n; } });
     expect(runners.every(Boolean)).toBe(true);
@@ -143,7 +143,7 @@ it('a real killed guard cannot count as a detected money mutation; assertion fai
     const interrupted = vi.fn();
     const guard = { file: 'child.cjs', env: 'ZOE_VERDICT_FIXTURE' };
     const context = vm.createContext({
-        process: { execPath: process.execPath, env: {} }, path, __dirname: dir,
+        process: { execPath: process.execPath, env: {} }, path, __dirname: dir, clearTimeout,
         execFile: (cmd: string, args: string[], options: any, callback: any) => execFile(cmd, args, { ...options, timeout: 500 }, (error, stdout, stderr) => {
             if (error?.killed) interrupted(error.signal);
             callback(error, stdout, stderr);
@@ -430,7 +430,8 @@ it('ផ្នែក money-guardian វាស់គ្រប់គូ mutation/�
         const context = vm.createContext({
             process: { argv: ['node', 'money-guardian-test.js', `--part=${part[1]}/${part[2]}`] },
             JOBS: 2, tasks: [],
-            runGuard: (guard: { file: string }, dir: string) => {
+            runGuard: (guard: { file: string }, dir: string, mutation?: number) => {
+                if (dir !== 'clean') expect(mutation).toBe(Number(dir) + 1);
                 calls.push(`${dir}:${guard.file}`);
                 return new Promise<void>(resolve => pending.push({ at: now + duration(guard.file), resolve }));
             }

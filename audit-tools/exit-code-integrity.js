@@ -1,4 +1,5 @@
 const fs = require('fs');
+const { observeChildProc } = require('./child-proc-diagnostic.cjs');
 const path = require('path');
 const cp = require('child_process');
 
@@ -459,45 +460,7 @@ function runPoisonedChild(file, budgetMs) {
         const elapsed = () => Date.now() - t0;
         const lifecycle = { pid: null, spawnMs: null, markerMs: null, exitMs: null, closeMs: null,
             timeoutMs: null, finishMs: null, exitCode: null, exitSignal: null, kill: null, proc: null };
-        const snapshot = () => {
-            if (process.platform !== 'linux') return { status: 'non-linux' };
-            if (!Number.isInteger(child?.pid) || child.pid <= 0) return { status: 'unavailable' };
-            const base = '/proc/' + child.pid;
-            const read = (file, size) => {
-                if (settled || exited) throw new Error('unavailable');
-                const handle = fs.openSync(file, 'r');
-                try {
-                    const buffer = Buffer.alloc(size);
-                    const bytesRead = fs.readSync(handle, buffer, 0, size, 0);
-                    return buffer.toString('utf8', 0, bytesRead);
-                } finally { fs.closeSync(handle); }
-            };
-            try {
-                const stat = read(base + '/stat', 1024);
-                const state = /^ ([RSDZTWtXxKPI]) /.exec(stat.slice(stat.lastIndexOf(')') + 1))?.[1];
-                if (!state) return { status: 'unavailable' };
-                const result = { status: 'available', state, threads: [], threadsStatus: 'unavailable' };
-                if (settled || exited) return result;
-                try {
-                    const dir = fs.opendirSync(base + '/task', { bufferSize: 16 });
-                    try {
-                        for (let i = 0; i < 16 && !settled && !exited; i++) {
-                            const entry = dir.readSync();
-                            if (!entry) { result.threadsStatus = 'complete'; break; }
-                            result.threadsStatus = 'bounded';
-                            if (!/^[0-9]{1,10}$/.test(entry.name)) continue;
-                            let wchan = null;
-                            try {
-                                const value = read(base + '/task/' + entry.name + '/wchan', 64).trim();
-                                if (/^[A-Za-z0-9_]{1,63}$/.test(value)) wchan = value;
-                            } catch (e) {}
-                            result.threads.push({ tid: Number(entry.name), wchan });
-                        }
-                    } finally { dir.closeSync(); }
-                } catch (e) {}
-                return result;
-            } catch (e) { return { status: 'unavailable' }; }
-        };
+        let snapshot = () => ({ status: 'unavailable' });
         const finish = (code, signal) => {
             if (settled) return;
             settled = true;
@@ -529,6 +492,7 @@ function runPoisonedChild(file, budgetMs) {
             return;
         }
         lifecycle.pid = Number.isInteger(child.pid) ? child.pid : null;
+        try { snapshot = observeChildProc(child.pid, () => !settled && !exited); } catch (_) {}
         liveChildren.add(child);
         child.on('spawn', () => { if (!settled) lifecycle.spawnMs = elapsed(); });
         let markerTail = '';

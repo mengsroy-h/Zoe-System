@@ -131,6 +131,7 @@ registerStore(firebaseState);
 
 export interface DataState {
     exchangeRateRiel: any;
+    exchangeRateObservedVersion: number;
     scanHistory: any[];
     deletedItems: any[];
     dailyRevenueData: Record<string, any>;
@@ -155,6 +156,7 @@ export interface DataState {
 
 export const dataState = createStore<DataState>('dataState', {
     exchangeRateRiel: parseFloat(safeStoreGet(appLocalStore, 'zoew_exchange_rate')) || 4100,
+    exchangeRateObservedVersion: 0,
     scanHistory: [],
     deletedItems: [],
     dailyRevenueData: {},

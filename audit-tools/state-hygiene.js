@@ -56,6 +56,7 @@ const ACCEPTED = {
         pickupResetOwner: 'សញ្ញាម្ចាស់ Reset ជា object ទទេតែមួយ គ្មានទិន្នន័យអតិថិជនឬ credentials; រក្សាទុកក្រោយបញ្ចប់ ហើយជំនួសរាល់ Reset ថ្មី។ Logout បង្កើន authGeneration ភ្លាមៗ; updater/ACK/finally ចាស់ត្រូវផ្គូផ្គងទាំង owner, database និង authGeneration មុនសរសេរឬដោះ busy flag (ZoeW/tests/pickup-reset-session.test.ts)។',
         sessionExpiryCheck: 'the 4-hour session verdict for the CURRENT user; forceExpireSession sets it to "expired" and showLoginModalWithPrefill runs inside that path, so resetting it there would erase the very fact the login toast must report. proceedAfterLogin re-arms it to "pending" on the next sign-in',
         exchangeRateRiel: 'business config, not user data; mirrored in localStorage',
+        exchangeRateObservedVersion: 'លេខជំនាន់ snapshot អត្រាប្រាក់ គ្មានទិន្នន័យគណនី; ការបរាជ័យយឺតស្តារបានតែពេលជំនាន់មិនប្រែ និង session ដើមនៅដដែល (ZoeW/tests/exchange-rate-listener-race.test.ts)។',
         serverTimeOffsetMs: 'clock offset, not user data',
         isInitializingFirebase: 'init mutex, unrelated to session',
         lastEnteredLocker: 'operator convenience, persisted in localStorage by design',

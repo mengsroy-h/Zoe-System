@@ -26,8 +26,9 @@ export async function saveExchangeRate() {
     if (val <= 0) val = 4100;
 
     const previousRate = dataState.exchangeRateRiel;
+    const observedVersion = dataState.exchangeRateObservedVersion;
     const restorePreviousRate = () => {
-        if (!sessionIsCurrent()) return;
+        if (!sessionIsCurrent() || dataState.exchangeRateObservedVersion !== observedVersion) return;
         dataState.exchangeRateRiel = previousRate;
         safeStoreSet(appLocalStore, 'zoew_exchange_rate', previousRate);
         refreshCurrentHistoryView();
@@ -81,7 +82,7 @@ export async function saveExchangeRate() {
                     return;
                 }
                 restorePreviousRate();
-                showToast('⚠️ អត្រាប្រាក់មិនបានរក្សាទុកទៅ Firebase ទេ — បានត្រឡប់ទៅអត្រាមុនវិញ។');
+                showToast('⚠️ ការកែអត្រាប្រាក់នេះមិនបានរក្សាទុកទៅ Server ទេ។');
             }, 'saveExchangeRate');
             if (lateArmed) {
                 if (sessionIsCurrent()) showToast('⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងរង់ចាំរក្សាទុកអត្រាប្រាក់។ សូមកុំកែម្ដងទៀត។');
@@ -89,7 +90,7 @@ export async function saveExchangeRate() {
             }
         }
         restorePreviousRate();
-        if (sessionIsCurrent()) showToast('⚠️ អត្រាប្រាក់មិនបានរក្សាទុកទៅ Firebase ទេ — បានត្រឡប់ទៅអត្រាមុនវិញ។');
+        if (sessionIsCurrent()) showToast('⚠️ ការកែអត្រាប្រាក់នេះមិនបានរក្សាទុកទៅ Server ទេ។');
         return 'failed';
     } finally {
         if (!lateArmed) releaseWrite();

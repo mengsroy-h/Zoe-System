@@ -357,8 +357,21 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         if (!locks || writeLocks.has(opId)) return;
         let release;
         const held = new Promise<void>((resolve) => { release = resolve; });
-        writeLocks.set(opId, release);
-        try { locks.request(SB_WRITE_LOCK_PREFIX + opId, () => held).catch(() => {}); } catch (e) {}
+        let granted = false;
+        return new Promise<void>((resolve, reject) => {
+            writeLocks.set(opId, () => { release(); if (!granted) reject(disconnectError()); });
+            try {
+                locks.request(SB_WRITE_LOCK_PREFIX + opId, () => {
+                    if (closed || !liveWriteIds.has(opId)) { reject(disconnectError()); return; }
+                    granted = true;
+                    resolve();
+                    return held;
+                }).catch(reject);
+            } catch (error) { reject(error); }
+        }).catch(() => {
+            dropWrite(opId);
+            throw Object.assign(firebaseLikeError('write_lock_unavailable', []), { txOutcome: 'not-applied', noRetry: true });
+        });
     };
     const dropWrite = (opId) => {
         liveWriteIds.delete(opId);
@@ -376,11 +389,11 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         }
         let release;
         const held = new Promise<void>((resolve) => { release = resolve; });
-        const granted = await new Promise<boolean>((resolve) => {
+        const granted = await new Promise<boolean>((resolve, reject) => {
             try {
                 locks.request(SB_WRITE_LOCK_PREFIX + opId, { ifAvailable: true }, (lock) => { resolve(!!lock); return lock ? held : undefined; })
-                    .catch(() => resolve(true));
-            } catch (e) { resolve(true); }
+                    .catch(reject);
+            } catch (e) { reject(e); }
         });
         if (!granted) return false;
         if (liveWriteIds.has(opId)) { release(); return false; }
@@ -1316,15 +1329,6 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     const enqueueWrite = (ops, path, overlay, purge = false) => {
         const w: any = { seq: ++writeSeq, ops, path, overlay, purge, keys: ops.flatMap(opDocKeys), opId: newOpId(), scope: authScope, topic: tenantTopic, epoch: sessionEpoch };
         if (purge && !writeJournal) return Promise.reject(journalUnavailable(path));
-        holdWrite(w.opId);
-        if (writeJournal) {
-            w.journalRow = { v: 1, scope: w.scope, topic: w.topic, opId: w.opId,
-                ops, writeProtocol: purge ? 3 : 2, stage: purge ? 'purge-queued' : 'unresolved', awaitingRecovery: true, sentAfter: 0, queuedAt: Date.now() };
-            if (!w.scope || !w.topic || purge && JSON.stringify(w.journalRow).length > WRITE_JOURNAL_MAX_BYTES || !writeJournal.put(w.journalRow)) {
-                dropWrite(w.opId);
-                return Promise.reject(journalUnavailable(path));
-            }
-        }
         let resolveDone;
         let rejectDone;
         w.done = new Promise((res, rej) => { resolveDone = res; rejectDone = rej; });
@@ -1335,6 +1339,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                 if (typeof hooks.onWriteRecovery === 'function') hooks.onWriteRecovery({ blocked: recoveryBlocked });
             }
             settleWrite(w);
+            notify();
             rejectDone(error);
         };
         const stopUnverifiedWrite = () => {
@@ -1381,11 +1386,27 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             notify();
         }
         (async () => {
-            await waitDeps(w);
             try {
+                const lockReady = holdWrite(w.opId);
+                if (lockReady) await lockReady;
+                if (closed || authScope !== w.scope || tenantTopic !== w.topic || sessionEpoch !== w.epoch) {
+                    settleWrite(w);
+                    notify();
+                    rejectDone(Object.assign(firebaseLikeError(closed ? 'disconnect' : 'permission_denied', path), { txOutcome: 'not-applied', noRetry: true }));
+                    return;
+                }
+                if (writeJournal) {
+                    w.journalRow = { v: 1, scope: w.scope, topic: w.topic, opId: w.opId,
+                        ops, writeProtocol: purge ? 3 : 2, stage: purge ? 'purge-queued' : 'unresolved', awaitingRecovery: true, sentAfter: 0, queuedAt: Date.now() };
+                    if (!w.scope || !w.topic || purge && JSON.stringify(w.journalRow).length > WRITE_JOURNAL_MAX_BYTES || !writeJournal.put(w.journalRow)) {
+                        throw journalUnavailable(path);
+                    }
+                }
+                await waitDeps(w);
                 await waitForWriteRecovery();
                 if (closed || authScope !== w.scope || tenantTopic !== w.topic || sessionEpoch !== w.epoch) {
                     settleWrite(w);
+                    notify();
                     rejectDone(firebaseLikeError(closed ? 'disconnect' : 'permission_denied', path));
                     return;
                 }
@@ -1410,6 +1431,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             catch (e) {
                 if (closed || authScope !== w.scope || tenantTopic !== w.topic || sessionEpoch !== w.epoch) {
                     settleWrite(w);
+                    notify();
                     rejectDone(firebaseLikeError(closed ? 'disconnect' : 'permission_denied', path));
                     return;
                 }
@@ -1791,6 +1813,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         const run = async () => {
             const txScope = authScope;
             const txTopic = tenantTopic;
+            const txEpoch = sessionEpoch;
             const gate: any = { seq: ++writeSeq, keys: opDocKeys({ p: path }), ops: [], overlay: false, scope: txScope, topic: txTopic };
             let release;
             gate.done = new Promise<void>((res) => { release = res; });
@@ -1813,7 +1836,10 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     const op = { k: 'cas', p: path, x: base, v: next };
                     const opId = newOpId();
                     gate.opId = opId;
-                    holdWrite(opId);
+                    await holdWrite(opId);
+                    if (closed || authScope !== txScope || tenantTopic !== txTopic || sessionEpoch !== txEpoch) {
+                        throw Object.assign(firebaseLikeError(closed ? 'disconnect' : 'permission_denied', path), { txOutcome: 'not-applied', noRetry: true });
+                    }
                     await waitForLink();
                     let res;
                     let lost = null;

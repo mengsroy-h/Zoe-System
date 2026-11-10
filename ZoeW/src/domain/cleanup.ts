@@ -1026,6 +1026,9 @@ export async function resumeCleanupJournalEntry(trashId) {
 
 export async function resumeInterruptedCleanups() {
     if (dataState.cleanupResumeInFlight || !firebaseState.db || !firebaseState.fb || !firebaseState.dbRefDeleted || shopScopePending()) return;
+    const resumeOwner = captureTrashGenerationOwner();
+    if (!resumeOwner) return;
+    const resumeIsCurrent = () => trashGenerationOwnerCurrent(resumeOwner) && !shopScopePending();
     for (const [trashId, owner] of cleanupJournalLive) {
         if (owner.db !== firebaseState.db || owner.generation !== firebaseState.authGeneration || owner.hold && !owner.hold()) releaseCleanupJournalLive(trashId, owner);
     }
@@ -1035,32 +1038,39 @@ export async function resumeInterruptedCleanups() {
         const claimGeneration = firebaseState.authGeneration;
         await releaseLeftoverTrashClaims(claimScope, () => firebaseState.db === claimDb && firebaseState.authGeneration === claimGeneration);
     }
+    if (!resumeIsCurrent() || dataState.cleanupResumeInFlight) return;
     const list = readCleanupJournal().filter(entry => entry.scope === cleanupJournalScope() && entry.actorUid === firebaseState.auth?.currentUser?.uid);
     if (!list.length && !dataState.deletedItems.some(restoreAwaitsCancellation)) return;
     dataState.cleanupResumeInFlight = true;
     let finishResume = () => {};
-    cleanupResumeBarrier.settled = new Promise<void>((resolve) => { finishResume = resolve; });
+    const resumeBarrier = new Promise<void>((resolve) => { finishResume = resolve; });
+    cleanupResumeBarrier.settled = resumeBarrier;
     let restored = 0;
     let unverified = 0;
     try {
         await resumeBlockedRestoreCancellations();
         for (let i = 0; i < list.length; i++) {
+            if (!resumeIsCurrent()) return;
             const trashId = list[i].trashItem.id;
             let outcome = '';
             const owned = await withCleanupEntryOwnership(trashId, async () => {
+                if (!resumeIsCurrent()) return;
                 outcome = await resumeCleanupJournalEntry(trashId);
             });
+            if (!resumeIsCurrent()) return;
             if (!owned) continue;
             if (outcome === 'restored') restored++;
             else if (outcome === 'unverified') unverified++;
         }
     } catch (resumeErr) {
+        if (!resumeIsCurrent()) return;
         console.error('resumeInterruptedCleanups failed', resumeErr);
         if (window.ZoeErrors) ZoeErrors.capture(resumeErr, { zone: 'money', context: 'resumeInterruptedCleanups' });
     } finally {
-        dataState.cleanupResumeInFlight = false;
+        if (cleanupResumeBarrier.settled === resumeBarrier) dataState.cleanupResumeInFlight = false;
         finishResume();
     }
+    if (!resumeIsCurrent()) return;
     if (restored) showToast('✅ បញ្ចប់ការសម្អាតស្វ័យប្រវត្តិដែលត្រូវរំខានពីមុនវិញ ' + restored + ' កញ្ចប់។');
     if (unverified) {
         if (window.ZoeErrors) ZoeErrors.capture(new Error('Interrupted cleanup resumed with unverified ledger'), { zone: 'money', context: 'resumeInterruptedCleanups unverified', itemCount: unverified });

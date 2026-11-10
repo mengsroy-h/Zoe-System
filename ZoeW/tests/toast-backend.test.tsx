@@ -53,16 +53,22 @@ function sourceFiles(dir: string, out: string[] = []) {
     }
     return out;
 }
-// Parse call expressions, including conditional arguments. The old regexp missed
-// newly conditional phone-save success messages and other existing branch literals.
-function toastLiterals(source: string) {
+// Parse branches and interpolated messages without evaluating expressions. Keep
+// interpolation boundaries so static fragments cannot invent a backend name.
+function toastLiterals(source: string, backend = /Firebase/) {
     const out: string[] = [];
     const file = ts.createSourceFile('inventory.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
     const visit = (node: ts.Node) => {
         if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)
             && ['showToast', 'reannounceOrShowToast'].includes(node.expression.text) && node.arguments[0]) {
             const collect = (part: ts.Node) => {
-                if (ts.isStringLiteralLike(part) && /Firebase/.test(part.text)) out.push(part.text);
+                if (ts.isTemplateExpression(part)) {
+                    const text = part.head.text + part.templateSpans.map(span => '${…}' + span.literal.text).join('');
+                    if (backend.test(text)) out.push(text);
+                    else for (const span of part.templateSpans) collect(span.expression);
+                    return;
+                }
+                if (ts.isStringLiteralLike(part) && backend.test(part.text)) out.push(part.text);
                 ts.forEachChild(part, collect);
             };
             collect(node.arguments[0]);
@@ -110,6 +116,24 @@ describe('toast ៖ ឈ្មោះ backend តាម Config សកម្ម', (
             reannounceOrShowToast('Firebase direct');
             other('Firebase not a toast');
         `)).toEqual(['Firebase saved', 'Firebase failed', 'Firebase direct']);
+    });
+    it('inventory includes interpolated backend messages once without joining words across expressions', () => {
+        expect(toastLiterals([
+            '// showToast(`Firebase comment ${value}`);',
+            'const ignored = `Firebase unrelated ${value}`;',
+            'showToast(`Saved ${value} to Firebase`);',
+            'showToast(ok ? `Firebase saved ${value} of ${total}` : `Firebase failed ${value}`);',
+            'showToast(`Firebase ${"Firebase"} Firebase`);',
+            'reannounceOrShowToast(`Fire${part}base`);',
+            'showToast(`Saved ${ok ? "Firebase" : "Supabase"}`);',
+            'other(`Firebase not a toast ${value}`);',
+        ].join('\n'))).toEqual([
+            'Saved ${…} to Firebase',
+            'Firebase saved ${…} of ${…}',
+            'Firebase failed ${…}',
+            'Firebase ${…} Firebase',
+            'Firebase',
+        ]);
     });
     it('ជាន់អប្បបរមាតាមឯកសារ ៖ សារ Firebase ពិតយ៉ាងតិច 28 ក្រោយដក helper គ្មានអ្នកហៅ', () => {
         expect(Object.values(minimumByFile).reduce((sum, count) => sum + count, 0)).toBe(28);
@@ -159,6 +183,16 @@ describe('toast ៖ ឈ្មោះ backend តាម Config សកម្ម', (
         step(() => { id = showToast('🔄 កំពុងតភ្ជាប់...'); });
         step(() => { paintToast(id, '⚠️ មិនទាន់ភ្ជាប់ Firebase ទេ!', 'warn'); });
         expect(texts()).toContain('⚠️ មិនទាន់ភ្ជាប់ Supabase ទេ!');
+    });
+
+    it.each(['firebase', 'supabase'] as const)('%s ៖ exchange-rate rejection remains a generic Server warning in both completion paths', (backend) => {
+        const source = sources.find(({ name }) => name === 'features/exchange-rate.ts')!.source;
+        const warnings = toastLiterals(source, /\bServer\b/);
+        const expected = '⚠️ ការកែអត្រាប្រាក់នេះមិនបានរក្សាទុកទៅ Server ទេ។';
+        expect(warnings).toEqual([expected, expected]);
+        viewState.backendKind = backend;
+        for (const warning of warnings) step(() => { showToast(warning); });
+        expect(texts()).toEqual([expected, expected]);
     });
 
     it('ទិសផ្ទុយ ៖ App Firebase មិនប្រែ · Config/Console/បញ្ជីវាលមិនប្តូរ', () => {

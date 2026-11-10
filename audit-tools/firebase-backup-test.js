@@ -604,10 +604,11 @@ async function credentialRedirectScenario(kind, status) {
                 } catch (e) { return false; }
             })());
             builtConfig.businesses.forEach((business) => {
+                const keyPath = path.join(runRoot, business.serviceAccountPath);
                 privateFile('⛔ សោ service account ' + business.name,
-                    path.join(runRoot, business.serviceAccountPath), configWrites.writes);
+                    keyPath, configWrites.writes, `${keyPath}.${process.pid}.partial`);
             });
-            privateFile('⛔ Config ដែលសាងចេញ', built.configPath, configWrites.writes);
+            privateFile('⛔ Config ដែលសាងចេញ', built.configPath, configWrites.writes, `${built.configPath}.${process.pid}.partial`);
             ok('⛔ ការសង្ខេបមិនបញ្ចេញសម្ភារៈសោ',
                 built.summary.join('\n').indexOf('PRIVATE KEY') === -1
                 && built.summary.join('\n').indexOf(rawServiceAccount.client_email) === -1);

@@ -15,7 +15,9 @@ export default function serverTime(request) {
         'Cross-Origin-Resource-Policy': 'cross-origin',
         'X-Content-Type-Options': 'nosniff'
     };
-    if (origin !== null && !ALLOWED_ORIGINS.has(origin)) {
+    const ownPreview = origin !== null && /^https:\/\/deploy-preview-[1-9]\d*--(?:zoew|zoekeygen)\.netlify\.app$/.test(origin)
+        && origin === new URL(request.url).origin;
+    if (origin !== null && !ALLOWED_ORIGINS.has(origin) && !ownPreview) {
         return new Response('{}', { status: 403, headers });
     }
     if (origin !== null) headers['Access-Control-Allow-Origin'] = origin;

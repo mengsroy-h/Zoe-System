@@ -40,10 +40,33 @@ function check(id, pass, detail) { if (results.some(row => row.id === id)) throw
     currentCase.assertions.push(id);
     results.push({ id, pass: !!pass, ...(pass ? {} : { detail }) }); console.log((pass ? 'PASS ' : 'FAIL ') + id + (pass ? '' : ' ' + JSON.stringify(detail)));
     if (!pass) throw new Error('assertion failed: ' + id); }
-function locks() { const held = new Set(), calls = []; return { held, calls, api: { request: async (name, options, action) => {
-    if (options?.ifAvailable !== true) throw new Error('only production ifAvailable contract supported'); calls.push(name);
-    if (held.has(name)) return action(null); held.add(name); try { return await action({ name, mode: 'exclusive' }); } finally { held.delete(name); }
-} } }; }
+function locks() {
+    const held = new Set(), calls = [], queues = new Map();
+    return { held, calls, api: { request: async (name, options, action) => {
+        if (typeof options === 'function') { action = options; options = {}; }
+        options = options || {};
+        if (typeof action !== 'function' || Object.keys(options).some(key => !['mode', 'ifAvailable'].includes(key))
+            || options.mode !== undefined && options.mode !== 'exclusive'
+            || options.ifAvailable !== undefined && typeof options.ifAvailable !== 'boolean') throw new Error('unsupported fixture lock request');
+        calls.push(name);
+        const run = async () => {
+            held.add(name);
+            try { return await action({ name, mode: 'exclusive' }); }
+            finally {
+                held.delete(name);
+                const next = queues.get(name)?.shift();
+                if (!queues.get(name)?.length) queues.delete(name);
+                if (next) next();
+            }
+        };
+        if (!held.has(name) && !queues.get(name)?.length) return run();
+        if (options.ifAvailable === true) return action(null);
+        return new Promise((resolve, reject) => {
+            const queue = queues.get(name) || [];
+            queue.push(() => { run().then(resolve, reject); }); queues.set(name, queue);
+        });
+    } } };
+}
 function requestHttp(input, init = {}) {
     const target = new URL(typeof input === 'string' ? input : input.url);
     if (!fake || target.origin !== fake.url || target.hostname !== '127.0.0.1' || target.protocol !== 'http:') outside('request escaped owned HTTP', target.origin);

@@ -18,7 +18,7 @@ import * as cleanup from '../src/domain/cleanup';
 import * as pickup from '../src/domain/pickup';
 import { removeSingleBarcode } from '../src/features/barcode-ops';
 import { deleteSingleItem, toggleCloseStatus } from '../src/features/entry-ops';
-import { activeRestoreClaims, executeRestoreItem, restoreInFlight, saveRestoreClaim } from '../src/features/restore';
+import { activeRestoreClaims, executeRestoreItem, restoreInFlight, saveRestoreClaim, storedRestoreClaims } from '../src/features/restore';
 
 const HISTORY = 'zoew_scan_history_cod_dod';
 const TRASH = 'zoew_recently_deleted_cod_dod';
@@ -316,6 +316,48 @@ it('⛔ ស្តារ Barcode បិទពីធុងសំរាម «ដក
     expect(pickupKeys(), 'ស្តារ Barcode បើក ➜ គ្មាន key ថ្មី').toEqual([key('M5P0051')]);
     expect(revenueDay(), 'ប្រាក់ត្រឡប់ដូចដើម').toEqual([100, 10, 10]);
     expect(pickupJournal()).toEqual([]);
+});
+
+it.each(['pickup', 'collected'] as const)('Restore ចម្លើយ %s មកក្រោយប្ដូរហាង មិនលុប claim ថ្មី ឬបង្ហាញជោគជ័យក្នុងហាងថ្មី', async phase => {
+    seedItem('late_restore', ['LATE_CLOSED', 'KEPT_OPEN'], ['LATE_CLOSED']);
+    loadViewsFromServer();
+    await removeSingleBarcode('late_restore', 'LATE_CLOSED');
+    await sleep(20);
+    const trash = trashItems()[0];
+    const sdk = firebaseState.fb as any;
+    const originalTx = sdk.runTransaction, originalGet = sdk.get;
+    let release = () => {};
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    let waiting = false;
+    if (phase === 'pickup') sdk.runTransaction = async (ref: any, updater: any, options: any) => {
+        const result = await originalTx(ref, updater, options);
+        if (ref.path === PICKUP + '/' + DAY && getAt(TRASH + '/' + trash.id) === null) { waiting = true; await gate; }
+        return result;
+    };
+    else sdk.get = async (ref: any) => {
+        const result = await originalGet(ref);
+        if (ref.path === HISTORY + '/late_restore' && getAt(TRASH + '/' + trash.id) === null
+            && pickupJournal().length === 0) { waiting = true; await gate; }
+        return result;
+    };
+    const restoring = restore(trash.id);
+    try {
+        await waitForState(() => expect(waiting).toBe(true));
+        expect(getAt(TRASH + '/' + trash.id)).toBeNull();
+        expect(revenueDay()).toEqual([100, 10, 10]);
+        firebaseState.authGeneration++;
+        firebaseState.db = { name: 'another-shop' } as any;
+        appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://another-shop.firebaseio.com' }));
+        const nextClaim = { token: 'next-shop-token', targetId: 'next-shop-row' };
+        activeRestoreClaims.set(trash.id, nextClaim);
+        saveRestoreClaim(trash.id, nextClaim);
+        uiState.toasts = [];
+        release();
+        await restoring;
+        expect.soft(activeRestoreClaims.get(trash.id)).toEqual(nextClaim);
+        expect.soft(storedRestoreClaims()[trash.id]).toMatchObject(nextClaim);
+        expect(uiState.toasts).toEqual([]);
+    } finally { release(); await restoring; }
 });
 
 it('⛔ ស្តារ ៖ ការដាក់ key ព្យួរ ➜ ទំព័រស្លាប់ ➜ journal ស្ថិតិយកដាក់ key វិញ', async () => {

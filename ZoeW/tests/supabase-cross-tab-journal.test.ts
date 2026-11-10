@@ -172,3 +172,203 @@ it('control: a row its tab left behind (nobody holds it) is still recovered by t
   expect({ sent: server.sent, left: journalRows().length, value: server.get('zoew_settings/exchange_rate') })
     .toEqual({ sent: ['B:operation_closed_tab_01'], left: 0, value: 4200 });
 });
+
+for (const failure of ['throw', 'reject']) {
+  it('ការសង្គ្រោះរក្សា journal ពេល Web Lock ' + failure + ' ហើយអាចបន្តក្រោយទទួលសោ', async () => {
+    const server = fakeServer();
+    const journal = createLocalWriteJournal(lab.storage);
+    const row = { v: 1 as const, writeProtocol: 2 as const, scope: 'scope', topic: 'zoe:t1', stage: 'queued' as const,
+      opId: 'operation_lock_failure_01', sentAfter: 0, queuedAt: Date.now(),
+      ops: [{ k: 'set' as const, p: ['zoew_settings', 'exchange_rate'], v: 4200 }] };
+    expect(journal.put(row)).toBe(true);
+    let refused = true;
+    let attempts = 0;
+    vi.stubGlobal('navigator', { onLine: true, locks: { request: (...args: any[]) => {
+      if (refused) {
+        attempts++;
+        const error = new DOMException('សោមិនទាន់អាចប្រើបាន', 'InvalidStateError');
+        if (failure === 'throw') throw error;
+        return Promise.reject(error);
+      }
+      return (lab.locks.request as any)(...args);
+    } } });
+    const B = await openTab(server, 'B');
+    try {
+      expect(attempts).toBeGreaterThan(0);
+      expect(server.sent).toEqual([]);
+      expect(journalRows()).toEqual([row]);
+      refused = false;
+      B.onBrowserOnline();
+      for (let i = 0; i < 100 && journalRows().length; i++) await wait(5);
+      expect(server.sent).toEqual(['B:' + row.opId]);
+      expect(journalRows()).toEqual([]);
+      expect(server.get('zoew_settings/exchange_rate')).toBe(4200);
+    } finally { B.close('t'); }
+  });
+
+  it('ការបោះបង់មិនលុប journal ពេល Web Lock ' + failure, async () => {
+    const B = await openTab(fakeServer(), 'B');
+    const row = { v: 1 as const, writeProtocol: 2 as const, scope: 'scope', topic: 'zoe:t1', stage: 'unresolved' as const,
+      opId: 'operation_lock_failure_02', sentAfter: 0, queuedAt: Date.now(),
+      ops: [{ k: 'set' as const, p: ['zoew_settings', 'exchange_rate'], v: 4200 }] };
+    expect(createLocalWriteJournal(lab.storage).put(row)).toBe(true);
+    vi.stubGlobal('navigator', { onLine: true, locks: { request: () => {
+      const error = new DOMException('សោមិនទាន់អាចប្រើបាន', 'InvalidStateError');
+      if (failure === 'throw') throw error;
+      return Promise.reject(error);
+    } } });
+    try {
+      await expect(B.discardPendingWrites()).rejects.toMatchObject({ name: 'InvalidStateError' });
+      expect(journalRows()).toEqual([row]);
+    } finally { B.close('t'); }
+  });
+
+  it('ការកែប្រាក់មិនចាប់ផ្ដើមពេល Web Lock ' + failure, async () => {
+    const server = fakeServer();
+    server.set(ITEM, item(10)); server.set(LEDGER, ledger(40, 'op_prior_day'));
+    const A = await openTab(server, 'A');
+    vi.stubGlobal('navigator', { onLine: true, locks: { request: () => {
+      const error = new DOMException('សោមិនទាន់អាចប្រើបាន', 'InvalidStateError');
+      if (failure === 'throw') throw error;
+      return Promise.reject(error);
+    } } });
+    server.loseReply();
+    const token = 'op_mine_token_1';
+    const updater: any = Object.assign((v: any) => ledgerTagged({ ...v, codDollar: (v.codDollar || 0) + 5 }, token, ledgerOpRing(v, token)),
+      { connectionIntent: { ...ledgerDeltaIntent('daily', DAY, 5, 0, 0, ledgerDeltaCompanion('item1', 'B1', 15, 0, 10, 0)), token } });
+    const priceEdit = (async () => {
+      await A.runTransaction(A.ref(LEDGER), updater);
+      await A.runTransaction(A.ref(ITEM), (value: any) => ({ ...value, barcodes: [{ ...value.barcodes[0], cod: 15 }] }));
+    })().then(() => ({ applied: true }), (error: any) => ({ applied: false, txOutcome: error.txOutcome }));
+    let B: any;
+    try {
+      await wait(30);
+      expect(server.sent).toEqual([]);
+      expect(journalRows()).toEqual([]);
+      expect(await priceEdit).toEqual({ applied: false, txOutcome: 'not-applied' });
+      vi.stubGlobal('navigator', { onLine: true, locks: { request: lab.locks.request } });
+      B = await openTab(server, 'B');
+      expect({ cod: server.get(ITEM).barcodes[0].cod, ledger: server.get(LEDGER).codDollar }).toEqual({ cod: 10, ledger: 40 });
+      expect(Object.keys(server.get(LEDGER).ops).filter(t => /^op_r/.test(t))).toEqual([]);
+      expect(lab.locks.held.size).toBe(0);
+    } finally { server.setDown(false); A.close('t'); B?.close('t'); await priceEdit; }
+  });
+
+  it('ការសរសេរមិនបង្កើត journal ឬផ្ញើពេល Web Lock ' + failure, async () => {
+    const server = fakeServer(); const A = await openTab(server, 'A');
+    vi.stubGlobal('navigator', { onLine: true, locks: { request: () => {
+      const error = new DOMException('សោមិនទាន់អាចប្រើបាន', 'InvalidStateError');
+      if (failure === 'throw') throw error;
+      return Promise.reject(error);
+    } } });
+    try {
+      await expect(A.set(A.ref('zoew_settings/exchange_rate'), 4200)).rejects.toMatchObject({ txOutcome: 'not-applied' });
+      expect(server.sent).toEqual([]);
+      expect(journalRows()).toEqual([]);
+      expect(A.recoveryState().pending).toBe(0);
+    } finally { A.close('t'); }
+  });
+}
+
+for (const endSession of [false, true]) {
+  it('សោមកយឺត៖ journal រង់ចាំសោ និងគោរពសម័យដើម · ចាកចេញ=' + endSession, async () => {
+    const server = fakeServer(); const A = await openTab(server, 'A');
+    let unlock!: () => void;
+    const gate = new Promise<void>(resolve => { unlock = resolve; });
+    vi.stubGlobal('navigator', { onLine: true, locks: { request: (...args: any[]) => gate.then(() => (lab.locks.request as any)(...args)) } });
+    const writing = A.set(A.ref('zoew_settings/exchange_rate'), 4200).then(() => 'applied', () => 'refused');
+    try {
+      await wait(20);
+      expect(journalRows()).toEqual([]);
+      expect(server.sent).toEqual([]);
+      if (endSession) A.resetForSignOut();
+      unlock();
+      expect(await writing).toBe(endSession ? 'refused' : 'applied');
+      expect(server.sent.length).toBe(endSession ? 0 : 1);
+      expect(journalRows()).toEqual([]);
+      await wait(0);
+      expect(lab.locks.held.size).toBe(0);
+    } finally { unlock(); A.close('t'); await writing; }
+  });
+}
+
+it('ការសរសេរជាន់ផ្លូវដដែលនៅរក្សាលំដាប់ ពេលសោទីមួយមកយឺត', async () => {
+  const server = fakeServer(); const A = await openTab(server, 'A');
+  let unlock!: () => void; let requests = 0;
+  const gate = new Promise<void>(resolve => { unlock = resolve; });
+  vi.stubGlobal('navigator', { onLine: true, locks: { request: (...args: any[]) => {
+    requests++;
+    return requests === 1 ? gate.then(() => (lab.locks.request as any)(...args)) : (lab.locks.request as any)(...args);
+  } } });
+  const first = A.set(A.ref('zoew_settings/exchange_rate'), 4100);
+  const second = A.set(A.ref('zoew_settings/exchange_rate'), 4200);
+  try {
+    await wait(20);
+    expect(server.sent).toEqual([]);
+    expect(journalRows().map(row => row.ops[0].v)).toEqual([4200]);
+    unlock();
+    await Promise.all([first, second]);
+    expect(server.sent.length).toBe(2);
+    expect(server.get('zoew_settings/exchange_rate')).toBe(4200);
+    expect(journalRows()).toEqual([]);
+  } finally { unlock(); A.close('t'); await Promise.allSettled([first, second]); }
+});
+
+it('ការបិទ adapter មុនសោមកដល់ បញ្ចប់ការរង់ចាំ ហើយសោមកក្រោយមិនបញ្ចេញ write', async () => {
+  const server = fakeServer(); const A = await openTab(server, 'A');
+  let unlock!: () => void;
+  const gate = new Promise<void>(resolve => { unlock = resolve; });
+  vi.stubGlobal('navigator', { onLine: true, locks: { request: (...args: any[]) => gate.then(() => (lab.locks.request as any)(...args)) } });
+  const writing = A.runTransaction(A.ref('zoew_settings/exchange_rate'), () => 4200).then(() => 'applied', () => 'refused');
+  try {
+    await wait(20);
+    A.close('t');
+    expect(await writing).toBe('refused');
+    expect(journalRows()).toEqual([]);
+    unlock(); await wait(5);
+    expect(server.sent).toEqual([]);
+    expect(lab.locks.held.size).toBe(0);
+  } finally { unlock(); A.close('t'); await writing; }
+});
+
+it('សោដែលបដិសេធ ត្រឡប់តម្លៃ listener ទៅតម្លៃ Server', async () => {
+  const server = fakeServer(); server.set('zoew_settings/exchange_rate', 4000);
+  const A = await openTab(server, 'A');
+  const seen: any[] = [];
+  const off = A.onValue(A.ref('zoew_settings/exchange_rate'), (snap: any) => seen.push(snap.val()));
+  await wait(0);
+  vi.stubGlobal('navigator', { onLine: true, locks: { request: () => Promise.reject(new DOMException('សោមិនទាន់អាចប្រើបាន', 'InvalidStateError')) } });
+  try {
+    expect(seen.at(-1)).toBe(4000);
+    await expect(A.set(A.ref('zoew_settings/exchange_rate'), 4200)).rejects.toMatchObject({ txOutcome: 'not-applied' });
+    await wait(0);
+    expect(server.get('zoew_settings/exchange_rate')).toBe(4000);
+    expect(A.recoveryState().pending).toBe(0);
+    expect(seen.at(-1)).toBe(4000);
+  } finally { off(); A.close('t'); }
+});
+
+it('សោមកក្រោយចាកចេញហើយចូលគណនីដដែល ត្រឡប់ listener ទៅតម្លៃ Server', async () => {
+  const server = fakeServer(); server.set('zoew_settings/exchange_rate', 4000);
+  const A = await openTab(server, 'A');
+  const seen: any[] = [];
+  const off = A.onValue(A.ref('zoew_settings/exchange_rate'), (snap: any) => seen.push(snap.val()));
+  await wait(0);
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  vi.stubGlobal('navigator', { onLine: true, locks: { request: (...args: any[]) => gate.then(() => (lab.locks.request as any)(...args)) } });
+  const writing = A.set(A.ref('zoew_settings/exchange_rate'), 4200).then(() => 'applied', () => 'refused');
+  try {
+    await wait(0);
+    expect(seen.at(-1)).toBe(4200);
+    A.resetForSignOut(); A.setTenantTopic('zoe:t1'); A.setAuthed(true, 'scope');
+    for (let i = 0; i < 200 && !A.isReady(); i++) await wait(5);
+    expect(A.isReady()).toBe(true);
+    release();
+    expect(await writing).toBe('refused');
+    await wait(0);
+    expect(server.sent).toEqual([]);
+    expect(server.get('zoew_settings/exchange_rate')).toBe(4000);
+    expect(seen.at(-1)).toBe(4000);
+  } finally { release(); off(); A.close('t'); await writing; }
+});

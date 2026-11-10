@@ -303,6 +303,11 @@
       "line": 365
     },
     {
+      "name": "exchangeRateObservedVersion",
+      "init": "0",
+      "line": 0
+    },
+    {
       "name": "scanHistory",
       "init": "[]",
       "line": 392

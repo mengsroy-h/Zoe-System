@@ -170,10 +170,12 @@ export function initDatabaseListeners() {
             noteDbListenerAlive('exchangeRate');
             const val = snapshot.val();
             if (val && !isNaN(val)) {
+                dataState.exchangeRateObservedVersion++;
                 dataState.exchangeRateRiel = parseFloat(val);
                 try { appLocalStore.setItem('zoew_exchange_rate', dataState.exchangeRateRiel); } catch (e) {}
                 debouncedRenderAfterHistorySync();
             } else if (val === null || val === undefined) {
+                dataState.exchangeRateObservedVersion++;
                 dataState.exchangeRateRiel = 4100;
                 try { appLocalStore.removeItem('zoew_exchange_rate'); } catch (e) {}
                 debouncedRenderAfterHistorySync();

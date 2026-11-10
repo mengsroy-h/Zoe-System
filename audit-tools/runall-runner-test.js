@@ -574,6 +574,29 @@ for (const [part, wrapped] of [[1, false], [2, false], [3, false], [4, false], [
         owners);
 }
 
+// ស៊ុមចលនា live ត្រូវការពេល CPU ដាច់ពី browser និង emulator ផ្សេង; ផ្នែក geometry នៅតែស្របគ្នា។
+const modalDeviceScript = 'audit-tools/modal-keyboard-device-test.js';
+for (const [part, wrapped, isolated] of [['3/4', false, true], ['4/4', false, true], ['', false, true], ['3/4', true, true], ['1/4', false, false], ['2/4', false, false]]) {
+    const modalCase = newCase([
+        [modalDeviceScript, { ms: 500, browser: true }],
+        ['audit-tools/fx-modal-browser.js', { ms: 500, browser: true }],
+        [EMU + 'fx-modal-emulator.js', { ms: 500, ownedProbe: true }],
+        ['audit-tools/fx-modal-cpu.js', { ms: 500 }]
+    ]);
+    const modalRun = runHarness(modalCase,
+        'run "modal" node ' + (wrapped ? '--require ./audit-tools/runall-exit-guard.cjs ' : '') + modalDeviceScript + (part ? ' --part=' + part : '') + '\n'
+        + 'run "browser" node audit-tools/fx-modal-browser.js\n'
+        + 'run "emulator" node ' + EMU + 'fx-modal-emulator.js\n'
+        + 'run "cpu" node audit-tools/fx-modal-cpu.js',
+        { RUNALL_JOBS: '4', RUNALL_BROWSER_JOBS: '2' });
+    const ranges = intervals(modalRun.events), modal = ranges.find(x => x.name === modalDeviceScript);
+    const overlaps = ranges.filter(other => other !== modal && modal && other.start < modal.end && other.end > modal.start);
+    ok('⛔ modal device ' + (part || 'ទាំងអស់') + (wrapped ? ' មាន preload' : '') + (isolated ? ' វាស់ស៊ុមម្នាក់ឯង' : ' geometry នៅស្របគ្នា'),
+        modalRun.rc === 0 && ranges.length === 4 && !!modal && (isolated ? overlaps.length === 0 : overlaps.length === 3),
+        { rc: modalRun.rc, ranges, overlaps: overlaps.length });
+    ok('browser · emulator · CPU នៅស្របគ្នាក្រៅពេលវាស់ស៊ុម', maxOverlap(modalRun.events, name => name !== modalDeviceScript) === 3);
+}
+
 // ═══ ៣. ការព្យួរ ➜ FAIL ដែលមានឈ្មោះ · checker ដទៃមិនរង ═══
 console.log('\n=== ៣. checker ព្យួរ ➜ «ព្យួរ» FAIL ក្នុងពិដាន ខណៈ lane ផ្សេងបន្ត ===');
 const c3 = newCase([['audit-tools/fx-hang.js', { hang: true }], ['audit-tools/fx-ok1.js', { ms: 300 }], ['audit-tools/fx-ok2.js', { ms: 300 }]]);
@@ -758,12 +781,18 @@ async function sectionSix() {
         const h = path.join(dir, 'plan.sh');
         fs.writeFileSync(h, 'cd ' + JSON.stringify(ROOT) + ' || exit 1\n' + block + '\n'
             + runall.slice(listAt, listEnd).replace(/^#@runner-end$/m, '') + '\n'
-            + 'for i in "${!J_KIND[@]}"; do eval "set -- ${J_CMD[$i]}"; owned=0; runall_needs_rtdb "$@" && owned=1; printf \'%s\\t%s\\t%s\\t%s\\t%s\\n\' "${J_KIND[$i]}" "${J_LABEL[$i]}" "${J_ID[$i]}" "${J_LANE[$i]}" "$owned"; done\n'
+            + 'for i in "${!J_KIND[@]}"; do eval "set -- ${J_CMD[$i]}"; owned=0; runall_needs_rtdb "$@" && owned=1; printf \'%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n\' "${J_KIND[$i]}" "${J_LABEL[$i]}" "${J_ID[$i]}" "${J_LANE[$i]}" "$owned" "${J_CMD[$i]}"; done\n'
             + 'for h in $RUNALL_HINTS; do printf \'hint\\t%s\\t%s\\t-\\n\' "${h%%:*}" "${h##*:}"; done\n');
         const r = cp.spawnSync('bash', [h], { encoding: 'utf8', timeout: 60000, env: harnessEnv(dir) });
         plan = String(r.stdout || '').split('\n').filter(Boolean).map((l) => l.split('\t'))
-            .filter((p) => p[0] !== 'hdr').map(([kind, label, id, laneName, owned]) => ({ kind, label, id, lane: laneName, owned }));
+            .filter((p) => p[0] !== 'hdr').map(([kind, label, id, laneName, owned, command]) => ({ kind, label, id, lane: laneName, owned, command }));
     }
+    const modalJobs = plan.filter(j => j.kind === 'job' && j.id === 'modal-keyboard-device-test');
+    ok('⛔ modal device រក្សាផ្នែក 1/4 ដល់ 4/4 ម្តងគត់; geometry នៅ browser · ស៊ុម live នៅ excl',
+        modalJobs.length === 4 && [1, 2, 3, 4].every(part => {
+            const rows = modalJobs.filter(j => new RegExp('--part=' + part + '/4(?:\\s|$)').test(j.command || ''));
+            return rows.length === 1 && rows[0].lane === (part <= 2 ? 'browser' : 'excl');
+        }), modalJobs);
     const hintRows = plan.filter((p) => p.kind === 'hint');
     plan = plan.filter((p) => p.kind !== 'hint');
     const jobs = plan.filter((p) => p.kind === 'job');
@@ -848,6 +877,8 @@ async function sectionSix() {
             && c.includes("'--maxWorkers='");
         const isolatedGuardian = j.id === 'money-guardian-test' && /\bexecFile\s*\(\s*process\.execPath\b/.test(c)
             && c.includes('await runPool(tasks.map(');
+        const isolatedModal = j.id === 'modal-keyboard-device-test' && browser && c.includes('requestAnimationFrame(tick)')
+            && c.includes('smooth(') && /--part=[34]\/4(?:\s|$)/.test(j.command || '');
         if (j.lane === 'excl') exclN++;
         if (j.lane === 'emu') emuN++;
         if (j.lane === 'browser') browserN++;
@@ -855,9 +886,10 @@ async function sectionSix() {
         if (isolatedPurge && j.lane !== 'excl') wrong.push(j.id + ' ៖ F03 វាស់ deadline តែ lane=' + j.lane + ' (ត្រូវ excl)');
         if (isolatedSuite && j.lane !== 'excl') wrong.push(j.id + ' ៖ Vitest workers ក្នុង npm child តែ lane=' + j.lane + ' (ត្រូវ excl)');
         if (isolatedGuardian && j.lane !== 'excl') wrong.push(j.id + ' ៖ mutation child pool តែ lane=' + j.lane + ' (ត្រូវ excl)');
+        if (isolatedModal && j.lane !== 'excl') wrong.push(j.id + ' ៖ វាស់ស៊ុម live តែ lane=' + j.lane + ' (ត្រូវ excl)');
         if (emu && j.lane !== 'emu' && j.lane !== 'excl') wrong.push(j.id + ' ៖ ប្រើ emulator តែ lane=' + j.lane + ' (ត្រូវ emu)');
-        if (!poison && !emu && browser && j.lane !== 'browser') wrong.push(j.id + ' ៖ បើក browser តែ lane=' + j.lane);
-        if (j.lane === 'excl' && !poison && !isolatedPurge && !isolatedSuite && !isolatedGuardian) unjustified.push(j.id + ' ៖ excl គ្មានភស្តុតាង .tmp-poison-* ឬ F03 deadline ឬ Vitest child ឬ mutation child pool');
+        if (!poison && !emu && !isolatedModal && browser && j.lane !== 'browser') wrong.push(j.id + ' ៖ បើក browser តែ lane=' + j.lane);
+        if (j.lane === 'excl' && !poison && !isolatedPurge && !isolatedSuite && !isolatedGuardian && !isolatedModal) unjustified.push(j.id + ' ៖ excl គ្មានភស្តុតាង .tmp-poison-* ឬ F03 deadline ឬ Vitest child ឬ mutation child pool ឬស៊ុម live');
         if (j.lane === 'emu' && !emu) unjustified.push(j.id + ' ៖ emu គ្មានភស្តុតាង emulator');
         if (j.lane === 'browser' && !browser) unjustified.push(j.id + ' ៖ browser គ្មាន ' + BROWSER_MARK);
     }

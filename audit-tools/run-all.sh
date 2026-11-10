@@ -242,6 +242,7 @@ runall_fmt_ms() {  # <ms> ➜ «12.3s» · មិនមែនលេខ ➜ «—
 #             registry-purge-atomic-sdk វាស់ deadline ១៥ វិ. លើ JVM ផ្ទាល់ ➜ មិនចែក CPU ជាមួយ checker ផ្សេង។
 #             zoew-suite បើក Vitest workers និង browser ក្នុង child scripts ➜ រត់ម្នាក់ឯង ដោយរក្សាពិដាន 240s/step និង 300s/checker។
 #             money-guardian មាន mutation child pool ផ្ទាល់ខ្លួន ➜ មិនចែក CPU ជាមួយ browser/Postgres ដោយរក្សា matrix និងពិដានដដែល។
+#             modal-keyboard-device ផ្នែក 3/4 និង 4/4 វាស់ស៊ុម live ➜ មិនចែក CPU; ផ្នែក geometry 1/4 និង 2/4 នៅ lane browser។
 #   emu     ៖ ម្តងមួយ ៖ RTDB emulator តែមួយ (127.0.0.1:9000)
 #             money-checker-truthfulness អាន/ស្រង់ emulator harness៖ ដាក់ serial ដោយប្រុងប្រយ័ត្ន ទោះ VM probe ខ្លួនវាមិនបើក emulator។
 #   browser ៖ ប្រភពមាន `chromium.launch(` ➜ ពិដាន RUNALL_BROWSER_JOBS
@@ -299,6 +300,10 @@ runall_lane() {
     local s; s="$(runall_script_of "$@")"
     case "$s" in
         audit-tools/checker-coverage.js|audit-tools/exit-code-integrity.js|audit-tools/emu/registry-purge-atomic-sdk-test.js|audit-tools/zoew-suite-test.js|audit-tools/money-guardian-test.js) printf excl ;;
+        audit-tools/modal-keyboard-device-test.js)
+            local part='' a
+            for a in "$@"; do case "$a" in --part*) part="$a"; break ;; esac; done
+            case "$part" in --part=1/4|--part=2/4) printf browser ;; *) printf excl ;; esac ;;
         audit-tools/import-paired-ci-runner-test.js|audit-tools/scan-month-fixture-date-test.js|audit-tools/emu/*|audit-tools/supabase-scan-rules-test.js|audit-tools/money-checker-truthfulness-test.js) printf emu ;;
         *) if [ -n "$s" ] && grep -q 'chromium\.launch(' "$s" 2>/dev/null; then printf browser; else printf any; fi ;;
     esac

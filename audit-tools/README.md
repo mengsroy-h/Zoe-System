@@ -116,6 +116,7 @@ cat "$(git rev-parse --absolute-git-dir)/zoe-runall-state.tsv"               # �
 - lane ៖ `emu/*` និង `money-guardian` **ម្តងមួយ** (owned RTDB JVM resident តែមួយក្នុង task scope) · `checker-coverage` និង `exit-code-integrity`
   **រត់ម្នាក់ឯង** (ពួកវាសរសេរ/បោសឯកសារស្រមោល `.tmp-poison-*` ក្នុង `audit-tools/` ហើយ fan out ខាងក្នុងរួចស្រាប់) ·
   `emu/registry-purge-atomic-sdk` **រត់ម្នាក់ឯង** ដើម្បីវាស់ deadline ដើមដោយគ្មាន checker ផ្សេងប្រជែង CPU ហើយរក្សា owned emulator scope ដដែល ·
+  `modal-keyboard-device` ផ្នែក 3/4 និង 4/4 ដែលវាស់ស៊ុមចលនា live ក៏រត់ម្នាក់ឯង; ផ្នែក geometry 1/4 និង 2/4 នៅ lane browser។
   checker ដែលប្រភពមាន `chromium.launch(` ➜ lane browser។ Same owned API គ្រប emu tasks, exclusive meta ដែលបើក emu children និង BASE diagnostics; nested children ចែក engine របស់ outer task។ Lane ដេរីវេពីប្រភព ហើយ `runall-runner-test.js` ផ្ទៀងវា។
 - កិច្ចសន្យា exit ៖ job `node …` នីមួយៗរត់ជាមួយ `--require audit-tools/runall-exit-guard.cjs` ➜ exit code ចាប់ផ្តើម «មិនទាន់សម្រេច»
   ហើយ checker ត្រូវបន្ថយវាខ្លួនឯងក្នុងសេចក្តីសង្ខេប (`process.exitCode = 0` · `process.exit(fail ? 1 : 0)`) ➜ checker ដែល `await`

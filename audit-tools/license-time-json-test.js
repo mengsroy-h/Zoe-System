@@ -49,6 +49,34 @@ function reply(url, patch = {}, options = {}) {
 }
 const drain = async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); };
 for (const file of FILES) {
+    for (const origin of [
+        'https://deploy-preview-1--zoew.netlify.app', 'https://deploy-preview-400--zoew.netlify.app',
+        'https://deploy-preview-1--zoekeygen.netlify.app', 'https://deploy-preview-400--zoekeygen.netlify.app'
+    ]) test(file + ': preview ដែលបានអនុញ្ញាតអានម៉ោងពី origin ខ្លួន ' + origin, async () => {
+        const e = fixture(file, url => reply(url), { location: { origin } });
+        assert.equal(e.api.getTrustedServerNow(), null);
+        assert.equal(await e.api.syncServerTime(), true);
+        const { url, init } = e.calls[0], target = new URL(url);
+        assert.equal(target.origin, origin);
+        assert.equal(target.pathname, '/.netlify/functions/server-time');
+        assert.deepEqual([...target.searchParams.keys()], ['nonce']);
+        assert.match(target.searchParams.get('nonce'), /^[a-f0-9]{32}$/);
+        assert.equal(init.credentials, 'omit'); assert.equal(init.redirect, 'error'); assert.equal(init.cache, 'no-store');
+        assert.equal(init.body, undefined); assert.deepEqual(Object.keys(init.headers || {}), []);
+        assert.equal(e.api.getTrustedServerNow(), NOW + 42000);
+        assert.equal(e.storage.get('zoe_license_activation_ZOE'), e.savedActivation);
+    });
+    for (const origin of [
+        'https://zoew.netlify.app', 'https://zoekeygen.netlify.app', 'https://localhost', 'http://localhost',
+        'null', '', 'https://deploy-preview-0--zoew.netlify.app', 'https://deploy-preview-0400--zoew.netlify.app',
+        'http://deploy-preview-400--zoew.netlify.app', 'https://deploy-preview-400--zoew.netlify.app:8443',
+        'https://deploy-preview-400--other.netlify.app', 'https://deploy-preview-400--zoew.netlify.app.evil.example',
+        'https://branch--zoew.netlify.app', 'https://0123456789abcdef01234567--zoew.netlify.app'
+    ]) test(file + ': origin ក្រៅ preview ដែលអនុញ្ញាតមិនក្លាយជាប្រភពម៉ោង ' + origin, async () => {
+        const e = fixture(file, url => reply(url), { location: { origin } });
+        assert.equal(await e.api.syncServerTime(), true);
+        assert.equal(new URL(e.calls[0].url).origin + new URL(e.calls[0].url).pathname, ENDPOINT);
+    });
     test(file + ': readable JSON without Date establishes trust; request has no customer data', async () => {
         const e = fixture(file, url => reply(url));
         assert.equal(e.api.getServerTimeOffset(), null);

@@ -58,7 +58,7 @@
 
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
-- ⏳ **Launch audit · ZoeW 2.50.193 / ZoeKeyGen 2.24.39**៖ branch `audit/launch-20261109` ពី `851cbab9216e17cea7f9334c34ee49efd328a2da`; ការកែ និងភស្តុតាងនៅ Audit 1241។ Local money matrices និង bounded hosted probes ឆ្លង (Firebase19/Supabase45); CI ចុងក្រោយត្រូវផ្ទៀងតាម exact SHA ក្នុង [PR400](https://github.com/mengsroy-h/Zoe-System/pull/400) និង evidence bundle។ Sustained hosted parcel workload, ZTO/push ពិត និងទូរស័ព្ទពិតនៅមិនទាន់ផ្ទៀង។ Supabase migrations៦៣ ដល់ `20261109122019` និង Edge Functions v125 ដូច local; deployed Firebase rules ទាំងមូលនៅមិនទាន់ផ្ទៀង។ រក្សាសកម្មភាព rollout របស់ Audit 1238–1240 ដែលនៅបើក និង pending journals; សិទ្ធិ publication/merge/deploy ត្រូវយកពីសន្ទនាបច្ចុប្បន្ន។
+- ⏳ **Launch audit និង preview**៖ កំណែសាក ZoeW `2.50.194` / ZoeKeyGen `2.24.40`៖ ផ្ទៀង exact-commit deploy/CI តាម [PR400](https://github.com/mengsroy-h/Zoe-System/pull/400) និង evidence bundle ថ្មីដែល Audit 1242 យោង; ភស្តុតាង Audit 1241 នៅជារបស់ commit `61db3ff21734a784d1ce0bf9bb281a2170d5e672`។ Sustained hosted parcel workload, ZTO/push ពិត និងទូរស័ព្ទពិតនៅមិនទាន់ផ្ទៀង។ រក្សាសកម្មភាព rollout របស់ Audit 1238–1240 ដែលនៅបើក និង pending journals; សិទ្ធិ publication/merge/deploy ត្រូវយកពីសន្ទនាបច្ចុប្បន្ន។
 - 🧾 **សកម្មភាពដោយដៃ ជុំ A496–A520**៖ (១) Supabase គ្រប់ project ៖ អនុវត្ត `20261103090000_zoe_tombstone_external_delete.sql` (merge ➜ GitHub integration · ឬ SQL Editor) · (២) Apps Script «ZTO Import» ៖ បិទភ្ជាប់ `Watch.gs` `Code.gs` `Index.html` ថ្មីលើ Sheet សាកល្បងមុន · (៣) Netlify `FIREBASE_PROJECT_IDS` ៖ ធាតុគ្មានសាខា ➜ `projectId:branch` រួចមើល `?diag=1` · (៤) APK លើទូរស័ព្ទពិត ៖ beep ពេលពាក់កាស/Bluetooth មិនលើក volume · 📷 Sign បើកកាមេរ៉ាលើ Android 11+ · (៥) GitHub Actions Backup ៖ run បន្ទាប់គ្មាន `[FAIL]`។
 - 🧾 **សកម្មភាពដោយដៃ F03 (A523–A525)**៖ (១) Supabase គ្រប់ project ៖ អនុវត្ត `20261103230000_zoe_purge_slot_expand.sql` · `20261103230500_zoe_eval_fold.sql` មុន រួច `20261104095910_zoe_rules.sql` (GitHub integration អនុវត្តតាមលំដាប់ឈ្មោះ · SQL Editor ៖ paste តាមលំដាប់ ហើយ `migration repair`) ⛔ កុំអនុវត្ត rules តែឯងមុន migration ពង្រីក ៖ purge ទាំងអស់ (client ចាស់ និងថ្មី) នឹងត្រូវបដិសេធ ហើយឧបករណ៍ជាប់ «សរសេររង់ចាំ» (២) Firebase គ្រប់ project ៖ `node supabase/scripts/generate-rules-sql.mjs` (artifact ស្រាប់) រួច `node tools/firebase-provision/provision.js rules --all --dry-run` លើ project ពិតមួយ (Firebase វាស់ដែន 256 KB និង parser ពិតជាលើកដំបូង) រួច `deploy-rules.cmd` ឬ Console ➜ Rules ➜ paste ខ្លឹមសារ `firebase-database.rules.min.json` ទាំងមូល ➜ Publish (⛔ កុំ paste `firebase-database.rules.json` ៖ 268,935 bytes) (៣) merge ហើយ update ឧបករណ៍ទាំងអស់ភ្លាម ៖ ឧបករណ៍ Firebase ចាស់ purge មិនបានរហូតដល់ update (ធុងសំរាមនៅរង់ចាំលើសរយៈ · permission_denied គ្មាន effect · journal មិនជាប់ · ប្រាក់មិនប្រែ) · ឧបករណ៍ Supabase ចាស់ purge បានដូចមុន។ ឧបករណ៍ចាស់ដែលអាន G មាន certificate (id ធុងសំរាមដែលប្រើឡើងវិញ) ផ្អាក Restore/Delete/cleanup លើ id នោះរហូតដល់ update (fail-safe)។ ⛔ កុំ force reload ឬលុប storage។
 - 🧾 **សកម្មភាពដោយដៃ ជុំ A532–A541**៖ (១) Firebase គ្រប់ project អាជីវកម្ម ៖ Publish `firebase-database.rules.min.json` មុនចេញ App (rules លុបភស្តុតាងចាស់ ៦០ ថ្ងៃ + `.indexOn`) · (២) Supabase គ្រប់ project ៖ `20261105000000_zoe_tombstone_retro_resync.sql` (ឧបករណ៍នីមួយៗទាញពេញម្តង) រួច `20261105010507_zoe_rules.sql` និង `20261105011000_zoe_evidence_candidates.sql` (GitHub integration តាមលំដាប់ឈ្មោះ) · (៣) ផ្ទៀងលើបណ្តាញពិតថា Firebase ភ្ជាប់តាម WebSocket បាន (CSP លែងទទួល JSONP long-polling ➜ បណ្តាញដែលបិទ WebSocket ភ្ជាប់មិនបាន) · (៤) ផ្ទៀង OpenCode លើ thread ដែលមាន comment របស់ bot (App ដែលបានដំឡើង ទទួល · អ្នកក្រៅក្រុម បដិសេធ)។
@@ -122,6 +122,14 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ archive ផ្នែក ៩ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.194] · ZoeKeyGen [2.24.40] — 2026-11-10 · ម៉ោងដែលផ្ទៀងបានលើតំណសាក PR
+
+**ZoeW** (`zoew-v457` ➜ `zoew-v458`) និង **ZoeKeyGen** (`zoekeygen-v150` ➜ `zoekeygen-v151`)។
+
+- តំណ HTTPS `deploy-preview-<លេខ PR>--zoew.netlify.app` និង `deploy-preview-<លេខ PR>--zoekeygen.netlify.app` ទាញម៉ោងពី endpoint របស់ខ្លួន។ Endpoint ផ្ទៀង origin ទល់នឹង host ពិត; branch deploy និង deploy permalink មិនជាប្រភពម៉ោងសាកដែលគាំទ្រ។ ផ្លូវម៉ោងផលិតកម្ម និង Android រក្សាដដែល។
+- ZoeKeyGen មាន function ម៉ោងក្នុង artifact របស់ខ្លួន។ Netlify preview context របស់ App ទាំង ២ ត្រូវសាងតាម commit របស់ PR ទោះ automatic content-change check មិនឃើញការប្រែក្នុង base directory។
+- **សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ ផ្ទៀងតំណ preview មានស្ថិរភាពទាំង ២ ថាអាន shell/manifest/function បាន និង clock ជោគជ័យ មុនសាក Config/Activate ជាមួយគណនីសាក។ រង់ចាំ CI លើ commit ថ្មី; ប្រើ backend សាក និងរក្សាកៅអី License/pending journals តាមមគ្គុទ្ទេសក៍។ គ្មាន rules/migration ថ្មីក្នុងជុំនេះ។ ផ្ទៀងភស្តុតាង deploy និង CI ដែលចងនឹង exact commit តាម [PR400](https://github.com/mengsroy-h/Zoe-System/pull/400) និង evidence bundle ថ្មីរបស់ Audit 1242 មុនដាក់ប្រើ។
 
 ### [2.50.193] — 2026-11-09 · សិទ្ធិកាន់កាប់ recovery និងលំដាប់ realtime
 
@@ -2035,6 +2043,25 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-11-10 — Audit 1242៖ បើកផ្លូវផ្ទៀងម៉ោងសម្រាប់ deploy preview
+
+**ប្រភព និងព្រំដែន**៖ បន្តពី commit `61db3ff21734a784d1ce0bf9bb281a2170d5e672` / tree `3d0ecdf65d320cb39dbb55b52aaa068e7c766e17` ដែល CI ទាំង ៣ workflow / ១០ jobs ជោគជ័យ។ នោះជាភស្តុតាង Audit 1241 ដាច់ដោយឡែក; commit និង CI របស់កំណែ preview នេះត្រូវផ្ទៀងតាម [PR400](https://github.com/mengsroy-h/Zoe-System/pull/400) និង supplemental evidence bundle ថ្មី មិនយក CI ចាស់មកជំនួស។ ZoeW `2.50.194` / `zoew-v458` និង ZoeKeyGen `2.24.40` / `zoekeygen-v151` ប្រែទាំងពីរ ព្រោះ `license-verify.js` ដែល ship ទទួលផ្លូវម៉ោង preview។
+
+**ការរកឃើញ**៖ Preview ត្រូវ Netlify access protection បិទមុនដល់ App។ KeyGen deploy log ប្រាប់ `Canceled build due to no content change`៖ វាជាការរំលង build តាម content-change check មិនមែន compile/build កូដបរាជ័យ។ ក្រោយឆ្លង hosting gate ផ្លូវ clock នៅត្រូវផ្ទៀងដោយឡែក៖ client និង endpoint ត្រូវស្គាល់តែ HTTPS stable PR alias របស់ App ដែលបានអនុញ្ញាត។ Hosting readback បញ្ជាក់ site overrides ទាំង ២ `sso_login = false`; account defaults នៅ `site_sso_login = true` / `all`។ ZoeW preview កំណែ `2.50.193` ផ្ទុកដល់ PIN UI បាន ប៉ុន្តែ canonical clock ឆ្លើយ 403; នេះមិនមែនភស្តុតាងកំណែ preview ថ្មីបានជោគជ័យទេ។
+
+**ការកែ**៖ Netlify context `deploy-preview` ប្រើ `ignore = "exit 1"` ទាំង ២ sites ដើម្បីឱ្យ build រត់; KeyGen ចង្អុល `functions = "netlify/functions"`, ប្រើ build environment `NODE_VERSION = "24"` និងមាន wrapper endpoint ម៉ោងតែមួយ។ Client copies ទាំង ២ ទាញ `server-time` ពី preview origin របស់ខ្លួន; server ទទួល explicit preview Origin តែពេលដូច request URL origin ពិត និង hostname/HTTPS ត្រឹមត្រូវ។ GET គ្មាន Origin នៅជាសាធារណៈ ដើម្បីគាំទ្រ same-origin GET របស់ browser; គ្មានការបើក credentials ឬ wildcard CORS។ Branch deploy, permalink, site ក្រៅបញ្ជី, suffix ក្លែង និង port ផ្សេងមិនជាប្រភពម៉ោង preview ដែល client ជ្រើស ហើយ explicit Origin ទាំងនោះត្រូវបដិសេធ។ មិនប្តូរ production clock URL, business rules ឬ migrations។
+
+| ការផ្ទៀង | ភស្តុតាង និងចំណុចដែលត្រូវផ្ទៀងតាម commit |
+|---|---|
+| Regression និង source checks | Client/handler/missing-wrapper RED logs ក្នុង `clock/`; ក្រោយកែ JSON clock ១០៦, handler ៦៨, endpoint ៥៥ checks PASS; focused Vitest ៨ files / ២៤០ tests និង KeyGen artifact ៤ tests PASS។ Browser ៥៧ checks PASS (៥៣ local CORS + ៤ HTTPS route ទៅ handler ពិត); mutation ៧ បរាជ័យតាម assertion ដូចរំពឹង។ Route fulfill មិនមែនភស្តុតាង deployed CORS |
+| Version/docs | Measurement tree ថ្មីរួម KeyGen Node 24៖ `version-check` PASS, `version-bump-scope` ២០, `doc-scope` ១១៩ និង `netlify-config-scope` ៤៨ checks PASS; source `doc:check` និង `git diff --check` PASS |
+| Public stable preview ទាំង ២ | Access protection readback PASS; preview collaboration drawer ត្រូវបានបិទតាម context ទាំង ២ ដើម្បីរក្សា CSP ដដែល។ HTTP/browser លើកំណែ `2.50.194` / `2.24.40` ត្រូវចងនឹង deploy commit/version ក្នុងរបាយការណ៍បន្ថែម និង PR400 |
+| Auth/ZTO លើ preview | Seam review offline ១៦ checks PASS (`other-preview-boundaries.json`); hosted login/register/reset, WebAuthn និង ZTO ពិតមិនទាន់សាកលើ preview។ មិនបានកែ backend origin policy/config |
+| CI លើ commit preview ថ្មី | អាន SHA និងលទ្ធផល workflow ទាំង ៣ / jobs ទាំង ១០ តាម PR400 និងរបាយការណ៍បន្ថែម; CI របស់ `61db3ff2` មិនគ្របការកែនេះ |
+| Production deploy | Hosting readback បញ្ជាក់ published deploy IDs និង commit នៅ `851cbab9216e17cea7f9334c34ee49efd328a2da`; មិនបាន publish client ថ្មីទៅ production |
+
+**ភស្តុតាង**៖ `/tmp/zoe-preview-fix/20261110/` រក្សា hosting/browser diagnostics និង `clock/`; version/docs lane នៅ `docs/`។ កំណត់ត្រានេះមិនផ្ទុក token ឬ credentials។ ការផ្ទៀង preview shell និង clock មិនជំនួស physical iPhone/Android, hosted capacity ឬ real ZTO mutation coverage។
 
 ### 2026-11-09 — Audit 1241៖ Launch audit, ម្ចាស់ប្រតិបត្តិការ និងការវាស់បន្ទុក
 

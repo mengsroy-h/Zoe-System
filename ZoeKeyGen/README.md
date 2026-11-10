@@ -12,7 +12,7 @@
 
 ## កំណែ
 
-កំណែបច្ចុប្បន្ន **`2.24.39`** — ជាកំណែ **របស់ ZoeKeyGen ផ្ទាល់** (ដាច់ពី ZoeW
+កំណែបច្ចុប្បន្ន **`2.24.40`** — ជាកំណែ **របស់ ZoeKeyGen ផ្ទាល់** (ដាច់ពី ZoeW
 តាំងពី 2.19.4) ហើយត្រូវស៊ីនឹង `version` ក្នុង `manifest.json` របស់វា។
 
 - បង្ហាញ **១ កន្លែង** ៖ ប្រអប់ចូលប្រព័ន្ធ។
@@ -111,7 +111,7 @@ ZoeW ទាញវាពេលបើក App · ពេលបើកផ្ទាំ�
 ### ១. Deploy
 
 Netlify site មួយ ដោយ **Base directory = `ZoeKeyGen`** · Build command **ទទេ** ·
-Publish directory **`.`**។
+Publish directory **`.`** · Functions directory **`netlify/functions`** សម្រាប់ endpoint ម៉ោង · build environment **Node 24** តាម `netlify.toml`។ តំណសាក PR និងការផ្ទៀងម៉ោងតាម [មគ្គុទ្ទេសក៍ deploy preview](../ZoeW/docs/DEVELOPMENT.md#deploy-preview--ឧបករណ៍ពិត--ការថយក្រោយ)។
 
 Firebase rules របស់ **License Project** (`ZoeKeyGen/firebase-database.rules.json`)
 ត្រូវ paste ចូល Firebase Console ➜ **Publish** ដោយដៃ។ ⛔ វាជា Project

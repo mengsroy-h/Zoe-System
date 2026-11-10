@@ -552,7 +552,10 @@
             const pending = sharedRequest('time', priority, async () => {
                 const bytes = crypto.getRandomValues(new Uint8Array(16));
                 const nonce = Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('');
-                const url = 'https://zoew.netlify.app/.netlify/functions/server-time?nonce=' + nonce;
+                const origin = typeof location !== 'undefined' ? location.origin : '';
+                const base = typeof origin === 'string' && /^https:\/\/deploy-preview-[1-9]\d*--(?:zoew|zoekeygen)\.netlify\.app$/.test(origin)
+                    ? origin : 'https://zoew.netlify.app';
+                const url = base + '/.netlify/functions/server-time?nonce=' + nonce;
                 const out = await fetchWithBodyTimeout(url, (res) => {
                     if (res.status !== 200 || !res.ok || res.redirected ||
                         !/^application\/json(?:\s*;|$)/i.test(res.headers.get('Content-Type') || '')) return null;

@@ -931,6 +931,9 @@
     "ZoeKeyGen/netlify.toml": {
       "policy": "guard-22"
     },
+    "ZoeKeyGen/netlify/functions/server-time.mjs": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeKeyGen/qrcode.js": {
       "policy": "guard-8",
       "encoding": "lf-text",
@@ -3152,6 +3155,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/server-clock-estimator.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/server-time-artifact.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/session-expiry-race.test.ts": {

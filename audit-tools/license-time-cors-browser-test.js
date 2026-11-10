@@ -2,12 +2,14 @@
 // REAL Chromium Fetch CORS filtering, local HTTP servers on separate origins.
 // Transport mapping changes only destination; never mocks Response/headers/body.
 // No live service, customer database or browser credentials are touched.
-// These local HTTP fixtures test browser/client behavior. Exact deployed-origin
-// policy and the real handler are covered by server-time-function-test.mjs.
+// Fixture HTTP ក្នុងស្រុកវាស់ CORS ពិត។ Route HTTPS preview វាស់ handler ពិត
+// និងការមិនផ្ញើ credentials; route.fulfill មិនវាស់ការត្រង CORS របស់ browser ទេ។
+// server-time-function-test.mjs វាស់ការបដិសេធ Origin ដែលផ្ញើជាក់លាក់។
 const { chromium } = require('playwright-core');
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 const assert = require('node:assert/strict');
 const ROOT = path.resolve(process.env.LICENSETIME_APP_DIR || process.env.ZOE_REPO_ROOT || path.join(__dirname, '..'));
 const ENDPOINT = 'https://zoew.netlify.app/.netlify/functions/server-time';
@@ -97,6 +99,46 @@ async function check(label, run) {
             });
         }
         await context.close();
+    }
+    const { default: handler } = await import(pathToFileURL(path.join(ROOT, 'ZoeW/netlify/functions/server-time.mjs')));
+    for (const origin of ['https://deploy-preview-400--zoew.netlify.app', 'https://deploy-preview-400--zoekeygen.netlify.app']) {
+        for (const file of files) await check('preview អានម៉ោងពិតតាម browser ដោយគ្មាន credentials: ' + origin + ' / ' + file, async () => {
+            const context = await browser.newContext();
+            const calls = [], unexpected = [];
+            try {
+                await context.addCookies([{ name: 'fixture_session', value: 'synthetic-cookie', url: origin }]);
+                await context.route('**/*', async route => {
+                    const request = route.request(), url = new URL(request.url());
+                    if (url.origin === origin && url.pathname === '/') {
+                        await route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>Preview clock fixture</title>' });
+                    } else if (url.origin === origin && url.pathname === '/favicon.ico') {
+                        await route.fulfill({ status: 204 });
+                    } else if (url.origin === origin && url.pathname === '/.netlify/functions/server-time') {
+                        const headers = await request.allHeaders();
+                        const response = await handler(new Request(request.url(), { method: request.method(), headers }));
+                        calls.push({ url: request.url(), headers, status: response.status });
+                        await route.fulfill({ status: response.status, headers: Object.fromEntries(response.headers), body: await response.text() });
+                    } else {
+                        unexpected.push(request.url()); await route.abort('blockedbyclient');
+                    }
+                });
+                const page = await context.newPage();
+                await page.goto(origin);
+                await page.addScriptTag({ content: fs.readFileSync(path.join(ROOT, file), 'utf8') });
+                const result = await page.evaluate(async () => ({
+                    before: window.ZoeLicense.getTrustedServerNow(),
+                    success: await window.ZoeLicense.syncServerTime(),
+                    after: window.ZoeLicense.getTrustedServerNow()
+                }));
+                assert.equal(result.before, null); assert.equal(result.success, true, JSON.stringify({ result, calls: calls.map(({ url, status }) => ({ url, status })), unexpected }));
+                assert.ok(Number.isFinite(result.after) && Math.abs(result.after - Date.now()) < 3000);
+                assert.equal(calls.length, 1); assert.equal(calls[0].status, 200);
+                assert.equal(new URL(calls[0].url).origin, origin);
+                assert.equal(calls[0].headers.origin, undefined);
+                assert.equal(calls[0].headers.cookie, undefined); assert.equal(calls[0].headers.authorization, undefined);
+                assert.deepEqual(unexpected, []);
+            } finally { await context.close(); }
+        });
     }
 })().catch(error => { failed++; console.error(error); }).finally(async () => {
     if (browser) await browser.close();

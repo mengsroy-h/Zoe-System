@@ -1,1 +1,1 @@
-export const CACHE_VERSION = 'zoew-v457';
+export const CACHE_VERSION = 'zoew-v458';

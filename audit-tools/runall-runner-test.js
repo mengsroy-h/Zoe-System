@@ -552,19 +552,22 @@ for (const part of suiteParts) {
 }
 
 // Money guardian មាន child pool ផ្ទាល់ខ្លួន៖ checker ធ្ងន់ផ្សេងមិនត្រូវចែក CPU ក្នុងពិដានរបស់វា។
-for (const [part, wrapped] of [[1, false], [2, false], [3, false], [4, false], [1, true]]) {
+const guardianParts = [...runall.matchAll(/^run "money-guardian [^"]+" node audit-tools\/money-guardian-test\.js --part=(\d+\/\d+)$/gm)].map(match => match[1]);
+ok('⛔ ផ្នែក money-guardian ពិតមានគ្រប់ មិនស្ទួន និង denominator ដូចគ្នា', guardianParts.length >= 4
+    && guardianParts.every((part, index) => part === (index + 1) + '/' + guardianParts.length), guardianParts);
+for (const [part, wrapped] of [...guardianParts.map(part => [part, false]), [guardianParts[0], true]]) {
     const guardianCase = newCase([
         ['audit-tools/money-guardian-test.js', { ms: 900, ownedProbe: true }],
         ['audit-tools/supabase-money-multishop-test.js', { ms: 900, browser: true }],
         [EMU + 'fx-guardian-neighbor.js', { ms: 900, ownedProbe: true }]
     ]);
     const guardianRun = runHarness(guardianCase,
-        'run "guardian" node ' + (wrapped ? '--require ./audit-tools/runall-exit-guard.cjs ' : '') + 'audit-tools/money-guardian-test.js --part=' + part + '/4\n'
+        'run "guardian" node ' + (wrapped ? '--require ./audit-tools/runall-exit-guard.cjs ' : '') + 'audit-tools/money-guardian-test.js --part=' + part + '\n'
         + 'run "money" node audit-tools/supabase-money-multishop-test.js\n'
         + 'run "emulator" node ' + EMU + 'fx-guardian-neighbor.js',
         { RUNALL_JOBS: '2', RUNALL_BROWSER_JOBS: '1' });
     const ranges = intervals(guardianRun.events), guardian = ranges.find(x => x.name === 'audit-tools/money-guardian-test.js');
-    ok('⛔ money-guardian ' + part + '/4' + (wrapped ? ' មាន preload' : '') + ' រត់ម្នាក់ឯង ទោះមាន money/browser និង emulator រង់ចាំ',
+    ok('⛔ money-guardian ' + part + (wrapped ? ' មាន preload' : '') + ' រត់ម្នាក់ឯង ទោះមាន money/browser និង emulator រង់ចាំ',
         guardianRun.rc === 0 && ranges.length === 3 && guardian && ranges.every(other => other === guardian
             || other.end <= guardian.start || other.start >= guardian.end),
         { rc: guardianRun.rc, ranges });
@@ -939,10 +942,12 @@ async function sectionSix() {
         && jobs.length >= 150 && ownershipMatches(jobs)
         && jobs.filter(job => job.owned === '1').length >= 26, ownershipMismatches);
     const guardianJobs = jobs.filter(job => job.id === 'money-guardian-test');
-    ok('money-guardian ទាំងបួនផ្នែកនៅតែត្រូវការ owned RTDB ទោះរត់ម្នាក់ឯង',
-        guardianJobs.length === 4 && guardianJobs.every(job => job.lane === 'excl' && expectedOwned(job)) && ownershipMatches(guardianJobs), guardianJobs);
+    ok('money-guardian គ្រប់ផ្នែកនៅតែត្រូវការ owned RTDB ទោះរត់ម្នាក់ឯង',
+        guardianJobs.length === guardianParts.length && guardianParts.length >= 4
+        && guardianJobs.every(job => job.lane === 'excl' && expectedOwned(job)) && ownershipMatches(guardianJobs), guardianJobs);
     ok('ទិសផ្ទុយ ៖ ដក owned scope ពី money-guardian ត្រូវបានចាប់ ទោះ lane នៅ excl',
-        guardianJobs.length === 4 && guardianJobs.every(target => !ownershipMatches(jobs.map(job => job === target ? { ...job, owned: '0' } : job))));
+        guardianJobs.length === guardianParts.length && guardianParts.length >= 4
+        && guardianJobs.every(target => !ownershipMatches(jobs.map(job => job === target ? { ...job, owned: '0' } : job))));
     const base = runall.slice(runall.search(/^if \[ -n "\$BASE" \]/m));
     const baseCommands = [...base.matchAll(/^\s*([A-Z0-9_]+_APP_DIR)="\$BASE" (runall_owned )?node (audit-tools\/[A-Za-z0-9_/-]+\.js)/gm)];
     const requiredBase = entry => entry[3].startsWith(EMU) || ['money-guardian-test.js', 'money-checker-truthfulness-test.js', 'exit-code-integrity.js', 'supabase-scan-rules-test.js'].some(name => entry[3] === 'audit-tools/' + name);

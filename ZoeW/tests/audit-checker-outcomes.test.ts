@@ -402,7 +402,7 @@ it.each(['trash-modal-test.js', 'empty-state-truth-test.js', 'restore-race-test.
         expect(call({ code: 'KH123', createdAt: 300, ztoMisplacedAt: 310 }, {})).toBe('misplaced');
     });
 
-it('ផ្នែក money-guardian វាស់គ្រប់គូ mutation/អ្នកយាម និងចប់ក្នុងថវិកា CPU ពីរ', async () => {
+it.each([1, 1.25])('ផ្នែក money-guardian វាស់គ្រប់គូ mutation/អ្នកយាម និងថវិកា CPU ពីរ ក្នុងគំរូ ×%s', async scale => {
     const source = readFileSync(path.resolve(process.cwd(), '../audit-tools/money-guardian-test.js'), 'utf8');
     const runall = readFileSync(path.resolve(process.cwd(), '../audit-tools/run-all.sh'), 'utf8');
     const ast: any = parse(source, { ecmaVersion: 'latest' });
@@ -416,17 +416,25 @@ it('ផ្នែក money-guardian វាស់គ្រប់គូ mutation/�
     expect(declarations.every(Boolean) && pool && assembly).toBeTruthy();
     const parts = [...runall.matchAll(/^run "money-guardian [^"]+" node audit-tools\/money-guardian-test\.js --part=(\d+)\/(\d+)$/gm)];
     expect(parts.length).toBeGreaterThan(0);
+    expect(parts.map(part => `${part[1]}/${part[2]}`)).toEqual(parts.map((_, i) => `${i + 1}/${parts.length}`));
     const ceiling = Number(/CHECKER_TIMEOUT="?\$\{CHECKER_TIMEOUT:-(\d+)\}/.exec(runall)?.[1]) * 1000;
     expect(ceiling).toBe(300000);
     const seen: string[] = [];
     let matrix: string[] = [];
     for (const part of parts) {
-        let now = 0;
+        // គំរូបម្រុង ៣០ វិ. សម្រាប់ setup/control/cleanup; មិនមែនជាការវាស់ runtime ពិត។
+        let now = 30000;
         const pending: { at: number; resolve: () => void }[] = [];
         const calls: string[] = [];
-        // ពេលវាស់អ្នកយាមស្អាត៖ tx ~៤០ វិ. · cleanup ~២៣ វិ. · អ្នកផ្សេងតិចជាង។
-        const duration = (file: string) => file === 'tx-outcome-test.js' ? 40000
-            : file === 'cleanup-interrupt-atomicity-test.js' ? 23000 : 3000;
+        // អតិបរមាកូនដែលចប់ក្នុង Audit #1276; កូនចុងក្រោយមិនបានឃើញចប់។
+        // ធ្វើគំរូពេលដដែលលើ mutation ទាំងអស់ មិនអះអាងថាបានវាស់ពួកវាទាំងអស់ទេ។
+        const durations: Record<string, number> = {
+            'emu/ledger-revert-emu-test.js': 4966, 'price-edit-abort-test.js': 5044,
+            'revenue-rules-clamp-test.js': 622, 'ledger-failed-apply-revert-test.js': 484,
+            'pickup-barcode-identity-test.js': 3035, 'pickup-ledger-test.js': 361,
+            'tx-outcome-test.js': 51241, 'cleanup-interrupt-atomicity-test.js': 31276
+        };
+        const duration = (file: string) => { expect(Object.hasOwn(durations, file)).toBe(true); return Math.ceil(durations[file] * scale); };
         const context = vm.createContext({
             process: { argv: ['node', 'money-guardian-test.js', `--part=${part[1]}/${part[2]}`] },
             JOBS: 2, tasks: [],

@@ -8,6 +8,7 @@ import { EventEmitter } from 'node:events';
 
 const require = createRequire(import.meta.url);
 const guard = readFileSync('../audit-tools/exit-code-integrity.js', 'utf8');
+const exitToCloseGraceMs = Number(guard.match(/^const EXIT_TO_CLOSE_GRACE_MS = (\d+);$/m)?.[1]);
 const poison = runInNewContext(guard.slice(guard.indexOf('const POISON ='), guard.indexOf('function durationMs(')) + '\npoisonSource;', {});
 const files = ['scan-operation-sdk', 'trash-generation-sdk', 'cleanup-consumed-sdk', 'empty-delete-sdk'];
 
@@ -147,6 +148,7 @@ it('scan SDK cleanup៖ រំលងតែ app ដែល SDK បានលុប�
 
 describe('poison child៖ exit និង pipe មានពិដានដាច់ដោយឡែក', () => {
     function harness(spawnThrows = false, platform = 'darwin', procFs = {}) {
+        expect(exitToCloseGraceMs).toBe(2000);
         const child = Object.assign(new EventEmitter(), {
             stdout: Object.assign(new EventEmitter(), { setEncoding: vi.fn(), destroy: vi.fn() }),
             stderr: Object.assign(new EventEmitter(), { setEncoding: vi.fn(), destroy: vi.fn() }),
@@ -156,7 +158,7 @@ describe('poison child៖ exit និង pipe មានពិដានដាច�
         const source = guard.slice(guard.indexOf('function runPoisonedChild('), guard.indexOf('// ⛔⛔ **timeout'));
         const run = runInNewContext(source + '\nrunPoisonedChild;', {
             cp: { spawn: () => { if (spawnThrows) throw new Error('spawn ENOENT'); return child; } }, process: { execPath: 'node', env: {}, platform }, fs: procFs, Buffer, ROOT: '.',
-            EXIT_GUARD_ARGS: [], OUT_CAP: 4096, EXIT_TO_CLOSE_GRACE_MS: 2000, HARD_GRACE_MS: 5000,
+            EXIT_GUARD_ARGS: [], OUT_CAP: 4096, EXIT_TO_CLOSE_GRACE_MS: exitToCloseGraceMs, HARD_GRACE_MS: 5000,
             liveChildren, Date, setTimeout, clearTimeout,
             observeChildProc: (pid: number, live: () => boolean) => require('../../audit-tools/child-proc-diagnostic.cjs').observeChildProc(pid, live, platform, procFs)
         });
@@ -186,13 +188,22 @@ describe('poison child៖ exit និង pipe មានពិដានដាច�
     it('pipe មិន close ត្រូវបិទនៅពិដានខ្លួនឯង ហើយមិនទុក handle', async () => {
         vi.useFakeTimers();
         try {
-            const { child, run } = harness();
+            const { child, liveChildren, run } = harness();
             const result = run('fixture', 100);
+            let settled = false;
+            void result.then(() => { settled = true; });
             child.emit('exit', 1, null);
-            await vi.advanceTimersByTimeAsync(2000);
-            expect(await result).toMatchObject({ code: 1, timedOut: false });
+            await vi.advanceTimersByTimeAsync(1999);
+            expect(settled).toBe(false);
+            expect(child.stdout.destroy).not.toHaveBeenCalled();
+            expect(child.stderr.destroy).not.toHaveBeenCalled();
+            expect(liveChildren.size).toBe(1);
+            await vi.advanceTimersByTimeAsync(1);
+            expect(settled).toBe(true);
+            expect(await result).toMatchObject({ code: 1, timedOut: false, lifecycle: { exitMs: 0, finishMs: 2000 } });
             expect(child.stdout.destroy).toHaveBeenCalledOnce();
             expect(child.stderr.destroy).toHaveBeenCalledOnce();
+            expect(liveChildren.size).toBe(0);
             expect(vi.getTimerCount()).toBe(0);
         } finally { vi.useRealTimers(); }
     });
@@ -343,17 +354,25 @@ describe('poison child៖ exit និង pipe មានពិដានដាច�
 });
 
 it('កូន Node ពិត៖ marker · hang · stdout ដែលចៅកាន់ក្រោយ exit', async () => {
+    expect(exitToCloseGraceMs).toBe(2000);
     const dir = mkdtempSync(join(tmpdir(), 'exit-evidence-'));
     const liveChildren = new Set();
+    const timers: { delay: number | undefined; fired: boolean }[] = [];
+    const observedSetTimeout = (callback: () => void, delay?: number) => {
+        const timer = { delay, fired: false };
+        timers.push(timer);
+        return setTimeout(() => { timer.fired = true; callback(); }, delay);
+    };
     const source = guard.slice(guard.indexOf('function runPoisonedChild('), guard.indexOf('// ⛔⛔ **timeout'));
     const run = runInNewContext(source + '\nrunPoisonedChild;', {
         cp: require('node:child_process'), process, fs: require('node:fs'), Buffer, ROOT: dir,
-        EXIT_GUARD_ARGS: [], OUT_CAP: 4096, EXIT_TO_CLOSE_GRACE_MS: 2000, HARD_GRACE_MS: 5000,
-        liveChildren, Date, setTimeout, clearTimeout,
+        EXIT_GUARD_ARGS: [], OUT_CAP: 4096, EXIT_TO_CLOSE_GRACE_MS: exitToCloseGraceMs, HARD_GRACE_MS: 5000,
+        liveChildren, Date, setTimeout: observedSetTimeout, clearTimeout,
         observeChildProc: require('../../audit-tools/child-proc-diagnostic.cjs').observeChildProc
     });
     try {
         for (const mode of ['exit', 'hang', 'pipe']) {
+            timers.length = 0;
             const file = join(dir, mode + '.cjs');
             writeFileSync(file, "console.log('ZOE_EXITCODE_POISON_REACHED');\n" + (mode === 'hang'
                 ? 'setInterval(() => {}, 1000);'
@@ -374,7 +393,10 @@ it('កូន Node ពិត៖ marker · hang · stdout ដែលចៅកា�
                 expect(result.lifecycle.kill).toBeNull();
                 if (mode === 'pipe') {
                     expect(result.lifecycle.closeMs).toBeNull();
-                    expect(result.lifecycle.finishMs - result.lifecycle.exitMs).toBeGreaterThanOrEqual(2000);
+                    // Date.now() មិនធានាថាចន្លោះវាស់ស្មើ delay របស់ timer ពិតប្រាកដទេ។
+                    // នាឡិកាក្លែងខាងលើចាក់សោព្រំដែន 1999/2000; នៅទីនេះផ្ទៀងផ្លូវ timer ពិត។
+                    expect(timers.map(timer => timer.delay)).toEqual([5000, 10000, 2000]);
+                    expect(timers.map(timer => timer.fired)).toEqual([false, false, true]);
                 }
             }
         }

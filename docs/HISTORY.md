@@ -5151,6 +5151,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/apps-script-key-redaction.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/audit-checker-outcomes.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/audit-daily-report.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/audit-exit-state.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/audit-lifecycle.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/audit-module-runtime-scope.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/audit-poison-reachability.test.ts` | ផ្នែក ២ | — |

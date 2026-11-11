@@ -2044,6 +2044,14 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-11-11 — CI៖ សាកថវិកា money guardian លើ CPU ពីរ
+
+- [Audit #1276 attempt 2](https://github.com/mengsroy-h/Zoe-System/actions/runs/42920091979/job/130233760831) រត់ឡើងវិញតែ shard 3 លើ `056f776d`៖ checker ដដែលទាំង 48 PASS ដោយគ្មាន partial ឬ skip។ CPU ដែលប្រើបាន 2 → 4; job 28m33s → 21m43s; money-guardian 2/4 ដែលផុតពិដាន 300.4s ឥឡូវ PASS 174.0s។ គ្មានកូដប្រែ៖ មិនមែនជាភស្តុតាងថាបញ្ហាថវិកា CPU ពីរបានជួសជុលទេ។
+- បេក្ខជនសាកបែង `money-guardian-test` ជា 6 ផ្នែក ជំនួស 4 ដោយរក្សា mutation ទាំង 18 × អ្នកយាម 8 និង baseline ស្អាតគ្រប់ផ្នែក។ Child pool, ពិដាន 300s/240s និង owned JVM នៅដដែល; baseline guard runs កើន 32 → 48។ គំរូដែលមានបម្រុង 30s រាយ 241.409s ក្នុងមួយផ្នែក និង 294.269s ពេលកូនយឺតបន្ថែម 25%៖ មិនមែនជាការធានា runtime ឬការអះអាងថា CI ពេញលឿនជាងមុនទេ។
+- Local៖ Vitest ជាក់លាក់ 132 PASS, typecheck/lint ជាប់ និង `runall-runner-test` 266 PASS; budget controls ថ្មីធ្លាក់លើការបែង 4 ផ្នែកដើម។ Audit build ពិតត្រូវបានរារាំងដោយ Chromium socket ក្នុងបរិស្ថាន local។
+- [ការសាកដាច់ដោយឡែក](https://github.com/mengsroy-h/Zoe-System/actions/runs/42938770943/job/130255257727) លើ hosted runner ដដែល ដោយ affinity `[0,1]`, `availableParallelism=2`, worker ពីរ និងពិដាន 300s៖ baseline 4 ផ្នែក និង candidate 6 ផ្នែក PASS ទាំងអស់ គ្មាន partial ឬ skip។ ផ្នែកយឺតបំផុត 291.185s → 199.791s; ចន្លោះមុនពិដាន 8.815s → 100.209s។ ផលបូកពេល guardian 1062.710s → 1192.850s (+130.140s, +12.25%)៖ បន្ថែមចន្លោះពេល មិនមែនបន្ថយការងារសរុបទេ។ Source hash របស់ guardian/guard ដូចគ្នា និង strict PASS គ្រប mutation/guard 144 គូទាំងពីរ; cleanup ត្រូវបានបង្ខំដោយ run-all ហើយមិនមាន owned directory បន្សល់។
+- ភស្តុតាងនេះមានតែមួយលើក តាមលំដាប់ baseline → candidate លើ host CPU 4 និង RAM ប្រហែល 16GB ដែលកំណត់ affinity ពីរ។ វាមិនជំនួស Audit ពេញ ឬស្មើ private VM និង self-hosted quota/RAM ទេ។ ការកែផលិតកម្មនេះមិនបញ្ចូល workflow diagnostic មិនប្តូរ App ឬការកំណត់ self-hosted; Audit ពេញលើបេក្ខជននៅមិនទាន់រត់។
+
 ### 2026-11-10 — CI៖ ភស្តុតាង CAS និង audit bridge ដោយមិនប្ដូរលទ្ធផល
 
 - [Audit #1272](https://github.com/mengsroy-h/Zoe-System/actions/runs/42825409691) លើ `a076d642` មាន 247/249 PASS៖ Firebase/Sheet concurrent Delete ទុក barcode សាកនៅ history និង trash; tablet audit bridge មិនរួចមុនការវាស់ keyboard។ Owned JVM acquisition/cleanup ជាប់។ ម៉ូដែល CAS ដែលប្រើ functions ពិតក្នុងលំដាប់ប្រាំមួយ និង cold-null retry មិនបង្ក duplicate ឡើងវិញ; មិនជំនួស SDK/rules/browser ឬ prelude ពេញទេ។ គ្មានការកែ app តាមសម្មតិកម្ម។

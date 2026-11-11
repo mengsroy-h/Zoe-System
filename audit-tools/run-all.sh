@@ -574,10 +574,13 @@ declare -A RUNALL_LABEL_HINTS=(
     ["modal-keyboard-device 3/4 (browser ពិត · ប្រអប់រអិលតាម keyboard ៖ ស៊ុមម្តងៗ)"]=184
     ["modal-keyboard-device 4/4 (browser ពិត · iPhone ៖ ចុច + keyboard លោតហួស ➜ រអិលតែម្តង · ∨/∧ មិនរំកិលទំព័រ · keyboard លោត ➜ មិនទាញ document · ស្កេនដក ➜ លើក #appPages)"]=206
     # ពេលបែងចែកនៃផ្នែក mutation នីមួយៗ មិនមែនពិដាន checker។
-    ["money-guardian 1/4"]=292
-    ["money-guardian 2/4"]=262
-    ["money-guardian 3/4"]=212
-    ["money-guardian 4/4"]=211
+    # ផ្នែកថ្មីយកទម្ងន់ ២៤២ វិ. ពីគំរូ CPU ពីរ រួមបម្រុង ៣០ វិ.; ត្រូវវាស់ពិតមុនអះអាងល្បឿន។
+    ["money-guardian 1/6"]=242
+    ["money-guardian 2/6"]=242
+    ["money-guardian 3/6"]=242
+    ["money-guardian 4/6"]=242
+    ["money-guardian 5/6"]=242
+    ["money-guardian 6/6"]=242
     ["zoew-suite 1/5 (ZoeW React ៖ tsc · lint · vitest 1/4 · android)"]=176
     ["zoew-suite 2/5 (ZoeW React ៖ build · sw · smoke · native · rules)"]=224
     ["zoew-suite 3/5 (ZoeW React ៖ vitest 2/4)"]=130
@@ -1096,10 +1099,12 @@ run "emu/supabase-adapter-parity" node audit-tools/emu/supabase-adapter-parity-t
 # ⛔ «សំណុំបៃតង» មិនមែនភស្តុតាង — ឧបករណ៍នេះបំបែកតក្កវិជ្ជាលុយដោយចេតនា
 # រួចទាមទារថា **អ្នកយាមយ៉ាងតិច ១ ត្រូវក្រហម**។ បើអ្នកយាមចុងក្រោយងងឹត
 # វាធ្លាក់ **មុន** កំហុសលុយបន្ទាប់ ship។
-run "money-guardian 1/4" node audit-tools/money-guardian-test.js --part=1/4
-run "money-guardian 2/4" node audit-tools/money-guardian-test.js --part=2/4
-run "money-guardian 3/4" node audit-tools/money-guardian-test.js --part=3/4
-run "money-guardian 4/4" node audit-tools/money-guardian-test.js --part=4/4
+run "money-guardian 1/6" node audit-tools/money-guardian-test.js --part=1/6
+run "money-guardian 2/6" node audit-tools/money-guardian-test.js --part=2/6
+run "money-guardian 3/6" node audit-tools/money-guardian-test.js --part=3/6
+run "money-guardian 4/6" node audit-tools/money-guardian-test.js --part=4/6
+run "money-guardian 5/6" node audit-tools/money-guardian-test.js --part=5/6
+run "money-guardian 6/6" node audit-tools/money-guardian-test.js --part=6/6
 run "money-reality" node audit-tools/money-reality-test.js
 run "repository-file-coverage" node audit-tools/repository-file-coverage.js
 run "module-runtime-scope" node audit-tools/module-runtime-scope-test.js

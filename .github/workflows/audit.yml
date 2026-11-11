@@ -27,6 +27,7 @@ jobs:
   # ភស្តុតាងដាច់ពី run-all៖ មិនជំនួសសោ ឬអ្នកយាម browser ក្នុង Audit ទេ។
   zto-native-evidence:
     name: ភស្តុតាង ZTO/native
+    needs: ci-config
     if: (vars.ZOE_RUNNER_MODE == 'github' || github.event.repository.private == true) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && !(github.event_name == 'workflow_dispatch' && inputs.multishop_scale)
     runs-on: ${{ fromJSON(vars.ZOE_RUNNER_MODE == 'github' && '["ubuntu-latest"]' || '["self-hosted","Linux","X64","wsl-zoe-audit"]') }}
     timeout-minutes: 20
@@ -107,6 +108,7 @@ jobs:
   #    (emu/* · money-guardian រត់ពេញ មិនមែន SKIP) ➜ job «Firebase rules» ដាច់លែងត្រូវការ។
   audit-shard:
     name: ${{ github.event_name == 'workflow_dispatch' && inputs.multishop_scale && 'Supabase ៨ ហាង × ៣ ឧបករណ៍' || format('run-all.sh ផ្នែក {0}/4', matrix.shard) }}
+    needs: ci-config
     if: (vars.ZOE_RUNNER_MODE == 'github' || github.event.repository.private == true) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ${{ fromJSON(vars.ZOE_RUNNER_MODE == 'github' && '["ubuntu-latest"]' || '["self-hosted","Linux","X64","wsl-zoe-audit"]') }}
     timeout-minutes: 60
@@ -230,7 +232,8 @@ jobs:
           AUDIT_LOG: ${{ runner.temp }}/zoe-audit-${{ matrix.shard }}.log
           RUNALL_STRICT: '1'
           RUNALL_STATE: ''
-          RUNALL_JOBS: '2'
+          # GitHub ឯកជន = CPU ២ ➜ job មួយ (មិនបាន ១ CPU); GitHub public = CPU ៤ ➜ job ពីរ។
+          RUNALL_JOBS: ${{ vars.ZOE_RUNNER_MODE == 'github' && github.event.repository.private && '1' || '2' }}
           RUNALL_BROWSER_JOBS: '1'
           # កូនក្នុង container មាន CPU quota ២; GitHub រក្សា defaults តាម VM ដើម។
           MONEYGUARD_JOBS: ${{ vars.ZOE_RUNNER_MODE == 'github' && 'auto' || '2' }}
@@ -302,3 +305,27 @@ jobs:
         if: failure()
         run: |
           printf '%s\n' 'Owned command results and private evidence paths are printed by run-all; no shared emulator PID is adopted.'
+
+  # ⛔ Public + mode មិនមែន github ➜ jobs ទាំងអស់ skip ហើយ run បង្ហាញបៃតងដោយគ្មានភស្តុតាង។
+  #    job នេះធ្វើឲ្យការកំណត់ខុសក្រហមភ្លាម មុន jobs ផ្សេងចាប់ផ្ដើម។
+  #    Private + mode ទទេ/ផ្សេង នៅតែជ្រើស self-hosted ដូចមុន (គ្មានការប្រែអាកប្បកិរិយា)។
+  ci-config:
+    name: ផ្ទៀងរបៀប runner
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: ផ្ទៀង ZOE_RUNNER_MODE ជាមួយភាពមើលឃើញរបស់ repo
+        env:
+          REPO_PRIVATE: ${{ github.event.repository.private }}
+          RUNNER_MODE: ${{ vars.ZOE_RUNNER_MODE }}
+        run: |
+          set -euo pipefail
+          if [ "$REPO_PRIVATE" = 'true' ]; then
+            echo "repo ឯកជន ➜ ZOE_RUNNER_MODE='${RUNNER_MODE}' (ទទេ = self-hosted) ត្រូវបានអនុញ្ញាត"
+            exit 0
+          fi
+          if [ "$RUNNER_MODE" != 'github' ]; then
+            echo "::error::repo នេះ public តែ ZOE_RUNNER_MODE='${RUNNER_MODE}'។ កំណត់ Repository variable ZOE_RUNNER_MODE=github នៅ Settings → Secrets and variables → Actions → Variables ឬប្តូរ repo ទៅ private មុនរត់ CI។"
+            exit 1
+          fi
+          echo "repo public ➜ ZOE_RUNNER_MODE=github"

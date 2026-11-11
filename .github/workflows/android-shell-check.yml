@@ -17,6 +17,7 @@ concurrency:
 jobs:
   shell:
     name: ផ្ទៀង Git Bash និង Windows PowerShell
+    needs: ci-config
     if: (vars.ZOE_RUNNER_MODE == 'github' || github.event.repository.private == true) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ${{ fromJSON(vars.ZOE_RUNNER_MODE == 'github' && '["windows-latest"]' || '["self-hosted","Windows","X64","windows-zoe-android"]') }}
     timeout-minutes: 10
@@ -93,3 +94,26 @@ jobs:
           gh --version
           node --version
           cygpath -w /
+
+  # ⛔ Public + mode មិនមែន github ➜ shell job skip ហើយ workflow បង្ហាញបៃតងដោយគ្មានភស្តុតាង។
+  #    job នេះធ្វើឲ្យការកំណត់ខុសក្រហមភ្លាម។ Private + mode ទទេ/ផ្សេង នៅតែប្រើ self-hosted ដូចមុន។
+  ci-config:
+    name: ផ្ទៀងរបៀប runner
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: ផ្ទៀង ZOE_RUNNER_MODE ជាមួយភាពមើលឃើញរបស់ repo
+        env:
+          REPO_PRIVATE: ${{ github.event.repository.private }}
+          RUNNER_MODE: ${{ vars.ZOE_RUNNER_MODE }}
+        run: |
+          set -euo pipefail
+          if [ "$REPO_PRIVATE" = 'true' ]; then
+            echo "repo ឯកជន ➜ ZOE_RUNNER_MODE='${RUNNER_MODE}' (ទទេ = self-hosted) ត្រូវបានអនុញ្ញាត"
+            exit 0
+          fi
+          if [ "$RUNNER_MODE" != 'github' ]; then
+            echo "::error::repo នេះ public តែ ZOE_RUNNER_MODE='${RUNNER_MODE}'។ កំណត់ Repository variable ZOE_RUNNER_MODE=github នៅ Settings → Secrets and variables → Actions → Variables ឬប្តូរ repo ទៅ private មុនរត់ CI។"
+            exit 1
+          fi
+          echo "repo public ➜ ZOE_RUNNER_MODE=github"

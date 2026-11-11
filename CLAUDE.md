@@ -136,7 +136,8 @@ are evidence about that session; resolve today's authorization from the active c
   `tools/supabase-migrate/` (optional Firebase ➜ Supabase move per customer) · `tools/actions-runners/` (self-hosted runner kit ·
   [`docs/SELF-HOSTED-RUNNERS.md`](docs/SELF-HOSTED-RUNNERS.md)) · `.github/workflows/` (`audit.yml` · `backup.yml` · `android-release.yml` ·
   `android-shell-check.yml` · `opencode.yml`; repo variable `ZOE_RUNNER_MODE` = `github` ➜ GitHub-hosted runners; anything else ➜ self-hosted labels
-  `wsl-zoe-audit` · `windows-zoe-android` while the repo is private, skipped on a public repo (no CI evidence) · `backup.yml`
+  `wsl-zoe-audit` · `windows-zoe-android` while the repo is private; a public repo requires `github`, otherwise a `ci-config` preflight fails
+  instead of skipping silently (no false-green CI evidence) · `backup.yml`
   and `opencode.yml` always run on `ubuntu-latest`).
 
 ---

@@ -2044,6 +2044,15 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-11-11 — CI៖ public repo ត្រូវ `github` mode និង shard ស្រាលជាងមុនលើ runner ឯកជន
+
+- **ភស្តុតាងថាមិនមែនកូដថ្មី៖** [Audit #1282](https://github.com/mengsroy-h/Zoe-System/actions/runs/42962638664) លើ commit ដដែល `498af60`៖ attempt 1 ធ្លាក់ shard 2 ក្នុង 28.2 នាទី, attempt 2 មិនមាន log របស់ runner, attempt 3 ជាប់ទាំង 5 jobs (shard 2 ក្នុង 21.3 នាទី)។ PR #403 head `3ad87df` ជាប់ ប៉ុន្តែ merge commit ដដែលធ្លាក់ attempt 1 ➜ ភាពមិនស្ថិតស្ថេរតាម runner/ពេលវេលា មិនមែន logic ថ្មី។ ក្នុងរយៈពេលវាស់ ស្ថិតិ Audit មាន 517 failure ក្នុង 1,265 runs (ប្រហែល 41%) និង 35 failure ក្នុង 80 runs ចុងក្រោយ។
+- **Shard ដែលធ្លាក់៖** `exit-code-integrity 1/4 (meta)` ធ្លាក់ ខណៈ `reconnect-ladder-test` ខ្លួនឯងជាប់ក្នុង 0.7s។ Diagnostic របស់កូនពុលបាន marker នៅ 787ms ប៉ុន្តែចេញនៅ 190,046ms ជាមួយ timeout 190,030ms និង `SIGKILL`; process នៅ state `S` ក្នុង `futex_do_wait`។ មូលហេតុពិតនៃការរង់ចាំក្រោយ marker មិនទាន់បញ្ជាក់ — ការកែនេះមិនបន្ថយ deadline ឬប្តូរ checker ទេ។
+- **Preflight ថ្មី `ci-config`៖** រត់លើ `ubuntu-latest` ក្នុង Audit, APK, Windows shell និង F03 ។ Repo public + `ZOE_RUNNER_MODE != github` ➜ `::error::` និង exit 1 ភ្លាម; repo private ឬ mode `github` ➜ ឆ្លង។ Jobs សំខាន់ប្រើ `needs: ci-config` ➜ ការកំណត់ខុសក្រហម មិនមែនបៃតងស្ងាត់ដោយគ្មានភស្តុតាង។ លក្ខខណ្ឌ `github.event.repository.private == true` នៅដដែល ដើម្បីការពារ self-hosted ពី fork។
+- **`RUNALL_JOBS` តាម CPU៖** GitHub-hosted ឯកជន (CPU 2) ➜ 1; GitHub-hosted public (CPU 4) ➜ 2; self-hosted/ផ្សេង ➜ 2 ដូចមុន ➜ ប្រហែល 2 vCPU ក្នុងមួយ lane។ `MONEYGUARD_JOBS`, `ZOEWSUITE_TEST_WORKERS`, `RUNALL_BROWSER_JOBS` និងពិដាន deadline មិនប្តូរ។
+- **ការផ្ទៀងក្នុង session៖** `security-guard-test` 60/60 និង `checker-coverage` 90/90 ជាប់។ `repository-contract-test` រក្សា runtime contract 22/22 ដោយរាប់ `ci-config` ចេញពី cache/runtime/Chromium ហើយ guard ថ្មី ២/២ (preflight `needs` · `RUNALL_JOBS` តាម CPU) ជាប់; YAML ទាំង ៤ ឆ្លង parser។ Preflight logic ត្រូវបានហាត់គ្រប់ private/public × mode: private ឆ្លងទាំង mode ទទេ/`github`/`self-hosted`; public ឆ្លងតែ `github` និងធ្លាក់ 1 ចំពោះ mode ទទេ/`self-hosted`/ខុស។ Full local suite មាន failure មិនពាក់ព័ន្ធ ដោយ Windows/WSL (POSIX process group · `ZoeW/app.js` បាត់ក្នុង React era) — មិនមែនភស្តុតាង CI ទេ។ គ្មានការប្តូរកូដ App, កំណែ, business rules ឬ self-hosted configuration។
+- **សកម្មភាពដោយដៃ៖** នៅ repo public ត្រូវរក្សា `ZOE_RUNNER_MODE=github` (Settings → Secrets and variables → Actions → Variables)។ បើចង់ប្រើ self-hosted ត្រូវប្តូរ repo ទៅ private មុន; បើចង់ប្តូរ private → public ត្រូវផ្ទៀងថា variable នៅ `github` រួចបង្កើត Audit run ថ្មីលើ `main`។ Run ចាស់ និង rerun រក្សា mode/config នៅ commit/ref ដើម។
+
 ### 2026-11-11 — CI៖ សាកថវិកា money guardian លើ CPU ពីរ
 
 - [Audit #1276 attempt 2](https://github.com/mengsroy-h/Zoe-System/actions/runs/42920091979/job/130233760831) រត់ឡើងវិញតែ shard 3 លើ `056f776d`៖ checker ដដែលទាំង 48 PASS ដោយគ្មាន partial ឬ skip។ CPU ដែលប្រើបាន 2 → 4; job 28m33s → 21m43s; money-guardian 2/4 ដែលផុតពិដាន 300.4s ឥឡូវ PASS 174.0s។ គ្មានកូដប្រែ៖ មិនមែនជាភស្តុតាងថាបញ្ហាថវិកា CPU ពីរបានជួសជុលទេ។

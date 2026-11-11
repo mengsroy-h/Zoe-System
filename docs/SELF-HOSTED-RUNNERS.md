@@ -470,7 +470,7 @@ gh variable get ZOE_RUNNER_MODE --repo mengsroy-h/Zoe-System --json name,value
 
 លទ្ធផលត្រូវមាន name `ZOE_RUNNER_MODE` និង value ត្រឹមត្រូវ។ បើ not found ពិនិត្យថាបានបង្កើតជា Repository variable នៅ repo ត្រឹមត្រូវ។
 
-GitHub mode រត់បានទាំង Public និង Private; repo Private ត្រូវមាន quota នាទី ឬ billing សម្រាប់ GitHub-hosted។ Self-hosted mode រត់តែ repo Private។ PR ជា Draft មិនមែនជាលក្ខខណ្ឌ skip របស់ workflow នេះទេ; Audit អាចរត់ PR ក្នុង repo ដដែល ប៉ុន្តែមិនរត់ PR ពី fork។
+GitHub mode រត់បានទាំង Public និង Private; repo Private ត្រូវមាន quota នាទី ឬ billing សម្រាប់ GitHub-hosted។ Self-hosted mode រត់តែ repo Private។ បើ repo នៅ Public ហើយ value មិនមែន `github` នោះ job `ci-config` នឹងធ្លាក់ភ្លាម ជំនួសការ skip ស្ងាត់ — workflow មិនបង្ហាញបៃតងដោយគ្មានភស្តុតាងទេ។ PR ជា Draft មិនមែនជាលក្ខខណ្ឌ skip របស់ workflow នេះទេ; Audit អាចរត់ PR ក្នុង repo ដដែល ប៉ុន្តែមិនរត់ PR ពី fork។
 
 ពេល quota GitHub ត្រឡប់មក កែ value ទៅ `github` ហើយបង្កើត workflow run ថ្មី។ ការប្ដូរមិនធ្វើស្វ័យប្រវត្តិតាម quota និងមិនផ្លាស់ទី job ដែលកំពុងរត់។
 
@@ -482,7 +482,7 @@ GitHub mode រត់បានទាំង Public និង Private; repo Privat
 
 Repo → Settings → General → Danger Zone → Change repository visibility → Make private។ អនុវត្តការបញ្ជាក់ដែល GitHub ស្នើ។
 
-Self-hosted jobs នឹង skip បើ repo នៅ Public។ ផ្ដល់សិទ្ធិកែ source/workflow តែអ្នកដែលទុកចិត្ត ព្រោះ workflow អនុវត្តកូដលើ PC របស់អ្នក។
+Self-hosted jobs នឹង skip បើ repo នៅ Public ហើយ job `ci-config` នឹងធ្លាក់ (workflow ក្រហម) ដើម្បីកុំឲ្យមានបៃតងក្លែងក្លាយ។ ផ្ដល់សិទ្ធិកែ source/workflow តែអ្នកដែលទុកចិត្ត ព្រោះ workflow អនុវត្តកូដលើ PC របស់អ្នក។
 
 Private បិទការទាញ source ពីអ្នកគ្មានសិទ្ធិ ប៉ុន្តែមិនដកច្បាប់ចម្លងដែលគេធ្លាប់ទាញរួចទេ ហើយ fork សាធារណៈដែលមានស្រាប់នៅ public បន្ត (GitHub បំបែកវាចេញ) ➜ មើល Insights → Forks មុនប្ដូរ។ GitHub Release ក្នុង repo Private ទាមទារសិទ្ធិ ➜ Release ផ្លូវការរបស់ APK ចេញទៅ repo Release public ដាច់ដោយឡែក (`ZOE_RELEASES_REPO` ក្នុង `android-release.yml` · secret `ZOE_RELEASES_TOKEN` · មើល `ZoeW/docs/ANDROID.md`) ដែល App probe ➜ ទូរស័ព្ទនៅ update ស្វ័យប្រវត្តិ។ ⛔ ប្ដូរ Private តែក្រោយកំណែដែល probe repo Release នោះដល់ទូរស័ព្ទទាំងអស់រួច (កំណែមុនៗ probe repo source ➜ 404 ➜ ត្រូវ sideload ដោយដៃ)។ នាទី Actions របស់ repo Private ចេញពី quota (GitHub-hosted) — ជំហាន ១៣ សម្រាប់ប្ដូរទៅ self-hosted។
 
@@ -696,8 +696,8 @@ Get-Service 'actions.runner.*'
 | Runner name already exists | មាន runner ឈ្មោះដដែលនៅ GitHub | ពិនិត្យ runner ដែលមានស្រាប់មុនលុប; script មិនប្រើ --replace ស្វ័យប្រវត្តិ |
 | Runner Offline | Container/service មិនរត់ ឬ network បញ្ហា | មើល Compose logs ឬ Windows service និងអ៊ីនធឺណិត |
 | Waiting for a runner | Mode, Online, OS/X64 ឬ label មិនត្រូវ | ជំហានទី ១០, ១២ និង ១៣ |
-| Audit PR skipped | Public ជាមួយ self-hosted default, variable ខុស ឬ fork PR | ពិនិត្យ Repository variable ជំហានទី ១៣; Draft មិនមែន skip condition |
-| Android workflow skipped | Public ក្នុង self-hosted mode ឬ event មិនត្រូវ | ជំហានទី ១៤ និង ១៦; push build តែលើ main, branch ផ្សេងប្រើ Run workflow ដោយដៃជា Pre-release |
+| Audit ក្រហមនៅ `ci-config` | Public ជាមួយ self-hosted default ឬ variable ខុស | កំណត់ `ZOE_RUNNER_MODE=github` តាមជំហានទី ១៣; fork PR មិនរត់ audit job |
+| APK/shell/F03 ក្រហមនៅ `ci-config` | Public ក្នុង self-hosted mode | ជំហានទី ១៤ និង ១៦; បើ event មិនត្រូវ job នឹង skip ដោយឡែក |
 | Android build រំលងក្រោយ meta | Version មាន Release រួច | រង់ចាំ release កំណែថ្មីពិត; កុំឡើង version ទទេ |
 | Git/gh/cygpath រកមិនឃើញក្នុង APK job | Windows PATH ឬ service PATH ចាស់ | ជំហានទី ១១; restart service ក្រោយដំឡើង tools |
 | `ParserError` / `UnexpectedToken` និងអក្សរខ្មែរខូចក្នុង PowerShell | Windows PowerShell 5.1 អាចអាន inline UTF-8 script គ្មាន BOM ខុស | ពិនិត្យ SHA និង bootstrap step ដែលយកសារខ្មែរពី env; សាក Windows APK shell និងបង្កើត run ពី commit ដែលត្រូវវាស់ |

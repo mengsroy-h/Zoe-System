@@ -53,6 +53,7 @@ defaults:
 jobs:
   apk:
     name: Build APK ➜ GitHub Release
+    needs: ci-config
     if: (vars.ZOE_RUNNER_MODE == 'github' || github.event.repository.private == true) && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
     runs-on: ${{ fromJSON(vars.ZOE_RUNNER_MODE == 'github' && '["windows-latest"]' || '["self-hosted","Windows","X64","windows-zoe-android"]') }}
     timeout-minutes: 45
@@ -306,3 +307,28 @@ jobs:
       - name: លុប keystore តាមផ្លូវ Windows
         if: always()
         run: rm -f "$(cygpath -u "$RUNNER_TEMP")/zoew-release.jks"
+
+  # ⛔ Public + mode មិនមែន github ➜ APK job skip ហើយ workflow បង្ហាញបៃតងដោយគ្មាន build។
+  #    job នេះធ្វើឲ្យការកំណត់ខុសក្រហមភ្លាម។ Private + mode ទទេ/ផ្សេង នៅតែប្រើ self-hosted ដូចមុន។
+  ci-config:
+    name: ផ្ទៀងរបៀប runner
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: ផ្ទៀង ZOE_RUNNER_MODE ជាមួយភាពមើលឃើញរបស់ repo
+        env:
+          REPO_PRIVATE: ${{ github.event.repository.private }}
+          RUNNER_MODE: ${{ vars.ZOE_RUNNER_MODE }}
+        run: |
+          set -euo pipefail
+          if [ "$REPO_PRIVATE" = 'true' ]; then
+            echo "repo ឯកជន ➜ ZOE_RUNNER_MODE='${RUNNER_MODE}' (ទទេ = self-hosted) ត្រូវបានអនុញ្ញាត"
+            exit 0
+          fi
+          if [ "$RUNNER_MODE" != 'github' ]; then
+            echo "::error::repo នេះ public តែ ZOE_RUNNER_MODE='${RUNNER_MODE}'។ កំណត់ Repository variable ZOE_RUNNER_MODE=github នៅ Settings → Secrets and variables → Actions → Variables ឬប្តូរ repo ទៅ private មុនរត់ CI។"
+            exit 1
+          fi
+          echo "repo public ➜ ZOE_RUNNER_MODE=github"

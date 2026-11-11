@@ -716,7 +716,9 @@ function auditWorkflowJobs(workflow) {
 
 function auditShardRuntimeContract(workflow, image, apk) {
     const { jobs, valid } = auditWorkflowJobs(workflow);
-    const contracts = jobs.map(({ name, text }) => {
+    // `ci-config` ជា preflight ស្រាល (ubuntu-latest · គ្មាន checkout/dependency/Chromium)
+    // ➜ មិនត្រូវរំពឹង cache/runtime/Chromium ដូច audit shard ទេ។
+    const contracts = jobs.filter(({ name }) => name !== 'ci-config').map(({ name, text }) => {
         const shard = name === 'audit-shard';
         const steps = text.match(/^      -[^\n]*(?:\n(?!      -)[^\n]*)*/gm) || [];
         const privileged = steps.filter((step) => /\bsudo\b|--with-deps/.test(step));
@@ -804,6 +806,34 @@ scenario('runner ៖ Linux audit និង Windows APK មាន mode ទាំ�
         && allowed(apk, 'github', false, 'workflow_dispatch')
         && allowed(apk, 'self-hosted', true, 'workflow_dispatch')
         && !allowed(apk, 'self-hosted', false, 'workflow_dispatch'));
+    // Public + mode ខុស ➜ job សំខាន់ skip ហើយ run អាចបៃតងដោយគ្មានភស្តុតាង។
+    // `ci-config` ត្រូវធ្លាក់ឮៗ និង jobs សំខាន់ត្រូវពឹងវា ដើម្បីកុំឲ្យការកំណត់ខុសក្លាយជាបៃតងស្ងាត់។
+    const gated = {
+        'audit.yml': ['zto-native-evidence', 'audit-shard'],
+        'android-release.yml': ['apk'],
+        'android-shell-check.yml': ['shell'],
+        'f03-native-diagnostic.yml': ['native-order']
+    };
+    const preflight = Object.entries(gated).map(([file, names]) => {
+        const jobs = auditWorkflowJobs(read('.github/workflows/' + file)).jobs;
+        return { file, jobs, names, job: jobs.find((entry) => entry.name === 'ci-config') };
+    });
+    check('public repo ➜ mode ខុសត្រូវក្រហម ៖ ci-config ធ្លាក់ឮៗ និង jobs សំខាន់ needs វា',
+        preflight.every(({ jobs, names, job }) => job
+            && /^    runs-on: ubuntu-latest$/m.test(job.text)
+            && job.text.includes('::error::') && job.text.includes('exit 1')
+            && names.every((name) => /^    needs: ci-config$/m.test(jobs.find((entry) => entry.name === name)?.text || ''))),
+        preflight.map(({ file, jobs, names, job }) => file + ': ' + (job ? 'ci-config' : 'missing')
+            + ' needs=' + names.map((name) => /^    needs: ci-config$/m.test(jobs.find((entry) => entry.name === name)?.text || '')).join(',')).join(' · '));
+    const runall = (audit.match(/^          RUNALL_JOBS: \$\{\{ (.*?) \}\}$/m) || [])[1];
+    const runallFor = (mode, isPrivate) => runall && vm.runInNewContext(runall, {
+        vars: { ZOE_RUNNER_MODE: mode }, github: { event: { repository: { private: isPrivate } } }
+    });
+    check('RUNALL_JOBS សមនឹង CPU ៖ GitHub ឯកជន 1 · GitHub public 2 · self-hosted 2',
+        runallFor('github', true) === '1' && runallFor('github', false) === '2'
+        && runallFor('self-hosted', true) === '2' && runallFor('', false) === '2',
+        [['github', true], ['github', false], ['self-hosted', true], ['', false]]
+            .map(([mode, isPrivate]) => mode + '/' + isPrivate + '=' + runallFor(mode, isPrivate)).join(' · '));
     check('fork មិនរត់ audit · APK ស្វ័យប្រវត្តិ (push) នៅ main តែប៉ុណ្ណោះ · branch ផ្សេង ➜ តែ «Run workflow» ដោយដៃ (APK សាក)',
         !allowed(audit, 'self-hosted', true, 'pull_request', false)
         && !allowed(audit, 'github', false, 'pull_request', false)

@@ -27,15 +27,36 @@ async function sign(key: webcrypto.CryptoKey, body: unknown) {
 it('IndexedDB ពិត៖ reload រក្សា private key ដែលមិនអាច export និង tab ពីរទទួលម្ចាស់តែមួយ', async () => {
     const context = await browser.newContext();
     try {
+        let arrivals = 0;
+        let release!: () => void;
+        const bothReady = new Promise<void>(resolve => { release = resolve; });
+        await context.exposeBinding('seatCreationReady', async () => { if (++arrivals === 2) release(); await bothReady; });
         const first = await context.newPage(), second = await context.newPage();
         await Promise.all([load(first), load(second)]);
         const create = (page: Page) => page.evaluate(async id => {
             const api = (window as any).ZoeSeatClient;
-            const identity = await api.createIdentity('ZOE', id);
-            return { fingerprint: await api.fingerprint(identity.publicKey), extractable: identity.privateKey.extractable };
+            const nativeGenerate = crypto.subtle.generateKey;
+            const nativeAdd = IDBObjectStore.prototype.add;
+            let adds = 0, duplicates = 0;
+            (crypto.subtle as any).generateKey = async (...args: any[]) => {
+                await (window as any).seatCreationReady();
+                return (nativeGenerate as any).apply(crypto.subtle, args);
+            };
+            IDBObjectStore.prototype.add = function (...args: Parameters<typeof nativeAdd>) {
+                adds++;
+                const request = nativeAdd.apply(this, args);
+                request.addEventListener('error', () => { if (request.error?.name === 'ConstraintError') duplicates++; });
+                return request;
+            };
+            try {
+                const identity = await api.createIdentity('ZOE', id);
+                return { fingerprint: await api.fingerprint(identity.publicKey), extractable: identity.privateKey.extractable, adds, duplicates };
+            } finally { crypto.subtle.generateKey = nativeGenerate; IDBObjectStore.prototype.add = nativeAdd; }
         }, keyId);
         const [a, b] = await Promise.all([create(first), create(second)]);
-        expect(a).toEqual(b); expect(a.extractable).toBe(false);
+        expect(arrivals).toBe(2); expect(a.fingerprint).toBe(b.fingerprint);
+        expect([a.extractable, b.extractable]).toEqual([false, false]);
+        expect(a.adds + b.adds).toBe(2); expect(a.duplicates + b.duplicates).toBe(1);
         await first.reload(); await first.addScriptTag({ content: helper });
         const restored = await first.evaluate(async id => {
             const api = (window as any).ZoeSeatClient;
@@ -49,7 +70,7 @@ it('IndexedDB ពិត៖ reload រក្សា private key ដែលមិន
             const verified = await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, pub, sig, new TextEncoder().encode(proof.payload));
             return { fingerprint: await api.fingerprint(identity.publicKey), extractable: identity.privateKey.extractable, exported, verified };
         }, keyId);
-        expect(restored).toEqual({ ...a, exported: false, verified: true });
+        expect(restored).toEqual({ fingerprint: a.fingerprint, extractable: false, exported: false, verified: true });
     } finally { await context.close(); }
 }, 30000);
 

@@ -61,7 +61,7 @@
         const db = await openDatabase();
         try {
             return await new Promise((resolve, reject) => {
-                let tx, result, done = false;
+                let tx, result, requestError = null, done = false;
                 const finish = (error) => {
                     if (done) return;
                     done = true; clearTimeout(timer);
@@ -76,9 +76,10 @@
                     const store = tx.objectStore(STORE_NAME);
                     const request = value === undefined ? store.get(key) : store.add(value, key);
                     request.onsuccess = () => { result = request.result; };
+                    request.onerror = () => { requestError = request.error; };
                     tx.oncomplete = () => finish(null);
-                    tx.onabort = () => finish(tx.error || new Error('identity-storage-aborted'));
-                    tx.onerror = () => finish(tx.error || new Error('identity-storage-unavailable'));
+                    tx.onabort = () => finish(requestError || tx.error || new Error('identity-storage-aborted'));
+                    tx.onerror = () => { if (!requestError && tx.error) requestError = tx.error; };
                 } catch (e) { finish(e); }
             });
         } finally { db.close(); }

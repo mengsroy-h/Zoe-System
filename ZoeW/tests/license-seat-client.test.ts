@@ -6,16 +6,28 @@ import { describe, expect, it, vi } from 'vitest';
 
 function database() {
     const data = new Map<string, any>();
-    const state = { unavailable: false, failWrite: false };
+    const state = { unavailable: false, failWrite: false, abortWrite: false, pendingAbort: false, readsBeforeAbort: 0, aborts: 0 };
     const db = {
         objectStoreNames: { contains: () => true }, close() {}, createObjectStore() {},
         transaction(_name: string, mode: string) {
+            if (mode === 'readonly' && state.pendingAbort) state.readsBeforeAbort++;
             const tx: any = { error: null, abort() { queueMicrotask(() => tx.onabort?.()); } };
             const request = (fn: () => any) => {
                 const req: any = {};
                 queueMicrotask(() => {
-                    try { req.result = fn(); req.onsuccess?.(); queueMicrotask(() => tx.oncomplete?.()); }
-                    catch (error) { req.error = error; tx.error = error; req.onerror?.(); tx.onabort?.(); }
+                    try {
+                        req.result = fn(); req.onsuccess?.();
+                        if (mode === 'readwrite' && state.abortWrite) {
+                            data.delete(req.result);
+                            tx.error = Object.assign(Error('aborted'), { name: 'AbortError' });
+                            queueMicrotask(() => tx.onabort?.());
+                        } else queueMicrotask(() => tx.oncomplete?.());
+                    }
+                    catch (error) {
+                        req.error = error; state.pendingAbort = true;
+                        req.onerror?.(); tx.onerror?.({ target: req });
+                        queueMicrotask(() => { tx.error = error; state.pendingAbort = false; state.aborts++; tx.onabort?.(); });
+                    }
                 }); return req;
             };
             tx.objectStore = () => ({
@@ -56,6 +68,7 @@ describe('អត្តសញ្ញាណឧបករណ៍ License', () => {
         const db = database(), first = client(db), second = client(db);
         const [a, b] = await Promise.all([first.api.createIdentity(app, keyId), second.api.createIdentity(app, keyId)]);
         expect(a.publicKey).toEqual(b.publicKey); expect(db.data.size).toBe(1);
+        expect(db.state.aborts).toBe(1); expect(db.state.readsBeforeAbort).toBe(0);
     });
     it('ភស្តុតាងចង app និង Key ហើយទាមទារកូនសោឯកជនពិត', async () => {
         const c = client(); await c.api.createIdentity(app, keyId);
@@ -86,6 +99,11 @@ describe('អត្តសញ្ញាណឧបករណ៍ License', () => {
         await expect(c.api.createIdentity(app, keyId)).rejects.toThrow(); expect(c.data.size).toBe(0);
         c.state.unavailable = true;
         await expect(c.api.loadIdentity(app, keyId)).rejects.toThrow();
+    });
+    it('request success មុន transaction abort មិនមែនជាការរក្សាទុក ឬជាការប្រជែងកូនសោ', async () => {
+        const c = client(); c.state.abortWrite = true;
+        await expect(c.api.createIdentity(app, keyId)).rejects.toMatchObject({ name: 'AbortError' });
+        expect(c.data.size).toBe(0); expect(await c.api.loadIdentity(app, keyId)).toBeNull();
     });
     it('receipt ត្រូវចុះហត្ថលេខាដោយ key ដែលបាន pin និងចងឧបករណ៍ពិត', async () => {
         const c = client(), device = await c.api.createIdentity(app, keyId);

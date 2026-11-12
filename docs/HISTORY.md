@@ -124,6 +124,8 @@
 
 ### ZoeW [2.50.196] — 2026-11-12 · PIN និងការចាកចេញពីផ្ទាំងឧបករណ៍
 
+- **ការកែតេស្តមុនចេញប្រើ**៖ `license-clock-recovery.test.ts` ដាច់ពេលប្រមូលតេស្ត ព្រោះ import PIN ថ្មីទាញ action registry ដែលត្រូវការ `retrySessionVerification` ពី session mock។ តេស្តនេះដាក់ mock តែផ្លូវចូល PIN ដែលមិនពាក់ព័ន្ធនឹងការសង្គ្រោះម៉ោង ហើយបរាជ័យភ្លាមបើផ្លូវនោះត្រូវហៅ។ មិនប្តូរកូដប្រើប្រាស់ ឬបន្ធូរ session guard។ វាស់ឡើងវិញ៖ clock recovery/continuity · enrollment · PIN · session ចំនួន ៩ ឯកសារ/២១៧ ករណីឆ្លង; មិនមែនលទ្ធផល CI ពេញលេញលើ commit ថ្មី។
+
 **ZoeW** (`zoew-v459` ➜ `zoew-v460`)។ ZoeKeyGen មិនប្ដូរកំណែ។
 - ប៊ូតុងចុះឈ្មោះឧបករណ៍នៅជាប់ចាកចេញ មុនព័ត៌មានកំណែ។ បើកពីម៉ឺនុយត្រូវ PIN flow ដែលមានស្រាប់ និងផ្ទៀងម្ចាស់វគ្គក្រោយ callback; cancel/wrong PIN មិនបើកផ្ទាំង។
 - Logout ក្នុង activation/enrollment modal ប្រើ confirmation ដដែល។ Cancel រក្សា activation gate; វគ្គមិនទាន់ផ្ទៀងអនុញ្ញាតតែ retry/logout និងសកម្មភាព confirmation របស់ logout មិនបើកសកម្មភាពអាជីវកម្ម។

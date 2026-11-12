@@ -22,6 +22,7 @@ vi.mock('../src/features/auth', () => ({ updateAuthButton: effects.signed }));
 vi.mock('../src/features/customer-table', () => ({ prefetchCustomerDataTableRowsIfConfigured: vi.fn() }));
 vi.mock('../src/features/lookup-config', () => ({ refreshShopBoundUi: vi.fn() }));
 vi.mock('../src/features/session', () => ({ armSessionExpiryCheck: effects.arm }));
+vi.mock('../src/features/pin', () => ({ requestPinBeforeConfig: vi.fn(() => { throw new Error('ការសង្គ្រោះម៉ោងមិនត្រូវបើក PIN'); }) }));
 vi.mock('../src/domain/cleanup', () => ({ resumeInterruptedCleanups: vi.fn() }));
 vi.mock('../src/services/db-listeners', () => ({ dbListenersBelongToSession: () => firebaseState.isDatabaseInitialized, initDatabaseListeners: effects.init }));
 vi.mock('../src/core/timezone', () => ({ safeFocusScanner: vi.fn() }));

@@ -122,6 +122,13 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### ZoeKeyGen [2.24.42] — 2026-11-12 · បន្តសុពលភាពជាមួយម៉ោងទសភាគ
+
+**ZoeKeyGen** (`zoekeygen-v152` ➜ `zoekeygen-v153`)។ ZoeW មិនប្ដូរកំណែ។
+- បង្គត់ចុះមូលដ្ឋានម៉ោង trusted/current expiry ទៅមីលីវិនាទីគត់ មុនបន្ថែមរយៈពេលបន្ត។ Server នៅទាមទារ safe integer និងផ្ទៀង signature/revision ដដែល។
+- Regression ប្រើ seller signature និង server validator ពិត៖ មុនកែ expired/equal-now fractional cases2 fail; ក្រោយកែ seller/stage/clock suites73 pass។ Unexpired control, invalid days, missing clock, overflow និង signed fractional rejection នៅតែផ្ទៀង។
+- **សកម្មភាពដោយដៃ**៖ រង់ចាំ full CI លើ exact head និងការអនុញ្ញាត deploy; ផ្ទៀង renewal លើហាង/ឧបករណ៍សាកមុន production។ មិនបាន merge/deploy ឬកែ APK gate។
+
 ### [2.50.195] · ZoeKeyGen [2.24.41] — 2026-11-12 · ផ្ទៀងវគ្គ និងព្រំដែនប្រតិបត្តិការ
 
 - Audit1298 លើ0ab88b2៖ shards1/2/4/5 pass, shard3 មានតែ ZTO fixture race។ Idle barrier បង្ហាញថា expected6 ធ្លាប់រំលង manual retry ដំបូង; sequence ពិត5→6→7។ Test រង់ចាំ queue idle មុន retries ទាំងពីរ ហើយផ្ទៀង photo/identity/no-replay guards ដដែល។ E2E+lock32 និង repeated focused24 pass; production/locked ZTO មិនកែ។ រង់ចាំ full CI ថ្មី។

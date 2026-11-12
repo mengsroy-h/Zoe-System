@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import vm from 'node:vm';
 import { webcrypto } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
+import { createSeatStageService } from '../netlify/lib/license-seat-stage.mjs';
 
 const source = readFileSync(resolve(__dirname, '../../ZoeKeyGen/app.js'), 'utf8');
 const begin = source.indexOf('function seatSellerContext()');
@@ -148,4 +149,76 @@ describe('ការគ្រប់គ្រងឧបករណ៍សុវត្�
         expect(body.innerHTML).not.toContain('0/5');
     });
 
+});
+
+async function renewalHarness(expiresAt = 999999) {
+    const h = await harness();
+    let saved = { ...h.state, seats: {}, licenseExpiresAt: expiresAt };
+    const store = {
+        getWithMetadata: async () => ({ data: structuredClone(saved), etag: String(saved.revision) }),
+        setJSON: vi.fn(async (_path: string, next: typeof saved, options: any) => {
+            if (options.onlyIfMatch !== String(saved.revision)) return { modified: false };
+            saved = structuredClone(next);
+            return { modified: true };
+        })
+    };
+    const service = createSeatStageService({ store, enabled: true, now: () => 1000000,
+        publicKeys: [await webcrypto.subtle.exportKey('jwk', h.pair.publicKey)] });
+    h.ctx.captureKeygenClock = () => ({ now: 1000000.75, generation: 1 });
+    h.ctx.getTrustedServerNow = () => 1000000.75;
+    h.ctx.fetchWithTimeout.mockImplementation(async (url: string, options: any) => {
+        if (url.includes('firebaseio')) return { body: { seatProtocol: 2 }, res: { ok: true } };
+        const envelope = JSON.parse(options.body);
+        const command = JSON.parse(Buffer.from(envelope.payload, 'base64url').toString());
+        const result = await service.execute(envelope);
+        h.commands.push({ command, envelope, result });
+        return { res: { ok: result.status === 200 }, body: result.body };
+    });
+    return { ...h, store, saved: () => saved };
+}
+
+describe('បន្តសុពលភាពសុវត្ថិភាពជាមួយការផ្ទៀងផ្ទាត់ Server ពិត', () => {
+    it.each([999999, 1000000, 5000000])('ម៉ោងទសភាគ និងថ្ងៃផុត %s រក្សាចំនួនគត់', async expiresAt => {
+        const h = await renewalHarness(expiresAt);
+        await h.ctx.routeSecureSeatLifecycle('ABCDEFGHIJKLMNOP', 'extend', 1.5);
+        expect(h.commands.map(x => x.command.action)).toEqual(['inspect', 'configure', 'inspect']);
+        expect(h.commands.map(x => x.result.status)).toEqual([200, 200, 200]);
+        expect(h.saved().licenseExpiresAt).toBe(Math.max(1000000, expiresAt) + 129600000);
+        expect(Number.isSafeInteger(h.commands[1].command.licenseExpiresAt)).toBe(true);
+        expect(h.store.setJSON).toHaveBeenCalledOnce();
+        expect(h.ctx.showToast).toHaveBeenCalledOnce();
+        expect(h.ctx.closeModal).toHaveBeenCalledWith('extendModal');
+        expect(h.ctx.alert).not.toHaveBeenCalled();
+        expect(h.ctx.fb.runTransaction).not.toHaveBeenCalled();
+    });
+    it.each([undefined, null, NaN, Infinity, 0, -1, '1', {}, []])('ចំនួនថ្ងៃមិនត្រឹមត្រូវ %s មិនកែ Server', async days => {
+        const h = await renewalHarness();
+        await h.ctx.routeSecureSeatLifecycle('ABCDEFGHIJKLMNOP', 'extend', days);
+        expect(h.commands.map(x => x.command.action)).toEqual(['inspect']);
+        expect(h.store.setJSON).not.toHaveBeenCalled();
+        expect(h.ctx.showToast).not.toHaveBeenCalled();
+        expect(h.ctx.alert).toHaveBeenCalledOnce();
+    });
+    it('គ្មានម៉ោងទុកចិត្ត មិនកែ Server', async () => {
+        const h = await renewalHarness(); h.ctx.getTrustedServerNow = () => null;
+        await h.ctx.routeSecureSeatLifecycle('ABCDEFGHIJKLMNOP', 'extend', 1);
+        expect(h.store.setJSON).not.toHaveBeenCalled();
+        expect(h.ctx.showToast).not.toHaveBeenCalled();
+        expect(h.ctx.alert).toHaveBeenCalledOnce();
+    });
+    it('លទ្ធផលលើសចំនួនគត់សុវត្ថិភាព នៅតែត្រូវ Server បដិសេធ', async () => {
+        const h = await renewalHarness();
+        await h.ctx.routeSecureSeatLifecycle('ABCDEFGHIJKLMNOP', 'extend', Number.MAX_VALUE);
+        expect(h.commands.at(-1).result).toMatchObject({ status: 400, body: { reason: 'config-invalid' } });
+        expect(h.store.setJSON).not.toHaveBeenCalled();
+        expect(h.ctx.showToast).not.toHaveBeenCalled();
+        expect(h.ctx.alert).toHaveBeenCalledOnce();
+    });
+    it('Server នៅតែបដិសេធសំណើថ្ងៃផុតទសភាគដែលចុះហត្ថលេខា', async () => {
+        const h = await renewalHarness();
+        await expect(h.ctx.seatSellerCommand(h.ctx.seatSellerContext(), 'ABCDEFGHIJKLMNOP', 'configure', 1,
+            { maxDevices: 1, licenseExpiresAt: 1000000.75 + 86400000, revoked: false })).rejects.toThrow('seat-outcome-unverified');
+        expect(h.commands[0].result).toMatchObject({ status: 400, body: { reason: 'config-invalid' } });
+        expect(h.store.setJSON).not.toHaveBeenCalled();
+    });
 });

@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.41';
+const APP_VERSION = '2.24.42';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -3100,7 +3100,7 @@ async function routeSecureSeatLifecycle(id, action, days) {
         } else if (action === 'extend') {
             const now = getTrustedServerNow();
             if (now === null || !Number.isFinite(days) || days <= 0) throw new Error('seat-clock');
-            fields.licenseExpiresAt = Math.max(now, state.licenseExpiresAt) + Math.round(days * 86400000);
+            fields.licenseExpiresAt = Math.floor(Math.max(now, state.licenseExpiresAt)) + Math.round(days * 86400000);
             if (!confirm('បន្ថែមសុពលភាព ' + days + ' ថ្ងៃ?')) return true;
         } else if (action === 'release') {
             if (!confirm('ដោះឧបករណ៍ទាំងអស់? ត្រូវចុះឈ្មោះឧបករណ៍ឡើងវិញ មុនប្រើ Key នេះ។')) return true;

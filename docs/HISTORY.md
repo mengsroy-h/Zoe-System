@@ -122,6 +122,16 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### ZoeW [2.50.196] — 2026-11-12 · PIN និងការចាកចេញពីផ្ទាំងឧបករណ៍
+
+- **ការកែតេស្តមុនចេញប្រើ**៖ `license-clock-recovery.test.ts` ដាច់ពេលប្រមូលតេស្ត ព្រោះ import PIN ថ្មីទាញ action registry ដែលត្រូវការ `retrySessionVerification` ពី session mock។ តេស្តនេះដាក់ mock តែផ្លូវចូល PIN ដែលមិនពាក់ព័ន្ធនឹងការសង្គ្រោះម៉ោង ហើយបរាជ័យភ្លាមបើផ្លូវនោះត្រូវហៅ។ មិនប្តូរកូដប្រើប្រាស់ ឬបន្ធូរ session guard។ វាស់ឡើងវិញ៖ clock recovery/continuity · enrollment · PIN · session ចំនួន ៩ ឯកសារ/២១៧ ករណីឆ្លង; មិនមែនលទ្ធផល CI ពេញលេញលើ commit ថ្មី។
+
+**ZoeW** (`zoew-v459` ➜ `zoew-v460`)។ ZoeKeyGen មិនប្ដូរកំណែ។
+- ប៊ូតុងចុះឈ្មោះឧបករណ៍នៅជាប់ចាកចេញ មុនព័ត៌មានកំណែ។ បើកពីម៉ឺនុយត្រូវ PIN flow ដែលមានស្រាប់ និងផ្ទៀងម្ចាស់វគ្គក្រោយ callback; cancel/wrong PIN មិនបើកផ្ទាំង។
+- Logout ក្នុង activation/enrollment modal ប្រើ confirmation ដដែល។ Cancel រក្សា activation gate; វគ្គមិនទាន់ផ្ទៀងអនុញ្ញាតតែ retry/logout និងសកម្មភាព confirmation របស់ logout មិនបើកសកម្មភាពអាជីវកម្ម។
+- Regression មុនកែ12fail, ក្រោយកែ13pass។ Final focused suites92pass និង independent40pass; typecheck/lint/build/doc/slot/purity/Android135/coverage10 pass។ Full CI និងឧបករណ៍ពិតនៅមិនទាន់រត់។
+- **សកម្មភាពដោយដៃ**៖ review និង CI មុន publish; ផ្ទៀង PIN cancel/success និង logout cancel/confirm លើឧបករណ៍ពិត។ មិនបាន push/merge/deploy ឬកែ Firebase settings។
+
 ### ZoeKeyGen [2.24.43] — 2026-11-12 · ផ្ទេរសុពលភាព legacy ទសភាគ
 
 **ZoeKeyGen** (`zoekeygen-v153` ➜ `zoekeygen-v154`)។ ZoeW មិនប្ដូរកំណែ។
@@ -5318,6 +5328,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/ledger-stale-session.test.tsx` | — | ផ្នែក ៨ |
 | `ZoeW/tests/ledger-unknown-no-retry.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ledger-writer-contract.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/license-clock-recovery.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/list-paging.test.tsx` | — | ផ្នែក ៧ |
 | `ZoeW/tests/list-render-scope.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៦ · ផ្នែក ៧ |
 | `ZoeW/tests/listener-leak-coverage.test.ts` | ផ្នែក ២ | — |

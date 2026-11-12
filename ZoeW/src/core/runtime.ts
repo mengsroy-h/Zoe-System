@@ -27,6 +27,7 @@ export const ACTION_ALLOWLIST = [
     "closeZtoSyncModal",
     "confirmLocationChange",
     "confirmLogout",
+    "promptLogout",
     "confirmPhone",
     "confirmScannedRemoval",
     "connectPendingSetupLink",

@@ -25,7 +25,7 @@ export function ActivationModal() {
                     <button className="btn-cancel" id="seatIdentityRepairBtn" disabled={v.activationBusy || v.seatEnrollmentBusy} onClick={onAct('repairSeatEnrollmentIdentity')}>ជួសជុលកូនសោឧបករណ៍ដែលខូច</button>
                     {v.seatEnrollmentBusy && <button className="btn-cancel" onClick={onAct('clearSeatEnrollment')}>បោះបង់</button>}
                     {v.seatEnrollmentOnly && <button className="btn-cancel" onClick={onAct('closeSeatEnrollment')}>បិទ</button>}
-                    <button className="btn-cancel" id="activationLogoutBtn" onClick={onAct("logoutApp")}>ចាកចេញ</button>
+                    <button className="btn-cancel" id="activationLogoutBtn" onClick={onAct("promptLogout")}>ចាកចេញ</button>
                 </div>
                 <p role="status">{v.seatEnrollmentMessage}</p>
                 {v.seatEnrollmentJson && <div>

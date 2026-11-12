@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import { firebaseState, uiState } from '../src/core/state';
+import { firebaseState, securityState, uiState } from '../src/core/state';
 import { viewState } from '../src/core/view-state';
 import * as license from '../src/features/license';
 import { closeModal } from '../src/ui/modal';
@@ -55,7 +55,8 @@ describe('ការរៀបចំសំណើចុះឈ្មោះឧបក�
         expect(html).toContain('id="seatEnrollmentFingerprint"');
     });
     it('ប្រអប់ចុះឈ្មោះសម្រាប់អ្នកកំពុងប្រើអាចបិទវិញ ដោយមិនបិទការទាមទារ Active', () => {
-        api().openSeatEnrollment(); expect((viewState as any).seatEnrollmentOnly).toBe(true);
+        api().openSeatEnrollment(); securityState.pinTargetAction();
+        expect((viewState as any).seatEnrollmentOnly).toBe(true);
         api().closeSeatEnrollment(); expect((viewState as any).seatEnrollmentOnly).toBe(false);
         uiState.modalDisplay.activationModal = 'flex'; api().openSeatEnrollment();
         expect((viewState as any).seatEnrollmentOnly).toBe(false);

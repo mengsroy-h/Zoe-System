@@ -8,5 +8,5 @@ export function sessionVerificationRequired() {
 export function sessionUserActionAllowed(name) {
     if (!firebaseState.auth?.currentUser) return true;
     serverClockIsTrustworthy();
-    return !sessionVerificationRequired() || name === 'retrySessionVerification' || name === 'logoutApp';
+    return !sessionVerificationRequired() || name === 'retrySessionVerification' || name === 'logoutApp' || name === 'promptLogout' || name === 'confirmLogout' || name === 'cancelLogout';
 }

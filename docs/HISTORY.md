@@ -124,6 +124,8 @@
 
 ### [2.50.195] · ZoeKeyGen [2.24.41] — 2026-11-12 · ផ្ទៀងវគ្គ និងព្រំដែនប្រតិបត្តិការ
 
+- Actual-adapter fixture bootstrap បង្ក Firebase cached WebSocket ចង trace registry ចាស់។ ផ្លាស់ fixture ទៅ subprocess ឯករាជ្យ និងផ្ទៀង parent module cache/DOM ដដែល; child5 និង parent120 fixtures pass។ Native/Supabase engine verification ត្រូវរង់ចាំ CI ថ្មី។
+
 - Diagnostic wrapper ជុំដំបូងបង្ក recursion ដោយសរសេរឆ្លង SDK Proxy; កែជា outer observer Proxy មិនកែ base methods។ Actual-adapter regression ផ្ទៀង one-dispatch/error identity/ownership refusal; fixtures123 pass។ បញ្ហា preflight ដើមនៅមិនទាន់មានមូលហេតុបញ្ជាក់; ត្រូវផ្ទៀង CI ថ្មី។
 
 - F03 លើ head `8cae650` មាន permutation មួយបរាជ័យមុន dispatch ក្នុង Supabase postgc-partial; មួយទៀត pass598។ មូលហេតុមិនទាន់បញ្ជាក់។ បន្ថែម bounded/redacted preflight diagnostics និង observer fixtures8; fixtures118 pass ប៉ុន្តែ engines UNRUN local។ មិនកែ production, retries, timeout, concurrency ឬបន្ធូរ assertions។ ត្រូវរង់ចាំ CI ថ្មី។

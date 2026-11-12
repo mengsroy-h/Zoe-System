@@ -1157,7 +1157,24 @@ function observeSupabaseSdk(sdk, trace) {
         }
     });
 }
-async function verifySupabaseSdkObserver() {
+function verifySupabaseSdkObserver() {
+    // Firebase captures faye's Client at first require. Running a disposable bootstrap
+    // here would poison the parent's later wire observer even after restore().
+    const cachedRuntimeModules = () => Object.keys(require.cache).filter(file => /[\\/]node_modules[\\/](?:@firebase|firebase|faye-websocket)[\\/]/.test(file)).sort();
+    const before = { modules: cachedRuntimeModules(), window: globalThis.window, document: globalThis.document };
+    const { spawnSync } = require('child_process');
+    const result = spawnSync(process.execPath, [__filename, '--sdk-observer-fixture-only'], {
+        cwd: REPO, env: process.env, encoding: 'utf8', timeout: 30000, maxBuffer: 1024 * 1024
+    });
+    let evidence = null;
+    try { evidence = JSON.parse(result.stdout.trim().split('\n').at(-1)); } catch (_) {}
+    requireCheck('isolated actual SDK observer regressions pass without parent runtime bootstrap', result.status === 0 && !result.error
+        && evidence?.status === 'SDK_OBSERVER_FIXTURE_ONLY_UNRUN' && evidence.pass === 5 && evidence.fail === 0,
+        { exit: result.status, signal: result.signal, status: evidence?.status ?? 'missing', pass: evidence?.pass ?? null, fail: evidence?.fail ?? null });
+    requireCheck('actual SDK fixture leaves parent Firebase cache and DOM untouched', equal(before.modules, cachedRuntimeModules())
+        && before.window === globalThis.window && before.document === globalThis.document);
+}
+async function verifySupabaseSdkObserverInChild() {
     const runtime = await bootstrap(new URL('http://127.0.0.1:9000'));
     try {
         const app = {}, auth = { app, currentUser: { uid: 'observer-fixture' } }, db = { app };
@@ -2509,6 +2526,11 @@ async function runControlledTimings(runtime, namespace) {
     }
 }
 async function main() {
+    if (process.argv.includes('--sdk-observer-fixture-only')) {
+        await verifySupabaseSdkObserverInChild();
+        console.log(JSON.stringify({ status: 'SDK_OBSERVER_FIXTURE_ONLY_UNRUN', pass, fail }));
+        process.exitCode = fail ? 1 : 0; return;
+    }
     if (FIXTURES_ONLY && STRICT) throw new Error('fixtures-only cannot satisfy CI STRICT');
     verifyConstruction(); verifyNativeTrace(); await verifyFailureEvidence(); await verifyReceiptAndFixtureOwnership(); await verifyBoundedDeadline(); verifyControlledTimingGates();
     verifyGuardConstruction(); await verifySupabasePreflightTrace(); await verifySupabaseSdkObserver();

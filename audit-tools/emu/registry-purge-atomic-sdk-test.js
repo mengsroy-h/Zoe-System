@@ -1103,10 +1103,77 @@ async function makeSqlHarness() {
     return { H, c, fake, uid, pool, setActive: provider => { active = provider; }, close: shutdown };
     } catch (error) { try { await shutdown(); } catch (cleanup) { error.message += '; ' + cleanup.message; } throw error; }
 }
+// Observational only: never retry, inspect response bodies, or replace operation results/errors.
+class SupabasePreflightTrace {
+    constructor() { this.events = []; this.total = 0; this.inFlight = 0; this.peak = 0; this.errors = 0; this.firstFailure = null; this.observerErrors = 0; this.ownerSnapshots = []; }
+    note(event) {
+        try {
+            this.total++;
+            if (event.kind === 'owner') { if (this.ownerSnapshots.length === 8) this.ownerSnapshots.shift(); this.ownerSnapshots.push(event); }
+            if (this.events.length === 128) this.events.shift();
+            this.events.push(event);
+            if (event.phase === 'rejected' || event.phase === 'threw') {
+                this.errors++; if (!this.firstFailure) this.firstFailure = event;
+            }
+        } catch (_) { this.observerErrors++; }
+    }
+    observe(kind, operation) {
+        const started = performance.now();
+        const emit = event => { try { this.note({ kind, ...event }); } catch (_) { this.observerErrors++; } };
+        this.inFlight++; this.peak = Math.max(this.peak, this.inFlight);
+        emit({ phase: 'started' });
+        const finish = (phase, error, value) => {
+            try {
+                this.inFlight--;
+                const code = ['ECONNRESET', 'ECONNREFUSED', 'EPIPE', '42501', '22023', 'PT409', 'PGRST301', 'PGRST303', 'write_recovery_pending', 'write_outcome_unknown'].includes(error?.code) ? error.code : error ? 'other' : 'none';
+                const reason = ['Client is offline.', 'timeout', 'REGISTRY_PURGE_SESSION', 'Loopback request timed out', 'Owned loopback response aborted'].includes(error?.message) ? error.message : error ? 'other' : 'none';
+                emit({ phase, ms: Math.round(performance.now() - started), code, reason,
+                    ...(kind === 'public-purge' && phase === 'resolved' ? { outcome: value === true ? 'true' : value === false ? 'false' : value === null ? 'null' : 'other' } : {}),
+                    ...(kind.startsWith('http:') && Number.isInteger(value?.status) ? { status: value.status } : {}) });
+            } catch (_) { this.observerErrors++; }
+        };
+        let result;
+        try { result = operation(); } catch (error) { finish('threw', error); throw error; }
+        // Attach observers but return the original promise/value, preserving identity and timing semantics.
+        if (result && typeof result.then === 'function') result.then(value => finish('resolved', null, value), error => finish('rejected', error));
+        else finish('resolved', null, result);
+        return result;
+    }
+    summary() { return { events: this.events.slice(), ownerSnapshots: this.ownerSnapshots.slice(), total: this.total, droppedEvents: Math.max(0, this.total - this.events.length),
+        inFlight: this.inFlight, peak: this.peak, errors: this.errors, firstFailure: this.firstFailure, observerErrors: this.observerErrors }; }
+}
+function supabaseReadKind(ref) {
+    const root = ref?._path?.[0];
+    return [T, R, P, G, W, D, M, 'zoew_scan_history_cod_dod', 'zoew_scan_operations'].includes(root) ? root : 'other';
+}
+async function verifySupabasePreflightTrace() {
+    const trace = new SupabasePreflightTrace(), value = {}, error = Object.assign(new Error('SECRET_BODY'), { code: 'ECONNRESET' });
+    let calls = 0;
+    const successful = Promise.resolve(value);
+    requireCheck('Supabase observer preserves promise and successful result identity', trace.observe('get:other', () => { calls++; return successful; }) === successful && await successful === value);
+    const rejected = Promise.reject(error);
+    requireCheck('Supabase observer preserves rejected promise and error identity', trace.observe('get:other', () => { calls++; return rejected; }) === rejected && await rejected.catch(e => e) === error);
+    let thrown; try { trace.observe('update', () => { calls++; throw error; }); } catch (e) { thrown = e; }
+    requireCheck('Supabase observer preserves synchronous throws without retry', thrown === error && calls === 3 && trace.inFlight === 0 && trace.errors === 2);
+    for (let i = 0; i < 200; i++) trace.observe('get:other', () => null);
+    requireCheck('Supabase observer bounds events and retains first failure without secrets', trace.events.length === 128 && trace.firstFailure.code === 'ECONNRESET'
+        && trace.summary().droppedEvents > 0 && !JSON.stringify(trace.summary()).includes('SECRET_BODY'));
+    requireCheck('Supabase observer preserves refused and deferred purge outcomes', trace.observe('public-purge', () => false) === false
+        && trace.observe('public-purge', () => null) === null && trace.events.at(-1).outcome === 'null');
+    trace.note({ kind: 'owner', phase: 'entered', scopeSame: true });
+    for (let i = 0; i < 200; i++) trace.observe('get:other', () => null);
+    requireCheck('Supabase observer retains bounded owner snapshots after read bursts', trace.summary().ownerSnapshots.length === 1
+        && trace.summary().ownerSnapshots[0].phase === 'entered');
+    trace.note = () => { throw error; };
+    requireCheck('Supabase observer failure cannot alter successful operation', trace.observe('get:other', () => value) === value && trace.observerErrors > 0);
+    requireCheck('Supabase observer classifies roots without retaining child paths', supabaseReadKind({ _path: [P, 'SECRET_BODY'] }) === P
+        && supabaseReadKind({ _path: ['SECRET_BODY'] }) === 'other');
+}
 class SupabaseProvider {
     constructor(runtime, harness, scenario, row) {
         this.kind = 'supabase'; this.runtime = runtime; this.harness = harness; this.scenario = scenario; this.row = row;
         this.uid = harness.uid; this.stats = stats(); this.faults = {}; this.client = null; this.rawMode = false;
+        this.preflightTrace = new SupabasePreflightTrace();
     }
     async setup(seed) {
         const c = this.harness.c;
@@ -1128,7 +1195,9 @@ class SupabaseProvider {
         if (this.faults.denyProof && proofRead) {
             this.stats.deniedReads++; return Promise.resolve(new Response(JSON.stringify({ code: '42501', message: 'synthetic proof READ unavailable' }), { status: 403 }));
         }
-        return request(target, init);
+        const fn = target.pathname.split('/').pop();
+        const kind = ['zoe_read', 'zoe_purge_execute_v1', 'zoe_purge_status_v1', 'zoe_write_v2', 'zoe_sync', 'zoe_bootstrap'].includes(fn) ? fn : 'other';
+        return this.preflightTrace.observe('http:' + kind, () => request(target, init));
     }
     async hook(event) {
         if (this.ordinaryAdmissionObserver && event.fn === 'zoe_write_v2') this.ordinaryAdmissionObserver.sql.push({ phase: event.phase, body: clone(event.body), ...(event.phase === 'after' ? { result: clone(event.result) } : {}) });
@@ -1155,6 +1224,10 @@ class SupabaseProvider {
             dbOptions: { retryStepsMs: [50, 100], pollFallbackMs: 600000 }
         });
         const sdk = api.withTransactionOutcomeResolution(base);
+        for (const name of ['get', 'update']) {
+            const original = sdk[name];
+            sdk[name] = (...args) => this.preflightTrace.observe(name === 'get' ? 'get:' + supabaseReadKind(args[0]) : 'update', () => original.apply(sdk, args));
+        }
         const app = sdk.initializeApp({ supabaseUrl: this.harness.fake.url, supabaseKey: 'sb_publishable_f03_synthetic', loginDomain: 'users.zoew.invalid' });
         this.pendingApp = { app, close: () => sdk.deleteApp(app) };
         const auth = sdk.getAuth(app), db = sdk.getDatabase(app);
@@ -1169,7 +1242,20 @@ class SupabaseProvider {
         if (this.pendingApp) { await this.pendingApp.close(); this.pendingApp = null; }
     }
     async close() { await this.closeClient(); }
-    async purge() { return this.runtime.api.purgeTrashWithRegistry(clone(this.row)); }
+    async purge() {
+        const api = this.runtime.api, initial = { db: api.firebaseState.db, sdk: api.firebaseState.fb,
+            generation: api.firebaseState.authGeneration, uid: api.firebaseState.auth?.currentUser?.uid, scope: api.liveShopScope() };
+        const owner = phase => {
+            try { this.preflightTrace.note({ kind: 'owner', phase, dbSame: initial.db === api.firebaseState.db,
+                sdkSame: initial.sdk === api.firebaseState.fb, generationSame: initial.generation === api.firebaseState.authGeneration,
+                uidSame: initial.uid === api.firebaseState.auth?.currentUser?.uid, scopeSame: initial.scope === api.liveShopScope(),
+                uidPresent: typeof initial.uid === 'string' && !!initial.uid, scopePresent: typeof initial.scope === 'string' && !!initial.scope,
+                ready: this.client.db.isReady() }); } catch (_) { this.preflightTrace.observerErrors++; }
+        };
+        owner('entered');
+        try { return await this.preflightTrace.observe('public-purge', () => api.purgeTrashWithRegistry(clone(this.row))); }
+        finally { owner('finished'); }
+    }
     async retry() { return this.client.sdk.retryWriteRecovery(this.client.db); }
     recovery() { return this.client.db.recoveryState(); }
     async settle() { await until(() => this.client.db.isReady() && !this.recovery().recovering, 'Supabase recovery completion'); }
@@ -2391,7 +2477,7 @@ async function runControlledTimings(runtime, namespace) {
 async function main() {
     if (FIXTURES_ONLY && STRICT) throw new Error('fixtures-only cannot satisfy CI STRICT');
     verifyConstruction(); verifyNativeTrace(); await verifyFailureEvidence(); await verifyReceiptAndFixtureOwnership(); await verifyBoundedDeadline(); verifyControlledTimingGates();
-    verifyGuardConstruction();
+    verifyGuardConstruction(); await verifySupabasePreflightTrace();
     nativeComponentPlan();
     if (FIXTURES_ONLY) { report('FIXTURES_ONLY_UNRUN', { nativeRuntime: 'UNRUN', supabaseRuntime: 'UNRUN' }); process.exitCode = fail ? 1 : 0; return; }
     for (const file of SOURCE_FILES) requireCheck('source input ' + file, fs.existsSync(path.join(ROOT, file)));
@@ -2449,6 +2535,7 @@ async function main() {
                     && cleaned && !error;
                 if (!coherent) { fail++; console.error('  FAIL  case manifest ' + providerName + ':' + scenario.id); }
                 results.push({ id: scenario.id, provider: providerName, inputFingerprint, pass: coherent, assertions: checks, cleanup: cleaned, error,
+                    ...(providerName === 'supabase' ? { preflightDiagnostic: provider.preflightTrace.summary() } : {}),
                     ...(provider.rawBackendEvidence ? { rawBackendEvidence: provider.rawBackendEvidence } : {}),
                     ...(provider.ordinaryAdmissionEvidence ? { ordinarySourceAdmission: provider.ordinaryAdmissionEvidence } : {}),
                     ...(providerName === 'native' ? { resources: provider.resourceReport(), diagnostic: provider.trace.summary(), failureReadback } : {}), ...value });

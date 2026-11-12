@@ -124,6 +124,8 @@
 
 ### [2.50.195] · ZoeKeyGen [2.24.41] — 2026-11-12 · ផ្ទៀងវគ្គ និងព្រំដែនប្រតិបត្តិការ
 
+- F03 លើ head `8cae650` មាន permutation មួយបរាជ័យមុន dispatch ក្នុង Supabase postgc-partial; មួយទៀត pass598។ មូលហេតុមិនទាន់បញ្ជាក់។ បន្ថែម bounded/redacted preflight diagnostics និង observer fixtures8; fixtures118 pass ប៉ុន្តែ engines UNRUN local។ មិនកែ production, retries, timeout, concurrency ឬបន្ធូរ assertions។ ត្រូវរង់ចាំ CI ថ្មី។
+
 **ZoeW** (`zoew-v458` ➜ `zoew-v459`) និង **ZoeKeyGen** (`zoekeygen-v151` ➜ `zoekeygen-v152`)។
 - ការហៅផ្ទៀងវគ្គម្តងទៀតរក្សាសាលក្រម live តែពេលម្ចាស់វគ្គដដែល និង token/ម៉ោងដែលទុកចិត្តបាននៅមានសុពលភាព; នៅតែផ្ទៀង token ហើយបិទចំពោះ expiry, clock uncertainty ឬវគ្គថ្មី។
 - ការបរាជ័យក្នុង Web Lock របស់ price operation ត្រូវឡើងជាកំហុស មិនហៅប្រតិបត្តិការឡើងវិញក្រៅសោ។

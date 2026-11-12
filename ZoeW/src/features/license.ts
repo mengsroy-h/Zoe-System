@@ -8,6 +8,7 @@ import { updateAuthButton } from './auth';
 import { prefetchCustomerDataTableRowsIfConfigured } from './customer-table';
 import { captureAuthDatabaseGuard } from './exchange-rate';
 import { refreshShopBoundUi } from './lookup-config';
+import { requestPinBeforeConfig } from './pin';
 import { armSessionExpiryCheck } from './session';
 import { dbListenersBelongToSession, initDatabaseListeners } from '../services/db-listeners';
 import { withTimeout } from '../services/network';
@@ -107,12 +108,16 @@ export function clearSeatEnrollment() {
 
 export function openSeatEnrollment() {
     if (viewState.backendKind !== 'firebase' || !firebaseState.auth?.currentUser || !firebaseState.isDatabaseInitialized || openModalIds().includes('activationModal')) return;
-    clearSeatEnrollment();
-    viewState.seatEnrollmentOnly = true;
-    viewState.activationMessage = 'រៀបចំសំណើចុះឈ្មោះឧបករណ៍ រួចផ្ញើឱ្យអ្នកលក់ផ្ទៀងផ្ទាត់។';
+    const sessionIsCurrent = captureAuthDatabaseGuard();
     uiState.drawerOpen = false;
-    setFieldValue('activationKeyInput', '');
-    openModalHelper('activationModal');
+    requestPinBeforeConfig(() => {
+        if (!sessionIsCurrent() || viewState.backendKind !== 'firebase' || !firebaseState.isDatabaseInitialized || openModalIds().includes('activationModal')) return;
+        clearSeatEnrollment();
+        viewState.seatEnrollmentOnly = true;
+        viewState.activationMessage = 'រៀបចំសំណើចុះឈ្មោះឧបករណ៍ រួចផ្ញើឱ្យអ្នកលក់ផ្ទៀងផ្ទាត់។';
+        setFieldValue('activationKeyInput', '');
+        openModalHelper('activationModal');
+    }, 'seatEnrollment');
 }
 
 export function closeSeatEnrollment() {

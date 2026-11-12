@@ -122,6 +122,14 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### ZoeW [2.50.196] — 2026-11-12 · PIN និងការចាកចេញពីផ្ទាំងឧបករណ៍
+
+**ZoeW** (`zoew-v459` ➜ `zoew-v460`)។ ZoeKeyGen មិនប្ដូរកំណែ។
+- ប៊ូតុងចុះឈ្មោះឧបករណ៍នៅជាប់ចាកចេញ មុនព័ត៌មានកំណែ។ បើកពីម៉ឺនុយត្រូវ PIN flow ដែលមានស្រាប់ និងផ្ទៀងម្ចាស់វគ្គក្រោយ callback; cancel/wrong PIN មិនបើកផ្ទាំង។
+- Logout ក្នុង activation/enrollment modal ប្រើ confirmation ដដែល។ Cancel រក្សា activation gate; វគ្គមិនទាន់ផ្ទៀងអនុញ្ញាតតែ retry/logout និងសកម្មភាព confirmation របស់ logout មិនបើកសកម្មភាពអាជីវកម្ម។
+- Regression មុនកែ12fail, ក្រោយកែ13pass។ Final focused suites92pass និង independent40pass; typecheck/lint/build/doc/slot/purity/Android135/coverage10 pass។ Full CI និងឧបករណ៍ពិតនៅមិនទាន់រត់។
+- **សកម្មភាពដោយដៃ**៖ review និង CI មុន publish; ផ្ទៀង PIN cancel/success និង logout cancel/confirm លើឧបករណ៍ពិត។ មិនបាន push/merge/deploy ឬកែ Firebase settings។
+
 ### ZoeKeyGen [2.24.43] — 2026-11-12 · ផ្ទេរសុពលភាព legacy ទសភាគ
 
 **ZoeKeyGen** (`zoekeygen-v153` ➜ `zoekeygen-v154`)។ ZoeW មិនប្ដូរកំណែ។

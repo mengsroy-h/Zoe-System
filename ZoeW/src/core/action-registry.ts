@@ -1,6 +1,6 @@
 import { openZtoPalmSign } from '../features/zto-palm-sign';
 import { explainZtoReopenLock, explainZtoRestoreBlock } from '../features/zto-final-marks';
-import { cancelLogout, confirmLogout, drawerAuthFlow, drawerBiometricFlow, drawerConfigFlow, drawerCustomerTableFlow, drawerLockerSettingsFlow, drawerLookupApiFlow, submitLoginForm, toggleDrawerGroup } from './actions';
+import { cancelLogout, confirmLogout, promptLogout, drawerAuthFlow, drawerBiometricFlow, drawerConfigFlow, drawerCustomerTableFlow, drawerLockerSettingsFlow, drawerLookupApiFlow, submitLoginForm, toggleDrawerGroup } from './actions';
 import { drawerAppLockFlow, forgetAppLockPin, runAppLockBiometric, submitAppLockForm } from '../features/app-lock';
 import { logoutApp } from '../features/auth';
 import { retrySessionVerification } from '../features/session';
@@ -77,6 +77,7 @@ export const ACTION_REGISTRY: Record<string, (...args: any[]) => any> = Object.f
     closeZtoSyncModal,
     confirmLocationChange,
     confirmLogout,
+    promptLogout,
     confirmPhone,
     confirmScannedRemoval,
     connectPendingSetupLink,

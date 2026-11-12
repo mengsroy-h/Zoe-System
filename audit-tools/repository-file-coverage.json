@@ -5132,6 +5132,9 @@
     "ZoeW/tests/license-seat-client.test.ts": {
       "policy": "license-seat-protocol"
     },
+    "ZoeW/tests/enrollment-entry-controls.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/license-seat-enrollment.test.ts": {
       "policy": "license-seat-protocol"
     },

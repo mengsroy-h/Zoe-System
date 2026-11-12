@@ -166,6 +166,7 @@ export function SideDrawer() {
                     <span className="ico">{loggedIn ? '🚪' : '🔑'}</span>
                     <span className="drawer-auth-label">{loggedIn ? 'ចាកចេញ' : 'ចូល'}</span>
                 </button>
+                {loggedIn && v.backendKind === 'firebase' && <button type="button" className="drawer-item" id="drawerSeatEnrollment" onClick={onAct('openSeatEnrollment')}>🔐 ចុះឈ្មោះឧបករណ៍</button>}
                 <a
                     className="app-version-line"
                     data-app-version=""
@@ -175,7 +176,6 @@ export function SideDrawer() {
                     aria-label="បើកសៀវភៅណែនាំ ZoeW"
                 >{versionLabel}</a>
                 <DeviceInfoLine id="drawerDeviceInfo" />
-                {loggedIn && v.backendKind === 'firebase' && <button type="button" className="drawer-item" id="drawerSeatEnrollment" onClick={onAct('openSeatEnrollment')}>🔐 ចុះឈ្មោះឧបករណ៍</button>}
                 <div className="app-copyright-line">រក្សាសិទ្ធិគ្រប់យ៉ាង © 2026 ហ៊ុន ម៉េង ស្រូយ (MENGSROY HEN)</div>
                 <div className="app-copyright-line app-copyright-en">Copyright © 2026 MENGSROY HEN. All rights reserved.</div>
             </div>

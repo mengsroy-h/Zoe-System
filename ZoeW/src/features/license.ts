@@ -27,8 +27,8 @@ export function licenseFailureMessage(reason) {
         case 'not-found': return 'Key នេះមិនមានក្នុងប្រព័ន្ធទេ!';
         case 'seat-taken': return 'Key នេះប្រើគ្រប់ចំនួនឧបករណ៍ដែលអនុញ្ញាតហើយ! សូមទាក់ទងអ្នកលក់ ដើម្បីបន្ថែមចំនួនឧបករណ៍ ឬដោះឧបករណ៍ចាស់ចេញ។';
         case 'seat-released': return 'ឧបករណ៍នេះត្រូវបានដោះចេញពី Key ដោយអ្នកលក់! សូមទាក់ទងអ្នកលក់ ប្រសិនបើត្រូវប្រើឧបករណ៍នេះតទៅ។';
-        case 'device-unverified': return 'សម្គាល់ឧបករណ៍នេះមិនបានទេ! សូមបើក Storage (Cookie) របស់ Browser រួចសាកម្តងទៀត។';
-        case 'seat-unavailable': return 'ប្រព័ន្ធអាជ្ញាប័ណ្ណមិនទាន់រៀបចំរួចទេ! សូមប្រាប់អ្នកលក់ឲ្យ Publish Firebase Rules ថ្មី។';
+        case 'device-unverified': return 'ផ្ទៀងផ្ទាត់កូនសោឧបករណ៍មិនបានទេ! សូមអនុញ្ញាត Storage របស់ Browser ហើយប្រើ «ចុះឈ្មោះឧបករណ៍» ដើម្បីផ្ទៀងផ្ទាត់ជាមួយអ្នកលក់។ កុំលុបទិន្នន័យ App។';
+        case 'seat-unavailable': return 'ប្រព័ន្ធអាជ្ញាប័ណ្ណមិនទាន់រៀបចំរួចទេ! សូមទាក់ទងអ្នកលក់ឱ្យពិនិត្យ Server, Public Key និង Firebase Rules។';
         case 'signature': return 'Key មិនត្រឹមត្រូវទេ (Signature Invalid)!';
         case 'network':
         case 'not-configured':
@@ -55,6 +55,8 @@ export async function ensureAppActivated() {
         closeModal('activationModal');
         return true;
     }
+    clearSeatEnrollment();
+    viewState.seatEnrollmentOnly = false;
     viewState.activationMessage = (status.state === 'offline-grace-exceeded' && !status.reason)
         ? 'Key នេះនៅមានសុពលភាព ប៉ុន្តែត្រូវការភ្ជាប់អ៊ីនធឺណិតម្តងទៀត ដើម្បីផ្ទៀងផ្ទាត់។'
         : (status.reason ? licenseFailureMessage(status.reason) : 'សូមបញ្ចូល Activation Key សម្រាប់ ZoeW ដើម្បីបន្ត។');
@@ -92,8 +94,72 @@ export function runPeriodicLicenseCheck() {
     });
 }
 
+let seatEnrollmentOperation = null;
+
+export function clearSeatEnrollment() {
+    seatEnrollmentOperation = null;
+    viewState.seatEnrollmentBusy = false;
+    viewState.seatEnrollmentJson = '';
+    viewState.seatEnrollmentFingerprint = '';
+    viewState.seatEnrollmentMessage = '';
+}
+
+export function openSeatEnrollment() {
+    if (viewState.backendKind !== 'firebase' || !firebaseState.auth?.currentUser || !firebaseState.isDatabaseInitialized || openModalIds().includes('activationModal')) return;
+    clearSeatEnrollment();
+    viewState.seatEnrollmentOnly = true;
+    viewState.activationMessage = 'រៀបចំសំណើចុះឈ្មោះឧបករណ៍ រួចផ្ញើឱ្យអ្នកលក់ផ្ទៀងផ្ទាត់។';
+    uiState.drawerOpen = false;
+    setFieldValue('activationKeyInput', '');
+    openModalHelper('activationModal');
+}
+
+export function closeSeatEnrollment() {
+    if (!viewState.seatEnrollmentOnly) return;
+    clearSeatEnrollment();
+    viewState.seatEnrollmentOnly = false;
+    closeModal('activationModal');
+}
+
+export async function prepareSeatEnrollment() {
+    if (viewState.backendKind !== 'firebase' || !firebaseState.auth?.currentUser || viewState.activationBusy) return;
+    if (seatEnrollmentOperation?.isCurrent()) return;
+    clearSeatEnrollment();
+    const sessionIsCurrent = captureAuthDatabaseGuard();
+    const input = fieldValue('activationKeyInput').trim();
+    const selectedKey = () => input || (typeof ZoeLicense?.activationKeyString === 'function' ? ZoeLicense.activationKeyString(LICENSE_APP_CODE) : '');
+    const keyString = selectedKey();
+    if (!keyString) { viewState.seatEnrollmentMessage = 'សូមបញ្ចូល Activation Key មុនចុះឈ្មោះឧបករណ៍។'; return; }
+    const operation = { isCurrent: () => sessionIsCurrent() && fieldValue('activationKeyInput').trim() === input && selectedKey() === keyString };
+    seatEnrollmentOperation = operation;
+    viewState.seatEnrollmentBusy = true;
+    const current = () => seatEnrollmentOperation === operation && operation.isCurrent();
+    try {
+        if (typeof ZoeLicense?.createSeatEnrollment !== 'function') throw new Error('enrollment-unavailable');
+        const result = await withTimeout(ZoeLicense.createSeatEnrollment(keyString, LICENSE_APP_CODE), 20000, 'Enrollment timed out');
+        if (!current()) return;
+        if (!result?.valid) {
+            viewState.seatEnrollmentMessage = 'រៀបចំសំណើមិនបានទេ។ សូមផ្ទៀងផ្ទាត់ Key និង Storage រួចទាក់ទងអ្នកលក់។ បើកូនសោឧបករណ៍បាត់ ឬខូច ត្រូវឱ្យអ្នកលក់ដោះកៅអីចាស់ និងចុះឈ្មោះឡើងវិញ។';
+            return;
+        }
+        const enrollment = result.enrollment;
+        if (!enrollment || typeof enrollment.payload !== 'string' || typeof enrollment.signature !== 'string' || !/^[a-f0-9]{64}$/.test(enrollment.fingerprint)) throw new Error('enrollment-invalid');
+        viewState.seatEnrollmentJson = JSON.stringify({ payload: enrollment.payload, signature: enrollment.signature, fingerprint: enrollment.fingerprint });
+        viewState.seatEnrollmentFingerprint = enrollment.fingerprint;
+        viewState.seatEnrollmentMessage = 'ផ្ញើសំណើខាងក្រោមឱ្យអ្នកលក់ ហើយប្រៀបធៀប fingerprint តាមទំនាក់ទំនងដែលអ្នកស្គាល់។ សំណើនេះមិនទាន់ផ្ដល់សិទ្ធិប្រើប្រាស់ទេ។';
+    } catch (e) {
+        if (!current()) return;
+        viewState.seatEnrollmentMessage = 'រៀបចំសំណើមិនបានទេ។ សូមពិនិត្យ Storage ហើយទាក់ទងអ្នកលក់។ កុំលុបទិន្នន័យ App ឬប្រើលេខសម្គាល់សាធារណៈដើម្បីសង្គ្រោះកូនសោ។';
+    } finally {
+        if (seatEnrollmentOperation === operation) {
+            if (operation.isCurrent()) viewState.seatEnrollmentBusy = false;
+            seatEnrollmentOperation = null;
+        }
+    }
+}
+
 export async function submitActivationKey() {
-    if (viewState.activationBusy) return;
+    if (viewState.activationBusy || viewState.seatEnrollmentBusy) return;
     const sessionIsCurrent = captureAuthDatabaseGuard();
     viewState.activationBusy = true;
     try {

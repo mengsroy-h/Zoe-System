@@ -821,6 +821,15 @@
       ],
       "evidence": "Vitest រត់ account session លើ PostgreSQL ពិត និង Netlify mocks៖ session UUID ម្ចាស់ សុពលភាព ការដកសិទ្ធិ និងសាលក្រមថ្មី។",
       "limitation": "PostgREST និងសេវា Netlify ពិតមិនបានប្រើ; hosted rollout ត្រូវផ្ទៀងដាច់ដោយឡែក។"
+    },
+    "license-seat-protocol": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/zoew-suite-test.js",
+        "audit-tools/emu/license-seat-rules-test.js"
+      ],
+      "evidence": "រត់ protocol និង verifier ពិតជាមួយសោសាក; ផ្ទៀង enrollment, receipt, cutover, owner races និង rules។",
+      "limitation": "មិនបញ្ជាក់ production key provisioning, device fleet ឬការផ្ទេរ client ចាស់; rules ត្រូវការរត់ emulator ពិត។"
     }
   },
   "files": {
@@ -5107,6 +5116,30 @@
     },
     "supabase/migrations/20261112054956_zoe_account_active_session.sql": {
       "policy": "supabase-account-session"
+    },
+    "ZoeKeyGen/license-seat-client.js": {
+      "policy": "license-seat-protocol"
+    },
+    "ZoeKeyGen/license-seat-config.js": {
+      "policy": "license-seat-protocol"
+    },
+    "ZoeW/public/license-seat-client.js": {
+      "policy": "license-seat-protocol"
+    },
+    "ZoeW/public/license-seat-config.js": {
+      "policy": "license-seat-protocol"
+    },
+    "ZoeW/tests/license-seat-client.test.ts": {
+      "policy": "license-seat-protocol"
+    },
+    "ZoeW/tests/license-seat-enrollment.test.ts": {
+      "policy": "license-seat-protocol"
+    },
+    "ZoeW/tests/license-seat-seller.test.ts": {
+      "policy": "license-seat-protocol"
+    },
+    "ZoeW/tests/license-seat-idb.test.ts": {
+      "policy": "license-seat-protocol"
     }
   }
 }

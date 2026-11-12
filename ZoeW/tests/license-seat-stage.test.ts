@@ -1,8 +1,10 @@
 // @vitest-environment node
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
 import { webcrypto } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import licenseSeatStage from '../netlify/functions/license-seat-stage.mjs';
-import { createSeatStageService, handleSeatStageRequest } from '../netlify/lib/license-seat-stage.mjs';
+import { createSeatStageService, handleSeatStageRequest, seatKeyFingerprint } from '../netlify/lib/license-seat-stage.mjs';
 const now = 1800000000000;
 async function keys() {
     const pair = await webcrypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign', 'verify']);
@@ -13,7 +15,7 @@ async function signed(key: webcrypto.CryptoKey, value: any) {
     const signature = Buffer.from(await webcrypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, Buffer.from(payload))).toString('base64url');
     return { payload, signature };
 }
-async function fixture() {
+async function fixture(receipts = false) {
     const seller = await keys(), device = await keys(), impostor = await keys();
     let row: any = null, etag = 0;
     const store = {
@@ -23,12 +25,15 @@ async function fixture() {
             row = structuredClone(value); etag++; return { modified: true };
         }
     };
-    const service = createSeatStageService({ store, publicKeys: [seller.publicKey], now: () => now, enabled: true });
-    const base = { domain: 'zoe-license-seat-stage-v1', app: 'ZOE', keyId: 'SYNTHETICKEY123456789', expiresAt: now + 30000 };
+    const receiptPair = await webcrypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+    const receiptPublicKey = await webcrypto.subtle.exportKey('jwk', receiptPair.publicKey);
+    const receiptPrivateJwk = receipts ? await webcrypto.subtle.exportKey('jwk', receiptPair.privateKey) : null;
+    const service = createSeatStageService({ store, publicKeys: [seller.publicKey], now: () => now, enabled: true, receiptPrivateJwk });
+    const base = { domain: 'zoe-license-seat-stage-v1', audience: 'https://zoew.netlify.app', app: 'ZOE', keyId: 'SYNTHETICKEY123456789', expiresAt: now + 30000 };
     const request = async (who: any, action: string, revision: number, extra = {}) => service.execute(await signed(who.privateKey, { ...base, action, revision, ...extra }));
     const configure = () => request(seller, 'configure', 0, { licenseExpiresAt: now + 86400000, maxDevices: 1, revoked: false });
-    const enroll = () => request(seller, 'enroll', 1, { slot: 'd1', publicKey: device.publicKey, releaseEpoch: 0 });
-    return { service, seller, device, impostor, request, configure, enroll, row: () => row, store, base };
+    const enroll = async () => request(seller, 'enroll', 1, { slot: 'd1', publicKey: device.publicKey, releaseEpoch: 0, enrollment: await signed(device.privateKey, { domain: 'zoe-license-enrollment-v1', audience: 'https://zoew.netlify.app', app: base.app, keyId: base.keyId, publicKey: device.publicKey, nonce: '0123456789abcdef0123456789abcdef' }) });
+    return { service, seller, device, impostor, request, configure, enroll, row: () => row, store, base, receiptPublicKey };
 }
 describe('ការចុះឈ្មោះ License ជាដំណាក់កាល', () => {
     it('បិទតាមលំនាំដើម ដោយមិនអានឬសរសេរទិន្នន័យ', async () => {
@@ -115,5 +120,94 @@ describe('ការចុះឈ្មោះ License ជាដំណាក់ក�
             await vi.advanceTimersByTimeAsync(5000);
             expect((await pending).status).toBe(400);
         } finally { vi.useRealTimers(); }
+    });
+});
+
+describe('ការផ្ទេរ License ទៅសិទ្ធិថ្មី', () => {
+    it('មិនអនុញ្ញាត cutover បើគ្មានកូនសោ receipt និងឧបករណ៍គ្រប់ចំនួន', async () => {
+        const f = await fixture(); await f.configure(); await f.enroll();
+        expect((await f.request(f.seller, 'cutover', 2, { expectedDevices: 1, receiptKeyFingerprint: '0'.repeat(64) })).status).toBe(503);
+        expect(f.row().mode).toBe('staged');
+    });
+    it('ការចុះឈ្មោះត្រូវមានភស្តុតាង private key និងមិនទទួល public key តែឯង', async () => {
+        const f = await fixture(); await f.configure();
+        expect((await f.request(f.seller, 'enroll', 1, { slot: 'd1', releaseEpoch: 0, publicKey: f.device.publicKey })).status).toBe(400);
+        expect(f.row().seats).toEqual({});
+    });
+});
+
+async function activeFixture() {
+    const f = await fixture(true); await f.configure(); await f.enroll();
+    expect((await f.request(f.seller, 'cutover', 2, { expectedDevices: 1, receiptKeyFingerprint: seatKeyFingerprint(f.receiptPublicKey) })).status).toBe(200);
+    return f;
+}
+describe('អាជ្ញាប័ណ្ណថ្មីផ្ទៀងផ្ទាត់ពីចុងដល់ចុង', () => {
+    it('ចេញ signed receipt តែក្រោយ cutover និងបដិសេធ signer ខុស/ចំនួនឧបករណ៍ខុស', async () => {
+        const f = await fixture(true); await f.configure(); await f.enroll();
+        expect((await f.request(f.seller, 'cutover', 2, { expectedDevices: 2, receiptKeyFingerprint: seatKeyFingerprint(f.receiptPublicKey) })).status).toBe(409);
+        expect((await f.request(f.seller, 'cutover', 2, { expectedDevices: 1, receiptKeyFingerprint: 'a'.repeat(64) })).status).toBe(409);
+        expect((await f.request(f.device, 'prove', 2, { slot: 'd1', releaseEpoch: 0 })).body).not.toHaveProperty('receipt');
+        await f.request(f.seller, 'cutover', 3, { expectedDevices: 1, receiptKeyFingerprint: seatKeyFingerprint(f.receiptPublicKey) });
+        const proof = await f.request(f.device, 'prove', 4, { slot: 'd1', releaseEpoch: 0 });
+        expect(proof.body).toMatchObject({ grantsLicense: true, staged: false });
+        const payload = JSON.parse(Buffer.from(proof.body.receipt.payload, 'base64url').toString());
+        expect(payload).toMatchObject({ domain: 'zoe-license-seat-receipt-v1', fingerprint: seatKeyFingerprint(f.device.publicKey), releaseEpoch: 0 });
+        const pub = await webcrypto.subtle.importKey('jwk', f.receiptPublicKey, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
+        expect(await webcrypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, pub, Buffer.from(proof.body.receipt.signature, 'base64url'), Buffer.from(proof.body.receipt.payload))).toBe(true);
+        expect((await f.request(f.device, 'prove', 4, { slot: 'd1', releaseEpoch: 0 })).status).toBe(409);
+    });
+    it('verifier ពិតបដិសេធចម្លង ID/receipt ហើយទុក offline grace តែជាមួយ private key ត្រឹមត្រូវ', async () => {
+        const f = await activeFixture();
+        const licenseEnvelope = await signed(f.seller.privateKey, { a: 'ZOE', id: f.base.keyId, iat: Math.floor(now / 1000), exp: Math.floor((now + 86400000) / 1000) });
+        const licenseKey = 'ZOEKEY-' + licenseEnvelope.payload + '.' + licenseEnvelope.signature;
+        let offline = false, legacySeatRequests = 0;
+        const makeClient = (who: any, copied?: Map<string, string>, legacyPolicy: any = true) => {
+            const store = new Map(copied || [['zoe_license_device_id', 'PUBLICCOPIEDID1234567890']]);
+            const ctx: any = { Date, performance, setTimeout, clearTimeout, AbortController, TextEncoder, TextDecoder, Uint8Array, crypto: webcrypto,
+                navigator: { onLine: true },
+                atob: (s: string) => Buffer.from(s, 'base64').toString('binary'), btoa: (s: string) => Buffer.from(s, 'binary').toString('base64'),
+                localStorage: { getItem: (k: string) => store.get(k) || null, setItem: (k: string, v: string) => store.set(k, v), removeItem: (k: string) => store.delete(k) },
+                fetch: async (url: string, init: any) => {
+                    if (offline) throw Error('offline');
+                    if (url.includes('/license_seats/')) { legacySeatRequests++; throw Error('legacy forbidden'); }
+                    if (url.includes('/license_keys/')) return { ok: true, status: 200, headers: { get: () => null }, json: async () => ({ seatProtocol: 2, expiresAt: now - 1, revoked: true }) };
+                    const reply = await f.service.execute(JSON.parse(init.body));
+                    return { ok: reply.status === 200, status: reply.status, headers: { get: () => null }, json: async () => reply.body };
+                }
+            };
+            ctx.window = ctx;
+            vm.runInNewContext(readFileSync('public/license-seat-client.js', 'utf8'), ctx);
+            ctx.ZoeSeatClient.loadIdentity = async () => who;
+            ctx.ZoeSeatClient.signCommand = async (_app: string, _id: string, command: any) => signed(who.privateKey, command);
+            ctx.ZoeSeatConfig = { audience: 'https://zoew.netlify.app', legacyProtocolEnabled: legacyPolicy, receiptPublicKeys: [f.receiptPublicKey] };
+            if (legacyPolicy === 'missing') delete ctx.ZoeSeatConfig;
+            if (legacyPolicy === 'inherited') { delete ctx.ZoeSeatConfig.legacyProtocolEnabled; Object.setPrototypeOf(ctx.ZoeSeatConfig, { legacyProtocolEnabled: true }); }
+            const source = readFileSync('public/license-verify.js', 'utf8').replace(/const PUBLIC_KEYS_JWK = \[[\s\S]*?\];/, 'const PUBLIC_KEYS_JWK = [' + JSON.stringify(f.seller.publicKey) + '];');
+            vm.runInNewContext(source, ctx); ctx.ZoeLicense.setServerTimeOffset(now - Date.now() + 10);
+            return { api: ctx.ZoeLicense, store, ctx };
+        };
+        const owner = makeClient(f.device);
+        expect((await owner.api.activate(licenseKey, 'ZOE')).valid).toBe(true);
+        expect((await makeClient(f.impostor).api.activate(licenseKey, 'ZOE')).valid).toBe(false);
+        offline = true;
+        expect((await owner.api.getStatus('ZOE')).state).toBe('active');
+        expect((await makeClient(f.impostor, owner.store).api.getStatus('ZOE')).state).not.toBe('active');
+        const missingPins = makeClient(f.device, owner.store); missingPins.ctx.ZoeSeatConfig.receiptPublicKeys = [];
+        expect((await missingPins.api.getStatus('ZOE')).state).not.toBe('active');
+        const delayed = makeClient(f.device, owner.store);
+        delayed.ctx.ZoeSeatClient.loadIdentity = async () => { delayed.api.setServerTimeOffset(now + 2 * 86400000 - Date.now()); return f.device; };
+        expect((await delayed.api.getStatus('ZOE')).state).not.toBe('active');
+        const strippedStore = new Map(owner.store);
+        const recordKey = 'zoe_license_activation_ZOE';
+        const stripped = JSON.parse(strippedStore.get(recordKey)!); delete stripped.seatProtocol; delete stripped.seatReceipt;
+        strippedStore.set(recordKey, JSON.stringify(stripped));
+        expect((await makeClient(f.impostor, strippedStore, true).api.getStatus('ZOE')).state).toBe('active');
+        for (const policy of [false, 'missing', 'inherited', 'true', 1, null]) {
+            expect((await makeClient(f.impostor, strippedStore, policy).api.getStatus('ZOE')).state).not.toBe('active');
+        }
+        expect(legacySeatRequests).toBe(0);
+        offline = false;
+        await f.request(f.seller, 'release', f.row().revision);
+        expect((await owner.api.getStatus('ZOE')).state).toBe('required');
     });
 });

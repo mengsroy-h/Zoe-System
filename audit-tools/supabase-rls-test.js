@@ -231,7 +231,7 @@ for (const f of ['00-initial-schema.sql', '01-auth-schema.sql', '02-auth-functio
 }
 
 const { createPgHarness } = require('./supabase-pg.js');
-const H = createPgHarness({ depsDirs: DEPS_DIRS, shimDir: SHIM_DIR, wantMajor });
+const H = createPgHarness({ depsDirs: DEPS_DIRS, shimDir: SHIM_DIR, wantMajor, unixSockets: process.env.SUPABASE_PG_TCP_ONLY !== '1' });
 const { connect, freshDb, as, makeAuthUser, denied, raised } = H;
 
 if (fail > 0) {
@@ -637,6 +637,14 @@ async function body(c, rec, extra, mode) {
     rec('finish_registration ៖ owner + កូដ member របស់ហាងដដែល ➜ username-taken (⛔ មិនប្តូរ role) · កូដមិនស៊ី',
         raised(crossRole, 'username-taken') && (await usedOf(hAMember)) === 0, crossRole);
 
+    const accountAs = async (who, query) => {
+        const sid = (await one('insert into auth.sessions (id, user_id, created_at) values (gen_random_uuid(), $1, now()) returning id', [who.sub]))[0].id;
+        try {
+            return await as(c, { ...who, extra: { ...who.extra, session_id: sid } }, query);
+        } finally {
+            await one('delete from auth.sessions where id = $1', [sid]);
+        }
+    };
     const WA = { role: 'authenticated', sub: uA1 };
     const WB = { role: 'authenticated', sub: uB1 };
     const seeTenants = async (who) => ((await as(c, who, 'select id from public.tenants order by id')).rows || []).map((r) => r.id);
@@ -647,20 +655,22 @@ async function body(c, rec, extra, mode) {
     rec('សមាជិក A មិនឃើញកូដអញ្ជើញ', ((await as(c, WA, 'select 1 from public.tenant_invites')).rows || [1]).length === 0);
     rec('សមាជិក A មិនឃើញកូដកំណត់ពាក្យសម្ងាត់', ((await as(c, WA, 'select 1 from public.member_reset_codes')).rows || [1]).length === 0);
     rec('សមាជិក A មិនឃើញបញ្ជី admin', ((await as(c, WA, 'select 1 from public.platform_admins')).rows || [1]).length === 0);
-    const accA = (await as(c, WA, 'select * from public.my_account()')).rows || [];
+    const accountWithoutSession = await as(c, WA, 'select * from public.my_account()');
+    rec('my_account គ្មាន session_id ➜ PT401 មិនឆ្លើយគណនី', raised(accountWithoutSession, 'session-revoked') && accountWithoutSession.error.code === 'PT401');
+    const accA = (await accountAs(WA, 'select * from public.my_account()')).rows || [];
     rec('my_account() ៖ A · សាខា 881859 · active', accA.length === 1 && accA[0].tenant_id === A && accA[0].branch_code === '881859'
         && accA[0].status === 'active' && accA[0].username === 'sokha', accA);
     rec('anon ៖ អានតារាង ➜ permission denied', denied(await as(c, ANON, 'select * from public.tenants')));
     rec('anon ៖ my_account() ➜ permission denied', denied(await as(c, ANON, 'select * from public.my_account()')));
     rec('អ្នកគ្មានសមាជិកភាព ៖ ឃើញ tenant ០ · my_account ទទេ', (await seeTenants(PLAIN)).length === 0
-        && ((await as(c, PLAIN, 'select * from public.my_account()')).rows || [1]).length === 0);
+        && ((await accountAs(PLAIN, 'select * from public.my_account()')).rows || [1]).length === 0);
 
     const FORGED = { role: 'authenticated', sub: uA1, extra: {
         app_metadata: { tenant_id: B, branch_code: '770001', role: 'owner' },
         user_metadata: { tenant_id: B, branch_code: '770001' }, tenant_id: B, branch_code: '770001', is_admin: true } };
     rec('claim ក្លែង (app/user_metadata · tenant_id · branch_code របស់ B) ➜ នៅឃើញតែ A',
         JSON.stringify(await seeTenants(FORGED)) === JSON.stringify([A]));
-    const accForged = (await as(c, FORGED, 'select branch_code from public.my_account()')).rows || [];
+    const accForged = (await accountAs(FORGED, 'select branch_code from public.my_account()')).rows || [];
     rec('claim ក្លែង ➜ my_account() នៅរាយសាខា A', accForged.length === 1 && accForged[0].branch_code === '881859', accForged);
     rec('claim role=service_role ក្នុង JWT តែ DB role authenticated ➜ finish_registration នៅបដិសេធ',
         denied(await finishReg({ role: 'authenticated', sub: uA1, extra: { role: 'service_role' } }, uA1, h1, 'sokha')));
@@ -744,14 +754,14 @@ async function body(c, rec, extra, mode) {
 
     await as(c, ADMIN, 'select * from public.admin_update_tenant($1, null, null, null, true)', [A]);
     rec('Revoke A ➜ សមាជិក A ឃើញ tenant ០ ភ្លាម (មិនរង់ចាំ JWT ផុត)', (await seeTenants(WA)).length === 0);
-    rec('Revoke A ➜ my_account().status = revoked', ((await as(c, WA, 'select status from public.my_account()')).rows || [{}])[0].status === 'revoked');
+    rec('Revoke A ➜ my_account().status = revoked', ((await accountAs(WA, 'select status from public.my_account()')).rows || [{}])[0].status === 'revoked');
     rec('Revoke A ➜ ចេញកូដអញ្ជើញមិនបាន (tenant-inactive)', raised(await issue(ADMIN, A, 'member', 1, 24), 'tenant-inactive'));
     rec('Revoke A ➜ B មិនប៉ះ', JSON.stringify(await seeTenants(WB)) === JSON.stringify([B]));
     await as(c, ADMIN, 'select * from public.admin_update_tenant($1, null, null, null, false)', [A]);
     rec('បើកវិញ ➜ សមាជិក A ឃើញ A វិញ', JSON.stringify(await seeTenants(WA)) === JSON.stringify([A]));
     await c.query("update public.tenants set expires_at = now() - interval '1 second' where id = $1", [A]);
     rec('ផុតកំណត់ ➜ សមាជិក A ឃើញ tenant ០', (await seeTenants(WA)).length === 0);
-    rec('ផុតកំណត់ ➜ my_account().status = expired', ((await as(c, WA, 'select status from public.my_account()')).rows || [{}])[0].status === 'expired');
+    rec('ផុតកំណត់ ➜ my_account().status = expired', ((await accountAs(WA, 'select status from public.my_account()')).rows || [{}])[0].status === 'expired');
     const invExp = await as(c, ADMIN, "select * from public.admin_issue_invite($1, 'member', 1, 24)", [A]);
     rec('ផុតកំណត់ ➜ ចេញកូដអញ្ជើញមិនបាន', raised(invExp, 'tenant-inactive'));
     const extend = await as(c, ADMIN, 'select * from public.admin_update_tenant($1, null, null, $2, null)', [A, future]);
@@ -1064,7 +1074,19 @@ const MUTATIONS = [
     ['F03 purge RPC អាចហៅដោយ anon', PURGE_EXEC_GRANT, PURGE_EXEC_GRANT.replace('to authenticated;', 'to authenticated, anon;')],
     ['F03 implementation helper អាចហៅដោយ authenticated', PURGE_EXEC_GRANT,
         PURGE_EXEC_GRANT + '\ngrant execute on function private.zoe_purge_source_v1(uuid, jsonb) to authenticated;'],
-    ['Platform Admin ទទួល session របស់ UID ផ្សេង', 'where s.id = v_sid::uuid and s.user_id = v_uid', 'where s.id = v_sid::uuid'],
+    ['Platform Admin ទទួល session របស់ UID ផ្សេង', `where s.id = v_sid::uuid and s.user_id = v_uid
+            and ((to_jsonb(s) ->> 'not_after') is null
+                or (to_jsonb(s) ->> 'not_after')::timestamptz > statement_timestamp())
+    ) then
+        raise exception 'session-revoked' using errcode = 'PT401';
+    end if;
+    return true;`, `where s.id = v_sid::uuid
+            and ((to_jsonb(s) ->> 'not_after') is null
+                or (to_jsonb(s) ->> 'not_after')::timestamptz > statement_timestamp())
+    ) then
+        raise exception 'session-revoked' using errcode = 'PT401';
+    end if;
+    return true;`],
     ['zoe_write_v2 អាចហៅដោយ anon', 'grant execute on function private.zoe_write_v2(uuid, text, jsonb), public.zoe_write_v2(uuid, text, jsonb)\n    to authenticated;',
         'grant execute on function private.zoe_write_v2(uuid, text, jsonb), public.zoe_write_v2(uuid, text, jsonb)\n    to authenticated, anon;'],
     ['public.zoe_write_v2 ជា SECURITY DEFINER', "language sql volatile security invoker set search_path = ''\nas $$\n    select private.zoe_write_v2(",
@@ -1127,7 +1149,7 @@ const MUTATIONS = [
         "    if not private.is_platform_admin() then\n        raise exception 'forbidden' using errcode = '42501';\n    end if;\n    if p_role is null",
         '    if p_role is null'],
     ['admin_issue_invite ចេញកូដលើ tenant អសកម្ម', 'where t.id = p_tenant_id and private.tenant_row_active(t)', 'where t.id = p_tenant_id'],
-    ['my_account បាត់ search_path', "    status text\n)\nlanguage sql stable security definer set search_path = ''", '    status text\n)\nlanguage sql stable security definer'],
+    ['my_account បាត់ search_path', "    status text\n)\nlanguage plpgsql stable security definer set search_path = ''", '    status text\n)\nlanguage plpgsql stable security definer'],
     ['new_invite_code ប្រើ byte ថេរ (version របស់ uuid)', 'array[0, 1, 2, 3, 4, 5, 7, 8,', 'array[0, 1, 2, 3, 4, 5, 6, 8,'],
     ['new_invite_code ប្រើតែ ៤ bit', '(get_byte(raw, positions[i]) & 31)', '(get_byte(raw, positions[i]) & 15)'],
     ['username លែង unique', "    username text not null unique check (username ~", "    username text not null check (username ~"],

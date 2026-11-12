@@ -37,7 +37,7 @@ export function SideDrawer() {
     const open = useStoreValue(uiState, (s) => s.drawerOpen);
     const loggedIn = useStoreValue(firebaseState, (s) => s.authButtonIsLoggedIn);
     const versionLabel = useStoreValue(viewState, (s) => s.appVersionLabel);
-    const v = useStoreFields(viewState, ['ztoAutoCloseOn', 'ztoAutoCloseVisible', 'ztoAutoCloseText', 'ztoListSyncOn',
+    const v = useStoreFields(viewState, ['backendKind', 'ztoAutoCloseOn', 'ztoAutoCloseVisible', 'ztoAutoCloseText', 'ztoListSyncOn',
         'ztoListSyncDrawerVisible', 'ztoListSyncText', 'appLockToggleOn', 'appLockToggleText', 'biometricToggleOn',
         'biometricUnsupported', 'biometricToggleText', 'connectionPhase', 'scanEvidenceRetained', 'priceOperationsStuck']);
     return (
@@ -175,6 +175,7 @@ export function SideDrawer() {
                     aria-label="បើកសៀវភៅណែនាំ ZoeW"
                 >{versionLabel}</a>
                 <DeviceInfoLine id="drawerDeviceInfo" />
+                {loggedIn && v.backendKind === 'firebase' && <button type="button" className="drawer-item" id="drawerSeatEnrollment" onClick={onAct('openSeatEnrollment')}>🔐 ចុះឈ្មោះឧបករណ៍</button>}
                 <div className="app-copyright-line">រក្សាសិទ្ធិគ្រប់យ៉ាង © 2026 ហ៊ុន ម៉េង ស្រូយ (MENGSROY HEN)</div>
                 <div className="app-copyright-line app-copyright-en">Copyright © 2026 MENGSROY HEN. All rights reserved.</div>
             </div>

@@ -597,6 +597,22 @@ async function testSeatClockFixture() {
         }
     }
 
+    const MIGRATED_KEY = 'MIGRATEDKEY1234567890';
+    await owner('PUT', keyPath(MIGRATED_KEY), { expiresAt: 4102444800000, revoked: false, maxDevices: 1 });
+    await owner('PUT', seatPath(MIGRATED_KEY, SLOTS[0]), { device: DEV_A, at: Date.now() });
+    check(allowed(await anon('GET', seatPath(MIGRATED_KEY))), 'Legacy មុន cutover នៅអានកៅអីបាន');
+    const markerPath = keyPath(MIGRATED_KEY).replace('.json', '/seatProtocol.json');
+    check(denied(await anon('PUT', markerPath, 2)), 'អ្នកប្រើមិនអាចកំណត់ marker ដោយខ្លួនឯង');
+    check(denied(await asUser('PUT', markerPath, 1, ADMIN)), 'marker ទទួលតែ protocol 2');
+    check(allowed(await asUser('PUT', markerPath, 2, ADMIN)), 'អ្នកលក់អាចបញ្ជាក់ cutover ដោយរក្សា config');
+    check(allowed(await anon('GET', keyPath(MIGRATED_KEY))), 'marker discovery នៅអានបាន');
+    check(denied(await anon('GET', seatPath(MIGRATED_KEY))), 'កៅអី legacy មិនបង្ហាញ device ID ក្រោយ cutover');
+    check(denied(await anon('PUT', seatPath(MIGRATED_KEY, SLOTS[0]), { device: DEV_A, at: Date.now() })), 'ចម្លង device ID មិនអាចកក់ legacy seat ក្រោយ cutover');
+    for (const [field, value] of [['expiresAt', 4202444800000], ['revoked', true], ['maxDevices', 2], ['releasedAt', Date.now()], ['seatProtocol', null]]) {
+        check(denied(await asUser('PUT', keyPath(MIGRATED_KEY).replace('.json', '/' + field + '.json'), value, ADMIN)), 'អ្នកលក់ចាស់មិនអាចប្ដូរ authority ដែលបានផ្ទេរ៖ ' + field);
+    }
+    check(denied(await asUser('DELETE', keyPath(MIGRATED_KEY), null, ADMIN)), 'មិនអាចលុប marker ដើម្បីបើក legacy វិញ');
+
     console.log('\n' + pass + ' ok, ' + fail + ' FAIL');
     process.exitCode = fail === 0 ? 0 : 1;
 })();

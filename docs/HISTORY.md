@@ -42,8 +42,8 @@
 
 ## 📌 ការងារដែលនៅសល់ — ការផ្ទៀងផ្ទាត់ដោយអ្នកប្រើ
 - 🔍 **Audit 2026-11-12 មិនទាន់ចេញផ្សាយ**៖ កែ session modal, សោ price operation, `my_account` និង Netlify session authorization, parser Google Sheets។ ត្រូវអនុវត្ត migration `20261112054956_zoe_account_active_session.sql` និង deploy functions/App ក្រោយការផ្ទៀងពេញលេញ; Apps Script reader ត្រូវ copy និង Deploy ជាកំណែថ្មី។ គ្មានការប្ដូរផលិតកម្មក្នុង session នេះ។
-- 🔍 **ZTO lock និង browser**៖ guard PostgreSQL ថ្មីរត់បានតាម TCP; Chromium/PG Unix socket ត្រូវបរិស្ថានបដិសេធ។ `zto-lock.test.ts` នៅរក្សា hash ដើមដោយចេតនា រហូត guard ZTO ទាំងអស់ឆ្លងលើបរិស្ថានដែលអាចរត់បាន។ មិនទាន់អះអាង release-ready។
-- 🔍 **License seat ជាដំណាក់កាល**៖ ម្ចាស់គម្រោងយល់ព្រមការចុះឈ្មោះឧបករណ៍ឡើងវិញ។ Endpoint សាកថ្មីបិទជាលំនាំដើម ហើយ `grantsLicense:false` ជានិច្ច។ ត្រូវបំពេញ client/admin enrollment, ការផ្ទេរសិទ្ធិអាជ្ញាប័ណ្ណ និង rules cutover; legacy device-ID bypass នៅមិនទាន់បិទ។ APK release មិនរង់ចាំ Audit ជាការទទួលយកថ្មីរបស់ម្ចាស់គម្រោង ដូច្នេះ workflow មិនប្រែ។
+- 🔍 **ការផ្ទៀង commit ចុងក្រោយ**៖ ZTO guards និង native/browser លើ commit ដំបូងឆ្លងក្នុង CI ហើយ hash lock បានធ្វើបច្ចុប្បន្នភាពតាមភស្តុតាង។ ការកែ license និង fixtures បន្ទាប់ត្រូវការ strict CI ថ្មីលើ exact head មុនអះអាង release-ready។
+- 🔍 **License rollout**៖ enrollment, signed receipt និង cutover code រៀបចំរួចក្នុង PR; defaults មិនបើក production។ ត្រូវ provision receipt key/public pins, Publish License rules, ផ្ទេរគ្រប់ Key/ឧបករណ៍ ហើយចូលនិវត្តន៍ legacy ដោយ `legacyProtocolEnabled:false` មុនចាត់ទុក offline bypass បានបិទ។ APK gate ទុកដដែលតាមម្ចាស់គម្រោង។
 - 🔍 **Clock/ឧបករណ៍ពិត**៖ ផ្ទៀង history loading ក្រោយ session verification លើ iPhone/Android មុន merge។ Exact-SHA strict CI ជាភស្តុតាងក្នុងវិសាលភាព checker របស់វា; លទ្ធផលចាស់រក្សាក្នុងផ្នែកប្រវត្តិ។
 - 🔍 **Registration rollout**៖ Hosted project ដែលភ្ជាប់មាន migration versions ទាំង៦២ និង protocol 1/accepting/deferred trigger; មិនជំនួស hosted backup/restore ឬការរង់ចាំ handler ចាស់ឱ្យចប់។ មូលហេតុ F03 បរាជ័យដំបូងក្នុង session ចាស់នៅមិនទាន់បញ្ជាក់; dead-code ដែល dynamic references មិនអាចសម្រេចបាននៅរក្សាទុក។
 > ⛔ **ផ្នែកនេះកាន់តែការងារដែលនៅបើក** ៖ ស្ថានភាព git · អ្វីដែលអ្នកប្រើមិនទាន់បញ្ជាក់ · សកម្មភាពដោយដៃដែលមិនទាន់ធ្វើ · ការសម្រេចដែលនៅរស់។
@@ -122,13 +122,13 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.50.195] — 2026-11-12 · ផ្ទៀងវគ្គ និងព្រំដែនប្រតិបត្តិការ
+### [2.50.195] · ZoeKeyGen [2.24.41] — 2026-11-12 · ផ្ទៀងវគ្គ និងព្រំដែនប្រតិបត្តិការ
 
-**ZoeW** (`zoew-v458` ➜ `zoew-v459`)។ **ZoeKeyGen មិនប្រែ**។
+**ZoeW** (`zoew-v458` ➜ `zoew-v459`) និង **ZoeKeyGen** (`zoekeygen-v151` ➜ `zoekeygen-v152`)។
 - ការហៅផ្ទៀងវគ្គម្តងទៀតរក្សាសាលក្រម live តែពេលម្ចាស់វគ្គដដែល និង token/ម៉ោងដែលទុកចិត្តបាននៅមានសុពលភាព; នៅតែផ្ទៀង token ហើយបិទចំពោះ expiry, clock uncertainty ឬវគ្គថ្មី។
 - ការបរាជ័យក្នុង Web Lock របស់ price operation ត្រូវឡើងជាកំហុស មិនហៅប្រតិបត្តិការឡើងវិញក្រៅសោ។
 - Google Sheets reader កំណែ ៣ អាន decimal comma/dot ច្បាស់ ហើយបដិសេធអក្សរខូច/លេខមិនច្បាស់ជា `invalid-money`; Health Check រំពឹងកំណែដូចគ្នា។
-- **សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ ក្រោយផ្ទៀងតេស្តពេញលេញ ត្រូវ deploy App និង Netlify functions, អនុវត្ត migration session ថ្មី និង copy `zto-import/google-sheets-api/Code.gs` ចូល Apps Script រួច Deploy version ថ្មី។ ការងារក្នុង checkout នេះមិនទាន់ push/deploy។ License stage មិនត្រូវបើកជាសិទ្ធិផលិតកម្មទេ។
+- **សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ ក្រោយតេស្តពេញលេញ និងការអនុញ្ញាត deploy ត្រូវអនុវត្ត migration session ថ្មី, deploy App/functions និង copy Google Sheets reader ទៅ Apps Script រួច Deploy version ថ្មី។ License rollout ត្រូវតាមលំដាប់ក្នុង ZoeKeyGen README; កូនសោនិង production config មិនបាន provision ហើយមិនបាន deploy។
 
 ### [2.50.194] · ZoeKeyGen [2.24.40] — 2026-11-10 · ម៉ោងដែលផ្ទៀងបានលើតំណសាក PR
 
@@ -2055,10 +2055,17 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 
 - **សំណើម្ចាស់គម្រោង**៖ កែ findings ដោយប្រុងប្រយ័ត្ន និង modal ផ្ទៀងវគ្គដែលលេចឡើងវិញ ដោយមិនបន្ធូរសុវត្ថិភាព។ ម្ចាស់គម្រោងទទួលយក APK release មិនរង់ចាំ Audit ដូច្នេះបានទុក workflow ដើម។ ការចុះឈ្មោះឧបករណ៍អាជ្ញាប័ណ្ណឡើងវិញត្រូវបានយល់ព្រមជាដំណាក់កាល។
 - **ភស្តុតាងមុន/ក្រោយ**៖ modal និង Web Lock មាន regression ក្រហម ៣ មុនកែ; ក្រុម session/clock/auth/price ២០៤ តេស្តឆ្លងក្រោយកែ។ SQL session មាន ១២ ករណីបរាជ័យលើមុនកែ ហើយ ១៩ ឆ្លងលើ PostgreSQL ពិតក្រោយកែ; Netlify និង pending-read tests ១០៥ ឆ្លង។ Parser reader បរាជ័យលើ `12,50` ➜ `1250` មុនកែ ហើយឆ្លងក្រោយកែ; importer ៣២៦ assertions នៅឆ្លង។ លទ្ធផលទាំងនេះជាតេស្តផ្តោត មិនជំនួស full strict CI ឬ live deployment ទេ។
-- **Session authority**៖ `private.my_account` ទាមទារ session ID ត្រឹមត្រូវ ដែលចងនឹង UID ហើយនៅមិនផុតកំណត់; status ហាងនៅដដែល។ ដក completed Supabase authorization cache ចេញពី ZTO/push និងរក្សាតែ pending read coalescing។ វាត្រូវការ RPC ផ្ទៀងសិទ្ធិថ្មីលើសំណើបន្ទាប់។ កែ ZTO core តាមសំណើ audit-fix ផ្ទាល់; hash lock មិនទាន់ធ្វើបច្ចុប្បន្នភាព ព្រោះ browser guards មិនអាចរត់ក្នុងបរិស្ថាននេះ។
-- **License stage**៖ `license-seat-stage` ប្រើ Netlify Blobs strong read/ETag CAS, seller-signed domain-separated commands, enrolled P-256 device proof, revision/release epoch និងពិដានកៅអី។ បិទជាលំនាំដើម (`ZOE_LICENSE_SEAT_STAGE` មិនបានកំណត់), ចម្លើយទាំងអស់មាន `staged:true, grantsLicense:false`។ ៩ តេស្ត crypto/protocol/atomic race ឆ្លង; legacy verifiers/rules មិនប្រែ។ ការចម្លង public device ID នៅតែជាបញ្ហាលើផ្លូវ legacy រហូត client/admin UX, authoritative migration និង rules cutover បញ្ចប់។
-- **លទ្ធផលចុងក្រោយក្នុង checkout**៖ full Vitest ៩៦៩៤ ឆ្លង, ៥ test failures, ៨៩ skipped; ៤៨២ files ឆ្លង និង ១០ files បរាជ័យ។ ក្នុង ១០ នោះ ៩ ជា browser/PostgreSQL infrastructure និង ១ ជា ZTO hash lock ដែលទុកដើម។ Build/typecheck/ESLint, slot/purity/notice/doc checks, Android static ១៣៥ និង repository coverage ១០ ឆ្លង។ Full strict/browser/SW/native មិនបានបញ្ចប់; មិនមែន release-ready។
-- **ព្រំដែន**៖ គ្មាន secret/សិទ្ធិ server ត្រូវបាន provision, គ្មាន live services, push ឬ deploy។ Chromium ទាំងផ្លូវលំនាំដើម និង browser ដែលដំឡើងស្រាប់ មិនអាចបើកបានដោយ Unix socket restriction ទោះសុំ execution escalation; PostgreSQL guard ថ្មីប្រើ TCP-only ជាជម្រើសច្បាស់លាស់ (default harness មិនប្រែ)។ ត្រូវរត់ generated ZTO guards និង native/browser tests នៅបរិស្ថានសមស្រប មុនផ្លាស់ប្ដូរ LOCK និងចេញផ្សាយ។
+- **Session authority**៖ `private.my_account` ទាមទារ session ID ត្រឹមត្រូវ ដែលចងនឹង UID ហើយនៅមិនផុតកំណត់; status ហាងនៅដដែល។ ដក completed Supabase authorization cache ចេញពី ZTO/push និងរក្សាតែ pending read coalescing។ វាត្រូវការ RPC ផ្ទៀងសិទ្ធិថ្មីលើសំណើបន្ទាប់។ កែ ZTO core តាមសំណើ audit-fix ផ្ទាល់; hash lock ត្រូវបានធ្វើបច្ចុប្បន្នភាពក្រោយ CI ដែលផ្ទៀង bytes ដូចគ្នាឆ្លង។
+- **ជុំដំបូង License stage**៖ `license-seat-stage` ប្រើ Netlify Blobs strong read/ETag CAS, seller-signed domain-separated commands, enrolled P-256 device proof, revision/release epoch និងពិដានកៅអី។ បិទជាលំនាំដើម (`ZOE_LICENSE_SEAT_STAGE` មិនបានកំណត់), ចម្លើយទាំងអស់មាន `staged:true, grantsLicense:false`។ ៩ តេស្ត crypto/protocol/atomic race ឆ្លង; legacy verifiers/rules មិនប្រែ។ ការចម្លង public device ID នៅតែជាបញ្ហាលើផ្លូវ legacy រហូត client/admin UX, authoritative migration និង rules cutover បញ្ចប់។
+- **លទ្ធផល local ជុំដំបូង**៖ full Vitest ៩៦៩៤ ឆ្លង, ៥ test failures, ៨៩ skipped; ៤៨២ files ឆ្លង និង ១០ files បរាជ័យ។ ក្នុង ១០ នោះ ៩ ជា browser/PostgreSQL infrastructure និង ១ ជា ZTO hash lock ដែលទុកដើម។ Build/typecheck/ESLint, slot/purity/notice/doc checks, Android static ១៣៥ និង repository coverage ១០ ឆ្លង។ Full strict/browser/SW/native មិនបានបញ្ចប់; មិនមែន release-ready។
+- **ព្រំដែនប្រតិបត្តិការ**៖ មាន commit/push និង Draft PR តាមសំណើម្ចាស់គម្រោង; គ្មាន merge/deploy ឬ production secret provisioning។ Chromium local ជាប់ Unix socket restriction; PostgreSQL guard មាន TCP-only opt-in។ CI ជំនួសតែការផ្ទៀង browser/test ដែលបានរត់ពិត មិនជំនួសការផ្ទេរឧបករណ៍ និង production rollout ទេ។
+
+
+- **ជុំបន្ត ZTO**៖ [Audit1290](https://github.com/mengsroy-h/Zoe-System/actions/runs/43168040915) លើ `1e0cd038301101f1419d47835297cfdbb895a851` ឆ្លង ZTO/native ១២៩ files/៣២១៥ tests, list-sync ៦៣៧ និង browser sync-banner ២០៩។ Bytes core ដូច commit នោះ; កែ hash-lock រួច focused ៦៣ ឆ្លង។ Full CI ជុំដើមមានកំហុសតែ stale SQL fixtures/mutation anchor, header metadata និង hash pin; មិនមែន CI របស់ការកែ license ជុំបន្ទាប់ទេ។
+- **ជុំបន្ត Session/Push**៖ session/price owner-race controls ២១៤ ឆ្លង; SQL RLS fixtures ផ្ដល់ auth.sessions ពិត និងរក្សា no-session denial (មុនកែ ១១ failures ➜ ៦០៣ ឆ្លង)។ Push discovery អាន marker ថ្មី ហើយ marker2 អាន lifecycle ពី strong Blob authority, មិនប្រើ frozen RTDB/cached grant; push/session ៩៨ ឆ្លង។
+- **License production protocol**៖ client មាន nonexportable P-256 key, seller enrollment, signed offline receipts និង explicit per-license cutover; marker2 បិទ legacy seat paths និង legacy lifecycle mutations។ Seller UI កំណត់ readback/owner/clock gates និងមិន retry unknown outcome។ Endpoint បិទក្រៅ production context/origin។ Defaults រក្សា legacy compatibility ដូច្នេះមិនអះអាងថាបញ្ហា legacy បិទនៅ production ទេ។
+- **Independent review**៖ copied secure record ដែលលុប protocol/receipt fields អាចចូល legacy offline grace បាន។ Final retirement flag `legacyProtocolEnabled:false` ទាមទារ signed receipt + device key ដោយមិនជឿ absence នៃ local fields; ត្រូវផ្ទេរគ្រប់ Key និងឈប់ប្រើ client ចាស់ មុនបើក retirement។ នេះជាសកម្មភាព rollout ដែលមិនបានអនុវត្ត។
+- **ជុំបន្តការផ្ទៀង local**៖ focused License/KeyGen/activation/session/price/push/ZTO-lock ១៩ files/៥៣៩ tests ឆ្លង; seller security ៣៦៩, key-list ៥១; legacy license grace ៤១, clock rollback ៣៥, trust ៣២, record race ១៤០ និង seats ៧៩ ឆ្លង។ Build/typecheck/ESLint/doc/notice/slot/purity/Android static ឆ្លង; comment strip ៣៣៩ files ស្អាត, coverage ១០ ឆ្លង។ New real-rules assertions និង final browser persistence ត្រូវការភស្តុតាង CI ថ្មី; មិនរាប់ UNRUN ជា PASS។
 
 
 ### 2026-11-12 — CI៖ GitHub public ប្រើ ៥ shard ដោយមិនបន្ធូរ checker

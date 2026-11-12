@@ -311,3 +311,52 @@ it.each(['clock', 'generation', 'expired'])('arm មិនរក្សា live �
     await turn();
     expect(firebaseState.sessionExpiryCheck).toBe(reason === 'clock' ? 'unverified' : reason === 'expired' ? 'expired' : 'live');
 });
+
+it.each(['auth', 'user', 'sdk', 'database', 'scope', 'generation'])('ចម្លើយ arm ចាស់មិនប្ដូរសាលក្រមវគ្គថ្មីក្រោយប្ដូរ %s', async boundary => {
+    sample();
+    await runSessionExpiryCheck();
+    let oldReply!: (value: any) => void;
+    token.mockReturnValueOnce(new Promise(yes => { oldReply = yes; }));
+    armSessionExpiryCheck(firebaseState.auth.currentUser, firebaseState.authGeneration);
+    expect(firebaseState.sessionExpiryCheck).toBe('live');
+    if (boundary === 'auth') firebaseState.auth = { currentUser: firebaseState.auth.currentUser };
+    if (boundary === 'user') firebaseState.auth.currentUser = { uid: 'clock-policy' };
+    if (boundary === 'sdk') firebaseState.fb = { ...firebaseState.fb };
+    if (boundary === 'database') firebaseState.db = {};
+    if (boundary === 'scope') firebaseState.firebaseConfig = { databaseURL: 'https://new-clock-policy.invalid' };
+    if (boundary === 'generation') firebaseState.authGeneration++;
+    let newReply!: (value: any) => void;
+    token.mockReturnValueOnce(new Promise(yes => { newReply = yes; }));
+    armSessionExpiryCheck(firebaseState.auth.currentUser, firebaseState.authGeneration);
+    expect(firebaseState.sessionExpiryCheck).toBe('pending');
+    sample();
+    newReply({ authTime: new Date(START - HOUR).toISOString() });
+    await turn();
+    expect(firebaseState.sessionExpiryCheck).toBe('live');
+    oldReply({ authTime: new Date(START - 5 * HOUR).toISOString() });
+    await turn();
+    expect(firebaseState.sessionExpiryCheck).toBe('live');
+    expect(signOut).not.toHaveBeenCalled();
+});
+
+it.each([true, false])('arm និង periodic ជាន់គ្នាមិនបើកផ្ទាំង និងគោរពផុតកំណត់៖ arm ចប់មុន %s', async armFirst => {
+    sample();
+    await runSessionExpiryCheck();
+    let armReply!: (value: any) => void;
+    let periodicReply!: (value: any) => void;
+    token.mockReturnValueOnce(new Promise(yes => { armReply = yes; }));
+    armSessionExpiryCheck(firebaseState.auth.currentUser, firebaseState.authGeneration);
+    token.mockReturnValueOnce(new Promise(yes => { periodicReply = yes; }));
+    const periodic = runSessionExpiryCheck();
+    expect(firebaseState.sessionExpiryCheck).toBe('live');
+    const reply = { authTime: new Date(START - HOUR).toISOString() };
+    (armFirst ? armReply : periodicReply)(reply);
+    await turn();
+    expect(firebaseState.sessionExpiryCheck).toBe('live');
+    elapsed = 4 * HOUR;
+    (armFirst ? periodicReply : armReply)(reply);
+    await periodic;
+    await turn();
+    expect(firebaseState.sessionExpiryCheck).toBe('expired');
+    expect(signOut).toHaveBeenCalledTimes(1);
+});

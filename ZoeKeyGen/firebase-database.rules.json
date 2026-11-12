@@ -17,8 +17,9 @@
         ".validate": "$appCode === 'ZOE'",
         "$keyId": {
           ".read": true,
-          ".write": "auth != null && root.child('user_roles').child(auth.uid).val() === 'admin'",
+          ".write": "auth != null && root.child('user_roles').child(auth.uid).val() === 'admin' && data.child('seatProtocol').val() !== 2",
           ".validate": "newData.hasChildren()",
+          "seatProtocol": { ".validate": "newData.isNumber() && newData.val() === 2 && data.parent().exists() && newData.parent().child('expiresAt').val() === data.parent().child('expiresAt').val() && newData.parent().child('revoked').val() === data.parent().child('revoked').val() && newData.parent().child('maxDevices').val() === data.parent().child('maxDevices').val() && newData.parent().child('releasedAt').val() === data.parent().child('releasedAt').val()" },
           "expiresAt":  { ".validate": "newData.isNumber() && newData.val() > 0" },
           "revoked":    { ".validate": "newData.isBoolean()" },
           "maxDevices": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 5" },
@@ -33,11 +34,11 @@
       "$appCode": {
         ".validate": "$appCode === 'ZOE'",
         "$keyId": {
-          ".read": true,
+          ".read": "root.child('license_keys').child($appCode).child($keyId).child('seatProtocol').val() !== 2",
           ".write": "auth != null && root.child('user_roles').child(auth.uid).val() === 'admin'",
           ".validate": "newData.hasChildren()",
           "$slot": {
-            ".write": "(auth != null && root.child('user_roles').child(auth.uid).val() === 'admin') || (newData.exists() && root.child('license_keys').child($appCode).child($keyId).exists() && (!data.exists() || data.child('device').val() === newData.child('device').val()) && (root.child('license_keys').child($appCode).child($keyId).child('releasedAt').exists() ? (newData.child('releaseEpoch').val() === root.child('license_keys').child($appCode).child($keyId).child('releasedAt').val() || (data.exists() && !data.child('releaseEpoch').exists() && !newData.child('releaseEpoch').exists() && data.child('device').val() === newData.child('device').val() && data.child('at').val() === newData.child('at').val())) : (!newData.child('releaseEpoch').exists() || newData.child('releaseEpoch').val() === 0)))",
+            ".write": "(auth != null && root.child('user_roles').child(auth.uid).val() === 'admin') || (root.child('license_keys').child($appCode).child($keyId).child('seatProtocol').val() !== 2 && newData.exists() && root.child('license_keys').child($appCode).child($keyId).exists() && (!data.exists() || data.child('device').val() === newData.child('device').val()) && (root.child('license_keys').child($appCode).child($keyId).child('releasedAt').exists() ? (newData.child('releaseEpoch').val() === root.child('license_keys').child($appCode).child($keyId).child('releasedAt').val() || (data.exists() && !data.child('releaseEpoch').exists() && !newData.child('releaseEpoch').exists() && data.child('device').val() === newData.child('device').val() && data.child('at').val() === newData.child('at').val())) : (!newData.child('releaseEpoch').exists() || newData.child('releaseEpoch').val() === 0)))",
             ".validate": "newData.hasChildren(['device', 'at']) && $keyId.length >= 16 && $keyId.length <= 40 && ($slot === 'd1' || ($slot === 'd2' && root.child('license_keys').child($appCode).child($keyId).child('maxDevices').val() >= 2) || ($slot === 'd3' && root.child('license_keys').child($appCode).child($keyId).child('maxDevices').val() >= 3) || ($slot === 'd4' && root.child('license_keys').child($appCode).child($keyId).child('maxDevices').val() >= 4) || ($slot === 'd5' && root.child('license_keys').child($appCode).child($keyId).child('maxDevices').val() >= 5))",
             "device": { ".validate": "newData.isString() && newData.val().length >= 8 && newData.val().length <= 64" },
             "at":     { ".validate": "newData.isNumber() && newData.val() > 0" },

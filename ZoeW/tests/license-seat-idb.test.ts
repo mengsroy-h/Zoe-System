@@ -103,6 +103,12 @@ it('IndexedDB ពិត៖ copied receipt មិនផ្តល់សិទ្�
         const status = (page: Page) => page.evaluate(async () => (await (window as any).ZoeLicense.getStatus('ZOE')).state);
         expect(await status(owner)).toBe('active');
         expect(await status(copied)).not.toBe('active');
+        await corrupt(owner);
+        await owner.evaluate(async id => {
+            const api = (window as any).ZoeSeatClient;
+            await api.repairIdentity(await api.inspectCorruptIdentity('ZOE', id), () => true);
+        }, keyId);
+        expect(await status(owner)).not.toBe('active');
         const removed = await owner.evaluate(async id => {
             await new Promise<void>((resolve, reject) => {
                 const request = indexedDB.deleteDatabase('zoe-license-seat-identities-v1');
@@ -119,4 +125,120 @@ it('IndexedDB ពិត៖ copied receipt មិនផ្តល់សិទ្�
         await copied.evaluate(async id => { await (window as any).ZoeSeatClient.createIdentity('ZOE', id); }, keyId);
         expect(await status(copied)).not.toBe('active');
     } finally { await ownerContext.close(); await copiedContext.close(); }
+}, 30000);
+
+async function corrupt(page: Page, id = keyId) {
+    await page.evaluate(async id => {
+        await new Promise<void>((resolve, reject) => {
+            const request = indexedDB.open('zoe-license-seat-identities-v1', 1);
+            request.onsuccess = () => {
+                const db = request.result, tx = db.transaction('identities', 'readwrite');
+                tx.objectStore('identities').put({ corrupt: true }, 'ZOE/' + id);
+                tx.oncomplete = () => { db.close(); resolve(); };
+                tx.onabort = () => { db.close(); reject(tx.error); };
+            };
+            request.onerror = () => reject(request.error);
+        });
+    }, id);
+}
+
+it('ជួសជុលកូនសោខូចតែមួយដោយមិនប្តូរកូនសោល្អ ឬទិន្នន័យផ្សេង និងត្រូវការសិទ្ធិម្ចាស់បច្ចុប្បន្ន', async () => {
+    const context = await browser.newContext();
+    try {
+        const page = await context.newPage(); await load(page);
+        await page.evaluate(async id => { await (window as any).ZoeSeatClient.createIdentity('ZOE', id); }, keyId);
+        await corrupt(page);
+        const result = await page.evaluate(async id => {
+            const api = (window as any).ZoeSeatClient;
+            const otherId = 'OTHERKEY1234567890';
+            const other = await api.createIdentity('ZOE', otherId);
+            localStorage.setItem('pending-business-journal', 'preserve');
+            const rejects = async (fn: () => Promise<any>) => { try { await fn(); return false; } catch { return true; } };
+            const invalidToken = await rejects(() => api.repairIdentity({ app: 'ZOE', keyId: id }, () => true));
+            const token = await api.inspectCorruptIdentity('ZOE', id);
+            const cancelled = await rejects(() => api.repairIdentity(token, () => false));
+            const stillCorrupt = await rejects(() => api.loadIdentity('ZOE', id));
+            const repaired = await api.repairIdentity(await api.inspectCorruptIdentity('ZOE', id), () => true);
+            const healthyRefused = await rejects(() => api.inspectCorruptIdentity('ZOE', id));
+            const proof = await api.enrollmentRequest('ZOE', id);
+            return { invalidToken, cancelled, stillCorrupt, healthyRefused,
+                fingerprint: await api.fingerprint(repaired.publicKey), proof: proof.fingerprint,
+                other: JSON.stringify(other.publicKey) === JSON.stringify((await api.loadIdentity('ZOE', otherId)).publicKey),
+                journal: localStorage.getItem('pending-business-journal'), extractable: repaired.privateKey.extractable };
+        }, keyId);
+        expect(result).toMatchObject({ invalidToken: true, cancelled: true, stillCorrupt: true, healthyRefused: true, other: true, journal: 'preserve', extractable: false });
+        expect(result.fingerprint).toBe(result.proof);
+    } finally { await context.close(); }
+}, 30000);
+
+it('ការជួសជុលពីរទំព័រមិនប្តូរកូនសោអ្នកឈ្នះ និងការប្តូរម្ចាស់ក្រោយ await បោះបង់ transaction', async () => {
+    const context = await browser.newContext();
+    try {
+        const first = await context.newPage(), second = await context.newPage();
+        await Promise.all([load(first), load(second)]);
+        await first.evaluate(async id => { await (window as any).ZoeSeatClient.createIdentity('ZOE', id); }, keyId);
+        await corrupt(first);
+        for (const page of [first, second]) await page.evaluate(async id => { (window as any).repairToken = await (window as any).ZoeSeatClient.inspectCorruptIdentity('ZOE', id); }, keyId);
+        const repair = (page: Page) => page.evaluate(async () => {
+            const api = (window as any).ZoeSeatClient;
+            try { return { fingerprint: await api.fingerprint((await api.repairIdentity((window as any).repairToken, () => true)).publicKey) }; }
+            catch (error) { return { error: String(error) }; }
+        });
+        const results = await Promise.all([repair(first), repair(second)]);
+        expect(results.filter(r => r.fingerprint)).toHaveLength(1);
+        expect(results.filter(r => r.error)).toHaveLength(1);
+        const winner = results.find(r => r.fingerprint)!.fingerprint;
+        expect(await first.evaluate(async id => { const api = (window as any).ZoeSeatClient; return api.fingerprint((await api.loadIdentity('ZOE', id)).publicKey); }, keyId)).toBe(winner);
+        await corrupt(first);
+        expect(await first.evaluate(async id => {
+            const api = (window as any).ZoeSeatClient, token = await api.inspectCorruptIdentity('ZOE', id);
+            const native = crypto.subtle.generateKey; let current = true;
+            (crypto.subtle as any).generateKey = async (...args: any[]) => { const pair = await (native as any).apply(crypto.subtle, args); current = false; return pair; };
+            try { await api.repairIdentity(token, () => current); return false; } catch { return true; }
+            finally { crypto.subtle.generateKey = native; }
+        }, keyId)).toBe(true);
+        expect(await first.evaluate(async id => { try { await (window as any).ZoeSeatClient.loadIdentity('ZOE', id); return false; } catch { return true; } }, keyId)).toBe(true);
+    } finally { await context.close(); }
+}, 30000);
+
+
+it('ការផ្ទុក ឬ crypto មិនអាចផ្ទៀងផ្ទាត់មិនអនុញ្ញាតជួសជុល ហើយ token ចាស់មិនប្តូរកូនសោល្អ', async () => {
+    const context = await browser.newContext();
+    try {
+        const page = await context.newPage(); await load(page);
+        await page.evaluate(async id => { await (window as any).ZoeSeatClient.createIdentity('ZOE', id); }, keyId);
+        expect(await page.evaluate(async id => {
+            const api = (window as any).ZoeSeatClient, original = await api.loadIdentity('ZOE', id);
+            const native = crypto.subtle.sign;
+            (crypto.subtle as any).sign = async () => { throw new DOMException('unavailable', 'OperationError'); };
+            let refused = false;
+            try { await api.inspectCorruptIdentity('ZOE', id); } catch { refused = true; }
+            finally { crypto.subtle.sign = native; }
+            return refused && JSON.stringify(original.publicKey) === JSON.stringify((await api.loadIdentity('ZOE', id)).publicKey);
+        }, keyId)).toBe(true);
+        await corrupt(page);
+        expect(await page.evaluate(async id => {
+            const api = (window as any).ZoeSeatClient;
+            const stale = await api.inspectCorruptIdentity('ZOE', id);
+            const fresh = await api.repairIdentity(await api.inspectCorruptIdentity('ZOE', id), () => true);
+            let refused = false;
+            try { await api.repairIdentity(stale, () => true); } catch { refused = true; }
+            return refused && JSON.stringify(fresh.publicKey) === JSON.stringify((await api.loadIdentity('ZOE', id)).publicKey);
+        }, keyId)).toBe(true);
+        await corrupt(page);
+        expect(await page.evaluate(async id => {
+            const api = (window as any).ZoeSeatClient, token = await api.inspectCorruptIdentity('ZOE', id);
+            const native = IDBDatabase.prototype.transaction;
+            IDBDatabase.prototype.transaction = function (...args: Parameters<typeof native>) {
+                if (args[1] === 'readwrite') throw new DOMException('unavailable', 'UnknownError');
+                return native.apply(this, args);
+            };
+            let refused = false;
+            try { await api.repairIdentity(token, () => true); } catch { refused = true; }
+            finally { IDBDatabase.prototype.transaction = native; }
+            let corrupt = false;
+            try { await api.loadIdentity('ZOE', id); } catch { corrupt = true; }
+            return refused && corrupt;
+        }, keyId)).toBe(true);
+    } finally { await context.close(); }
 }, 30000);

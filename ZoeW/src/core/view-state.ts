@@ -110,6 +110,7 @@ export interface ViewState {
 
     activationMessage: string;
     activationBusy: boolean;
+    seatEnrollmentEpoch: number;
     seatEnrollmentBusy: boolean;
     seatEnrollmentOnly: boolean;
     seatEnrollmentJson: string;
@@ -249,6 +250,7 @@ export const viewState = createStore<ViewState>('viewState', {
     exportFilterLabel: 'ថ្ងៃនេះ',
     activationMessage: 'សូមបញ្ចូល Activation Key សម្រាប់ ZoeW ដើម្បីបន្ត។',
     activationBusy: false,
+    seatEnrollmentEpoch: 0,
     seatEnrollmentBusy: false,
     seatEnrollmentOnly: false,
     seatEnrollmentJson: '',

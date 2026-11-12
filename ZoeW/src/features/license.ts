@@ -98,6 +98,7 @@ let seatEnrollmentOperation = null;
 
 export function clearSeatEnrollment() {
     seatEnrollmentOperation = null;
+    viewState.seatEnrollmentEpoch++;
     viewState.seatEnrollmentBusy = false;
     viewState.seatEnrollmentJson = '';
     viewState.seatEnrollmentFingerprint = '';
@@ -126,11 +127,12 @@ export async function prepareSeatEnrollment() {
     if (seatEnrollmentOperation?.isCurrent()) return;
     clearSeatEnrollment();
     const sessionIsCurrent = captureAuthDatabaseGuard();
+    const epoch = viewState.seatEnrollmentEpoch;
     const input = fieldValue('activationKeyInput').trim();
     const selectedKey = () => input || (typeof ZoeLicense?.activationKeyString === 'function' ? ZoeLicense.activationKeyString(LICENSE_APP_CODE) : '');
     const keyString = selectedKey();
     if (!keyString) { viewState.seatEnrollmentMessage = 'សូមបញ្ចូល Activation Key មុនចុះឈ្មោះឧបករណ៍។'; return; }
-    const operation = { isCurrent: () => sessionIsCurrent() && fieldValue('activationKeyInput').trim() === input && selectedKey() === keyString };
+    const operation = { isCurrent: () => sessionIsCurrent() && viewState.backendKind === 'firebase' && viewState.seatEnrollmentEpoch === epoch && fieldValue('activationKeyInput').trim() === input && selectedKey() === keyString };
     seatEnrollmentOperation = operation;
     viewState.seatEnrollmentBusy = true;
     const current = () => seatEnrollmentOperation === operation && operation.isCurrent();
@@ -152,7 +154,41 @@ export async function prepareSeatEnrollment() {
         viewState.seatEnrollmentMessage = 'រៀបចំសំណើមិនបានទេ។ សូមពិនិត្យ Storage ហើយទាក់ទងអ្នកលក់។ កុំលុបទិន្នន័យ App ឬប្រើលេខសម្គាល់សាធារណៈដើម្បីសង្គ្រោះកូនសោ។';
     } finally {
         if (seatEnrollmentOperation === operation) {
-            if (operation.isCurrent()) viewState.seatEnrollmentBusy = false;
+            viewState.seatEnrollmentBusy = false;
+            seatEnrollmentOperation = null;
+        }
+    }
+}
+
+export async function repairSeatEnrollmentIdentity() {
+    if (viewState.backendKind !== 'firebase' || !firebaseState.auth?.currentUser || viewState.activationBusy || viewState.seatEnrollmentBusy || !openModalIds().includes('activationModal')) return;
+    clearSeatEnrollment();
+    const sessionIsCurrent = captureAuthDatabaseGuard();
+    const epoch = viewState.seatEnrollmentEpoch;
+    const input = fieldValue('activationKeyInput').trim();
+    const selectedKey = () => input || (typeof ZoeLicense?.activationKeyString === 'function' ? ZoeLicense.activationKeyString(LICENSE_APP_CODE) : '');
+    const keyString = selectedKey();
+    if (!keyString) { viewState.seatEnrollmentMessage = 'សូមបញ្ចូល Activation Key មុនជួសជុលកូនសោឧបករណ៍។'; return; }
+    const operation = { isCurrent: () => sessionIsCurrent() && viewState.backendKind === 'firebase' && viewState.seatEnrollmentEpoch === epoch && openModalIds().includes('activationModal') && fieldValue('activationKeyInput').trim() === input && selectedKey() === keyString };
+    seatEnrollmentOperation = operation;
+    const current = () => seatEnrollmentOperation === operation && operation.isCurrent();
+    viewState.seatEnrollmentBusy = true;
+    try {
+        if (typeof ZoeLicense?.inspectSeatIdentity !== 'function' || typeof ZoeLicense?.repairSeatIdentity !== 'function') throw new Error('repair-unavailable');
+        const inspection = await withTimeout(ZoeLicense.inspectSeatIdentity(keyString, LICENSE_APP_CODE), 20000, 'Identity inspection timed out');
+        if (!current()) return;
+        if (!inspection?.valid || !inspection.repairToken || typeof inspection.keyId !== 'string') throw new Error('repair-unverified');
+        const approved = confirm('ជំនួសកូនសោដែលខូចសម្រាប់អាជ្ញាប័ណ្ណ ' + inspection.keyId + ' នៅលើឧបករណ៍នេះ?\nកូនសោថ្មីត្រូវចុះឈ្មោះឡើងវិញ និងទទួលការយល់ព្រមពីអ្នកលក់។ អ្នកលក់ត្រូវដោះកៅអីចាស់បើចាំបាច់។ ការជួសជុលនេះមិនផ្ដល់សិទ្ធិប្រើប្រាស់ទេ ហើយមិនប៉ះពាល់ទិន្នន័យអាជីវកម្មឡើយ។');
+        if (!current() || !approved) return;
+        const result = await withTimeout(ZoeLicense.repairSeatIdentity(inspection.repairToken, current), 20000, 'Identity repair timed out');
+        if (!current()) return;
+        if (!result?.valid) throw new Error('repair-refused');
+        viewState.seatEnrollmentMessage = 'កូនសោឧបករណ៍ត្រូវបានជំនួស។ សូមចុច «ចុះឈ្មោះឧបករណ៍» ហើយផ្ញើសំណើថ្មីឱ្យអ្នកលក់អនុម័ត និងដោះកៅអីចាស់បើចាំបាច់។ មិនទាន់ផ្ដល់សិទ្ធិប្រើប្រាស់ទេ។';
+    } catch (e) {
+        if (current()) viewState.seatEnrollmentMessage = 'មិនអាចបញ្ជាក់លទ្ធផលជួសជុលកូនសោបានទេ។ សូមសាក «ចុះឈ្មោះឧបករណ៍» ដើម្បីពិនិត្យកូនសោបច្ចុប្បន្ន ហើយទាក់ទងអ្នកលក់។ កុំលុបទិន្នន័យ App។';
+    } finally {
+        if (seatEnrollmentOperation === operation) {
+            viewState.seatEnrollmentBusy = false;
             seatEnrollmentOperation = null;
         }
     }

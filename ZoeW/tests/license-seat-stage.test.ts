@@ -211,3 +211,43 @@ describe('អាជ្ញាប័ណ្ណថ្មីផ្ទៀងផ្ទ�
         expect((await owner.api.getStatus('ZOE')).state).toBe('required');
     });
 });
+
+describe('ការភ្ជាប់ជួសជុលកូនសោទៅអាជ្ញាប័ណ្ណដែលមានហត្ថលេខា', () => {
+    async function repairFixture() {
+        const seller = await keys();
+        const envelope = await signed(seller.privateKey, { a: 'ZOE', id: 'SYNTHETICKEY123456789', iat: 1, exp: 2000000000 });
+        const token = {};
+        const inspectCorruptIdentity = vi.fn(async () => token);
+        const repairIdentity = vi.fn(async () => ({}));
+        const ctx: any = { crypto: webcrypto, TextEncoder, TextDecoder, Uint8Array, Date, performance, setTimeout, clearTimeout,
+            atob: (s: string) => Buffer.from(s, 'base64').toString('binary'),
+            ZoeSeatClient: { inspectCorruptIdentity, repairIdentity } };
+        ctx.window = ctx;
+        vm.runInNewContext(readFileSync('public/license-verify.js', 'utf8').replace(/const PUBLIC_KEYS_JWK = \[[\s\S]*?\];/, 'const PUBLIC_KEYS_JWK = [' + JSON.stringify(seller.publicKey) + '];'), ctx);
+        return { api: ctx.ZoeLicense, keyString: 'ZOEKEY-' + envelope.payload + '.' + envelope.signature, token, inspectCorruptIdentity, repairIdentity };
+    }
+    it('ពិនិត្យហត្ថលេខា និង app មុនអានកូនសោ ហើយរក្សា key ID ត្រឹមត្រូវ', async () => {
+        const f = await repairFixture();
+        expect((await f.api.inspectSeatIdentity('ZOEKEY-invalid', 'ZOE')).valid).toBe(false);
+        expect((await f.api.inspectSeatIdentity(f.keyString, 'OTHER')).valid).toBe(false);
+        expect(f.inspectCorruptIdentity).not.toHaveBeenCalled();
+        expect(await f.api.inspectSeatIdentity(f.keyString, 'ZOE')).toEqual({ valid: true, repairToken: f.token, keyId: 'SYNTHETICKEY123456789' });
+        expect(f.inspectCorruptIdentity).toHaveBeenCalledWith('ZOE', 'SYNTHETICKEY123456789');
+        expect(f.repairIdentity).not.toHaveBeenCalled();
+    });
+    it('កំហុស Storage ឬគ្មាន token មិនអនុញ្ញាតឱ្យជួសជុល', async () => {
+        const f = await repairFixture(); f.inspectCorruptIdentity.mockRejectedValueOnce(Error('transient'));
+        expect((await f.api.inspectSeatIdentity(f.keyString, 'ZOE')).valid).toBe(false);
+        f.inspectCorruptIdentity.mockResolvedValueOnce(null as any);
+        expect((await f.api.inspectSeatIdentity(f.keyString, 'ZOE')).valid).toBe(false);
+        expect(f.repairIdentity).not.toHaveBeenCalled();
+    });
+    it('បញ្ជូន guard ដល់ helper ហើយបដិសេធម្ចាស់ចាស់', async () => {
+        const f = await repairFixture();
+        expect((await f.api.repairSeatIdentity(f.token, () => false)).valid).toBe(false);
+        expect(f.repairIdentity).not.toHaveBeenCalled();
+        const guard = () => true;
+        expect(await f.api.repairSeatIdentity(f.token, guard)).toEqual({ valid: true });
+        expect(f.repairIdentity).toHaveBeenCalledWith(f.token, guard);
+    });
+});

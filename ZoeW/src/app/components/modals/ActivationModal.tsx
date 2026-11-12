@@ -22,6 +22,8 @@ export function ActivationModal() {
                 <div className="modal-btns">
                     <button className="btn-confirm" id="activationSubmitBtn" disabled={v.activationBusy || v.seatEnrollmentBusy} onClick={onAct("submitActivationKey")}>{v.activationBusy ? 'កំពុងផ្ទៀងផ្ទាត់...' : 'ដាក់ Active'}</button>
                     <button className="btn-confirm" id="seatEnrollmentPrepareBtn" disabled={v.activationBusy || v.seatEnrollmentBusy} onClick={onAct('prepareSeatEnrollment')}>{v.seatEnrollmentBusy ? 'កំពុងរៀបចំ...' : 'ចុះឈ្មោះឧបករណ៍'}</button>
+                    <button className="btn-cancel" id="seatIdentityRepairBtn" disabled={v.activationBusy || v.seatEnrollmentBusy} onClick={onAct('repairSeatEnrollmentIdentity')}>ជួសជុលកូនសោឧបករណ៍ដែលខូច</button>
+                    {v.seatEnrollmentBusy && <button className="btn-cancel" onClick={onAct('clearSeatEnrollment')}>បោះបង់</button>}
                     {v.seatEnrollmentOnly && <button className="btn-cancel" onClick={onAct('closeSeatEnrollment')}>បិទ</button>}
                     <button className="btn-cancel" id="activationLogoutBtn" onClick={onAct("logoutApp")}>ចាកចេញ</button>
                 </div>

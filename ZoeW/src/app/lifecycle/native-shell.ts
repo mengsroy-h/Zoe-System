@@ -77,6 +77,10 @@ export function setupNativeShell(scope: LifecycleScope): void {
 }
 
 export function handleNativeBack(minimize: () => void, history?: BackHistory): void {
+    if (topmostModal() === 'activationModal') {
+        viewState.seatEnrollmentEpoch++;
+        viewState.seatEnrollmentBusy = false;
+    }
     if (securityState.appIsLocked || sessionVerificationRequired()) { minimize(); return; }
     if (!uiState.moreMenuOpen && ROOT_SCREEN_MODALS.includes(topmostModal())) { minimize(); return; }
     if (closeTopmostLayer({ includeMoreMenu: true })) return;

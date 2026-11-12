@@ -453,6 +453,28 @@
         } catch (e) { return { valid: false, reason: 'device-unverified' }; }
     }
 
+    async function inspectSeatIdentity(keyString, appCode) {
+        try {
+            const checked = await verifySignatureAndScope(keyString, appCode);
+            if (!checked.valid) return checked;
+            const client = global.ZoeSeatClient;
+            if (!client || typeof client.inspectCorruptIdentity !== 'function') return { valid: false, reason: 'device-unverified' };
+            const token = await client.inspectCorruptIdentity(appCode, checked.payload.id);
+            if (!token) return { valid: false, reason: 'device-unverified' };
+            return { valid: true, repairToken: token, keyId: checked.payload.id };
+        } catch (e) { return { valid: false, reason: 'device-unverified' }; }
+    }
+
+    async function repairSeatIdentity(token, isCurrent) {
+        try {
+            const client = global.ZoeSeatClient;
+            if (!client || typeof client.repairIdentity !== 'function' || typeof isCurrent !== 'function' || !isCurrent()) return { valid: false, reason: 'device-unverified' };
+            await client.repairIdentity(token, isCurrent);
+            if (!isCurrent()) return { valid: false, reason: 'device-unverified' };
+            return { valid: true };
+        } catch (e) { return { valid: false, reason: 'device-unverified' }; }
+    }
+
     async function validateSeatReceipt(appCode, keyId, receipt, time, releaseEpoch) {
         const client = global.ZoeSeatClient;
         const config = global.ZoeSeatConfig;
@@ -824,6 +846,8 @@
         KEY_PREFIX: KEY_PREFIX,
         activate: activate,
         createSeatEnrollment: createSeatEnrollment,
+        inspectSeatIdentity: inspectSeatIdentity,
+        repairSeatIdentity: repairSeatIdentity,
         getStatus: getStatus,
         getDeviceId: getDeviceId,
         setDeviceMeta: setDeviceMeta,

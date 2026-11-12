@@ -5,6 +5,7 @@
     const DEADLINE_MS = 5000;
     const DOMAIN = 'zoe-license-seat-stage-v1';
     const AUDIENCE = 'https://zoew.netlify.app';
+    const repairTokens = new WeakMap();
 
     function scope(app, keyId) {
         if (app !== 'ZOE' || typeof keyId !== 'string' || !/^[A-Z0-9]{16,40}$/.test(keyId)) throw new Error('identity-scope');
@@ -91,7 +92,8 @@
         if (!privateKey || privateKey.type !== 'private' || privateKey.extractable !== false || !privateKey.algorithm ||
             privateKey.algorithm.name !== 'ECDSA' || privateKey.algorithm.namedCurve !== 'P-256' ||
             !privateKey.usages || privateKey.usages.length !== 1 || privateKey.usages[0] !== 'sign') throw new Error('identity-corrupt');
-        const publicKey = canonicalPublicKey(identity.publicKey);
+        let publicKey;
+        try { publicKey = canonicalPublicKey(identity.publicKey); } catch (e) { throw new Error('identity-corrupt'); }
         const verifyKey = await crypto.subtle.importKey('jwk', publicKey, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
         const challenge = crypto.getRandomValues(new Uint8Array(32));
         const signature = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, privateKey, challenge);
@@ -114,6 +116,100 @@
         try { await storedIdentity(key, identity); }
         catch (error) { if (!error || error.name !== 'ConstraintError') throw error; }
         const winner = await loadIdentity(app, keyId);
+        if (!winner) throw new Error('identity-storage-unverified');
+        return winner;
+    }
+
+    async function requireCorruptIdentity(identity, app, keyId) {
+        if (identity === undefined) throw new Error('identity-missing');
+        try { await validateIdentity(identity, app, keyId); }
+        catch (error) {
+            if (error && error.message === 'identity-corrupt') return;
+            throw error;
+        }
+        throw new Error('identity-healthy');
+    }
+
+    async function inspectCorruptIdentity(app, keyId) {
+        const key = scope(app, keyId);
+        await requireCorruptIdentity(await storedIdentity(key), app, keyId);
+        const token = Object.freeze({ app: app, keyId: keyId });
+        repairTokens.set(token, { app: app, keyId: keyId });
+        return token;
+    }
+
+    async function repairIdentity(token, isCurrent) {
+        const target = token && repairTokens.get(token);
+        if (!target) throw new Error('identity-repair-token');
+        repairTokens.delete(token);
+        const owned = () => typeof isCurrent === 'function' && isCurrent() === true;
+        if (!owned()) throw new Error('identity-repair-stale');
+        const key = scope(target.app, target.keyId);
+        const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign', 'verify']);
+        if (!owned()) throw new Error('identity-repair-stale');
+        const publicKey = canonicalPublicKey(await crypto.subtle.exportKey('jwk', pair.publicKey));
+        if (!owned()) throw new Error('identity-repair-stale');
+        const replacement = { version: 1, app: target.app, keyId: target.keyId, privateKey: pair.privateKey, publicKey: publicKey };
+        const db = await openDatabase();
+        try {
+            if (!owned()) throw new Error('identity-repair-stale');
+            await new Promise((resolve, reject) => {
+                let tx, abortTimer, done = false, stopping = false, ready = false, failure = null, inspecting = false, wrote = false;
+                const finish = (error) => {
+                    if (done) return;
+                    done = true; clearTimeout(timer); clearTimeout(abortTimer);
+                    if (error) reject(error); else resolve();
+                };
+                const abort = (error) => {
+                    if (done || stopping) return;
+                    stopping = true; failure = error;
+                    if (!tx) { finish(error); return; }
+                    abortTimer = setTimeout(() => finish(new Error('identity-storage-unverified')), DEADLINE_MS);
+                    try { tx.abort(); } catch (e) { finish(new Error('identity-storage-unverified')); }
+                };
+                const timer = setTimeout(() => abort(new Error('identity-storage-timeout')), DEADLINE_MS);
+                try {
+                    tx = db.transaction(STORE_NAME, 'readwrite');
+                    const store = tx.objectStore(STORE_NAME);
+                    tx.oncomplete = () => finish(wrote && !failure ? null : new Error('identity-storage-unverified'));
+                    tx.onabort = () => finish(failure || tx.error || new Error('identity-storage-aborted'));
+                    tx.onerror = () => { if (!failure && tx.error) failure = tx.error; };
+                    const pump = () => {
+                        if (done || stopping) return;
+                        try {
+                            if (!owned()) { abort(new Error('identity-repair-stale')); return; }
+                            const request = store.get(key);
+                            request.onerror = () => abort(request.error || new Error('identity-storage-unavailable'));
+                            request.onsuccess = () => {
+                                if (done || stopping) return;
+                                try {
+                                    if (!owned()) { abort(new Error('identity-repair-stale')); return; }
+                                    if (failure) { abort(failure); return; }
+                                    if (ready) {
+                                        const write = store.put(replacement, key);
+                                        write.onerror = () => abort(write.error || new Error('identity-storage-unavailable'));
+                                        write.onsuccess = () => {
+                                            try { if (!owned()) abort(new Error('identity-repair-stale')); else wrote = true; }
+                                            catch (error) { abort(error); }
+                                        };
+                                        return;
+                                    }
+                                    if (!inspecting) {
+                                        inspecting = true;
+                                        requireCorruptIdentity(request.result, target.app, target.keyId).then(() => { ready = true; }, (error) => { failure = error; });
+                                    }
+                                    pump();
+                                } catch (error) { abort(error); }
+                            };
+                        } catch (error) { abort(error); }
+                    };
+                    pump();
+                } catch (error) { abort(error); }
+            });
+        } finally { db.close(); }
+        if (!owned()) throw new Error('identity-repair-stale');
+        const winner = await loadIdentity(target.app, target.keyId);
+        if (!owned()) throw new Error('identity-repair-stale');
         if (!winner) throw new Error('identity-storage-unverified');
         return winner;
     }
@@ -174,5 +270,5 @@
         return payload;
     }
 
-    global.ZoeSeatClient = { loadIdentity: loadIdentity, createIdentity: createIdentity, enrollmentRequest: enrollmentRequest, signCommand: signCommand, fingerprint: fingerprint, verifyReceipt: verifyReceipt };
+    global.ZoeSeatClient = { loadIdentity: loadIdentity, createIdentity: createIdentity, inspectCorruptIdentity: inspectCorruptIdentity, repairIdentity: repairIdentity, enrollmentRequest: enrollmentRequest, signCommand: signCommand, fingerprint: fingerprint, verifyReceipt: verifyReceipt };
 })(window);

@@ -134,6 +134,7 @@ export const ACTION_ALLOWLIST = [
     "startBatchScan",
     "stopBatchScan",
     "submitActivationKey",
+    "repairSeatEnrollmentIdentity",
     "prepareSeatEnrollment",
     "clearSeatEnrollment",
     "openSeatEnrollment",

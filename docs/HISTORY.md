@@ -124,6 +124,8 @@
 
 ### [2.50.195] · ZoeKeyGen [2.24.41] — 2026-11-12 · ផ្ទៀងវគ្គ និងព្រំដែនប្រតិបត្តិការ
 
+- Diagnostic wrapper ជុំដំបូងបង្ក recursion ដោយសរសេរឆ្លង SDK Proxy; កែជា outer observer Proxy មិនកែ base methods។ Actual-adapter regression ផ្ទៀង one-dispatch/error identity/ownership refusal; fixtures123 pass។ បញ្ហា preflight ដើមនៅមិនទាន់មានមូលហេតុបញ្ជាក់; ត្រូវផ្ទៀង CI ថ្មី។
+
 - F03 លើ head `8cae650` មាន permutation មួយបរាជ័យមុន dispatch ក្នុង Supabase postgc-partial; មួយទៀត pass598។ មូលហេតុមិនទាន់បញ្ជាក់។ បន្ថែម bounded/redacted preflight diagnostics និង observer fixtures8; fixtures118 pass ប៉ុន្តែ engines UNRUN local។ មិនកែ production, retries, timeout, concurrency ឬបន្ធូរ assertions។ ត្រូវរង់ចាំ CI ថ្មី។
 
 **ZoeW** (`zoew-v458` ➜ `zoew-v459`) និង **ZoeKeyGen** (`zoekeygen-v151` ➜ `zoekeygen-v152`)។

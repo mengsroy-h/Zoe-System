@@ -1125,7 +1125,7 @@ class SupabasePreflightTrace {
         const finish = (phase, error, value) => {
             try {
                 this.inFlight--;
-                const code = ['ECONNRESET', 'ECONNREFUSED', 'EPIPE', '42501', '22023', 'PT409', 'PGRST301', 'PGRST303', 'write_recovery_pending', 'write_outcome_unknown'].includes(error?.code) ? error.code : error ? 'other' : 'none';
+                const code = ['CONNECTION_SCOPE_CHANGED', 'ECONNRESET', 'ECONNREFUSED', 'EPIPE', '42501', '22023', 'PT409', 'PGRST301', 'PGRST303', 'write_recovery_pending', 'write_outcome_unknown'].includes(error?.code) ? error.code : error ? 'other' : 'none';
                 const reason = ['Client is offline.', 'timeout', 'REGISTRY_PURGE_SESSION', 'Loopback request timed out', 'Owned loopback response aborted'].includes(error?.message) ? error.message : error ? 'other' : 'none';
                 emit({ phase, ms: Math.round(performance.now() - started), code, reason,
                     ...(kind === 'public-purge' && phase === 'resolved' ? { outcome: value === true ? 'true' : value === false ? 'false' : value === null ? 'null' : 'other' } : {}),
@@ -1145,6 +1145,44 @@ class SupabasePreflightTrace {
 function supabaseReadKind(ref) {
     const root = ref?._path?.[0];
     return [T, R, P, G, W, D, M, 'zoew_scan_history_cod_dod', 'zoew_scan_operations'].includes(root) ? root : 'other';
+}
+function observeSupabaseSdk(sdk, trace) {
+    // SDK ownership adapters are Proxies: assigning a wrapper to them mutates their
+    // underlying target and recurses when their captured method delegates to it.
+    return new Proxy(sdk, {
+        get(target, name) {
+            const original = Reflect.get(target, name, target);
+            if (name !== 'get' && name !== 'update') return original;
+            return (...args) => trace.observe(name === 'get' ? 'get:' + supabaseReadKind(args[0]) : 'update', () => original.apply(target, args));
+        }
+    });
+}
+async function verifySupabaseSdkObserver() {
+    const runtime = await bootstrap(new URL('http://127.0.0.1:9000'));
+    try {
+        const app = {}, auth = { app, currentUser: { uid: 'observer-fixture' } }, db = { app };
+        const value = {}, failure = new Error('observer-fixture-failure');
+        let reads = 0, writes = 0, mode = 'success', release;
+        const base = { __supabase: true, getAuth: () => auth, getDatabase: () => db,
+            ref: (database, path) => ({ _db: database, _path: path.split('/') }),
+            get: () => { reads++; return mode === 'reject' ? Promise.reject(failure) : mode === 'pending' ? new Promise(resolve => { release = resolve; }) : Promise.resolve(value); },
+            update: () => { writes++; if (mode === 'throw') throw failure; return mode === 'reject' ? Promise.reject(failure) : Promise.resolve(value); } };
+        const originalGet = base.get, originalUpdate = base.update;
+        const trace = new SupabasePreflightTrace();
+        const sdk = observeSupabaseSdk(runtime.api.withTransactionOutcomeResolution(base), trace);
+        sdk.getAuth(app); sdk.getDatabase(app);
+        const ref = sdk.ref(db, T + '/observer-fixture');
+        requireCheck('actual SDK observer dispatches one read and one write without modifying base', await sdk.get(ref) === value && await sdk.update(ref, {}) === value
+            && reads === 1 && writes === 1 && base.get === originalGet && base.update === originalUpdate && trace.peak === 1);
+        mode = 'reject';
+        requireCheck('actual SDK observer preserves read and write rejection identity', await sdk.get(ref).catch(e => e) === failure
+            && await sdk.update(ref, {}).catch(e => e) === failure && reads === 2 && writes === 2);
+        mode = 'throw'; let thrown; try { sdk.update(ref, {}); } catch (error) { thrown = error; }
+        requireCheck('actual SDK observer preserves synchronous write failure', thrown === failure && writes === 3);
+        mode = 'pending'; const pending = sdk.get(ref); auth.currentUser = { uid: 'changed-observer-fixture' }; release(value);
+        requireCheck('actual SDK observer preserves ownership refusal after read', (await pending.catch(e => e))?.code === 'CONNECTION_SCOPE_CHANGED'
+            && reads === 3 && trace.inFlight === 0 && trace.peak === 1 && trace.events.at(-1).code === 'CONNECTION_SCOPE_CHANGED');
+    } finally { await runtime.restore(); fs.rmSync(runtime.scratch, { recursive: true, force: true }); }
 }
 async function verifySupabasePreflightTrace() {
     const trace = new SupabasePreflightTrace(), value = {}, error = Object.assign(new Error('SECRET_BODY'), { code: 'ECONNRESET' });
@@ -1223,11 +1261,7 @@ class SupabaseProvider {
             docsCache: null, registryPurge: { intent: api.boundedRegistryPurgeIntent, hash: api.registryPurgeBindingHash },
             dbOptions: { retryStepsMs: [50, 100], pollFallbackMs: 600000 }
         });
-        const sdk = api.withTransactionOutcomeResolution(base);
-        for (const name of ['get', 'update']) {
-            const original = sdk[name];
-            sdk[name] = (...args) => this.preflightTrace.observe(name === 'get' ? 'get:' + supabaseReadKind(args[0]) : 'update', () => original.apply(sdk, args));
-        }
+        const sdk = observeSupabaseSdk(api.withTransactionOutcomeResolution(base), this.preflightTrace);
         const app = sdk.initializeApp({ supabaseUrl: this.harness.fake.url, supabaseKey: 'sb_publishable_f03_synthetic', loginDomain: 'users.zoew.invalid' });
         this.pendingApp = { app, close: () => sdk.deleteApp(app) };
         const auth = sdk.getAuth(app), db = sdk.getDatabase(app);
@@ -2477,7 +2511,7 @@ async function runControlledTimings(runtime, namespace) {
 async function main() {
     if (FIXTURES_ONLY && STRICT) throw new Error('fixtures-only cannot satisfy CI STRICT');
     verifyConstruction(); verifyNativeTrace(); await verifyFailureEvidence(); await verifyReceiptAndFixtureOwnership(); await verifyBoundedDeadline(); verifyControlledTimingGates();
-    verifyGuardConstruction(); await verifySupabasePreflightTrace();
+    verifyGuardConstruction(); await verifySupabasePreflightTrace(); await verifySupabaseSdkObserver();
     nativeComponentPlan();
     if (FIXTURES_ONLY) { report('FIXTURES_ONLY_UNRUN', { nativeRuntime: 'UNRUN', supabaseRuntime: 'UNRUN' }); process.exitCode = fail ? 1 : 0; return; }
     for (const file of SOURCE_FILES) requireCheck('source input ' + file, fs.existsSync(path.join(ROOT, file)));

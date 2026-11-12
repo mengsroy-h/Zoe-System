@@ -979,9 +979,7 @@ const SITE_EMAIL_PREFIX_DEFAULT = 'zoew';
 
 const certsState = { at: 0, keys: null, inFlight: null };
 
-const SUPABASE_ACCOUNT_TTL_MS = 5 * 60 * 1000;
 const SUPABASE_ACCOUNT_CACHE_MAX = 500;
-const supabaseAccountCache = new Map();
 const supabaseAccountInFlight = new Map();
 
 function readSupabaseIdentity(env) {
@@ -1001,14 +999,6 @@ function tokenIssuer(token) {
     return parsed && typeof parsed.payload.iss === 'string' ? parsed.payload.iss : '';
 }
 
-function rememberSupabaseVerdict(cacheKey, verdict, until) {
-    if (supabaseAccountCache.size >= SUPABASE_ACCOUNT_CACHE_MAX) {
-        const oldest = supabaseAccountCache.keys().next();
-        if (!oldest.done) supabaseAccountCache.delete(oldest.value);
-    }
-    supabaseAccountCache.set(cacheKey, { verdict: verdict, until: until });
-}
-
 async function verifySupabaseToken(token, identity, timeoutMs) {
     const parsed = decodeIdToken(token);
     if (!parsed) return { ok: false, reason: 'idtoken:malformed' };
@@ -1019,10 +1009,6 @@ async function verifySupabaseToken(token, identity, timeoutMs) {
     if (parsed.payload.role !== 'authenticated' || typeof parsed.payload.sub !== 'string' || !parsed.payload.sub) {
         return { ok: false, reason: 'idtoken:sub' };
     }
-    const cacheKey = crypto.createHash('sha256').update(identity.issuer + '|' + token).digest('hex');
-    const hit = supabaseAccountCache.get(cacheKey);
-    if (hit && hit.until > now) return hit.verdict;
-    if (hit) supabaseAccountCache.delete(cacheKey);
     const flightKey = crypto.createHash('sha256').update(JSON.stringify([identity.issuer, identity.key, token])).digest('hex');
     const out = await sharedBoundedRead(supabaseAccountInFlight, flightKey, async () => {
         const res = await fetch(identity.base + '/rest/v1/rpc/my_account', {
@@ -1036,7 +1022,6 @@ async function verifySupabaseToken(token, identity, timeoutMs) {
         return { rows: await res.json() };
     }, timeoutMs, FIREBASE_CERTS_MAX_TIMEOUT_MS, SUPABASE_ACCOUNT_CACHE_MAX, 'supabase');
     if (!out.ok || !out.value) return { ok: false, reason: 'idtoken:supabase-unreachable' };
-    const until = Math.min(exp, now + SUPABASE_ACCOUNT_TTL_MS);
     let verdict;
     if (out.value.denied) {
         verdict = { ok: false, reason: 'idtoken:signature' };
@@ -1047,7 +1032,6 @@ async function verifySupabaseToken(token, identity, timeoutMs) {
         else if (row.status !== 'active') verdict = { ok: false, reason: 'site:tenant-' + (row.status === 'expired' ? 'expired' : 'revoked') };
         else verdict = { ok: true, siteCode: typeof row.branch_code === 'string' ? row.branch_code : '', reason: '' };
     }
-    rememberSupabaseVerdict(cacheKey, verdict, until);
     return verdict;
 }
 
@@ -3033,7 +3017,6 @@ exports.resetCachesForTests = function resetCachesForTests() {
     certsState.at = 0;
     certsState.keys = null;
     certsState.inFlight = null;
-    supabaseAccountCache.clear();
     supabaseAccountInFlight.clear();
     cookieReadsInFlight.clear();
     signedMismatchSignal.at = 0;

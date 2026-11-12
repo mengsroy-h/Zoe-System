@@ -308,9 +308,6 @@ export function createPushService(deps) {
         }
         const exp = Number(payload.exp) * 1000;
         if (!isFinite(exp) || exp <= now()) return { ok: false, status: 403, reason: 'supabase:session' };
-        const cacheKey = 'sb:' + crypto.createHash('sha256').update(sb.issuer + '|' + token).digest('hex');
-        const cached = licenseCache.get(cacheKey);
-        if (cached && cached.until > now()) return cached.verdict;
         const res = await fetchJson(sb.base + '/rest/v1/rpc/my_account', {
             method: 'POST',
             headers: { apikey: sb.key, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -324,11 +321,6 @@ export function createPushService(deps) {
         if (!row || typeof row.tenant_id !== 'string' || !row.tenant_id) verdict = { ok: false, status: 403, reason: 'supabase:account' };
         else if (row.status !== 'active') verdict = { ok: false, status: 403, reason: 'supabase:inactive' };
         else verdict = { ok: true, keyId: supabaseTenantKeyId(row.tenant_id) };
-        if (licenseCache.size >= PUSH_IDENTITY_CACHE_MAX) {
-            const oldest = licenseCache.keys().next();
-            if (!oldest.done) licenseCache.delete(oldest.value);
-        }
-        licenseCache.set(cacheKey, { until: Math.min(exp, now() + PUSH_LICENSE_CACHE_MS), verdict: verdict });
         return verdict;
     }
 

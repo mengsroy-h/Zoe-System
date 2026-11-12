@@ -128,7 +128,9 @@ export function armSessionExpiryCheck(user, generation) {
     const owner = sessionExpiryOwner(user);
     if (generation !== owner.generation || !owner.current()) return false;
     sessionExpiryArm = owner;
-    firebaseState.sessionExpiryCheck = 'pending';
+    const verifiedLive = firebaseState.sessionExpiryCheck === 'live' && sessionAuthTime?.owner.current()
+        && sessionAuthTime.owner.user === user && sessionVerdictAt(sessionAuthTime.authTimeMs) === 'live';
+    if (!verifiedLive) firebaseState.sessionExpiryCheck = 'pending';
     const settle = (verdict) => {
         if (sessionExpiryArm === owner) sessionExpiryArm = null;
         if (generation !== firebaseState.authGeneration || !owner.current()) return;

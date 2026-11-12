@@ -967,13 +967,28 @@ describe('⛔ អត្តសញ្ញាណ ៖ គណនីហាង Supabase 
         expect(readPushConfig(Object.assign(sbEnv(), { SUPABASE_URL: 'http://evil.example.com' })).supabase).toBeNull();
     });
 
-    it('cache ៖ token ដដែលក្នុង ១០ នាទី ➜ ហៅ Supabase ម្តង · Activation Key នៅដើរដូចមុនលើ service ដដែល', async () => {
+    it('session ៖ token ដដែល ➜ ផ្ទៀង Supabase រាល់សំណើ · Activation Key នៅដើរដូចមុនលើ service ដដែល', async () => {
         const h = harness({ env: sbEnv() });
         await h.service.subscribe({ supabase: SB_OWNER }, webSub().sub);
         await h.service.subscribe({ supabase: SB_OWNER }, webSub().sub);
-        expect(h.calls.filter((c) => c.url === SB_URL + '/rest/v1/rpc/my_account').length).toBe(1);
+        expect(h.calls.filter((c) => c.url === SB_URL + '/rest/v1/rpc/my_account').length).toBe(2);
         expect(await h.service.subscribe(GOOD, webSub().sub)).toMatchObject({ ok: true });
         expect(await h.service.subscribe({ license: GOOD }, webSub().sub)).toMatchObject({ ok: true });
+    });
+
+    it('session ត្រូវដកក្រោយ subscribe ➜ JWT ចាស់មិនអាចសរសេរ subscription ថ្មី', async () => {
+        const h = harness({ env: sbEnv() });
+        const token = sbJwt('revoked-session');
+        SB_ACCOUNTS[token] = { tenant_id: TENANT_A, status: 'active' };
+        try {
+            expect(await h.service.subscribe({ supabase: token }, webSub().sub)).toMatchObject({ ok: true });
+            const before = [...h.store.data.entries()];
+            delete SB_ACCOUNTS[token];
+            expect(await h.service.subscribe({ supabase: token }, webSub().sub)).toMatchObject({ ok: false, reason: 'supabase:session' });
+            expect([...h.store.data.entries()]).toEqual(before);
+        } finally {
+            delete SB_ACCOUNTS[token];
+        }
     });
 
     it('HTTP ៖ body `supabase` ➜ អត្តសញ្ញាណហាង · token មិនលេចក្នុងចម្លើយ', async () => {

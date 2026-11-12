@@ -177,7 +177,7 @@ function createPgHarness(opts) {
         const init = cp.spawnSync(icmd, iargs, { encoding: 'utf8', timeout: 120000 });
         if (init.status !== 0) throw new Error('initdb ធ្លាក់ ៖ ' + String(init.stderr || init.error || '').slice(-600));
         port = await freePort();
-        const [scmd, sargs] = wrap(path.join(pgBin.bin, 'postgres'), ['-D', data, '-p', String(port), '-k', sock,
+        const [scmd, sargs] = wrap(path.join(pgBin.bin, 'postgres'), ['-D', data, '-p', String(port), '-k', opts.unixSockets === false ? '' : sock,
             '-c', 'listen_addresses=127.0.0.1', '-c', 'fsync=off', '-c', 'synchronous_commit=off',
             '-c', 'full_page_writes=off', '-c', 'max_connections=60'], user, 'INT');
         let log = '';

@@ -41,15 +41,14 @@
 ---
 
 ## 📌 ការងារដែលនៅសល់ — ការផ្ទៀងផ្ទាត់ដោយអ្នកប្រើ
-
+- 🔍 **Audit 2026-11-12 មិនទាន់ចេញផ្សាយ**៖ កែ session modal, សោ price operation, `my_account` និង Netlify session authorization, parser Google Sheets។ ត្រូវអនុវត្ត migration `20261112054956_zoe_account_active_session.sql` និង deploy functions/App ក្រោយការផ្ទៀងពេញលេញ; Apps Script reader ត្រូវ copy និង Deploy ជាកំណែថ្មី។ គ្មានការប្ដូរផលិតកម្មក្នុង session នេះ។
+- 🔍 **ZTO lock និង browser**៖ guard PostgreSQL ថ្មីរត់បានតាម TCP; Chromium/PG Unix socket ត្រូវបរិស្ថានបដិសេធ។ `zto-lock.test.ts` នៅរក្សា hash ដើមដោយចេតនា រហូត guard ZTO ទាំងអស់ឆ្លងលើបរិស្ថានដែលអាចរត់បាន។ មិនទាន់អះអាង release-ready។
+- 🔍 **License seat ជាដំណាក់កាល**៖ ម្ចាស់គម្រោងយល់ព្រមការចុះឈ្មោះឧបករណ៍ឡើងវិញ។ Endpoint សាកថ្មីបិទជាលំនាំដើម ហើយ `grantsLicense:false` ជានិច្ច។ ត្រូវបំពេញ client/admin enrollment, ការផ្ទេរសិទ្ធិអាជ្ញាប័ណ្ណ និង rules cutover; legacy device-ID bypass នៅមិនទាន់បិទ។ APK release មិនរង់ចាំ Audit ជាការទទួលយកថ្មីរបស់ម្ចាស់គម្រោង ដូច្នេះ workflow មិនប្រែ។
 - 🔍 **Clock/ឧបករណ៍ពិត**៖ ផ្ទៀង history loading ក្រោយ session verification លើ iPhone/Android មុន merge។ Exact-SHA strict CI ជាភស្តុតាងក្នុងវិសាលភាព checker របស់វា; លទ្ធផលចាស់រក្សាក្នុងផ្នែកប្រវត្តិ។
-
 - 🔍 **Registration rollout**៖ Hosted project ដែលភ្ជាប់មាន migration versions ទាំង៦២ និង protocol 1/accepting/deferred trigger; មិនជំនួស hosted backup/restore ឬការរង់ចាំ handler ចាស់ឱ្យចប់។ មូលហេតុ F03 បរាជ័យដំបូងក្នុង session ចាស់នៅមិនទាន់បញ្ជាក់; dead-code ដែល dynamic references មិនអាចសម្រេចបាននៅរក្សាទុក។
-
 > ⛔ **ផ្នែកនេះកាន់តែការងារដែលនៅបើក** ៖ ស្ថានភាព git · អ្វីដែលអ្នកប្រើមិនទាន់បញ្ជាក់ · សកម្មភាពដោយដៃដែលមិនទាន់ធ្វើ · ការសម្រេចដែលនៅរស់។
 > អ្នកប្រើបញ្ជាក់ ឬធ្វើរួច ➜ **លុបធាតុនោះ** (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុងផ្នែក ១ · ២) ⛔ កុំបន្ថែមខ្សែ branch/PR ចាស់ (git ជាភស្តុតាង) ·
 > ⛔ ≤ ៨០ បន្ទាត់ (`doc-scope-test`)។
-
 ### 🤝 Handoff
 
 - ⛔ **ផ្ទៀងផ្ទាត់ git មុនជឿអត្ថបទនេះ** (`git log --oneline -3 origin/main` · `git rev-list --count origin/main..origin/<branch>`) · ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង ·
@@ -122,6 +121,14 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ archive ផ្នែក ៩ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.195] — 2026-11-12 · ផ្ទៀងវគ្គ និងព្រំដែនប្រតិបត្តិការ
+
+**ZoeW** (`zoew-v458` ➜ `zoew-v459`)។ **ZoeKeyGen មិនប្រែ**។
+- ការហៅផ្ទៀងវគ្គម្តងទៀតរក្សាសាលក្រម live តែពេលម្ចាស់វគ្គដដែល និង token/ម៉ោងដែលទុកចិត្តបាននៅមានសុពលភាព; នៅតែផ្ទៀង token ហើយបិទចំពោះ expiry, clock uncertainty ឬវគ្គថ្មី។
+- ការបរាជ័យក្នុង Web Lock របស់ price operation ត្រូវឡើងជាកំហុស មិនហៅប្រតិបត្តិការឡើងវិញក្រៅសោ។
+- Google Sheets reader កំណែ ៣ អាន decimal comma/dot ច្បាស់ ហើយបដិសេធអក្សរខូច/លេខមិនច្បាស់ជា `invalid-money`; Health Check រំពឹងកំណែដូចគ្នា។
+- **សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ ក្រោយផ្ទៀងតេស្តពេញលេញ ត្រូវ deploy App និង Netlify functions, អនុវត្ត migration session ថ្មី និង copy `zto-import/google-sheets-api/Code.gs` ចូល Apps Script រួច Deploy version ថ្មី។ ការងារក្នុង checkout នេះមិនទាន់ push/deploy។ License stage មិនត្រូវបើកជាសិទ្ធិផលិតកម្មទេ។
 
 ### [2.50.194] · ZoeKeyGen [2.24.40] — 2026-11-10 · ម៉ោងដែលផ្ទៀងបានលើតំណសាក PR
 
@@ -2043,6 +2050,16 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-11-12 — Audit fixes និង License enrollment stage
+
+- **សំណើម្ចាស់គម្រោង**៖ កែ findings ដោយប្រុងប្រយ័ត្ន និង modal ផ្ទៀងវគ្គដែលលេចឡើងវិញ ដោយមិនបន្ធូរសុវត្ថិភាព។ ម្ចាស់គម្រោងទទួលយក APK release មិនរង់ចាំ Audit ដូច្នេះបានទុក workflow ដើម។ ការចុះឈ្មោះឧបករណ៍អាជ្ញាប័ណ្ណឡើងវិញត្រូវបានយល់ព្រមជាដំណាក់កាល។
+- **ភស្តុតាងមុន/ក្រោយ**៖ modal និង Web Lock មាន regression ក្រហម ៣ មុនកែ; ក្រុម session/clock/auth/price ២០៤ តេស្តឆ្លងក្រោយកែ។ SQL session មាន ១២ ករណីបរាជ័យលើមុនកែ ហើយ ១៩ ឆ្លងលើ PostgreSQL ពិតក្រោយកែ; Netlify និង pending-read tests ១០៥ ឆ្លង។ Parser reader បរាជ័យលើ `12,50` ➜ `1250` មុនកែ ហើយឆ្លងក្រោយកែ; importer ៣២៦ assertions នៅឆ្លង។ លទ្ធផលទាំងនេះជាតេស្តផ្តោត មិនជំនួស full strict CI ឬ live deployment ទេ។
+- **Session authority**៖ `private.my_account` ទាមទារ session ID ត្រឹមត្រូវ ដែលចងនឹង UID ហើយនៅមិនផុតកំណត់; status ហាងនៅដដែល។ ដក completed Supabase authorization cache ចេញពី ZTO/push និងរក្សាតែ pending read coalescing។ វាត្រូវការ RPC ផ្ទៀងសិទ្ធិថ្មីលើសំណើបន្ទាប់។ កែ ZTO core តាមសំណើ audit-fix ផ្ទាល់; hash lock មិនទាន់ធ្វើបច្ចុប្បន្នភាព ព្រោះ browser guards មិនអាចរត់ក្នុងបរិស្ថាននេះ។
+- **License stage**៖ `license-seat-stage` ប្រើ Netlify Blobs strong read/ETag CAS, seller-signed domain-separated commands, enrolled P-256 device proof, revision/release epoch និងពិដានកៅអី។ បិទជាលំនាំដើម (`ZOE_LICENSE_SEAT_STAGE` មិនបានកំណត់), ចម្លើយទាំងអស់មាន `staged:true, grantsLicense:false`។ ៩ តេស្ត crypto/protocol/atomic race ឆ្លង; legacy verifiers/rules មិនប្រែ។ ការចម្លង public device ID នៅតែជាបញ្ហាលើផ្លូវ legacy រហូត client/admin UX, authoritative migration និង rules cutover បញ្ចប់។
+- **លទ្ធផលចុងក្រោយក្នុង checkout**៖ full Vitest ៩៦៩៤ ឆ្លង, ៥ test failures, ៨៩ skipped; ៤៨២ files ឆ្លង និង ១០ files បរាជ័យ។ ក្នុង ១០ នោះ ៩ ជា browser/PostgreSQL infrastructure និង ១ ជា ZTO hash lock ដែលទុកដើម។ Build/typecheck/ESLint, slot/purity/notice/doc checks, Android static ១៣៥ និង repository coverage ១០ ឆ្លង។ Full strict/browser/SW/native មិនបានបញ្ចប់; មិនមែន release-ready។
+- **ព្រំដែន**៖ គ្មាន secret/សិទ្ធិ server ត្រូវបាន provision, គ្មាន live services, push ឬ deploy។ Chromium ទាំងផ្លូវលំនាំដើម និង browser ដែលដំឡើងស្រាប់ មិនអាចបើកបានដោយ Unix socket restriction ទោះសុំ execution escalation; PostgreSQL guard ថ្មីប្រើ TCP-only ជាជម្រើសច្បាស់លាស់ (default harness មិនប្រែ)។ ត្រូវរត់ generated ZTO guards និង native/browser tests នៅបរិស្ថានសមស្រប មុនផ្លាស់ប្ដូរ LOCK និងចេញផ្សាយ។
+
 
 ### 2026-11-12 — CI៖ GitHub public ប្រើ ៥ shard ដោយមិនបន្ធូរ checker
 

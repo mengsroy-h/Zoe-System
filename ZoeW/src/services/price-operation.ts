@@ -147,8 +147,7 @@ export function withPriceOperationLock<T>(token: string, action: () => Promise<T
         try { return await action(); } finally { livePriceTokens.delete(token); }
     };
     if (!locks || typeof locks.request !== 'function') return run();
-    return Promise.resolve(locks.request(PRICE_LIVE_LOCK_PREFIX + token, ifAvailable ? { ifAvailable: true } : {}, (lock) => (lock ? run() : null)))
-        .catch(() => run());
+    return Promise.resolve(locks.request(PRICE_LIVE_LOCK_PREFIX + token, ifAvailable ? { ifAvailable: true } : {}, (lock) => (lock ? run() : null)));
 }
 
 function priceOwner() {

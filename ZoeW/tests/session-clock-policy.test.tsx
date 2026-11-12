@@ -281,3 +281,33 @@ it.each(['live', 'expired'])('ព្រំដែនវគ្គមិនច្�
     expect(firebaseState.sessionExpiryCheck).toBe(expected);
     expect(signOut).toHaveBeenCalledTimes(expected === 'expired' ? 1 : 0);
 });
+
+it('ផ្ទៀងផ្ទាត់វគ្គដដែលរួច មិនបើកផ្ទាំងឡើងវិញពេល License arm បន្ទាប់', async () => {
+    sample();
+    armSessionExpiryCheck(firebaseState.auth.currentUser, firebaseState.authGeneration);
+    await turn();
+    expect(firebaseState.sessionExpiryCheck).toBe('live');
+    mount(<AppLockScreen />);
+    let resolve!: (value: any) => void;
+    token.mockReturnValueOnce(new Promise(yes => { resolve = yes; }));
+    step(() => { armSessionExpiryCheck(firebaseState.auth.currentUser, firebaseState.authGeneration); });
+    expect(firebaseState.sessionExpiryCheck).toBe('live');
+    expect(document.getElementById('appLockScreen')?.classList.contains('is-open')).toBe(false);
+    resolve({ authTime: new Date(START - HOUR).toISOString() });
+    await turn();
+});
+
+it.each(['clock', 'generation', 'expired'])('arm មិនរក្សា live ពេលភស្តុតាងលែងមានសុពលភាព៖ %s', async reason => {
+    sample();
+    await runSessionExpiryCheck();
+    if (reason === 'clock') skew = 24 * HOUR;
+    if (reason === 'generation') firebaseState.authGeneration++;
+    if (reason === 'expired') elapsed = 4 * HOUR;
+    let resolve!: (value: any) => void;
+    token.mockReturnValueOnce(new Promise(yes => { resolve = yes; }));
+    armSessionExpiryCheck(firebaseState.auth.currentUser, firebaseState.authGeneration);
+    expect(firebaseState.sessionExpiryCheck).toBe('pending');
+    resolve({ authTime: new Date(START - HOUR).toISOString() });
+    await turn();
+    expect(firebaseState.sessionExpiryCheck).toBe(reason === 'clock' ? 'unverified' : reason === 'expired' ? 'expired' : 'live');
+});

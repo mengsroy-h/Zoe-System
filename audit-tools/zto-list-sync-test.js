@@ -2809,7 +2809,17 @@ function firstBody(requests) {
     global.fetch = withSupabase(responder(listPayload([listRow()])));
     await call(listQuery({ page: '1' }), { 'x-zoe-id-token': tokA });
     await call(listQuery({ from: '2026-09-09' }), { 'x-zoe-id-token': tokA });
-    ok('Supabase ៖ សាលក្រមចងចាំតាម token (សំណើទី ២ មិនសួរ Supabase ម្តងទៀត)', sbCalls.length === 1, sbCalls.length);
+    ok('Supabase ៖ token ដដែលត្រូវផ្ទៀង session រាល់សំណើ', sbCalls.length === 2, sbCalls.length);
+    const savedAccount = ACCOUNTS[tokA];
+    delete ACCOUNTS[tokA];
+    seenRequests.length = 0;
+    const revokedSession = await call(listQuery({ page: '1' }), { 'x-zoe-id-token': tokA });
+    const revokedSessionBody = JSON.parse(revokedSession.body);
+    ok('⛔ session ត្រូវដក ➜ JWT ចាស់បិទភ្លាម ទោះមាន cache លទ្ធផល · មិនហៅ ZTO',
+        revokedSessionBody.enabled === false && revokedSessionBody.reason === 'idtoken:signature' && ztoCalls() === 0,
+        revokedSessionBody);
+    ACCOUNTS[tokA] = savedAccount;
+
 
     const tokRevoked = sbToken('user-r');
     ACCOUNTS[tokRevoked] = [{ tenant_id: 't-r', branch_code: '770022', status: 'revoked' }];

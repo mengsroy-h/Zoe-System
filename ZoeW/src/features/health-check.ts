@@ -27,7 +27,7 @@ import { HEALTH_ADVICE_LABELS, HEALTH_NO_BACKEND_TEXT, buildHealthAdvice } from 
 import { isSupabaseConfig } from '../services/supabase-config';
 import { firebaseWebsocketIsBlocked, FIREBASE_WEBSOCKET_BLOCKED_TEXT } from '../services/firebase-websocket-observation';
 
-export const SHEET_SCRIPT_VERSION_EXPECTED = 2;
+export const SHEET_SCRIPT_VERSION_EXPECTED = 3;
 
 export const HEALTH_ICONS = { ok: '✅', warn: '⚠️', bad: '❌', info: 'ℹ️' };
 

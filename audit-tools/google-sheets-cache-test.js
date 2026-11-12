@@ -183,7 +183,7 @@ function testReaderTellsTheTruth() {
         assert.ok(res.error && /sheet-missing/.test(res.error), 'tab Customers បាត់ ➜ error មិនមែន found:false — ' + JSON.stringify(res));
         assert.strictEqual(res.rows, undefined);
     }
-    const api = createApi({ secret: 'test-secret\n', rows: [['M-1', '$1,250.50', ' 15.5 ', '-'], ['M-2', 'abc', 2, "'"], ['M-3', 0, 3, '012 345']] });
+    const api = createApi({ secret: 'test-secret\n', rows: [['M-1', '$1,250.50', ' 15.5 ', '-'], ['M-2', '', 2, "'"], ['M-3', 0, 3, '012 345']] });
     const list = api.request({ list: '1' });
     assert.deepStrictEqual(list.rows, [
         { barcode: 'M-1', dod: 1250.5, cod: 15.5, phone: '' },
@@ -194,6 +194,25 @@ function testReaderTellsTheTruth() {
     assert.deepStrictEqual([one.found, one.dod, one.cod, one.phone], [true, 1250.5, 15.5, '']);
     assert.strictEqual(createApi({ secret: '  ', rows: [] }).request({ list: '1' }).error.indexOf('API_KEY'), 0);
 }
+
+function testMoneyFormatsFailClosed() {
+    for (const [value, expected] of [['12,50', 12.5], ['1.234,56', 1234.56], ['$1,234.56', 1234.56], ['-12,50', -12.5], [12.5, 12.5], ['', 0]]) {
+        const api = createApi({ rows: [['MONEY-1', value, value, '012 000 001']] });
+        const one = api.request({ code: 'MONEY-1' });
+        assert.deepStrictEqual([one.dod, one.cod], [expected, expected], 'ទឹកប្រាក់ត្រូវអានត្រឹមត្រូវ៖ ' + value);
+        assert.deepStrictEqual(api.request({ list: '1' }).rows[0], { barcode: 'MONEY-1', dod: expected, cod: expected, phone: '012 000 001' });
+    }
+    for (const value of ['12abc34', 'abc', '1,234', '1.234', '1,23,4', '--12', '1e3']) {
+        const api = createApi({ rows: [['MONEY-1', value, 2, '012 000 001']] });
+        for (const result of [api.request({ code: 'MONEY-1' }), api.request({ list: '1' })]) {
+            assert.strictEqual(result.error, 'invalid-money', 'ទឹកប្រាក់មិនច្បាស់ត្រូវបដិសេធ៖ ' + value);
+            assert.strictEqual(result.rows, undefined);
+            assert.strictEqual(result.found, undefined);
+        }
+    }
+}
+
+testMoneyFormatsFailClosed();
 
 testReaderTellsTheTruth();
 

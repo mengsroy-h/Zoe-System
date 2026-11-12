@@ -124,6 +124,8 @@
 
 ### [2.50.195] · ZoeKeyGen [2.24.41] — 2026-11-12 · ផ្ទៀងវគ្គ និងព្រំដែនប្រតិបត្តិការ
 
+- Audit1298 លើ0ab88b2៖ shards1/2/4/5 pass, shard3 មានតែ ZTO fixture race។ Idle barrier បង្ហាញថា expected6 ធ្លាប់រំលង manual retry ដំបូង; sequence ពិត5→6→7។ Test រង់ចាំ queue idle មុន retries ទាំងពីរ ហើយផ្ទៀង photo/identity/no-replay guards ដដែល។ E2E+lock32 និង repeated focused24 pass; production/locked ZTO មិនកែ។ រង់ចាំ full CI ថ្មី។
+
 - Audit1297 លើ0c677b2៖ shards2/3/5 pass រួម browser recovery; F03 permutations ទាំងពីរ608 pass និង Registration71 pass។ កែ duplication ដោយ shared enrollment scope (52tests/typecheck/lint pass) និង optional diagnostic មិនបាំង original outcome (reporting18/F03fixtures120 pass)។ មូលហេតុ intermittent preflight ដើមមិនទាន់បញ្ជាក់; រង់ចាំ full CI លើកូដថ្មី។
 
 - Actual-adapter fixture bootstrap បង្ក Firebase cached WebSocket ចង trace registry ចាស់។ ផ្លាស់ fixture ទៅ subprocess ឯករាជ្យ និងផ្ទៀង parent module cache/DOM ដដែល; child5 និង parent120 fixtures pass។ Native/Supabase engine verification ត្រូវរង់ចាំ CI ថ្មី។

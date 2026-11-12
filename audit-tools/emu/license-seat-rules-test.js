@@ -70,17 +70,21 @@ function loadSeatReleaser(onRequest) {
     const releasePendingDecl = (src.match(/^const RELEASE_PENDING_TEXT = .*;$/m) || [])[0] || "const RELEASE_PENDING_TEXT = '(អវត្តមាន RELEASE_PENDING_TEXT)';";
     const names = ['releaseKeySeat', 'getTrustedServerNow', 'captureKeygenClock', 'keygenClockIsCurrent', 'patchLicenseViaRest', 'readKeyReleaseViaRest', 'databaseUrlOf', 'isFirebaseDatabaseHost', 'fetchWithTimeout'];
     const fns = names.map((name) => sliceShippedFn(src, name)).filter(Boolean);
+    const sellerStart = src.indexOf('function seatSellerContext()');
+    const sellerEnd = src.indexOf('async function toggleRevokeKey(', sellerStart);
+    if (sellerStart !== -1 && sellerEnd > sellerStart) fns.push(src.slice(sellerStart, sellerEnd));
     if (!pendingDecl || !fns.length || fns[0].indexOf('releaseKeySeat') === -1) return null;
     const log = { alerts: [], toasts: [], refreshed: 0, sdk: [] };
     const user = { uid: 'adminUid', email: 'admin@example.test', getIdToken: () => Promise.resolve('emu-admin-token') };
     const ctx = {
         console: { error() {}, log() {}, warn() {} }, Promise, Error, JSON, Object, Array, String, Number, Math, Date, performance, URL, AbortController,
         setTimeout, clearTimeout, encodeURIComponent,
-        window: {}, ZoeErrors: { capture() {} },
+        window: {}, ZoeErrors: { capture() {} }, signingPrivateKeyJwk: null,
         db: { app: { options: { databaseURL: 'https://licseat-emu.firebaseio.com/' } } },
         auth: { currentUser: user },
         captureSensitiveSession: () => ({ user }),
         adminOperationIsCurrent: () => true,
+        isSensitiveSessionCurrent: () => true,
         withTimeout: (promise) => promise,
         retryAsync: (fn) => fn(),
         serverTimeSynced: true,
@@ -191,7 +195,10 @@ async function testSeatClockFixture() {
                 }
                 throw new TypeError('ចម្លើយបាត់');
             }
-            return { ok: true, status: 200, json: async () => String(url).includes('/releasedAt') ? Date.now() + 10000 : null };
+            const markerRead = new URL(String(url)).pathname === '/license_keys/' + APP + '/' + id + '.json';
+            return { ok: true, status: 200, json: async () => markerRead
+                ? { maxDevices: 1, revoked: false, expiresAt: 4102444800000 }
+                : String(url).includes('/releasedAt') ? Date.now() + 10000 : null };
         };
         await releaser.ctx.releaseKeySeat(id);
         check(patches === 1 && releaser.log.sdk.length === 0, 'ចម្លើយបាត់ ➜ PATCH តែមួយ គ្មាន SDK — ' + mode);

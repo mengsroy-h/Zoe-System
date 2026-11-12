@@ -42,6 +42,7 @@ function sliceFn(name) {
 
 const AUTH_DATABASE_GUARD = sliceFn('captureAuthDatabaseGuard') || 'function captureAuthDatabaseGuard() { return () => true; }';
 const PENDING_ACTIVATION_DECL = (source.match(/(?:^|\n)[ \t]*(let pendingActivation = [^\n]+;)/) || [])[1] || '';
+const SEAT_ENROLLMENT_DECL = (source.match(/(?:^|\n)[ \t]*(let seatEnrollmentOperation = [^\n]+;)/) || [])[1] || '';
 
 (async () => {
     const sessionFn = sliceFn('runSessionExpiryCheck');
@@ -50,6 +51,7 @@ const PENDING_ACTIVATION_DECL = (source.match(/(?:^|\n)[ \t]*(let pendingActivat
     ok('មាន guard សម្រាប់ការពិនិត្យ Session ជាប្រចាំ', !!sessionFn);
     ok('មាន guard សម្រាប់ការពិនិត្យ License ជាប្រចាំ', !!licenseFn);
     ok('ស្រង់ស្ថានភាពរង់ចាំផ្ទៀងផ្ទាត់ Activation ពិតបាន', !!PENDING_ACTIVATION_DECL);
+    ok('ស្រង់ស្ថានភាពចុះឈ្មោះឧបករណ៍ពិតបាន', !!SEAT_ENROLLMENT_DECL);
     ok('ការអាន Firebase token មាន timeout', /withTimeout\([^,]*\.getIdTokenResult\(/.test(sliceFn('getFirebaseSessionVerdict')));
     // ⛔ ZoeW (React) ចុះឈ្មោះវដ្តតាម `scope.every(ms, fn)` (`app/lifecycle/scope.ts` ៖ dispose ពេល unmount) ➜
     //    ទទួលវា **តែពេល** តួ `every()` ពិតជា `setInterval(fn, ms)` (ដេរីវេពីកូដ មិនមែនជឿឈ្មោះ)
@@ -208,7 +210,7 @@ const PENDING_ACTIVATION_DECL = (source.match(/(?:^|\n)[ \t]*(let pendingActivat
 
     // សំណើចាស់អាចមកដល់ក្រោយចាកចេញ ឬប្ដូរ database។ ប្រើ helper ដែលកែ DOM
     // ពិត រួមនឹង withTimeout ពិត ដើម្បីកុំឱ្យ stub លាក់ស្នាមភ្ជាប់នេះ។
-    const activationNames = ['ensureAppActivated', 'submitActivationKey', 'runPeriodicLicenseCheck', 'withTimeout'];
+    const activationNames = ['ensureAppActivated', 'submitActivationKey', 'runPeriodicLicenseCheck', 'withTimeout', 'clearSeatEnrollment'];
     const activationFunctions = activationNames.map((name) => {
         const found = sliceFn(name);
         ok('ស្រង់ផ្លូវវគ្គ Activation ពិត ៖ ' + name, !!found);
@@ -253,7 +255,7 @@ const PENDING_ACTIVATION_DECL = (source.match(/(?:^|\n)[ \t]*(let pendingActivat
             ZoeErrors: { capture: () => effects.push('error') }
         });
         vm.runInContext(reactRuntime(source, { exclude: activationNames, context }), context);
-        vm.runInContext('let licenseRecheckInFlight = false;\n' + PENDING_ACTIVATION_DECL + '\n' + activationFunctions, context);
+        vm.runInContext('let licenseRecheckInFlight = false;\n' + PENDING_ACTIVATION_DECL + '\n' + SEAT_ENROLLMENT_DECL + '\n' + activationFunctions, context);
         return { context, effects, reads, activations, timers, element };
     }
     const changes = {
@@ -270,6 +272,7 @@ const PENDING_ACTIVATION_DECL = (source.match(/(?:^|\n)[ \t]*(let pendingActivat
                 const h = activationContext();
                 const c = h.context;
                 c.isDatabaseInitialized = surface === 'កាលកំណត់';
+                vm.runInContext("seatEnrollmentOperation = { isCurrent: () => true }; viewState.seatEnrollmentJson = 'pending-request'; viewState.seatEnrollmentFingerprint = 'pending-fingerprint';", c);
                 let pending;
                 if (surface === 'ផ្ទៀងផ្ទាត់') pending = c.ensureAppActivated();
                 else if (surface === 'កាលកំណត់') pending = c.runPeriodicLicenseCheck();
@@ -286,6 +289,7 @@ const PENDING_ACTIVATION_DECL = (source.match(/(?:^|\n)[ \t]*(let pendingActivat
                 h.effects.length = 0;
                 // ⛔ សារក្នុងប្រអប់ Activation (`viewState.activationMessage` ➜ JSX) ក៏ជា UI ដែរ
                 const messageBefore = vm.runInContext('viewState.activationMessage', c);
+                const enrollmentBefore = vm.runInContext('JSON.stringify([seatEnrollmentOperation !== null, viewState.seatEnrollmentJson, viewState.seatEnrollmentFingerprint])', c);
                 if (request) request.resolve(surface === 'Activate ដំណាក់ទី១'
                     ? { valid: active, reason: 'revoked' }
                     : { state: active ? 'active' : 'inactive', reason: 'revoked' });
@@ -299,10 +303,15 @@ const PENDING_ACTIVATION_DECL = (source.match(/(?:^|\n)[ \t]*(let pendingActivat
                     ok('លទ្ធផលចាស់មិនកែ UI/arm/listener ៖ ' + label,
                         h.effects.length === 0 && h.element('activationKeyInput').value === 'KEY-NEW'
                         && vm.runInContext('viewState.activationMessage', c) === messageBefore
+                        && vm.runInContext('JSON.stringify([seatEnrollmentOperation !== null, viewState.seatEnrollmentJson, viewState.seatEnrollmentFingerprint])', c) === enrollmentBefore
                         && (surface !== 'Activate ដំណាក់ទី១' || h.reads.length === 0),
                         { effects: h.effects, input: h.element('activationKeyInput').value, reads: h.reads.length });
                 } else {
                     ok('ទិសផ្ទុយ៖ វគ្គដដែលនៅបង្ហាញសាលក្រម ៖ ' + label, h.effects.length > 0, h.effects);
+                    if (!active && surface !== 'Activate ដំណាក់ទី១') {
+                        ok('សាលក្រមបដិសេធលុបសំណើចុះឈ្មោះចាស់ពិត ៖ ' + label,
+                            vm.runInContext("seatEnrollmentOperation === null && viewState.seatEnrollmentJson === '' && viewState.seatEnrollmentFingerprint === ''", c));
+                    }
                 }
             }
         }

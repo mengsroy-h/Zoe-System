@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.42';
+const APP_VERSION = '2.24.43';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -3051,6 +3051,12 @@ async function requireLegacySeat(context, id) {
     return row;
 }
 
+function seatLegacyExpiresAt(value) {
+    if (!Number.isFinite(value) || value <= 0) return null;
+    const expiresAt = Math.floor(value);
+    return Number.isSafeInteger(expiresAt) && expiresAt > 0 ? expiresAt : null;
+}
+
 function seatSellerEncode(bytes) {
     return btoa(Array.from(new Uint8Array(bytes), (byte) => String.fromCharCode(byte)).join('')).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
@@ -3137,8 +3143,10 @@ async function manageSecureSeats(id) {
             if (row.seatProtocol === 2) throw new Error('seat-already-active');
             if (!confirm('ចម្លងចំនួនឧបករណ៍ សុពលភាព និងស្ថានភាព Key បច្ចុប្បន្នទៅ Server សុវត្ថិភាព? មិនប្ដូរ marker របស់ Key ទេ។')) return;
             const latest = await requireLegacySeat(context, id);
-            verifyState = (checked) => checked.maxDevices === (latest.maxDevices || 1) && checked.licenseExpiresAt === latest.expiresAt && checked.revoked === !!latest.revoked;
-            await seatSellerCommand(context, id, 'configure', state.revision, { maxDevices: latest.maxDevices || 1, licenseExpiresAt: latest.expiresAt, revoked: !!latest.revoked });
+            const expiresAt = seatLegacyExpiresAt(latest.expiresAt);
+            if (expiresAt === null) throw new Error('seat-expiry-invalid');
+            verifyState = (checked) => checked.maxDevices === (latest.maxDevices || 1) && checked.licenseExpiresAt === expiresAt && checked.revoked === !!latest.revoked;
+            await seatSellerCommand(context, id, 'configure', state.revision, { maxDevices: latest.maxDevices || 1, licenseExpiresAt: expiresAt, revoked: !!latest.revoked });
         } else if (choice === '2') {
             const raw = prompt('បិទភ្ជាប់សំណើចុះឈ្មោះ JSON ពីឧបករណ៍ដែលអ្នកបានផ្ទៀងផ្ទាត់៖');
             if (raw === null) return;
@@ -3169,7 +3177,7 @@ async function manageSecureSeats(id) {
             if (!fingerprints.includes(inspected.receiptKeyFingerprint) || count < 1) throw new Error('seat-cutover-not-ready');
             if (state.mode === 'staged') {
                 const latest = await requireLegacySeat(context, id);
-                if ((latest.maxDevices || 1) !== state.maxDevices || latest.expiresAt !== state.licenseExpiresAt || !!latest.revoked !== state.revoked) throw new Error('seat-config-changed');
+                if ((latest.maxDevices || 1) !== state.maxDevices || seatLegacyExpiresAt(latest.expiresAt) !== state.licenseExpiresAt || !!latest.revoked !== state.revoked) throw new Error('seat-config-changed');
                 if (!confirm('បើកការផ្ទៀងផ្ទាត់សុវត្ថិភាពលើ Server សម្រាប់ឧបករណ៍ ' + count + '? សូមបញ្ជាក់ថាគ្រប់ឧបករណ៍បានដំឡើង App ដែលគាំទ្រ។')) return;
                 await seatSellerCommand(context, id, 'cutover', state.revision, { expectedDevices: count, receiptKeyFingerprint: inspected.receiptKeyFingerprint });
             }
@@ -3186,7 +3194,7 @@ async function manageSecureSeats(id) {
                 await withTimeout(fb.runTransaction(fb.ref(context.database, 'license_keys/ZOE/' + id), (current) => {
                     if (!context.current() || signingPrivateKeyJwk !== context.privateKey || !keygenClockIsCurrent(markerClock) || !current) return;
                     if (current.seatProtocol === 2) return;
-                    if ((current.maxDevices || 1) !== state.maxDevices || current.expiresAt !== state.licenseExpiresAt || !!current.revoked !== state.revoked) return;
+                    if ((current.maxDevices || 1) !== state.maxDevices || current.expiresAt !== latest.expiresAt || seatLegacyExpiresAt(current.expiresAt) !== state.licenseExpiresAt || !!current.revoked !== state.revoked) return;
                     return { ...current, seatProtocol: 2 };
                 }), 15000, 'Seat marker outcome unknown');
                 if (!context.current()) return;
@@ -3474,13 +3482,13 @@ async function confirmExtendKey() {
                 if (current === null || current === undefined) { outcome = 'missing'; return null; }
                 if (typeof current !== 'number' || current !== shown) { outcome = 'changed'; return; }
                 outcome = 'extended';
-                return Math.max(current, from) + addMs;
+                return Math.floor(Math.max(current, from)) + addMs;
             }).then((result) => {
                 const value = result && result.committed && result.snapshot ? result.snapshot.val() : null;
                 if (outcome === 'extended' && typeof value === 'number' && value > 0) return value;
                 throw Object.assign(new Error('Extend ' + outcome), { extendOutcome: outcome });
             }, () => {
-                const expected = typeof shown === 'number' ? Math.max(shown, from) + addMs : NaN;
+                const expected = typeof shown === 'number' ? Math.floor(Math.max(shown, from)) + addMs : NaN;
                 return readExpiresAtViaRest(p, targetId, operationDb).then((value) => {
                     if (value === expected) return value;
                     const settled = value === shown ? 'failed' : 'unknown';

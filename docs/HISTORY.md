@@ -122,6 +122,13 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### ZoeKeyGen [2.24.43] — 2026-11-12 · ផ្ទេរសុពលភាព legacy ទសភាគ
+
+**ZoeKeyGen** (`zoekeygen-v153` ➜ `zoekeygen-v154`)។ ZoeW មិនប្ដូរកំណែ។
+- ការផ្ទៀងឯករាជ្យក្រោយ CI រកឃើញ legacy expiry ទសភាគដែលមានស្រាប់បរាជ័យពេល configure secure state។ បកប្រែតែ finite positive expiry ទៅ safe integer ដោយ floor; configure/readback/cutover ប្រើតម្លៃដូចគ្នា។ Marker transaction រក្សា exact raw-expiry CAS និងមិនសរសេរតម្លៃ expiry ឡើងវិញ។
+- Legacy renewal និង lost-ACK expectation បង្គត់មូលដ្ឋានដូចគ្នា។ Server validation មិនបន្ធូរ។ Regression មុនកែ6fail/69pass; ក្រោយកែ seller/stage/clock/calendar136pass រួម actual signed configure→enroll→cutover និង same-millisecond raw mutation refusal។
+- **សកម្មភាពដោយដៃ**៖ រង់ចាំ full CI និង review ថ្មីមុន merge; merge អាចបើក APK/Netlify/Supabase integrations តាមការកំណត់ពិត។ Live deployment settings និងឧបករណ៍ពិតមិនទាន់ផ្ទៀង; receipt keys/rules/enrollment/legacy retirement និង Apps Script rollout នៅតាមផែនការ។ មិនបាន merge/deploy ឬកែ APK gate។
+
 ### ZoeKeyGen [2.24.42] — 2026-11-12 · បន្តសុពលភាពជាមួយម៉ោងទសភាគ
 
 **ZoeKeyGen** (`zoekeygen-v152` ➜ `zoekeygen-v153`)។ ZoeW មិនប្ដូរកំណែ។

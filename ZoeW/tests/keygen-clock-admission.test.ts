@@ -222,3 +222,23 @@ it('Release៖ ACK ពិតនៅជោគជ័យទោះ clock មិនច
 it('Release៖ session ចាស់មិនសរសេរ',async()=>{
   const h=keygen(env());h.sync();await release(h,{stale:true});expect(h.c.__effects.writes).toHaveLength(0);
 });
+
+it.each([
+  {expiresAt:T-DAY,lostAck:false},{expiresAt:T+DAY+0.75,lostAck:false},
+  {expiresAt:T-DAY,lostAck:true},{expiresAt:T+DAY+0.75,lostAck:true}
+])('Extend legacy៖ $expiresAt ម៉ោងទសភាគ និងចម្លើយបាត់ $lostAck រក្សាចំនួនគត់', async ({expiresAt,lostAck}) => {
+  const h=keygen(env());h.sync();h.advance(0.75);
+  h.c.__expires=expiresAt;
+  if(lostAck){
+    const transact=h.c.__fb.runTransaction;
+    h.c.__fb.runTransaction=async(...args)=>{await transact(...args);throw Error('synthetic lost ACK');};
+    h.c.readExpiresAtViaRest=async()=>h.c.__effects.writes[0].val;
+  }
+  vm.runInContext("keyListCache=[{id:'SYNTHETICKEY123456789',paths:['ZOE'],perApp:{ZOE:{expiresAt:__expires}}}]",h.c);
+  h.c.document.getElementById('extendDaysInput').value='30';
+  await settle(h,()=>h.c.confirmExtendKey());
+  expect(h.c.__effects.writes).toHaveLength(1);
+  expect(h.c.__effects.writes[0].val).toBe(Math.floor(Math.max(expiresAt,T+0.75))+30*DAY);
+  expect(Number.isSafeInteger(h.c.__effects.writes[0].val)).toBe(true);
+  expect(h.c.__effects.toasts.some(t=>t.startsWith('✅'))).toBe(true);
+});

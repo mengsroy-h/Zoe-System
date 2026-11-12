@@ -222,3 +222,85 @@ describe('បន្តសុពលភាពសុវត្ថិភាពជា�
         expect(h.store.setJSON).not.toHaveBeenCalled();
     });
 });
+
+async function migrationHarness(expiresAt: unknown = 5000000.75) {
+    const h = await harness();
+    const publicKey = await webcrypto.subtle.exportKey('jwk', h.pair.publicKey);
+    let saved: any = { ...h.state, mode: 'staged', seats: {} };
+    const store = {
+        getWithMetadata: async () => ({ data: structuredClone(saved), etag: String(saved.revision) }),
+        setJSON: vi.fn(async (_path: string, next: any, options: any) => {
+            if (options.onlyIfMatch !== String(saved.revision)) return { modified: false };
+            saved = structuredClone(next); return { modified: true };
+        })
+    };
+    const service = createSeatStageService({ store, enabled: true, now: () => 1000000,
+        publicKeys: [publicKey], receiptPrivateJwk: h.ctx.signingPrivateKeyJwk });
+    const originalFetch = h.ctx.fetchWithTimeout;
+    h.ctx.fetchWithTimeout = async (url: string, options: any) => {
+        if (url.includes('firebaseio')) return originalFetch(url, options);
+        const envelope = JSON.parse(options.body);
+        const command = JSON.parse(Buffer.from(envelope.payload, 'base64url').toString());
+        const result = await service.execute(envelope);
+        h.commands.push({ command, envelope, result });
+        return { res: { ok: result.status === 200 }, body: result.body };
+    };
+    h.setRow({ maxDevices: 1, expiresAt, revoked: false });
+    h.ctx.window.ZoeSeatConfig.receiptPublicKeys = [publicKey];
+    const canonical = { kty: publicKey.kty, crv: publicKey.crv, x: publicKey.x, y: publicKey.y };
+    const fingerprint = Buffer.from(await webcrypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(canonical)))).toString('hex');
+    const payload = Buffer.from(JSON.stringify({ domain: 'zoe-license-enrollment-v1', audience: 'https://zoew.netlify.app',
+        app: 'ZOE', keyId: 'ABCDEFGHIJKLMNOP', publicKey: canonical, nonce: '0123456789abcdef0123456789abcdef' })).toString('base64url');
+    const signature = Buffer.from(await webcrypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, h.pair.privateKey,
+        Buffer.from(payload))).toString('base64url');
+    h.ctx.window.ZoeSeatClient = { fingerprint: async () => fingerprint };
+    const choose = async (choice: string) => {
+        h.ctx.prompt.mockReturnValueOnce(choice);
+        if (choice === '2') h.ctx.prompt.mockReturnValueOnce(JSON.stringify({ payload, signature, fingerprint }));
+        await h.ctx.manageSecureSeats('ABCDEFGHIJKLMNOP');
+    };
+    return { ...h, saved: () => saved, store, choose };
+}
+
+describe('ផ្ទេរសុពលភាព legacy ទសភាគទៅ Server សុវត្ថិភាព', () => {
+    it.each([5000000, 5000000.75])('ថ្ងៃផុត %s អាច configure ចុះឈ្មោះ និង cutover ដោយហត្ថលេខាពិត', async expiresAt => {
+        const h = await migrationHarness(expiresAt);
+        await h.choose('1');
+        expect(h.commands.map(x => x.result.status)).toEqual([200, 200, 200]);
+        expect(h.saved().licenseExpiresAt).toBe(5000000);
+        expect(h.ctx.showToast).toHaveBeenCalledOnce();
+        expect(h.ctx.fb.runTransaction).not.toHaveBeenCalled();
+        await h.choose('2');
+        expect(Object.keys(h.saved().seats)).toEqual(['d1']);
+        await h.choose('4');
+        expect(h.saved().mode).toBe('active');
+        expect(h.ctx.alert).not.toHaveBeenCalled();
+        expect(h.ctx.showToast).toHaveBeenCalledTimes(3);
+        expect(h.ctx.fb.runTransaction).toHaveBeenCalledOnce();
+        expect(await h.ctx.seatSellerRow(h.ctx.seatSellerContext(), 'ABCDEFGHIJKLMNOP')).toMatchObject({ seatProtocol: 2, expiresAt });
+    });
+    it.each([undefined, null, NaN, Infinity, -1, 0, 0.75, '5000000.75', {}, [], Number.MAX_SAFE_INTEGER + 1])('ថ្ងៃផុតមិនត្រឹមត្រូវ %s មិន configure', async expiresAt => {
+        const h = await migrationHarness(); h.setRow({ maxDevices: 1, expiresAt, revoked: false });
+        await h.choose('1');
+        expect(h.store.setJSON).not.toHaveBeenCalled();
+        expect(h.ctx.showToast).not.toHaveBeenCalled();
+        expect(h.ctx.alert).toHaveBeenCalledOnce();
+        expect(h.ctx.fb.runTransaction).not.toHaveBeenCalled();
+    });
+    it('ការប្ដូរថ្ងៃផុតក្នុងមីលីវិនាទីដូចគ្នាមុន transaction មិនប្ដូរ marker', async () => {
+        const h = await migrationHarness();
+        await h.choose('1'); await h.choose('2');
+        const transaction = h.ctx.fb.runTransaction.getMockImplementation();
+        h.ctx.fb.runTransaction.mockImplementation(async (...args: any[]) => {
+            h.setRow({ maxDevices: 1, expiresAt: 5000000.875, revoked: false });
+            return transaction(...args);
+        });
+        h.ctx.showToast.mockClear();
+        await h.choose('4');
+        expect(h.saved().mode).toBe('active');
+        expect(h.ctx.fb.runTransaction).toHaveBeenCalledOnce();
+        expect((await h.ctx.seatSellerRow(h.ctx.seatSellerContext(), 'ABCDEFGHIJKLMNOP')).seatProtocol).not.toBe(2);
+        expect(h.ctx.showToast).not.toHaveBeenCalled();
+        expect(h.ctx.alert).toHaveBeenCalledOnce();
+    });
+});

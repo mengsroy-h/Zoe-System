@@ -84,7 +84,7 @@ function build(options) {
     const log = { alerts: [], toasts: [], updates: 0 };
     const user = { uid: 'admin-1', email: 'admin@example.com' };
     // ថ្ងៃផុតកំណត់លើ Server ៖ Extend សរសេរតាម transaction លើ `expiresAt` (CAS) ➜ fake ផ្ញើតម្លៃថ្មីតាម `fb.update` របស់ scenario (ពេលឆ្លើយ · ព្យួរ · បដិសេធ)
-    const keyServer = { 'license_keys/ADM/key-a/expiresAt': 1000, 'license_keys/ADM/key-b/expiresAt': 1000 };
+    const keyServer = { 'license_keys/ADM/AAAAAAAAAAAAAAAA/expiresAt': 1000, 'license_keys/ADM/BBBBBBBBBBBBBBBB/expiresAt': 1000 };
     const license = {
         getTrustedServerNow: () => 1000, getServerTimeGeneration: () => 1, resetServerTime() {},
         generateKeyPair: () => Promise.resolve({ publicKeyJwk: { kty: 'EC', x: 'pub' }, privateKeyJwk: { kty: 'EC', crv: 'P-256', d: 'private' } }),
@@ -143,7 +143,8 @@ function build(options) {
                     .then(() => { keyServer[ref.path] = next; return { committed: true, snapshot: { val: () => next } }; });
             }
         },
-        db: {},
+        URL,
+        db: { app: { options: { databaseURL: 'https://kg-probe.firebaseio.com' } } },
         auth: { currentUser: user },
         window: { ZoeLicense: license, ZoeErrors: { capture() {} } },
         ZoeErrors: { capture() { log.captures = (log.captures || 0) + 1; } },
@@ -161,6 +162,13 @@ function build(options) {
         __elements: elements,
         __storage: storage
     };
+    let fetchFixture = async () => { throw new Error('unexpected request'); };
+    Object.defineProperty(sandbox, 'fetch', { configurable: true, get: () => { const fixture = fetchFixture; return (url, init) => {
+        if (/\/license_keys\/ZOE\/[A-Z0-9]{16,40}\.json$/.test(String(url)) && (!init || !init.method || init.method === 'GET')) {
+            return Promise.resolve({ ok: true, status: 200, json: async () => ({ maxDevices: 1, revoked: false, expiresAt: 1000 }) });
+        }
+        return fixture(url, init);
+    }; }, set: (value) => { fetchFixture = value; } });
     const ctx = vm.createContext(sandbox);
     // ⛔ កំណែ 2.22.5 ៖ កូដ ship ចូលប្រើ storage តាម shim `appLocalStore` /
     // `appSessionStore` (អាន `window.localStorage` ក្នុង `try` តែម្តង ព្រោះ
@@ -185,8 +193,8 @@ function build(options) {
         var isGeneratingKey = false;
         var keyListSessionGeneration = 0;
         var lastGeneratedKey = '';
-        var extendTargetId = 'key-a';
-        var keyListCache = [{ id: 'key-a', paths: ['ADM'], perApp: { ADM: { expiresAt: 1000 } }, expiresAt: 1000, revoked: false, maxDevices: 1, seatDevices: [{ device: 'device-1', at: 1 }] }, { id: 'key-b', paths: ['ADM'], perApp: { ADM: { expiresAt: 1000 } }, expiresAt: 1000, revoked: false, maxDevices: 1, seatDevices: [] }];
+        var extendTargetId = 'AAAAAAAAAAAAAAAA';
+        var keyListCache = [{ id: 'AAAAAAAAAAAAAAAA', paths: ['ADM'], perApp: { ADM: { expiresAt: 1000 } }, expiresAt: 1000, revoked: false, maxDevices: 1, seatDevices: [{ device: 'device-1', at: 1 }] }, { id: 'BBBBBBBBBBBBBBBB', paths: ['ADM'], perApp: { ADM: { expiresAt: 1000 } }, expiresAt: 1000, revoked: false, maxDevices: 1, seatDevices: [] }];
         var seatReadFailed = false;
         var serverTimeSynced = true;
         var SIGNING_KEY_SESSION_STORAGE_KEY = 'zoekeygen_signing_key_enc';
@@ -226,6 +234,7 @@ function build(options) {
         'copySetupLink',
         'tryRestoreSigningKeyFromSession'
     ]), ctx);
+    if (src.includes('function seatSellerContext()')) vm.runInContext(src.slice(src.indexOf('function seatSellerContext()'), src.indexOf('async function toggleRevokeKey(')), ctx);
     return { ctx, license, log, elements, storage, getElementById, keyServer };
 }
 
@@ -295,7 +304,7 @@ function adminRetryFixture() {
             authListener(f.ctx.auth.currentUser);
         }
     };
-    const start = (kind) => f.ctx[kind](kind === 'deleteNotice' ? 'notice-a' : 'key-a');
+    const start = (kind) => f.ctx[kind](kind === 'deleteNotice' ? 'notice-a' : 'AAAAAAAAAAAAAAAA');
     return { ...f, timers, writes, change, start };
 }
 
@@ -441,7 +450,7 @@ function listRefreshFixture(kind) {
         request.requests.forEach((pending, index) => {
             if (failure && index === 0) { pending.reject(new Error('offline')); return; }
             if (kind === 'key') {
-                const value = index === 0 ? { ZOE: { 'key-a': { revoked, expiresAt: 1000, maxDevices: 1 } } } : {};
+                const value = index === 0 ? { ZOE: { 'AAAAAAAAAAAAAAAA': { revoked, expiresAt: 1000, maxDevices: 1 } } } : {};
                 pending.resolve({ exists: () => true, val: () => value });
             } else {
                 const body = index === 0 ? [{ id: 'shop-a', name: 'ហាង', revoked }] : [];
@@ -472,10 +481,10 @@ function releaseRestFixture(options) {
     vm.runInContext('var serverTimeSynced = ' + (o.synced ? 'true' : 'false') + ';', h.ctx);
     const tokens = [];
     h.ctx.auth.currentUser.getIdToken = () => { tokens.push(h.ctx.auth.currentUser.uid); return o.token ? o.token.promise : Promise.resolve('admin-id-token'); };
-    const store = { seats: { 'key-a': o.seats, 'key-b': null }, releasedAt: { 'key-a': o.releasedAt, 'key-b': null } };
+    const store = { seats: { 'AAAAAAAAAAAAAAAA': o.seats, 'BBBBBBBBBBBBBBBB': null }, releasedAt: { 'AAAAAAAAAAAAAAAA': o.releasedAt, 'BBBBBBBBBBBBBBBB': null } };
     const server = {
-        get seats() { return store.seats['key-a']; }, set seats(value) { store.seats['key-a'] = value; },
-        get releasedAt() { return store.releasedAt['key-a']; }, set releasedAt(value) { store.releasedAt['key-a'] = value; },
+        get seats() { return store.seats['AAAAAAAAAAAAAAAA']; }, set seats(value) { store.seats['AAAAAAAAAAAAAAAA'] = value; },
+        get releasedAt() { return store.releasedAt['AAAAAAAAAAAAAAAA']; }, set releasedAt(value) { store.releasedAt['AAAAAAAAAAAAAAAA'] = value; },
         store
     };
     const sdk = [];
@@ -525,8 +534,8 @@ async function verifyReleaseOverRest() {
     console.log('-- ⛔ A505 ៖ ដោះឧបករណ៍តាម REST PATCH ៖ ចម្លើយបាត់មិនផ្ញើម្តងទៀត · អានពី Database របស់ប្រតិបត្តិការ --');
     const patches = (f) => f.requests.filter((r) => r.method === 'PATCH');
     const reads = (f) => f.requests.filter((r) => r.method === 'GET');
-    const stampedBody = JSON.stringify({ 'license_seats/ADM/key-a': null, 'license_keys/ADM/key-a/releasedAt': { '.sv': 'timestamp' } });
-    const seatsOnlyBody = JSON.stringify({ 'license_seats/ADM/key-a': null });
+    const stampedBody = JSON.stringify({ 'license_seats/ADM/AAAAAAAAAAAAAAAA': null, 'license_keys/ADM/AAAAAAAAAAAAAAAA/releasedAt': { '.sv': 'timestamp' } });
+    const seatsOnlyBody = JSON.stringify({ 'license_seats/ADM/AAAAAAAAAAAAAAAA': null });
     const pendingText = (f) => vm.runInContext('RELEASE_PENDING_TEXT', f.ctx);
     const released = (f) => f.log.toasts.some((t) => t.startsWith('✅')) && f.log.alerts.length === 0 && f.log.refreshed >= 1;
     const pending = (f) => f.log.alerts.length === 1 && f.log.alerts[0] === pendingText(f) && !f.log.toasts.some((t) => t.startsWith('✅')) && f.log.refreshed >= 1;
@@ -536,7 +545,7 @@ async function verifyReleaseOverRest() {
     const runRelease = async (options, keyId) => {
         const f = releaseRestFixture(options);
         if (options && options.prepare) options.prepare(f);
-        await f.ctx.releaseKeySeat(keyId || 'key-a');
+        await f.ctx.releaseKeySeat(keyId || 'AAAAAAAAAAAAAAAA');
         await drain();
         return f;
     };
@@ -634,7 +643,7 @@ async function verifyReleaseOverRest() {
         for (const stage of ['token', 'patch']) {
             const gate = deferred();
             f = releaseRestFixture(stage === 'token' ? { token: gate } : { patch: ['pending'], pending: gate });
-            const task = f.ctx.releaseKeySeat('key-a');
+            const task = f.ctx.releaseKeySeat('AAAAAAAAAAAAAAAA');
             await drain();
             const before = f.requests.length;
             const generationBefore = vm.runInContext('authGeneration', f.ctx);
@@ -661,7 +670,7 @@ async function verifyReleaseOverRest() {
         const gate = deferred();
         f = releaseRestFixture({ patch: ['pending'], pending: gate });
         vm.runInContext(slice(['closeModal', 'clearPinInputValues', 'clearKeypairOutputs']) + '\nvar pinTargetAction = null;', f.ctx);
-        const task = f.ctx.releaseKeySeat('key-a');
+        const task = f.ctx.releaseKeySeat('AAAAAAAAAAAAAAAA');
         await drain();
         f.getElementById('pinModal').classList.add('active');
         f.ctx.closeModal('pinModal');
@@ -676,9 +685,9 @@ async function verifyReleaseOverRest() {
         f = releaseRestFixture({ patch: ['pending'], pending: gate });
         let confirms = 0;
         f.ctx.confirm = () => { confirms++; return true; };
-        const task = f.ctx.releaseKeySeat('key-a');
+        const task = f.ctx.releaseKeySeat('AAAAAAAAAAAAAAAA');
         await drain();
-        const second = f.ctx.releaseKeySeat('key-a');
+        const second = f.ctx.releaseKeySeat('AAAAAAAAAAAAAAAA');
         await drain();
         const whileBusy = { patches: patches(f).length, confirms, toasts: f.log.toasts.slice() };
         gate.resolve({ ok: true, status: 200, text: () => Promise.resolve('{}') });
@@ -687,7 +696,7 @@ async function verifyReleaseOverRest() {
         ok('⛔ R14 ៖ ចុចដោះម្តងទៀតពេល PATCH មិនទាន់ឆ្លើយ ➜ មិនសួរ · មិនផ្ញើ PATCH ទី ២ · ⏳ ប្រាប់ឲ្យរង់ចាំ',
             whileBusy.patches === 1 && whileBusy.confirms === 1 && whileBusy.toasts.some((t) => t.startsWith('⏳')), { whileBusy, ...detail(f) });
         ok('R14 ៖ ក្រោយ PATCH ទី ១ ចប់ ➜ ✅ តែម្តង ហើយការដោះលើកក្រោយផ្ញើបាន', patches(f).length === 1 && released(f), detail(f));
-        await f.ctx.releaseKeySeat('key-a');
+        await f.ctx.releaseKeySeat('AAAAAAAAAAAAAAAA');
         await drain();
         ok('R14 ៖ busy ត្រូវដោះក្រោយចប់ (ការដោះបន្ទាប់សួរ និងផ្ញើ PATCH)', confirms === 2 && patches(f).length === 2, { confirms, ...detail(f) });
     }
@@ -892,13 +901,13 @@ async function run() {
     for (const kind of ['extend', 'revoke', 'seat']) {
         h = build();
         vm.runInContext(slice(['closeModal', 'clearPinInputValues', 'clearKeypairOutputs']) + '\nvar pinTargetAction = null;', h.ctx);
-        if (kind === 'extend') { h.ctx.openExtendModal('key-a'); h.getElementById('extendDaysInput').value = '7'; }
+        if (kind === 'extend') { h.ctx.openExtendModal('AAAAAAAAAAAAAAAA'); h.getElementById('extendDaysInput').value = '7'; }
         const pending = deferred();
         h.ctx.fb.update = () => { h.log.updates++; return pending.promise; };
         h.ctx.fb.set = () => { h.log.updates++; return pending.promise; };
         h.ctx.prompt = () => '2';
-        const task = kind === 'extend' ? h.ctx.confirmExtendKey() : kind === 'revoke' ? h.ctx.toggleRevokeKey('key-a')
-            : kind === 'seat' ? h.ctx.setKeySeatLimit('key-a') : h.ctx.releaseKeySeat('key-a');
+        const task = kind === 'extend' ? h.ctx.confirmExtendKey() : kind === 'revoke' ? h.ctx.toggleRevokeKey('AAAAAAAAAAAAAAAA')
+            : kind === 'seat' ? h.ctx.setKeySeatLimit('AAAAAAAAAAAAAAAA') : h.ctx.releaseKeySeat('AAAAAAAAAAAAAAAA');
         await drain();
         ok(kind + ' ៖ លក្ខខណ្ឌចាំបាច់ ៖ ការសរសេរចាប់ផ្តើមមុនបិទប្រអប់ PIN', h.log.updates >= 1, h.log.updates);
         h.getElementById('pinModal').classList.add('active');
@@ -913,7 +922,7 @@ async function run() {
         h = build();
         const pend = deferred();
         h.ctx.fb.update = () => { h.log.updates++; return pend.promise; };
-        const task = h.ctx.toggleRevokeKey('key-a');
+        const task = h.ctx.toggleRevokeKey('AAAAAAAAAAAAAAAA');
         await drain();
         vm.runInContext('invalidateSensitiveSession(); isSignedInUiActive = false; authGeneration++; isSignedInUiActive = true;', h.ctx);
         pend.resolve();
@@ -932,24 +941,24 @@ async function run() {
 
     console.log('-- បន្ថែមសុពលភាព៖ target និង session ត្រូវនៅត្រឹមត្រូវក្រោយ await --');
     h = build();
-    h.ctx.openExtendModal('key-a');
+    h.ctx.openExtendModal('AAAAAAAAAAAAAAAA');
     h.getElementById('extendDaysInput').value = '7';
     const clockWait = deferred();
     h.ctx.waitForServerTimeSync = () => clockWait.promise;
     const targetWrites = [];
     h.ctx.fb.update = (ref, value) => { targetWrites.push({ path: ref.path, value }); return Promise.resolve(); };
     const extendTask = h.ctx.confirmExtendKey();
-    h.ctx.openExtendModal('key-b');
+    h.ctx.openExtendModal('BBBBBBBBBBBBBBBB');
     clockWait.resolve(true);
     await extendTask;
     ok('បើក Key B ខណៈ Key A រង់ចាំម៉ោង៖ សរសេរតែ Key A',
-        targetWrites.length === 1 && targetWrites[0].path === 'license_keys/ADM/key-a', targetWrites);
+        targetWrites.length === 1 && targetWrites[0].path === 'license_keys/ADM/AAAAAAAAAAAAAAAA', targetWrites);
     ok('ថ្ងៃសុពលភាពយកពីការបញ្ជាក់ Key A មិនមែន input ថ្មី',
         targetWrites.length === 1 && targetWrites[0].value.expiresAt === 1000 + 7 * 86400000, targetWrites);
     ok('ការបញ្ចប់ Key A មិនបិទ modal ថ្មីរបស់ Key B', h.getElementById('extendModal').classList.contains('active'));
 
     h = build();
-    h.ctx.openExtendModal('key-a');
+    h.ctx.openExtendModal('AAAAAAAAAAAAAAAA');
     const logoutClock = deferred();
     h.ctx.waitForServerTimeSync = () => logoutClock.promise;
     const logoutBeforeWrite = h.ctx.confirmExtendKey();
@@ -963,10 +972,10 @@ async function run() {
 
     for (const kind of ['extend', 'revoke']) {
         h = build();
-        h.ctx.openExtendModal('key-a');
+        h.ctx.openExtendModal('AAAAAAAAAAAAAAAA');
         const pendingWrite = deferred();
         h.ctx.fb.update = () => { h.log.updates++; return pendingWrite.promise; };
-        const pendingTask = kind === 'extend' ? h.ctx.confirmExtendKey() : h.ctx.toggleRevokeKey('key-a');
+        const pendingTask = kind === 'extend' ? h.ctx.confirmExtendKey() : h.ctx.toggleRevokeKey('AAAAAAAAAAAAAAAA');
         await drain();
         ok(kind + '៖ write ចាប់ផ្តើមមុន logout', h.log.updates === 1, h.log.updates);
         simulateLogout(h.ctx);
@@ -976,7 +985,7 @@ async function run() {
             !h.log.toasts.length && !h.log.alerts.length && !h.log.refreshed && !h.log.closed, h.log);
     }
 
-    h = build(); h.ctx.openExtendModal('key-a');
+    h = build(); h.ctx.openExtendModal('AAAAAAAAAAAAAAAA');
     const dbClock = deferred(); h.ctx.waitForServerTimeSync = () => dbClock.promise;
     const databaseSwitch = h.ctx.confirmExtendKey();
     h.ctx.db = { business: 'other' };
@@ -987,11 +996,11 @@ async function run() {
     for (const kind of ['extend', 'revoke']) {
         for (const failure of ['resolve', 'timeout']) {
             for (const change of ['db-only', 'logout']) {
-                h = build(); h.ctx.openExtendModal('key-a');
+                h = build(); h.ctx.openExtendModal('AAAAAAAAAAAAAAAA');
                 const pending = deferred(); const timed = deferred();
                 h.ctx.fb.update = () => { h.log.updates++; return pending.promise; };
                 if (failure === 'timeout') h.ctx.withTimeout = () => timed.promise;
-                const task = kind === 'extend' ? h.ctx.confirmExtendKey() : h.ctx.toggleRevokeKey('key-a');
+                const task = kind === 'extend' ? h.ctx.confirmExtendKey() : h.ctx.toggleRevokeKey('AAAAAAAAAAAAAAAA');
                 await drain();
                 ok(kind + '/' + failure + '/' + change + '៖ write ត្រូវចាប់ផ្តើមពិត', h.log.updates === 1);
                 if (change === 'db-only') h.ctx.db = { business: 'other' };
@@ -1012,13 +1021,13 @@ async function run() {
     console.log('-- ការកែ Key ព្យួរ ➜ «⏳ មិនទាន់បញ្ជាក់» · ចុះយឺត ➜ ✅ --');
     const PENDING_RE = /^⏳ /;
     for (const kind of ['extend', 'revoke', 'seat']) {
-        h = build(); h.ctx.openExtendModal('key-a');
+        h = build(); h.ctx.openExtendModal('AAAAAAAAAAAAAAAA');
         h.ctx.prompt = () => '3';
         const pending = deferred(); const timed = deferred();
         h.ctx.fb.update = () => { h.log.updates++; return pending.promise; };
         h.ctx.fb.set = () => { h.log.updates++; return pending.promise; };
         h.ctx.withTimeout = () => timed.promise;
-        const task = kind === 'extend' ? h.ctx.confirmExtendKey() : kind === 'revoke' ? h.ctx.toggleRevokeKey('key-a') : h.ctx.setKeySeatLimit('key-a');
+        const task = kind === 'extend' ? h.ctx.confirmExtendKey() : kind === 'revoke' ? h.ctx.toggleRevokeKey('AAAAAAAAAAAAAAAA') : h.ctx.setKeySeatLimit('AAAAAAAAAAAAAAAA');
         await drain();
         ok(kind + '/ព្យួរ ៖ write ចាប់ផ្តើមពិត', h.log.updates === 1, h.log.updates);
         timed.reject(new Error(kind === 'seat' ? 'Seat limit update timed out' : 'Update timed out'));
@@ -1033,13 +1042,13 @@ async function run() {
         h = build();
         h.ctx.prompt = () => '3';
         h.ctx.fb.update = () => { h.log.updates++; return Promise.reject(new Error('PERMISSION_DENIED')); };
-        await h.ctx.setKeySeatLimit('key-a');
+        await h.ctx.setKeySeatLimit('AAAAAAAAAAAAAAAA');
         await drain();
         ok('seat/បដិសេធពិត ➜ «មិនបាន» (ទិសផ្ទុយ ៖ មិនមែន ⏳ · ដោះឧបករណ៍ ៖ R10)',
             h.log.alerts.length === 1 && !PENDING_RE.test(h.log.alerts[0]) && /មិនបាន/.test(h.log.alerts[0]), h.log);
     }
     {
-        h = build(); h.ctx.openExtendModal('key-a');
+        h = build(); h.ctx.openExtendModal('AAAAAAAAAAAAAAAA');
         const pending = deferred(); const timed = deferred();
         h.ctx.fb.update = () => { h.log.updates++; return pending.promise; };
         h.ctx.withTimeout = () => timed.promise;
@@ -1133,42 +1142,42 @@ async function run() {
     {
         const DAY = 86400000;
         const extendOn = async (h, days) => {
-            h.ctx.openExtendModal('key-a');
+            h.ctx.openExtendModal('AAAAAAAAAAAAAAAA');
             h.getElementById('extendDaysInput').value = String(days);
             await h.ctx.confirmExtendKey();
             await drain();
         };
         h = build();
-        h.keyServer['license_keys/ADM/key-a/expiresAt'] = 1000 + 300 * DAY;
+        h.keyServer['license_keys/ADM/AAAAAAAAAAAAAAAA/expiresAt'] = 1000 + 300 * DAY;
         h.ctx.keyListCache[0].perApp.ADM.expiresAt = 1000 + 300 * DAY;
         await extendOn(h, 30);
         ok('F5 ៖ Key នៅសល់ ៣០០ ថ្ងៃ · បន្ថែម ៣០ ➜ ៣៣០ ថ្ងៃ (មិនខ្លីជាងមុន)',
-            h.keyServer['license_keys/ADM/key-a/expiresAt'] === 1000 + 330 * DAY && h.log.toasts.some((t) => t.startsWith('✅')),
-            { days: (h.keyServer['license_keys/ADM/key-a/expiresAt'] - 1000) / DAY, log: h.log });
+            h.keyServer['license_keys/ADM/AAAAAAAAAAAAAAAA/expiresAt'] === 1000 + 330 * DAY && h.log.toasts.some((t) => t.startsWith('✅')),
+            { days: (h.keyServer['license_keys/ADM/AAAAAAAAAAAAAAAA/expiresAt'] - 1000) / DAY, log: h.log });
         h = build();
-        h.keyServer['license_keys/ADM/key-a/expiresAt'] = 500;
+        h.keyServer['license_keys/ADM/AAAAAAAAAAAAAAAA/expiresAt'] = 500;
         h.ctx.keyListCache[0].perApp.ADM.expiresAt = 500;
         await extendOn(h, 7);
-        ok('F5 ៖ Key ផុតកំណត់រួច ➜ គិតពីម៉ោង Server (៧ ថ្ងៃពីថ្ងៃនេះ)', h.keyServer['license_keys/ADM/key-a/expiresAt'] === 1000 + 7 * DAY,
-            (h.keyServer['license_keys/ADM/key-a/expiresAt'] - 1000) / DAY);
+        ok('F5 ៖ Key ផុតកំណត់រួច ➜ គិតពីម៉ោង Server (៧ ថ្ងៃពីថ្ងៃនេះ)', h.keyServer['license_keys/ADM/AAAAAAAAAAAAAAAA/expiresAt'] === 1000 + 7 * DAY,
+            (h.keyServer['license_keys/ADM/AAAAAAAAAAAAAAAA/expiresAt'] - 1000) / DAY);
         h = build();
         await extendOn(h, 365);
-        const afterFirst = h.keyServer['license_keys/ADM/key-a/expiresAt'];
+        const afterFirst = h.keyServer['license_keys/ADM/AAAAAAAAAAAAAAAA/expiresAt'];
         h.log.toasts.length = 0; h.log.updates = 0;
         await extendOn(h, 7);
         ok('F5 ៖ admin ទី ២ មើលឃើញតម្លៃចាស់ (+៣៦៥ ពីឧបករណ៍ផ្សេង) ➜ មិនសរសេរជាន់ · ប្រាប់ «កែពីកន្លែងផ្សេង» · Refresh',
-            afterFirst === 1000 + 365 * DAY && h.keyServer['license_keys/ADM/key-a/expiresAt'] === afterFirst && h.log.updates === 0
+            afterFirst === 1000 + 365 * DAY && h.keyServer['license_keys/ADM/AAAAAAAAAAAAAAAA/expiresAt'] === afterFirst && h.log.updates === 0
                 && h.log.alerts.some((a) => /ផ្សេង/.test(a)) && h.log.refreshed >= 1 && !h.log.toasts.some((t) => t.startsWith('✅')),
-            { days: (h.keyServer['license_keys/ADM/key-a/expiresAt'] - 1000) / DAY, log: h.log });
+            { days: (h.keyServer['license_keys/ADM/AAAAAAAAAAAAAAAA/expiresAt'] - 1000) / DAY, log: h.log });
         h.ctx.keyListCache[0].perApp.ADM.expiresAt = afterFirst;
         h.log.alerts.length = 0;
         await extendOn(h, 7);
-        ok('F5 ៖ ក្រោយ Refresh ➜ +៧ បន្ថែមលើ ៣៦៥ (= ៣៧២ ថ្ងៃ)', h.keyServer['license_keys/ADM/key-a/expiresAt'] === 1000 + 372 * DAY,
-            (h.keyServer['license_keys/ADM/key-a/expiresAt'] - 1000) / DAY);
+        ok('F5 ៖ ក្រោយ Refresh ➜ +៧ បន្ថែមលើ ៣៦៥ (= ៣៧២ ថ្ងៃ)', h.keyServer['license_keys/ADM/AAAAAAAAAAAAAAAA/expiresAt'] === 1000 + 372 * DAY,
+            (h.keyServer['license_keys/ADM/AAAAAAAAAAAAAAAA/expiresAt'] - 1000) / DAY);
         h = build();
-        delete h.keyServer['license_keys/ADM/key-a/expiresAt'];
+        delete h.keyServer['license_keys/ADM/AAAAAAAAAAAAAAAA/expiresAt'];
         await extendOn(h, 30);
-        ok('F5 ៖ Key បាត់លើ Server ➜ មិនបង្កើតថ្ងៃផុតកំណត់ · ប្រាប់', h.keyServer['license_keys/ADM/key-a/expiresAt'] === undefined
+        ok('F5 ៖ Key បាត់លើ Server ➜ មិនបង្កើតថ្ងៃផុតកំណត់ · ប្រាប់', h.keyServer['license_keys/ADM/AAAAAAAAAAAAAAAA/expiresAt'] === undefined
             && h.log.updates === 0 && h.log.alerts.length === 1 && !h.log.toasts.some((t) => t.startsWith('✅')), h.log);
 
         // ⛔ re-audit (K1) ៖ SDK បោះបង់ transaction ដែលបានផ្ញើ ដោយ `disconnect` ទោះ Server អនុវត្តរួច ➜ «មិនអាចធ្វើបច្ចុប្បន្នភាពបានទេ!» ហើយការចុចម្តងទៀត
@@ -1191,12 +1200,12 @@ async function run() {
         };
         for (const [label, landed, mode, expect] of [['ចុះរួច', true, 'up', 'applied'], ['មិនទាន់ចុះ', false, 'up', 'failed'], ['អានមិនបាន', true, 'down', 'pending']]) {
             h = build();
-            h.keyServer['license_keys/ADM/key-a/expiresAt'] = 1000 + 300 * DAY;
+            h.keyServer['license_keys/ADM/AAAAAAAAAAAAAAAA/expiresAt'] = 1000 + 300 * DAY;
             h.ctx.keyListCache[0].perApp.ADM.expiresAt = 1000 + 300 * DAY;
             restReadback(h, mode);
             lostAck(h, landed);
             await extendOn(h, 30);
-            const days = (h.keyServer['license_keys/ADM/key-a/expiresAt'] - 1000) / DAY;
+            const days = (h.keyServer['license_keys/ADM/AAAAAAAAAAAAAAAA/expiresAt'] - 1000) / DAY;
             const shown = expect === 'applied' ? h.log.toasts.some((t) => t.startsWith('✅')) && h.log.alerts.length === 0
                 : expect === 'failed' ? h.log.alerts.some((a) => /មិនអាចធ្វើបច្ចុប្បន្នភាពបានទេ/.test(a)) && !h.log.toasts.some((t) => t.startsWith('✅'))
                     : h.log.alerts.some((a) => a === vm.runInContext('ADMIN_WRITE_PENDING_TEXT', h.ctx)) && !h.log.toasts.some((t) => t.startsWith('✅'));
@@ -1208,7 +1217,7 @@ async function run() {
         //    (Config ថ្មីឆ្លើយ null ➜ ⏳ ក្លែងលើការសរសេរដែលចុះរួច)
         {
             h = build();
-            h.keyServer['license_keys/ADM/key-a/expiresAt'] = 1000 + 300 * DAY;
+            h.keyServer['license_keys/ADM/AAAAAAAAAAAAAAAA/expiresAt'] = 1000 + 300 * DAY;
             h.ctx.keyListCache[0].perApp.ADM.expiresAt = 1000 + 300 * DAY;
             restReadback(h, 'up');
             const fetched = [];
@@ -1228,14 +1237,14 @@ async function run() {
 
         // ⛔ re-audit (K6) ៖ ចុច «រក្សាទុក» ២ ដងលឿន ➜ transaction ទី ២ ឃើញតម្លៃថ្មី ➜ សារ «កែពីឧបករណ៍ផ្សេង» ក្លែង ➜ ការចុចទី ២ ត្រូវមិនធ្វើអ្វី
         h = build();
-        h.ctx.openExtendModal('key-a');
+        h.ctx.openExtendModal('AAAAAAAAAAAAAAAA');
         h.getElementById('extendDaysInput').value = '30';
         const twice = [h.ctx.confirmExtendKey(), h.ctx.confirmExtendKey()];
         await Promise.all(twice);
         await drain();
         ok('K6 ៖ ចុចពីរដង ➜ បន្ថែមម្តង · គ្មានសារ «កែពីឧបករណ៍ផ្សេង» ក្លែង',
-            h.keyServer['license_keys/ADM/key-a/expiresAt'] === 1000 + 30 * DAY && !h.log.alerts.some((a) => /ផ្សេង/.test(a))
-                && h.log.toasts.filter((t) => t.startsWith('✅')).length === 1, { days: (h.keyServer['license_keys/ADM/key-a/expiresAt'] - 1000) / DAY, log: h.log });
+            h.keyServer['license_keys/ADM/AAAAAAAAAAAAAAAA/expiresAt'] === 1000 + 30 * DAY && !h.log.alerts.some((a) => /ផ្សេង/.test(a))
+                && h.log.toasts.filter((t) => t.startsWith('✅')).length === 1, { days: (h.keyServer['license_keys/ADM/AAAAAAAAAAAAAAAA/expiresAt'] - 1000) / DAY, log: h.log });
     }
 
     // ⛔ deep audit ៩ (F2) ៖ «🔓 ដោះឧបករណ៍» លុបកៅអី + `releasedAt` (ម៉ោង server) ក្នុង update តែមួយ ➜ ឧបករណ៍ចាស់ដែលនៅដំណើរការឈប់ប្រើ Key
@@ -1245,36 +1254,36 @@ async function run() {
     {
         const restPatches = (f) => f.requests.filter((r) => r.method === 'PATCH').map((r) => r.body);
         h = releaseRestFixture();
-        await h.ctx.releaseKeySeat('key-a');
+        await h.ctx.releaseKeySeat('AAAAAAAAAAAAAAAA');
         await drain();
-        const atomic = restPatches(h).find((body) => body && 'license_seats/ADM/key-a' in body);
+        const atomic = restPatches(h).find((body) => body && 'license_seats/ADM/AAAAAAAAAAAAAAAA' in body);
         ok('F2 ៖ ដោះ ➜ update តែមួយ ៖ license_seats null + license_keys/…/releasedAt = ម៉ោង server',
-            restPatches(h).length === 1 && !!atomic && atomic['license_seats/ADM/key-a'] === null
-                && JSON.stringify(atomic['license_keys/ADM/key-a/releasedAt']) === JSON.stringify({ '.sv': 'timestamp' })
+            restPatches(h).length === 1 && !!atomic && atomic['license_seats/ADM/AAAAAAAAAAAAAAAA'] === null
+                && JSON.stringify(atomic['license_keys/ADM/AAAAAAAAAAAAAAAA/releasedAt']) === JSON.stringify({ '.sv': 'timestamp' })
                 && h.log.toasts.some((t) => t.startsWith('✅')), { patches: restPatches(h), log: h.log });
         h = releaseRestFixture({ patch: ['refuse-stamp', 'ok'] });
-        await h.ctx.releaseKeySeat('key-a');
+        await h.ctx.releaseKeySeat('AAAAAAAAAAAAAAAA');
         await drain();
         const seatsOnly = restPatches(h).slice(1);
         // ⛔ re-audit (K2) ៖ ក្រោយ Rules ចាស់ ➜ កៅអីត្រូវលុបហើយ (គ្មានឧបករណ៍ក្នុងបញ្ជី) តែ Key គ្មាន `releasedAt` ➜ សារ «Publish Rules រួចដោះម្តងទៀត»
         //    ត្រូវដើរ ៖ ការដោះម្តងទៀតចុះត្រា `releasedAt` តែមួយ (មុនកែ ៖ «មិនទាន់ចងនឹងឧបករណ៍ណាទេ» ហើយមិនសរសេរ ➜ ឧបករណ៍ចាស់កក់កៅអីវិញ)
         {
             const hs = releaseRestFixture();
-            await hs.ctx.releaseKeySeat('key-b');
+            await hs.ctx.releaseKeySeat('BBBBBBBBBBBBBBBB');
             await drain();
             const stamps = restPatches(hs);
             ok('K2 ៖ គ្មានឧបករណ៍ក្នុងបញ្ជី · Key គ្មាន releasedAt ➜ ចុះត្រា releasedAt (ដោះម្តងទៀតដើរ)',
-                stamps.length === 1 && JSON.stringify(stamps[0]['license_keys/ADM/key-b/releasedAt']) === JSON.stringify({ '.sv': 'timestamp' })
-                    && hs.server.store.releasedAt['key-b'] === RELEASE_STAMP_AT && hs.log.toasts.some((t) => t.startsWith('✅')), { stamps, log: hs.log });
+                stamps.length === 1 && JSON.stringify(stamps[0]['license_keys/ADM/BBBBBBBBBBBBBBBB/releasedAt']) === JSON.stringify({ '.sv': 'timestamp' })
+                    && hs.server.store.releasedAt['BBBBBBBBBBBBBBBB'] === RELEASE_STAMP_AT && hs.log.toasts.some((t) => t.startsWith('✅')), { stamps, log: hs.log });
             const hn = releaseRestFixture();
             hn.ctx.keyListCache[1].perApp.ADM.releasedAt = 900;
-            await hn.ctx.releaseKeySeat('key-b');
+            await hn.ctx.releaseKeySeat('BBBBBBBBBBBBBBBB');
             await drain();
             ok('K2 ទិសផ្ទុយ ៖ Key មាន releasedAt រួច ហើយគ្មានឧបករណ៍ ➜ «គ្មានអ្វីត្រូវដោះ» · មិនសរសេរ',
                 hn.requests.length === 0 && hn.sdk.length === 0 && hn.log.alerts.length === 1 && /មិនទាន់ចងនឹងឧបករណ៍/.test(hn.log.alerts[0]), hn.log);
         }
         ok('F2 ៖ Rules ចាស់បដិសេធ releasedAt ➜ ដោះកៅអីតែមួយ · ប្រាប់ឲ្យ Publish Rules (មិនមែន «ដោះមិនបាន»)',
-            seatsOnly.length === 1 && JSON.stringify(seatsOnly[0]) === JSON.stringify({ 'license_seats/ADM/key-a': null })
+            seatsOnly.length === 1 && JSON.stringify(seatsOnly[0]) === JSON.stringify({ 'license_seats/ADM/AAAAAAAAAAAAAAAA': null })
                 && h.log.alerts.length === 1 && /Publish/.test(h.log.alerts[0]) && !/មិនបាន/.test(h.log.alerts[0]), { seatsOnly, log: h.log });
     }
 
@@ -1304,7 +1313,7 @@ async function run() {
         vm.runInContext(slice(['initFirebase']), h.ctx);
         const reconfigured = await h.ctx.initFirebase();
         ok('P1 ៖ លក្ខខណ្ឌចាំបាច់ ៖ initFirebase ពិតបាន teardown + ភ្ជាប់ Project ថ្មី', reconfigured === true && h.ctx.db && h.ctx.db.project === 'B', { reconfigured, db: h.ctx.db });
-        await h.ctx.toggleRevokeKey('key-a');
+        await h.ctx.toggleRevokeKey('AAAAAAAAAAAAAAAA');
         await drain();
         ok('P1 ៖ ⛔ ចុច Revoke លើជួរ Key របស់ Project ចាស់ ក្រោយ Reconfig ➜ មិនសរសេរចូល Project ថ្មី',
             writes.length === 0 && !h.log.toasts.some((t) => t.startsWith('✅')), { writes, log: h.log });

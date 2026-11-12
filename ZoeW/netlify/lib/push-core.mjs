@@ -254,7 +254,6 @@ export function createPushService(deps) {
     const fetchImpl = d.fetch || globalThis.fetch;
     const now = d.now || (() => Date.now());
     const publicKeys = d.publicKeys || LICENSE_PUBLIC_KEYS_JWK;
-    const licenseCache = d.licenseCache || new Map();
     const fcmToken = d.fcmTokenState || { token: '', exp: 0, inFlight: null };
 
     async function requestWithin(url, init, timeoutMs, read) {
@@ -283,19 +282,33 @@ export function createPushService(deps) {
         if (!licenseSignatureValid(parsed, publicKeys)) return { ok: false, status: 403, reason: 'license:signature' };
         if (parsed.payload.a !== LICENSE_APP_CODE && parsed.payload.a !== 'ALL') return { ok: false, status: 403, reason: 'license:app' };
         const keyId = parsed.payload.id;
-        const cached = licenseCache.get(keyId);
-        if (cached && elapsedSince(cached.at, now()) < PUSH_LICENSE_CACHE_MS) return cached.verdict;
         const res = await fetchJson(cfg.licenseDbUrl + '/license_keys/' + LICENSE_APP_CODE + '/' + keyId + '.json', { method: 'GET' });
         if (!res.ok || res.body === undefined) return { ok: false, status: 503, reason: 'license:unverified' };
         const rec = res.body;
         let verdict;
         if (!rec || typeof rec !== 'object') verdict = { ok: false, status: 403, reason: 'license:unknown' };
+        else if (rec.seatProtocol === 2) {
+            const read = await settleWithin(async () => {
+                const seatStore = d.seatStore || (await import('@netlify/blobs')).getStore({ name: 'zoew-license-seat-stage-v1', consistency: 'strong' });
+                return seatStore.getWithMetadata(LICENSE_APP_CODE + '/' + keyId, { type: 'json', consistency: 'strong' });
+            }, PUSH_READ_TIMEOUT_MS);
+            const state = read.ok && read.value ? read.value.data : null;
+            if (!state || typeof state !== 'object' || Array.isArray(state) || state.schema !== 1 || state.mode !== 'active'
+                || !Number.isSafeInteger(state.revision) || state.revision < 1
+                || !Number.isSafeInteger(state.releaseEpoch) || state.releaseEpoch < 0
+                || !Number.isSafeInteger(state.maxDevices) || state.maxDevices < 1 || state.maxDevices > 5
+                || !state.seats || typeof state.seats !== 'object' || Array.isArray(state.seats)
+                || typeof state.revoked !== 'boolean' || !Number.isSafeInteger(state.licenseExpiresAt) || state.licenseExpiresAt <= 0) {
+                return { ok: false, status: 503, reason: 'license:unverified' };
+            }
+            if (state.revoked) return { ok: false, status: 403, reason: 'license:revoked' };
+            return state.licenseExpiresAt > now() ? { ok: true, keyId: keyId } : { ok: false, status: 403, reason: 'license:expired' };
+        }
         else if (rec.revoked === true) verdict = { ok: false, status: 403, reason: 'license:revoked' };
         else {
             const expiresAt = typeof rec.expiresAt === 'number' && rec.expiresAt > 0 ? rec.expiresAt : parsed.payload.exp * 1000;
             verdict = expiresAt > now() ? { ok: true, keyId: keyId } : { ok: false, status: 403, reason: 'license:expired' };
         }
-        licenseCache.set(keyId, { at: now(), verdict: verdict });
         return verdict;
     }
 
@@ -308,9 +321,6 @@ export function createPushService(deps) {
         }
         const exp = Number(payload.exp) * 1000;
         if (!isFinite(exp) || exp <= now()) return { ok: false, status: 403, reason: 'supabase:session' };
-        const cacheKey = 'sb:' + crypto.createHash('sha256').update(sb.issuer + '|' + token).digest('hex');
-        const cached = licenseCache.get(cacheKey);
-        if (cached && cached.until > now()) return cached.verdict;
         const res = await fetchJson(sb.base + '/rest/v1/rpc/my_account', {
             method: 'POST',
             headers: { apikey: sb.key, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -324,11 +334,6 @@ export function createPushService(deps) {
         if (!row || typeof row.tenant_id !== 'string' || !row.tenant_id) verdict = { ok: false, status: 403, reason: 'supabase:account' };
         else if (row.status !== 'active') verdict = { ok: false, status: 403, reason: 'supabase:inactive' };
         else verdict = { ok: true, keyId: supabaseTenantKeyId(row.tenant_id) };
-        if (licenseCache.size >= PUSH_IDENTITY_CACHE_MAX) {
-            const oldest = licenseCache.keys().next();
-            if (!oldest.done) licenseCache.delete(oldest.value);
-        }
-        licenseCache.set(cacheKey, { until: Math.min(exp, now() + PUSH_LICENSE_CACHE_MS), verdict: verdict });
         return verdict;
     }
 

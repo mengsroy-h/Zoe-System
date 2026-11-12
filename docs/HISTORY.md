@@ -41,15 +41,14 @@
 ---
 
 ## 📌 ការងារដែលនៅសល់ — ការផ្ទៀងផ្ទាត់ដោយអ្នកប្រើ
-
+- 🔍 **Audit 2026-11-12 មិនទាន់ចេញផ្សាយ**៖ កែ session modal, សោ price operation, `my_account` និង Netlify session authorization, parser Google Sheets។ ត្រូវអនុវត្ត migration `20261112054956_zoe_account_active_session.sql` និង deploy functions/App ក្រោយការផ្ទៀងពេញលេញ; Apps Script reader ត្រូវ copy និង Deploy ជាកំណែថ្មី។ គ្មានការប្ដូរផលិតកម្មក្នុង session នេះ។
+- 🔍 **ការផ្ទៀង commit ចុងក្រោយ**៖ ZTO guards និង native/browser លើ commit ដំបូងឆ្លងក្នុង CI ហើយ hash lock បានធ្វើបច្ចុប្បន្នភាពតាមភស្តុតាង។ ការកែ license និង fixtures បន្ទាប់ត្រូវការ strict CI ថ្មីលើ exact head មុនអះអាង release-ready។
+- 🔍 **License rollout**៖ enrollment, signed receipt និង cutover code រៀបចំរួចក្នុង PR; defaults មិនបើក production។ ត្រូវ provision receipt key/public pins, Publish License rules, ផ្ទេរគ្រប់ Key/ឧបករណ៍ ហើយចូលនិវត្តន៍ legacy ដោយ `legacyProtocolEnabled:false` មុនចាត់ទុក offline bypass បានបិទ។ APK gate ទុកដដែលតាមម្ចាស់គម្រោង។
 - 🔍 **Clock/ឧបករណ៍ពិត**៖ ផ្ទៀង history loading ក្រោយ session verification លើ iPhone/Android មុន merge។ Exact-SHA strict CI ជាភស្តុតាងក្នុងវិសាលភាព checker របស់វា; លទ្ធផលចាស់រក្សាក្នុងផ្នែកប្រវត្តិ។
-
 - 🔍 **Registration rollout**៖ Hosted project ដែលភ្ជាប់មាន migration versions ទាំង៦២ និង protocol 1/accepting/deferred trigger; មិនជំនួស hosted backup/restore ឬការរង់ចាំ handler ចាស់ឱ្យចប់។ មូលហេតុ F03 បរាជ័យដំបូងក្នុង session ចាស់នៅមិនទាន់បញ្ជាក់; dead-code ដែល dynamic references មិនអាចសម្រេចបាននៅរក្សាទុក។
-
 > ⛔ **ផ្នែកនេះកាន់តែការងារដែលនៅបើក** ៖ ស្ថានភាព git · អ្វីដែលអ្នកប្រើមិនទាន់បញ្ជាក់ · សកម្មភាពដោយដៃដែលមិនទាន់ធ្វើ · ការសម្រេចដែលនៅរស់។
 > អ្នកប្រើបញ្ជាក់ ឬធ្វើរួច ➜ **លុបធាតុនោះ** (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុងផ្នែក ១ · ២) ⛔ កុំបន្ថែមខ្សែ branch/PR ចាស់ (git ជាភស្តុតាង) ·
 > ⛔ ≤ ៨០ បន្ទាត់ (`doc-scope-test`)។
-
 ### 🤝 Handoff
 
 - ⛔ **ផ្ទៀងផ្ទាត់ git មុនជឿអត្ថបទនេះ** (`git log --oneline -3 origin/main` · `git rev-list --count origin/main..origin/<branch>`) · ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង ·
@@ -122,6 +121,38 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ archive ផ្នែក ៩ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### ZoeKeyGen [2.24.43] — 2026-11-12 · ផ្ទេរសុពលភាព legacy ទសភាគ
+
+**ZoeKeyGen** (`zoekeygen-v153` ➜ `zoekeygen-v154`)។ ZoeW មិនប្ដូរកំណែ។
+- ការផ្ទៀងឯករាជ្យក្រោយ CI រកឃើញ legacy expiry ទសភាគដែលមានស្រាប់បរាជ័យពេល configure secure state។ បកប្រែតែ finite positive expiry ទៅ safe integer ដោយ floor; configure/readback/cutover ប្រើតម្លៃដូចគ្នា។ Marker transaction រក្សា exact raw-expiry CAS និងមិនសរសេរតម្លៃ expiry ឡើងវិញ។
+- Legacy renewal និង lost-ACK expectation បង្គត់មូលដ្ឋានដូចគ្នា។ Server validation មិនបន្ធូរ។ Regression មុនកែ6fail/69pass; ក្រោយកែ seller/stage/clock/calendar136pass រួម actual signed configure→enroll→cutover និង same-millisecond raw mutation refusal។
+- **សកម្មភាពដោយដៃ**៖ រង់ចាំ full CI និង review ថ្មីមុន merge; merge អាចបើក APK/Netlify/Supabase integrations តាមការកំណត់ពិត។ Live deployment settings និងឧបករណ៍ពិតមិនទាន់ផ្ទៀង; receipt keys/rules/enrollment/legacy retirement និង Apps Script rollout នៅតាមផែនការ។ មិនបាន merge/deploy ឬកែ APK gate។
+
+### ZoeKeyGen [2.24.42] — 2026-11-12 · បន្តសុពលភាពជាមួយម៉ោងទសភាគ
+
+**ZoeKeyGen** (`zoekeygen-v152` ➜ `zoekeygen-v153`)។ ZoeW មិនប្ដូរកំណែ។
+- បង្គត់ចុះមូលដ្ឋានម៉ោង trusted/current expiry ទៅមីលីវិនាទីគត់ មុនបន្ថែមរយៈពេលបន្ត។ Server នៅទាមទារ safe integer និងផ្ទៀង signature/revision ដដែល។
+- Regression ប្រើ seller signature និង server validator ពិត៖ មុនកែ expired/equal-now fractional cases2 fail; ក្រោយកែ seller/stage/clock suites73 pass។ Unexpired control, invalid days, missing clock, overflow និង signed fractional rejection នៅតែផ្ទៀង។
+- **សកម្មភាពដោយដៃ**៖ រង់ចាំ full CI លើ exact head និងការអនុញ្ញាត deploy; ផ្ទៀង renewal លើហាង/ឧបករណ៍សាកមុន production។ មិនបាន merge/deploy ឬកែ APK gate។
+
+### [2.50.195] · ZoeKeyGen [2.24.41] — 2026-11-12 · ផ្ទៀងវគ្គ និងព្រំដែនប្រតិបត្តិការ
+
+- Audit1298 លើ0ab88b2៖ shards1/2/4/5 pass, shard3 មានតែ ZTO fixture race។ Idle barrier បង្ហាញថា expected6 ធ្លាប់រំលង manual retry ដំបូង; sequence ពិត5→6→7។ Test រង់ចាំ queue idle មុន retries ទាំងពីរ ហើយផ្ទៀង photo/identity/no-replay guards ដដែល។ E2E+lock32 និង repeated focused24 pass; production/locked ZTO មិនកែ។ រង់ចាំ full CI ថ្មី។
+
+- Audit1297 លើ0c677b2៖ shards2/3/5 pass រួម browser recovery; F03 permutations ទាំងពីរ608 pass និង Registration71 pass។ កែ duplication ដោយ shared enrollment scope (52tests/typecheck/lint pass) និង optional diagnostic មិនបាំង original outcome (reporting18/F03fixtures120 pass)។ មូលហេតុ intermittent preflight ដើមមិនទាន់បញ្ជាក់; រង់ចាំ full CI លើកូដថ្មី។
+
+- Actual-adapter fixture bootstrap បង្ក Firebase cached WebSocket ចង trace registry ចាស់។ ផ្លាស់ fixture ទៅ subprocess ឯករាជ្យ និងផ្ទៀង parent module cache/DOM ដដែល; child5 និង parent120 fixtures pass។ Native/Supabase engine verification ត្រូវរង់ចាំ CI ថ្មី។
+
+- Diagnostic wrapper ជុំដំបូងបង្ក recursion ដោយសរសេរឆ្លង SDK Proxy; កែជា outer observer Proxy មិនកែ base methods។ Actual-adapter regression ផ្ទៀង one-dispatch/error identity/ownership refusal; fixtures123 pass។ បញ្ហា preflight ដើមនៅមិនទាន់មានមូលហេតុបញ្ជាក់; ត្រូវផ្ទៀង CI ថ្មី។
+
+- F03 លើ head `8cae650` មាន permutation មួយបរាជ័យមុន dispatch ក្នុង Supabase postgc-partial; មួយទៀត pass598។ មូលហេតុមិនទាន់បញ្ជាក់។ បន្ថែម bounded/redacted preflight diagnostics និង observer fixtures8; fixtures118 pass ប៉ុន្តែ engines UNRUN local។ មិនកែ production, retries, timeout, concurrency ឬបន្ធូរ assertions។ ត្រូវរង់ចាំ CI ថ្មី។
+
+**ZoeW** (`zoew-v458` ➜ `zoew-v459`) និង **ZoeKeyGen** (`zoekeygen-v151` ➜ `zoekeygen-v152`)។
+- ការហៅផ្ទៀងវគ្គម្តងទៀតរក្សាសាលក្រម live តែពេលម្ចាស់វគ្គដដែល និង token/ម៉ោងដែលទុកចិត្តបាននៅមានសុពលភាព; នៅតែផ្ទៀង token ហើយបិទចំពោះ expiry, clock uncertainty ឬវគ្គថ្មី។
+- ការបរាជ័យក្នុង Web Lock របស់ price operation ត្រូវឡើងជាកំហុស មិនហៅប្រតិបត្តិការឡើងវិញក្រៅសោ។
+- Google Sheets reader កំណែ ៣ អាន decimal comma/dot ច្បាស់ ហើយបដិសេធអក្សរខូច/លេខមិនច្បាស់ជា `invalid-money`; Health Check រំពឹងកំណែដូចគ្នា។
+- **សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ ក្រោយតេស្តពេញលេញ និងការអនុញ្ញាត deploy ត្រូវអនុវត្ត migration session ថ្មី, deploy App/functions និង copy Google Sheets reader ទៅ Apps Script រួច Deploy version ថ្មី។ License rollout ត្រូវតាមលំដាប់ក្នុង ZoeKeyGen README; កូនសោនិង production config មិនបាន provision ហើយមិនបាន deploy។
 
 ### [2.50.194] · ZoeKeyGen [2.24.40] — 2026-11-10 · ម៉ោងដែលផ្ទៀងបានលើតំណសាក PR
 
@@ -2043,6 +2074,26 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-11-12 — Audit fixes និង License enrollment stage
+
+- **សំណើម្ចាស់គម្រោង**៖ កែ findings ដោយប្រុងប្រយ័ត្ន និង modal ផ្ទៀងវគ្គដែលលេចឡើងវិញ ដោយមិនបន្ធូរសុវត្ថិភាព។ ម្ចាស់គម្រោងទទួលយក APK release មិនរង់ចាំ Audit ដូច្នេះបានទុក workflow ដើម។ ការចុះឈ្មោះឧបករណ៍អាជ្ញាប័ណ្ណឡើងវិញត្រូវបានយល់ព្រមជាដំណាក់កាល។
+- **ភស្តុតាងមុន/ក្រោយ**៖ modal និង Web Lock មាន regression ក្រហម ៣ មុនកែ; ក្រុម session/clock/auth/price ២០៤ តេស្តឆ្លងក្រោយកែ។ SQL session មាន ១២ ករណីបរាជ័យលើមុនកែ ហើយ ១៩ ឆ្លងលើ PostgreSQL ពិតក្រោយកែ; Netlify និង pending-read tests ១០៥ ឆ្លង។ Parser reader បរាជ័យលើ `12,50` ➜ `1250` មុនកែ ហើយឆ្លងក្រោយកែ; importer ៣២៦ assertions នៅឆ្លង។ លទ្ធផលទាំងនេះជាតេស្តផ្តោត មិនជំនួស full strict CI ឬ live deployment ទេ។
+- **Session authority**៖ `private.my_account` ទាមទារ session ID ត្រឹមត្រូវ ដែលចងនឹង UID ហើយនៅមិនផុតកំណត់; status ហាងនៅដដែល។ ដក completed Supabase authorization cache ចេញពី ZTO/push និងរក្សាតែ pending read coalescing។ វាត្រូវការ RPC ផ្ទៀងសិទ្ធិថ្មីលើសំណើបន្ទាប់។ កែ ZTO core តាមសំណើ audit-fix ផ្ទាល់; hash lock ត្រូវបានធ្វើបច្ចុប្បន្នភាពក្រោយ CI ដែលផ្ទៀង bytes ដូចគ្នាឆ្លង។
+- **ជុំដំបូង License stage**៖ `license-seat-stage` ប្រើ Netlify Blobs strong read/ETag CAS, seller-signed domain-separated commands, enrolled P-256 device proof, revision/release epoch និងពិដានកៅអី។ បិទជាលំនាំដើម (`ZOE_LICENSE_SEAT_STAGE` មិនបានកំណត់), ចម្លើយទាំងអស់មាន `staged:true, grantsLicense:false`។ ៩ តេស្ត crypto/protocol/atomic race ឆ្លង; legacy verifiers/rules មិនប្រែ។ ការចម្លង public device ID នៅតែជាបញ្ហាលើផ្លូវ legacy រហូត client/admin UX, authoritative migration និង rules cutover បញ្ចប់។
+- **លទ្ធផល local ជុំដំបូង**៖ full Vitest ៩៦៩៤ ឆ្លង, ៥ test failures, ៨៩ skipped; ៤៨២ files ឆ្លង និង ១០ files បរាជ័យ។ ក្នុង ១០ នោះ ៩ ជា browser/PostgreSQL infrastructure និង ១ ជា ZTO hash lock ដែលទុកដើម។ Build/typecheck/ESLint, slot/purity/notice/doc checks, Android static ១៣៥ និង repository coverage ១០ ឆ្លង។ Full strict/browser/SW/native មិនបានបញ្ចប់; មិនមែន release-ready។
+- **ព្រំដែនប្រតិបត្តិការ**៖ មាន commit/push និង Draft PR តាមសំណើម្ចាស់គម្រោង; គ្មាន merge/deploy ឬ production secret provisioning។ Chromium local ជាប់ Unix socket restriction; PostgreSQL guard មាន TCP-only opt-in។ CI ជំនួសតែការផ្ទៀង browser/test ដែលបានរត់ពិត មិនជំនួសការផ្ទេរឧបករណ៍ និង production rollout ទេ។
+
+
+- **ជុំបន្ត ZTO**៖ [Audit1290](https://github.com/mengsroy-h/Zoe-System/actions/runs/43168040915) លើ `1e0cd038301101f1419d47835297cfdbb895a851` ឆ្លង ZTO/native ១២៩ files/៣២១៥ tests, list-sync ៦៣៧ និង browser sync-banner ២០៩។ Bytes core ដូច commit នោះ; កែ hash-lock រួច focused ៦៣ ឆ្លង។ Full CI ជុំដើមមានកំហុសតែ stale SQL fixtures/mutation anchor, header metadata និង hash pin; មិនមែន CI របស់ការកែ license ជុំបន្ទាប់ទេ។
+- **ជុំបន្ត Session/Push**៖ session/price owner-race controls ២១៤ ឆ្លង; SQL RLS fixtures ផ្ដល់ auth.sessions ពិត និងរក្សា no-session denial (មុនកែ ១១ failures ➜ ៦០៣ ឆ្លង)។ Push discovery អាន marker ថ្មី ហើយ marker2 អាន lifecycle ពី strong Blob authority, មិនប្រើ frozen RTDB/cached grant; push/session ៩៨ ឆ្លង។
+- **License production protocol**៖ client មាន nonexportable P-256 key, seller enrollment, signed offline receipts និង explicit per-license cutover; marker2 បិទ legacy seat paths និង legacy lifecycle mutations។ Seller UI កំណត់ readback/owner/clock gates និងមិន retry unknown outcome។ Endpoint បិទក្រៅ production context/origin។ Defaults រក្សា legacy compatibility ដូច្នេះមិនអះអាងថាបញ្ហា legacy បិទនៅ production ទេ។
+- **Independent review**៖ copied secure record ដែលលុប protocol/receipt fields អាចចូល legacy offline grace បាន។ Final retirement flag `legacyProtocolEnabled:false` ទាមទារ signed receipt + device key ដោយមិនជឿ absence នៃ local fields; ត្រូវផ្ទេរគ្រប់ Key និងឈប់ប្រើ client ចាស់ មុនបើក retirement។ នេះជាសកម្មភាព rollout ដែលមិនបានអនុវត្ត។
+- **ជុំបន្តការផ្ទៀង local**៖ focused License/KeyGen/activation/session/price/push/ZTO-lock ១៩ files/៥៣៩ tests ឆ្លង; seller security ៣៦៩, key-list ៥១; legacy license grace ៤១, clock rollback ៣៥, trust ៣២, record race ១៤០ និង seats ៧៩ ឆ្លង។ Build/typecheck/ESLint/doc/notice/slot/purity/Android static ឆ្លង; comment strip ៣៣៩ files ស្អាត, coverage ១០ ឆ្លង។ New real-rules assertions និង final browser persistence ត្រូវការភស្តុតាង CI ថ្មី; មិនរាប់ UNRUN ជា PASS។
+- **CI1291 fixture integration**៖ exact head `4f1a56bd3f554e694373058b0a78e8fb30df3157` ចាប់ clock fixture ដែលមិនផ្ដល់ legacy policy និង extraction harness ដែលខ្វះ clearSeatEnrollment/routeSecureSeatLifecycle។ កែតែ fixture/dependency extraction ដោយរក្សា production fail-closed និង assertions; estimator មុនកែ ២៦/២៧ ➜ clock/license ១៥១ និង related ៨៨ ឆ្លង។ Periodic guard ៨៣ ឆ្លង និង seller rules clock/readback ៦ ឆ្លង; actual marker emulator ត្រូវរត់ CI ថ្មី។
+- **CI1292 IndexedDB race**៖ real Chromium concurrent-tab test ចាប់ `identity-storage-unavailable` ពេល request ConstraintError មកមុន tx.error។ Unit fixture event order ធ្លាក់ ៨/៩ មុនកែ។ Helper រង់ចាំ transaction abort/complete, រក្សា request error ហើយអានកូនសោដែលឧបករណ៍/tab មួយទៀតបានរក្សាទុក; មិនបង្ហាញ success មុន durable settlement។ Browser guard បង្ខំ tab ទាំងពីរឆ្លង absent-read មុន key generation ដើម្បីវាស់ race ជារៀងរាល់ជុំ។ Actual owned-emulator License rules ១៤៤ និង periodic ៨៣ ឆ្លងក្នុងជុំ CI នេះ; fixture blockers មុនត្រូវបានបិទ។
+- **CI1293 និងការស្ដារកូនសោខូច**៖ head `1ca2e036175a4310022705bf55dcc9e6f236d30b` ឆ្លង strict Audit ២៥១ checker groups, zero fail/partial/skip រួម deterministic IDB, emulator ១៤៤, SQL RLS ៦០៣ និង Registration/F03។ ម្ចាស់គម្រោងស្នើផ្ទៀងឡើងវិញឱ្យហ្មត់ចត់; review បញ្ជាក់ missing-key recovery មាន តែ corrupted-existing-key មិនមានផ្លូវស្ដារដោយមិនលុប App data។ បន្ថែមការផ្ទៀង corruption ពិត, explicit confirmation និង atomic scoped replacement ក្នុង readwrite transaction ដែលមានព្រំដែន; healthy winner/transient error ត្រូវបដិសេធ។ UI ការពារ key/session/backend/close-reopen/Android Back និងប្រាប់ unknown outcome តាមពិត; seller re-enrollment នៅតែចាំបាច់។ ការបន្ថែមនេះត្រូវការ exact-head CI ថ្មី មិនយក CI1293 ជំនួសទេ។
+
 
 ### 2026-11-12 — CI៖ GitHub public ប្រើ ៥ shard ដោយមិនបន្ធូរ checker
 

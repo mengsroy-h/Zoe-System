@@ -15,7 +15,7 @@ import { acceptPalmSignBarcode, cancelPalmSignConfirmation, openZtoPalmSign, pal
 import { applyBarcodeCloseChange } from '../src/features/barcode-ops';
 import { encryptLookupSecret } from '../src/services/crypto';
 import { closeModal } from '../src/ui/modal';
-import { actOnQueuedSign, runPalmSignOutbox } from '../src/features/palm-sign-outbox';
+import { actOnQueuedSign, palmSignOutboxState, refreshPalmSignQueue, runPalmSignOutbox } from '../src/features/palm-sign-outbox';
 import { openSignJob } from '../src/services/palm-sign-outbox-store';
 
 const disk = vi.hoisted(() => ({ rows: new Map<string, any>() }));
@@ -350,11 +350,23 @@ it.each([['during-grace', false], ['after-manual', false], ['fresh-status', true
         expect(value.job).toMatchObject({ phase: 'action', manualReviewReason: 'photo_unverified', photoGraceChecks: 5, continuationAllowed: false });
         expect(value.job.message).toContain('ZTO បង្ហាញថា Sign រួច');
         const reads = zto.length; now += 600000; await runPalmSignOutbox();
+        // ការហៅ runner រង់ចាំតែការរៀបចំការងារ៖ status នៅខាងក្រោយអាចកាន់ lease។
+        // រង់ចាំប៊ូតុងទំនេរ មុន retry ទាំងពីរ ដើម្បីកុំឱ្យការសាកត្រូវរំលង។
+        const waitUntilIdle = async () => {
+            await vi.waitFor(async () => {
+                await refreshPalmSignQueue();
+                expect(palmSignOutboxState.rows.find(row => row.id === value.row.id)).toMatchObject({ phase: 'action', busy: false });
+            });
+        };
+        await waitUntilIdle();
         expect(zto).toHaveLength(reads); expect(disk.rows.size).toBe(1);
+        expect(applyBarcodeCloseChange).toHaveBeenCalledTimes(5);
         await actOnQueuedSign(value.row.id, 'retry');
         await vi.waitFor(async () => expect((await openSignJob([...disk.rows.values()][0], securityState.lookupSecretKey!)).phase).toBe('action'));
         value = await settled();
-        expect(value.job).toMatchObject({ photo: original, photoGraceChecks: 5 });
+        expect(value.job).toMatchObject({ photo: original, photoGraceChecks: 5, photoVerified: false, readOnlyProbe: true, phase: 'action', continuationAllowed: false });
+        expect(applyBarcodeCloseChange).toHaveBeenCalledTimes(6);
+        await waitUntilIdle();
         readback = 'exact';
         await actOnQueuedSign(value.row.id, 'retry');
     } else {
@@ -362,7 +374,7 @@ it.each([['during-grace', false], ['after-manual', false], ['fresh-status', true
         readback = 'exact'; now = value.row.due; await runPalmSignOutbox();
     }
     await expectQueueCompleted();
-    expect(applyBarcodeCloseChange).toHaveBeenCalledTimes(visibility === 'after-manual' ? 6 : 2);
+    expect(applyBarcodeCloseChange).toHaveBeenCalledTimes(visibility === 'after-manual' ? 7 : 2);
     for (const args of vi.mocked(applyBarcodeCloseChange).mock.calls) expect(args).toEqual(['item1', CODE, true, { silent: true, showModal: false, expectedSignIdentity: expect.any(String) }]);
     expect(scans('04')).toHaveLength(1); expect(scans('05')).toHaveLength(0);
     expect(zto.filter(call => call.path.endsWith('saveBillPic'))).toHaveLength(0);

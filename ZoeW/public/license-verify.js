@@ -13,6 +13,7 @@
     ];
 
     const KEY_PREFIX = 'ZOEKEY-';
+    const LEGACY_PROTOCOL_ENABLED = !!(global.ZoeSeatConfig && Object.prototype.hasOwnProperty.call(global.ZoeSeatConfig, 'legacyProtocolEnabled') && global.ZoeSeatConfig.legacyProtocolEnabled === true);
     const OFFLINE_GRACE_MS = 3 * 24 * 60 * 60 * 1000;
     const DEVICE_ID_KEY = 'zoe_license_device_id';
     const DEVICE_ID_RE = /^[0-9A-Z]{20,32}$/;
@@ -285,6 +286,7 @@
                 exp: result.payload.exp,
                 activatedAt: elapsed === null ? now : now - elapsed,
                 releaseEpoch: online.releaseEpoch,
+                ...(online.protocol === 2 ? { seatProtocol: 2, seatReceipt: online.receipt } : {}),
                 lastOnlineCheck: now,
                 onlineExp: ceiling,
                 seenMax: now
@@ -372,6 +374,8 @@
             if (!res.ok) return { ok: null, reason: 'network' };
             const data = out.body;
             if (data === null || data === undefined) return { ok: false, reason: 'not-found' };
+            if (data.seatProtocol === 2) return checkSecureSeat(appCode, keyId, priority);
+            if (!LEGACY_PROTOCOL_ENABLED) return { ok: null, protocol: 2, reason: 'seat-unavailable' };
             if (data.revoked === true) return { ok: false, reason: 'revoked' };
             if (typeof data.expiresAt === 'number' && !Number.isFinite(data.expiresAt)) return { ok: null, reason: 'network' };
             const trustedNow = getTrustedServerNow();
@@ -434,6 +438,95 @@
     function licenseSeatUrl(appCode, keyId, slot, child) {
         return LICENSE_DB_URL.replace(/\/+$/, '') + '/license_seats/' + appCode + '/' + keyId
             + (slot ? '/' + slot : '') + (slot && child ? '/' + child : '') + '.json';
+    }
+
+    const SEAT_AUDIENCE = 'https://zoew.netlify.app';
+
+    async function createSeatEnrollment(keyString, appCode) {
+        try {
+            const checked = await verifySignatureAndScope(keyString, appCode);
+            if (!checked.valid) return checked;
+            if (!global.ZoeSeatClient) return { valid: false, reason: 'device-unverified' };
+            await global.ZoeSeatClient.createIdentity(appCode, checked.payload.id);
+            const enrollment = await global.ZoeSeatClient.enrollmentRequest(appCode, checked.payload.id);
+            return { valid: true, enrollment: enrollment };
+        } catch (e) { return { valid: false, reason: 'device-unverified' }; }
+    }
+
+    async function inspectSeatIdentity(keyString, appCode) {
+        try {
+            const checked = await verifySignatureAndScope(keyString, appCode);
+            if (!checked.valid) return checked;
+            const client = global.ZoeSeatClient;
+            if (!client || typeof client.inspectCorruptIdentity !== 'function') return { valid: false, reason: 'device-unverified' };
+            const token = await client.inspectCorruptIdentity(appCode, checked.payload.id);
+            if (!token) return { valid: false, reason: 'device-unverified' };
+            return { valid: true, repairToken: token, keyId: checked.payload.id };
+        } catch (e) { return { valid: false, reason: 'device-unverified' }; }
+    }
+
+    async function repairSeatIdentity(token, isCurrent) {
+        try {
+            const client = global.ZoeSeatClient;
+            if (!client || typeof client.repairIdentity !== 'function' || typeof isCurrent !== 'function' || !isCurrent()) return { valid: false, reason: 'device-unverified' };
+            await client.repairIdentity(token, isCurrent);
+            if (!isCurrent()) return { valid: false, reason: 'device-unverified' };
+            return { valid: true };
+        } catch (e) { return { valid: false, reason: 'device-unverified' }; }
+    }
+
+    async function validateSeatReceipt(appCode, keyId, receipt, time, releaseEpoch) {
+        const client = global.ZoeSeatClient;
+        const config = global.ZoeSeatConfig;
+        if (!client || !config || config.audience !== SEAT_AUDIENCE || !Array.isArray(config.receiptPublicKeys) || !config.receiptPublicKeys.length) throw new Error('seat-trust-unavailable');
+        const identity = await client.loadIdentity(appCode, keyId);
+        if (!identity) throw new Error('seat-identity-missing');
+        const fingerprint = await client.fingerprint(identity.publicKey);
+        const proof = await client.verifyReceipt(receipt, config.receiptPublicKeys, { app: appCode, keyId: keyId, fingerprint: fingerprint,
+            ...(typeof releaseEpoch === 'number' ? { releaseEpoch: releaseEpoch } : {}) }, Math.ceil(time));
+        const live = trustedClock();
+        const verifiedAt = live ? Math.max(Math.ceil(time), Math.ceil(live.now + live.uncertainty)) : Infinity;
+        if (proof.validUntil < verifiedAt || proof.licenseExpiresAt < verifiedAt) throw new Error('seat-receipt-expired');
+        return proof;
+    }
+
+    async function checkSecureSeat(appCode, keyId, priority) {
+        const uncertain = (reason) => ({ ok: null, protocol: 2, reason: reason || 'verify-unavailable' });
+        try {
+            const pending = sharedRequest('secure-seat:' + appCode + '/' + keyId, priority, async () => {
+                const client = global.ZoeSeatClient;
+                if (!client) return uncertain('device-unverified');
+                if (!global.ZoeSeatConfig || !Array.isArray(global.ZoeSeatConfig.receiptPublicKeys) || !global.ZoeSeatConfig.receiptPublicKeys.length) return uncertain('seat-unavailable');
+                const identity = await client.loadIdentity(appCode, keyId);
+                if (!identity) return uncertain('device-unverified');
+                if (getTrustedServerNow() === null) await syncServerTime({ priority: true });
+                if (getTrustedServerNow() === null) return uncertain('clock-unverified');
+                const send = async (command) => {
+                    const time = getTrustedServerNow();
+                    if (time === null) throw new Error('clock-unverified');
+                    const envelope = await client.signCommand(appCode, keyId, Object.assign({ domain: 'zoe-license-seat-stage-v1',
+                        audience: SEAT_AUDIENCE, app: appCode, keyId: keyId, expiresAt: Math.floor(time + 45000) }, command));
+                    return fetchWithBodyTimeout(SEAT_AUDIENCE + '/.netlify/functions/license-seat-stage', (r) => r.json(), {
+                        method: 'POST', credentials: 'omit', redirect: 'error', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(envelope)
+                    });
+                };
+                for (let attempt = 0; attempt < 2; attempt++) {
+                    const state = await send({ action: 'device-state', revision: 0, publicKey: identity.publicKey });
+                    if (state.res.status === 403) return { ok: false, protocol: 2, reason: 'seat-released' };
+                    if (!state.res.ok || !state.body || state.body.mode !== 'active') return uncertain();
+                    const proof = await send({ action: 'prove', revision: state.body.revision, releaseEpoch: state.body.releaseEpoch, slot: state.body.slot });
+                    if (proof.res.status === 409) continue;
+                    if (proof.res.status === 403) return { ok: false, protocol: 2, reason: proof.body && proof.body.reason === 'license-expired' ? 'expired-server' : proof.body && proof.body.reason === 'license-revoked' ? 'revoked' : 'seat-released' };
+                    if (!proof.res.ok || !proof.body || proof.body.grantsLicense !== true || proof.body.staged !== false || !proof.body.receipt) return uncertain();
+                    const current = trustedClock();
+                    if (!current) return uncertain('clock-unverified');
+                    const receipt = await validateSeatReceipt(appCode, keyId, proof.body.receipt, current.now + current.uncertainty, state.body.releaseEpoch);
+                    return { ok: true, protocol: 2, seat: 'mine', expiresAt: receipt.licenseExpiresAt, releaseEpoch: receipt.releaseEpoch, receipt: proof.body.receipt };
+                }
+                return uncertain();
+            });
+            return pending ? await pending : uncertain();
+        } catch (e) { return uncertain('device-unverified'); }
     }
 
     function announcementsUrl(appCode, limit) {
@@ -658,10 +751,27 @@
             await syncServerTime();
             if (JSON.stringify(loadLocalRecord(appCode)) !== recordSnapshot) return recheck();
         }
-        const current = trustedClock();
+        let current = trustedClock();
         const ceilingBeforeRefresh = Number.isFinite(record.onlineExp) ? record.onlineExp : (signed ? signed.exp : record.exp) * 1000;
         if (!current) return { state: 'offline-grace-exceeded', exp: ceilingBeforeRefresh, reason: 'clock-unverified' };
         let now = Math.max(current.now, recordSeenMark(record));
+        if (!LEGACY_PROTOCOL_ENABLED || online.protocol === 2 || record.seatProtocol === 2) {
+            try {
+                const receipt = online.ok === true && online.protocol === 2 ? online.receipt : record.seatReceipt;
+                const proof = await validateSeatReceipt(appCode, signed ? signed.id : record.id, receipt, now + current.uncertainty,
+                    online.ok === true && online.protocol === 2 ? online.releaseEpoch : undefined);
+                if (JSON.stringify(loadLocalRecord(appCode)) !== recordSnapshot) return recheck();
+                current = trustedClock();
+                if (!current) throw new Error('clock-unverified');
+                now = Math.max(current.now, recordSeenMark(record));
+                record.seatProtocol = 2;
+                record.seatReceipt = receipt;
+                record.onlineExp = proof.licenseExpiresAt;
+            } catch (e) {
+                return { state: 'offline-grace-exceeded', exp: ceilingBeforeRefresh, reason: 'device-unverified' };
+            }
+        }
+
         if (online.ok === true) {
             now = current.now;
             record.seenMax = now;
@@ -735,6 +845,9 @@
     global.ZoeLicense = {
         KEY_PREFIX: KEY_PREFIX,
         activate: activate,
+        createSeatEnrollment: createSeatEnrollment,
+        inspectSeatIdentity: inspectSeatIdentity,
+        repairSeatIdentity: repairSeatIdentity,
         getStatus: getStatus,
         getDeviceId: getDeviceId,
         setDeviceMeta: setDeviceMeta,

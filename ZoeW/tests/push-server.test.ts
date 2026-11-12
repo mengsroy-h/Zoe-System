@@ -110,6 +110,7 @@ function decryptWebPush(body: Buffer, ua: ReturnType<typeof uaKeys>) {
 interface Harness {
     store: ReturnType<typeof makeStore>;
     service: any;
+    seatStore: ReturnType<typeof makeStore>;
     calls: { url: string; init: any }[];
     clock: { now: number };
     db: Record<string, any>;
@@ -121,7 +122,7 @@ function harness(opts: { env?: any; notices?: Record<string, any> | null; dbDown
     const store = makeStore();
     const clock = { now: NOW };
     const h: Harness = {
-        store, clock, calls: [], service: null,
+        store, seatStore: makeStore(), clock, calls: [], service: null,
         db: { [KEY_ID]: { expiresAt: NOW + 86400000 * 30, revoked: false }, [OTHER_KEY]: { expiresAt: NOW + 86400000 * 30, revoked: false } },
         notices: opts.notices === undefined ? null : opts.notices,
         push: () => ({ status: 201 })
@@ -148,7 +149,7 @@ function harness(opts: { env?: any; notices?: Record<string, any> | null; dbDown
     };
     h.service = createPushService({
         env: opts.env || Object.assign(vapidEnv(), { FCM_SERVICE_ACCOUNT: JSON.stringify(FCM_SA) }),
-        store, fetch, now: () => clock.now, publicKeys: [signerJwk]
+        store, seatStore: h.seatStore, fetch, now: () => clock.now, publicKeys: [signerJwk]
     });
     return h;
 }
@@ -255,11 +256,55 @@ describe('ស្នាមភ្ជាប់ ៖ ដេរីវេពីកូ�
 });
 
 describe('អត្តសញ្ញាណ ៖ Activation Key', () => {
-    it('Key ពិត + License Project ល្អ ➜ ទទួល · cache ១០ នាទី', async () => {
+    it('Key ពិត + License Project ល្អ ➜ ទទួល · ផ្ទៀង marker រាល់សំណើ', async () => {
         const h = harness();
         expect(await h.service.verifyLicense(GOOD)).toEqual({ ok: true, keyId: KEY_ID });
         await h.service.verifyLicense(GOOD);
-        expect(h.calls.filter((c) => c.url.includes('/license_keys/'))).toHaveLength(1);
+        expect(h.calls.filter((c) => c.url.includes('/license_keys/'))).toHaveLength(2);
+    });
+
+    it('cutover ក្រោយ legacy ផ្ទៀងរួច ➜ មិនប្រើ cache ដើម្បីរំលង Blob revoke', async () => {
+        const h = harness();
+        expect(await h.service.verifyLicense(GOOD)).toMatchObject({ ok: true });
+        h.db[KEY_ID].seatProtocol = 2;
+        await h.seatStore.setJSON('ZOE/' + KEY_ID, { schema: 1, mode: 'active', revision: 1, releaseEpoch: 0, maxDevices: 1, seats: {}, revoked: true, licenseExpiresAt: NOW + 86400000 });
+        expect(await h.service.verifyLicense(GOOD)).toMatchObject({ ok: false, reason: 'license:revoked' });
+    });
+
+    it('migrated lifecycle មកពី Blob មិនមែន RTDB ដែលកក · revoke បន្ទាប់បិទភ្លាម', async () => {
+        const h = harness();
+        h.db[KEY_ID] = { seatProtocol: 2, revoked: true, expiresAt: NOW - 1 };
+        const state = { schema: 1, mode: 'active', revision: 1, releaseEpoch: 0, maxDevices: 1, seats: {}, revoked: false, licenseExpiresAt: NOW + 86400000 };
+        await h.seatStore.setJSON('ZOE/' + KEY_ID, state);
+        expect(await h.service.verifyLicense(GOOD)).toMatchObject({ ok: true });
+        await h.seatStore.setJSON('ZOE/' + KEY_ID, { ...state, revoked: true, revision: 2 });
+        expect(await h.service.verifyLicense(GOOD)).toMatchObject({ ok: false, reason: 'license:revoked' });
+    });
+
+    it.each([null, { mode: 'staged' }, { mode: 'active', revoked: false, licenseExpiresAt: 'forever' }])('Blob migrated ខ្វះ/ខូច %j ➜ មិនប្រើ legacy active', async state => {
+        const h = harness(); h.db[KEY_ID].seatProtocol = 2;
+        if (state) await h.seatStore.setJSON('ZOE/' + KEY_ID, state);
+        expect(await h.service.verifyLicense(GOOD)).toMatchObject({ ok: false, status: 503, reason: 'license:unverified' });
+    });
+
+    it('Blob migrated ដាច់ ➜ 503 មិនប្រើ legacy active', async () => {
+        const h = harness(); h.db[KEY_ID].seatProtocol = 2;
+        h.seatStore.getWithMetadata = async () => { throw new Error('synthetic outage'); };
+        expect(await h.service.verifyLicense(GOOD)).toMatchObject({ ok: false, status: 503, reason: 'license:unverified' });
+    });
+
+    it('Blob migrated ផុត ➜ 403 · អាន strong · ព្យួរមិនបើកសិទ្ធិ', async () => {
+        const h = harness(); h.db[KEY_ID].seatProtocol = 2;
+        await h.seatStore.setJSON('ZOE/' + KEY_ID, { schema: 1, mode: 'active', revision: 1, releaseEpoch: 0, maxDevices: 1, seats: {}, revoked: false, licenseExpiresAt: NOW - 1 });
+        const read = vi.spyOn(h.seatStore, 'getWithMetadata');
+        expect(await h.service.verifyLicense(GOOD)).toMatchObject({ ok: false, reason: 'license:expired' });
+        expect(read).toHaveBeenCalledWith('ZOE/' + KEY_ID, { type: 'json', consistency: 'strong' });
+        read.mockImplementation(() => new Promise(() => {}));
+        vi.useFakeTimers();
+        const pending = h.service.verifyLicense(GOOD);
+        await vi.advanceTimersByTimeAsync(PUSH_READ_TIMEOUT_MS + 1);
+        expect(await pending).toMatchObject({ ok: false, status: 503, reason: 'license:unverified' });
+        vi.useRealTimers();
     });
 
     it('ហត្ថលេខាក្លែង · App ខុស · ទម្រង់ខុស ➜ 403 មុនហៅបណ្តាញ', async () => {
@@ -967,13 +1012,28 @@ describe('⛔ អត្តសញ្ញាណ ៖ គណនីហាង Supabase 
         expect(readPushConfig(Object.assign(sbEnv(), { SUPABASE_URL: 'http://evil.example.com' })).supabase).toBeNull();
     });
 
-    it('cache ៖ token ដដែលក្នុង ១០ នាទី ➜ ហៅ Supabase ម្តង · Activation Key នៅដើរដូចមុនលើ service ដដែល', async () => {
+    it('session ៖ token ដដែល ➜ ផ្ទៀង Supabase រាល់សំណើ · Activation Key នៅដើរដូចមុនលើ service ដដែល', async () => {
         const h = harness({ env: sbEnv() });
         await h.service.subscribe({ supabase: SB_OWNER }, webSub().sub);
         await h.service.subscribe({ supabase: SB_OWNER }, webSub().sub);
-        expect(h.calls.filter((c) => c.url === SB_URL + '/rest/v1/rpc/my_account').length).toBe(1);
+        expect(h.calls.filter((c) => c.url === SB_URL + '/rest/v1/rpc/my_account').length).toBe(2);
         expect(await h.service.subscribe(GOOD, webSub().sub)).toMatchObject({ ok: true });
         expect(await h.service.subscribe({ license: GOOD }, webSub().sub)).toMatchObject({ ok: true });
+    });
+
+    it('session ត្រូវដកក្រោយ subscribe ➜ JWT ចាស់មិនអាចសរសេរ subscription ថ្មី', async () => {
+        const h = harness({ env: sbEnv() });
+        const token = sbJwt('revoked-session');
+        SB_ACCOUNTS[token] = { tenant_id: TENANT_A, status: 'active' };
+        try {
+            expect(await h.service.subscribe({ supabase: token }, webSub().sub)).toMatchObject({ ok: true });
+            const before = [...h.store.data.entries()];
+            delete SB_ACCOUNTS[token];
+            expect(await h.service.subscribe({ supabase: token }, webSub().sub)).toMatchObject({ ok: false, reason: 'supabase:session' });
+            expect([...h.store.data.entries()]).toEqual(before);
+        } finally {
+            delete SB_ACCOUNTS[token];
+        }
     });
 
     it('HTTP ៖ body `supabase` ➜ អត្តសញ្ញាណហាង · token មិនលេចក្នុងចម្លើយ', async () => {

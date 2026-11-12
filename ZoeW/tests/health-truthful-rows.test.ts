@@ -50,7 +50,7 @@ it('Sheet Config មិនមែនភស្តុតាងសេវា live', a
 });
 it('កំណែ Sheet ជាចម្លើយចុងក្រោយ ត្រូវប្រាប់អាយុប្រភព', () => {
     localStorage.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, url: 'https://script.google.com/macros/s/synthetic/exec' }));
-    lookupState.sheetScriptVersionSeen = 2;
+    lookupState.sheetScriptVersionSeen = 3;
     expect(healthSheetScriptRow().detail).toContain('ចុងក្រោយ');
 });
 it.each([NaN, Infinity, -Infinity])('នាឡិកា offset %s មិនមែនភស្តុតាង sync', async (offset) => {

@@ -451,3 +451,65 @@ describe('pricePending ៖ commit atomic (A526) ជំនួស history callback
         expect(money()).toEqual([[amount, 1], [amount, 1]]);
     });
 });
+
+describe('Web Lock មិនចាក់សកម្មភាពដែលបរាជ័យឡើងវិញក្រៅសោ', () => {
+    afterEach(() => { vi.unstubAllGlobals(); });
+    it('បញ្ជូនកំហុសដើម ហើយរត់សកម្មភាពតែម្ដងក្នុងសោ', async () => {
+        const { withPriceOperationLock } = await import('../src/services/price-operation');
+        const failure = new Error('unknown write outcome');
+        let held = false;
+        vi.stubGlobal('navigator', { locks: { request: vi.fn(async (_name, _options, callback) => {
+            held = true;
+            try { return await callback({ name: 'price' }); } finally { held = false; }
+        }) } });
+        const action = vi.fn(async () => { expect(held).toBe(true); throw failure; });
+        await expect(withPriceOperationLock('reject-token', action)).rejects.toBe(failure);
+        expect(action).toHaveBeenCalledTimes(1);
+    });
+    it('មិនរត់សកម្មភាពពេលសំណើសោត្រូវបដិសេធ', async () => {
+        const { withPriceOperationLock } = await import('../src/services/price-operation');
+        const failure = new Error('lock unavailable');
+        vi.stubGlobal('navigator', { locks: { request: vi.fn(async () => { throw failure; }) } });
+        const action = vi.fn(async () => 'written');
+        await expect(withPriceOperationLock('unavailable-token', action)).rejects.toBe(failure);
+        expect(action).not.toHaveBeenCalled();
+    });
+    it('សោមានម្ចាស់ផ្សេង មិនរត់សកម្មភាព ឬប្ដូរទៅក្រៅសោ', async () => {
+        const { withPriceOperationLock } = await import('../src/services/price-operation');
+        const request = vi.fn(async (_name, options, callback) => {
+            expect(options).toEqual({ ifAvailable: true });
+            return callback(null);
+        });
+        vi.stubGlobal('navigator', { locks: { request } });
+        const action = vi.fn(async () => 'written');
+        expect(await withPriceOperationLock('contended-token', action, true)).toBeNull();
+        expect(action).not.toHaveBeenCalled();
+        expect(request).toHaveBeenCalledTimes(1);
+    });
+    it('កំហុសដោះសោក្នុងផ្ទាំង ហើយការសាកថ្មីត្រូវចូល Web Lock ថ្មី', async () => {
+        const { withPriceOperationLock } = await import('../src/services/price-operation');
+        let held = false;
+        const request = vi.fn(async (_name, _options, callback) => {
+            held = true;
+            try { return await callback({ name: 'price' }); } finally { held = false; }
+        });
+        vi.stubGlobal('navigator', { locks: { request } });
+        const failure = new Error('unknown outcome');
+        await expect(withPriceOperationLock('retry-token', async () => { throw failure; })).rejects.toBe(failure);
+        const retry = vi.fn(async () => { expect(held).toBe(true); return 'verified'; });
+        expect(await withPriceOperationLock('retry-token', retry)).toBe('verified');
+        expect(retry).toHaveBeenCalledTimes(1);
+        expect(request).toHaveBeenCalledTimes(2);
+    });
+    it('គ្មាន Web Locks នៅតែប្រើសោក្នុងផ្ទាំងដដែល', async () => {
+        const { withPriceOperationLock } = await import('../src/services/price-operation');
+        vi.stubGlobal('navigator', {});
+        let resolve!: (value: string) => void;
+        const action = vi.fn(() => new Promise<string>(yes => { resolve = yes; }));
+        const first = withPriceOperationLock('local-token', action);
+        expect(await withPriceOperationLock('local-token', action)).toBeNull();
+        resolve('done');
+        expect(await first).toBe('done');
+        expect(action).toHaveBeenCalledTimes(1);
+    });
+});

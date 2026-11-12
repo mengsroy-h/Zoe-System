@@ -119,7 +119,9 @@ describe('ការអាន ZTO ចែករំលែកតែសំណើក�
         expect(JSON.parse((await first).body).reason).toBe('idtoken:supabase-unreachable');
         expect(JSON.parse((await call(listQuery)).body).success).toBe(true); expect(rpc).toHaveBeenCalledTimes(2);
         hung.resolve(response([{ status: 'revoked', branch_code: '999999' }])); await ticks();
-        expect(JSON.parse((await call(listQuery)).body).site).toBe('700001'); expect(rpc).toHaveBeenCalledTimes(2);
+        expect(JSON.parse((await call(listQuery)).body).site).toBe('700001'); expect(rpc).toHaveBeenCalledTimes(3);
+        rpc.mockImplementationOnce(async () => response({ message: 'session-revoked' }, 401));
+        expect(JSON.parse((await call(listQuery)).body).reason).toBe('idtoken:signature'); expect(rpc).toHaveBeenCalledTimes(4);
     });
 
     it('ការអាន Cookie ព្យួរ ត្រូវដកចេញនៅពិដានពេល ហើយ Cookie ចាស់មកយឺតមិនជាន់លទ្ធផលថ្មី', async () => {

@@ -130,6 +130,7 @@ function buildEnv(app, opts) {
     FakeDate.prototype = RealDate.prototype;
 
     const sandbox = {
+        ZoeSeatConfig: { legacyProtocolEnabled: true },
         console, Promise, Error, JSON, Object, Array, Number, String, Boolean, isNaN,
         Math, Map, Set, RegExp, setTimeout, clearTimeout, AbortController,
         TextEncoder, TextDecoder, Uint8Array,

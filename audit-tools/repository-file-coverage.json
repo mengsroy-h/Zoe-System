@@ -813,6 +813,23 @@
       ],
       "evidence": "វ៉ិចទ័រ restoreGuard រួមរត់លើ rules source និង artifact ពិត ក្នុង RTDB និង PostgreSQL RPC; ពិនិត្យបដិសេធដោយ server ទាំងមូលមិនប្រែ ពេល receipt ឬ lifecycle ប្រែ និងពេល fanout ក្នុង write ដូចគ្នា។ AST កិច្ចសន្យា .write ចាស់ប្រៀប migration មុនដដែល។",
       "limitation": "Fixture បង្កើតទិន្នន័យសាក មិនមែន checker ឯករាជ្យ។ ភស្តុតាង backend មានតែ runtime ដែលរត់ពិត; skip ឬ source-only មិនជំនួស native engine ទេ។"
+    },
+    "supabase-account-session": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/zoew-suite-test.js"
+      ],
+      "evidence": "Vitest រត់ account session លើ PostgreSQL ពិត និង Netlify mocks៖ session UUID ម្ចាស់ សុពលភាព ការដកសិទ្ធិ និងសាលក្រមថ្មី។",
+      "limitation": "PostgREST និងសេវា Netlify ពិតមិនបានប្រើ; hosted rollout ត្រូវផ្ទៀងដាច់ដោយឡែក។"
+    },
+    "license-seat-protocol": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/zoew-suite-test.js",
+        "audit-tools/emu/license-seat-rules-test.js"
+      ],
+      "evidence": "រត់ protocol និង verifier ពិតជាមួយសោសាក; ផ្ទៀង enrollment, receipt, cutover, owner races និង rules។",
+      "limitation": "មិនបញ្ជាក់ production key provisioning, device fleet ឬការផ្ទេរ client ចាស់; rules ត្រូវការរត់ emulator ពិត។"
     }
   },
   "files": {
@@ -5078,6 +5095,51 @@
     },
     "supabase/migrations/20261109122019_zoe_rules.sql": {
       "policy": "supabase-rules-generator"
+    },
+    "ZoeW/netlify/functions/license-seat-stage.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/netlify/lib/license-seat-stage.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/license-seat-stage.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-account-session.pg.test.ts": {
+      "policy": "supabase-account-session"
+    },
+    "ZoeW/tests/supabase-server-session.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "audit-tools/supabase-account-session-test.cjs": {
+      "policy": "supabase-account-session"
+    },
+    "supabase/migrations/20261112054956_zoe_account_active_session.sql": {
+      "policy": "supabase-account-session"
+    },
+    "ZoeKeyGen/license-seat-client.js": {
+      "policy": "license-seat-protocol"
+    },
+    "ZoeKeyGen/license-seat-config.js": {
+      "policy": "license-seat-protocol"
+    },
+    "ZoeW/public/license-seat-client.js": {
+      "policy": "license-seat-protocol"
+    },
+    "ZoeW/public/license-seat-config.js": {
+      "policy": "license-seat-protocol"
+    },
+    "ZoeW/tests/license-seat-client.test.ts": {
+      "policy": "license-seat-protocol"
+    },
+    "ZoeW/tests/license-seat-enrollment.test.ts": {
+      "policy": "license-seat-protocol"
+    },
+    "ZoeW/tests/license-seat-seller.test.ts": {
+      "policy": "license-seat-protocol"
+    },
+    "ZoeW/tests/license-seat-idb.test.ts": {
+      "policy": "license-seat-protocol"
     }
   }
 }

@@ -23,7 +23,7 @@ function harness(file: string) {
         localStorage: { getItem: (k: string) => store.get(k) || null, setItem: (k: string, v: string) => store.set(k, v), removeItem: (k: string) => store.delete(k) },
         setTimeout: (f: () => void) => { timers.set(++timerId, f); return timerId; }, clearTimeout: (id: number) => timers.delete(id),
         fetch: async () => { throw Error('បណ្ដាញក្លែងមិនបានរៀបចំ'); } };
-    ctx.window = ctx; vm.createContext(ctx); vm.runInContext(readFileSync(resolve(ROOT, file), 'utf8'), ctx);
+    ctx.ZoeSeatConfig = { legacyProtocolEnabled: true }; ctx.window = ctx; vm.createContext(ctx); vm.runInContext(readFileSync(resolve(ROOT, file), 'utf8'), ctx);
     const payload = { a: 'ZOE', id: 'SYNTHETICKEY', iat: T / 1000, exp: (T + 30 * DAY) / 1000 };
     const key = 'ZOEKEY-' + Buffer.from(JSON.stringify(payload)).toString('base64url') + '.AA';
     const record = { keyString: key, ...payload, activatedAt: T, lastOnlineCheck: T, onlineExp: T + 30 * DAY, seenMax: T, releaseEpoch: 0 };

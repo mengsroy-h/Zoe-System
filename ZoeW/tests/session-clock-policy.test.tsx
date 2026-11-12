@@ -281,3 +281,82 @@ it.each(['live', 'expired'])('ព្រំដែនវគ្គមិនច្�
     expect(firebaseState.sessionExpiryCheck).toBe(expected);
     expect(signOut).toHaveBeenCalledTimes(expected === 'expired' ? 1 : 0);
 });
+
+it('ផ្ទៀងផ្ទាត់វគ្គដដែលរួច មិនបើកផ្ទាំងឡើងវិញពេល License arm បន្ទាប់', async () => {
+    sample();
+    armSessionExpiryCheck(firebaseState.auth.currentUser, firebaseState.authGeneration);
+    await turn();
+    expect(firebaseState.sessionExpiryCheck).toBe('live');
+    mount(<AppLockScreen />);
+    let resolve!: (value: any) => void;
+    token.mockReturnValueOnce(new Promise(yes => { resolve = yes; }));
+    step(() => { armSessionExpiryCheck(firebaseState.auth.currentUser, firebaseState.authGeneration); });
+    expect(firebaseState.sessionExpiryCheck).toBe('live');
+    expect(document.getElementById('appLockScreen')?.classList.contains('is-open')).toBe(false);
+    resolve({ authTime: new Date(START - HOUR).toISOString() });
+    await turn();
+});
+
+it.each(['clock', 'generation', 'expired'])('arm មិនរក្សា live ពេលភស្តុតាងលែងមានសុពលភាព៖ %s', async reason => {
+    sample();
+    await runSessionExpiryCheck();
+    if (reason === 'clock') skew = 24 * HOUR;
+    if (reason === 'generation') firebaseState.authGeneration++;
+    if (reason === 'expired') elapsed = 4 * HOUR;
+    let resolve!: (value: any) => void;
+    token.mockReturnValueOnce(new Promise(yes => { resolve = yes; }));
+    armSessionExpiryCheck(firebaseState.auth.currentUser, firebaseState.authGeneration);
+    expect(firebaseState.sessionExpiryCheck).toBe('pending');
+    resolve({ authTime: new Date(START - HOUR).toISOString() });
+    await turn();
+    expect(firebaseState.sessionExpiryCheck).toBe(reason === 'clock' ? 'unverified' : reason === 'expired' ? 'expired' : 'live');
+});
+
+it.each(['auth', 'user', 'sdk', 'database', 'scope', 'generation'])('ចម្លើយ arm ចាស់មិនប្ដូរសាលក្រមវគ្គថ្មីក្រោយប្ដូរ %s', async boundary => {
+    sample();
+    await runSessionExpiryCheck();
+    let oldReply!: (value: any) => void;
+    token.mockReturnValueOnce(new Promise(yes => { oldReply = yes; }));
+    armSessionExpiryCheck(firebaseState.auth.currentUser, firebaseState.authGeneration);
+    expect(firebaseState.sessionExpiryCheck).toBe('live');
+    if (boundary === 'auth') firebaseState.auth = { currentUser: firebaseState.auth.currentUser };
+    if (boundary === 'user') firebaseState.auth.currentUser = { uid: 'clock-policy' };
+    if (boundary === 'sdk') firebaseState.fb = { ...firebaseState.fb };
+    if (boundary === 'database') firebaseState.db = {};
+    if (boundary === 'scope') firebaseState.firebaseConfig = { databaseURL: 'https://new-clock-policy.invalid' };
+    if (boundary === 'generation') firebaseState.authGeneration++;
+    let newReply!: (value: any) => void;
+    token.mockReturnValueOnce(new Promise(yes => { newReply = yes; }));
+    armSessionExpiryCheck(firebaseState.auth.currentUser, firebaseState.authGeneration);
+    expect(firebaseState.sessionExpiryCheck).toBe('pending');
+    sample();
+    newReply({ authTime: new Date(START - HOUR).toISOString() });
+    await turn();
+    expect(firebaseState.sessionExpiryCheck).toBe('live');
+    oldReply({ authTime: new Date(START - 5 * HOUR).toISOString() });
+    await turn();
+    expect(firebaseState.sessionExpiryCheck).toBe('live');
+    expect(signOut).not.toHaveBeenCalled();
+});
+
+it.each([true, false])('arm និង periodic ជាន់គ្នាមិនបើកផ្ទាំង និងគោរពផុតកំណត់៖ arm ចប់មុន %s', async armFirst => {
+    sample();
+    await runSessionExpiryCheck();
+    let armReply!: (value: any) => void;
+    let periodicReply!: (value: any) => void;
+    token.mockReturnValueOnce(new Promise(yes => { armReply = yes; }));
+    armSessionExpiryCheck(firebaseState.auth.currentUser, firebaseState.authGeneration);
+    token.mockReturnValueOnce(new Promise(yes => { periodicReply = yes; }));
+    const periodic = runSessionExpiryCheck();
+    expect(firebaseState.sessionExpiryCheck).toBe('live');
+    const reply = { authTime: new Date(START - HOUR).toISOString() };
+    (armFirst ? armReply : periodicReply)(reply);
+    await turn();
+    expect(firebaseState.sessionExpiryCheck).toBe('live');
+    elapsed = 4 * HOUR;
+    (armFirst ? periodicReply : armReply)(reply);
+    await periodic;
+    await turn();
+    expect(firebaseState.sessionExpiryCheck).toBe('expired');
+    expect(signOut).toHaveBeenCalledTimes(1);
+});

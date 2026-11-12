@@ -47,15 +47,20 @@ it('native trace ចង UTC ជាមួយព្រំ monotonic ហើយម�
     expect(trace.summary().timeAnchor.wallUtc).toBe(wallStart);
 });
 
-async function simulate(options: { failedProvider?: string; failure?: unknown; different?: boolean; providersDiffer?: boolean; missingLogical?: boolean } = {}) {
+async function simulate(options: { failedProvider?: string; failure?: unknown; different?: boolean; providersDiffer?: boolean; missingLogical?: boolean; diagnostic?: 'summary-throws' | 'getter-throws' | 'present' } = {}) {
     const checks: { label: string; pass: boolean }[] = [];
-    const results: { provider: string; error: string | null; pass: boolean }[] = [];
+    const results: { provider: string; error: string | null; pass: boolean; preflightDiagnostic?: unknown }[] = [];
     const comparisons: { status: string; unavailableProviders?: string[] }[] = [];
     const closed: string[] = [];
     class Provider {
         faults = {}; trace = { note() {}, summary: () => ({}) };
         kind: string;
         constructor(kind: string) { this.kind = kind; }
+        get preflightTrace() {
+            if (options.diagnostic === 'getter-throws') throw new Error('synthetic observer getter failure');
+            if (options.diagnostic === 'summary-throws') return { summary() { throw new Error('synthetic observer summary failure'); } };
+            return options.diagnostic === 'present' ? { summary: () => ({ events: [], observerErrors: 0 }) } : undefined;
+        }
         async setup() {}
         async close() { closed.push(this.kind); }
         async failureEvidence() { return null; }
@@ -122,4 +127,30 @@ it('លទ្ធផល logical ដែលបាត់មិនមែន parity mi
     expect(String(result.thrown)).toContain('Provider comparison unavailable: synthetic');
     expect(result.checks).toEqual([]);
     expect(result.comparisons[0]?.status).toBe('UNAVAILABLE');
+});
+
+
+it.each(['summary-throws', 'getter-throws'] as const)('optional observer %s cannot change successful parity', async diagnostic => {
+    const result = await simulate({ diagnostic });
+    expect(result.rejected).toBe(false);
+    expect(result.comparisons[0]?.status).toBe('MATCH');
+    expect(result.closed).toEqual(['native', 'supabase']);
+    expect(result.results.find(row => row.provider === 'supabase')?.preflightDiagnostic).toEqual({ status: 'UNAVAILABLE', reason: 'observer-failed' });
+});
+it.each([null, undefined, 'original thrown value', new Error('original provider failure')])('optional observer failure preserves original throw %s', async failure => {
+    const result = await simulate({ diagnostic: 'summary-throws', failedProvider: 'supabase', failure });
+    expect(result.rejected).toBe(true);
+    expect(result.thrown).toBe(failure);
+    expect(result.comparisons[0]?.status).toBe('UNAVAILABLE');
+    expect(result.closed).toEqual(['native', 'supabase']);
+});
+it('missing optional observer is explicit without changing outcome', async () => {
+    const result = await simulate();
+    expect(result.rejected).toBe(false);
+    expect(result.results.find(row => row.provider === 'supabase')?.preflightDiagnostic).toEqual({ status: 'UNAVAILABLE', reason: 'observer-missing' });
+});
+it('present optional observer is retained in provider result', async () => {
+    const result = await simulate({ diagnostic: 'present' });
+    expect(result.rejected).toBe(false);
+    expect(result.results.find(row => row.provider === 'supabase')?.preflightDiagnostic).toEqual({ events: [], observerErrors: 0 });
 });

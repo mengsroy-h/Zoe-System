@@ -57,7 +57,7 @@ beforeEach(() => {
             const body = url.includes('/server-time') ? { nonce: new URL(url).searchParams.get('nonce'), now: Date.now() } : url.includes('/license_keys/') ? { expiresAt: T + 30 * DAY, revoked: net.revoked, maxDevices: 1 } : { d1: { device: 'SYNTHETICDEVICE1234567890', at: T, releaseEpoch: 0 } };
             return { ok: true, status: 200, redirected: false, headers: { get: (n: string) => n === 'Content-Type' ? 'application/json' : null }, json: async () => body };
         } };
-    ctx.window = ctx; vm.runInNewContext(readFileSync('public/license-verify.js', 'utf8'), ctx); api = ctx.ZoeLicense; vi.stubGlobal('ZoeLicense', api);
+    ctx.ZoeSeatConfig = { legacyProtocolEnabled: true }; ctx.window = ctx; vm.runInNewContext(readFileSync('public/license-verify.js', 'utf8'), ctx); api = ctx.ZoeLicense; vi.stubGlobal('ZoeLicense', api);
 });
 afterEach(() => { license.cancelActivationRetry(); vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals(); firebaseState.authGeneration++; });
 

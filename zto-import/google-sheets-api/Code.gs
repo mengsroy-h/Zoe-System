@@ -1,4 +1,4 @@
-var SCRIPT_VERSION = 2;
+var SCRIPT_VERSION = 3;
 var CACHE_TTL_SECONDS = 60;
 var CACHE_KEY_PREFIX = 'customer_rows_v2_';
 
@@ -65,10 +65,13 @@ function doGet(e) {
     for (var j = 0; j < rows.length; j++) {
       var r = rows[j];
       if (!r[0]) continue;
+      var listDod = toMoney(r[1]);
+      var listCod = toMoney(r[2]);
+      if (listDod === null || listCod === null) return jsonResponse({ error: 'invalid-money' });
       list.push({
         barcode: r[0],
-        dod: toMoney(r[1]),
-        cod: toMoney(r[2]),
+        dod: listDod,
+        cod: listCod,
         phone: phoneText(r[3])
       });
     }
@@ -79,11 +82,14 @@ function doGet(e) {
     var row = rows[i];
     var barcode = row[0] ? row[0].toString().trim().toUpperCase() : '';
     if (barcode === code) {
+      var dod = toMoney(row[1]);
+      var cod = toMoney(row[2]);
+      if (dod === null || cod === null) return jsonResponse({ error: 'invalid-money' });
       return jsonResponse({
         found: true,
         barcode: row[0],
-        dod: toMoney(row[1]),
-        cod: toMoney(row[2]),
+        dod: dod,
+        cod: cod,
         phone: phoneText(row[3])
       });
     }
@@ -94,8 +100,38 @@ function doGet(e) {
 
 function toMoney(value) {
   if (value === null || value === undefined || value === '') return 0;
-  var n = typeof value === 'number' ? value : parseFloat(String(value).replace(/[^0-9.\-]/g, ''));
-  if (!isFinite(n)) return 0;
+  var n;
+  if (typeof value === 'number') {
+    n = value;
+  } else if (typeof value === 'string') {
+    var text = value.trim().replace(/^(?:USD|KHR|\$|៛)\s*/i, '').replace(/\s*(?:USD|KHR|\$|៛)$/i, '').trim();
+    if (!text) return value.trim() === '' ? 0 : null;
+    if (!/^-?(?:[0-9]+(?:[.,][0-9]*)*|[.,][0-9]+)$/.test(text)) return null;
+    var negative = text.charAt(0) === '-';
+    var body = negative ? text.slice(1) : text;
+    var commas = body.split(',').length - 1;
+    var dots = body.split('.').length - 1;
+    if (commas && dots) {
+      var decimal = body.lastIndexOf('.') > body.lastIndexOf(',') ? '.' : ',';
+      var groups = body.slice(0, body.lastIndexOf(decimal)).split(decimal === '.' ? ',' : '.');
+      var fraction = body.slice(body.lastIndexOf(decimal) + 1);
+      if (!/^[0-9]{1,3}$/.test(groups[0]) || !groups.slice(1).every(function (part) { return /^[0-9]{3}$/.test(part); }) || !/^[0-9]+$/.test(fraction)) return null;
+      body = groups.join('') + '.' + fraction;
+    } else if (commas || dots) {
+      var parts = body.split(commas ? ',' : '.');
+      if (parts.length === 2) {
+        if (/^[0-9]{1,3}$/.test(parts[0]) && /^[0-9]{3}$/.test(parts[1])) return null;
+        body = (parts[0] || '0') + '.' + (parts[1] || '0');
+      } else {
+        if (!/^[0-9]{1,3}$/.test(parts[0]) || !parts.slice(1).every(function (part) { return /^[0-9]{3}$/.test(part); })) return null;
+        body = parts.join('');
+      }
+    }
+    n = Number(body) * (negative ? -1 : 1);
+  } else {
+    return null;
+  }
+  if (!isFinite(n) || !isFinite(n * 100)) return null;
   return Math.round(n * 100) / 100;
 }
 

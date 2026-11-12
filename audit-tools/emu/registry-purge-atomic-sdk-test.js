@@ -2590,8 +2590,16 @@ async function main() {
                 const coherent = checks.length === expected.length && expected.every(label => checks.filter(check => check.label === label && check.pass).length === 1)
                     && cleaned && !error;
                 if (!coherent) { fail++; console.error('  FAIL  case manifest ' + providerName + ':' + scenario.id); }
+                let preflightDiagnostic;
+                if (providerName === 'supabase') {
+                    try {
+                        const trace = provider.preflightTrace;
+                        preflightDiagnostic = trace && typeof trace.summary === 'function' ? trace.summary() : null;
+                        if (!preflightDiagnostic || typeof preflightDiagnostic !== 'object') preflightDiagnostic = { status: 'UNAVAILABLE', reason: 'observer-missing' };
+                    } catch (_) { preflightDiagnostic = { status: 'UNAVAILABLE', reason: 'observer-failed' }; }
+                }
                 results.push({ id: scenario.id, provider: providerName, inputFingerprint, pass: coherent, assertions: checks, cleanup: cleaned, error,
-                    ...(providerName === 'supabase' ? { preflightDiagnostic: provider.preflightTrace.summary() } : {}),
+                    ...(providerName === 'supabase' ? { preflightDiagnostic } : {}),
                     ...(provider.rawBackendEvidence ? { rawBackendEvidence: provider.rawBackendEvidence } : {}),
                     ...(provider.ordinaryAdmissionEvidence ? { ordinarySourceAdmission: provider.ordinaryAdmissionEvidence } : {}),
                     ...(providerName === 'native' ? { resources: provider.resourceReport(), diagnostic: provider.trace.summary(), failureReadback } : {}), ...value });

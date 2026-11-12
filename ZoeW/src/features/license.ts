@@ -122,17 +122,25 @@ export function closeSeatEnrollment() {
     closeModal('activationModal');
 }
 
-export async function prepareSeatEnrollment() {
-    if (viewState.backendKind !== 'firebase' || !firebaseState.auth?.currentUser || viewState.activationBusy) return;
-    if (seatEnrollmentOperation?.isCurrent()) return;
-    clearSeatEnrollment();
+function captureSeatEnrollmentScope(requireOpen: boolean) {
     const sessionIsCurrent = captureAuthDatabaseGuard();
     const epoch = viewState.seatEnrollmentEpoch;
     const input = fieldValue('activationKeyInput').trim();
     const selectedKey = () => input || (typeof ZoeLicense?.activationKeyString === 'function' ? ZoeLicense.activationKeyString(LICENSE_APP_CODE) : '');
     const keyString = selectedKey();
+    return {
+        keyString,
+        isCurrent: () => sessionIsCurrent() && viewState.backendKind === 'firebase' && viewState.seatEnrollmentEpoch === epoch && (!requireOpen || openModalIds().includes('activationModal')) && fieldValue('activationKeyInput').trim() === input && selectedKey() === keyString
+    };
+}
+
+export async function prepareSeatEnrollment() {
+    if (viewState.backendKind !== 'firebase' || !firebaseState.auth?.currentUser || viewState.activationBusy) return;
+    if (seatEnrollmentOperation?.isCurrent()) return;
+    clearSeatEnrollment();
+    const operation = captureSeatEnrollmentScope(false);
+    const { keyString } = operation;
     if (!keyString) { viewState.seatEnrollmentMessage = 'សូមបញ្ចូល Activation Key មុនចុះឈ្មោះឧបករណ៍។'; return; }
-    const operation = { isCurrent: () => sessionIsCurrent() && viewState.backendKind === 'firebase' && viewState.seatEnrollmentEpoch === epoch && fieldValue('activationKeyInput').trim() === input && selectedKey() === keyString };
     seatEnrollmentOperation = operation;
     viewState.seatEnrollmentBusy = true;
     const current = () => seatEnrollmentOperation === operation && operation.isCurrent();
@@ -163,13 +171,9 @@ export async function prepareSeatEnrollment() {
 export async function repairSeatEnrollmentIdentity() {
     if (viewState.backendKind !== 'firebase' || !firebaseState.auth?.currentUser || viewState.activationBusy || viewState.seatEnrollmentBusy || !openModalIds().includes('activationModal')) return;
     clearSeatEnrollment();
-    const sessionIsCurrent = captureAuthDatabaseGuard();
-    const epoch = viewState.seatEnrollmentEpoch;
-    const input = fieldValue('activationKeyInput').trim();
-    const selectedKey = () => input || (typeof ZoeLicense?.activationKeyString === 'function' ? ZoeLicense.activationKeyString(LICENSE_APP_CODE) : '');
-    const keyString = selectedKey();
+    const operation = captureSeatEnrollmentScope(true);
+    const { keyString } = operation;
     if (!keyString) { viewState.seatEnrollmentMessage = 'សូមបញ្ចូល Activation Key មុនជួសជុលកូនសោឧបករណ៍។'; return; }
-    const operation = { isCurrent: () => sessionIsCurrent() && viewState.backendKind === 'firebase' && viewState.seatEnrollmentEpoch === epoch && openModalIds().includes('activationModal') && fieldValue('activationKeyInput').trim() === input && selectedKey() === keyString };
     seatEnrollmentOperation = operation;
     const current = () => seatEnrollmentOperation === operation && operation.isCurrent();
     viewState.seatEnrollmentBusy = true;

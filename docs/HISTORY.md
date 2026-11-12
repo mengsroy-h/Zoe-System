@@ -124,6 +124,8 @@
 
 ### [2.50.195] · ZoeKeyGen [2.24.41] — 2026-11-12 · ផ្ទៀងវគ្គ និងព្រំដែនប្រតិបត្តិការ
 
+- Audit1297 លើ0c677b2៖ shards2/3/5 pass រួម browser recovery; F03 permutations ទាំងពីរ608 pass និង Registration71 pass។ កែ duplication ដោយ shared enrollment scope (52tests/typecheck/lint pass) និង optional diagnostic មិនបាំង original outcome (reporting18/F03fixtures120 pass)។ មូលហេតុ intermittent preflight ដើមមិនទាន់បញ្ជាក់; រង់ចាំ full CI លើកូដថ្មី។
+
 - Actual-adapter fixture bootstrap បង្ក Firebase cached WebSocket ចង trace registry ចាស់។ ផ្លាស់ fixture ទៅ subprocess ឯករាជ្យ និងផ្ទៀង parent module cache/DOM ដដែល; child5 និង parent120 fixtures pass។ Native/Supabase engine verification ត្រូវរង់ចាំ CI ថ្មី។
 
 - Diagnostic wrapper ជុំដំបូងបង្ក recursion ដោយសរសេរឆ្លង SDK Proxy; កែជា outer observer Proxy មិនកែ base methods។ Actual-adapter regression ផ្ទៀង one-dispatch/error identity/ownership refusal; fixtures123 pass។ បញ្ហា preflight ដើមនៅមិនទាន់មានមូលហេតុបញ្ជាក់; ត្រូវផ្ទៀង CI ថ្មី។

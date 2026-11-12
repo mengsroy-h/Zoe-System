@@ -784,12 +784,40 @@ scenario('runner ៖ Linux audit និង Windows APK មាន mode ទាំ�
         if (!match) return null;
         return vm.runInNewContext(match[1], { vars: { ZOE_RUNNER_MODE: mode }, fromJSON: JSON.parse });
     };
-    check('audit ជ្រើស Linux pool ឬ GitHub និងអនុញ្ញាត shard ទាំង ៤ស្របគ្នា',
+    // matrix ថាមវន្ត៖ public GitHub (CPU ៤) ៥ shard · GitHub ឯកជន/self-hosted (CPU ២) ៤ shard · scale តែផ្នែក 1។
+    // ⛔ ការអានត្រូវវាយតម្លៃ expression ពិត (មិនមែន regex លើលេខថេរ) ដើម្បីកុំឲ្យ matrix ខុស N ក្លាយជាបៃតងស្ងាត់។
+    const matrixMatch = /^\s*include: \$\{\{\s*(.*)\s*\}\}\s*$/m.exec(audit);
+    const matrixFor = (mode, isPrivate, event = 'pull_request', scale = false) => {
+        if (!matrixMatch) return null;
+        try {
+            return vm.runInNewContext(matrixMatch[1], {
+                vars: { ZOE_RUNNER_MODE: mode },
+                github: { event_name: event, event: { repository: { private: isPrivate } } },
+                inputs: { multishop_scale: scale }, fromJSON: JSON.parse
+            });
+        } catch (e) { return null; }
+    };
+    const matrixJson = (n) => JSON.stringify(Array.from({ length: n }, (_, i) => ({ shard: i + 1, n })));
+    const matrix = {
+        public: matrixFor('github', false), private: matrixFor('github', true),
+        self: matrixFor('self-hosted', true), unset: matrixFor('', false),
+        scalePublic: matrixFor('github', false, 'workflow_dispatch', true),
+        scaleSelf: matrixFor('self-hosted', true, 'workflow_dispatch', true)
+    };
+    check('audit ជ្រើស Linux pool ឬ GitHub និងបែងចែក shard ៥ (public) / ៤ (ឯកជន · self-hosted)',
         same(labels(audit, 'self-hosted'), ['self-hosted', 'Linux', 'X64', 'wsl-zoe-audit'])
         && same(labels(audit, 'github'), ['ubuntu-latest'])
         && same(labels(audit, ''), ['self-hosted', 'Linux', 'X64', 'wsl-zoe-audit'])
         && same(labels(audit, 'invalid'), ['self-hosted', 'Linux', 'X64', 'wsl-zoe-audit'])
-        && /shard:\s*\[1, 2, 3, 4\]/.test(audit) && /max-parallel:\s*4\b/.test(audit));
+        && JSON.stringify(matrix.public) === matrixJson(5)
+        && JSON.stringify(matrix.private) === matrixJson(4)
+        && JSON.stringify(matrix.self) === matrixJson(4)
+        && JSON.stringify(matrix.unset) === matrixJson(4)
+        && JSON.stringify(matrix.scalePublic) === JSON.stringify([{ shard: 1, n: 5 }])
+        && JSON.stringify(matrix.scaleSelf) === JSON.stringify([{ shard: 1, n: 4 }])
+        && /max-parallel:\s*5\b/.test(audit)
+        && /RUNALL_SHARD:\s*\$\{\{\s*matrix\.shard\s*\}\}\/\$\{\{\s*matrix\.n\s*\}\}/.test(audit),
+        JSON.stringify(matrix));
     const allowed = (source, mode, isPrivate, event = 'pull_request', sameRepo = true, ref = 'refs/heads/main') => {
         const match = source.match(/^    if: (.+)$/m);
         if (!match) return false;
@@ -995,7 +1023,7 @@ scenario('APK សាក ៖ branch ផ្សេងពី main ➜ Pre-release �
     } finally { fs.rmSync(temp, { recursive: true, force: true }); }
 });
 
-scenario('runner៖ workers ខាងក្នុងសមនឹង CPU quota ដោយរក្សា shards ទាំង៤', () => {
+scenario('runner៖ workers ខាងក្នុងសមនឹង CPU quota ដោយរក្សា shards តាម mode (៥ public · ៤ self-hosted)', () => {
     const audit = read('.github/workflows/audit.yml');
     const compose = read('tools/actions-runners/compose.yml');
     const cpu = Number((compose.match(/cpus:\s*([\d.]+)/) || [])[1]);
@@ -1012,22 +1040,24 @@ scenario('runner៖ workers ខាងក្នុងសមនឹង CPU quota �
 scenario('audit៖ scale តាមសំណើដោយដៃ មិនកាត់ការគ្រប CI ធម្មតា', () => {
     const audit = read('.github/workflows/audit.yml');
     const expression = (line) => (line || '').match(/\$\{\{\s*(.*?)\s*\}\}/)?.[1] || '';
-    const evaluate = (source, event, scale, shard = 1) => source ? vm.runInNewContext(source, {
-        github: { event_name: event }, inputs: { multishop_scale: scale }, matrix: { shard },
-        fromJSON: JSON.parse, always: () => true
+    const evaluate = (source, event, scale, mode = 'github', isPrivate = false) => source ? vm.runInNewContext(source, {
+        vars: { ZOE_RUNNER_MODE: mode },
+        github: { event_name: event, event: { repository: { private: isPrivate } } },
+        inputs: { multishop_scale: scale }, matrix: { shard: 1 }, fromJSON: JSON.parse, always: () => true
     }) : undefined;
-    const exclude = expression(audit.split('\n').find((line) => /^\s+exclude:/.test(line)));
+    const include = expression(audit.split('\n').find((line) => /^\s+include:/.test(line)));
     const mode = expression(audit.split('\n').find((line) => /^\s+ZOE_MULTISHOP_SCALE:/.test(line)));
-    const shards = ((audit.match(/^\s*shard:\s*\[([\d, ]+)\]/m) || [])[1] || '').split(',').filter(Boolean).map(Number);
-    const active = (event, scale) => {
-        const excluded = evaluate(exclude, event, scale) || [];
-        return shards.filter((shard) => !excluded.some((entry) => entry.shard === shard));
-    };
+    const active = (event, scale, runnerMode, isPrivate) =>
+        (evaluate(include, event, scale, runnerMode, isPrivate) || []).map((entry) => entry.shard);
     check('manual scale ជា boolean លំនាំដើម false', /multishop_scale:\s*\n(?:[^\n]*\n)*?\s+type: boolean\s*\n\s+default: false/.test(audit));
-    check('PR/push និង dispatch ធម្មតានៅមាន shard ទាំង៤ ទោះ context input មិនសមក៏ដោយ',
-        ['pull_request', 'push'].every((event) => [false, true].every((scale) => same(active(event, scale), [1, 2, 3, 4])))
-        && same(active('workflow_dispatch', false), [1, 2, 3, 4]));
-    check('manual scale តែប៉ុណ្ណោះជ្រើស shard១', same(active('workflow_dispatch', true), [1]));
+    check('PR/push និង dispatch ធម្មតានៅមាន shard ៥ public / ៤ ឯកជន · self-hosted ទោះ context input មិនសមក៏ដោយ',
+        ['pull_request', 'push'].every((event) => [false, true].every((scale) => same(active(event, scale), [1, 2, 3, 4, 5])))
+        && same(active('workflow_dispatch', false), [1, 2, 3, 4, 5])
+        && same(active('pull_request', false, 'github', true), [1, 2, 3, 4])
+        && same(active('pull_request', false, 'self-hosted', true), [1, 2, 3, 4]));
+    check('manual scale តែប៉ុណ្ណោះជ្រើស shard១',
+        same(active('workflow_dispatch', true), [1])
+        && same(active('workflow_dispatch', true, 'self-hosted', true), [1]));
     const steps = audit.match(/^      -[^\n]*(?:\n(?!      -)[^\n]*)*/gm) || [];
     const step = steps.find((part) => /- name: run-all\.sh \(ផ្នែក/.test(part)) || '';
     const block = (step.match(/^        run: \|\r?\n([\s\S]*)/m) || [])[1];
@@ -1038,7 +1068,7 @@ scenario('audit៖ scale តាមសំណើដោយដៃ មិនកាត
         try { return cp.spawnSync('bash', ['-e', '-o', 'pipefail', '-c',
         'bash() { printf \'%s|%s|%s|%s\\n\' "$RUNALL_ONLY" "$RUNALL_SHARD" "$SBMONEY_SHOPS" "$SBMONEY_DEVICES"; }\n' + script], {
         cwd: ROOT, encoding: 'utf8', timeout: 10000,
-        env: { ...process.env, RUNALL_ONLY: '', RUNALL_SHARD: '1/4', SBMONEY_SHOPS: '', SBMONEY_DEVICES: '',
+        env: { ...process.env, RUNALL_ONLY: '', RUNALL_SHARD: '1/5', SBMONEY_SHOPS: '', SBMONEY_DEVICES: '',
             AUDIT_LOG: path.join(dir, 'audit.log'),
             ZOE_MULTISHOP_SCALE: String(evaluate(mode, event, scale) || false) }
         }); } finally { fs.rmSync(dir, { recursive: true, force: true }); }
@@ -1047,7 +1077,7 @@ scenario('audit៖ scale តាមសំណើដោយដៃ មិនកាត
     check('scale រត់ checker ពិត៨ហាង×៣devices ដោយគ្មាន shard filter', scaled.status === 0
         && scaled.stdout.trim() === 'supabase-money-multishop-test||8|3', scaled.stdout + scaled.stderr);
     check('CI ធម្មតាមិនប្ដូរ selection ឬទំហំ matrix លំនាំដើម', [regular, ignored].every((result) =>
-        result.status === 0 && result.stdout.trim() === '|1/4||'), regular.stdout + regular.stderr + ignored.stdout + ignored.stderr);
+        result.status === 0 && result.stdout.trim() === '|1/5||'), regular.stdout + regular.stderr + ignored.stdout + ignored.stderr);
     const group = audit.split('\n').find((line) => /^  group:/.test(line)) || '';
     const modeGroup = expression(group.replace(/\$\{\{\s*github\.(workflow|ref)\s*\}\}/g, ''));
     check('scale concurrency ដាច់ពី full CI ហើយរក្សា deadline/STRICT', evaluate(modeGroup, 'workflow_dispatch', true) !== evaluate(modeGroup, 'pull_request', false)

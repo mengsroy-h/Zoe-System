@@ -2044,6 +2044,14 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-11-12 — CI៖ GitHub public ប្រើ ៥ shard ដោយមិនបន្ធូរ checker
+
+- **រង្វាស់ ៤ shard បច្ចុប្បន្ន៖** Audit ពេញពីរ run — PR #404 [`43022937488`](https://github.com/mengsroy-h/Zoe-System/actions/runs/43022937488) និង main [`43027207193`](https://github.com/mengsroy-h/Zoe-System/actions/runs/43027207193) — មាន checker ២៥១ ដូចគ្នាទាំងសំណុំ; shard ១–៤ មាន ៣៨/១២១/៤៨/៤៤ job និងគ្មានស្លាកស្ទួន ឬបាត់។ ជញ្ជាំងវាស់៖ run A ១៣២៣,៤/១៣៦៨,៨/១១៥១,៦/៩៨៨,៥ វិ. (job យឺតបំផុត ~២៤,០ នាទី), run B ១៣៦៨,៤/១២២១,៨/១១៦០,៦/១០២៩,៩ វិ.។
+- **មូលហេតុ និងគំរូ៖** GitHub public runner មាន CPU ៤ ហើយ shard នីមួយៗរត់ ២ lane; shard ទី ៥ កាត់កំពូលដោយមិនប្តូរ `RUNALL_JOBS`, browser/emulator lane, `RUNALL_HINTS` ឬ deadline ។ គំរូលើរង្វាស់ទាំងពីរឲ្យ ~១០៤១–១០៥២ វិ. (~១៧,៥ នាទី) ធៀប ~១៣៦៨ វិ. (~២២,៨ នាទី); setup job បន្ថែម ~៦០ វិ. មិនលេបផលចំណេញ។
+- **សេចក្តីសម្រេច៖** `audit.yml` ប្រើ `matrix.include` ថាមវន្ត — GitHub public ៥ shard (`n=5`), GitHub ឯកជន និង self-hosted ៤ shard (`n=4`) ព្រោះ ៥ shard លើ runner ២ CPU ឬ container ៤ នឹងរត់ជួរ ហើយយឺតជាង។ `RUNALL_SHARD` និងឈ្មោះ job អាន `matrix.n` ដូចគ្នា; scale run នៅតែផ្នែក ១។
+- **Test ថ្មី៖** `runall-runner-test` វាយតម្លៃ expression ពិតរបស់ matrix សម្រាប់ public/private/self-hosted/scale និងរត់បញ្ជីពិត N=4 និង N=5 ដោយទាមទារឲ្យ checker ២៥១ មានម្ចាស់ម្តងគត់ និងទម្ងន់ shard ស្មើក្នុង ២០% (វាស់ N=5: ១២៧៨–១២៨១ វិ.)។ `repository-contract-test` ផ្ទៀង matrix ថាមវន្តដូចគ្នា។ គ្មានការបន្ធូរ checker, assertion, coverage, isolation, `STRICT` ឬ lane ណាមួយ។
+- **ស្ថានភាព៖** លេខ ~១៧,៥ នាទីជាការព្យាករណ៍ពីរង្វាស់ ៤ shard; ត្រូវផ្ទៀងជញ្ជាំង ៥ shard ពិត និងស្លាក ២៥១ ក្នុង Audit លើ PR នេះមុន merge។
+
 ### 2026-11-11 — CI៖ public repo ត្រូវ `github` mode និង shard ស្រាលជាងមុនលើ runner ឯកជន
 
 - **ភស្តុតាងថាមិនមែនកូដថ្មី៖** [Audit #1282](https://github.com/mengsroy-h/Zoe-System/actions/runs/42962638664) លើ commit ដដែល `498af60`៖ attempt 1 ធ្លាក់ shard 2 ក្នុង 28.2 នាទី, attempt 2 មិនមាន log របស់ runner, attempt 3 ជាប់ទាំង 5 jobs (shard 2 ក្នុង 21.3 នាទី)។ PR #403 head `3ad87df` ជាប់ ប៉ុន្តែ merge commit ដដែលធ្លាក់ attempt 1 ➜ ភាពមិនស្ថិតស្ថេរតាម runner/ពេលវេលា មិនមែន logic ថ្មី។ ក្នុងរយៈពេលវាស់ ស្ថិតិ Audit មាន 517 failure ក្នុង 1,265 runs (ប្រហែល 41%) និង 35 failure ក្នុង 80 runs ចុងក្រោយ។

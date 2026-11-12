@@ -1,5 +1,5 @@
 # ការត្រួតពិនិត្យស្វ័យប្រវត្តិលើរាល់ PR និង main ៖ `run-all.sh` ពេញ (រួមតេស្ត browser · RTDB emulator ពិត · Postgres ពិត)
-# បែងចែកជា ៤ ផ្នែក (`RUNALL_SHARD`) ហើយរត់ស្របគ្នាទាំង ៤។ CI បៃតង = ផ្នែកទាំង ៤ បៃតង។
+# បែងចែកជា ៥ ផ្នែកលើ GitHub public (៤ ផ្នែកលើ runner ២ CPU) (`RUNALL_SHARD`) ហើយរត់ស្របគ្នាទាំងអស់។ CI បៃតង = ផ្នែកទាំងអស់បៃតង។
 #
 # ⛔ ទង់ *_STRICT ធ្វើឲ្យការ SKIP ក្លាយជាការធ្លាក់ — បើ emulator · Postgres · firebase-tools មិនឡើង
 #    នោះ CI ត្រូវក្រហម មិនមែនបៃតងក្លែងក្លាយទេ (កំហុស 2.17.2/2.17.3 ship បាន ព្រោះគ្មានអ្វីសាកនឹង rules ពិត)។
@@ -104,20 +104,21 @@ jobs:
   # ⛔ runner GitHub (repo ឯកជន) មាន CPU ២ ➜ run-all.sh ពេញមួយ job ចំណាយ ~២៣ នាទី (lane 2 · meta រត់ម្នាក់ឯង) ខណៈ session
   #    (CPU ៤) ~១០ នាទី។ ការកែ ៖ បែងចែកបញ្ជីទៅ job ស្របគ្នា `RUNALL_SHARD=k/N` (`run-all.sh` ៖ LPT តាម RUNALL_HINTS ➜ ផ្នែក
   #    ទាំង N មិនជាន់ · មិនខ្វះ តាមរចនាសម្ព័ន្ធ · runall-runner-test ផ្ទៀង matrix ខាងក្រោម ↔ N)។
+  # ⛔ GitHub public មាន CPU ៤ ➜ ៥ shard (job ស្រប ៥ បាន) ដើម្បីកាត់កំពូលពី ~២៣ ទៅ ~១៨ នាទី; runner ២ CPU
+  #    (GitHub ឯកជន · self-hosted container ៤) នៅ ៤ shard ដដែល — ៥ shard នឹងរត់ជួរ ហើយយឺតជាង។
   # ⛔ shard នីមួយៗបើក RTDB emulator ផ្ទាល់ ហើយរត់ទង់ STRICT ដូច Runbook ជំហានទី ០ ➜ CI ស្មើការរត់ពេញក្នុង session
   #    (emu/* · money-guardian រត់ពេញ មិនមែន SKIP) ➜ job «Firebase rules» ដាច់លែងត្រូវការ។
   audit-shard:
-    name: ${{ github.event_name == 'workflow_dispatch' && inputs.multishop_scale && 'Supabase ៨ ហាង × ៣ ឧបករណ៍' || format('run-all.sh ផ្នែក {0}/4', matrix.shard) }}
+    name: ${{ github.event_name == 'workflow_dispatch' && inputs.multishop_scale && 'Supabase ៨ ហាង × ៣ ឧបករណ៍' || format('run-all.sh ផ្នែក {0}/{1}', matrix.shard, matrix.n) }}
     needs: ci-config
     if: (vars.ZOE_RUNNER_MODE == 'github' || github.event.repository.private == true) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ${{ fromJSON(vars.ZOE_RUNNER_MODE == 'github' && '["ubuntu-latest"]' || '["self-hosted","Linux","X64","wsl-zoe-audit"]') }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
-      max-parallel: 4
+      max-parallel: 5
       matrix:
-        shard: [1, 2, 3, 4]
-        exclude: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.multishop_scale && '[{"shard":2},{"shard":3},{"shard":4}]' || '[]') }}
+        include: ${{ fromJSON((github.event_name == 'workflow_dispatch' && inputs.multishop_scale) && (vars.ZOE_RUNNER_MODE == 'github' && github.event.repository.private == false && '[{"shard":1,"n":5}]' || '[{"shard":1,"n":4}]') || (vars.ZOE_RUNNER_MODE == 'github' && github.event.repository.private == false && '[{"shard":1,"n":5},{"shard":2,"n":5},{"shard":3,"n":5},{"shard":4,"n":5},{"shard":5,"n":5}]' || '[{"shard":1,"n":4},{"shard":2,"n":4},{"shard":3,"n":4},{"shard":4,"n":4}]')) }}
     steps:
       # ⛔ `fetch-depth: 0` ចាំបាច់។ លំនាំដើម (`1`) ទាញតែ commit តែមួយ ➜
       # គ្មាន `origin/main` ➜ `version-bump-scope.js` **SKIP រាល់ការរត់**
@@ -226,7 +227,7 @@ jobs:
         run: npm --prefix ZoeW run test -- tests/queued-sign-photo-layout.test.ts
 
       # ⛔ ទង់ STRICT ដូច Runbook ជំហានទី ០ (CLAUDE.md) ➜ runall-runner-test ផ្ទៀងថាគ្មានទង់ណាបាត់
-      - name: run-all.sh (ផ្នែក ${{ matrix.shard }}/4)
+      - name: run-all.sh (ផ្នែក ${{ matrix.shard }}/${{ matrix.n }})
         id: audit
         env:
           AUDIT_LOG: ${{ runner.temp }}/zoe-audit-${{ matrix.shard }}.log
@@ -238,7 +239,7 @@ jobs:
           # កូនក្នុង container មាន CPU quota ២; GitHub រក្សា defaults តាម VM ដើម។
           MONEYGUARD_JOBS: ${{ vars.ZOE_RUNNER_MODE == 'github' && 'auto' || '2' }}
           ZOEWSUITE_TEST_WORKERS: ${{ vars.ZOE_RUNNER_MODE == 'github' && 'auto' || '2' }}
-          RUNALL_SHARD: ${{ matrix.shard }}/4
+          RUNALL_SHARD: ${{ matrix.shard }}/${{ matrix.n }}
           ZOE_MULTISHOP_SCALE: ${{ github.event_name == 'workflow_dispatch' && inputs.multishop_scale }}
           CRUD_FLOW_STRICT: '1'
           VERSIONSCOPE_STRICT: '1'

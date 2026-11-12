@@ -9,7 +9,7 @@
 | Audit / `run-all.sh` | Linux container ក្នុង Docker Desktop និង WSL2 | ៤ | `wsl-zoe-audit` |
 | Build APK | Windows ផ្ទាល់ | ១ | `windows-zoe-android` |
 
-Linux runner ទាំង ៤មាន home/source workspace និង network ដាច់ពីគ្នា; binary cache របស់ Chromium/RTDB ចែករំលែកតាម volume `audit-binaries`។ ដូច្នេះ emulator នីមួយៗអាចប្រើ port 9000 ក្នុង container ផ្ទាល់បាន។ Workflow អនុញ្ញាត audit shard ទាំង ៤រត់ព្រមគ្នា (`max-parallel: 4`); ត្រូវមាន runner ទំនេរទាំង ៤ទើបចាប់ job ទាំង ៤បាន។ កុំបើក audit ច្រើន branch ព្រមគ្នា។
+Linux runner ទាំង ៤មាន home/source workspace និង network ដាច់ពីគ្នា; binary cache របស់ Chromium/RTDB ចែករំលែកតាម volume `audit-binaries`។ ដូច្នេះ emulator នីមួយៗអាចប្រើ port 9000 ក្នុង container ផ្ទាល់បាន។ Workflow បែងចែក audit shard ៤ លើ self-hosted (GitHub public ប្រើ ៥); `max-parallel: 5` មិនបង្កើនលើសបញ្ជី matrix — self-hosted រត់ ៤ job ស្របគ្នា ដូច្នេះត្រូវមាន runner ទំនេរទាំង ៤ទើបចាប់ job ទាំង ៤បាន។ កុំបើក audit ច្រើន branch ព្រមគ្នា។
 
 RAM 16GB ត្រូវសាកការប្រើជាក់ស្ដែង។ WSL cap 12GB ក្នុងការណែនាំនេះជាពិដាន មិនមែន RAM ដែលកក់ជានិច្ចទេ។ Runner មួយមាន cap 3GB និង CPU quota 2។ ពេលសាកដំបូង បិទកម្មវិធីធ្ងន់ ហើយរង់ចាំ Audit ចប់មុនសាក APK។ បើ memory មិនគ្រប់ ត្រូវកាត់ parallel ឬប្រើ GitHub mode; កុំបិទ STRICT ដើម្បីឱ្យ test បៃតង។
 

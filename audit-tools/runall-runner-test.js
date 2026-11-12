@@ -23,6 +23,7 @@ process.exitCode = 1;
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const vm = require('vm');
 const cp = require('child_process');
 
 const ROOT = path.resolve(process.env.RUNALLRUNNER_APP_DIR || path.join(__dirname, '..'));
@@ -902,14 +903,40 @@ async function sectionSix() {
     ok('⛔ ទិសផ្ទុយ ៖ lane លើកលែងទាំងអស់មានភស្តុតាងក្នុងប្រភព (គ្មានធាតុចាស់)', unjustified.length === 0, unjustified.join('\n'));
 
     // ═══ ៧ខ. matrix ក្នុង audit.yml ↔ ការបែងចែកបញ្ជី **ពិត** ═══
-    // ⛔ CI ពេញ = ផ្នែកទាំង N បៃតង ➜ matrix ដែលភ្លេចផ្នែកណាមួយ (ឧ. [1, 2, 3] ជាមួយ «/4») បោះបង់ checker មួយភាគបួនដោយស្ងាត់
+    // ⛔ CI ពេញ = ផ្នែកទាំង N បៃតង ➜ matrix ដែលភ្លេចផ្នែកណាមួយ (ឧ. [1, 2, 3] ជាមួយ «/4») បោះបង់ checker មួយភាគបួនដោយស្ងាត់។
+    // ⛔ GitHub public (CPU ៤) ប្រើ ៥ shard · GitHub ឯកជន/self-hosted (CPU ២) ប្រើ ៤ — matrix ត្រូវផ្គូផ្គងនឹង N ក្នុង
+    //    `RUNALL_SHARD` និង `matrix.n` ក្នុងឈ្មោះ/ផ្នែក; scale run រត់តែផ្នែក 1។
     let wf = '';
     try { wf = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'audit.yml'), 'utf8'); } catch (e) { wf = ''; }
-    const shardEnv = /RUNALL_SHARD:\s*\$\{\{\s*matrix\.shard\s*\}\}\/(\d+)/.exec(wf);
-    const matrixRow = /^\s*shard:\s*\[([0-9,\s]+)\]\s*$/m.exec(wf);
-    const N = shardEnv ? Number(shardEnv[1]) : 0;
-    const matrix = matrixRow ? matrixRow[1].split(',').map((x) => Number(x.trim())) : [];
-    ok('audit.yml ៖ matrix shard = 1..N ដែល N ស្មើ «/N» ក្នុង RUNALL_SHARD (ឃើញ [' + matrix.join(',') + '] · /' + N + ')',
+    const shardEnv = /RUNALL_SHARD:\s*\$\{\{\s*matrix\.shard\s*\}\}\/\$\{\{\s*matrix\.n\s*\}\}/.test(wf);
+    const matrixExpr = /^\s*include: \$\{\{\s*(.*)\s*\}\}\s*$/m.exec(wf);
+    const matrixFor = (mode, isPrivate, scale) => {
+        if (!matrixExpr) return null;
+        try {
+            return vm.runInNewContext(matrixExpr[1], {
+                vars: { ZOE_RUNNER_MODE: mode },
+                github: { event_name: scale ? 'workflow_dispatch' : 'pull_request', event: { repository: { private: isPrivate } } },
+                inputs: { multishop_scale: scale }, fromJSON: JSON.parse
+            });
+        } catch (e) { return null; }
+    };
+    const expectedMatrix = (n) => Array.from({ length: n }, (_, i) => ({ shard: i + 1, n }));
+    const publicMatrix = matrixFor('github', false, false);
+    const privateMatrix = matrixFor('github', true, false);
+    const selfMatrix = matrixFor('self-hosted', true, false);
+    const scalePublic = matrixFor('github', false, true);
+    const scaleSelf = matrixFor('self-hosted', true, true);
+    ok('audit.yml ៖ matrix public = 1..5/5 · ឯកជន/self-hosted = 1..4/4 · scale = ផ្នែក 1 តែមួយ',
+        shardEnv && JSON.stringify(publicMatrix) === JSON.stringify(expectedMatrix(5))
+        && JSON.stringify(privateMatrix) === JSON.stringify(expectedMatrix(4))
+        && JSON.stringify(selfMatrix) === JSON.stringify(expectedMatrix(4))
+        && JSON.stringify(scalePublic) === JSON.stringify([{ shard: 1, n: 5 }])
+        && JSON.stringify(scaleSelf) === JSON.stringify([{ shard: 1, n: 4 }])
+        && /^\s*max-parallel:\s*5\s*$/m.test(wf),
+        { shardEnv, publicMatrix, privateMatrix, selfMatrix, scalePublic, scaleSelf });
+    const N = publicMatrix ? Math.max(...publicMatrix.map((entry) => entry.n)) : 0;
+    const matrix = publicMatrix ? publicMatrix.map((entry) => entry.shard) : [];
+    ok('audit.yml ៖ លេខផ្នែក = 1..N ហើយ N ស្មើ matrix.n ក្នុង RUNALL_SHARD (ឃើញ [' + matrix.join(',') + '] · /' + N + ')',
         N >= 1 && JSON.stringify(matrix) === JSON.stringify(Array.from({ length: N }, (_, i) => i + 1)), { matrix, N });
     const runbook = (() => { try { return fs.readFileSync(path.join(ROOT, 'CLAUDE.md'), 'utf8'); } catch (e) { return ''; } })();
     const rbLine = (runbook.match(/^[A-Z_=1 ]*_STRICT=1[A-Z_=1 ]* bash audit-tools\/run-all\.sh/m) || [''])[0];
@@ -1156,23 +1183,29 @@ async function sectionSix() {
     ok('BASE lost-wrapper mutant ត្រូវបានចាប់ មិនមែនជាការលុប startup guard',
         missingOwned(baseFixture).length === 0 && missingOwned(baseFixture.replace('runall_owned ', '')).length === 1);
     if (N >= 1 && blockAt !== -1 && listAt !== -1 && listEnd > listAt) {
-        const dir2 = path.join(TMP, 'shards');
-        fs.mkdirSync(dir2, { recursive: true });
-        const h2 = path.join(dir2, 'shards.sh');
-        fs.writeFileSync(h2, 'cd ' + JSON.stringify(ROOT) + ' || exit 1\npass=0; fail=0; skip=0; partial=0\n' + block + '\n'
-            + runall.slice(listAt, listEnd).replace(/^#@runner-end$/m, '') + '\n'
-            + 'for ((k = 1; k <= ' + N + '; k++)); do RUNALL_SHARD="$k/' + N + '"; runall_select >/dev/null || exit 3; '
-            + 'for i in "${!J_KIND[@]}"; do [ "${J_ST[$i]}" = queue ] && printf \'%s\\t%s\\t%s\\n\' "$k" "${J_LABEL[$i]}" "$RUNALL_SHARD_LOAD"; done; done\nexit 0\n');
-        const r2 = cp.spawnSync('bash', [h2], { encoding: 'utf8', timeout: 60000, env: harnessEnv(dir2) });
-        const rowsS = String(r2.stdout || '').split('\n').filter(Boolean).map((l) => l.split('\t'));
-        const labels = rowsS.map((x) => x[1]);
         const allJobs = plan.filter((p) => p.kind === 'job').map((p) => p.label);
-        const loads = [...new Set(rowsS.map((x) => x[0] + ':' + x[2]))].map((x) => Number(x.split(':')[1]));
-        ok('⛔ បញ្ជីពិត ៖ ផ្នែកទាំង ' + N + ' រួមគ្នា = checker ទាំង ' + allJobs.length + ' គ្មានការជាន់',
-            r2.status === 0 && labels.length === allJobs.length && new Set(labels).size === labels.length
-            && allJobs.every((l) => labels.includes(l)), { status: r2.status, got: labels.length, want: allJobs.length });
-        ok('បញ្ជីពិត ៖ ទម្ងន់ផ្នែកស្មើគ្នាក្នុង ២០% (' + loads.join(' · ') + ')',
-            loads.length === N && Math.max(...loads) <= Math.min(...loads) * 1.2, loads);
+        const coverage = [4, 5].map((n) => {
+            const dir2 = path.join(TMP, 'shards-' + n);
+            fs.mkdirSync(dir2, { recursive: true });
+            const h2 = path.join(dir2, 'shards.sh');
+            fs.writeFileSync(h2, 'cd ' + JSON.stringify(ROOT) + ' || exit 1\npass=0; fail=0; skip=0; partial=0\n' + block + '\n'
+                + runall.slice(listAt, listEnd).replace(/^#@runner-end$/m, '') + '\n'
+                + 'for ((k = 1; k <= ' + n + '; k++)); do RUNALL_SHARD="$k/' + n + '"; runall_select >/dev/null || exit 3; '
+                + 'for i in "${!J_KIND[@]}"; do [ "${J_ST[$i]}" = queue ] && printf \'%s\\t%s\\t%s\\n\' "$k" "${J_LABEL[$i]}" "$RUNALL_SHARD_LOAD"; done; done\nexit 0\n');
+            const r2 = cp.spawnSync('bash', [h2], { encoding: 'utf8', timeout: 180000, env: harnessEnv(dir2) });
+            const rowsS = String(r2.stdout || '').split('\n').filter(Boolean).map((l) => l.split('\t'));
+            const labels = rowsS.map((x) => x[1]);
+            const loads = [...new Set(rowsS.map((x) => x[0] + ':' + x[2]))].map((x) => Number(x.split(':')[1]));
+            return { n, status: r2.status, labels, loads };
+        });
+        ok('⛔ បញ្ជីពិត ៖ N=4 និង N=5 រួមគ្នា = checker ' + allJobs.length + ' គ្មានការជាន់ គ្មានការខ្វះ',
+            coverage.every((c) => c.status === 0 && c.labels.length === allJobs.length
+                && new Set(c.labels).size === c.labels.length && allJobs.every((l) => c.labels.includes(l))),
+            coverage.map((c) => ({ n: c.n, status: c.status, got: c.labels.length, unique: new Set(c.labels).size, want: allJobs.length })));
+        for (const c of coverage) {
+            ok('បញ្ជីពិត N=' + c.n + ' ៖ ទម្ងន់ផ្នែកស្មើគ្នាក្នុង ២០% (' + c.loads.join(' · ') + ')',
+                c.loads.length === c.n && Math.max(...c.loads) <= Math.min(...c.loads) * 1.2, c.loads);
+        }
     }
 
     // លំនាំដើម RUNALL_JOBS = CPU ក្នុងព្រំដែន 2–6 (nproc ក្លែងក្នុង PATH)

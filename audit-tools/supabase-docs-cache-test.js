@@ -1,7 +1,7 @@
 // ⛔ cache `zoe_docs` របស់ហាង Supabase (IndexedDB) ក្នុង Chromium ពិត — ប្រភព TS ពិត (esbuild) មិនមែនច្បាប់ចម្លង។
 //
 // cache នេះសម្រាប់កាត់ egress តែប៉ុណ្ណោះ (Free 5 GB/ខែ) ៖ បើក App ម្តងទៀត ➜ ទាញតែ delta ពី cursor ជំនួសទិន្នន័យទាំងមូល។
-// vitest (`ZoeW/tests/supabase-pull-paging.test.ts`) វាស់ adapter ជាមួយ cache ក្លែងក្នុងសតិ · emu/supabase-adapter-parity វាស់ SQL ពិត។
+// vitest (`audit-tools/zoew/tests/supabase-pull-paging.test.ts`) វាស់ adapter ជាមួយ cache ក្លែងក្នុងសតិ · emu/supabase-adapter-parity វាស់ SQL ពិត។
 // ឯកសារនេះវាស់ផ្នែកដែលពួកវាមើលមិនឃើញ ៖ IndexedDB **ពិត** និងថ្នេរ adapter ↔ cache ពិត។
 //
 //   ១. រក្សាទុក ➜ ផ្ទុកវិញ (រួមទាំងក្រោយ reload ទំព័រ) ស្មើបេះបិទ · scope ផ្សេង ➜ null · កំណត់ត្រាតែមួយ (scope ថ្មីលុបចាស់)

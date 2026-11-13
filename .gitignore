@@ -31,14 +31,21 @@ audit-tools/emu/real.rules.json
 # (ការរត់ដែលត្រូវសម្លាប់អាចបន្សល់វា — វាមិនត្រូវចូល repo ឡើយ)
 audit-tools/.tmp-poison-*
 audit-tools/emu/.tmp-poison-*
-zto-import/.tmp-poison-*
+audit-tools/zto-import/.tmp-poison-*
 
 # Windows ZTO Cookie Sync: npm lock មូលដ្ឋាន (dependency ត្រូវបាន pin ក្នុង package.json)
 tools/zto-cookie-sync-windows/package-lock.json
 
-# ⛔ keystore សម្រាប់ sign APK ជា credential ពិត (មើល ZoeW/docs/ANDROID.md) — មិនត្រូវ commit ដាច់ខាត
+# ⛔ keystore សម្រាប់ sign APK ជា credential ពិត (មើល docs/zoew/ANDROID.md) — មិនត្រូវ commit ដាច់ខាត
 *.jks
 *.keystore
 
 # Firebase provisioning tool: per-customer state (project IDs, settings) stays on the owner machine
 tools/firebase-provision/state/
+
+# លទ្ធផល TypeScript និងភស្តុតាងរបស់ឧបករណ៍ audit
+audit-tools/zoew/*.tsbuildinfo
+audit-tools/zoew/test-results/
+
+# តំណ dependency និងថតដំឡើងជាទិន្នន័យមូលដ្ឋាន មិនចូល repo
+node_modules

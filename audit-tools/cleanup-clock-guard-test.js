@@ -198,7 +198,7 @@ function buildWorld(opts) {
         extractFn(src, 'acceptServerClockOffset'),
         extractFn(src, 'serverClockOffsetIsFromServer'),
         CLOCK_GATE,
-        // ⛔ ច្រកទ្វារ «ហាងស្គាល់» (`shopScopePending()`) ៖ function ពិត ➜ sandbox គ្មាន Config ➜ ឆ្លើយ `false` (វាស់ក្នុង `ZoeW/tests/shop-pending-cleanup.test.tsx`)
+        // ⛔ ច្រកទ្វារ «ហាងស្គាល់» (`shopScopePending()`) ៖ function ពិត ➜ sandbox គ្មាន Config ➜ ឆ្លើយ `false` (វាស់ក្នុង `audit-tools/zoew/tests/shop-pending-cleanup.test.tsx`)
         extractFn(src, 'shopScope') || "function shopScope() { return ''; }",
         extractFn(src, 'liveShopScope') || "function liveShopScope() { return shopScope(); }",
         "function abandonZtoSignedHolds() { return new Set(); }",
@@ -207,7 +207,7 @@ function buildWorld(opts) {
         extractFn(src, 'attachInfoListeners'),
         extractFn(src, 'runAutomaticCleanupRules'),
         // ⛔ ZTO-E1 ៖ ច្រកទ្វាររង់ចាំបញ្ជី «ចុះហត្ថលេខា» ➜ sandbox គ្មាន ZTO ➜ ច្រកទ្វារពិតឆ្លើយ `false` (វាស់ក្នុង
-        //    `ZoeW/tests/zto-abandon-signed-gate.test.tsx`)។ checker នេះវាស់តែច្រកទ្វារនាឡិកា។
+        //    `audit-tools/zoew/tests/zto-abandon-signed-gate.test.tsx`)។ checker នេះវាស់តែច្រកទ្វារនាឡិកា។
         'function ztoAbandonCleanupIsHeld() { return false; }',
         extractFn(src, 'barcodeAbandonIsRipe'),
         extractFn(src, 'barcodeAbandonBasis'),

@@ -137,7 +137,7 @@ function scanScope(node, body, inherited, params, onSub) {
 // ⛔ នេះវាស់ភាពខុសគ្នារវាងនាឡិកាពីរនៅពេលសំណើ មិនមែនពិដានល្បឿនទេ។
 // `elapsedSince()` ប្តូររយៈពេលអវិជ្ជមានទៅ Infinity ដូច្នេះមិនរក្សាតម្លៃសម្រាប់ប្រៀបធៀបនាឡិកាពីរទេ។
 // អនុញ្ញាតតែ initializer មួយក្នុង noteServerTime របស់ម៉ូឌុល Supabase ពិត។ ការបដិសេធនាឡិកាលោត
-// និងសំណើហួសពិដាន វាស់ដោយ ZoeW/tests/server-clock-estimator.test.ts។
+// និងសំណើហួសពិដាន វាស់ដោយ audit-tools/zoew/tests/server-clock-estimator.test.ts។
 function pairedRequestAgeSubtractions(ast) {
     const allowed = new Set();
     const factories = ast.body.filter(n => n.type === 'FunctionDeclaration' && n.id && n.id.name === 'createSupabaseDatabase');

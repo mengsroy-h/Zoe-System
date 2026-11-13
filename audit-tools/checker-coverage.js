@@ -35,8 +35,8 @@ const { execFile, execFileSync } = require('child_process');
 
 const TOOLS = path.resolve(__dirname);
 const RUNALL = path.join(TOOLS, 'run-all.sh');
-const CHECKER_DIRS = [TOOLS, path.join(TOOLS, 'emu'), path.join(TOOLS, '..', 'zto-import')];
-const EXTERNAL_CHECKERS = [{ f: '../zto-import/test.js', env: 'ZTO_IMPORT_APP_DIR' }];
+const CHECKER_DIRS = [TOOLS, path.join(TOOLS, 'emu'), path.join(TOOLS, 'zto-import')];
+const EXTERNAL_CHECKERS = [{ f: 'zto-import/test.js', env: 'ZTO_IMPORT_APP_DIR' }];
 
 // ឯកសារដែលមិនមែនជា checker — ពួកវាជាឧបករណ៍កែកូដ
 // ⛔ រាល់ធាតុត្រូវមានហេតុផលសរសេរជាប់ — កុំបន្ថែមដើម្បីឲ្យបៃតង
@@ -116,8 +116,8 @@ const runNames = runnableNames(mainSection);
 function externalWiringFailures(normal, baseline) {
     const active = (source) => source.replace(/^\s*#.*$/gm, '');
     const failures = [];
-    if (!/^\s*run\s+"[^"]*"\s+node\s+zto-import\/test\.js(?=\s|$)/m.test(active(normal))) failures.push('zto-import/test.js (normal)');
-    if (!/^\s*ZTO_IMPORT_APP_DIR="\$BASE\/zto-import"\s+node\s+zto-import\/test\.js(?=\s|$)/m.test(active(baseline))) failures.push('zto-import/test.js (baseline)');
+    if (!/^\s*run\s+"[^"]*"\s+node\s+audit-tools\/zto-import\/test\.js(?=\s|$)/m.test(active(normal))) failures.push('audit-tools/zto-import/test.js (normal)');
+    if (!/^\s*ZTO_IMPORT_APP_DIR="\$BASE\/zto-import"\s+node\s+audit-tools\/zto-import\/test\.js(?=\s|$)/m.test(active(baseline))) failures.push('audit-tools/zto-import/test.js (baseline)');
     return failures;
 }
 // ⛔ `$BASE` = root វាស់របស់ baseline (គ្មាន `ZoeW/src`) ៖ checker ដែលវាស់ **ប្រភព repo** (root របស់វាដើរតាម `ZOE_REPO_ROOT` ក្នុង
@@ -260,8 +260,8 @@ const missingCliGuards = [...CLI_GUARDS].filter(([file, guard]) =>
 if (missingCliGuards.length) bad('CLI ត្រូវមាន fixture checker ដែលរត់ក្នុង suite', missingCliGuards);
 else ok('CLI ដែលទាមទារ dump ត្រូវបានយាមដោយ fixture checker ពិត មិនរាប់ usage exit ជាភស្តុតាង');
 {
-    const normal = 'run "zto-import/test.js" node zto-import/test.js';
-    const baseline = 'ZTO_IMPORT_APP_DIR="$BASE/zto-import" node zto-import/test.js';
+    const normal = 'run "audit-tools/zto-import/test.js" node audit-tools/zto-import/test.js';
+    const baseline = 'ZTO_IMPORT_APP_DIR="$BASE/zto-import" node audit-tools/zto-import/test.js';
     const cases = [[normal, baseline, 0], ['', baseline, 1], [normal, '', 1],
         ['# ' + normal, '# ' + baseline, 2], ['echo ' + normal, baseline, 1],
         [normal + '.bak', baseline + '.bak', 2], [normal, baseline.replace('$BASE/zto-import', '$BASE'), 1]];

@@ -34,7 +34,7 @@ function inventory() {
     (function visit(rel) {
         for (const entry of fs.readdirSync(path.join(ROOT, rel), { withFileTypes: true })) {
             if (entry.name === '.git' || entry.name === 'node_modules'
-                || (['audit-tools', 'audit-tools/emu', 'zto-import'].includes(rel) && entry.name.startsWith('.tmp-poison-'))) continue;
+                || (['audit-tools', 'audit-tools/emu', 'audit-tools/zto-import'].includes(rel) && entry.name.startsWith('.tmp-poison-'))) continue;
             const next = rel ? rel + '/' + entry.name : entry.name;
             if (entry.isDirectory()) visit(next);
             else found.push(next);

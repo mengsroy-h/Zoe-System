@@ -98,7 +98,7 @@ function serve(files) {
         'LIVE_SCAN_MIN_INTERVAL_MS', 'LIVE_SCAN_MAX_INTERVAL_MS',
         'LIVE_SCAN_BACKOFF', 'LIVE_SCAN_SLOW_MS', 'LIVE_SCAN_FAST_MS', 'FRESH_FRAME_GIVE_UP',
         'SCAN_CONFIRM_REPEATS', 'SCAN_CONFIRM_WINDOW_MS',
-        // ⛔ WASM ផ្ទុកមិនបាន ➜ purge + prepare ឡើងវិញ (SENTRY-2 · `ZoeW/tests/scan-engine-recovery.test.ts`)
+        // ⛔ WASM ផ្ទុកមិនបាន ➜ purge + prepare ឡើងវិញ (SENTRY-2 · `audit-tools/zoew/tests/scan-engine-recovery.test.ts`)
         'SCAN_ENGINE_RETRY_STEPS_MS', 'SCAN_ENGINE_FAIL_TOAST_AFTER', 'SCAN_ENGINE_FAIL_TEXT']
         .map((n) => (src.match(new RegExp('^ *const ' + n + ' = .*$', 'm')) || [''])[0]).join('\n');
 

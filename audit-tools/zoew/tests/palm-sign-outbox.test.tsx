@@ -1,0 +1,2472 @@
+import * as serverClock from '../../../ZoeW/src/core/clock';
+import { exportQueuedSignPhoto } from '../../../ZoeW/src/features/queued-sign-photo';
+import { saveOriginalQueuedPhoto } from '../../../ZoeW/src/platform/queued-photo-output';
+import { createHash, webcrypto } from 'node:crypto';
+import { createRequire } from 'node:module';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { dataState, firebaseState, securityState, uiState } from '../../../ZoeW/src/core/state';
+import { palmSignState } from '../../../ZoeW/src/core/palm-sign-state';
+import { registerModalMeta, unregisterModalMeta, modalIsOpen } from '../../../ZoeW/src/core/modals';
+import { appLocalStore } from '../../../ZoeW/src/core/storage';
+import { getFormattedDate } from '../../../ZoeW/src/core/timezone';
+import { encryptLookupSecret } from '../../../ZoeW/src/services/crypto';
+import { openSignJob, sealSignJob, replaceSignJob, addSignJob, SIGN_OUTBOX_LEASE_MS } from '../../../ZoeW/src/services/palm-sign-outbox-store';
+import { palmOriginalFingerprint } from '../../../ZoeW/src/services/palm-sign-transport';
+import { openZtoPalmSign, submitZtoPalmSign, acceptPalmSignBarcode, setPalmSignName } from '../../../ZoeW/src/features/zto-palm-sign';
+import { actOnQueuedSign, discardUnreadablePalmSignJobs, palmSignOutboxState, runPalmSignOutbox, refreshPalmSignQueue, persistPalmSignJob } from '../../../ZoeW/src/features/palm-sign-outbox';
+import { applyBarcodeCloseChange } from '../../../ZoeW/src/features/barcode-ops';
+import { closeModal } from '../../../ZoeW/src/ui/modal';
+import { barcodeSignIdentity } from '../../../ZoeW/src/domain/barcode';
+import { resetZtoFinalMarks, syncZtoFinalMarks } from '../../../ZoeW/src/features/zto-final-marks';
+import { runAutomaticCleanupRules, cleanupInFlight, cleanupPartialTrashId } from '../../../ZoeW/src/domain/cleanup';
+import { dbListenerFailedPaths, dbListenerPendingPaths } from '../../../ZoeW/src/core/text';
+import { resetZtoTrashMode } from '../../../ZoeW/src/services/zto-trash-mode';
+import { ztoPickupStatus } from '../../../ZoeW/src/features/zto-status';
+import { act } from 'react';
+import { mount, unmount } from './native/react-harness';
+import { LookupApiConfigModal } from '../../../ZoeW/src/app/components/modals/LookupApiConfigModal';
+import { openLookupApiConfigModal, saveLookupApiConfig } from '../../../ZoeW/src/features/lookup-config';
+import { setFieldChecked } from '../../../ZoeW/src/app/refs';
+vi.mock('../../../ZoeW/src/platform/queued-photo-output', () => ({ saveOriginalQueuedPhoto: vi.fn(async () => 'saved') }));
+const disk = vi.hoisted(() => ({ rows: new Map<string, any>(), commit: null as null | Promise<void>, fail: false }));
+vi.mock('../../../ZoeW/src/services/palm-sign-outbox-store', async (original) => ({ ...await original<any>(),
+    listSignJobs: vi.fn(async (owner) => [...disk.rows.values()].filter((r) => r.owner === owner).map((r) => ({ ...r }))),
+    addSignJob: vi.fn(async (row, current) => {
+        if (disk.commit) await disk.commit;
+        if (disk.fail || !current()) throw new Error('outbox:aborted');
+        if (disk.rows.has(row.id)) return false;
+        disk.rows.set(row.id, { ...row }); return true;
+    }),
+    replaceSignJob: vi.fn(async (previous, next, current) => {
+        const actual = disk.rows.get(previous.id);
+        if (!current() || !actual || actual.revision !== previous.revision) return false;
+        if (next) disk.rows.set(next.id, { ...next, revision: previous.revision + 1 }); else disk.rows.delete(previous.id);
+        return true;
+    })
+}));
+vi.mock('../../../ZoeW/src/services/palm-sign-camera', () => ({ capturePalmSignPhoto: vi.fn(async () => ''), palmSignLocation: { status: 'ready' } }));
+vi.mock('../../../ZoeW/src/features/barcode-ops', () => ({
+    openViewListModal: () => {}, removeSingleBarcode: async () => 'failed', toggleIndividualBarcodeClose: async () => false,
+    openEditBarcodePriceModal: () => {}, closeEditBarcodeModal: () => {}, saveEditedBarcodePrice: () => {}, applyBarcodeCloseChange: vi.fn(async () => true)
+}));
+const codes = ['77130500000012', '77130500000013', '77130500000014'];
+const photos = codes.map((_, n) => Buffer.from([255,216,255,192,0,11,8,0,1,0,1,1,1,17,0,255,218,0,8,1,1,0,0,63,0,n + 1,255,217]).toString('base64'));
+const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
+const receipt = (body: any, patch = {}) => reply({ success: true, stage: 'receipt', barcode: body.barcode, requestId: body.requestId, ztoClosed: true, photoAccepted: true, photoProof: { protocol: 'original-sha256-v1', verified: true, barcode: body.barcode, requestId: body.requestId, originalSHA256: body.originalSHA256 }, ...patch });
+const warning = (body: any, token = 'confirmation') => reply({ code: 'ZTO_PALM_SIGN_CONFIRM_REQUIRED', barcode: body.barcode, stage: 'receipt', message: 'កញ្ចប់មានបញ្ហា សូមបញ្ជាក់ដោះស្រាយរួច', confirmationToken: token }, 409);
+function gate<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>((yes) => { resolve = yes; }); return { resolve, promise }; }
+let requests: any[];
+let reservationFixtures = true;
+const sentReceipts = new Set<string>();
+const warningReceipts = new Set<string>();
+let network: (body: any) => Promise<Response>;
+let key: CryptoKey;
+let config: any;
+async function ready(count = 3) {
+    openZtoPalmSign('item1');
+    await vi.waitFor(() => expect(palmSignState.checking).toBe(false));
+    setPalmSignName('សុខា');
+    for (let i = 0; i < count; i++) acceptPalmSignBarcode(codes[i], photos[i]);
+    await vi.waitFor(() => expect(palmSignState.dispatchResults.filter((r) => r.proof)).toHaveLength(3));
+    requests = [];
+}
+async function jobs() { return Promise.all([...disk.rows.values()].map(async (row) => ({ row, job: await openSignJob(row, key) }))); }
+async function expectQueueCompleted() {
+    await vi.waitFor(async () => {
+        const saved = await jobs();
+        expect(saved.every(({ job }) => job.recoveryCheck?.signedStatusVerified === true)).toBe(true);
+    });
+    const offset = firebaseState.serverTimeOffsetMs;
+    const connected = firebaseState.isDatabaseConnected, trusted = firebaseState.serverClockTrusted;
+    try {
+        firebaseState.isDatabaseConnected = true; firebaseState.serverClockTrusted = true;
+        await vi.waitFor(async () => {
+            await runPalmSignOutbox();
+            expect((await jobs()).every(value => Number.isFinite(value.job.signedCleanupAt))).toBe(true);
+        });
+        firebaseState.serverTimeOffsetMs = offset + 86400001;
+        await runPalmSignOutbox();
+        await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    } finally {
+        firebaseState.serverTimeOffsetMs = offset; firebaseState.isDatabaseConnected = connected; firebaseState.serverClockTrusted = trusted;
+    }
+}
+const bodies = (stage: string) => requests.filter((b) => b.stage === stage);
+const closes = () => vi.mocked(applyBarcodeCloseChange).mock.calls.map((c) => c[1]);
+beforeEach(async () => {
+    resetZtoFinalMarks(); ztoPickupStatus.clear(); resetZtoTrashMode();
+    cleanupInFlight.clear(); dbListenerFailedPaths.clear(); dbListenerPendingPaths.clear();
+    serverClock.resetServerClock();
+    firebaseState.isDatabaseConnected = true; firebaseState.serverClockTrusted = true; firebaseState.serverTimeOffsetMs = 0;
+    firebaseState.sessionExpiryCheck = 'live';
+    disk.rows.clear(); disk.commit = null; disk.fail = false;
+    vi.stubGlobal('crypto', webcrypto); vi.stubGlobal('indexedDB', {});
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
+    firebaseState.authGeneration++; firebaseState.db = {}; firebaseState.auth = { currentUser: { uid: 'audit-user' } };
+    firebaseState.fb = { getIdTokenResult: async () => ({ token: 'synthetic-id' }) };
+    securityState.appIsLocked = false; securityState.appLockVeiled = false;
+    key = await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']) as CryptoKey;
+    securityState.lookupSecretKey = key;
+    appLocalStore.clear(); appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://sign-shop.firebaseio.com' }));
+    config = { enabled: true, url: window.location.origin + '/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}', headerName: 'X-Zoe-Proxy-Key', headerValueEnc: await encryptLookupSecret('synthetic-key'), palmTokenEnc: await encryptLookupSecret('session'), shop: 'https://sign-shop.firebaseio.com' };
+    appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(config));
+    dataState.deletedItems = [];
+    dataState.scanHistory = [{ id: 'item1', phone: '012345678', isClosed: false, barcodes: codes.map((code, i) => ({ code, cod: i + 1, dod: 0.5, isClosed: false })) }];
+    registerModalMeta('ztoPalmSignModal', {}); palmSignState.busy = false;
+    vi.mocked(applyBarcodeCloseChange).mockReset().mockResolvedValue(true);
+    requests = []; reservationFixtures = true; sentReceipts.clear(); warningReceipts.clear();
+    network = async (body) => body.stage === 'status' ? reply({ success: true, barcode: body.barcode, stage: 'status', dispatched: true, ztoClosed: false, dispatchProof: 'dispatch-' + body.barcode })
+        : body.stage === 'receipt-check' ? reply({ success: true, barcode: body.barcode, stage: 'receipt-check', ready: true }) : receipt(body);
+    vi.stubGlobal('fetch', vi.fn(async (_url, init) => { const b = JSON.parse(String(init?.body)); requests.push(b); const identity = b.barcode + '|' + b.requestId;
+        if (b.stage === 'receipt') { sentReceipts.add(identity); warningReceipts.delete(identity); }
+        if (reservationFixtures && b.stage === 'receipt-status' && b.reservationProtocol === 'original-reservation-v1' && (!sentReceipts.has(identity) || b.confirmationToken && warningReceipts.has(identity))) return resume(b);
+        const response = await network(b);
+        if (b.stage === 'receipt' && (await response.clone().json()).code === 'ZTO_PALM_SIGN_CONFIRM_REQUIRED') warningReceipts.add(identity);
+        return response; }));
+    await runPalmSignOutbox();
+});
+afterEach(async () => {
+    resetZtoFinalMarks(); ztoPickupStatus.clear(); resetZtoTrashMode();
+    firebaseState.authGeneration++; securityState.lookupSecretKey = null;
+    closeModal('ztoPalmSignModal'); unregisterModalMeta('ztoPalmSignModal');
+    await runPalmSignOutbox();
+    vi.unstubAllGlobals(); vi.restoreAllMocks();
+});
+it('លេខទូរស័ព្ទមួយ ៣ កញ្ចប់៖ modal បិទក្រោយ durable commit ដោយមិនរង់ចាំ receipt-check ឬ ACK · រូបដាច់តាម barcode', async () => {
+    await ready(); const ack = gate<Response>(); const precheck = gate<Response>(); const requestId = palmSignState.requestId;
+    network = async (body) => body.stage === 'receipt-check' ? precheck.promise : ack.promise.then(() => receipt(body));
+    await submitZtoPalmSign();
+    expect(modalIsOpen('ztoPalmSignModal')).toBe(false);
+    expect(disk.rows.size).toBe(3); expect(closes()).toEqual([]);
+    expect(bodies('receipt-check')).toHaveLength(0);
+    expect((await jobs()).map(({ job }) => ({ code: job.code, photo: job.photo, signMan: job.signMan,
+        dispatchProof: job.dispatchProof, requestId: job.requestId, autoConfirm: job.autoConfirm })).sort((a, b) => a.code.localeCompare(b.code)))
+        .toEqual(codes.map((code, i) => ({ code, photo: photos[i], signMan: 'សុខា', dispatchProof: 'dispatch-' + code, requestId, autoConfirm: true })));
+    await vi.waitFor(() => expect(bodies('receipt')).toHaveLength(2));
+    expect(palmSignOutboxState.rows).toHaveLength(3);
+    ack.resolve(reply({}));
+    await expectQueueCompleted();
+    expect(bodies('receipt')).toHaveLength(3);
+    expect(bodies('receipt').map((b) => [b.barcode, b.photo]).sort()).toEqual(codes.map((code, i) => [code, photos[i]]));
+    expect(closes().sort()).toEqual(codes);
+    await runPalmSignOutbox(); expect(bodies('receipt')).toHaveLength(3);
+});
+it.each(['cipher', 'key'])('ការងារ Sign អានមិនបាន (%s) មិនរារាំងកញ្ចប់ផ្សេង ហើយមិនលុបរូបដើម', async (kind) => {
+    const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    await ready();
+    await submitZtoPalmSign();
+    await runPalmSignOutbox();
+    expect(disk.rows.size).toBe(3);
+    const badId = (await jobs()).find((value) => value.job.code === codes[0])!.row.id;
+    const bad = disk.rows.get(badId);
+    if (kind === 'cipher') {
+        const bytes = new Uint8Array(bad.cipher.slice(0)); bytes[0] ^= 1;
+        bad.cipher = bytes.buffer;
+    } else {
+        const oldKey = await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']) as CryptoKey;
+        const job = await openSignJob(bad, key);
+        const old = await sealSignJob(bad.owner, oldKey, job);
+        bad.cipher = old.cipher; bad.iv = old.iv;
+    }
+    const original = new Uint8Array(bad.cipher.slice(0));
+    await runPalmSignOutbox();
+    await vi.waitFor(() => expect(palmSignOutboxState.message).not.toBe(''));
+    requests = []; online.mockReturnValue(true);
+    await runPalmSignOutbox();
+    await vi.waitFor(() => expect(closes().sort()).toEqual(codes.slice(1)));
+    expect(disk.rows.size).toBe(3);
+    expect(bodies('receipt').map((body) => body.barcode).sort()).toEqual(codes.slice(1));
+    expect(new Uint8Array(disk.rows.get(bad.id).cipher)).toEqual(original);
+    expect(palmSignOutboxState.message).toContain('១');
+});
+it('ការងារ Sign អានមិនបាន (key ចាស់) ៖ Sign កញ្ចប់នោះម្ដងទៀត មិនជំនួស ឬលុបរូបដើម', async () => {
+    const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    await ready(1); await submitZtoPalmSign([codes[0]]); await runPalmSignOutbox();
+    expect(disk.rows.size).toBe(1);
+    const row = [...disk.rows.values()][0];
+    const oldKey = await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']) as CryptoKey;
+    const old = await sealSignJob(row.owner, oldKey, await openSignJob(row, key));
+    row.cipher = old.cipher; row.iv = old.iv;
+    await runPalmSignOutbox();
+    await vi.waitFor(() => expect(palmSignOutboxState.message).toContain('១'));
+    online.mockReturnValue(true);
+    await ready(1); await submitZtoPalmSign([codes[0]]);
+    expect(palmSignState.results).toEqual([expect.objectContaining({ code: codes[0], state: 'failed' })]);
+    expect(disk.rows.size).toBe(1);
+    expect(bodies('receipt')).toHaveLength(0);
+    expect(closes()).toEqual([]);
+    expect(disk.rows.get(row.id).cipher).toEqual(old.cipher);
+});
+// 📌 ភ្លេច PIN ៖ ការងារដែល PIN បច្ចុប្បន្នអានមិនបានមិនដែលចេញដោយស្វ័យប្រវត្តិ (អាចជាការងារតែមួយគត់ដែល PIN ដើមបើកវិញបាន) ➜ ច្រកចេញរបស់ម្ចាស់
+//    «🗑️ លុបការងារ Sign ដែលអានមិនបាន» ៖ confirm · លុបតែជួរអានមិនបាន ដែលគ្មាន lease (CAS តាម revision) · ការងារអានបានមិនប៉ះ។
+it('ការងារ Sign អានមិនបាន ៖ ច្រកចេញរបស់ម្ចាស់លុបតែជួរអានមិនបាន (confirm · គ្មាន lease) ហើយការងារអានបាននៅដដែល', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    await ready(); await submitZtoPalmSign(); await runPalmSignOutbox();
+    expect(disk.rows.size).toBe(3);
+    const oldKey = await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']) as CryptoKey;
+    const all = await jobs();
+    const ids = all.filter((value) => value.job.code !== codes[2]).map((value) => value.row.id);
+    const keepId = all.find((value) => value.job.code === codes[2])!.row.id;
+    for (const id of ids) {
+        const row = disk.rows.get(id);
+        const old = await sealSignJob(row.owner, oldKey, await openSignJob(row, key));
+        row.cipher = old.cipher; row.iv = old.iv;
+    }
+    disk.rows.get(ids[1]).leaseUntil = Date.now() + 60000;
+    await refreshPalmSignQueue();
+    expect(palmSignOutboxState.unreadable).toBe(2);
+    const confirmSpy = vi.fn(() => false);
+    vi.stubGlobal('confirm', confirmSpy);
+    await discardUnreadablePalmSignJobs();
+    expect(disk.rows.size).toBe(3);
+    confirmSpy.mockImplementation(() => true);
+    await discardUnreadablePalmSignJobs();
+    expect(confirmSpy).toHaveBeenCalledTimes(2);
+    expect([...disk.rows.keys()].sort()).toEqual([ids[1], keepId].sort());
+    expect((await openSignJob(disk.rows.get(keepId), key)).code).toBe(codes[2]);
+    expect(palmSignOutboxState.unreadable).toBe(1);
+});
+it('ការងារ Sign ទម្រង់មិនស្គាល់ (អានបានដោយ PIN បច្ចុប្បន្ន) ៖ បង្ហាញដាច់ដោយឡែក · ច្រកចេញលុបមិនប៉ះ · បញ្ជីដទៃនៅបង្ហាញ', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    await ready(); await submitZtoPalmSign(); await runPalmSignOutbox();
+    const all = await jobs();
+    const bad = disk.rows.get(all[0].row.id);
+    const sealed = await sealSignJob(bad.owner, key, { ...all[0].job, phase: 'unknown-phase' } as any);
+    bad.cipher = sealed.cipher; bad.iv = sealed.iv;
+    await refreshPalmSignQueue();
+    expect(palmSignOutboxState.unreadable).toBe(0);
+    expect(palmSignOutboxState.message).toContain('ទម្រង់មិនស្គាល់');
+    expect(palmSignOutboxState.rows.length + palmSignOutboxState.recoveryRows.length).toBe(2);
+    const confirmSpy = vi.fn(() => true);
+    vi.stubGlobal('confirm', confirmSpy);
+    await discardUnreadablePalmSignJobs();
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(disk.rows.size).toBe(3);
+});
+it('នាឡិកាថយក្រោយ៖ deadline ចាស់មិនបញ្ឈប់ការផ្ទៀង ACK ហើយមិនផ្ញើ05ម្ដងទៀត', async () => {
+    const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    await ready(1); await submitZtoPalmSign([codes[0]]); await runPalmSignOutbox();
+    const row = [...disk.rows.values()][0]; const job = await openSignJob(row, key);
+    const sealed = await sealSignJob(row.owner, key, { ...job, phase: 'checking' });
+    sentReceipts.add(job.code + '|' + job.requestId);
+    disk.rows.set(row.id, { ...sealed, due: Date.now() + 3600000, leaseUntil: Date.now() + 3600000 });
+    requests = []; online.mockReturnValue(true);
+    await runPalmSignOutbox();
+    await expectQueueCompleted();
+    expect(bodies('receipt-status')).toHaveLength(1);
+    expect(bodies('receipt')).toHaveLength(0);
+    expect(closes()).toEqual([codes[0]]);
+});
+it.each(['leaseUntil', 'due'])('ការរង់ចាំ %s ត្រឹមត្រូវនៅតែទប់ការផ្ញើមុនកំណត់', async (field) => {
+    const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    await ready(1); await submitZtoPalmSign([codes[0]]); await runPalmSignOutbox();
+    const row = [...disk.rows.values()][0];
+    row[field] = Date.now() + (field === 'due' ? 14000 : 85000);
+    requests = []; online.mockReturnValue(true);
+    await runPalmSignOutbox();
+    expect(disk.rows.size).toBe(1); expect(bodies('receipt')).toHaveLength(0);
+    expect(bodies('receipt-status')).toHaveLength(0); expect(closes()).toEqual([]);
+});
+it('durable commit កំពុងរង់ចាំ និងបរាជ័យ៖ modal និងរូបនៅដដែល · មិន upload រូប/05', async () => {
+    await ready(1); const committed = gate<void>(); disk.commit = committed.promise; disk.fail = true;
+    const before = vi.mocked(addSignJob).mock.calls.length;
+    const work = submitZtoPalmSign([codes[0]]);
+    await vi.waitFor(() => expect(vi.mocked(addSignJob).mock.calls.length).toBeGreaterThan(before));
+    expect(bodies('receipt-check')).toHaveLength(0);
+    expect(modalIsOpen('ztoPalmSignModal')).toBe(true); expect(bodies('receipt')).toHaveLength(0);
+    committed.resolve(); await work;
+    expect(disk.rows.size).toBe(0); expect(bodies('receipt')).toHaveLength(0); expect(closes()).toEqual([]);
+    expect(palmSignState.photos[codes[0]]).toBe(photos[0]); expect(modalIsOpen('ztoPalmSignModal')).toBe(true);
+});
+it('៣ កញ្ចប់៖ queue មុនបណ្ដាញ ហើយ worker បញ្ជាក់សាររបស់កញ្ចប់នីមួយៗដោយមិនច្រឡំ token', async () => {
+    await ready(); const normal = network;
+    network = async (body) => body.barcode === codes[1] && body.stage === 'receipt' && !body.confirmationToken ? warning(body) : normal(body);
+    await submitZtoPalmSign();
+    expect(palmSignState.confirmation).toBeNull(); expect(modalIsOpen('ztoPalmSignModal')).toBe(false);
+    expect(bodies('receipt-check')).toHaveLength(0);
+    await vi.waitFor(() => expect(new Set(closes())).toEqual(new Set(codes)));
+    expect(bodies('receipt').filter((b) => b.confirmationToken).map((b) => b.barcode)).toEqual([codes[1]]);
+    expect(bodies('receipt')).toHaveLength(4);
+});
+it('ការងារចាស់គ្មាន autoConfirm៖ បញ្ហាថ្មីក្នុង background នៅតែរង់ចាំបញ្ជាក់តែមួយ barcode', async () => {
+    const online = await queuedWithPolicy(); const normal = network;
+    network = async (body) => body.stage === 'receipt' && !body.confirmationToken ? warning(body, 'new-warning') : normal(body);
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(() => expect(palmSignOutboxState.rows[0]?.warning).toContain('កញ្ចប់មានបញ្ហា'));
+    expect(closes()).toEqual([]); await runPalmSignOutbox(); expect(bodies('receipt')).toHaveLength(1);
+    const id = palmSignOutboxState.rows[0].id;
+    await Promise.all([actOnQueuedSign(id, 'approve'), actOnQueuedSign(id, 'approve')]);
+    await expectQueueCompleted();
+    expect(bodies('receipt')).toHaveLength(2); expect(bodies('receipt')[1].confirmationToken).toBe('new-warning'); expect(closes()).toEqual([codes[0]]);
+});
+
+async function queuedWithPolicy(autoConfirm?: boolean) {
+    const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    await ready(1); await submitZtoPalmSign([codes[0]]); await runPalmSignOutbox();
+    const value = (await jobs())[0];
+    const next = await sealSignJob(value.row.owner, key, { ...value.job, autoConfirm } as any);
+    disk.rows.set(value.row.id, { ...next, revision: value.row.revision + 1 });
+    requests = [];
+    return online;
+}
+
+async function autoTrashQueued(partial: boolean) {
+    const online = await queuedWithPolicy(false);
+    const original = (await jobs())[0];
+    const real = await vi.importActual<typeof import('../../../ZoeW/src/features/barcode-ops')>('../src/features/barcode-ops');
+    const clone = (v: any) => v == null ? null : JSON.parse(JSON.stringify(v));
+    const item = clone(dataState.scanHistory[0]);
+    if (!partial) item.barcodes = item.barcodes.slice(0, 1);
+    const state: any = { zoew_scan_history_cod_dod: { item1: item } };
+    const writes: string[] = [], reads: string[] = [];
+    const read = (path: string) => clone(path.split('/').filter(Boolean).reduce((v: any, part) => v?.[part], state));
+    const write = (path: string, value: any) => {
+        writes.push(path); const parts = path.split('/').filter(Boolean); const last = parts.pop()!; let target = state;
+        for (const part of parts) target = target[part] ||= {};
+        if (value == null) delete target[last]; else target[last] = clone(value);
+    };
+    const snapshot = (value: any) => ({ val: () => clone(value), exists: () => value != null });
+    firebaseState.fb = {
+        getIdTokenResult: async () => ({ token: 'synthetic-id' }),
+        ref: (_db: unknown, path = '') => ({ path }),
+        get: async (ref: any) => { reads.push(ref.path); return snapshot(read(ref.path)); },
+        runTransaction: async (ref: any, change: (value: any) => any) => {
+            const next = change(read(ref.path));
+            if (next === undefined) return { committed: false, snapshot: snapshot(read(ref.path)) };
+            write(ref.path, next); return { committed: true, snapshot: snapshot(read(ref.path)) };
+        },
+        update: async (ref: any, updates: any) => { for (const [name, value] of Object.entries(updates)) write([ref.path, name].filter(Boolean).join('/'), value); },
+        set: async (ref: any, value: any) => write(ref.path, value)
+    };
+    firebaseState.isDatabaseConnected = true; firebaseState.serverClockTrusted = true; firebaseState.serverTimeOffsetMs = 0;
+    firebaseState.dbRefHistory = { path: 'zoew_scan_history_cod_dod' }; firebaseState.dbRefDeleted = { path: 'zoew_recently_deleted_cod_dod' };
+    firebaseState.dbRefDailyPickup = { path: 'zoew_daily_pickup_cod_dod' }; firebaseState.dbRefDailyCollected = { path: 'zoew_daily_collected_cod_dod' };
+    dataState.dailyPickupData = {}; dataState.dailyCollectedData = {}; dataState.scanHistory = [clone(item)];
+    vi.mocked(applyBarcodeCloseChange).mockImplementation(real.applyBarcodeCloseChange);
+    reservationFixtures = false; network = async body => receipt(body, { photoProof: null });
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(async () => {
+        expect((await jobs())[0].job.scanCompleted).toBe(true); expect((await jobs())[0].row.leaseUntil).toBe(0);
+    });
+    expect(requests.map(body => body.stage)).toEqual(['receipt-status', 'status']);
+    online.mockReturnValue(false); await runPalmSignOutbox(); await syncZtoFinalMarks();
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 3 * 60 * 60 * 1000);
+    dataState.scanHistory = Object.values(clone(state.zoew_scan_history_cod_dod));
+    expect(dataState.scanHistory[0].barcodes[0].isClosed).toBe(true);
+    expect(dataState.scanHistory[0].barcodes[0].ztoSignedAt).toBeGreaterThan(0);
+    expect(Date.now() - dataState.scanHistory[0].barcodes[0].ztoSignedAt).toBeGreaterThanOrEqual(3 * 60 * 60 * 1000);
+    runAutomaticCleanupRules();
+    await vi.waitFor(() => { expect(dataState.deletedItems).toHaveLength(1); expect(cleanupInFlight.size).toBe(0); });
+    dataState.scanHistory = Object.values(clone(state.zoew_scan_history_cod_dod));
+    const trash = dataState.deletedItems[0];
+    expect(trash.trashReason).toBe('pickup'); expect(trash.barcodes.map(b => b.code)).toEqual([codes[0]]);
+    expect(trash.id === 'item1').toBe(!partial);
+    expect(dataState.scanHistory.flatMap(i => i.barcodes).map(b => b.code)).toEqual(partial ? codes.slice(1) : []);
+    expect((await jobs())[0].job.photo).toBe(photos[0]);
+    writes.length = 0; reads.length = 0; requests = []; vi.mocked(applyBarcodeCloseChange).mockClear(); reservationFixtures = false;
+    return { online, original, state, trash, writes, reads, write };
+}
+
+it.each([false, true])('auto-close ពិត (%s)៖ ztoClosed និងរូប hash ត្រូវ បញ្ចប់ queue ពី trash ដោយគ្មាន receipt ឬលុយស្ទួន', async partial => {
+    const fixture = await autoTrashQueued(partial); const before = JSON.stringify(fixture.state);
+    if (partial) disk.rows.set(fixture.original.row.id, await sealSignJob(fixture.original.row.owner, key, { ...fixture.original.job,
+        phase: 'checking', scanCompleted: true, photoVerified: false, photoGraceStartedAt: Date.now() - 3600000 }));
+    network = async body => receipt(body);
+    fixture.online.mockReturnValue(true); await runPalmSignOutbox();
+    await expectQueueCompleted();
+    expect(requests.map(b => b.stage)).toEqual(['receipt-status']);
+    expect(requests[0]).not.toHaveProperty('photo'); expect(requests[0].requestId).toBe(fixture.original.job.requestId);
+    expect(fixture.reads).toContain(`zoew_recently_deleted_cod_dod/${fixture.trash.id}`);
+    expect(fixture.reads).toContain(`zoew_restore_finalizations/${fixture.trash.id}`);
+    expect(fixture.writes).toEqual([]); expect(closes()).toEqual([]); expect(JSON.stringify(fixture.state)).toBe(before);
+});
+
+it('auto-close ពិត៖ Server ស្នើ bind រូប ➜ ផ្ទៀងរូបតាម status ដោយរក្សា request ដើម មិនផ្ញើ receipt', async () => {
+    const fixture = await autoTrashQueued(false);
+    network = async body => body.photo ? receipt(body) : reply({ code: 'ZTO_PALM_SIGN_PHOTO_BIND_REQUIRED', barcode: body.barcode, requestId: body.requestId }, 409);
+    fixture.online.mockReturnValue(true); await runPalmSignOutbox();
+    await expectQueueCompleted();
+    expect(requests.map(b => b.stage)).toEqual(['receipt-status', 'receipt-status']);
+    expect(requests[0]).not.toHaveProperty('photo'); expect(requests[1].photo).toBe(photos[0]);
+    expect(requests.every(b => b.requestId === fixture.original.job.requestId)).toBe(true);
+    expect(fixture.writes).toEqual([]); expect(closes()).toEqual([]);
+});
+
+it.each(['photo', 'wrong-hash', 'wrong-request', 'unsigned', 'restore-claim', 'restore-target', 'trash-vanished', 'database', 'cas', 'auth'])('auto-close ពិត៖ %s មិនលុបរូប ឬ replay សំណើចាស់', async kind => {
+    const fixture = await autoTrashQueued(true);
+    if (kind === 'restore-claim') fixture.state.zoew_recently_deleted_cod_dod[fixture.trash.id].restoreClaim = { token: 'other-device' };
+    if (kind === 'restore-target') {
+        fixture.state.zoew_restore_finalizations = { [fixture.trash.id]: { targetId: 'restored1' } };
+        fixture.state.zoew_scan_history_cod_dod.restored1 = { id: 'restored1', barcodes: [{ code: codes[0], restoredAt: Date.now() }] };
+    }
+    const get = firebaseState.fb.get; let protectedRow: any;
+    firebaseState.fb.get = async ref => {
+        if (kind === 'database') throw new Error('synthetic-offline');
+        if (kind === 'trash-vanished' && ref.path.startsWith('zoew_scan_history')) delete fixture.state.zoew_recently_deleted_cod_dod[fixture.trash.id];
+        if (kind === 'auth') { protectedRow = { ...disk.rows.get(fixture.original.row.id) }; firebaseState.authGeneration++; }
+        return get(ref);
+    };
+    network = async body => {
+        if (kind === 'cas') {
+            const row = disk.rows.get(fixture.original.row.id); protectedRow = { ...row, revision: row.revision + 1 }; disk.rows.set(row.id, protectedRow);
+        }
+        return receipt(body, kind === 'photo' ? { photoProof: null } : kind === 'unsigned' ? { ztoClosed: false }
+            : kind === 'wrong-request' ? { requestId: 'another-request' } : kind === 'wrong-hash' ? { photoProof: { protocol: 'original-sha256-v1',
+                verified: true, barcode: body.barcode, requestId: body.requestId, originalSHA256: '0'.repeat(64) } } : {});
+    };
+    fixture.online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(() => expect(bodies('receipt-status')).toHaveLength(1));
+    if (['cas', 'auth'].includes(kind)) {
+        await vi.waitFor(() => expect(protectedRow).toBeDefined());
+        if (kind === 'cas') await vi.waitFor(() => expect(vi.mocked(replaceSignJob).mock.calls.some(([previous, next]) => previous.revision === protectedRow.revision - 1 && next !== null && next.cipher !== protectedRow.cipher)).toBe(true));
+        expect(disk.rows.get(fixture.original.row.id)).toEqual(protectedRow);
+    } else await vi.waitFor(async () => expect((await jobs())[0].row.leaseUntil).toBe(0));
+    const held = (await jobs())[0]; expect(held.job.photo).toBe(photos[0]); expect(held.job.requestId).toBe(fixture.original.job.requestId);
+    if (!['cas', 'auth'].includes(kind)) expect(held.job.phase).toBe('action');
+    expect(requests.map(b => b.stage)).toEqual(['cas', 'auth'].includes(kind) ? ['receipt-status'] : ['receipt-status', 'status']); expect(fixture.writes).toEqual([]); expect(closes()).toEqual([]);
+});
+
+it.each(['queued', 'confirmed', 'cancelling'])('ធុងសំរាម៖ %s ផ្អាកដោយរក្សារូបនិងភស្តុតាង មិនបោះបង់ឬ Sign', async kind => {
+    const online = await queuedWithPolicy(true);
+    const old = (await jobs())[0];
+    const job = { ...old.job, phase: kind === 'confirmed' ? 'confirmed' : 'queued', photoVerified: kind === 'confirmed',
+        cancelRequested: kind === 'cancelling', reservationOwner: 'original-owner', reservationToken: 'original-token', warningToken: 'original-warning' } as typeof old.job;
+    disk.rows.set(old.row.id, await sealSignJob(old.row.owner, key, job));
+    dataState.deletedItems = [{ ...structuredClone(dataState.scanHistory[0]), deletedAt: Date.now(), isFromDeletion: true }];
+    dataState.scanHistory = [];
+    reservationFixtures = false; network = async body => receipt(body, { photoProof: null });
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0].job.phase).toBe('action'));
+    const held = (await jobs())[0];
+    expect(held.job).toMatchObject({ manualReviewReason: 'parent_in_trash', readOnlyProbe: true, continuationAllowed: false,
+        photo: job.photo, requestId: job.requestId, originalFingerprint: job.originalFingerprint, originalSHA256: job.originalSHA256,
+        reservationOwner: job.reservationOwner, reservationToken: job.reservationToken, warningToken: job.warningToken, cancelRequested: job.cancelRequested });
+    expect(held.row.due).toBe(0); expect(held.row.leaseUntil).toBe(0);
+    await runPalmSignOutbox(); expect(requests.map(body => body.stage)).toEqual(['receipt-status', 'status']);
+    await actOnQueuedSign(held.row.id, 'retry'); await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0].job.phase).toBe('action'));
+    expect(requests.map(body => body.stage)).toEqual(['receipt-status', 'status', 'receipt-status', 'status']); expect(closes()).toEqual([]); expect(disk.rows.size).toBe(1);
+    await refreshPalmSignQueue();
+    expect(palmSignOutboxState.rows[0]).toMatchObject({ manualReviewReason: 'parent_in_trash', warning: '' });
+    const html = await openedQueueMarkup();
+    expect(html).toContain('រក្សាទុករូបដើម'); expect(html).toContain('ពិនិត្យ (មិនផ្ញើ Sign)');
+    expect(html).not.toContain('បញ្ជាក់ និងបន្ត'); expect(html).not.toContain('បោះបង់ការងារមិនទាន់ផ្ញើ');
+    await exportQueuedSignPhoto(held.row.id, job.code);
+    expect(vi.mocked(saveOriginalQueuedPhoto)).toHaveBeenLastCalledWith(job.photo, expect.any(String), expect.any(Function));
+    expect((await jobs())[0].job.photo).toBe(job.photo);
+});
+
+it.each(['unloaded', 'other-id', 'other-life', 'no-deleted-at'])('ធុងសំរាម៖ %s មិនត្រូវចាត់ជាកញ្ចប់មេដែលបានលុប', async kind => {
+    const online = await queuedWithPolicy(true);
+    const trash = { ...structuredClone(dataState.scanHistory[0]), deletedAt: Date.now() };
+    if (kind === 'other-id') trash.id = 'other-item';
+    if (kind === 'other-life') trash.barcodes[0].restoredAt = Date.now();
+    if (kind === 'no-deleted-at') delete trash.deletedAt;
+    dataState.deletedItems = kind === 'unloaded' ? [] : [trash]; dataState.scanHistory = [];
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0].row.leaseUntil).toBe(0));
+    expect((await jobs())[0].job.phase).not.toBe('action'); expect((await jobs())[0].row.due).toBeGreaterThan(Date.now());
+    expect(requests).toEqual([]); expect((await jobs())[0].job.photo).toBe(photos[0]);
+});
+
+it('ធុងសំរាម៖ ឆ្លងឧបករណ៍ខណៈ status រង់ចាំ មិនបន្ត receipt ឬបិទកញ្ចប់', async () => {
+    const online = await queuedWithPolicy(true); reservationFixtures = false; const pending = gate<Response>();
+    network = async () => pending.promise;
+    online.mockReturnValue(true); await runPalmSignOutbox(); await vi.waitFor(() => expect(bodies('receipt-status')).toHaveLength(1));
+    dataState.deletedItems = [{ ...structuredClone(dataState.scanHistory[0]), deletedAt: Date.now() }]; dataState.scanHistory = [];
+    pending.resolve(resume(bodies('receipt-status')[0]));
+    await vi.waitFor(async () => expect((await jobs())[0].job.phase).toBe('action'));
+    expect((await jobs())[0].job.manualReviewReason).toBe('parent_in_trash');
+    expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]); expect((await jobs())[0].job.photo).toBe(photos[0]);
+});
+
+it('ធុងសំរាម៖ កញ្ចប់សកម្មមានអាទិភាព ហើយការស្តារវគ្គថ្មីមិនបន្ត job ចាស់', async () => {
+    const online = await queuedWithPolicy(false); const item = structuredClone(dataState.scanHistory[0]);
+    dataState.deletedItems = [{ ...item, deletedAt: Date.now() }];
+    network = async body => warning(body); online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0].job.phase).toBe('action'));
+    expect(bodies('receipt')).toHaveLength(1);
+    dataState.scanHistory = []; const id = (await jobs())[0].row.id;
+    await actOnQueuedSign(id, 'approve');
+    expect((await jobs())[0].job.manualReviewReason).toBe('parent_in_trash');
+    dataState.scanHistory = [{ ...item, restoredAt: Date.now() }]; dataState.deletedItems = [];
+    await actOnQueuedSign(id, 'retry');
+    await vi.waitFor(async () => expect((await jobs())[0].row.leaseUntil).toBe(0));
+    expect(bodies('receipt')).toHaveLength(1); expect(closes()).toEqual([]); expect((await jobs())[0].job.photo).toBe(photos[0]);
+});
+
+it('ការងារថ្មីបញ្ជាក់ warning ដោយស្វ័យប្រវត្តិ៖ រក្សា token និងបន្ត lease តាម CAS មុន replay', async () => {
+    const online = await queuedWithPolicy(true); const now = Date.now(); let clock = now;
+    vi.spyOn(Date, 'now').mockImplementation(() => clock);
+    let beforeLease = 0; let savedBeforeReplay: any;
+    network = async (body) => {
+        if (!body.confirmationToken) { beforeLease = (await jobs())[0].row.leaseUntil; clock += 44000; return warning(body, 'auto-warning'); }
+        savedBeforeReplay = (await jobs())[0]; return receipt(body);
+    };
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await expectQueueCompleted();
+    expect(bodies('receipt')).toHaveLength(2); expect(disk.rows.size).toBe(0); expect(closes()).toEqual([codes[0]]);
+    expect(savedBeforeReplay.job).toMatchObject({ phase: 'checking', autoConfirm: true, confirmationToken: 'auto-warning' });
+    expect(savedBeforeReplay.row.leaseUntil).toBe(clock + SIGN_OUTBOX_LEASE_MS);
+    expect(savedBeforeReplay.row.leaseUntil).toBeGreaterThan(beforeLease);
+    expect(bodies('receipt')[1]).toEqual({ ...bodies('receipt')[0], confirmationToken: 'auto-warning' });
+});
+
+it('CAS រក្សា token បរាជ័យ៖ ការងារ auto-confirm មិន replay និងមិនបិទ', async () => {
+    const online = await queuedWithPolicy(true);
+    network = async (body) => { vi.mocked(replaceSignJob).mockResolvedValueOnce(false); return warning(body); };
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.message).toContain('បណ្ដាញ'));
+    expect(bodies('receipt')).toHaveLength(1); expect(closes()).toEqual([]); expect(disk.rows.size).toBe(1);
+});
+
+it.each(['restore', 'remove'])('កញ្ចប់ %s ខណៈ warning រង់ចាំ៖ មិន replay រូបចាស់ និងមិនបិទ', async (change) => {
+    const online = await queuedWithPolicy(true); const pending = gate<void>();
+    network = async (body) => body.confirmationToken ? receipt(body) : pending.promise.then(() => warning(body));
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(() => expect(bodies('receipt')).toHaveLength(1));
+    if (change === 'restore') dataState.scanHistory[0].barcodes[0].restoredAt = Date.now();
+    else dataState.scanHistory[0].barcodes = dataState.scanHistory[0].barcodes.slice(1);
+    pending.resolve();
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    expect(bodies('receipt')).toHaveLength(1); expect(closes()).toEqual([]); expect(disk.rows.size).toBe(1);
+    expect((await jobs())[0].job.confirmationToken).toBeUndefined();
+});
+
+it('កញ្ចប់ស្តារពេល CAS រក្សា token៖ រក្សាការងារដើម ហើយមិន replay រូបចាស់', async () => {
+    const online = await queuedWithPolicy(true);
+    network = async (body) => {
+        vi.mocked(replaceSignJob).mockImplementationOnce(async (previous, next, current) => {
+            const actual = disk.rows.get(previous.id);
+            if (!current() || !next || !actual || actual.revision !== previous.revision) return false;
+            disk.rows.set(next.id, { ...next, revision: previous.revision + 1 });
+            dataState.scanHistory[0].barcodes[0].restoredAt = Date.now();
+            return true;
+        });
+        return warning(body, 'auto-warning');
+    };
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.message).toContain('បណ្ដាញ'));
+    expect(bodies('receipt')).toHaveLength(1); expect(closes()).toEqual([]); expect(disk.rows.size).toBe(1);
+    expect((await jobs())[0].job).toMatchObject({ phase: 'checking', confirmationToken: 'auto-warning' });
+});
+
+it('បាត់ ACK ក្រោយ auto-confirm៖ token នៅរក្សាទុក ហើយបើកឡើងវិញសួរតែ receipt-status', async () => {
+    const online = await queuedWithPolicy(true);
+    network = async (body) => {
+        if (body.stage === 'receipt-status') return receipt(body);
+        if (!body.confirmationToken) return warning(body, 'auto-warning');
+        throw new Error('lost ack after automatic confirmation');
+    };
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.message).toContain('បណ្ដាញ'));
+    expect(bodies('receipt')).toHaveLength(2); expect(closes()).toEqual([]);
+    expect((await jobs())[0].job).toMatchObject({ phase: 'checking', confirmationToken: 'auto-warning' });
+    for (const row of disk.rows.values()) row.due = 0;
+    await runPalmSignOutbox();
+    await expectQueueCompleted();
+    expect(bodies('receipt')).toHaveLength(2); expect(bodies('receipt-status')).toHaveLength(2);
+    expect(closes()).toEqual([codes[0]]); expect(disk.rows.size).toBe(0);
+});
+
+it('ការងារ auto-confirm មាន token រួច៖ warning ថ្មីនៅតែទាមទារសកម្មភាព ហើយមិនបញ្ជាក់ជារង្វង់', async () => {
+    const online = await queuedWithPolicy(true); const value = (await jobs())[0];
+    const next = await sealSignJob(value.row.owner, key, { ...value.job, confirmationToken: 'already-approved' });
+    disk.rows.set(value.row.id, { ...next, revision: value.row.revision + 1 });
+    network = async (body) => warning(body, 'changed-warning');
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
+    expect(bodies('receipt')).toHaveLength(1); expect(closes()).toEqual([]);
+    expect((await jobs())[0].job).toMatchObject({ phase: 'action', warningToken: 'changed-warning' });
+});
+it('បណ្ដាញដាច់ក្រោយ05៖ ស្តារដោយ receipt-status តូច មិនផ្ញើរូប/05 ម្ដងទៀត', async () => {
+    await ready(1); const normal = network;
+    network = async (body) => { if (body.stage === 'receipt') throw new Error('lost ack'); return normal(body); };
+    await submitZtoPalmSign([codes[0]]);
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.message).toContain('បណ្ដាញ'));
+    expect(closes()).toEqual([]);
+    for (const row of disk.rows.values()) row.due = 0;
+    await runPalmSignOutbox();
+    await expectQueueCompleted();
+    expect(bodies('receipt')).toHaveLength(1); expect(bodies('receipt-status')).toHaveLength(2);
+    expect(bodies('receipt-status')[0].photo).toBeUndefined(); expect(closes()).toEqual([codes[0]]);
+});
+it.each(['photo', 'request'])('ACK ខ្វះ %s រក្សារូបដើម ហើយបិទតែ Sign ដែលបានបញ្ជាក់', async (kind) => {
+    await ready(1); const normal = network;
+    network = async (body) => body.stage === 'receipt' ? receipt(body, kind === 'photo' ? { photoAccepted: undefined, photoProof: undefined } : { requestId: 'other-request' }) : normal(body);
+    await submitZtoPalmSign([codes[0]]);
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.message).toContain(kind === 'photo' ? 'រង់ចាំផ្ទៀងរូបដើម' : 'មិនទាន់បញ្ជាក់'));
+    expect(closes()).toEqual(kind === 'photo' ? [codes[0]] : []); expect(disk.rows.size).toBe(1);
+});
+it('ZTO ACK រួច · local DB ACK បាត់ ទោះ optimistic closed ក៏រក្សា queue ហើយ retry តែ local close', async () => {
+    await ready(1);
+    vi.mocked(applyBarcodeCloseChange).mockImplementationOnce(async () => { dataState.scanHistory[0].barcodes[0].isClosed = true; return false; });
+    await submitZtoPalmSign([codes[0]]);
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('confirmed'));
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    expect(disk.rows.size).toBe(1);
+    for (const row of disk.rows.values()) row.due = 0;
+    await runPalmSignOutbox(); await expectQueueCompleted();
+    expect(bodies('receipt')).toHaveLength(1); expect(closes()).toEqual([codes[0], codes[0]]);
+});
+it('offline ក្រោយ precheck៖ រក្សា ៣ រូប · online បន្តតែមួយដងតាម barcode', async () => {
+    await ready(); vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    await submitZtoPalmSign();
+    expect(modalIsOpen('ztoPalmSignModal')).toBe(false);
+    expect(disk.rows.size).toBe(3); expect(bodies('receipt')).toHaveLength(0); expect(closes()).toEqual([]);
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
+    await runPalmSignOutbox(); await expectQueueCompleted();
+    expect(closes().sort()).toEqual(codes); expect(bodies('receipt')).toHaveLength(3);
+});
+it('ស្តារកញ្ចប់ខណៈ ACK រង់ចាំ៖ ការងារចាស់មិនបិទវគ្គថ្មី ឬផ្ញើ05ម្ដងទៀត', async () => {
+    await ready(1); const ack = gate<Response>(); const normal = network;
+    network = async (body) => body.stage === 'receipt' ? ack.promise.then(() => receipt(body)) : normal(body);
+    await submitZtoPalmSign([codes[0]]); await vi.waitFor(() => expect(bodies('receipt')).toHaveLength(1));
+    dataState.scanHistory[0].barcodes[0].restoredAt = Date.now();
+    ack.resolve(reply({}));
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.message).toContain('បណ្ដាញ'));
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    for (const row of disk.rows.values()) row.due = 0;
+    await runPalmSignOutbox(); await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
+    expect(closes()).toEqual([]); expect(dataState.scanHistory[0].barcodes[0].isClosed).toBe(false);
+    expect(bodies('receipt')).toHaveLength(1); expect(disk.rows.size).toBe(1);
+});
+it('DB មាន restore ថ្មីជាង local៖ transaction មិនបិទ barcode ឬបន្ថែមលុយក្នុងវគ្គថ្មី', async () => {
+    const real = await vi.importActual<typeof import('../../../ZoeW/src/features/barcode-ops')>('../src/features/barcode-ops');
+    const item = dataState.scanHistory[0];
+    const identity = barcodeSignIdentity(item, item.barcodes[0]);
+    const server = structuredClone(item); server.barcodes[0].restoredAt = Date.now();
+    const pickupPath = 'zoew_daily_pickup_cod_dod/' + getFormattedDate();
+    let pickup: any = { packagesPickedUp: 0, pickupRevision: 1, pickupResetEpoch: 0 };
+    dataState.dailyPickupData = {}; dataState.dailyCollectedData = {};
+    let mutation: any = 'not-called';
+    const update = vi.fn(async () => {});
+    firebaseState.fb = {
+        ref: (_db: unknown, path: string) => ({ path }), update,
+        get: async (ref: any) => {
+            expect(ref.path).toBe(pickupPath);
+            return { val: () => structuredClone(pickup), exists: () => true };
+        },
+        runTransaction: async (ref: any, change: (v: any) => any) => {
+            if (ref.path === pickupPath) {
+                const next = change(structuredClone(pickup));
+                if (next !== undefined) pickup = structuredClone(next);
+                return { committed: next !== undefined, snapshot: { val: () => structuredClone(pickup) } };
+            }
+            expect(ref.path).toBe('zoew_scan_history_cod_dod/' + item.id);
+            mutation = change(structuredClone(server));
+            return { committed: false, snapshot: { val: () => server } };
+        }
+    };
+    expect(await real.applyBarcodeCloseChange(item.id, codes[0], true, { silent: true, showModal: false, expectedSignIdentity: identity })).toBe(false);
+    expect(mutation).toBeUndefined(); expect(server.barcodes[0].isClosed).toBe(false);
+    expect(update).not.toHaveBeenCalled(); expect(item.barcodes[0].isClosed).toBe(false);
+    expect(pickup.packagesPickedUp).toBe(0);
+    expect(pickup.pickedUpBarcodes || {}).toEqual({}); expect(pickup.pickedUpPhones || {}).toEqual({});
+    expect(pickup.pickupResetEpoch).toBe(0);
+});
+it.each(['auth', 'shop', 'database', 'lock', 'key'])('ចម្លើយមកក្រោយប្ដូរ %s មិនបិទឬលុប queue របស់ម្ចាស់ដើម', async (kind) => {
+    await ready(1); const ack = gate<Response>(); const normal = network;
+    network = async (body) => body.stage === 'receipt' ? ack.promise.then(() => receipt(body)) : normal(body);
+    await submitZtoPalmSign([codes[0]]); await vi.waitFor(() => expect(bodies('receipt')).toHaveLength(1));
+    if (kind === 'auth') firebaseState.authGeneration++;
+    if (kind === 'shop') appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://other.firebaseio.com' }));
+    if (kind === 'database') firebaseState.db = {};
+    if (kind === 'lock') securityState.appIsLocked = true;
+    if (kind === 'key') securityState.lookupSecretKey = null;
+    ack.resolve(reply({})); await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(closes()).toEqual([]); expect(disk.rows.size).toBe(1);
+});
+
+it.each<[number, boolean, boolean, boolean]>([[2, false, false, false], [3, false, false, false], [2, true, false, false], [2, false, true, true],
+    [2, false, false, true], [3, false, false, true], [2, true, false, true]])('លេខមួយ %s កញ្ចប់ · rollback takeover %s · រូបផ្ទៀង %s · status ថ្មីអាចអាន %s៖ App → Function → ZTO · ACK បាត់ · លុយ/អតិថិជនមិនស្ទួន', async (count, rollback, exactPhoto, statusAvailable) => {
+    const real = await vi.importActual<typeof import('../../../ZoeW/src/features/barcode-ops')>('../src/features/barcode-ops');
+    reservationFixtures = false;
+    const sign = createRequire(import.meta.url)('../../../ZoeW/netlify/functions/_shared/zto-palm-sign.js');
+    const chosen = codes.slice(0, count);
+    const day = (await import('../../../ZoeW/src/core/timezone')).getFormattedDate();
+    const clone = (v: any) => v == null ? null : JSON.parse(JSON.stringify(v));
+    const db: any = { zoew_scan_history_cod_dod: { item1: { id: 'item1', phone: '012345678', scanDate: day, isClosed: false,
+        barcodes: chosen.map((code, i) => ({ code, cod: i + 1, dod: 0.5, isClosed: false })) } } };
+    const read = (path: string) => clone(path.split('/').filter(Boolean).reduce((value: any, part) => value?.[part], db));
+    const write = (path: string, value: any) => {
+        const parts = path.split('/').filter(Boolean); const last = parts.pop()!; let target = db;
+        for (const part of parts) target = target[part] ||= {};
+        if (value == null) delete target[last]; else target[last] = clone(value);
+    };
+    firebaseState.fb = {
+        getIdTokenResult: async () => ({ token: 'synthetic-id' }),
+        ref: (_db: unknown, path: string) => ({ path }),
+        get: async (ref: any) => ({ val: () => read(ref.path), exists: () => read(ref.path) !== null }),
+        runTransaction: async (ref: any, change: (value: any) => any) => {
+            const next = change(read(ref.path)); if (next === undefined) return { committed: false };
+            write(ref.path, next); return { committed: true, snapshot: { val: () => read(ref.path) } };
+        },
+        update: async (ref: any, updates: any) => { for (const [key, value] of Object.entries(updates)) write(ref.path + '/' + key, value); }
+    };
+    dataState.scanHistory = [clone(db.zoew_scan_history_cod_dod.item1)]; dataState.deletedItems = []; dataState.dailyCollectedData = {}; dataState.dailyPickupData = {};
+    firebaseState.serverClockTrusted = true; firebaseState.serverTimeOffsetMs = 0;
+    firebaseState.dbRefDailyPickup = { path: 'zoew_daily_pickup_cod_dod' }; firebaseState.dbRefDailyCollected = { path: 'zoew_daily_collected_cod_dod' };
+    vi.mocked(applyBarcodeCloseChange).mockImplementation(real.applyBarcodeCloseChange);
+    const journal = new Map<string, { data: string; etag: string }>(); let revision = 0;
+    const session = { token: 'session', site: 'KH1', operator: 'operator' };
+    const proof = { seal: JSON.stringify, open: JSON.parse, stamp: (s: string) => s, verdict: (r: any) => ({ ztoClosed: r.result[0].mail.isSign === 1 }) };
+    const deps = { keyLabel: 'synthetic', lookupAccess: async () => ({ verified: true, site: 'KH1' }), blobStore: () => ({ store: {
+        getWithMetadata: async (key: string) => journal.get(key) || null,
+        set: async (key: string, data: string, opts: any) => {
+            const old = journal.get(key);
+            if (opts.onlyIfNew && old || opts.onlyIfMatch && old?.etag !== opts.onlyIfMatch) return { modified: false };
+            const etag = String(++revision); journal.set(key, { data, etag }); return { modified: true, etag };
+        }
+    } }) };
+    const upstream: any[] = []; const received = new Set<string>(); let problemChecks = 0;
+    const firstSign = gate<void>();
+    const request = async (path: string, body: any) => {
+        upstream.push({ path, body });
+        if (path.endsWith('queryTrackInfo')) return { status: true, result: [{ mail: { mailNo: body.mailNos, isSign: received.has(body.mailNos) ? 1 : 0 },
+            tracks: [{ mailNo: body.mailNos, siteCode: session.site, action: received.has(body.mailNos) ? '5' : '4', time: '2026-10-19 12:01:00' }] }] };
+        if (path.endsWith('querySignPic')) return { status: true, result: [{ billCode: body.billCode, savePos: 'https://zto-haiwai2025.oss-cn-hongkong.aliyuncs.com/track/shortterm/bill/1/202610/' + body.billCode + '_1.jpg' }] };
+        if (path.endsWith('queryPreOrderByBillCode')) return { status: true, result: { billCode: body.billCode } };
+        if (path.endsWith('newBusinessCheck') && body.billCode === codes[1]) return { status: true, result: { message: rollback && ++problemChecks > 1 ? 'បញ្ហាថ្មី ត្រូវបញ្ជាក់ម្ដងទៀត' : 'កញ្ចប់មានបញ្ហា', whetherForce: false } };
+        if (path.endsWith('saveScanInfo')) {
+            if (rollback && body[0].billCode === codes[0]) await firstSign.promise;
+            received.add(body[0].billCode);
+            if (body[0].billCode === codes[0]) throw new Error('accepted-but-ack-lost');
+            return { status: true, result: [] };
+        }
+        return { status: true, result: null };
+    };
+    network = async (body) => {
+        if (!statusAvailable && body.stage === 'status' && received.has(body.barcode)) return reply({ code: 'ZTO_PALM_STATUS_UNCONFIRMED' }, 503);
+        const out = await sign.signPalm({ body: JSON.stringify(body) }, session, deps, request, proof); return new Response(out.body, { status: out.statusCode });
+    };
+    vi.stubGlobal('fetch', vi.fn(async (url, init) => {
+        if (String(url).startsWith('https://zto-haiwai2025.oss-cn-hongkong.aliyuncs.com/')) {
+            const index = codes.findIndex(code => String(url).includes('/' + code + '_'));
+            return new Response(Buffer.from(photos[exactPhoto ? index : (index + 1) % photos.length], 'base64'), { headers: { 'Content-Type': 'image/jpeg' } });
+        }
+        const body = JSON.parse(String(init?.body)); requests.push(body); return network(body);
+    }));
+    try {
+        openZtoPalmSign('item1'); await vi.waitFor(() => expect(palmSignState.checking).toBe(false)); setPalmSignName('សុខា');
+        const originalRequestId = palmSignState.requestId;
+        chosen.forEach((code, i) => acceptPalmSignBarcode(code, photos[i]));
+        await submitZtoPalmSign();
+        expect(palmSignState.confirmation).toBeNull();
+        expect(modalIsOpen('ztoPalmSignModal')).toBe(false);
+        if (rollback) {
+            await vi.waitFor(async () => expect((await jobs()).find((value) => value.job.code === codes[1])?.job.phase).toBe('action'));
+            expect(upstream.filter((c) => c.path.endsWith('saveBillPic') && c.body.billCode === codes[1])).toHaveLength(0);
+            await vi.waitFor(() => expect(upstream.filter((c) => c.path.endsWith('saveScanInfo'))).toHaveLength(1));
+            const before = (await jobs()).find((value) => value.job.code === codes[0])!;
+            expect(before.job.phase).toBe('checking');
+            // A clock rollback makes an active lease appear farther away than its maximum duration.
+            disk.rows.get(before.row.id).leaseUntil = Date.now() + 3600000;
+            const otherTab = await import('../../../ZoeW/src/features/palm-sign-outbox' + '?rollback-takeover');
+            expect(otherTab.runPalmSignOutbox).not.toBe(runPalmSignOutbox);
+            await otherTab.runPalmSignOutbox();
+            await vi.waitFor(() => expect(bodies('receipt-status')).toHaveLength(count + 1));
+            await vi.waitFor(async () => expect((await jobs()).find((value) => value.job.code === codes[0])?.row.leaseUntil).toBe(0));
+            const pending = (await jobs()).find((value) => value.job.code === codes[0])!;
+            expect(pending.row.revision).toBeGreaterThan(before.row.revision);
+            expect(pending.job).toMatchObject({ requestId: before.job.requestId, photo: photos[0], phase: 'checking' });
+            expect(received.has(codes[0])).toBe(false);
+            expect(read('zoew_scan_history_cod_dod/item1').barcodes[0].isClosed).toBe(false);
+            expect(upstream.filter((c) => c.path.endsWith('saveScanInfo'))).toHaveLength(1);
+            expect(upstream.filter((c) => c.path.endsWith('saveBillPic'))).toHaveLength(1);
+            firstSign.resolve();
+            await vi.waitFor(() => expect(received.has(codes[0])).toBe(true));
+            expect((await jobs()).find((value) => value.job.code === codes[0])!.job.requestId).toBe(before.job.requestId);
+        }
+        await vi.waitFor(async () => expect((await jobs()).find((v) => v.job.code === codes[0])?.job.message).toContain('មិនទាន់បញ្ជាក់'));
+        expect(read('zoew_scan_history_cod_dod/item1').barcodes[0].isClosed).toBe(false);
+        if (rollback) {
+            expect(read('zoew_scan_history_cod_dod/item1').barcodes[1].isClosed).toBe(false);
+            const pending = (await jobs()).find((value) => value.job.code === codes[1])!;
+            await actOnQueuedSign(pending.row.id, 'approve');
+        }
+        expect(modalIsOpen('ztoPalmSignModal')).toBe(false);
+        if (statusAvailable && !exactPhoto) {
+            for (const row of disk.rows.values()) row.due = 0;
+            await runPalmSignOutbox();
+            await vi.waitFor(async () => expect((await jobs()).filter(value => value.job.signedCleanupConfirmed)).toHaveLength(count));
+            const retained = await jobs();
+            retained.forEach(value => {
+                const index = chosen.indexOf(value.job.code);
+                expect(value.job).toMatchObject({ requestId: originalRequestId, photo: photos[index], signedCleanupConfirmed: true,
+                    phase: 'action', readOnlyProbe: true, recovery: { dismissed: true }, recoveryCheck: { signed: true, signedStatusVerified: true, photoVerified: false } });
+                expect(value.job.photoVerified).not.toBe(true);
+            });
+            expect(read('zoew_scan_history_cod_dod/item1').barcodes.every((b: any) => b.isClosed === false)).toBe(true);
+            expect(read('zoew_daily_pickup_cod_dod/' + day)?.packagesPickedUp || 0).toBe(0);
+            expect(Object.values(read('zoew_daily_collected_cod_dod/' + day) || {})).toEqual([]);
+            expect(upstream.filter(c => c.path.endsWith('saveScanInfo'))).toHaveLength(count);
+            expect(upstream.filter(c => c.path.endsWith('saveBillPic')).map(c => [c.body.billCode, c.body.fileName]).sort()).toEqual(chosen.map((code, i) => [code, photos[i]]));
+            const sent = upstream.length;
+            await runPalmSignOutbox();
+            expect(upstream).toHaveLength(sent);
+            expect(disk.rows.size).toBe(count);
+            return;
+        }
+        await vi.waitFor(() => expect(read('zoew_scan_history_cod_dod/item1').barcodes.filter((b: any) => b.isClosed)).toHaveLength(count - 1));
+        expect(read('zoew_scan_history_cod_dod/item1').isClosed).toBe(false);
+        for (const row of disk.rows.values()) row.due = 0;
+        await runPalmSignOutbox(); await vi.waitFor(() => expect(read('zoew_scan_history_cod_dod/item1').barcodes.filter((b: any) => b.isClosed)).toHaveLength(count));
+        if (exactPhoto) await expectQueueCompleted();
+        else expect(disk.rows.size).toBe(count);
+        await vi.waitFor(() => expect(read('zoew_daily_pickup_cod_dod/' + day)?.packagesPickedUp).toBe(count));
+        expect(read('zoew_scan_history_cod_dod/item1').isClosed).toBe(true);
+        expect(Object.keys(read('zoew_daily_pickup_cod_dod/' + day).pickedUpPhones)).toHaveLength(1);
+        const money = Object.values(read('zoew_daily_collected_cod_dod/' + day)) as { c: number; d: number }[];
+        expect(money.reduce((sum, r) => sum + r.c, 0)).toBe(count * (count + 1) / 2);
+        expect(money.reduce((sum, r) => sum + r.d, 0)).toBe(count * 0.5);
+        expect(upstream.filter((c) => c.path.endsWith('saveScanInfo'))).toHaveLength(count);
+        expect(upstream.filter((c) => c.path.endsWith('saveBillPic')).map((c) => [c.body.billCode, c.body.fileName]).sort()).toEqual(chosen.map((code, i) => [code, photos[i]]));
+        await runPalmSignOutbox();
+        expect(read('zoew_daily_pickup_cod_dod/' + day).packagesPickedUp).toBe(count);
+        expect(upstream.filter((c) => c.path.endsWith('saveScanInfo'))).toHaveLength(count);
+    } finally {
+        firstSign.resolve();
+        firebaseState.serverClockTrusted = false; firebaseState.dbRefDailyPickup = null; firebaseState.dbRefDailyCollected = null;
+    }
+});
+
+it('ការពារ៖ terminal rejection រក្សារូប មិនបង្កើត retry និងមិនរត់សំណើបន្ថែម', async () => {
+    await ready(1);
+    network = async body => reply({ code: 'ZTO_PALM_SIGN_REPORTED_REJECTED', barcode: body.barcode, requestId: body.requestId, stage: 'receipt', verificationRequired: true }, 409);
+    await submitZtoPalmSign([codes[0]]);
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
+    const value = (await jobs())[0];
+    expect(value.job).toMatchObject({ verificationRequired: true, photo: photos[0] });
+    expect(palmSignOutboxState.rows[0]).toMatchObject({ verificationRequired: true });
+    expect(closes()).toEqual([]);
+    const count = requests.length;
+    await actOnQueuedSign(value.row.id, 'retry'); await runPalmSignOutbox();
+    expect(requests).toHaveLength(count); expect(disk.rows.size).toBe(1);
+});
+
+it('ការពារ៖ ACK ចាស់មិនលុប verificationRequired ដែលរក្សាទុកដោយ worker ផ្សេង', async () => {
+    await ready(1); const ack = gate<Response>();
+    network = async body => { await ack.promise; return receipt(body); };
+    await submitZtoPalmSign([codes[0]]);
+    await vi.waitFor(() => expect(bodies('receipt')).toHaveLength(1));
+    const old = (await jobs())[0];
+    const sealed = await sealSignJob(old.row.owner, key, { ...old.job, phase: 'action', verificationRequired: true, message: 'ត្រូវផ្ទៀងក្នុង ZTO' });
+    expect(await replaceSignJob(old.row, sealed, () => true)).toBe(true);
+    ack.resolve(reply({}));
+    await vi.waitFor(() => expect(palmSignOutboxState.rows[0]?.busy).toBe(false));
+    expect((await jobs())[0].job).toMatchObject({ phase: 'action', verificationRequired: true, photo: photos[0] });
+    expect(closes()).toEqual([]); expect(bodies('receipt')).toHaveLength(1);
+});
+
+it('ការពារ៖ queue terminal បង្ហាញសារផ្ទៀង តែគ្មាន Retry ឬ Approve', async () => {
+    palmSignOutboxState.rows = [{ id: 'synthetic', code: codes[0], phase: 'action', message: 'ត្រូវផ្ទៀងក្នុង ZTO', verificationRequired: true, busy: false }];
+    const html = await openedQueueMarkup();
+    expect(html).toContain('ត្រូវផ្ទៀងក្នុង ZTO');
+    expect(html).not.toContain('ពិនិត្យស្ថានភាពឡើងវិញ');
+    expect(html).not.toContain('បញ្ជាក់ និងបន្ត');
+    palmSignOutboxState.rows = [{ ...palmSignOutboxState.rows[0], verificationRequired: undefined }];
+    expect(await openedQueueMarkup()).toContain('ពិនិត្យ (មិនផ្ញើ Sign)');
+});
+
+it.each([
+    ...['queryPreOrderByBillCode', 'newBusinessCheck', '/add'].flatMap(failure => ['logical', 'transport', 'malformed', 'auth'].map(mode => ({ failure, mode }))),
+    { failure: 'saveBillPic', mode: 'logical' },
+    ...['transport', 'logical', 'malformed'].map(mode => ({ failure: 'saveScanInfo', mode }))
+])('ការបដិសេធមុន Sign $failure/$mode មិនច្រឡំនឹងការផ្ញើមិនទាន់បញ្ជាក់', async ({ failure, mode }) => {
+    reservationFixtures = false;
+    const sign = createRequire(import.meta.url)('../../../ZoeW/netlify/functions/_shared/zto-palm-sign.js');
+    const journal = new Map<string, { data: string; etag: string }>(); let serial = 0;
+    const session = { token: 'session', site: 'KH1', operator: 'operator' };
+    const proof = { seal: JSON.stringify, open: JSON.parse, stamp: (s: string) => s, verdict: (r: any) => ({ ztoClosed: r.result[0].mail.isSign === 1 }) };
+    const deps = { keyLabel: 'synthetic', lookupAccess: async () => ({ verified: true, site: 'KH1' }), blobStore: () => ({ store: {
+        getWithMetadata: async (key: string) => journal.get(key) || null,
+        set: async (key: string, data: string, opts: any) => {
+            const old = journal.get(key);
+            if (opts.onlyIfNew && old || opts.onlyIfMatch && old?.etag !== opts.onlyIfMatch) return { modified: false };
+            const etag = String(++serial); journal.set(key, { data, etag }); return { modified: true, etag };
+        }
+    } }) };
+    const upstream: string[] = [];
+    const request = async (path: string, body: any) => {
+        upstream.push(path);
+        if (path.endsWith('queryTrackInfo')) return { status: true, result: [{ mail: { mailNo: body.mailNos, isSign: 0 },
+            tracks: [{ mailNo: body.mailNos, siteCode: 'KH1', action: '4', time: '2026-10-19 12:01:00' }] }] };
+        if (path.endsWith(failure)) {
+            if (mode === 'transport') throw new Error('synthetic transport failure');
+            if (mode === 'malformed') return { result: null };
+            if (mode === 'auth') return { status: false, authRejected: true };
+            return { status: false, result: null };
+        }
+        if (path.endsWith('queryPreOrderByBillCode')) return { status: true, result: { billCode: body.billCode } };
+        return { status: true, result: null };
+    };
+    const responses: any[] = [];
+    network = async (body) => { const out = await sign.signPalm({ body: JSON.stringify(body) }, session, deps, request, proof);
+        responses.push({ requestStage: body.stage, status: out.statusCode, ...JSON.parse(out.body) }); return new Response(out.body, { status: out.statusCode }); };
+    openZtoPalmSign('item1'); await vi.waitFor(() => expect(palmSignState.checking).toBe(false));
+    setPalmSignName('សុខា'); acceptPalmSignBarcode(codes[0], photos[0]);
+    await submitZtoPalmSign([codes[0]]);
+    const photoFailure = failure === 'saveBillPic'; const postSend = failure === 'saveScanInfo';
+    const blocked = !postSend && (mode === 'logical' || mode === 'auth');
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe(blocked ? 'action' : 'checking'));
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    const snapshots: any[] = [];
+    const snapshot = async () => { const value = (await jobs())[0]; return { queue: value.job.phase, message: value.job.message,
+        journal: JSON.parse([...journal.values()][0].data).phase, photoAccepted: JSON.parse([...journal.values()][0].data).photoAccepted,
+        receipt: bodies('receipt').length, receiptStatus: bodies('receipt-status').length,
+        photos: upstream.filter(p => p.endsWith('saveBillPic')).length, scans: upstream.filter(p => p.endsWith('saveScanInfo')).length }; };
+    snapshots.push(await snapshot());
+    for (let i = 0; i < 3; i++) {
+        for (const row of disk.rows.values()) { row.due = 0; row.leaseUntil = 0; }
+        const stopped = (await jobs())[0].job.phase === 'action';
+        const polls = bodies('receipt-status').length;
+        await runPalmSignOutbox();
+        if (!stopped) {
+            await vi.waitFor(() => expect(bodies('receipt-status')).toHaveLength(polls + 1));
+            await vi.waitFor(async () => expect((await jobs())[0].row.leaseUntil).toBe(0));
+        }
+        snapshots.push(await snapshot());
+    }
+    expect(closes()).toEqual([]); expect(disk.rows.size).toBe(1);
+    if (photoFailure) {
+        expect(snapshots.at(-1)).toMatchObject({ queue: 'action', journal: 'reservation-v1:image-sending', photoAccepted: false, receipt: 1, receiptStatus: 1, photos: 1, scans: 0 });
+    } else if (postSend) {
+        expect(snapshots.at(-1)).toMatchObject({ queue: 'checking', journal: 'reservation-v1:sending', photoAccepted: true, receipt: 1, receiptStatus: 4, photos: 1, scans: 1 });
+    } else if (blocked) {
+        expect(snapshots.at(-1)).toMatchObject({ queue: 'action', journal: 'reservation-v1:blocked', photoAccepted: false, receipt: 1, receiptStatus: 1, photos: 0, scans: 0 });
+        expect(upstream.filter(p => p.endsWith(failure))).toHaveLength(1);
+    } else {
+        expect(snapshots.at(-1)).toMatchObject({ queue: mode === 'malformed' ? 'action' : 'checking', journal: mode === 'transport' ? 'reservation-v1:claimed' : 'reservation-v1:blocked', photoAccepted: false, receipt: 1, receiptStatus: mode === 'malformed' ? 2 : 4, photos: 0, scans: 0 });
+        expect(upstream.filter(p => p.endsWith(failure))).toHaveLength(1);
+    }
+    const retained = (await jobs())[0].job;
+    expect(retained.photo).toBe(photos[0]);
+    expect(retained.requestId).toBe(bodies('receipt')[0].requestId);
+    if (blocked && !photoFailure) expect(responses.find(r => r.requestStage === 'receipt')).toMatchObject({ status: mode === 'auth' ? 401 : 409, code: mode === 'auth' ? 'ZTO_AUTH_EXPIRED' : 'ZTO_PALM_SIGN_CHECK_REJECTED' });
+});
+
+it('បើកជួរដើម្បីសង្គ្រោះរូប៖ អានតែប៉ុណ្ណោះ មិន Sign ឬកែ envelope', async () => {
+    const owner = JSON.stringify(['https://sign-shop.firebaseio.com', 'audit-user']);
+    const row = await sealSignJob(owner, key, { code: codes[0], itemId: 'item1', requestId: 'synthetic-request', signMan: '', photo: photos[0], reservationProtocol: 'original-reservation-v1', originalFingerprint: 'f'.repeat(64), originalSHA256: 'e'.repeat(64), dispatchProof: '', signature: '', parcelIdentity: '', phase: 'queued', attempts: 0, message: '' });
+    disk.rows.set(row.id, row);
+    const before = structuredClone(row);
+    await refreshPalmSignQueue();
+    expect(palmSignOutboxState.rows.map((v) => v.code)).toEqual([codes[0]]);
+    expect(disk.rows.get(row.id)).toEqual(before);
+    expect(requests).toEqual([]); expect(closes()).toEqual([]);
+});
+
+it('បិទការភ្ជាប់ ZTO នៅតែអានជួររូបបាន ដោយគ្មានបណ្ដាញ', async () => {
+    const owner = JSON.stringify(['https://sign-shop.firebaseio.com', 'audit-user']);
+    const row = await sealSignJob(owner, key, { code: codes[0], itemId: 'item1', requestId: 'synthetic-request', signMan: '', photo: photos[0], reservationProtocol: 'original-reservation-v1', originalFingerprint: 'f'.repeat(64), originalSHA256: 'e'.repeat(64), dispatchProof: '', signature: '', parcelIdentity: '', phase: 'queued', attempts: 0, message: '' });
+    disk.rows.set(row.id, row);
+    appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ ...config, enabled: false }));
+    await refreshPalmSignQueue();
+    expect(palmSignOutboxState.rows.map((v) => v.code)).toEqual([codes[0]]);
+    await runPalmSignOutbox();
+    expect(palmSignOutboxState.rows.map((v) => v.code)).toEqual([codes[0]]);
+    await exportQueuedSignPhoto(row.id, codes[0]);
+    expect(saveOriginalQueuedPhoto).toHaveBeenCalledWith(photos[0], 'ZoeW-' + codes[0] + '-original.jpg', expect.any(Function));
+    expect(requests).toEqual([]); expect(closes()).toEqual([]);
+});
+
+it.each(['absent', 'wrong', 'reversed'])('រូបដើមនៅរក្សាទុក ពេលភស្តុតាង %s', async (kind) => {
+    await ready(1);
+    network = async (body) => receipt(body, { photoProof: kind === 'absent' ? undefined : { protocol: 'original-sha256-v1', verified: true,
+        barcode: kind === 'reversed' ? codes[1] : body.barcode, requestId: body.requestId, originalSHA256: kind === 'wrong' ? '0'.repeat(64) : body.originalSHA256 } });
+    await submitZtoPalmSign([codes[0]]);
+    await vi.waitFor(() => expect(closes()).toEqual([codes[0]]));
+    expect(disk.rows.size).toBe(1);
+    expect((await jobs())[0].job.photo).toBe(photos[0]);
+});
+it('គ្មាន IndexedDB មិនផ្ញើ receipt និងរក្សារូបក្នុង modal', async () => {
+    await ready(1); vi.stubGlobal('indexedDB', undefined);
+    await submitZtoPalmSign([codes[0]]);
+    expect(bodies('receipt')).toHaveLength(0);
+    expect(palmSignState.photos[codes[0]]).toBe(photos[0]);
+});
+
+it('ការងារ confirmed ចាស់ក្រោយបើកឡើងវិញ មិនលុបរូបតាម ACK ចាស់', async () => {
+    const online = await queuedWithPolicy(true);
+    const value = (await jobs())[0];
+    const row = await sealSignJob(value.row.owner, key, { ...value.job, phase: 'confirmed' });
+    disk.rows.set(row.id, row); sentReceipts.add(value.job.code + '|' + value.job.requestId);
+    network = async (body) => receipt(body, { photoProof: undefined });
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(() => expect(bodies('receipt-status')).toHaveLength(1));
+    await vi.waitFor(async () => expect((await jobs())[0].row.leaseUntil).toBe(0));
+    expect(disk.rows.size).toBe(1); expect((await jobs())[0].job.photo).toBe(photos[0]);
+    expect(bodies('receipt')).toHaveLength(0);
+    expect(bodies('receipt-status')[0].originalSHA256).toMatch(/^[a-f0-9]{64}$/);
+});
+
+it.each([28, 900000])('ZTO បិទមុន receipt ៖ bind រូប %s bytes ផ្ញើពេញតែម្ដង រួច poll hash តូច និងលុបតែភស្តុតាងត្រឹមត្រូវ', async photoBytes => {
+    const online = await queuedWithPolicy(true); const value = (await jobs())[0];
+    const bytes = Buffer.alloc(photoBytes, 17); const template = Buffer.from(value.job.photo, 'base64');
+    template.copy(bytes, 0, 0, template.length - 2); bytes.set([255, 217], bytes.length - 2);
+    const originalPhoto = bytes.toString('base64');
+    const row = await sealSignJob(value.row.owner, key, { ...value.job, photo: originalPhoto, originalSHA256: createHash('sha256').update(bytes).digest('hex'),
+        originalFingerprint: await palmOriginalFingerprint(value.job.code, value.job.requestId, value.job.signMan, originalPhoto), phase: 'checking' });
+    disk.rows.set(row.id, row); sentReceipts.add(value.job.code + '|' + value.job.requestId);
+    let bound = false; let verified = false;
+    network = async (body) => {
+        const serialized = JSON.stringify(body); expect(Buffer.byteLength(serialized)).toBeLessThan(1220000);
+        if (body.photo) { expect(body.photo).toBe(originalPhoto); expect(serialized.split(originalPhoto)).toHaveLength(2); expect(body.signMan).toBe(value.job.signMan); bound = true; }
+        if (!bound) return reply({ code: 'ZTO_PALM_SIGN_PHOTO_BIND_REQUIRED', barcode: body.barcode, uncertain: true }, 409);
+        return receipt(body, verified ? {} : { photoProof: undefined });
+    };
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0].row.leaseUntil).toBe(0));
+    expect(bodies('receipt-status')).toHaveLength(2); expect(disk.rows.size).toBe(1);
+    verified = true; for (const row of disk.rows.values()) row.due = 0;
+    await runPalmSignOutbox(); await expectQueueCompleted();
+    expect(bodies('receipt-status')).toHaveLength(3);
+    expect(bodies('receipt-status').filter(body => body.photo)).toHaveLength(1);
+    expect(bodies('receipt')).toHaveLength(0);
+});
+
+it('៣ កញ្ចប់ ACK បញ្ច្រាស លុបតែកញ្ចប់ដែលរូបបានផ្ទៀងត្រូវ', async () => {
+    await ready(); const pending = codes.map(() => gate<void>());
+    network = async (body) => { const index = codes.indexOf(body.barcode); await pending[index].promise; return receipt(body, index === 1 ? { photoProof: undefined } : {}); };
+    await submitZtoPalmSign(); await vi.waitFor(() => expect(bodies('receipt')).toHaveLength(2));
+    pending[codes.indexOf(bodies('receipt')[1].barcode)].resolve(); await vi.waitFor(() => expect(bodies('receipt')).toHaveLength(3));
+    pending.forEach(gate => gate.resolve());
+    await vi.waitFor(() => expect(new Set(closes())).toEqual(new Set(codes)));
+    expect(disk.rows.size).toBe(3);
+    const pendingPhoto = (await jobs()).find(value => value.job.code === codes[1])!;
+    expect(pendingPhoto.job.photo).toBe(photos[1]);
+    await vi.waitFor(async () => expect((await jobs()).filter(value => value.job.recoveryCheck?.signedStatusVerified)).toHaveLength(2));
+});
+
+it('ភស្តុតាងរូបត្រឹមត្រូវ តែ restore ក្រោយ local close ACK មិនលុបរូប', async () => {
+    await ready(1);
+    vi.mocked(applyBarcodeCloseChange).mockImplementationOnce(async () => { dataState.scanHistory[0].barcodes[0].restoredAt = Date.now(); return true; });
+    await submitZtoPalmSign([codes[0]]);
+    await vi.waitFor(() => expect(closes()).toEqual([codes[0]]));
+    expect(disk.rows.size).toBe(1); expect((await jobs())[0].job.photo).toBe(photos[0]);
+});
+
+it('bind រូបបាត់សំណើ៖ poll តូច និងសាក binding ឡើងវិញក្រោយរយៈពេលរង់ចាំ ដោយមិន05', async () => {
+    const online = await queuedWithPolicy(true); const value = (await jobs())[0];
+    const row = await sealSignJob(value.row.owner, key, { ...value.job, phase: 'checking' });
+    disk.rows.set(row.id, row); sentReceipts.add(value.job.code + '|' + value.job.requestId);
+    let fail = true;
+    network = async (body) => {
+        if (!body.photo) return reply({ code: 'ZTO_PALM_SIGN_PHOTO_BIND_REQUIRED', barcode: body.barcode, uncertain: true }, 409);
+        if (fail) throw new Error('binding lost');
+        return receipt(body);
+    };
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0].row.leaseUntil).toBe(0));
+    expect(bodies('receipt-status').filter(body => body.photo)).toHaveLength(1);
+    for (const row of disk.rows.values()) row.due = 0;
+    await runPalmSignOutbox();
+    await vi.waitFor(() => expect(bodies('receipt-status')).toHaveLength(3));
+    await vi.waitFor(async () => expect((await jobs())[0].row.leaseUntil).toBe(0));
+    expect(bodies('receipt-status').filter(body => body.photo)).toHaveLength(1);
+    const saved = (await jobs())[0];
+    const expired = await sealSignJob(saved.row.owner, key, { ...saved.job, photoBindRetryAfter: Date.now() - 1 });
+    disk.rows.set(expired.id, { ...expired, revision: saved.row.revision + 1 }); fail = false;
+    await runPalmSignOutbox(); await expectQueueCompleted();
+    expect(bodies('receipt-status').filter(body => body.photo)).toHaveLength(2);
+    expect(bodies('receipt')).toHaveLength(0);
+});
+
+it('ភស្តុតាងត្រឹមត្រូវ តែ CAS លុបបរាជ័យ រូបនៅរក្សាទុក ហើយសាក local close ដោយមិន05', async () => {
+    const replace = vi.mocked(replaceSignJob).getMockImplementation()!;
+    vi.mocked(replaceSignJob).mockImplementation(async (previous, next, current) => next === null ? false : replace(previous, next, current));
+    await ready(1); await submitZtoPalmSign([codes[0]]);
+    await vi.waitFor(() => expect(closes()).toEqual([codes[0]]));
+    expect(disk.rows.size).toBe(1); expect((await jobs())[0].job.photoVerified).toBe(true);
+    vi.mocked(replaceSignJob).mockImplementation(replace);
+    for (const row of disk.rows.values()) { row.due = 0; row.leaseUntil = 0; }
+    await runPalmSignOutbox(); await expectQueueCompleted();
+    expect(bodies('receipt')).toHaveLength(1);
+});
+
+it.each(['signed', 'sending'])('Barcode វគ្គថ្មី៖ journal %s ចាស់ មិនបិទវគ្គស្តារ ឬលុបរូបថ្មី', async (phase) => {
+    reservationFixtures = false;
+    const sign = createRequire(import.meta.url)('../../../ZoeW/netlify/functions/_shared/zto-palm-sign.js');
+    const digest = (value: string | Buffer) => createHash('sha256').update(value).digest('hex');
+    const oldRequest = crypto.randomUUID();
+    const session = { token: 'synthetic-session', site: 'KH1', operator: 'synthetic-operator' };
+    const keyLabel = 'synthetic-cycle';
+    const journalKey = 'palm-sign-v1/' + digest(JSON.stringify([keyLabel, session.site, codes[0]]));
+    const historical = { kind: 'sign-journal', owner: 'old-cycle-owner', requestId: oldRequest,
+        fingerprint: digest(JSON.stringify([codes[0], oldRequest, 'អ្នកទទួលចាស់', photos[1]])), phase: 'reservation-v1:' + phase, photoAccepted: true, leaseUntil: 0,
+        originalSHA256: digest(Buffer.from(photos[1], 'base64')), photoProtocol: 'original-sha256-v1', reservationProtocol: 'original-reservation-v1', attempt: 'old-cycle-attempt' };
+    const journal = new Map([[journalKey, { data: JSON.stringify(historical), etag: 'historical' }]]); let serial = 0;
+    const deps = { keyLabel, lookupAccess: async () => ({ verified: true, site: session.site }), blobStore: () => ({ store: {
+        getWithMetadata: async (id: string) => journal.get(id) || null,
+        set: async (id: string, data: string, options: any) => {
+            const old = journal.get(id);
+            if (options.onlyIfNew && old || options.onlyIfMatch && old?.etag !== options.onlyIfMatch) return { modified: false };
+            const etag = String(++serial); journal.set(id, { data, etag }); return { modified: true, etag };
+        }
+    } }) };
+    const proof = { seal: JSON.stringify, open: JSON.parse, stamp: (value: string) => value, verdict: (value: any) => ({ ztoClosed: value.result[0].mail.isSign === 1 }) };
+    let closed = false;
+    const upstream: string[] = [];
+    const request = async (path: string, body: any) => {
+        upstream.push(path);
+        if (path.endsWith('queryTrackInfo')) return { status: true, result: [{ mail: { mailNo: body.mailNos, isSign: closed ? 1 : 0 },
+            tracks: [{ mailNo: body.mailNos, siteCode: session.site, action: closed ? '5' : '4', time: '2026-10-25 12:00:00' }] }] };
+        throw new Error('unexpected upstream write or photo read');
+    };
+    network = async body => { const out = await sign.signPalm({ body: JSON.stringify(body) }, session, deps, request, proof); return reply(JSON.parse(out.body), out.statusCode); };
+    dataState.scanHistory[0].barcodes[0].restoredAt = 1792890000000;
+    await ready(1);
+    expect(palmSignState.requestId).not.toBe(oldRequest);
+    await submitZtoPalmSign([codes[0]]);
+    await vi.waitFor(() => expect(bodies('receipt-status')).toHaveLength(1));
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    const original = (await jobs())[0].job;
+    expect(original).toMatchObject({ code: codes[0], phase: 'action', photo: photos[0] });
+    expect(original.requestId).not.toBe(oldRequest);
+    expect(original.parcelIdentity).toBe(barcodeSignIdentity(dataState.scanHistory[0], dataState.scanHistory[0].barcodes[0]));
+    expect(closes()).toEqual([]);
+    expect(JSON.parse(journal.get(journalKey)!.data)).toEqual(historical);
+    closed = true;
+    for (const row of disk.rows.values()) row.due = 0;
+    await actOnQueuedSign((await jobs())[0].row.id, 'retry');
+    await vi.waitFor(() => expect(bodies('receipt-status')).toHaveLength(2));
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    expect(closes()).toEqual([]); expect(disk.rows.size).toBe(1);
+    expect((await jobs())[0].job).toMatchObject({ photo: original.photo, requestId: original.requestId, parcelIdentity: original.parcelIdentity });
+    expect(upstream.every(path => path.endsWith('queryTrackInfo'))).toBe(true);
+    expect(journal.size).toBe(1); expect(JSON.parse(journal.get(journalKey)!.data).requestId).toBe(oldRequest);
+    expect(bodies('receipt')).toHaveLength(0);
+});
+
+it('ចម្លើយ proof ត្រឹមត្រូវរបស់ request ចាស់ មិនបិទ ឬលុបរូបនៃ request វគ្គថ្មី', async () => {
+    dataState.scanHistory[0].barcodes[0].restoredAt = 1792890000000;
+    await ready(1);
+    const oldRequest = crypto.randomUUID();
+    network = async body => receipt(body, { requestId: oldRequest, photoProof: { protocol: 'original-sha256-v1', verified: true,
+        barcode: body.barcode, requestId: oldRequest, originalSHA256: body.originalSHA256 } });
+    await submitZtoPalmSign([codes[0]]);
+    await vi.waitFor(() => expect(bodies('receipt')).toHaveLength(1));
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    expect(closes()).toEqual([]); expect(disk.rows.size).toBe(1);
+    expect((await jobs())[0].job.photo).toBe(photos[0]);
+    expect((await jobs())[0].job.requestId).not.toBe(oldRequest);
+});
+
+const resume = (body: any, patch = {}) => reply({ ...(body.refreshRequestId ? { refreshRequestId: body.refreshRequestId } : {}), code: 'ZTO_PALM_SIGN_RESUME_READY', stage: 'receipt', barcode: body.barcode, requestId: body.requestId,
+    photoProtocol: body.photoProtocol, originalSHA256: body.originalSHA256, originalFingerprint: body.originalFingerprint,
+    reservationProtocol: 'original-reservation-v1', reservationOwner: body.reservationOwner || 'reserved-owner', reservationToken: 'reserved-token', ...patch }, 409);
+
+it('status បិទរួចគ្មាន capability មិនផ្ញើរូបឬ05', async () => {
+    reservationFixtures = false; await ready(1); network = async body => receipt(body, { photoProof: undefined });
+    await submitZtoPalmSign([codes[0]]); await vi.waitFor(() => expect(requests.length).toBeGreaterThan(0)); await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    expect(bodies('receipt')).toHaveLength(0); expect((await jobs())[0].job.photo).toBe(photos[0]);
+});
+
+it('reservation crash checking មុនសំណើដំបូង បន្ត status បន្ទាប់មកផ្ញើតែម្ដង', async () => {
+    reservationFixtures = false; const online = await queuedWithPolicy(true); const value = (await jobs())[0];
+    expect(value.job.reservationProtocol).toBe('original-reservation-v1');
+    expect(value.job.originalFingerprint).toMatch(/^[a-f0-9]{64}$/);
+    const row = await sealSignJob(value.row.owner, key, { ...value.job, phase: 'checking' }); disk.rows.set(row.id, row);
+    network = async body => body.stage === 'receipt-status' ? resume(body) : receipt(body);
+    online.mockReturnValue(true); await runPalmSignOutbox(); await expectQueueCompleted();
+    expect(bodies('receipt-status')).toHaveLength(1); expect(bodies('receipt')).toHaveLength(1);
+    expect(bodies('receipt')[0]).toMatchObject({ reservationProtocol: 'original-reservation-v1', reservationOwner: 'reserved-owner', reservationToken: 'reserved-token' });
+});
+
+it('reservation token រក្សាទុកបរាជ័យ មិនផ្ញើរូបឬ05', async () => {
+    reservationFixtures = false; const online = await queuedWithPolicy(true);
+    const replace = vi.mocked(replaceSignJob).getMockImplementation()!;
+    vi.mocked(replaceSignJob).mockImplementation(async (previous, next, current) => {
+        if (next && (await openSignJob(next, key)).reservationToken) return false;
+        return replace(previous, next, current);
+    });
+    network = async body => body.stage === 'receipt-status' ? resume(body) : receipt(body);
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(() => expect(requests.length).toBeGreaterThan(0));
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    expect(bodies('receipt')).toHaveLength(0); expect(disk.rows.size).toBe(1);
+    vi.mocked(replaceSignJob).mockImplementation(replace);
+});
+
+it.each(['barcode', 'requestId', 'photoProtocol', 'originalSHA256', 'originalFingerprint', 'reservationProtocol', 'reservationOwner', 'reservationToken'])('reservation READY ខ្វះឬខុស %s មិនផ្ញើរូប', async field => {
+    reservationFixtures = false; const online = await queuedWithPolicy(true);
+    network = async body => resume(body, { [field]: field === 'reservationOwner' || field === 'reservationToken' ? '' : 'mismatch' });
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
+    expect(bodies('receipt')).toHaveLength(0); expect((await jobs())[0].job.photo).toBe(photos[0]);
+});
+
+it('reservation រក្សា owner token ក្រោយ network ដាច់ ហើយមិនទទួល owner ថ្មី', async () => {
+    reservationFixtures = false; const online = await queuedWithPolicy(true);
+    network = async body => body.stage === 'receipt-status' ? resume(body) : Promise.reject(new Error('lost scan ack'));
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.message).toContain('បណ្ដាញ'));
+    expect((await jobs())[0].job).toMatchObject({ everReserved: true, reservationOwner: 'reserved-owner', reservationToken: 'reserved-token' });
+    for (const row of disk.rows.values()) row.due = 0;
+    network = async body => resume(body, { reservationOwner: 'other-owner' });
+    await runPalmSignOutbox(); await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
+    expect(bodies('receipt-status')[1]).toMatchObject({ reservationOwner: 'reserved-owner', reservationToken: 'reserved-token' });
+    expect(bodies('receipt')).toHaveLength(1); expect((await jobs())[0].job.reservationOwner).toBe('reserved-owner');
+});
+
+it('photo poll រង់ចាំ 15 30 60 120 វិនាទី ហើយលទ្ធផលទី5 ត្រូវផ្ទៀងដោយដៃ', async () => {
+    await ready(1); network = async body => receipt(body, { photoProof: undefined });
+    await submitZtoPalmSign([codes[0]]);
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.scanCompleted).toBe(true));
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    for (const [index, delay] of [15000, 30000, 60000, 120000].entries()) {
+        const value = (await jobs())[0]; expect(value.job.photoPollDelay).toBe(delay);
+        expect(value.row.due - Date.now()).toBeGreaterThan(delay - 3000);
+        const polls = bodies('receipt-status').length;
+        await runPalmSignOutbox(); expect(bodies('receipt-status')).toHaveLength(polls);
+        disk.rows.get(value.row.id).due = 0; await runPalmSignOutbox();
+        await vi.waitFor(async () => expect((await jobs())[0]?.job.photoGraceChecks).toBe(index + 2));
+        await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    }
+    expect((await jobs())[0].job.phase).toBe('action');
+    expect(bodies('receipt')).toHaveLength(1); expect(disk.rows.size).toBe(1);
+});
+
+it('manual review ចងសំណើត្រឹមត្រូវ ទប់ poll រក្សារូប និងអនុញ្ញាតតែ retry អានស្ថានភាព', async () => {
+    await ready(1);
+    network = async body => reply({ code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED', manualReview: true, uncertain: true, stage: 'receipt',
+        barcode: body.barcode, requestId: body.requestId, photoProtocol: body.photoProtocol, originalSHA256: body.originalSHA256,
+        reservationProtocol: body.reservationProtocol, originalFingerprint: body.originalFingerprint, reason: 'photo_unverified' }, 409);
+    await submitZtoPalmSign([codes[0]]);
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
+    expect((await jobs())[0].job.manualReviewReason).toBe('photo_unverified');
+    expect((await jobs())[0].job.verificationRequired).not.toBe(true);
+    const count = requests.length; await runPalmSignOutbox(); expect(requests).toHaveLength(count);
+    network = async body => receipt(body, { photoProof: undefined });
+    await actOnQueuedSign((await jobs())[0].row.id, 'retry');
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
+    expect(bodies('receipt')).toHaveLength(1); expect((await jobs())[0].job.photo).toBe(photos[0]);
+});
+
+async function warningJob() {
+    const online = await queuedWithPolicy(false); network = async body => warning(body);
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
+    requests = []; return (await jobs())[0];
+}
+const cancelled = (body: any, patch = {}) => reply({ ...body, stage: 'receipt-cancel', success: true, cancelled: true, ...patch });
+
+it('cancel បិទ confirmation មិនរក្សា intent មិនហៅ API និងមិនលុបរូប', async () => {
+    const value = await warningJob(); vi.stubGlobal('confirm', vi.fn(() => false));
+    await actOnQueuedSign(value.row.id, 'cancel');
+    expect(confirm).toHaveBeenCalledOnce(); expect(requests).toHaveLength(0);
+    expect((await jobs())[0].job.cancelRequested).not.toBe(true); expect(disk.rows.size).toBe(1);
+});
+
+it('cancel រក្សា intent មុន API ហើយលុបតែ cancelled ACK ត្រឹមត្រូវ', async () => {
+    const value = await warningJob(); vi.stubGlobal('confirm', vi.fn(() => true));
+    network = async body => { expect((await jobs())[0].job.cancelRequested).toBe(true); return cancelled(body); };
+    await actOnQueuedSign(value.row.id, 'cancel'); await expectQueueCompleted();
+    expect(requests).toHaveLength(1); expect(requests[0]).toMatchObject({ stage: 'receipt-cancel', reservationOwner: value.job.reservationOwner,
+        reservationToken: value.job.reservationToken, originalFingerprint: value.job.originalFingerprint, confirmationToken: value.job.warningToken });
+});
+
+it('cancel intent CAS បរាជ័យ មិនហៅ API និងមិនលុបរូប', async () => {
+    const value = await warningJob(); vi.stubGlobal('confirm', vi.fn(() => true));
+    const replace = vi.mocked(replaceSignJob).getMockImplementation()!;
+    vi.mocked(replaceSignJob).mockImplementation(async (previous, next, current) => next && (await openSignJob(next, key)).cancelRequested ? false : replace(previous, next, current));
+    await actOnQueuedSign(value.row.id, 'cancel').catch(() => {});
+    expect(requests).toHaveLength(0); expect(disk.rows.size).toBe(1); vi.mocked(replaceSignJob).mockImplementation(replace);
+});
+
+it('cancel ACK បាត់ បើកឡើងវិញផ្ញើតែ cancellation ដែលអ្នកបានបញ្ជាក់', async () => {
+    const value = await warningJob(); vi.stubGlobal('confirm', vi.fn(() => true));
+    network = async () => { throw new Error('cancel ack lost'); };
+    await actOnQueuedSign(value.row.id, 'cancel');
+    await vi.waitFor(() => expect(requests).toHaveLength(1));
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    expect((await jobs())[0].job.cancelRequested).toBe(true);
+    network = async body => cancelled(body); for (const row of disk.rows.values()) row.due = 0;
+    await runPalmSignOutbox(); await expectQueueCompleted();
+    expect(requests).toHaveLength(2); expect(requests.every(body => body.stage === 'receipt-cancel')).toBe(true);
+    expect(closes()).toEqual([]);
+});
+
+it.each(['barcode', 'requestId', 'originalSHA256', 'originalFingerprint', 'reservationOwner', 'reservationToken', 'reservationProtocol', 'photoProtocol'])('cancel ACK ខុស %s មិនលុបរូប', async field => {
+    const value = await warningJob(); vi.stubGlobal('confirm', vi.fn(() => true));
+    network = async body => cancelled(body, { [field]: 'other' });
+    await actOnQueuedSign(value.row.id, 'cancel');
+    await vi.waitFor(() => expect(requests).toHaveLength(1));
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    expect(disk.rows.size).toBe(1); expect((await jobs())[0].job.cancelRequested).toBe(true);
+});
+
+it('cancel Server បដិសេធ រូបនៅ action មិនផ្ញើកម្ចាត់ឡើងវិញស្វ័យប្រវត្តិ', async () => {
+    const value = await warningJob(); vi.stubGlobal('confirm', vi.fn(() => true));
+    network = async () => reply({ code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED' }, 409);
+    await actOnQueuedSign(value.row.id, 'cancel');
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.cancelRequested).toBe(false));
+    expect((await jobs())[0].job.phase).toBe('action'); const count = requests.length;
+    await runPalmSignOutbox(); expect(requests).toHaveLength(count); expect(disk.rows.size).toBe(1);
+});
+
+it.each(['auth', 'key', 'restore'])('cancel ACK មកក្រោយ %s មិនលុបរូបម្ចាស់ដើម', async kind => {
+    const value = await warningJob(); vi.stubGlobal('confirm', vi.fn(() => true)); const pending = gate<void>();
+    network = async body => { await pending.promise; return cancelled(body); };
+    await actOnQueuedSign(value.row.id, 'cancel'); await vi.waitFor(() => expect(requests).toHaveLength(1));
+    if (kind === 'auth') firebaseState.authGeneration++;
+    if (kind === 'key') securityState.lookupSecretKey = null;
+    if (kind === 'restore') dataState.scanHistory[0].barcodes[0].restoredAt = Date.now();
+    pending.resolve(); await new Promise(resolve => setTimeout(resolve, 20)); expect(disk.rows.size).toBe(1);
+});
+
+it('reservation headers រង់ចាំ ហើយកញ្ចប់ត្រូវដក មិនហៅ fetch និងរក្សារូប', async () => {
+    await ready(1); const pending = gate<void>();
+    const identity = vi.fn(async () => { await pending.promise; return { token: 'synthetic-id' }; });
+    firebaseState.fb.getIdTokenResult = identity;
+    await submitZtoPalmSign([codes[0]]); await vi.waitFor(() => expect(identity).toHaveBeenCalled());
+    dataState.scanHistory[0].barcodes = dataState.scanHistory[0].barcodes.slice(1);
+    pending.resolve(); await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    expect(requests).toHaveLength(0); expect((await jobs())[0].job.photo).toBe(photos[0]);
+});
+
+it('photo poll metadata មិនត្រូវ មិនអាចពង្រីករបាំងរង់ចាំការងារមិនទាន់ Sign', async () => {
+    const online = await queuedWithPolicy(true); const value = (await jobs())[0];
+    const row = await sealSignJob(value.row.owner, key, { ...value.job, photoPollStep: 5, photoPollDelay: 300000, scanCompleted: false });
+    disk.rows.set(row.id, { ...row, due: Date.now() + 60000 });
+    online.mockReturnValue(true); await runPalmSignOutbox(); await expectQueueCompleted();
+    expect(bodies('receipt')).toHaveLength(1);
+});
+
+it.each(['cancel', 'delete', 'delete-blocked', 'delete-sending'] as const)('%s App → Server CAS tombstone ពិត មិនផ្ញើរូបឬ05 ហើយទើបលុប local original', async action => {
+    reservationFixtures = false;
+    const sign = createRequire(import.meta.url)('../../../ZoeW/netlify/functions/_shared/zto-palm-sign.js');
+    const journal = new Map<string, { data: string; etag: string }>(); let revision = 0;
+    const session = { token: 'session', site: 'KH1', operator: 'operator' };
+    const proof = { seal: JSON.stringify, open: JSON.parse, stamp: (value: string) => value, verdict: () => ({ ztoClosed: false }) };
+    const deps = { keyLabel: 'cancel-seam', lookupAccess: async () => ({ verified: true, site: session.site }), blobStore: () => ({ store: {
+        getWithMetadata: async (id: string) => journal.get(id) || null,
+        set: async (id: string, data: string, options: any) => { const old = journal.get(id);
+            if (options.onlyIfNew && old || options.onlyIfMatch && old?.etag !== options.onlyIfMatch) return { modified: false };
+            const etag = String(++revision); journal.set(id, { data, etag }); return { modified: true, etag };
+        }
+    } }) };
+    const upstream: string[] = [];
+    const request = async (path: string, body: any) => {
+        upstream.push(path);
+        if (path.endsWith('queryTrackInfo')) return { status: true, result: [{ mail: { mailNo: body.mailNos, isSign: 0 }, tracks: [{ mailNo: body.mailNos, siteCode: session.site, action: '4', time: '2026-10-25 12:00:00' }] }] };
+        if (path.endsWith('queryPreOrderByBillCode')) return { status: true, result: { billCode: body.billCode } };
+        if (path.endsWith('newBusinessCheck')) return { status: true, result: { message: 'ត្រូវបញ្ជាក់', whetherForce: false } };
+        throw new Error('unexpected image or scan write');
+    };
+    network = async body => { const out = await sign.signPalm({ body: JSON.stringify(body) }, session, deps, request, proof); return reply(JSON.parse(out.body), out.statusCode); };
+    await ready(1); const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    await submitZtoPalmSign([codes[0]]); await runPalmSignOutbox();
+    const value = (await jobs())[0]; const row = await sealSignJob(value.row.owner, key, { ...value.job, autoConfirm: false }); disk.rows.set(row.id, row);
+    online.mockReturnValue(true); await runPalmSignOutbox(); await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
+    expect(JSON.parse([...journal.values()][0].data).phase).toBe('reservation-v1:warning');
+    if (action === 'delete-blocked' || action === 'delete-sending') {
+        const [id, saved] = [...journal][0];
+        journal.set(id, { ...saved, data: JSON.stringify({ ...JSON.parse(saved.data),
+            phase: action === 'delete-blocked' ? 'reservation-v1:blocked' : 'reservation-v1:sending',
+            photoAccepted: action === 'delete-sending', leaseUntil: 0 }) });
+    }
+    vi.stubGlobal('confirm', vi.fn(() => true)); await actOnQueuedSign(row.id, action === 'cancel' ? 'cancel' : 'delete');
+    await expectQueueCompleted();
+    expect(JSON.parse([...journal.values()][0].data).phase).toBe(action === 'delete-sending' ? 'reservation-v1:sending' : 'reservation-v1:cancelled');
+    expect(bodies('receipt-cancel')).toHaveLength(action === 'delete-sending' ? 0 : 1);
+    expect(upstream.some(path => /saveBillPic|saveScanInfo/.test(path))).toBe(false);
+});
+
+it('manual retry ជា read-only ទោះ Server ឆ្លើយ READY ក៏មិនផ្ញើរូបឬ05', async () => {
+    await ready(1);
+    network = async body => reply({ code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED', manualReview: true, uncertain: true, stage: 'receipt',
+        barcode: body.barcode, requestId: body.requestId, photoProtocol: body.photoProtocol, originalSHA256: body.originalSHA256,
+        reservationProtocol: body.reservationProtocol, originalFingerprint: body.originalFingerprint, reason: 'photo_unverified' }, 409);
+    await submitZtoPalmSign([codes[0]]); await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
+    network = async body => body.stage === 'receipt-status' ? resume(body) : receipt(body);
+    await actOnQueuedSign((await jobs())[0].row.id, 'retry');
+    await vi.waitFor(() => expect(bodies('receipt-status')).toHaveLength(2));
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    expect(bodies('receipt')).toHaveLength(1); expect((await jobs())[0].job).toMatchObject({ phase: 'action', readOnlyProbe: true, photo: photos[0] });
+});
+
+const refreshRequired = (body: any) => reply({ ...body, stage: 'receipt', code: 'ZTO_PALM_SIGN_WARNING_REFRESH_REQUIRED', warningRefreshRequired: true,
+    message: 'ត្រូវផ្ទៀងសារឡើងវិញ', confirmationToken: body.confirmationToken }, 409);
+const refreshedWarning = (body: any) => reply({ ...body, stage: 'receipt', code: 'ZTO_PALM_SIGN_CONFIRM_REQUIRED', message: 'សារថ្មីត្រូវបញ្ជាក់',
+    confirmationToken: 'changed-warning', reservationToken: 'fresh-reservation-token', warningRefreshed: true, warningChanged: true }, 409);
+
+it('expired warning refresh ជាអានតែប៉ុណ្ណោះ រក្សា fresh token មុនបន្ត receipt', async () => {
+    const value = await warningJob(); reservationFixtures = false;
+    network = async body => {
+        if (body.stage === 'receipt-status') return refreshRequired(body);
+        if (body.stage === 'receipt-warning-refresh') { expect(body.photo).toBe(photos[0]); expect(body.signMan).toBe(value.job.signMan); return resume(body, { warningRefreshed: true, confirmationToken: 'fresh-warning', reservationToken: 'fresh-reservation-token' }); }
+        expect((await jobs())[0].job.confirmationToken).toBe('fresh-warning'); expect(body.reservationToken).toBe('fresh-reservation-token'); return receipt(body);
+    };
+    await actOnQueuedSign(value.row.id, 'approve'); await expectQueueCompleted();
+    expect(bodies('receipt-warning-refresh')).toHaveLength(1); expect(bodies('receipt')).toHaveLength(1);
+});
+
+it('expired warning ផ្លាស់សារ មិនបន្តតាមការយល់ព្រមចាស់ ឬ autoConfirm', async () => {
+    const value = await warningJob(); reservationFixtures = false;
+    network = async body => body.stage === 'receipt-status' ? refreshRequired(body) : refreshedWarning(body);
+    await actOnQueuedSign(value.row.id, 'approve');
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.warningToken).toBe('changed-warning'));
+    expect((await jobs())[0].job).toMatchObject({ phase: 'action', confirmationToken: '', reservationToken: 'fresh-reservation-token' });
+    expect(bodies('receipt')).toHaveLength(0); expect(bodies('receipt-warning-refresh')).toHaveLength(1);
+});
+
+it('blocked continuation ត្រូវការ eligibility ពី Server និងសកម្មភាព Continue ដាច់ដោយឡែក', async () => {
+    await ready(1);
+    network = async body => reply({ ...body, stage: 'receipt', code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED', manualReview: true, reason: 'blocked', continuationAllowed: true }, 409);
+    await submitZtoPalmSign([codes[0]]); await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
+    expect((await jobs())[0].job.continuationAllowed).toBe(true); requests = [];
+    network = async body => body.stage === 'receipt-prewrite-refresh' ? resume(body, { warningRefreshed: true, confirmationToken: '', reservationToken: 'fresh-reservation-token' }) : receipt(body);
+    await actOnQueuedSign((await jobs())[0].row.id, 'continue'); await expectQueueCompleted();
+    expect(bodies('receipt-prewrite-refresh')).toHaveLength(1); expect(bodies('receipt')).toHaveLength(1);
+});
+
+it('expired warning បាត់ចម្លើយ refresh មិនបញ្ជាក់តាម token ចាស់ និងមិនផ្ញើរូបពេញរៀងរាល់ poll', async () => {
+    const value = await warningJob(); reservationFixtures = false;
+    network = async body => { if (body.stage === 'receipt-status') return refreshRequired(body); throw new Error('lost refresh response'); };
+    await actOnQueuedSign(value.row.id, 'approve');
+    await vi.waitFor(() => expect(bodies('receipt-warning-refresh')).toHaveLength(1));
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    for (const row of disk.rows.values()) row.due = 0; await runPalmSignOutbox();
+    await vi.waitFor(() => expect(bodies('receipt-status')).toHaveLength(2));
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    expect(bodies('receipt-warning-refresh')).toHaveLength(1); expect(bodies('receipt')).toHaveLength(0);
+    expect((await jobs())[0].job.confirmationToken).toBe(value.job.warningToken);
+});
+
+it('expired warning dispatch proof ចាស់ ប្រើ status read មួយ ដោយមិនផ្ញើ04', async () => {
+    const value = await warningJob(); reservationFixtures = false; let refreshed = false;
+    network = async body => {
+        if (body.stage === 'receipt-status') return refreshRequired(body);
+        if (body.stage === 'status') return reply({ success: true, stage: 'status', barcode: body.barcode, dispatched: true, ztoClosed: false, dispatchProof: 'fresh-dispatch-proof' });
+        if (body.stage === 'receipt-warning-refresh') {
+            if (!refreshed) { refreshed = true; return reply({ code: 'ZTO_PALM_DISPATCH_REQUIRED', barcode: body.barcode, requestId: body.requestId }, 409); }
+            expect(body.dispatchProof).toBe('fresh-dispatch-proof'); return resume(body, { warningRefreshed: true, confirmationToken: '' });
+        }
+        expect(body.dispatchProof).toBe('fresh-dispatch-proof'); return receipt(body);
+    };
+    await actOnQueuedSign(value.row.id, 'approve'); await expectQueueCompleted();
+    expect(bodies('status')).toHaveLength(1); expect(bodies('receipt-warning-refresh')).toHaveLength(2); expect(bodies('dispatch')).toHaveLength(0);
+});
+
+it('expired warning សារថ្មីកើតឡើងក្រោយ refresh clear មិន autoConfirm ស្ទួន', async () => {
+    const value = await warningJob(); reservationFixtures = false;
+    network = async body => body.stage === 'receipt-status' ? refreshRequired(body)
+        : body.stage === 'receipt-warning-refresh' ? resume(body, { warningRefreshed: true, confirmationToken: '' }) : warning(body, 'raced-warning');
+    await actOnQueuedSign(value.row.id, 'approve'); await vi.waitFor(async () => expect((await jobs())[0]?.job.warningToken).toBe('raced-warning'));
+    expect(bodies('receipt')).toHaveLength(1); expect((await jobs())[0].job.autoConfirm).toBe(false);
+});
+
+it.each(['flag', 'owner', 'fingerprint'])('blocked continuation eligibility ខុស %s មិនបើកផ្លូវ Continue', async kind => {
+    await ready(1);
+    network = async body => reply({ ...body, stage: 'receipt', code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED', manualReview: true, reason: 'blocked',
+        continuationAllowed: kind !== 'flag', reservationOwner: kind === 'owner' ? 'other' : body.reservationOwner,
+        originalFingerprint: kind === 'fingerprint' ? '0'.repeat(64) : body.originalFingerprint }, 409);
+    await submitZtoPalmSign([codes[0]]); await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
+    const before = requests.length; await actOnQueuedSign((await jobs())[0].row.id, 'continue');
+    expect(requests).toHaveLength(before); expect((await jobs())[0].job.continuationAllowed).not.toBe(true);
+});
+
+it('blocked continuation បដិសេធម្ដងទៀត ត្រូវចុច Continue ថ្មី មិនសាកជារង្វង់', async () => {
+    await ready(1);
+    network = async body => reply({ ...body, stage: 'receipt', code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED', manualReview: true, reason: 'blocked', continuationAllowed: true }, 409);
+    await submitZtoPalmSign([codes[0]]); await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action')); requests = [];
+    await actOnQueuedSign((await jobs())[0].row.id, 'continue'); await vi.waitFor(async () => expect((await jobs())[0]?.job.continueRequested).toBe(false));
+    expect(bodies('receipt-prewrite-refresh')).toHaveLength(1); await runPalmSignOutbox(); expect(requests).toHaveLength(1);
+    expect((await jobs())[0].job.phase).toBe('action'); expect(bodies('receipt')).toHaveLength(0);
+});
+
+it.each([['expired-warning', 28], ['blocked', 28], ['blocked-lost', 28], ['expired-warning', 900000], ['blocked', 900000]] as const)('App → Server readonly refresh %s រូប %s bytes → fresh decision → exact proof ពិត', async (scenario, photoBytes) => {
+    const originalBytes = Buffer.alloc(photoBytes, 17);
+    const template = Buffer.from(photos[0], 'base64');
+    template.copy(originalBytes, 0, 0, template.length - 2);
+    originalBytes.set([255, 217], originalBytes.length - 2);
+    const originalPhoto = originalBytes.toString('base64');
+    const measuredBodies: Array<{ stage: string; bytes: number }> = [];
+    reservationFixtures = false;
+    const sign = createRequire(import.meta.url)('../../../ZoeW/netlify/functions/_shared/zto-palm-sign.js');
+    const journal = new Map<string, { data: string; etag: string }>(); let revision = 0;
+    let clock = Date.now(); vi.spyOn(Date, 'now').mockImplementation(() => clock);
+    let condition = scenario.startsWith('blocked') ? 'blocked' : 'old'; let closed = false;
+    const session = { token: 'refresh-session', site: 'KH1', operator: 'operator' };
+    const proof = { seal: JSON.stringify, open: JSON.parse, stamp: (value: string) => value, verdict: () => ({ ztoClosed: closed }) };
+    const deps = { keyLabel: 'refresh-seam', lookupAccess: async () => ({ verified: true, site: session.site }), blobStore: () => ({ store: {
+        getWithMetadata: async (id: string) => journal.get(id) || null,
+        set: async (id: string, data: string, options: any) => { const old = journal.get(id);
+            if (options.onlyIfNew && old || options.onlyIfMatch && old?.etag !== options.onlyIfMatch) return { modified: false };
+            const etag = String(++revision); journal.set(id, { data, etag }); return { modified: true, etag };
+        }
+    } }) };
+    const upstream: string[] = [];
+    const request = async (path: string, body: any) => {
+        upstream.push(path);
+        if (path.endsWith('queryTrackInfo')) return { status: true, result: [{ mail: { mailNo: body.mailNos, isSign: closed ? 1 : 0 }, tracks: [{ mailNo: body.mailNos, siteCode: session.site, action: closed ? '5' : '4', time: '2026-10-25 12:00:00' }] }] };
+        if (path.endsWith('queryPreOrderByBillCode')) return { status: true, result: { billCode: body.billCode } };
+        if (path.endsWith('newBusinessCheck')) return condition === 'blocked' ? { status: false } : { status: true, result: condition === 'clear' ? null : { message: condition === 'old' ? 'សារដើម' : 'សារថ្មី', whetherForce: false } };
+        if (path.endsWith('saveScanInfo')) closed = true;
+        if (path.endsWith('querySignPic')) return { status: true, result: [{ billCode: body.billCode, savePos: 'https://zto-haiwai2025.oss-cn-hongkong.aliyuncs.com/track/shortterm/bill/1/202610/' + body.billCode + '_1.jpg' }] };
+        return { status: true, result: null };
+    };
+    let lost = false;
+    network = async body => { const out = await sign.signPalm({ body: JSON.stringify(body) }, session, deps, request, proof);
+        if (scenario === 'blocked-lost' && body.stage === 'receipt-prewrite-refresh' && !lost) { lost = true; throw new Error('lost refusal ACK'); }
+        return reply(JSON.parse(out.body), out.statusCode); };
+    vi.stubGlobal('fetch', vi.fn(async (url, init) => {
+        if (String(url).startsWith('https://zto-haiwai2025.oss-cn-hongkong.aliyuncs.com/')) return new Response(originalBytes, { headers: { 'Content-Type': 'image/jpeg' } });
+        const serialized = String(init?.body);
+        const body = JSON.parse(serialized);
+        expect(Buffer.byteLength(serialized)).toBeLessThanOrEqual(1250000);
+        if (body.photo) {
+            expect(body.photo).toBe(originalPhoto);
+            expect(serialized.split(originalPhoto)).toHaveLength(2);
+            measuredBodies.push({ stage: body.stage, bytes: Buffer.byteLength(serialized) });
+        }
+        requests.push(body); return network(body);
+    }));
+    await ready(1); palmSignState.photos[codes[0]] = originalPhoto; const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    await submitZtoPalmSign([codes[0]]); await runPalmSignOutbox(); const value = (await jobs())[0];
+    const row = await sealSignJob(value.row.owner, key, { ...value.job, autoConfirm: false }); disk.rows.set(row.id, row);
+    online.mockReturnValue(true); await runPalmSignOutbox(); await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
+    expect(upstream.some(path => /saveBillPic|saveScanInfo/.test(path))).toBe(false);
+    if (scenario === 'expired-warning') {
+        condition = 'changed'; clock += 3600001;
+        await actOnQueuedSign(row.id, 'approve'); await vi.waitFor(async () => expect((await jobs())[0]?.job.message).toBe('សារថ្មី'));
+        expect((await jobs())[0].job.phase).toBe('action'); expect(bodies('receipt-warning-refresh')).toHaveLength(2);
+        expect(upstream.some(path => /saveBillPic|saveScanInfo/.test(path))).toBe(false);
+        condition = 'clear'; await actOnQueuedSign(row.id, 'approve');
+    } else {
+        await actOnQueuedSign(row.id, 'retry'); await vi.waitFor(async () => expect((await jobs())[0]?.job.continuationAllowed).toBe(true));
+        if (scenario === 'blocked-lost') {
+            const oldToken = (await jobs())[0].job.reservationToken;
+            await actOnQueuedSign(row.id, 'continue');
+            await vi.waitFor(() => expect(bodies('receipt-prewrite-refresh')).toHaveLength(1));
+            await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+            const nonce = (await jobs())[0].job.refreshRequestId; expect(nonce).toMatch(/^[a-f0-9-]{36}$/i);
+            condition = 'clear'; for (const envelope of disk.rows.values()) envelope.due = 0;
+            await runPalmSignOutbox(); await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
+            expect((await jobs())[0].job.reservationToken).not.toBe(oldToken);
+            expect((await jobs())[0].job.refreshRequestId).toBeUndefined(); expect((await jobs())[0].job.refreshStage).toBeUndefined();
+            expect((await jobs())[0].job.continueRequested).toBe(false);
+            expect(upstream.filter(path => path.endsWith('newBusinessCheck'))).toHaveLength(2);
+            expect(upstream.some(path => /saveBillPic|saveScanInfo/.test(path))).toBe(false);
+        }
+        condition = 'clear'; await actOnQueuedSign(row.id, 'continue');
+    }
+    await expectQueueCompleted();
+    expect(upstream.filter(path => path.endsWith('newBusinessCheck'))).toHaveLength(scenario === 'blocked-lost' ? 4 : 3);
+    expect(upstream.filter(path => path.endsWith('saveBillPic'))).toHaveLength(1); expect(upstream.filter(path => path.endsWith('saveScanInfo'))).toHaveLength(1);
+    expect(closes()).toEqual([codes[0]]);
+    expect(measuredBodies.some(row => row.stage === 'receipt')).toBe(true);
+    expect(measuredBodies.some(row => row.stage === (scenario === 'expired-warning' ? 'receipt-warning-refresh' : 'receipt-prewrite-refresh'))).toBe(true);
+    if (photoBytes === 900000) expect(Math.max(...measuredBodies.map(row => row.bytes))).toBeLessThan(1220000);
+});
+
+
+it('pending warning refresh read-only retry រក្សា prior confirmation សម្រាប់ cached decision', async () => {
+    const value = await warningJob(); reservationFixtures = false;
+    let pending: any;
+    network = async body => {
+        if (body.stage === 'receipt-status') return refreshRequired(body);
+        pending = body;
+        return resume(body, { warningRefreshed: true, originalFingerprint: '0'.repeat(64), confirmationToken: 'fresh-warning' });
+    };
+    await actOnQueuedSign(value.row.id, 'approve');
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.refreshStage).toBe('receipt-warning-refresh'));
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
+    network = async body => {
+        expect(body.stage).toBe('receipt-status');
+        expect(body.confirmationToken).toBe(pending.confirmationToken);
+        expect(body.refreshRequestId).toBe(pending.refreshRequestId);
+        return resume(body, { warningRefreshed: true, confirmationToken: 'fresh-warning', reservationToken: 'cached-fresh-cap' });
+    };
+    await actOnQueuedSign(value.row.id, 'retry');
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.reservationToken).toBe('cached-fresh-cap'));
+    expect((await jobs())[0].job).toMatchObject({ readOnlyProbe: true, phase: 'action', photo: photos[0] });
+    expect(bodies('receipt')).toHaveLength(0);
+});
+
+it.each([false, true])('signed photo grace បញ្ចប់ត្រឹម 5 លទ្ធផល រក្សារូប ទោះ local close បរាជ័យ %s', async failClose => {
+    await ready(1); if (failClose) vi.mocked(applyBarcodeCloseChange).mockResolvedValue(false);
+    network = async body => receipt(body, { photoProof: undefined, photoAccepted: false });
+    await submitZtoPalmSign([codes[0]]);
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.scanCompleted).toBe(true));
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    for (let i = 1; i < 5; i++) {
+        disk.rows.get((await jobs())[0].row.id).due = 0; await runPalmSignOutbox();
+        await vi.waitFor(async () => expect((await jobs())[0]?.job.photoGraceChecks).toBe(i + 1));
+        await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    }
+    const value = (await jobs())[0]; expect(value.job.phase).toBe('action');
+    expect(value.job.photo).toBe(photos[0]); expect(value.job.photoGraceChecks).toBe(5);
+    const count = requests.length; await runPalmSignOutbox(); expect(requests).toHaveLength(count);
+    await actOnQueuedSign(value.row.id, 'retry');
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
+    expect((await jobs())[0].job.photoGraceChecks).toBe(5);
+    vi.mocked(applyBarcodeCloseChange).mockResolvedValue(true); network = async body => receipt(body);
+    await actOnQueuedSign(value.row.id, 'retry'); await expectQueueCompleted();
+    expect(bodies('receipt')).toHaveLength(1);
+});
+
+it.each(['expiry', 'rollback', 'rollback-last', 'old-max'])('signed photo grace restart %s មិនផ្ដើមថវិកាថ្មី', async mode => {
+    await ready(1); network = async body => receipt(body, { photoProof: undefined });
+    await submitZtoPalmSign([codes[0]]); await vi.waitFor(async () => expect((await jobs())[0]?.job.scanCompleted).toBe(true));
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    const value = (await jobs())[0]; const started = mode === 'rollback' ? Date.now() + 1000 : mode === 'rollback-last' ? Date.now() - 1000 : Date.now() - 300001;
+    const row = await sealSignJob(value.row.owner, key, { ...value.job, photoGraceStartedAt: mode === 'old-max' ? undefined : started, photoGraceLastObservedAt: mode === 'rollback-last' ? Date.now() + 1000 : value.job.photoGraceLastObservedAt, photoPollStep: mode === 'old-max' ? 5 : 1 });
+    disk.rows.set(row.id, row); const count = requests.length;
+    await runPalmSignOutbox(); await vi.waitFor(async () => expect((await jobs())[0].job.phase).toBe('action'));
+    expect(requests).toHaveLength(count); expect((await jobs())[0].job.photo).toBe(photos[0]);
+});
+
+it('signed photo grace រូបឃើញយឺត អាចផ្ទៀងហើយលុបដោយមិន Sign ស្ទួន', async () => {
+    await ready(1); network = async body => receipt(body, { photoProof: undefined });
+    await submitZtoPalmSign([codes[0]]); await vi.waitFor(async () => expect((await jobs())[0]?.job.scanCompleted).toBe(true));
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    const value = (await jobs())[0]; expect(value.job.photoGraceStartedAt).toBeGreaterThan(0);
+    network = async body => receipt(body); disk.rows.get(value.row.id).due = 0;
+    await runPalmSignOutbox(); await expectQueueCompleted();
+    expect(bodies('receipt')).toHaveLength(1);
+});
+
+it('signed photo grace កាត់ delay ត្រឹម deadline និង manual READY មិន Sign', async () => {
+    await ready(1); network = async body => receipt(body, { photoProof: undefined });
+    await submitZtoPalmSign([codes[0]]); await vi.waitFor(async () => expect((await jobs())[0]?.job.scanCompleted).toBe(true));
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    let clock = Date.now(); vi.spyOn(Date, 'now').mockImplementation(() => clock);
+    const value = (await jobs())[0]; const row = await sealSignJob(value.row.owner, key, { ...value.job, photoGraceStartedAt: clock - 290000, photoGraceLastObservedAt: clock, photoGraceChecks: 1 });
+    disk.rows.set(row.id, row); await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.photoGraceChecks).toBe(2));
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.scanCompleted).toBe(true));
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    expect((await jobs())[0].row.due).toBe(clock + 10000);
+    clock += 10000; await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
+    network = async body => resume(body); const count = bodies('receipt').length;
+    await actOnQueuedSign(row.id, 'retry'); await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
+    expect(bodies('receipt')).toHaveLength(count); expect((await jobs())[0].job.photoGraceStartedAt).toBe(clock - 300000);
+});
+
+it('signed photo grace បណ្ដាញមិនច្បាស់មិនរាប់ជាលទ្ធផលបញ្ជាក់ តែ deadline នៅដដែល', async () => {
+    await ready(1); network = async body => receipt(body, { photoProof: undefined });
+    await submitZtoPalmSign([codes[0]]); await vi.waitFor(async () => expect((await jobs())[0]?.job.scanCompleted).toBe(true));
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    const value = (await jobs())[0]; network = async () => { throw new Error('network unknown'); };
+    disk.rows.get(value.row.id).due = 0; await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.photoPollStep).toBe(2));
+    expect((await jobs())[0].job.photoGraceChecks).toBe(1); expect((await jobs())[0].job.photoGraceStartedAt).toBe(value.job.photoGraceStartedAt);
+});
+
+it('សង្គ្រោះ៖ ផ្លាស់ចេញពី active queue ដោយរក្សា original និង linkage ហើយមិនបាត់ក្រោយអានឡើងវិញ', async () => {
+    const online = await queuedWithPolicy(false); const old = (await jobs())[0];
+    await actOnQueuedSign(old.row.id, 'archive' as any);
+    const saved = (await jobs())[0];
+    expect(saved.job).toMatchObject({ photo: old.job.photo, signMan: old.job.signMan, code: old.job.code, requestId: old.job.requestId,
+        originalSHA256: old.job.originalSHA256, originalFingerprint: old.job.originalFingerprint, dispatchProof: old.job.dispatchProof,
+        phase: 'action', recovery: { previousPhase: old.job.phase, previousMessage: old.job.message } });
+    expect(saved.job.recovery.archivedAt).toBeGreaterThan(0); expect(saved.row.leaseUntil).toBe(0); expect(saved.row.due).toBe(0);
+    expect(palmSignOutboxState.rows).toHaveLength(0); expect((palmSignOutboxState as any).recoveryRows).toHaveLength(1);
+    const before = structuredClone([...disk.rows]);
+    palmSignOutboxState.rows = []; (palmSignOutboxState as any).recoveryRows = [];
+    await refreshPalmSignQueue(); online.mockReturnValue(true); await runPalmSignOutbox(); await runPalmSignOutbox();
+    expect([...disk.rows]).toEqual(before); expect(requests).toEqual([]); expect(closes()).toEqual([]);
+    expect((palmSignOutboxState as any).recoveryRows[0]).toMatchObject({ id: old.row.id, code: old.job.code });
+    await exportQueuedSignPhoto(old.row.id, old.job.code);
+    expect(vi.mocked(saveOriginalQueuedPhoto)).toHaveBeenLastCalledWith(old.job.photo, expect.any(String), expect.any(Function));
+    const { renderToStaticMarkup } = await import('react-dom/server'); const { createElement } = await import('react');
+    const { PalmSignQueueModal, PalmSignQueueButton } = await import('../../../ZoeW/src/app/components/modals/PalmSignQueueModal');
+    const html = renderToStaticMarkup(createElement(PalmSignQueueModal));
+    expect(html).toContain('សង្គ្រោះ 1'); expect(html).not.toContain('រង់ចាំ 0'); expect(html).toContain(old.job.code);
+    expect(renderToStaticMarkup(createElement(PalmSignQueueButton))).toContain('រក្សាទុក 1');
+    expect(disk.rows.size).toBe(1);
+});
+
+it.each(['signed', 'different-request'])('សង្គ្រោះ៖ %s ផ្ទៀងដោយចេតនា មិនផ្ញើរូប/receipt ឬសន្មត photo proof', async kind => {
+    const online = await queuedWithPolicy(false); const old = (await jobs())[0];
+    await actOnQueuedSign(old.row.id, 'archive' as any); reservationFixtures = false;
+    network = async body => body.stage === 'status' ? reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: true })
+        : kind === 'signed' ? receipt(body, { photoProof: null })
+        : reply({ ...body, stage: 'receipt', code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED', manualReview: true,
+            reason: 'different_request', requestId: 'other-device-request' }, 409);
+    online.mockReturnValue(true); await actOnQueuedSign(old.row.id, 'recover' as any);
+    const held = (await jobs())[0]; expect(held.job.recovery).toBeDefined(); expect(held.job.photo).toBe(old.job.photo); expect(held.job.requestId).toBe(old.job.requestId);
+    expect(held.job.recoveryCheck.signed).toBe(true); expect(held.job.recoveryCheck.photoVerified).toBe(false);
+    expect(held.job.recoveryCheck.continuation).toBeUndefined();
+    expect(held.job.message).toContain('Sign រួច'); expect(held.job.message).toContain('រូបដើម');
+    await actOnQueuedSign(old.row.id, 'approve'); await actOnQueuedSign(old.row.id, 'continue'); await actOnQueuedSign(old.row.id, 'cancel');
+    await actOnQueuedSign(old.row.id, 'resume' as any); await runPalmSignOutbox();
+    expect(requests.every(b => ['receipt-status', 'status'].includes(b.stage))).toBe(true);
+    expect(requests.every(b => !b.photo)).toBe(true); expect(closes()).toEqual([]); expect(disk.rows.size).toBe(1);
+});
+
+it.each([false, true])('សង្គ្រោះ៖ trash signed (%s) ជាភស្តុតាងដាច់ពីរូប ទោះ journal ចាស់មិនអនុញ្ញាតផ្ទៀងបន្ត', async partial => {
+    const online = await queuedWithPolicy(false); const old = (await jobs())[0];
+    const trash = structuredClone(dataState.scanHistory[0]); trash.barcodes[0].ztoSignedAt = Date.now() - 1000;
+    dataState.scanHistory = partial ? [{ ...trash, barcodes: trash.barcodes.slice(1) }] : [];
+    if (partial) { trash.barcodes = trash.barcodes.slice(0, 1); trash.id = cleanupPartialTrashId(old.job.itemId, 'close', trash); }
+    dataState.deletedItems = [{ ...trash, deletedAt: Date.now(), trashReason: 'pickup' }];
+    reservationFixtures = false; network = async body => body.stage === 'status' ? reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: true }) : reply({ ...body, stage: 'receipt', code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED', manualReview: true, reason: 'missing_journal' }, 409);
+    online.mockReturnValue(true); await runPalmSignOutbox(); await vi.waitFor(async () => expect((await jobs())[0].job.phase).toBe('action'));
+    expect((await jobs())[0].job.message).toContain('Sign រួច'); expect((await jobs())[0].job.message).not.toContain('មិនទាន់ផ្ទៀងបានទាំង Sign');
+    await actOnQueuedSign(old.row.id, 'archive' as any); await actOnQueuedSign(old.row.id, 'recover' as any);
+    expect((await jobs())[0].job.recoveryCheck.signed).toBe(true); expect((await jobs())[0].job.photo).toBe(old.job.photo);
+    expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]);
+});
+
+it.each(['active', 'lease', 'cas'])('សង្គ្រោះ៖ %s មិនផ្លាស់ការងារកំពុងដំណើរការ ឬជាន់ revision ថ្មី', async kind => {
+    const online = await queuedWithPolicy(false); const old = (await jobs())[0]; const pending = gate<Response>(); reservationFixtures = false;
+    if (kind === 'active') { network = async () => pending.promise; online.mockReturnValue(true); await runPalmSignOutbox(); await vi.waitFor(() => expect(requests).toHaveLength(1)); }
+    if (kind === 'lease') disk.rows.set(old.row.id, { ...old.row, leaseUntil: Date.now() + SIGN_OUTBOX_LEASE_MS });
+    if (kind === 'cas') vi.mocked(replaceSignJob).mockResolvedValueOnce(false);
+    const before = structuredClone([...disk.rows]); await actOnQueuedSign(old.row.id, 'archive' as any);
+    expect([...disk.rows]).toEqual(before); expect((await jobs())[0].job.recovery).toBeUndefined(); expect(closes()).toEqual([]);
+    pending.resolve(reply({ code: 'ZTO_PALM_SIGN_UNCONFIRMED', uncertain: true }, 409));
+    if (kind === 'active') await vi.waitFor(async () => expect((await jobs())[0].row.leaseUntil).toBe(0));
+});
+
+it('សង្គ្រោះ៖ current reservation អនុញ្ញាតបន្តតែ explicit resume និង request ដើម', async () => {
+    const online = await queuedWithPolicy(false); const old = (await jobs())[0];
+    await actOnQueuedSign(old.row.id, 'archive' as any); reservationFixtures = false;
+    network = async body => body.stage === 'receipt-status' ? resume(body) : body.stage === 'status' ? reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: false }) : receipt(body);
+    online.mockReturnValue(true); await actOnQueuedSign(old.row.id, 'recover' as any);
+    expect((await jobs())[0].job.recoveryCheck.continuation).toBe('reserved'); expect(bodies('receipt')).toEqual([]);
+    await runPalmSignOutbox(); expect(bodies('receipt')).toEqual([]);
+    await actOnQueuedSign(old.row.id, 'resume' as any);
+    await expectQueueCompleted();
+    expect(bodies('receipt')).toHaveLength(1); expect(bodies('receipt')[0]).toMatchObject({ requestId: old.job.requestId, photo: old.job.photo, signMan: old.job.signMan });
+    expect(bodies('receipt-status').length).toBeGreaterThanOrEqual(3);
+});
+
+it('សង្គ្រោះ៖ capability ចាស់មិនគ្រប់ ពេល server ផ្លាស់ទៅ different request មិន resume', async () => {
+    const online = await queuedWithPolicy(false); const old = (await jobs())[0]; await actOnQueuedSign(old.row.id, 'archive' as any); reservationFixtures = false;
+    network = async body => body.stage === 'status' ? reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: false }) : resume(body);
+    online.mockReturnValue(true); await actOnQueuedSign(old.row.id, 'recover' as any);
+    expect((await jobs())[0].job.recoveryCheck.continuation).toBe('reserved');
+    network = async body => body.stage === 'status' ? reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: false }) : reply({ ...body, stage: 'receipt', code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED', manualReview: true, reason: 'different_request' }, 409);
+    await actOnQueuedSign(old.row.id, 'resume' as any); await runPalmSignOutbox();
+    expect((await jobs())[0].job.recovery).toBeDefined(); expect((await jobs())[0].job.photo).toBe(old.job.photo); expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]);
+});
+
+
+it('សង្គ្រោះ៖ photo proof របស់ឧបករណ៍ផ្សេងមិនបញ្ជាក់រូប/request ដើមរបស់ឧបករណ៍នេះ', async () => {
+    const online = await queuedWithPolicy(false); const old = (await jobs())[0]; await actOnQueuedSign(old.row.id, 'archive'); reservationFixtures = false;
+    network = async body => body.stage === 'status' ? reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: true }) : receipt({ ...body, requestId: 'different-device-request', originalSHA256: 'a'.repeat(64) });
+    online.mockReturnValue(true); await actOnQueuedSign(old.row.id, 'recover');
+    const held = (await jobs())[0].job;
+    expect(held.recoveryCheck).toMatchObject({ signed: true, photoVerified: false });
+    expect(held.requestId).toBe(old.job.requestId); expect(held.photo).toBe(old.job.photo); expect(held.recovery).toBeDefined();
+    expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]);
+});
+
+it('សង្គ្រោះ៖ response មកក្រោយ auth switch មិនផ្លាស់ archive ឬរូប', async () => {
+    const online = await queuedWithPolicy(false); const old = (await jobs())[0]; await actOnQueuedSign(old.row.id, 'archive'); reservationFixtures = false;
+    const pending = gate<Response>(); network = async () => pending.promise; online.mockReturnValue(true);
+    const operation = actOnQueuedSign(old.row.id, 'recover'); await vi.waitFor(() => expect(requests).toHaveLength(1));
+    const before = structuredClone([...disk.rows]); firebaseState.authGeneration++; pending.resolve(resume(requests[0])); await operation;
+    expect([...disk.rows]).toEqual(before); expect((await jobs())[0].job.recovery).toBeDefined(); expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]);
+});
+
+it('សង្គ្រោះ៖ ciphertext/original មិនត្រូវ hash មិនស្នើ server ឬបន្តដោយ capability ចាស់', async () => {
+    const online = await queuedWithPolicy(false); const old = (await jobs())[0]; await actOnQueuedSign(old.row.id, 'archive');
+    const archived = (await jobs())[0]; disk.rows.set(old.row.id, await sealSignJob(old.row.owner, key, { ...archived.job, photo: photos[1] }));
+    online.mockReturnValue(true); await actOnQueuedSign(old.row.id, 'resume');
+    expect((await jobs())[0].job.recovery).toBeDefined(); expect((await jobs())[0].job.recoveryCheck.reason).toBe('reservation_conflict');
+    expect(requests).toEqual([]); expect(closes()).toEqual([]);
+});
+
+it('សង្គ្រោះ៖ Sign barcode ដដែលមិនជំនួស archive ហើយសារនាំទៅបញ្ជីត្រូវសង្គ្រោះ', async () => {
+    await queuedWithPolicy(false); const old = (await jobs())[0]; await actOnQueuedSign(old.row.id, 'archive');
+    await ready(1); await submitZtoPalmSign([codes[0]]);
+    expect(palmSignState.results[0]).toMatchObject({ code: codes[0], state: 'failed' });
+    expect(palmSignState.results[0].message).toContain('ត្រូវសង្គ្រោះ');
+    const kept = (await jobs())[0]; expect(kept.job.recovery).toBeDefined(); expect(kept.job.requestId).toBe(old.job.requestId); expect(kept.job.photo).toBe(old.job.photo);
+    expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]);
+});
+
+it('បញ្ជីរក្សាទុក៖ ដក/បង្ហាញវិញរក្សា original និង request ក្រោយអានឡើងវិញ មិនបញ្ជូនអ្វី', async () => {
+    const online = await queuedWithPolicy(false); const old = (await jobs())[0];
+    await actOnQueuedSign(old.row.id, 'archive'); await actOnQueuedSign(old.row.id, 'dismiss');
+    const hidden = (await jobs())[0];
+    expect(hidden.job.recovery.dismissed).toBe(true); expect(hidden.job.photo).toBe(old.job.photo); expect(hidden.job.requestId).toBe(old.job.requestId);
+    expect(hidden.job.scanCompleted).toBe(old.job.scanCompleted); expect(hidden.job.originalFingerprint).toBe(old.job.originalFingerprint);
+    await refreshPalmSignQueue(); expect(palmSignOutboxState.recoveryRows[0].dismissed).toBe(true);
+    online.mockReturnValue(true); await runPalmSignOutbox(); expect(requests).toEqual([]); expect(closes()).toEqual([]);
+    await actOnQueuedSign(old.row.id, 'show'); expect((await jobs())[0].job.recovery.dismissed).toBe(false);
+    expect(disk.rows.size).toBe(1); expect(requests).toEqual([]);
+});
+
+it.each(['lease', 'cas', 'active-list'])('ដកពីបញ្ជី៖ %s មិនជាន់សំណើ ឬបោះបង់ការងារ', async kind => {
+    await queuedWithPolicy(false); const old = (await jobs())[0];
+    if (kind !== 'active-list') await actOnQueuedSign(old.row.id, 'archive');
+    if (kind === 'lease') { const row = disk.rows.get(old.row.id); disk.rows.set(old.row.id, { ...row, leaseUntil: Date.now() + SIGN_OUTBOX_LEASE_MS }); }
+    if (kind === 'cas') vi.mocked(replaceSignJob).mockResolvedValueOnce(false);
+    const before = structuredClone([...disk.rows]); await actOnQueuedSign(old.row.id, 'dismiss');
+    expect([...disk.rows]).toEqual(before); expect(requests).toEqual([]); expect(closes()).toEqual([]);
+});
+
+it.each(['valid', 'wrong-barcode', 'generic-close', 'cached', 'returned', 'unsigned', 'failure'])('Sign ថ្មី %s៖ លាក់តែភស្តុតាង status ត្រឹមត្រូវ ហើយរូបមិនត្រូវលុប ឬសន្មត verified', async kind => {
+    const online = await queuedWithPolicy(false); const old = (await jobs())[0];
+    await actOnQueuedSign(old.row.id, 'archive'); reservationFixtures = false;
+    const status = { success: true, stage: 'status', barcode: old.job.code, ztoClosed: true,
+        ...(kind === 'wrong-barcode' ? { barcode: codes[1] } : {}), ...(kind === 'generic-close' ? { stage: 'lookup' } : {}),
+        ...(kind === 'cached' ? { cached: true } : {}), ...(kind === 'returned' ? { ztoReturned: true } : {}), ...(kind === 'unsigned' ? { ztoClosed: false } : {}) };
+    network = async body => body.stage === 'status' ? reply(status, kind === 'failure' ? 503 : 200)
+        : reply({ code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED', manualReview: true, reason: 'missing_journal', stage: 'receipt', barcode: body.barcode, requestId: body.requestId, photoProtocol: body.photoProtocol, originalSHA256: body.originalSHA256, reservationProtocol: body.reservationProtocol, originalFingerprint: body.originalFingerprint }, 409);
+    online.mockReturnValue(true); await actOnQueuedSign(old.row.id, 'recover');
+    const kept = (await jobs())[0]; expect(kept.job.recovery.dismissed === true).toBe(kind === 'valid');
+    expect(kept.job.photo).toBe(old.job.photo); expect(kept.job.requestId).toBe(old.job.requestId); expect(kept.job.recoveryCheck.photoVerified).toBe(false);
+    expect(palmSignOutboxState.rows).toHaveLength(0); expect(palmSignOutboxState.recoveryRows.filter(row => !row.dismissed)).toHaveLength(kind === 'valid' ? 0 : 1);
+    expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]); expect(disk.rows.size).toBe(1);
+});
+
+it('Sign local ចាស់ជាសញ្ញាឱ្យផ្ទៀងតែម្ដង មិនមែនភស្តុតាងលាក់ការងារ', async () => {
+    const online = await queuedWithPolicy(false); const old = (await jobs())[0]; await actOnQueuedSign(old.row.id, 'archive');
+    dataState.scanHistory[0].barcodes[0].ztoSignedAt = Date.now(); reservationFixtures = false;
+    network = async body => reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: false });
+    online.mockReturnValue(true); await runPalmSignOutbox(); await vi.waitFor(async () => expect((await jobs())[0].job.recoveryCheck.statusChecked).toBe(true));
+    expect((await jobs())[0].job.recovery.dismissed).not.toBe(true);
+    const reads = requests.length; await runPalmSignOutbox(); expect(requests).toHaveLength(reads); expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]);
+});
+
+it('Sign status ពិតលាក់ active task តែរក្សារូបដែលមិនទាន់ផ្ទៀង ក្នុង record ដើម', async () => {
+    const online = await queuedWithPolicy(false); const old = (await jobs())[0]; reservationFixtures = false;
+    network = async body => body.stage === 'status' ? reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: true })
+        : reply({ success: true, stage: 'receipt', barcode: body.barcode, requestId: body.requestId, ztoClosed: true, scanCompleted: true, photoAccepted: false });
+    online.mockReturnValue(true); await runPalmSignOutbox(); await vi.waitFor(async () => expect((await jobs())[0]?.job.recovery?.dismissed).toBe(true));
+    const kept = (await jobs())[0]; expect(kept.job.photo).toBe(old.job.photo); expect(kept.job.requestId).toBe(old.job.requestId);
+    expect(kept.job.recoveryCheck).toMatchObject({ signed: true, photoVerified: false, signedStatusVerified: true });
+    expect(palmSignOutboxState.rows).toHaveLength(0); expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]);
+});
+
+it.each([true, false, undefined])('ស្ថានភាពចាស់ %s មិនបាត់ពេល status ថ្មីអានមិនបាន ហើយមិនអនុញ្ញាត resume', async signed => {
+    const online = await queuedWithPolicy(false); const old = (await jobs())[0];
+    await actOnQueuedSign(old.row.id, 'archive'); const saved = (await jobs())[0];
+    const previous = { at: Date.now() - 1000, signed, photoVerified: false, statusChecked: true };
+    const sealed = await sealSignJob(saved.row.owner, key, { ...saved.job, recoveryCheck: previous });
+    disk.rows.set(saved.row.id, { ...sealed, revision: saved.row.revision + 1 });
+    reservationFixtures = false;
+    network = async body => body.stage === 'status' ? reply({ error: 'synthetic-unavailable' }, 503) : resume(body);
+    online.mockReturnValue(true); await actOnQueuedSign(old.row.id, 'resume');
+    const kept = (await jobs())[0];
+    expect(kept.job.recoveryCheck).toMatchObject({ statusUnavailable: true, signedStatusVerified: false });
+    expect(kept.job.recoveryCheck.signed).toBe(signed);
+    expect(kept.job.recoveryCheck.continuation).toBeUndefined(); expect(kept.job.recovery.dismissed).not.toBe(true);
+    expect(kept.job.photo).toBe(old.job.photo); expect(kept.job.requestId).toBe(old.job.requestId);
+    await refreshPalmSignQueue(); expect(palmSignOutboxState.recoveryRows[0]).toMatchObject({ statusUnavailable: true });
+    expect(palmSignOutboxState.recoveryRows[0].signed).toBe(signed);
+    const count = requests.length; await runPalmSignOutbox(); expect(requests).toHaveLength(count);
+    expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]);
+});
+
+it.each(['http', 'throw', 'cached', 'wrong-barcode'])('Sign ចាស់ក្នុង trash៖ status %s មិនលុបភស្តុតាង និងមិនលាក់ដោយសន្មត', async kind => {
+    const online = await queuedWithPolicy(false); const old = (await jobs())[0];
+    dataState.scanHistory[0].barcodes[0].ztoSignedAt = Date.now() - 1000;
+    dataState.deletedItems = [{ ...structuredClone(dataState.scanHistory[0]), deletedAt: Date.now(), trashReason: 'pickup' }];
+    dataState.scanHistory = []; await actOnQueuedSign(old.row.id, 'archive'); reservationFixtures = false;
+    network = async body => {
+        if (kind === 'throw') throw new Error('synthetic-offline');
+        return reply({ success: true, stage: 'status', barcode: kind === 'wrong-barcode' ? codes[1] : body.barcode,
+            ztoClosed: true, cached: kind === 'cached' }, kind === 'http' ? 503 : 200);
+    };
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0].job.recoveryCheck.statusUnavailable).toBe(true));
+    await vi.waitFor(async () => expect((await jobs())[0].row.leaseUntil).toBe(0));
+    const kept = (await jobs())[0]; expect(kept.job.recoveryCheck.signed).toBe(true); expect(kept.job.recovery.dismissed).not.toBe(true);
+    expect(kept.job.photo).toBe(old.job.photo); expect(kept.job.requestId).toBe(old.job.requestId);
+    await refreshPalmSignQueue(); expect(palmSignOutboxState.recoveryRows[0]).toMatchObject({ signed: true, statusUnavailable: true });
+    const count = requests.length; await runPalmSignOutbox(); expect(requests).toHaveLength(count);
+    expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]);
+});
+
+it('record 157 បាត់ signed តែមានភស្តុតាង parcel ដូចគ្នា៖ បង្ហាញចាស់ មិនលាក់ ឬហៅ network', async () => {
+    await queuedWithPolicy(false); const old = (await jobs())[0]; await actOnQueuedSign(old.row.id, 'archive');
+    const saved = (await jobs())[0]; const sealed = await sealSignJob(saved.row.owner, key, { ...saved.job,
+        recoveryCheck: { at: Date.now(), photoVerified: false, statusChecked: true } });
+    disk.rows.set(saved.row.id, { ...sealed, revision: saved.row.revision + 1 });
+    dataState.scanHistory[0].barcodes[0].ztoSignedAt = Date.now() - 1000;
+    await refreshPalmSignQueue(); expect(palmSignOutboxState.recoveryRows[0]).toMatchObject({ signed: true, statusUnavailable: true });
+    expect((await jobs())[0].job.recovery.dismissed).not.toBe(true); expect(requests).toEqual([]); expect(closes()).toEqual([]);
+    dataState.scanHistory[0].barcodes[0].ztoSignedAt = null;
+    await refreshPalmSignQueue(); expect(palmSignOutboxState.recoveryRows[0].signed).toBeUndefined();
+});
+
+
+it.each(['auth', 'restore', 'cas'])('Sign response យឺត៖ %s មិនលាក់ការងារ ឬលុបរូបលើ state ថ្មី', async kind => {
+    const online = await queuedWithPolicy(false); const old = (await jobs())[0]; await actOnQueuedSign(old.row.id, 'archive');
+    reservationFixtures = false; const pending = gate<Response>();
+    network = async body => body.stage === 'status' ? pending.promise : resume(body);
+    online.mockReturnValue(true); const operation = actOnQueuedSign(old.row.id, 'recover');
+    await vi.waitFor(() => expect(bodies('status')).toHaveLength(1));
+    if (kind === 'auth') firebaseState.authGeneration++;
+    if (kind === 'restore') {
+        const trash = structuredClone(dataState.scanHistory[0]); dataState.scanHistory = [];
+        dataState.deletedItems = [{ ...trash, deletedAt: Date.now(), trashReason: 'pickup', restoreClaim: 'synthetic-restore' }];
+    }
+    if (kind === 'cas') vi.mocked(replaceSignJob).mockResolvedValueOnce(false);
+    pending.resolve(reply({ success: true, stage: 'status', barcode: old.job.code, ztoClosed: true })); await operation;
+    const kept = (await jobs())[0]; expect(kept.job.recovery.dismissed).not.toBe(true);
+    expect(kept.job.photo).toBe(old.job.photo); expect(kept.job.requestId).toBe(old.job.requestId);
+    expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]); expect(disk.rows.size).toBe(1);
+});
+
+it('ជីវិត queue៖ លុបអចិន្ត្រៃយ៍ត្រូវបញ្ជាក់ ហើយបញ្ចូល barcode ដដែលវិញបានពេលមិនទាន់ផ្ញើ', async () => {
+    await queuedWithPolicy(false);
+    const old = (await jobs())[0];
+    const prompt = vi.fn(() => false); vi.stubGlobal('confirm', prompt);
+    await actOnQueuedSign(old.row.id, 'delete' as any);
+    expect(disk.rows.size).toBe(1);
+    prompt.mockReturnValue(true);
+    await actOnQueuedSign(old.row.id, 'delete' as any);
+    expect(disk.rows.size).toBe(0);
+    expect(palmSignOutboxState.rows).toHaveLength(0);
+    expect(palmSignOutboxState.recoveryRows).toHaveLength(0);
+    expect(await addSignJob(old.row, () => true)).toBe(true);
+    expect(bodies('receipt')).toHaveLength(0);
+});
+
+it('ជីវិត queue៖ លើស១០នាទីផ្លាស់ទៅសង្គ្រោះពេល offline ដោយមិនបាត់រូប', async () => {
+    await queuedWithPolicy(false);
+    const old = (await jobs())[0];
+    firebaseState.isDatabaseConnected = true; firebaseState.serverClockTrusted = true; firebaseState.serverTimeOffsetMs = 0;
+    const clock = Date.now();
+    disk.rows.set(old.row.id, await sealSignJob(old.row.owner, key, { ...old.job, signQueuedAt: clock - 600000 } as any));
+    await runPalmSignOutbox();
+    expect((await jobs())[0].job.recovery).toBeTruthy();
+    expect((await jobs())[0].job.photo).toBe(old.job.photo);
+    expect(requests).toEqual([]);
+});
+
+it.each([false, true])('ជីវិត queue៖ កាលកំណត់លុបត្រូវការនាឡិកាដែលទុកចិត្ត (%s)', async trusted => {
+    await queuedWithPolicy(false);
+    const old = (await jobs())[0]; const now = Date.now();
+    firebaseState.serverTimeOffsetMs = 0;
+    firebaseState.serverClockTrusted = trusted; firebaseState.isDatabaseConnected = trusted;
+    disk.rows.set(old.row.id, await sealSignJob(old.row.owner, key, { ...old.job,
+        recovery: { archivedAt: now - 86400000, previousPhase: 'checking', previousMessage: 'ចាស់' },
+        signedCleanupConfirmed: true, signedVerifiedAt: now - 86400000, signedCleanupAt: now,
+        recoveryCheck: { at: now - 86400000, signed: true, signedStatusVerified: true, photoVerified: false }
+    }));
+    await runPalmSignOutbox();
+    expect(disk.rows.size).toBe(trusted ? 0 : 1);
+    expect(requests).toEqual([]);
+});
+
+it.each(['unsigned', 'unknown', 'malformed', 'early', 'busy'])('ជីវិត queue៖ មិនលុបស្វ័យប្រវត្តិ %s', async kind => {
+    await queuedWithPolicy(false);
+    const old = (await jobs())[0]; const now = Date.now();
+    firebaseState.serverTimeOffsetMs = 0; firebaseState.serverClockTrusted = true; firebaseState.isDatabaseConnected = true;
+    const row = await sealSignJob(old.row.owner, key, { ...old.job,
+        signedCleanupConfirmed: !['unsigned', 'unknown'].includes(kind), signedVerifiedAt: now - 86400000, signedCleanupAt: now + (kind === 'early' ? 1 : 0),
+        recoveryCheck: { at: now, signed: kind === 'unsigned' ? false : true, signedStatusVerified: kind !== 'unknown', photoVerified: false }
+    });
+    if (kind === 'malformed') row.cipher = new ArrayBuffer(3);
+    if (kind === 'busy') row.leaseUntil = now + 90000;
+    disk.rows.set(row.id, row); await runPalmSignOutbox();
+    expect(disk.rows.size).toBe(1);
+});
+
+it('ជីវិត queue៖ ការលុបមិនរំលង lease កំពុងផ្ញើ', async () => {
+    await queuedWithPolicy(false); const old = (await jobs())[0];
+    disk.rows.get(old.row.id).leaseUntil = Date.now() + 90000;
+    vi.stubGlobal('confirm', vi.fn(() => true));
+    await actOnQueuedSign(old.row.id, 'delete');
+    expect(disk.rows.size).toBe(1); expect(confirm).not.toHaveBeenCalled();
+});
+it('ជីវិត queue៖ Sign រួចជាមួយរូប ត្រូវរក្សា24ម៉ោង ហើយសម្អាតមិនផ្ញើស្ទួន', async () => {
+    firebaseState.serverTimeOffsetMs = 0; firebaseState.serverClockTrusted = true; firebaseState.isDatabaseConnected = true;
+    await ready(1); await submitZtoPalmSign([codes[0]]);
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.signedCleanupAt).toBeGreaterThan(0));
+    const saved = (await jobs())[0];
+    expect(saved.job.signedCleanupAt! - saved.job.signedVerifiedAt!).toBe(86400000);
+    expect(saved.job.photo).toBe(photos[0]);
+    await vi.waitFor(() => expect(palmSignOutboxState.rows).toHaveLength(0));
+    const before = bodies('receipt').length;
+    firebaseState.serverTimeOffsetMs = 86400001;
+    await runPalmSignOutbox();
+    expect(disk.rows.size).toBe(0); expect(bodies('receipt').length).toBe(before);
+    firebaseState.serverTimeOffsetMs = 0;
+});
+it('ជីវិត queue៖ បន្តដោយដៃក្រោយ10នាទីមិនជាប់សង្គ្រោះវិញភ្លាម ហើយ request ដើមនៅដដែល', async () => {
+    const online = await queuedWithPolicy(false); const old = (await jobs())[0]; const now = Date.now();
+    firebaseState.isDatabaseConnected = true; firebaseState.serverClockTrusted = true; firebaseState.serverTimeOffsetMs = 0;
+    disk.rows.set(old.row.id, await sealSignJob(old.row.owner, key, { ...old.job, signQueuedAt: now - 600001 }));
+    await runPalmSignOutbox(); expect((await jobs())[0].job.recovery).toBeTruthy();
+    online.mockReturnValue(true); await actOnQueuedSign(old.row.id, 'recover');
+    expect((await jobs())[0].job.recoveryCheck?.continuation).toBe('reserved');
+    await actOnQueuedSign(old.row.id, 'resume');
+    await vi.waitFor(() => expect(bodies('receipt')).toHaveLength(1));
+    expect(bodies('receipt')[0].requestId).toBe(old.job.requestId);
+    expect((await jobs())[0].job.userRetryAt).toBeGreaterThan(old.job.signQueuedAt!);
+});
+it('ជីវិត queue៖ ពិនិត្យថ្មីបរាជ័យមិនលុបភស្តុតាង Sign ដែលកំណត់សម្អាតរួច', async () => {
+    const online = await queuedWithPolicy(false); const old = (await jobs())[0];
+    firebaseState.serverTimeOffsetMs = 0; firebaseState.serverClockTrusted = true; firebaseState.isDatabaseConnected = true;
+    await actOnQueuedSign(old.row.id, 'archive'); reservationFixtures = false;
+    network = async body => body.stage === 'status' ? reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: true }) : receipt(body);
+    online.mockReturnValue(true); await actOnQueuedSign(old.row.id, 'recover');
+    const saved = (await jobs())[0]; expect(saved.job.signedCleanupConfirmed).toBe(true);
+    network = async () => { throw new Error('offline'); };
+    await actOnQueuedSign(old.row.id, 'recover');
+    expect((await jobs())[0].job.signedCleanupAt).toBe(saved.job.signedCleanupAt);
+    firebaseState.serverTimeOffsetMs = 86400001;
+    await runPalmSignOutbox(); expect(disk.rows.size).toBe(0);
+    firebaseState.serverTimeOffsetMs = 0;
+});
+it('ជីវិត queue៖ សង្គ្រោះមិនទាន់Sign អាចផ្ទៀង auto ក្រោយ5នាទី មិនត្រូវការសញ្ញា local signed', async () => {
+    const online = await queuedWithPolicy(false); const old = (await jobs())[0];
+    await actOnQueuedSign(old.row.id, 'archive');
+    const held = (await jobs())[0];
+    disk.rows.set(held.row.id, await sealSignJob(held.row.owner, key, { ...held.job, recovery: { ...held.job.recovery!, archivedAt: Date.now() - 300001 } }));
+    network = async body => reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: true });
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0].job.signedCleanupConfirmed).toBe(true));
+    expect(requests.map(body => body.stage)).toEqual(['status']);
+});
+
+it.each(['rollback', 'invalid', 'trust-lost', 'auth-switch', 'unchanged'])('ជីវិត queue៖ លក្ខខណ្ឌមុន commit លុប %s ត្រូវផ្ទៀងម្ដងទៀត', async mode => {
+    await queuedWithPolicy(false);
+    const saved = (await jobs())[0];
+    const previousOffset = firebaseState.serverTimeOffsetMs;
+    const now = Date.now();
+    firebaseState.serverTimeOffsetMs = 0;
+    firebaseState.serverClockTrusted = true;
+    firebaseState.isDatabaseConnected = true;
+    const due = now - 1000;
+    disk.rows.set(saved.row.id, await sealSignJob(saved.row.owner, key, { ...saved.job,
+        signedCleanupConfirmed: true, signedVerifiedAt: due - 86400000, signedCleanupAt: due,
+        recoveryCheck: { at: now, signed: true, signedStatusVerified: true, photoVerified: false }
+    }));
+    const replace = vi.mocked(replaceSignJob).getMockImplementation()!;
+    let reachedDelete = false;
+    vi.mocked(replaceSignJob).mockImplementationOnce(async (previous, next, current) => {
+        expect(next).toBeNull();
+        reachedDelete = true;
+        await Promise.resolve();
+        if (mode === 'rollback') firebaseState.serverTimeOffsetMs = -60000;
+        if (mode === 'invalid') firebaseState.serverTimeOffsetMs = Infinity;
+        if (mode === 'trust-lost') firebaseState.serverClockTrusted = false;
+        if (mode === 'auth-switch') firebaseState.authGeneration++;
+        return replace(previous, next, current);
+    });
+    try {
+        await runPalmSignOutbox();
+        expect(reachedDelete).toBe(true);
+        expect(disk.rows.size).toBe(mode === 'unchanged' ? 0 : 1);
+        if (mode !== 'unchanged') expect((await jobs())[0].job.photo).toBe(saved.job.photo);
+        expect(requests).toEqual([]);
+    } finally { firebaseState.serverTimeOffsetMs = previousOffset; }
+});
+
+async function openedQueueMarkup() {
+    const { act, createElement } = await import('react');
+    const { createRoot } = await import('react-dom/client');
+    const { PalmSignQueueModal } = await import('../../../ZoeW/src/app/components/modals/PalmSignQueueModal');
+    const node = document.createElement('div'); const root = createRoot(node);
+    try {
+        await act(async () => root.render(createElement(PalmSignQueueModal)));
+        await act(async () => node.querySelector<HTMLButtonElement>('.sign-queue-menu-toggle')!.click());
+        return node.innerHTML;
+    } finally { await act(async () => root.unmount()); }
+}
+
+
+it.each(['blocked', 'wrong-owner', 'different-request', 'network', 'http', 'lost-cancel', 'offline', 'bad-ack'])('លុប local និង cancel ដាច់គ្នា៖ %s', async kind => {
+    const value = await warningJob(); reservationFixtures = false;
+    vi.stubGlobal('confirm', vi.fn(() => true));
+    if (kind === 'offline') vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    network = async body => {
+        if (kind === 'network') throw new Error('synthetic status unavailable');
+        if (body.stage === 'receipt-status') return reply({ ...body, reservationToken: undefined,
+            code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED', manualReview: true, stage: 'receipt',
+            reason: kind === 'different-request' ? 'different_request' : 'blocked',
+            reservationOwner: kind === 'wrong-owner' ? 'another-owner' : value.job.reservationOwner }, kind === 'http' ? 503 : 409);
+        if (kind === 'lost-cancel') throw new Error('synthetic cancel ACK lost');
+        return cancelled(body, kind === 'bad-ack' ? { reservationOwner: 'another-owner' } : {});
+    };
+    const history = structuredClone(dataState.scanHistory); uiState.toasts = [];
+    await actOnQueuedSign(value.row.id, 'delete');
+    expect(disk.rows.size).toBe(0);
+    expect(bodies('receipt-cancel')).toHaveLength(['blocked', 'lost-cancel', 'bad-ack'].includes(kind) ? 1 : 0);
+    if (bodies('receipt-cancel').length) expect(bodies('receipt-cancel')[0]).toMatchObject({
+        reservationOwner: value.job.reservationOwner, reservationToken: value.job.reservationToken, confirmationToken: value.job.warningToken });
+    const message = uiState.toasts.map((toast: any) => toast.msg).join(' ');
+    expect(message.includes('Server បានបោះបង់')).toBe(kind === 'blocked');
+    if (kind !== 'blocked') expect(message).toContain('ក្នុងឧបករណ៍');
+    expect(dataState.scanHistory).toEqual(history); expect(closes()).toEqual([]);
+    expect(bodies('receipt')).toEqual([]);
+});
+
+async function restartFixture() {
+    const online = await queuedWithPolicy(false);
+    const old = (await jobs())[0];
+    disk.rows.set(old.row.id, await sealSignJob(old.row.owner, key, { ...old.job, phase: 'action', manualReviewReason: 'different_request' }));
+    reservationFixtures = false;
+    online.mockReturnValue(true);
+    requests = [];
+    return old;
+}
+const restartChallenge = (body: any, patch = {}) => reply({ ...body, code: 'ZTO_PALM_SIGN_RESTART_CONFIRM_REQUIRED', restartToken: 'restart-consent-token', expiresAt: Date.now() + 60000, ...patch }, 409);
+const restartReady = (body: any, patch = {}) => resume(body, { restarted: true, restartFromRequestId: body.restartFromRequestId, ...patch });
+it('restart៖ បញ្ជាក់រាល់ barcode រក្សារូប ហើយមិនផ្ញើ Sign រហូតដល់ resume ដោយចេតនា', async () => {
+    const old = await restartFixture(); vi.stubGlobal('confirm', vi.fn(() => true));
+    network = async body => body.stage === 'receipt-restart-check' ? restartChallenge(body) : restartReady(body);
+    await actOnQueuedSign(old.row.id, 'restart' as any);
+    const kept = (await jobs())[0].job;
+    expect(bodies('receipt-restart-check')).toHaveLength(1); expect(bodies('receipt-restart-confirm')).toHaveLength(1);
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining(old.job.code));
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('រូប ឬសំណើមុនអាចបានទៅដល់ ZTO ឬមកដល់យឺត'));
+    expect(kept.requestId).not.toBe(old.job.requestId); expect(kept.photo).toBe(old.job.photo); expect(kept.signMan).toBe(old.job.signMan);
+    expect(kept).toMatchObject({ phase: 'action', readOnlyProbe: true, autoConfirm: false, recoveryCheck: { continuation: 'reserved' } });
+    expect(kept.recovery).toBeDefined();
+    expect(palmSignOutboxState.recoveryRows[0].restartReady).toBe(true);
+    await runPalmSignOutbox(); expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]);
+    expect(requests.every(body => !body.photo && !body.signMan)).toBe(true);
+});
+it('restart៖ បោះបង់ confirmation មិនបញ្ជូន restart-confirm', async () => {
+    const old = await restartFixture(); vi.stubGlobal('confirm', vi.fn(() => false));
+    network = async body => restartChallenge(body);
+    await actOnQueuedSign(old.row.id, 'restart' as any);
+    expect(bodies('receipt-restart-check')).toHaveLength(1); expect(bodies('receipt-restart-confirm')).toEqual([]);
+    expect((await jobs())[0].job.requestId).toBe(old.job.requestId); expect((await jobs())[0].job.photo).toBe(old.job.photo);
+});
+it('restart៖ lost ACK ពិនិត្យតែ identity ដដែល មិន replay confirm ឬ Sign', async () => {
+    const old = await restartFixture(); vi.stubGlobal('confirm', vi.fn(() => true));
+    network = async body => body.stage === 'receipt-restart-check' ? restartChallenge(body) : Promise.reject(new Error('lost ack'));
+    await actOnQueuedSign(old.row.id, 'restart' as any);
+    const sent = bodies('receipt-restart-confirm')[0]; expect(sent).toBeDefined();
+    expect((await jobs())[0].job.requestId).toBe(old.job.requestId);
+    network = async body => restartReady(body);
+    await actOnQueuedSign(old.row.id, 'restart' as any);
+    expect(bodies('receipt-restart-confirm')).toHaveLength(1); expect(bodies('receipt-restart-check')[1].requestId).toBe(sent.requestId);
+    expect((await jobs())[0].job.requestId).toBe(sent.requestId); expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]);
+});
+it.each(['barcode', 'requestId', 'restartFromRequestId', 'originalSHA256', 'originalFingerprint', 'reservationProtocol', 'photoProtocol'])('restart៖ challenge identity %s ខុសមិន confirm', async field => {
+    const old = await restartFixture(); vi.stubGlobal('confirm', vi.fn(() => true));
+    network = async body => restartChallenge(body, { [field]: 'wrong' });
+    await actOnQueuedSign(old.row.id, 'restart' as any);
+    expect(bodies('receipt-restart-check')).toHaveLength(1); expect(bodies('receipt-restart-confirm')).toEqual([]); expect(window.confirm).not.toHaveBeenCalled();
+    expect((await jobs())[0].job.requestId).toBe(old.job.requestId);
+});
+it.each(['session', 'parent', 'signed', 'row'])('restart៖ response ចាស់ក្រោយ %s ប្រែ មិនអនុញ្ញាតបន្ត', async kind => {
+    const old = await restartFixture(); vi.stubGlobal('confirm', vi.fn(() => true)); const pending = gate<Response>();
+    network = async () => pending.promise;
+    const task = actOnQueuedSign(old.row.id, 'restart' as any);
+    await vi.waitFor(() => expect(bodies('receipt-restart-check')).toHaveLength(1));
+    if (kind === 'session') firebaseState.authGeneration++;
+    if (kind === 'parent') dataState.scanHistory[0].barcodes![0].restoredAt = Date.now();
+    if (kind === 'signed') dataState.scanHistory[0].barcodes![0].ztoSignedAt = Date.now();
+    if (kind === 'row') { const saved = (await jobs())[0]; disk.rows.set(saved.row.id, { ...saved.row, revision: saved.row.revision + 1 }); }
+    pending.resolve(restartChallenge(bodies('receipt-restart-check')[0])); await task;
+    expect(bodies('receipt-restart-confirm')).toEqual([]); expect((await jobs())[0].job.requestId).toBe(old.job.requestId); expect(closes()).toEqual([]);
+});
+it('restart៖ double click និង server waiting មិនបង្កើតសំណើស្ទួន', async () => {
+    const old = await restartFixture(); vi.stubGlobal('confirm', vi.fn(() => true)); const pending = gate<Response>(); network = async () => pending.promise;
+    const task = actOnQueuedSign(old.row.id, 'restart' as any); await vi.waitFor(() => expect(bodies('receipt-restart-check')).toHaveLength(1));
+    await actOnQueuedSign(old.row.id, 'restart' as any);
+    pending.resolve(reply({ ...bodies('receipt-restart-check')[0], code: 'ZTO_PALM_SIGN_RESTART_WAIT', retryAfterMs: 900000, serverNow: Date.now() }, 409)); await task;
+    expect(bodies('receipt-restart-check')).toHaveLength(1); expect(bodies('receipt-restart-confirm')).toEqual([]); expect(window.confirm).not.toHaveBeenCalled();
+    expect((await jobs())[0].job.requestId).toBe(old.job.requestId);
+});
+it.each(['session', 'parent', 'signed', 'row'])('restart៖ confirm ACK ចាស់ក្រោយ %s ប្រែ រក្សា pending identity មិន adopt ឬ Sign', async kind => {
+    const old = await restartFixture(); vi.stubGlobal('confirm', vi.fn(() => true)); const pending = gate<Response>();
+    network = async body => body.stage === 'receipt-restart-check' ? restartChallenge(body) : pending.promise;
+    const task = actOnQueuedSign(old.row.id, 'restart' as any);
+    await vi.waitFor(() => expect(bodies('receipt-restart-confirm')).toHaveLength(1));
+    const sent = bodies('receipt-restart-confirm')[0];
+    if (kind === 'session') firebaseState.authGeneration++;
+    if (kind === 'parent') dataState.scanHistory[0].barcodes![0].restoredAt = Date.now();
+    if (kind === 'signed') dataState.scanHistory[0].barcodes![0].ztoSignedAt = Date.now();
+    if (kind === 'row') { const saved = (await jobs())[0]; disk.rows.set(saved.row.id, { ...saved.row, revision: saved.row.revision + 1 }); }
+    pending.resolve(restartReady(sent)); await task;
+    expect((await jobs())[0].job.requestId).toBe(old.job.requestId);
+    expect((await jobs())[0].job.restartIntent).toMatchObject({ pending: true, requestId: sent.requestId });
+    expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]);
+});
+it('restart៖ confirm មិនដល់ server ត្រូវ consent ថ្មីជាមួយ successor ដដែល', async () => {
+    const old = await restartFixture(); vi.stubGlobal('confirm', vi.fn(() => true));
+    network = async body => body.stage === 'receipt-restart-check' ? restartChallenge(body) : Promise.reject(new Error('lost ack'));
+    await actOnQueuedSign(old.row.id, 'restart' as any);
+    network = async body => body.stage === 'receipt-restart-check' ? restartChallenge(body) : Promise.reject(new Error('not sent'));
+    await actOnQueuedSign(old.row.id, 'restart' as any); await actOnQueuedSign(old.row.id, 'retry'); await actOnQueuedSign(old.row.id, 'resume');
+    await runPalmSignOutbox();
+    expect(bodies('receipt-restart-confirm')).toHaveLength(2); expect(window.confirm).toHaveBeenCalledTimes(2);
+    expect(bodies('receipt-restart-confirm')[1].requestId).toBe(bodies('receipt-restart-confirm')[0].requestId);
+    expect((await jobs())[0].job.requestId).toBe(old.job.requestId); expect(bodies('receipt')).toEqual([]);
+});
+it.each([['signed', 'Sign រួច'], ['active', 'កំពុងដំណើរការ'], ['ineligible', 'លក្ខខណ្ឌ'], ['conflict', 'ផ្លាស់ប្តូរ'], ['not_restartable', 'មិនអនុញ្ញាត'], ['missing_journal', 'មិនរកឃើញ']])('restart៖ server បដិសេធ %s មិន confirm', async (reason, message) => {
+    const old = await restartFixture(); vi.stubGlobal('confirm', vi.fn(() => true));
+    network = async body => reply({ ...body, code: 'ZTO_PALM_SIGN_RESTART_BLOCKED', reason }, 409);
+    await actOnQueuedSign(old.row.id, 'restart' as any);
+    expect(bodies('receipt-restart-confirm')).toEqual([]); expect(window.confirm).not.toHaveBeenCalled();
+    expect((await jobs())[0].job.message).toContain(message);
+    expect((await jobs())[0].job.requestId).toBe(old.job.requestId); expect(bodies('receipt')).toEqual([]);
+});
+it('restart៖ cancel consent ថ្មីមិនបាត់ pending successor ពេល ACK មុនអាចមកយឺត', async () => {
+    const old = await restartFixture(); vi.stubGlobal('confirm', vi.fn(() => true));
+    network = async body => body.stage === 'receipt-restart-check' ? restartChallenge(body) : Promise.reject(new Error('ack unknown'));
+    await actOnQueuedSign(old.row.id, 'restart' as any);
+    const sent = bodies('receipt-restart-confirm')[0]; vi.mocked(window.confirm).mockReturnValue(false);
+    network = async body => restartChallenge(body);
+    await actOnQueuedSign(old.row.id, 'restart' as any);
+    expect((await jobs())[0].job.restartIntent).toMatchObject({ requestId: sent.requestId, pending: true });
+    network = async body => restartReady(body);
+    await actOnQueuedSign(old.row.id, 'restart' as any);
+    expect((await jobs())[0].job.requestId).toBe(sent.requestId); expect(bodies('receipt-restart-confirm')).toHaveLength(1);
+    expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]);
+});
+it('restart៖ resume ដោយចេតនា ផ្ទៀង dispatch ថ្មីមុនផ្ញើរូប', async () => {
+    const old = await restartFixture(); vi.stubGlobal('confirm', vi.fn(() => true));
+    network = async body => body.stage === 'receipt-restart-check' ? restartChallenge(body) : restartReady(body);
+    await actOnQueuedSign(old.row.id, 'restart' as any); expect(bodies('receipt')).toEqual([]);
+    network = async body => body.stage === 'receipt-status' ? resume(body)
+        : body.stage === 'status' ? reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: false, dispatched: true, dispatchProof: 'new-dispatch' })
+            : body.stage === 'receipt-prewrite-refresh' ? body.dispatchProof ? resume(body, { warningRefreshed: true, confirmationToken: '' }) : reply({ code: 'ZTO_PALM_DISPATCH_REQUIRED', barcode: body.barcode }, 409)
+                : receipt(body);
+    await actOnQueuedSign(old.row.id, 'resume');
+    await vi.waitFor(() => expect(bodies('receipt-prewrite-refresh')).toHaveLength(2));
+    await vi.waitFor(() => expect(bodies('receipt')).toHaveLength(1));
+    expect(bodies('receipt')[0].dispatchProof).toBe('new-dispatch');
+});
+it.each(['barcode', 'requestId', 'restartFromRequestId', 'originalSHA256', 'originalFingerprint', 'reservationOwner', 'reservationToken', 'restarted'])('restart៖ ready identity %s ខុសរក្សា pending មិន adopt', async field => {
+    const old = await restartFixture(); vi.stubGlobal('confirm', vi.fn(() => true));
+    network = async body => body.stage === 'receipt-restart-check' ? restartChallenge(body)
+        : restartReady(body, { [field]: field === 'restarted' ? false : field === 'reservationOwner' || field === 'reservationToken' ? '' : 'wrong' });
+    await actOnQueuedSign(old.row.id, 'restart' as any);
+    expect((await jobs())[0].job.requestId).toBe(old.job.requestId); expect((await jobs())[0].job.restartIntent?.pending).toBe(true);
+    expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]);
+});
+it('restart៖ challenge ផុតកំណត់តាមម៉ោង server មិន confirm', async () => {
+    const old = await restartFixture(); vi.stubGlobal('confirm', vi.fn(() => true));
+    const offset = firebaseState.serverTimeOffsetMs;
+    try {
+        firebaseState.serverTimeOffsetMs = 120000;
+        network = async body => restartChallenge(body, { expiresAt: Date.now() + 60000 });
+        await actOnQueuedSign(old.row.id, 'restart' as any);
+        expect(window.confirm).not.toHaveBeenCalled(); expect(bodies('receipt-restart-confirm')).toEqual([]);
+        expect((await jobs())[0].job.requestId).toBe(old.job.requestId);
+    } finally { firebaseState.serverTimeOffsetMs = offset; }
+});
+it('restart៖ recovery បន្ទាប់ពីផ្ញើរូបប្រើ reservation ដដែល មិន refresh ផ្លូវដំបូងស្ទួន', async () => {
+    const old = await restartFixture(); vi.stubGlobal('confirm', vi.fn(() => true));
+    network = async body => body.stage === 'receipt-restart-check' ? restartChallenge(body) : restartReady(body);
+    await actOnQueuedSign(old.row.id, 'restart' as any);
+    const saved = (await jobs())[0];
+    disk.rows.set(saved.row.id, await sealSignJob(saved.row.owner, key, { ...saved.job, dispatchProof: 'already-refreshed-proof', attempts: 1 }));
+    network = async body => body.stage === 'receipt-status' ? resume(body)
+        : body.stage === 'status' ? reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: false })
+            : body.stage === 'receipt-prewrite-refresh' ? reply({ code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED', manualReview: true, reason: 'preimage_uncertain' }, 409) : receipt(body);
+    await actOnQueuedSign(old.row.id, 'resume');
+    await vi.waitFor(() => expect(bodies('receipt')).toHaveLength(1));
+    expect(bodies('receipt-prewrite-refresh')).toEqual([]);
+});
+
+it.each(['save', 'login', 'key', 'branch'] as const)('ការភ្ជាប់ ZTO %s ក្រោយការងារ Sign ចូលជួរ ៖ Lookup រក្សាទុក ឬ Login ឡើងវិញដោយអត្តសញ្ញាណ ZTO ដដែលមិនកកការងារ · សោភ្ជាប់ ឬសាខាផ្សេង ➜ កក មិនផ្ញើ', async (kind) => {
+    config = { ...config, palmAccount: { siteCode: 'KH001', siteName: 'សាខាសាកល្បង' } };
+    appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(config));
+    const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    await ready(1); await submitZtoPalmSign([codes[0]]); await runPalmSignOutbox();
+    expect(disk.rows.size).toBe(1);
+    if (kind === 'save') {
+        vi.stubGlobal('alert', vi.fn());
+        mount(<LookupApiConfigModal />);
+        try {
+            act(() => openLookupApiConfigModal());
+            setFieldChecked('lookupApiAutoSubmitCheckbox', true);
+            await act(async () => { await saveLookupApiConfig(); });
+        } finally { unmount(); }
+        expect(window.alert).not.toHaveBeenCalled();
+        expect(JSON.parse(appLocalStore.getItem('zoew_lookup_api_config')!)).toMatchObject({ autoSubmit: true, palmAccount: config.palmAccount });
+    } else {
+        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true, autoSubmit: false, url: config.url, headerName: 'X-Zoe-Proxy-Key',
+            headerValueEnc: await encryptLookupSecret(kind === 'key' ? 'another-synthetic-key' : 'synthetic-key'), phoneField: 'phone', codField: 'cod', dodField: 'dod',
+            palmAccount: { siteCode: kind === 'branch' ? 'KH002' : 'KH001', siteName: 'សាខាសាកល្បង' }, shop: config.shop, palmLoginAt: Date.now(),
+            palmTokenEnc: await encryptLookupSecret('renewed-session'), palmExpiresAt: Date.now() + 8 * 3600000 }));
+    }
+    requests = []; online.mockReturnValue(true);
+    await runPalmSignOutbox();
+    if (kind === 'save' || kind === 'login') {
+        await vi.waitFor(() => expect(closes()).toEqual([codes[0]]));
+        expect(bodies('receipt')).toHaveLength(1);
+    } else {
+        await vi.waitFor(() => expect(palmSignOutboxState.rows[0]?.message).toContain('ការភ្ជាប់ ZTO ប្រែ'));
+        expect(requests).toEqual([]); expect(closes()).toEqual([]);
+        expect((await jobs())[0].job.photo).toBe(photos[0]);
+    }
+});
+
+it('DISPATCH_REQUIRED ៖ អាន status យកភស្តុតាងថ្មីរាល់ពេល មិនផ្ញើភស្តុតាងដែលបដិសេធម្ដងទៀត · លើកទី ២ ក្នុង ៥ នាទីផ្ញើឡើងវិញក្រោយ ១៥ វិ. · គ្មានការចុចពីមនុស្ស', async () => {
+    await ready(1); let fresh = 0; let rejected = 2;
+    network = async body => body.stage === 'status' ? reply({ success: true, barcode: body.barcode, stage: 'status', dispatched: true, ztoClosed: false, dispatchProof: 'fresh-' + (++fresh) })
+        : body.stage === 'receipt-status' ? resume(body)
+            : body.stage === 'receipt' && rejected-- > 0 ? reply({ code: 'ZTO_PALM_DISPATCH_REQUIRED', barcode: body.barcode, requestId: body.requestId }, 409) : receipt(body);
+    await submitZtoPalmSign([codes[0]]);
+    await vi.waitFor(() => expect(bodies('receipt')).toHaveLength(2));
+    await vi.waitFor(async () => expect((await jobs())[0].row.leaseUntil).toBe(0));
+    const held = (await jobs())[0];
+    expect(held.job.dispatchProof).toBe('fresh-2'); expect(held.row.due).toBeGreaterThan(Date.now() + 10000); expect(held.row.due).toBeLessThanOrEqual(Date.now() + 15000);
+    for (const row of disk.rows.values()) row.due = 0;
+    await runPalmSignOutbox();
+    await vi.waitFor(() => expect(closes()).toEqual([codes[0]]));
+    expect(bodies('receipt').map(body => body.dispatchProof)).toEqual(['dispatch-' + codes[0], 'fresh-1', 'fresh-2']);
+    expect(bodies('status')).toHaveLength(2); expect(bodies('dispatch')).toHaveLength(0);
+});
+it('DISPATCH_REQUIRED ហើយ ZTO មិនទាន់បង្ហាញការចែកចាយ ➜ រង់ចាំមនុស្ស · មិនផ្ញើចែកចាយ ឬ 05 · រូបនៅរក្សាទុក', async () => {
+    await ready(1);
+    network = async body => body.stage === 'status' ? reply({ success: true, barcode: body.barcode, stage: 'status', dispatched: false, ztoClosed: false })
+        : body.stage === 'receipt-status' ? resume(body) : reply({ code: 'ZTO_PALM_DISPATCH_REQUIRED', barcode: body.barcode, requestId: body.requestId }, 409);
+    await submitZtoPalmSign([codes[0]]);
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
+    const held = (await jobs())[0];
+    expect(held.job.message).toContain('ZTO មិនទាន់បង្ហាញការចែកចាយ'); expect(held.job.photo).toBe(photos[0]);
+    for (const row of disk.rows.values()) row.due = 0;
+    await runPalmSignOutbox();
+    expect(bodies('receipt')).toHaveLength(1); expect(bodies('dispatch')).toHaveLength(0); expect(closes()).toEqual([]);
+});
+it('ZTO_PALM_SIGN_RETRY_LATER (ថវិកា Function ជិតអស់មុនសរសេររូប ឬ 05) ➜ រង់ចាំ ១៥ វិ. ហើយផ្ញើម្ដងទៀតដោយស្វ័យប្រវត្តិ · requestId និងរូបដើមដដែល · គ្មានការចុចពីមនុស្ស', async () => {
+    await ready(1); let squeezed = 1; let pendingPolls = 1;
+    network = async body => body.stage === 'receipt-status'
+        ? (pendingPolls-- > 0 && bodies('receipt').length > 0 ? reply({ code: 'ZTO_PALM_SIGN_UNCONFIRMED', uncertain: true, barcode: body.barcode }, 503) : resume(body))
+        : body.stage === 'receipt' && squeezed-- > 0 ? reply({ code: 'ZTO_PALM_SIGN_RETRY_LATER', barcode: body.barcode, stage: 'receipt', retryable: true }, 503) : receipt(body);
+    await submitZtoPalmSign([codes[0]]);
+    await vi.waitFor(() => expect(bodies('receipt')).toHaveLength(1));
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.message).toContain('ផ្ញើម្ដងទៀតដោយស្វ័យប្រវត្តិ'));
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    const held = (await jobs())[0];
+    expect(held.job.phase).toBe('checking');
+    expect(held.row.due).toBeGreaterThan(Date.now() + 10000); expect(held.row.due).toBeLessThanOrEqual(Date.now() + 15000);
+    expect(closes()).toEqual([]);
+    for (let round = 0; round < 3 && closes().length === 0; round++) {
+        for (const row of disk.rows.values()) row.due = 0;
+        await runPalmSignOutbox();
+        await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil ?? 0).toBe(0)).catch(() => {});
+    }
+    await vi.waitFor(() => expect(closes()).toEqual([codes[0]]));
+    const sent = bodies('receipt');
+    expect(sent).toHaveLength(2);
+    expect(new Set(sent.map(body => body.requestId)).size).toBe(1); expect(sent[1].photo).toBe(photos[0]);
+});
+
+
+it.each(['delete-straddle', 'archive-straddle', 'archive-unknown', 'queue-future', 'retry-future', 'verified-preserve', 'delete-expired', 'archive-expired', 'delete-generation', 'archive-generation', 'delete-bounds', 'archive-bounds', 'initialize-generation', 'initialize-session', 'initialize-unknown'])('នាឡិកា outbox៖ %s', async mode => {
+    await queuedWithPolicy(false);
+    const old = (await jobs())[0];
+    const now = Date.now();
+    vi.spyOn(Date, 'now').mockReturnValue(now);
+    vi.spyOn(performance, 'now').mockReturnValue(1000);
+    firebaseState.isDatabaseConnected = true;
+    serverClock.resetServerClock();
+    expect(serverClock.acceptServerClockOffset(0, { epochMs: now - 100, estimateEpochMs: now, uncertaintyMs: 200, monotonicMs: 1000, wallMs: now }, false)).toBe(true);
+    const deleting = mode.startsWith('delete');
+    const initializing = mode.startsWith('initialize');
+    const expiry = mode.endsWith('straddle') ? now - 50 : now - 1000;
+    const patch: any = deleting
+        ? { signedCleanupConfirmed: true, signedVerifiedAt: expiry - 86400000, signedCleanupAt: expiry }
+        : { signQueuedAt: initializing ? undefined : expiry - 600000 };
+    if (mode === 'queue-future') patch.signQueuedAt = now + 50;
+    if (mode === 'retry-future') patch.userRetryAt = now + 50;
+    if (mode === 'verified-preserve') Object.assign(patch, { signedCleanupConfirmed: true, signedVerifiedAt: now + 50 });
+    disk.rows.set(old.row.id, await sealSignJob(old.row.owner, key, { ...old.job, ...patch }));
+    if (mode.endsWith('unknown')) serverClock.resetServerClock();
+    let callbackReached = false;
+    if (mode.endsWith('generation') || mode.endsWith('session') || mode.endsWith('bounds')) {
+        const replace = vi.mocked(replaceSignJob).getMockImplementation()!;
+        vi.mocked(replaceSignJob).mockImplementationOnce(async (previous, next, current) => {
+            callbackReached = true;
+            await Promise.resolve();
+            if (mode.endsWith('session')) firebaseState.authGeneration++;
+            else if (mode.endsWith('bounds')) serverClock.acceptServerClockOffset(0, { epochMs: now - 2000, estimateEpochMs: now, uncertaintyMs: 4000, monotonicMs: 1000, wallMs: now }, false);
+            else { serverClock.resetServerClock(); serverClock.acceptServerClockOffset(0, null, false); }
+            return replace(previous, next, current);
+        });
+    }
+    try {
+        await runPalmSignOutbox();
+        if (mode.endsWith('generation') || mode.endsWith('session') || mode.endsWith('bounds')) expect(callbackReached).toBe(true);
+        if (mode === 'delete-expired') expect(disk.rows.size).toBe(0);
+        else {
+            const kept = (await jobs())[0].job;
+            expect(kept.photo).toBe(old.job.photo);
+            if (mode === 'archive-expired') expect(kept.recovery).toBeTruthy();
+            else expect(kept.recovery).toBeUndefined();
+            if (mode === 'queue-future') expect(kept.signQueuedAt).toBe(now + 50);
+            if (mode === 'verified-preserve') expect(kept.signedVerifiedAt).toBe(now + 50);
+            if (initializing) expect(kept.signQueuedAt).toBeUndefined();
+        }
+        expect(requests).toEqual([]);
+    } finally { serverClock.resetServerClock(); }
+});
+
+
+it.each(['enqueue-unknown', 'enqueue-generation', 'retain-generation', 'retain-preserve'])('នាឡិកា outbox៖ %s', async mode => {
+    if (mode === 'enqueue-unknown') serverClock.resetServerClock();
+    const online = await queuedWithPolicy(false);
+    const old = (await jobs())[0];
+    if (mode === 'enqueue-unknown') { expect(old.job.signQueuedAt).toBeUndefined(); return; }
+    firebaseState.isDatabaseConnected = true;
+    serverClock.resetServerClock(); serverClock.acceptServerClockOffset(0, null, false);
+    try {
+        if (mode === 'enqueue-generation') {
+            disk.rows.clear();
+            const pending = gate<void>(); disk.commit = pending.promise;
+            const calls = vi.mocked(addSignJob).mock.calls.length;
+            const operation = persistPalmSignJob(old.job, () => true);
+            const outcome = operation.catch(error => error);
+            await vi.waitFor(() => expect(vi.mocked(addSignJob).mock.calls.length).toBe(calls + 1));
+            serverClock.resetServerClock(); serverClock.acceptServerClockOffset(0, null, false);
+            pending.resolve();
+            expect(await outcome).toBeInstanceOf(Error);
+            expect(disk.rows.size).toBe(0);
+        } else {
+            await actOnQueuedSign(old.row.id, 'archive');
+            const archived = (await jobs())[0];
+            const preserved = Date.now() + 50;
+            if (mode === 'retain-preserve') disk.rows.set(old.row.id, await sealSignJob(old.row.owner, key, { ...archived.job, signedVerifiedAt: preserved }));
+            const replace = vi.mocked(replaceSignJob).getMockImplementation()!;
+            let reached = false;
+            vi.mocked(replaceSignJob).mockImplementation(async (previous, next, current) => {
+                if (next && (await openSignJob(next, key)).signedCleanupConfirmed) {
+                    reached = true;
+                    if (mode === 'retain-generation') { serverClock.resetServerClock(); serverClock.acceptServerClockOffset(0, null, false); }
+                }
+                return replace(previous, next, current);
+            });
+            reservationFixtures = false;
+            network = async body => body.stage === 'status' ? reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: true }) : receipt(body);
+            online.mockReturnValue(true);
+            await actOnQueuedSign(old.row.id, 'recover');
+            expect(reached).toBe(true);
+            const kept = (await jobs())[0].job;
+            if (mode === 'retain-generation') expect(kept.signedVerifiedAt).toBeUndefined();
+            else expect(kept.signedVerifiedAt).toBe(preserved);
+            expect(kept.photo).toBe(old.job.photo);
+        }
+    } finally { disk.commit = null; serverClock.resetServerClock(); }
+});
+
+it.each(['unknown', 'generation', 'current'])('នាឡិកា outbox៖ retry %s', async mode => {
+    await queuedWithPolicy(false);
+    const old = (await jobs())[0];
+    firebaseState.isDatabaseConnected = true;
+    serverClock.resetServerClock();
+    if (mode !== 'unknown') serverClock.acceptServerClockOffset(0, null, false);
+    const queuedAt = Date.now() - 1000;
+    disk.rows.set(old.row.id, await sealSignJob(old.row.owner, key, { ...old.job, signQueuedAt: queuedAt, phase: 'action', continuationAllowed: true }));
+    const replace = vi.mocked(replaceSignJob).getMockImplementation()!;
+    let reached = false;
+    if (mode === 'generation') vi.mocked(replaceSignJob).mockImplementationOnce(async (previous, next, current) => {
+        reached = true;
+        if (mode === 'generation') { serverClock.resetServerClock(); serverClock.acceptServerClockOffset(0, null, false); }
+        return replace(previous, next, current);
+    });
+    try {
+        await actOnQueuedSign(old.row.id, 'continue');
+        const kept = (await jobs())[0].job;
+        if (mode === 'current') expect(kept.userRetryAt).toBeGreaterThan(queuedAt);
+        else { expect(kept.userRetryAt).toBeUndefined(); expect(kept.phase).toBe('action'); }
+        if (mode === 'generation') expect(reached).toBe(true);
+        expect(kept.signQueuedAt).toBe(queuedAt);
+        expect(kept.photo).toBe(old.job.photo);
+        expect(requests).toEqual([]);
+    } finally { serverClock.resetServerClock(); }
+});

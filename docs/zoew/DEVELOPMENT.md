@@ -1,0 +1,196 @@
+# ការអភិវឌ្ឍ ZoeW (React + Vite)
+
+ZoeW សរសេរលើ **React 19 + TypeScript + Vite**។ ឯកសារនេះសម្រាប់ **អ្នកអភិវឌ្ឍ** — របៀបប្រើ App
+ស្ថិតក្នុង [`README.md`](../../ZoeW/README.md)។ ឥរិយាបថ **ត្រូវបានវាស់** មិនមែនអះអាង ៖ ពាក្យបញ្ជាខាងក្រោម និង checker
+ក្នុង `audit-tools/` (`bash audit-tools/run-all.sh`) · លេខដែលវាស់បានរស់នៅ [`../HISTORY.md`](../HISTORY.md)
+(ប្រវត្តិរស់នៅ `docs/HISTORY*.md` ប៉ុណ្ណោះ)។
+
+### ឯកសារ
+
+| ឯកសារ | មាតិកា |
+|---|---|
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | ស្រទាប់ · ឃ្លាំង state · SW · ដំណើរការចាប់ផ្តើម |
+| [`TYPESCRIPT.md`](TYPESCRIPT.md) | វិន័យ type និងផ្លូវតឹងបន្តិចម្តងៗ |
+| [`EXTENDING.md`](EXTENDING.md) | កន្លែងដាក់កូដថ្មី (state · component · lifecycle · platform) |
+| [`ANDROID.md`](ANDROID.md) | App Android (Capacitor) |
+| [`README.md`](../../ZoeW/README.md) | របៀបប្រើ App (កំណែ · មុខងារ · របៀបប្រើប្រាស់ · សុវត្ថិភាព · អាជ្ញាប័ណ្ណ) |
+
+---
+
+## ១. កំណែ
+
+| អ្វី | តម្លៃ | ដេរីវេពី |
+|---|---|---|
+| កំណែ App | `APP_VERSION` | [`src/core/version.ts`](../../ZoeW/src/core/version.ts) |
+| កំណែ cache របស់ Service Worker | `CACHE_VERSION` | [`src/sw/cache-version.ts`](../../ZoeW/src/sw/cache-version.ts) |
+| Node ដែលត្រូវការ | `^22.17` · `>=24` | `package.json` (`engines`) |
+
+⛔ `dist/manifest.json` ទទួលកំណែពី `src/core/version.ts` អំឡុង build (`vite.config.mts`) ហើយ `index.html`
+គ្មានលេខកំណែជា literal។ `public/manifest.json` នៅផ្ទុក literal ➜ `audit-tools/version-check.js` ចាក់សោឲ្យស៊ី ·
+`version-bump-scope.js` ចាក់សោថា កូដ ship ប្រែ ➜ ត្រូវឡើងកំណែ (`CLAUDE.md` ច្បាប់ ៦)។
+
+---
+
+## ២. មុខងារ
+
+មុខងារទាំងអស់របស់ ZoeW ៖
+
+- **បញ្ចូល និងកែកញ្ចប់** — ស្កេនដោយកាមេរ៉ា · ម៉ាស៊ីនស្កេនដៃ · រូបភាព · វាយដោយដៃ
+- **លុយ COD និង DOD** — ledger ថ្ងៃ និងខែ · ច្បាប់ «លុប» ទល់នឹង «ដក» · អត្រាប្រាក់រៀល
+- **ស្ថិតិយក** — តាមសំណុំ barcode (មិនមែន counter) · ចំណូលប្រចាំថ្ងៃ · របាយការណ៍ខែ
+- **ទីតាំង Locker** — កំណត់ទូ · ចាត់តាំង · ផ្លាស់ទី
+- **ធុងសំរាម និងការស្តារ** — គោលការណ៍តាមរបៀប ZTO Login/Cookie/Lookup ផ្សេងក្នុង [`CLAUDE.md`](../../CLAUDE.md) · ៧ ថ្ងៃ · ៣០ ថ្ងៃ · ២ ថ្ងៃ
+- **Lookup អតិថិជន** — ZTO · Google Apps Script · តារាងអតិថិជនក្នុងឧបករណ៍
+- **ZTO** — ពិនិត្យស្ថានភាព «បិទរួច» · បិទស្វ័យប្រវត្តិ · ទាញបញ្ជីកញ្ចប់
+- **នាំចូល Excel ទៅ Sheet** និង **Export** (Excel · PDF · CSV)
+- **សុវត្ថិភាព** — PIN · ក្រយៅដៃ/មុខ (WebAuthn) · ចាក់សោពេលបើក App · License
+- **ដំណើរការក្រៅបណ្តាញ** — PWA · Service Worker · Pull-to-refresh លើ iOS
+
+### រចនាសម្ព័ន្ធដែលប្រើបច្ចុប្បន្ន
+
+| ចំណុច | ប្រភព និងដំណើរការ |
+|---|---|
+| កូដ | module React/TypeScript ក្នុង `src/**`; TypeScript ពិនិត្យតាម `tsconfig.app.json` |
+| សំបក SW | បញ្ជីដេរីវេពី build ពិត; ឈ្មោះ asset មាន hash |
+| សកម្មភាព | ចុះបញ្ជីដែលពិនិត្យពេល build; JSX ប្រើ handler របស់ React |
+| ការគូរ | React ជាម្ចាស់ DOM; អត្ថបទតាម JSX និងជួរតាម `key` |
+| ឯកសារ | `npm run doc:check` ផ្ទៀងការអះអាងដែលដេរីវេបាន |
+
+រចនាសម្ព័ន្ធពេញនៅ [`ARCHITECTURE.md`](ARCHITECTURE.md); ប្រវត្តិផ្ទេរពី vanilla នៅ [បណ្ណសារ](../HISTORY-ARCHIVE.md) ផ្នែក ៦។
+
+---
+
+## ៣. របៀបប្រើប្រាស់
+
+### ដំឡើង និងអភិវឌ្ឍ
+
+```bash
+npm ci
+npm run dev              # server អភិវឌ្ឍន៍ (http://localhost:5173)
+```
+
+Dependency របស់ App និងតេស្តប្រើកំណែដែលចាក់សោក្នុង `ZoeW/package-lock.json` តែមួយ។ `audit-tools/zoew/prepare-dependencies.mjs` រៀបចំ `audit-tools/zoew/node_modules` ជា symlink ទៅ `ZoeW/node_modules` (Windows ប្រើ junction); បើមានថត ឬតំណខុស គឺបដិសេធដោយមិនជាន់ទិន្នន័យ។ npm ហៅ hooks ខាងក្រោមដោយស្វ័យប្រវត្តិ។
+
+| Hook | ពេលរត់ |
+|---|---|
+| `npm run postinstall` | ក្រោយដំឡើង dependency |
+| `npm run pretypecheck` | មុនពិនិត្យ TypeScript |
+| `npm run prelint` | មុន ESLint |
+| `npm run pretest` | មុន Vitest |
+| `npm run pretest:watch` | មុន Vitest តាមដាន |
+| `npm run prebuild` | មុន build web |
+| `npm run prebuild:android` | មុន build Android |
+| `npm run preaudit:build` | មុន build សម្រាប់វាស់ |
+
+### Build និងពិនិត្យ
+
+```bash
+npm run build            # ពិនិត្យ type រួច build ➜ dist/
+npm run verify           # ការពិនិត្យ ZoeW រួម; មិនរួម rules:check និង audit-tools ពេញ
+```
+
+ការងារក្នុង session រត់តែការពិនិត្យលឿន និងតេស្តពាក់ព័ន្ធ; suite ពេញ និងការរង់ចាំ Audit CI ទាំង ៤ ផ្នែក តាម [Runbook](../../CLAUDE.md#-runbook)។
+
+| ពាក្យបញ្ជា | អ្វីដែលវាធ្វើ |
+|---|---|
+| `npm run typecheck` | ពិនិត្យ TypeScript |
+| `npm run lint` | ESLint |
+| `npm test` | Vitest (រួមទាំងសោតំបន់ហាម `audit-tools/zoew/tests/forbidden-zone-lock.test.ts` ៖ PTR · ចលនាផ្ទាំង · ការរមូរ · `app.css` — ច្បាប់ ៖ `CLAUDE.md` «Forbidden zone») |
+| `npm run rules:check` | វាស់ច្បាប់ **លុប/ដក** និងព្រំដែនពេលវេលា; matrix របៀប ZTO Login/Cookie រស់នៅ checker ពហុឧបករណ៍ (គោលការណ៍ក្នុង `CLAUDE.md`) ដោយទិន្នន័យសងខាងព្រំដែន (±១ នាទី) លើ build web និង Android រួចប្រៀប DB ចុងក្រោយ Android ទល់ web |
+| `npm run slot:check` | ផ្ទៀងផ្ទាត់ថាកូដ imperative **មិនប៉ះកូន** របស់ធាតុដែល React ជាម្ចាស់ (បើប៉ះ ➜ App ស) |
+| `npm run purity:check` | **React ១០០%** ៖ កូដមុខងារ (`core` · `domain` · `features` · `services` · `ui` · `platform`) ប៉ះ DOM **០** កន្លែង · ស្រទាប់ React (`src/app/**`) សរសេរ DOM **០** ក្រៅច្រកចេញ (`refs.ts` · `DocumentEffects` · ពិដានតឹង) · component មិនស្វែងរក DOM តាម id · ឈ្មោះ ref គ្រប់ឈ្មោះមាន `ref={…}` ពិតចង (មើល [`ARCHITECTURE.md`](ARCHITECTURE.md) ផ្នែក ១១) |
+| `npm run smoke` | Build tree ដែលចង់វាស់មុន; checker បដិសេធ manifest/SW version ខុសពី source មុនបើក browser · រកកំហុស runtime · ⛔ build ផលិតកម្មគ្មាន bridge វាស់ (`expose-globals` · `__auditRebind`) · syntax ក្នុង build ស្ថិតក្នុង `build.target` · design token CSS (`--x: value`) ទៅដល់ build ដូចដែលសរសេរ (minifier CSS មិនសរសេរតម្លៃឡើងវិញ) |
+| `npm run money:core` | ស្រង់កូដលុយពិតចូល `audit-tools/money-core.js` សម្រាប់ `check-money.cmd` (អ្នកយាមភាពស្រស់ធ្លាក់ពេលកូដលុយប្រែ) |
+| `npm run sw:check` | Build មុន ហើយផ្ទៀង manifest/cache version, activated worker និងសំបកក្នុង cache ដែលរំពឹង; `DIST_DIR` ជ្រើស build ផ្សេង។ ការផ្ទៀងកំណែមិនជំនួស rebuild ពេល source ប្រែតែកំណែដដែលទេ |
+| `npm run doc:check` | ផ្ទៀងផ្ទាត់ថាការអះអាងក្នុងឯកសារស៊ីនឹងកូដ (បញ្ជី slot · កំណែ · ពាក្យបញ្ជា) |
+| `npm run audit:build` | build វាស់ (`dist-audit/ZoeW`) សម្រាប់ `audit-tools/` — ⛔ `bash audit-tools/run-all.sh` (ពី root) build វាដោយខ្លួនឯង ហើយរត់ checker ទាំងអស់ |
+| `npm run build:only` | build ដោយរំលងការពិនិត្យ type (ប្រើក្នុង `verify` ដែលពិនិត្យរួច) |
+| `npm run notice:check` | build ជាមួយ sourcemap ចូលថតបណ្តោះអាសន្ន ➜ រាល់កញ្ចប់ npm ដែលចូល `dist/assets` និងឯកសារ vendor (`xlsx` · `zxing-wasm`) ត្រូវមាន `ឈ្មោះ@កំណែ` ដែល ship ពិតក្នុង `NOTICE` (root) |
+| `npm run preview` | បម្រើ `dist/` ក្នុងស្រុកដើម្បីសាកមើល |
+| `npm run test:watch` | Vitest ក្នុងរបៀបតាមដាន |
+| `npm run build:android` | build សម្រាប់ App Android (`--mode android` ➜ អាន `.env.android`) |
+| `npm run android:sync` | build Android រួចចម្លងចូល `android/` (`cap sync android`) |
+| `npm run android:open` | បើក `android/` ក្នុង Android Studio |
+| `npm run android:icons` | បង្កើត logo និង splash របស់ Android ពី `resources/icon.svg` |
+| `npm run android:check` | ចាក់សោលេខកំណែ APK · appId · សិទ្ធិ · logo · plugin · web មិនផ្ទុកកូដ native · config Gradle/AGP/SDK ស្ថិតក្នុងខ្សែ template របស់ Capacitor ដែលដំឡើង · workflow release APK ↔ keystore |
+| `npm run native:check` | សាក App ជាមួយ bridge Capacitor ក្លែងក្នុង Chromium (Back · ប្រវត្តិ · pause/resume · Export/Share/Print · ជីវមាត្រ · PTR) និងតារាងប្រវត្តិវែង (App និង PWA លើ Android បង្ហាញជួរជុំវិញទីតាំងរមូរ · iPhone បន្ថែមជួរ · ជួរកម្ពស់ខុសគ្នា · គ្មានចន្លោះទទេ · modal · sync · ប្តូរតម្រង ➜ កំពូល) |
+
+### Deploy ទៅ Netlify
+
+1. **Base directory** ៖ **`ZoeW`** — ⛔ **ប្រកាន់អក្សរតូចធំ** (Linux)
+2. **Build command** ៖ `npm run build`
+3. **Publish directory** ៖ `dist`
+4. **Functions directory** ៖ `netlify/functions`
+
+`netlify.toml` ក្នុងថតនេះផ្ទុក header · CSP · redirect រួចរាល់ហើយ។
+⛔ **កុំដាក់ `netlify.toml` នៅ root របស់ repo** — Netlify អានវាសម្រាប់ site
+ទាំងអស់ ➜ វាបង្វែរ build របស់ App ផ្សេង។
+
+### Deploy preview · ឧបករណ៍ពិត · ការថយក្រោយ
+
+1. បើក PR ➜ Netlify សាង **deploy preview** (URL ដាច់ពីផលិតកម្ម) ➜ deploy log ត្រូវឃើញ `npm run build` · `vite build`
+   ហើយ publish ថត `dist`។
+2. ⛔ PR ដែលប៉ះ PTR · ចលនាផ្ទាំងប្រវត្តិ · ការរមូរ · ផ្លូវ native ➜ សាកលើ **iPhone ពិត (PWA ដំឡើងលើអេក្រង់ដើម) និង Android
+   ពិត** មុន merge (`CLAUDE.md` ច្បាប់ ១១) ៖ checker ក្នុង `audit-tools/` វាស់ក្នុង Chromium ដែល **ធ្វើត្រាប់តាម** iOS មិនមែន
+   WebKit ពិត។
+3. ⚠️ Deploy preview មាន **origin ផ្សេង** ➜ storage ទទេ ៖ បញ្ចូល Config ហើយ **Activate** ម្តងទៀត។ ⛔ ការ Activate នោះស៊ីកៅអី
+   ឧបករណ៍ (`maxDevices`) ដូចឧបករណ៍ថ្មីមួយ ➜ ប្រើ Key សាកល្បង ឬដោះកៅអីក្នុង ZoeKeyGen ក្រោយសាករួច។ ប្រើ **backend សាកល្បងដាច់ដោយឡែក** ជាមួយទិន្នន័យសំយោគ។
+   ⛔ មិនអនុញ្ញាតឱ្យ preview និងផលិតកម្ម ឬ tab/ឧបករណ៍កំណែខុសគ្នា សរសេរចូល backend ដូចគ្នា ដោយសន្មតថាច្បាប់នៅស៊ីគ្នាទេ។ ផ្ទៀង client/rules/migrations និងផែនការ rollout ក្នុង [HISTORY](../HISTORY.md) មុនការសាកដែលប្រើ backend រួម; បិទ tab/ឧបករណ៍ចាស់មុនផ្លាស់កំណែ។
+   ប្រើតំណ PR មានស្ថិរភាព `https://deploy-preview-<លេខ PR>--zoew.netlify.app` ឬ `https://deploy-preview-<លេខ PR>--zoekeygen.netlify.app`។ កម្មវិធីទាញ `/.netlify/functions/server-time` ពី origin របស់តំណនោះ ហើយ endpoint អនុញ្ញាតតែ preview ដែលត្រូវនឹង host ខ្លួនពិតប្រាកដ។ ផ្ទៀង HTTP 200, JSON/nonce និង trusted time លើតំណដែលបាន deploy មុនសាក Activate; ការអានម៉ោងជោគជ័យមិនជំនួសការផ្ទៀង Auth ឬ License ទេ។
+   Branch deploy, deploy permalink, site ផ្សេង, HTTP និង port ផ្ទាល់ខ្លួន មិនមែន origin សម្រាប់ preview clock ដែលគាំទ្រ។ Origin ផលិតកម្មទាំង ២ និង Android `https://localhost` រក្សាផ្លូវម៉ោងផលិតកម្ម; HTTP localhost នៅតែទទួល **403**។ កុំបើក wildcard origin ឬបន្ថែម origin ក្រៅវិសាលភាពនេះដោយគ្មានការអនុញ្ញាត។
+   Config សាកប្រើ endpoint ZTO នៅ origin របស់ preview នោះ; URL ZTO ផលិតកម្មជា absolute URL មិនមែនច្រកដែល preview ទុកចិត្ត។ Supabase register/reset ដែលប្រើ custom endpoint ត្រូវមាន exact preview origin ក្នុង allowlist របស់ backend ដែលម្ចាស់អនុញ្ញាត; password login ធម្មតាមិនពឹង OAuth redirect allowlist ទេ ប៉ុន្តែត្រូវសាក Auth flow ពិតដោយឡែក។ WebAuthn របស់ ZoeKeyGen ចងនឹង RP/origin; credential ផលិតកម្មមិនជំនួសការចុះឈ្មោះលើ preview ទេ។
+4. **ការថយក្រោយ** ៖ មុន rollback ត្រូវផ្ទៀងថា **client** គោលដៅស៊ីនឹង **rules** និង **migrations** ដែលបានដាក់ប្រើ ហើយរក្សា journal/receipt និង **pending/unknown** ទាំងអស់។ មិនត្រូវលុប ឬបញ្ច្រាស migration ដែល merge រួច ដើម្បីឱ្យ client ចាស់ដើរទេ។
+   បើភាពស៊ីគ្នាមិនទាន់បញ្ជាក់ ត្រូវផ្អាក rollback និងរៀបផែនការស្តារដែលរក្សាទិន្នន័យ។ ក្រោយបញ្ជាក់ និងម្ចាស់អនុញ្ញាត ទើប Netlify UI ➜ **Deploys** ➜ deploy ដែលបានផ្ទៀង ➜ **Publish deploy** ឬ `git revert` ➜ build ថ្មី; បិទ tab/ឧបករណ៍ចាស់តាមផែនការ rollout។
+5. **Service Worker** ៖ SW លុប cache `zoew-` ទាំងអស់ដែលមិនមែន `CACHE_VERSION` បច្ចុប្បន្ន (`src/sw/cache-version.ts`) ហើយ SW
+   ថ្មីជំនួសខ្លួនពេលដំឡើងរួច (`skipWaiting` + `clients.claim`) ➜ អ្នកប្រើនៅឃើញ App ចាស់ ៖ បិទបើក App ២ ដង។
+6. ⛔ ការ deploy មិនកែ Firebase rules ទេ — កំណែដែលបន្ថែម path ថ្មីប្រាប់ «Publish rules» ក្នុងសកម្មភាពដោយដៃរបស់វា
+   (`CLAUDE.md` ច្បាប់ ១០) · migration Supabase ចូល live តាម GitHub integration ពេល merge ចូល `main`
+   ([`../../supabase/README.md`](../../supabase/README.md))។
+
+### ការដាក់ប្រើ Restore និង pickup journal
+
+មុនដាក់ client ដែលប្រើ Restore journal `protocol: 3` ត្រូវមានការអនុញ្ញាត deployment ហើយដាក់ backend មុន៖
+
+1. Firebase ប្រើ `firebase-database.rules.min.json` ដែលផ្ទៀងវាល `restoreGuard` នៅ `zoew_daily_pickup_cod_dod/<day>`; Supabase អនុវត្ត migration rules ថ្មីដែល compile ពីប្រភពដូចគ្នា តាមលំដាប់ឈ្មោះ។ ផ្ទៀង backend ដែល Config ជ្រើស មុនបើក Restore។ Rules ចាស់បដិសេធ `restoreGuard`; client រក្សាការងាររង់ចាំ គ្មាន fallback សរសេរដោយគ្មាន guard។ ការសាក local មិនបញ្ជាក់ថាបាន Publish ឬអនុវត្ត migration រួចទេ។
+2. អាប់ដេតគ្រប់ tab/PWA/APK ដែលអាច Restore មុនឱ្យធ្វើការរួមគ្នា រួមឧបករណ៍ចាស់ដែល offline។ Restore journal ថ្មីរក្សាក្រោម prefix `zoew_pickup_journal_v2:` ដដែល ដោយមាន `protocol: 3`, `kind: 'restore'` និង `restorePlan`។ Client ចាស់ដែលស្គាល់តែ protocol ២ បដិសេធការអាន protocol ៣ រក្សា bytes ដើម និងទប់ការទទួល pickup intent ថ្មី; វាមិនមែន upgrade ដែលអាចប្រើកំណែចាស់/ថ្មីលាយដោយស្វ័យប្រវត្តិទេ។ កុំ clear storage, ប្ដូរ prefix/protocol ដោយដៃ ឬ downgrade client ដើម្បីរំលងការរង់ចាំ។
+3. Journal រក្សា UID/ហាង/ថ្ងៃ, Reset epoch ដើម, finalization `zoew_restore_finalizations` (F), consumption `zoew_trash_consumptions` (K) និងអត្តសញ្ញាណ Barcode ដើម។ ការចាប់ផ្ដើមក្រោយបិទ App អាចបន្តតែពេល journal ដើមត្រឹមត្រូវនៅមាន និងការអាន Server ផ្គូផ្គង F/K, កញ្ចប់, ថ្ងៃ, លេខទូរស័ព្ទដើមជាខ្សែអក្សរ និង lifecycle របស់ Barcode។ `phoneKey` ជាអត្តសញ្ញាណក្នុងស្ថិតិ ដាច់ពី raw phone ដែលត្រូវផ្ទៀងដូចតម្លៃក្នុងជួរ; key ដែល sanitize ដូចគ្នាមិនបញ្ជាក់ថាលេខដើមដូចគ្នាទេ។ Raw phone ខ្វះ/មិនមែន string, proof ខ្វះ/ផ្ទុយ, session ប្ដូរ ឬការអានមិនបាន រក្សា HOLD។ Journal protocol ២ ដែលគ្មាន Restore plan មិនត្រូវបម្លែងឬទាយភស្តុតាងឡើងវិញ។
+4. ការបូក pickup របស់ Restore ធ្វើ CAS តាម Barcode មួយៗជាលំដាប់ ដោយផ្ទៀង revision និង Reset epoch។ Server ផ្ទៀង `restoreGuard` ក្នុង transaction ដូចគ្នា ទល់នឹង F/K និង Barcode ក្នុងស្ថានភាពដែលសំណើសរសេរទាំងមូលនឹង commit សូម្បី guard ត្រូវបានទុកដដែលក្នុងការសរសេរបន្ទាប់។ ការប្រែប្រួលក្រោយ client អានមិនអាចប្រើ proof ចាស់ដើម្បីបូកបានទេ។ Guard មាន envelope ១៥ fields និង target តែមួយ ៧ fields; `target.slot` ជាខ្សែអក្សរ `String(index)` របស់ index ដែលជាលេខគត់ត្រឹមត្រូវ និង `scanIntent: ''` ទាមទារថា field នោះអវត្តមានលើ Server។ Ordinary pickup writer មិនយក guard ចាស់មកប្រើឡើងវិញ។ Reset epoch ថ្មីមិនបូកស្ថិតិពីមុន Reset ត្រឡប់; ការបញ្ចប់ត្រូវរក្សាភស្តុតាង `reset-cancelled` តាម contract ដើម។
+
+F មិនត្រូវសម្អាតមុន pickup journal បញ្ចប់ដោយភស្តុតាង; ការសម្អាតផ្ទៀង token ដើម។ K នៅជាភស្តុតាង lifecycle តាម retention ដែលមានស្រាប់; គ្មាន TTL ថ្មីសម្រាប់ដោះ UNKNOWN។ ឧបករណ៍ថ្មីដែល storage ទទេអាចអានស្ថានភាព committed ប៉ុន្តែមិនអាចបង្កើត intent ដែលបាត់ពីឧបករណ៍ដើម ឬសម្រេច Restore ដោយគ្មាន journal/proof បានទេ។ រក្សា journals/receipts និងផ្ទៀង outcome ដាច់ដោយឡែកមុន rollback ឬការសង្គ្រោះដោយដៃ។
+
+ការវាស់ client recovery និង server guard ជាភស្តុតាងដាច់ពីគ្នា៖ [កាតាឡុកអ្នកយាម](../../audit-tools/README.md)។ Hosted rollout, old/new-client operation និងការបិទ/បើកលើឧបករណ៍ពិតនៅត្រូវការការផ្ទៀងក្នុងបរិស្ថានដែលបានអនុញ្ញាត។
+
+### `src/` ជាប្រភពការពិត
+
+កូដក្នុង `src/**` ជា **ប្រភពការពិតតែមួយ** ហើយកែដោយដៃ — ឯកសារដែលផលិត និងបញ្ជី slot ដែល `doc:check` ·
+`slot:check` អាន ៖ [ARCHITECTURE.md](ARCHITECTURE.md) ផ្នែក ៩។
+
+### App Android (Capacitor)
+
+មើល [`ANDROID.md`](ANDROID.md) ៖ build APK · លេខកំណែ · logo · ការកំណត់ ·
+ការសាកលើទូរស័ព្ទពិត។ របៀបបន្ថែមមុខងារ (state · lifecycle · platform) ៖
+[`EXTENDING.md`](EXTENDING.md)។
+
+---
+
+## ៤. ប្រព័ន្ធសុវត្ថិភាព
+
+- **CSP គ្មាន `'unsafe-inline'` ក្នុង `script-src`** — build មិនបញ្ចេញ
+  inline script សោះ (`modulePreload.polyfill` បិទ) ហើយ handler ទាំងអស់
+  ជា handler របស់ React មិនមែន attribute `on*=` ។
+- **សកម្មភាពមានព្រំដែន** — `lookupAction()` អនុញ្ញាតតែ function ក្នុង `ACTION_REGISTRY` ដែលកែដោយដៃ។
+  TypeScript ផ្ទៀង import; ឈ្មោះសកម្មភាពដែលមិនស្គាល់ត្រូវបដិសេធពេលរត់។
+  ការភ្ជាប់ប៊ូតុង និងកញ្ចក់ `ACTION_ALLOWLIST` សម្រាប់ audit ត្រូវផ្ទៀងតាមតេស្ត។
+- **ការគេចអក្សរ** — React គេចអត្ថបទទាំងអស់ដោយស្វ័យប្រវត្តិ។
+- **secret** — `redactDeep()` លាក់វាមុនផ្ញើទៅ Sentry; PIN ដេរីវេជាកូនសោ AES។ ការរក្សាកូនសោ និងការស្តារក្រោយ reload
+  ពិពណ៌នាក្នុង [README ផ្នែកទិន្នន័យរសើប](../../ZoeW/README.md#ទិន្នន័យរសើប)។
+- **License** — ផ្ទៀងផ្ទាត់ដោយ ECDSA បូកពិដានឧបករណ៍ក្នុងមួយ Key ខាង server ។
+- **ធនធានស្កេន និង SheetJS មកពី origin របស់ App** — ឯកសារ vendor នៅក្នុង repo ហើយអាច cache សម្រាប់ប្រើក្រៅបណ្តាញ។
+  Firebase SDK ផ្ទុកពី `www.gstatic.com` ពេលមិនប្រើ Config Supabase; Sentry ផ្ទុក SDK ពី `browser.sentry-cdn.com`
+  ជាមួយ SRI ពេល SDK មិនទាន់មាន។ Loader ទាំងពីរមិនមាន SDK បម្រុងក្នុង bundle ទេ; កុំសន្មតថាការបើក App លើកដំបូងអាចដំណើរការដោយគ្មានបណ្តាញ។
+
+---
+
+## ៥. អាជ្ញាប័ណ្ណ
+
+កម្មសិទ្ធិឯកជន។ រក្សាសិទ្ធិគ្រប់យ៉ាង។

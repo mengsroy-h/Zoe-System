@@ -26,7 +26,7 @@ IMPORTPAIRED_BASE_SOURCE="${IMPORTPAIRED_BASE_SOURCE:-$BASE}"
 
 # ── ZoeW React ៖ checker វាស់ «root វាស់» មិនមែនប្រភព ─────────────────────────
 # ZoeW ជា React (`ZoeW/src/**` ➜ Vite)។ checker ស្រង់ function ពី `ZoeW/app.js` · អាន markup ពី
-# `ZoeW/index.html` · បើក App ក្នុង browser ➜ ទាំងនោះរស់នៅ **build វាស់** (`ZoeW/scripts/build-audit.mjs`
+# `ZoeW/index.html` · បើក App ក្នុង browser ➜ ទាំងនោះរស់នៅ **build វាស់** (`audit-tools/zoew/scripts/build-audit.mjs`
 # ➜ `ZoeW/dist-audit/ZoeW` ៖ ទិដ្ឋភាពអត្ថបទនៃ src ពិត + bundle Vite ពិត + prerender)។ ដូច្នេះ run-all ៖
 #   ១. build វាស់ពីប្រភពពិត (ធ្លាក់ ➜ FAIL មិនមែនវាស់ build ចាស់)
 #   ២. ផ្គុំ root វាស់ ៖ ឯកសារ repo ទាំងអស់ លើកលែង ZoeW/ ដែលជំនួសដោយ build វាស់
@@ -97,7 +97,14 @@ runall_tree_hash() (  # <root>
 zoe_build_audit() {  # <src root>
     local log
     [ -e "$1/ZoeW/node_modules" ] || ln -s "$ZOE_NODE_MODULES" "$1/ZoeW/node_modules"
-    if ! log=$( (cd "$1/ZoeW" && node scripts/build-audit.mjs) 2>&1 ); then
+    if ! log=$( (cd "$1/ZoeW" && {
+        if [ -f ../audit-tools/zoew/scripts/build-audit.mjs ]; then
+            node ../audit-tools/zoew/prepare-dependencies.mjs && node ../audit-tools/zoew/scripts/build-audit.mjs
+        else
+            # baseline មុនការផ្ទេរថត រក្សាផ្លូវ build ដើមរបស់ commit នោះ។
+            node scripts/build-audit.mjs
+        fi
+    }) 2>&1 ); then
         echo "*** FAIL *** build វាស់ធ្លាក់ ($1)"; printf '%s\n' "$log" | tail -20 | sed 's/^/      /'
         return 1
     fi
@@ -1050,6 +1057,7 @@ run "exit-code-integrity 1/4 (meta)" node audit-tools/exit-code-integrity.js --p
 run "exit-code-integrity 2/4 (meta)" node audit-tools/exit-code-integrity.js --part=2/4
 run "exit-code-integrity 3/4 (meta)" node audit-tools/exit-code-integrity.js --part=3/4
 run "exit-code-integrity 4/4 (meta)" node audit-tools/exit-code-integrity.js --part=4/4
+run "test-placement" node audit-tools/test-placement-test.js
 run "version-bump-scope" node audit-tools/version-bump-scope.js
 run "semantic-ui-color" node audit-tools/semantic-ui-color-test.js
 run "user-guide" node audit-tools/user-guide-test.js
@@ -1197,7 +1205,7 @@ section "== ខ្សែសង្វាក់នាំចូល (zto-import) =="
 # ⛔ ចំណាំ ៖ `zto-import` ជាខាង **server** នៃមុខងារ «នាំចូល Excel ទៅ Sheet»
 # ដែលរស់នៅក្នុង ZoeW តាំងពីកំណែ 2.21.0 (App `ZoeImport` ត្រូវលុបចេញហើយ) ➜
 # វាកាន់តែសំខាន់ជាងមុន។ ខាង client ចាក់សោដោយ `sheet-import-test.js`។
-run "zto-import/test.js" node zto-import/test.js
+run "audit-tools/zto-import/test.js" node audit-tools/zto-import/test.js
 
 section "== Supabase (Project តែមួយ ៖ tenant · RLS · ឃ្លាំងទិន្នន័យ · Edge Functions) =="
 # ⛔ Postgres ពិត (major ពី supabase/config.toml) + supabase-js ពិត ➜ `npm ci --prefix supabase`
@@ -1362,6 +1370,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     HANGGUARD_APP_DIR="$BASE" node audit-tools/hang-guard.js 2>&1 | tail -1 | sed 's/^/   hang-guard:      /'
     RUNALLRUNNER_APP_DIR="$BASE" node audit-tools/runall-runner-test.js 2>&1 | tail -1 | sed 's/^/   runall-runner:   /'
     EXITCODE_APP_DIR="$BASE" runall_owned node audit-tools/exit-code-integrity.js 2>&1 | tail -1 | sed 's/^/   exit-code:       /'
+    TESTPLACEMENT_APP_DIR="$BASE" node audit-tools/test-placement-test.js
     VERSIONSCOPE_APP_DIR="$BASE" node audit-tools/version-bump-scope.js 2>&1 | tail -1 | sed 's/^/   version-scope:   /'
     BOOTANIM_APP_DIR="$BASE" node audit-tools/boot-animation-test.js 2>&1 | tail -1 | sed 's/^/   boot-animation:  /'
     INLINEXSS_APP_DIR="$BASE" node audit-tools/inline-handler-xss-test.js 2>&1 | tail -1 | sed 's/^/   inline-xss:      /'
@@ -1498,7 +1507,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     FNSURFACE_APP_DIR="$BASE" node audit-tools/function-surface-test.js 2>&1 | tail -1 | sed 's/^/   function-surface: /'
     DUPCODE_APP_DIR="$BASE" node audit-tools/code-duplication-test.js 2>&1 | tail -1 | sed 's/^/   code-duplication: /'
     SHEETIMPORT_APP_DIR="$BASE" node audit-tools/sheet-import-test.js 2>&1 | tail -1 | sed 's/^/   sheet-import:    /'
-    ZTO_IMPORT_APP_DIR="$BASE/zto-import" node zto-import/test.js 2>&1 | tail -1 | sed 's/^/   zto-import:      /'
+    ZTO_IMPORT_APP_DIR="$BASE/zto-import" node audit-tools/zto-import/test.js 2>&1 | tail -1 | sed 's/^/   zto-import:      /'
     APPLOCK_APP_DIR="$BASE" node audit-tools/app-lock-test.js 2>&1 | tail -1 | sed 's/^/   app-lock:        /'
     LEAK_APP_DIR="$BASE" node audit-tools/listener-leak-test.js 2>&1 | tail -1 | sed 's/^/   listener-leak:   /'
     STALLGUARD_APP_DIR="$BASE" node audit-tools/stall-guard-test.js 2>&1 | tail -1 | sed 's/^/   stall-guard:     /'

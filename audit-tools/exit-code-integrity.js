@@ -9,7 +9,7 @@ try { acorn = require('acorn'); } catch (e) { console.log('SKIP — ត្រូ
 const ROOT = process.env.EXITCODE_APP_DIR || path.join(__dirname, '..');
 const TOOLS = path.join(ROOT, 'audit-tools');
 const RUNALL = path.join(TOOLS, 'run-all.sh');
-const ZTO_IMPORT_TEST = '../zto-import/test.js';
+const ZTO_IMPORT_TEST = 'zto-import/test.js';
 
 let pass = 0, fail = 0;
 function ok(label, cond, detail) {
@@ -35,13 +35,13 @@ function checkersFromRunAll() {
         }
     }
     const normal = sh.replace(/^\s*#.*$/gm, '').split(/if \[ -n "\$BASE" \]/)[0];
-    if (/^\s*run\s+"[^"]*"\s+node\s+zto-import\/test\.js(?=\s|$)/m.test(normal)) found.add(ZTO_IMPORT_TEST);
+    if (/^\s*run\s+"[^"]*"\s+node\s+audit-tools\/zto-import\/test\.js(?=\s|$)/m.test(normal)) found.add(ZTO_IMPORT_TEST);
     return [...found].filter((f) => f !== 'owned-rtdb-command.js' && fs.existsSync(path.join(TOOLS, f)));
 }
 
 const checkers = checkersFromRunAll();
 const MIN_CHECKERS = 40;
-ok('zto-import/test.js ៖ រកឃើញការរត់ពិតក្នុងផ្នែកធម្មតា', checkers.includes(ZTO_IMPORT_TEST));
+ok('audit-tools/zto-import/test.js ៖ រកឃើញការរត់ពិតក្នុងផ្នែកធម្មតា', checkers.includes(ZTO_IMPORT_TEST));
 ok('ជាន់អប្បបរមា៖ រកឃើញ checker ក្នុង run-all.sh >= ' + MIN_CHECKERS + ' (ឃើញ ' + checkers.length + ')',
     checkers.length >= MIN_CHECKERS, { found: checkers.length });
 if (checkers.length < MIN_CHECKERS) {
@@ -700,7 +700,7 @@ if (PART && PART.n > 1) {
 // (រួមទាំង SIGKILL) **មិនអាចធ្វើឲ្យ repo ខូចបានទេ**។ សំណល់ដែលនៅសល់ជា
 // ឯកសារ `.tmp-poison-*` ដែលគ្មានគ្រោះថ្នាក់ ហើយត្រូវបោសចោលពេលចាប់ផ្តើម។
 const POISON_PREFIX = '.tmp-poison-';
-const POISON_DIRS = [TOOLS, path.join(TOOLS, 'emu'), path.join(ROOT, 'zto-import')];
+const POISON_DIRS = [TOOLS, path.join(TOOLS, 'emu'), path.join(TOOLS, 'zto-import')];
 
 function sweepPoisonLeftovers() {
     for (const dir of POISON_DIRS) {
@@ -808,11 +808,11 @@ console.log('   (ពុល ' + timings.length + ' checker ក្នុង ' + ((
 
 const MIN_POISONED = 25;
 if (process.env.EXITCODE_CHILD || mine.includes(ZTO_IMPORT_TEST)) {
-    ok('zto-import/test.js ៖ ពុលការអះអាងពិតយ៉ាងតិច ៦៩ ➜ exit 1 ហើយឯកសារដើមមិនប្រែ',
+    ok('audit-tools/zto-import/test.js ៖ ពុលការអះអាងពិតយ៉ាងតិច ៦៩ ➜ exit 1 ហើយឯកសារដើមមិនប្រែ',
         ztoPoison && ztoPoison.rc === 1 && ztoPoison.passed === 0 && ztoPoison.failed >= 69 && ztoPoison.unchanged,
         ztoPoison);
 } else {
-    console.log('   (zto-import/test.js ពុលក្នុងផ្នែកផ្សេង)');
+    console.log('   (audit-tools/zto-import/test.js ពុលក្នុងផ្នែកផ្សេង)');
 }
 ok('ជាន់អប្បបរមា៖ ពុល checker ដែលមិនប្រើ browser >= ' + MIN_POISONED + ' (ពុលបាន ' + poisoned + ')',
     poisoned >= MIN_POISONED, { poisoned, unpoisonable });

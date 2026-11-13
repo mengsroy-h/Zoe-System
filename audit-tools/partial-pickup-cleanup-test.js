@@ -293,7 +293,7 @@ function buildWorld(historySeed, startNow) {
         extractFn(src, 'cleanupClockIsTrustworthy'),
         // ⛔ ZTO-E1 ៖ `runAutomaticCleanupRules()` សួរ `ztoAbandonCleanupIsHeld()` មុន `abandon` ➜ sandbox នេះគ្មាន ZTO
         //    (Lookup មិនកំណត់) ➜ ច្រកទ្វារពិតឆ្លើយ `false` ➜ stub ដូចគ្នា។ ច្រកទ្វារខ្លួនវាវាស់ដោយ module ពិតក្នុង
-        //    `ZoeW/tests/zto-abandon-signed-gate.test.tsx` (មិនមែននៅទីនេះ)។
+        //    `audit-tools/zoew/tests/zto-abandon-signed-gate.test.tsx` (មិនមែននៅទីនេះ)។
         'function ztoAbandonCleanupIsHeld() { return false; }',
         'const cleanupInFlight = new Set(); const liveTrashClaims = new Set(); const trashClaimPage = Math.random().toString(36).slice(2); const cleanupOperationOwners = new Map(); const cleanupJournalLive = new Map();',
         optionalPart(() => extractConst(src, 'CLEANUP_LIVE_LOCK_PREFIX'), "const CLEANUP_LIVE_LOCK_PREFIX = 'zoew-cleanup-live-';"),

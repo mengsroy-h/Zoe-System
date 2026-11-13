@@ -11,7 +11,7 @@ const host = document.getElementById('root');
 if (!host) throw new Error('#root missing from index.html');
 
 if (import.meta.env.VITE_EXPOSE_GLOBALS === '1') {
-    import('./expose-globals').then((m) => m.exposeGlobals());
+    import('../../audit-tools/zoew/runtime/expose-globals').then((m) => m.exposeGlobals());
 }
 
 const app = <AppErrorBoundary><App /></AppErrorBoundary>;

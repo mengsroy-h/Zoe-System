@@ -243,7 +243,7 @@ file — លើកក្រោយ file ZTO បែបដដែលនឹងផ្�
 ### ការធ្វើតេស្ត
 
 ```bash
-node zto-import/test.js
+node audit-tools/zto-import/test.js
 ```
 
 តេស្តនេះ **ដកកូដពិតចេញពី `Code.gs`** មករត់ក្នុង `vm` (មិនមែនកូដចម្លងទេ) ហើយ

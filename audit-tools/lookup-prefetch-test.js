@@ -526,7 +526,7 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
         vm.runInContext(sliceFn('lookupApiIsAppsScript') || 'function lookupApiIsAppsScript() { return false; }', ctx);
         vm.runInContext(sliceFn('lookupApiSendsHeader') || 'function lookupApiSendsHeader(cfg) { return !!(cfg && cfg.headerName); }', ctx);
         // ⛔ `attemptAutoLookup()` ពិតហៅ `addZtoIdentityHeader()` (ID token ទៅ Function ZTO) ➜ helper ពិតចូល sandbox ៖ គ្មាន `fb`/`auth` ➜
-        //    `ztoIdToken()` ពិតឆ្លើយ '' ➜ សំណើចេញគ្មាន token (ការវាស់ token ៖ `ZoeW/tests/zto-detail-identity.test.ts`)
+        //    `ztoIdToken()` ពិតឆ្លើយ '' ➜ សំណើចេញគ្មាន token (ការវាស់ token ៖ `audit-tools/zoew/tests/zto-detail-identity.test.ts`)
         vm.runInContext(sliceFn('ztoIdToken') || '', ctx);
         ['bridge', 'isNativeApp', 'nativeWebOrigin', 'ztoIdentityTargetTrusted'].forEach((n) => vm.runInContext(sliceFn(n) || '', ctx));
         vm.runInContext(sliceFn('addZtoIdentityHeader') || '', ctx);

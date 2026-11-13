@@ -191,7 +191,7 @@ scenario('.gitignore ការពារសោ/ទិន្នន័យ ហើយ
         const blocked = ['firebase-backup/config.json', 'firebase-backup/secrets/key.json',
             'firebase-backup/backups/data.json', 'firebase-backup/backup.log',
             'audit-tools/emu/real.rules.json', 'audit-tools/.tmp-poison-fixture.js',
-            'audit-tools/emu/.tmp-poison-fixture.js', 'zto-import/.tmp-poison-fixture.js', 'node_modules/fixture.js'];
+            'audit-tools/emu/.tmp-poison-fixture.js', 'audit-tools/zto-import/.tmp-poison-fixture.js', 'node_modules/fixture.js'];
         const allowed = ['firebase-backup/config.example.json', 'ZoeW/package-lock.json',
             'audit-tools/new-guard.js', 'zto-import/appsscript.json'];
         const answer = cp.spawnSync('git', ['-C', temp, 'check-ignore', '--no-index', '--stdin'], {
@@ -470,8 +470,8 @@ scenario('CORS scanner ប្រើ selector ពិតលើ entry និង hel
         'supabase/functions/_shared/http.ts'
     ];
     const excluded = [
-        'ZoeW/tests/zto-cors.test.ts',
-        'ZoeW/tests/fixtures/server.cjs',
+        'audit-tools/zoew/tests/zto-cors.test.ts',
+        'audit-tools/zoew/tests/fixtures/server.cjs',
         'ZoeW/netlify/functions/settings.json',
         'ZoeW/netlify/functions/_shared/settings.json',
         'ZoeW/netlify/functions/source.js.map',

@@ -122,7 +122,7 @@ ok('ដក barcode ➜ keyed ledger ក្រោយ trash (ព្រឹត្ត
         && /commitLedgerEventStep\s*\(/.test(fnSrc.deductCleanupLedgerKeyed) && /deductCleanupLedgerKeyed\s*\(/.test(fnSrc.deductCleanupRevenue)
         && !/correctRevenueLedgerToActual\s*\(/.test(fnSrc.deductCleanupRevenue));
 // ⛔ ការដកនៃការសម្អាត ៧ ថ្ងៃ = ព្រឹត្តិការណ៍មានសោ (idempotent · journal ព្យាយាមម្តងទៀត) ➜ គ្មានផ្លូវ reconcile ពេល rules បដិសេធ ring
-//    (គ្មាន compat មុន launch)។ ការវាស់ឥរិយាបថ ៖ `cleanup-interrupt-atomicity-test` ៣ខ · `ZoeW/tests/cleanup-ledger-key.test.ts`។
+//    (គ្មាន compat មុន launch)។ ការវាស់ឥរិយាបថ ៖ `cleanup-interrupt-atomicity-test` ៣ខ · `audit-tools/zoew/tests/cleanup-ledger-key.test.ts`។
 ok('auto-abandon > ៧ ថ្ងៃ ➜ ការដកមានសោក្រោយ trash ជោគជ័យ · មិនទម្លាក់ទៅ reconcile',
     /deductCleanupRevenue\s*\(/.test(fnSrc.claimAndCleanupItem)
         && /deductCleanupLedgerKeyed\s*\(/.test(fnSrc.deductCleanupRevenue)

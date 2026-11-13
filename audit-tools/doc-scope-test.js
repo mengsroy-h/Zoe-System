@@ -43,7 +43,7 @@ const SECTIONED = [
 ];
 // ឯកសារ «របៀបប្រើ» ដទៃ (មិនមែន README) ៖ ច្បាប់ **ខ្លឹមសារ** អនុវត្តដែរ តែមិនមានផ្នែក ៥ ទេ
 const CONTENT_ONLY = [
-    'ZoeW/ZTO-SETUP-KH.md',
+    'docs/zoew/ZTO-SETUP-KH.md',
     'docs/SELF-HOSTED-RUNNERS.md'
 ];
 
@@ -58,7 +58,7 @@ function listReadmeFiles(dir, rel, out) {
     let entries = [];
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (_) { return out; }
     entries.forEach((entry) => {
-        if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === 'docs') return;
+        if (entry.name === 'node_modules' || entry.name === '.git') return;
         const next = rel ? rel + '/' + entry.name : entry.name;
         if (entry.isDirectory()) listReadmeFiles(path.join(dir, entry.name), next, out);
         else if (/^README.*\.md$/i.test(entry.name)) out.push(next);
@@ -72,8 +72,8 @@ function listReadmeFiles(dir, rel, out) {
 // ពឹងលើ **បញ្ជីរឹង** `CONTENT_ONLY` ➜ ឯកសារថ្មីឈ្មោះផ្សេងរអិលកាត់ទាំងស្រុង។
 // នេះជាថ្នាក់ «បញ្ជីរឹង = កាលបរិច្ឆេទផុតកំណត់» ដដែល ➜ ដេរីវេពី **ថតពិត**។
 // ⛔ លើកលែង ៖ `docs/` **នៅ root តែប៉ុណ្ណោះ** (ផ្ទះរបស់ប្រវត្តិ) និង `CLAUDE.md` (ឯកសារច្បាប់ ➜ វា
-// *ត្រូវតែ* យោងការវាស់ជាហេតុផលនៃច្បាប់)។ ⛔ ថត `docs` ក្នុង App (`ZoeW/docs/`) **មិនមែន** ផ្ទះរបស់ប្រវត្តិ ៖
-// ការលើកលែងតាម *ឈ្មោះថត* គ្រប់ជម្រៅ ធ្លាប់ធ្វើឲ្យ `ZoeW/docs/*.md` (លទ្ធផល parity ឆៅ · ប្រវត្តិការរកឃើញ)
+// *ត្រូវតែ* យោងការវាស់ជាហេតុផលនៃច្បាប់)។ ⛔ ថត `docs` ក្នុង App (`docs/zoew/`) **មិនមែន** ផ្ទះរបស់ប្រវត្តិ ៖
+// ការលើកលែងតាម *ឈ្មោះថត* គ្រប់ជម្រៅ ធ្លាប់ធ្វើឲ្យ `docs/zoew/*.md` (លទ្ធផល parity ឆៅ · ប្រវត្តិការរកឃើញ)
 // **គ្មាននរណាស្កេនសោះ** ➜ ប្រវត្តិរស់នៅ ២ កន្លែង ខណៈច្បាប់និយាយ «តែមួយ»។
 function listAllDocs(dir, rel, out) {
     let entries = [];
@@ -83,7 +83,7 @@ function listAllDocs(dir, rel, out) {
         const next = rel ? rel + '/' + entry.name : entry.name;
         if (next === 'docs/HISTORY.md' || next === 'docs/HISTORY-ARCHIVE.md') return;
         if (entry.isDirectory()) listAllDocs(path.join(dir, entry.name), next, out);
-        else if (/\.md$/i.test(entry.name) && next !== 'CLAUDE.md') out.push(next);
+        else if (/\.md$/i.test(entry.name) && next !== 'CLAUDE.md' && next !== 'AGENTS.md') out.push(next);
     });
     return out;
 }
@@ -92,6 +92,8 @@ const KNOWN_DOCS = SECTIONED.concat(CONTENT_ONLY);
 const FOUND_READMES = listReadmeFiles(ROOT, '', []);
 check(FOUND_READMES.length >= 7,
     'ជាន់អប្បបរមា ៖ រកឃើញ README យ៉ាងតិច ៧ ក្នុងថតពិត', String(FOUND_READMES.length));
+check(['ZoeW/README.md', 'ZoeKeyGen/README.md'].every((rel) => FOUND_READMES.includes(rel)),
+    'ជាន់អប្បបរមា ៖ រកឃើញ README របស់ App ទាំងពីរក្នុងថតរបស់វា');
 const UNGUARDED_DOCS = FOUND_READMES.filter((rel) => KNOWN_DOCS.indexOf(rel) === -1);
 check(UNGUARDED_DOCS.length === 0,
     '⛔ រាល់ README ក្នុង repo ត្រូវឈរក្នុងបញ្ជីរបស់ checker នេះ (បញ្ជីរឹង = កាលបរិច្ឆេទផុតកំណត់)',
@@ -165,7 +167,7 @@ for (const rel of ALL_DOCS) {
 check(ALL_DOCS.length >= FOUND_READMES.length,
     'ជាន់អប្បបរមា ៖ ការស្កេន `.md` ទាំងអស់ គ្របយ៉ាងតិចស្មើចំនួន README',
     ALL_DOCS.length + ' ធៀប ' + FOUND_READMES.length);
-check(ALL_DOCS.indexOf('ZoeW/ZTO-SETUP-KH.md') !== -1,
+check(ALL_DOCS.indexOf('docs/zoew/ZTO-SETUP-KH.md') !== -1,
     'ជាន់អប្បបរមា ៖ ការដេរីវេចាប់បានឯកសារ «របៀបប្រើ» ដែលមិនមែន README',
     ALL_DOCS.join(' · '));
 
@@ -352,6 +354,10 @@ check(CLAUDE_NARRATIVE_RE.test('ក្នុងកំណែ 2.31.7 (2026-09-03)'
 check(claudeText.length > 20000 && claudeNarrative.length === 0,
     '⛔ CLAUDE.md ៖ គ្មានលេខកំណែ ឬកាលបរិច្ឆេទក្រៅតារាងក្បាល (ប្រវត្តិ ➜ docs/HISTORY.md)',
     claudeNarrative.slice(0, 8).map((x) => 'បន្ទាត់ ' + x.n + ' ៖ ' + x.line.trim().slice(0, 90)).join('\n        '));
+
+const agentsText = fs.existsSync(path.join(ROOT, 'AGENTS.md')) ? fs.readFileSync(path.join(ROOT, 'AGENTS.md'), 'utf8') : '';
+check(agentsText.includes('CLAUDE.md') && !CLAUDE_NARRATIVE_RE.test(agentsText),
+    'AGENTS.md ៖ យោងច្បាប់រួម និងគ្មានលេខកំណែ/កាលបរិច្ឆេទ');
 
 // ⛔ ទិសផ្ទុយ ៖ ការយោង **ប្រវត្តិ** មិនត្រូវធ្វើឲ្យធ្លាក់ — បើច្បាប់នេះហាមរាល់
 // លេខកំណែក្នុង README នោះវាជាទោស មិនមែនការការពារ។
@@ -569,7 +575,7 @@ check(appLineCount > 1000, 'ជាន់អប្បបរមា ៖ អាន `
 // session) ខណៈ `CLAUDE.md` រាយ `setsid nohup … &` — ហើយការព្រមាន `pkill`
 // របស់វាចង្អៀតជាងច្បាប់ដើម។ ⛔ `docs/` ជាផ្ទះរបស់ប្រវត្តិ ➜ លើកលែង។
 const fenceOwners = new Map();
-listAllDocs(ROOT, "", []).concat(["CLAUDE.md"]).forEach((rel) => {
+listAllDocs(ROOT, "", []).concat(["CLAUDE.md", "AGENTS.md"]).forEach((rel) => {
     if (/^docs[\\/]/.test(rel)) return;
     let text = '';
     try { text = fs.readFileSync(path.join(ROOT, rel), 'utf8'); } catch (e) { return; }
@@ -634,7 +640,7 @@ function listMarkdownFiles(dir, rel, out) {
     let entries = [];
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (_) { return out; }
     entries.forEach((entry) => {
-        if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === 'docs') return;
+        if (entry.name === 'node_modules' || entry.name === '.git') return;
         const next = rel ? rel + '/' + entry.name : entry.name;
         if (entry.isDirectory()) listMarkdownFiles(path.join(dir, entry.name), next, out);
         else if (/\.md$/i.test(entry.name)) out.push(next);
@@ -749,7 +755,7 @@ check(histIndex.length > 2000 && unindexed.length === 0,
     '⛔ docs/HISTORY.md ៖ លិបិក្រមគ្រប checker ដែលលេចក្នុងឯកសារប្រវត្តិទាំង ២',
     histIndexAt === -1 ? 'រកលិបិក្រមមិនឃើញ' : 'ខ្វះក្នុងលិបិក្រម ៖ ' + unindexed.join(' · '));
 // ⛔ DOCS-2 ៖ ជួរនីមួយៗត្រូវប្រាប់ **ផ្នែកដែលឈ្មោះលេចពិត** (ទិសទាំងពីរ ៖ ផ្នែកដែលបាត់ពីជួរ · ផ្នែកក្នុងជួរដែលឈ្មោះលែងលេច) ·
-//    ជួរក៏គ្របអ្នកយាម vitest (`ZoeW/tests/**/*.test.ts(x)`) ដែលឯកសារប្រវត្តិយោង។ បញ្ជី tests អានពី repo ពិត (`ZOE_REPO_ROOT` ៖ root វាស់គ្មាន `ZoeW/tests`)។
+//    ជួរក៏គ្របអ្នកយាម vitest (`audit-tools/zoew/tests/**/*.test.ts(x)`) ដែលឯកសារប្រវត្តិយោង។ បញ្ជី tests អានពី repo ពិត (`ZOE_REPO_ROOT` ៖ root វាស់គ្មាន `ZoeW/tests`)។
 const KH_DIGITS = '០១២៣៤៥៦៧៨៩';
 function historyParts(text) {
     const stop = text.indexOf('## 🔎 លិបិក្រម');
@@ -762,7 +768,7 @@ function historyParts(text) {
     return out;
 }
 const escRe = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const testsRoot = [process.env.ZOE_REPO_ROOT, ROOT].filter(Boolean).find((d) => fs.existsSync(path.join(d, 'ZoeW/tests')));
+const testsRoot = [process.env.ZOE_REPO_ROOT, ROOT].filter(Boolean).find((d) => fs.existsSync(path.join(d, 'audit-tools/zoew/tests')));
 function listTestFiles(dir, rel, out) {
     let entries = [];
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (_) { return out; }
@@ -772,7 +778,7 @@ function listTestFiles(dir, rel, out) {
     });
     return out;
 }
-const vitestFiles = testsRoot ? listTestFiles(path.join(testsRoot, 'ZoeW/tests'), '', []) : [];
+const vitestFiles = testsRoot ? listTestFiles(path.join(testsRoot, 'audit-tools/zoew/tests'), '', []) : [];
 const histPartsMap = historyParts(hist);
 const archPartsMap = historyParts(histArchive);
 const indexKeys = [];
@@ -782,7 +788,7 @@ checkerFiles.forEach((rel) => {
 });
 vitestFiles.forEach((rel) => {
     const base = rel.replace(/\.test\.tsx?$/, '');
-    indexKeys.push({ key: 'ZoeW/tests/' + rel, re: new RegExp('(?<![\\w-])' + escRe(base) + '\\.test\\.tsx?(?![\\w-])') });
+    indexKeys.push({ key: 'audit-tools/zoew/tests/' + rel, re: new RegExp('(?<![\\w-])' + escRe(base) + '\\.test\\.tsx?(?![\\w-])') });
 });
 const partList = (map, re) => Object.keys(map).sort((x, y) => KH_DIGITS.indexOf(x) - KH_DIGITS.indexOf(y)).filter((n) => re.test(map[n]));
 const fmtParts = (list) => list.length ? list.map((n) => 'ផ្នែក ' + n).join(' · ') : '—';
@@ -798,7 +804,7 @@ const indexWrong = [];
 expectedIndex.forEach((row, key) => { if (actualIndex.get(key) !== row) indexWrong.push(key); });
 actualIndex.forEach((row, key) => {
     if (expectedIndex.has(key)) return;
-    if (!key.startsWith('ZoeW/tests/') || testsRoot) indexWrong.push(key);
+    if (!key.startsWith('audit-tools/zoew/tests/') || testsRoot) indexWrong.push(key);
 });
 check(expectedIndex.size >= 150 && (!testsRoot || vitestFiles.length >= 50) && indexWrong.length === 0,
     '⛔ docs/HISTORY.md ៖ លិបិក្រមស្មើការលេចពិត (ផ្នែកក្នុងជួរនីមួយៗ · ទិសទាំងពីរ · checker + អ្នកយាម vitest)',
@@ -1059,7 +1065,7 @@ const siteInputExists = /ztoListSite/i.test(zoewHtml);
 // ផុតកំណត់ ➜ ឯកសារថ្មីដែលរៀបរាប់ផ្ទៃដដែល រអិលកាត់ស្ងាត់ៗ)។ `CLAUDE.md`
 // និងសៀវភៅណែនាំក្នុង App ចូលរួមដែរ ព្រោះទាំង ២ ណែនាំអ្នកអាន។
 const SITE_DOC_FILES = listAllDocs(ROOT, '', [])
-    .concat(['CLAUDE.md', 'ZoeW/guide.html', 'ZoeKeyGen/guide.html'])
+    .concat(['CLAUDE.md', 'AGENTS.md', 'ZoeW/guide.html', 'ZoeKeyGen/guide.html'])
     .filter((rel) => fs.existsSync(path.join(ROOT, rel)));
 // «បំពេញលេខសាខា…» · «លេខសាខា…បំពេញក្នុង App» · «លេខសាខា…រស់ក្នុងឧបករណ៍»
 const SITE_MANUAL_RE = /(បំពេញ[^។\n]{0,40}លេខសាខា|លេខសាខា[^។\n]{0,40}(?:បំពេញក្នុង App|បំពេញក្នុង|រស់ក្នុងឧបករណ៍|រស់ក្នុង ZoeW))/;
@@ -1152,17 +1158,21 @@ function emuRunnerTargets(runAll) {
     try { sourceList = JSON.parse(fs.readFileSync(path.join(ROOT, 'ZoeW', 'audit-source-files.json'), 'utf8')); } catch (_) { sourceList = []; }
     const inZoeW = (rel) => sourceList.indexOf(rel) !== -1 || fs.existsSync(path.join(ROOT, 'ZoeW', rel))
         || (testsRoot ? fs.existsSync(path.join(testsRoot, 'ZoeW', rel)) : false);
+    const inAudit = (rel) => fs.existsSync(path.join(ROOT, 'audit-tools', rel))
+        || (testsRoot ? fs.existsSync(path.join(testsRoot, 'audit-tools', rel)) : false);
     const GUARD_NAME = /^(?:emu\/)?[a-z0-9][a-z0-9-]*-(?:test|check|harness|guard|hygiene|fuzz|flow|parity|integrity|pressure|latency|surface|fns|coverage|truthfulness)(?:\.m?js)?$/;
     const guardExists = (name) => {
         const base = name.replace(/\.m?js$/, '');
         const tries = [base + '.js', base + '-test.js', 'emu/' + base + '.js', 'emu/' + base + '-test.js', 'emu/' + base + '-emu-test.js'];
         if (tries.some((t) => fs.existsSync(path.join(ROOT, 'audit-tools', t)))) return true;
         if (fs.existsSync(path.join(ROOT, 'zto-import', base + '.js'))) return true;
-        return inZoeW('scripts/' + base + '.mjs') || inZoeW('tests/' + base + '.test.ts') || inZoeW('tests/' + base + '.test.tsx');
+        return inAudit('zoew/scripts/' + base + '.mjs') || inAudit('zoew/tests/' + base + '.test.ts')
+            || inAudit('zoew/tests/' + base + '.test.tsx') || inAudit('zto-import/' + base + '.js')
+            || inZoeW('scripts/' + base + '.mjs');
     };
     const testExists = (raw) => {
-        const rel = raw.replace(/^ZoeW\//, '').replace(/^tests\//, '');
-        return inZoeW('tests/' + rel);
+        const rel = raw.replace(/^(?:audit-tools\/zoew\/|ZoeW\/)?tests\//, '');
+        return inAudit('zoew/tests/' + rel);
     };
     const ghostsIn = (text) => {
         const out = [];
@@ -1182,9 +1192,9 @@ function emuRunnerTargets(runAll) {
     check(ghosts.length === 0,
         '⛔ CLAUDE.md ៖ រាល់ឈ្មោះអ្នកយាម (`<x>-test` · `-check` · `-harness` … · `*.test.ts(x)`) ត្រូវមានឯកសារពិត',
         'ឈ្មោះខ្មោច ៖ ' + ghosts.join(' · '));
-    const probe = ghostsIn('`doc-scope-test` · `shared-fns` · `zz-ghost-harness` · `tests/zz-ghost-x.test.ts`');
+    const probe = ghostsIn('`doc-scope-test` · `shared-fns` · `zz-ghost-harness` · `tests/zz-ghost-x.test.ts` · `audit-tools/zoew/tests/zz-ghost-new.test.ts`');
     check(probe.indexOf('zz-ghost-harness') !== -1 && probe.indexOf('doc-scope-test') === -1 && probe.indexOf('shared-fns') === -1
-        && ((!sourceList.length && !testsRoot) || probe.indexOf('tests/zz-ghost-x.test.ts') !== -1),
+        && ((!sourceList.length && !testsRoot) || (probe.indexOf('tests/zz-ghost-x.test.ts') !== -1 && probe.indexOf('audit-tools/zoew/tests/zz-ghost-new.test.ts') !== -1)),
         'probe ទិសទាំង ២ ៖ ឈ្មោះខ្មោចធ្លាក់ · ឈ្មោះពិតឆ្លង', probe.join(' · '));
 })();
 
@@ -1399,8 +1409,8 @@ function emuRunnerTargets(runAll) {
     function indexOrderProblems(text) {
         const at = text.indexOf('## 🔎 លិបិក្រម');
         const keys = (at === -1 ? '' : text.slice(at)).split('\n').filter((l) => l.startsWith('| `')).map((l) => l.split('`')[1]);
-        const checkers = keys.filter((k) => !k.startsWith('ZoeW/tests/'));
-        const tests = keys.filter((k) => k.startsWith('ZoeW/tests/'));
+        const checkers = keys.filter((k) => !k.startsWith('audit-tools/zoew/tests/'));
+        const tests = keys.filter((k) => k.startsWith('audit-tools/zoew/tests/'));
         const want = checkers.slice().sort().concat(tests.slice().sort());
         return keys.length && keys.join('\n') === want.join('\n') ? [] : ['លំដាប់ ' + keys.length + ' ជួរ'];
     }

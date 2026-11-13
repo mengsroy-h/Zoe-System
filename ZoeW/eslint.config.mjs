@@ -1,13 +1,18 @@
 import js from '@eslint/js';
+import { fileURLToPath } from 'node:url';
+
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
 
+const REPO = fileURLToPath(new URL('../', import.meta.url));
+
 export default tseslint.config(
-    { ignores: ['dist', 'dist-audit', 'node_modules', 'public', 'android', 'src/_generated-state.json'] },
+    { ignores: ['**/dist/**', '**/dist-audit/**', '**/node_modules/**', '**/public/**', '**/android/**', '**/src/_generated-state.json'] },
 
     {
-        files: ['src/app/**/*.{ts,tsx}', 'src/platform/**/*.ts', 'src/main.tsx', 'src/core/store.ts', 'src/core/dom.ts', 'src/core/lifecycle.ts', 'tests/**/*.{ts,tsx}'],
+        basePath: REPO,
+        files: ['ZoeW/src/app/**/*.{ts,tsx}', 'ZoeW/src/platform/**/*.ts', 'ZoeW/src/main.tsx', 'ZoeW/src/core/store.ts', 'ZoeW/src/core/dom.ts', 'ZoeW/src/core/lifecycle.ts', 'audit-tools/zoew/tests/**/*.{ts,tsx}'],
         extends: [js.configs.recommended, ...tseslint.configs.recommended],
         languageOptions: { ecmaVersion: 2023, globals: { ...globals.browser, ZoeErrors: 'readonly', XLSX: 'readonly' } },
         plugins: { 'react-hooks': reactHooks },
@@ -20,7 +25,8 @@ export default tseslint.config(
     },
 
     {
-        files: ['src/core/**/*.ts', 'src/domain/**/*.ts', 'src/features/**/*.ts', 'src/services/**/*.ts', 'src/ui/**/*.ts'],
+        basePath: REPO,
+        files: ['ZoeW/src/core/**/*.ts', 'ZoeW/src/domain/**/*.ts', 'ZoeW/src/features/**/*.ts', 'ZoeW/src/services/**/*.ts', 'ZoeW/src/ui/**/*.ts'],
         extends: [js.configs.recommended, ...tseslint.configs.recommended],
         languageOptions: { ecmaVersion: 2023, globals: { ...globals.browser, ZoeErrors: 'readonly', ZoeLicense: 'readonly', XLSX: 'readonly', ZXingWASM: 'readonly', Sentry: 'readonly', BarcodeDetector: 'readonly' } },
         rules: {
@@ -47,32 +53,37 @@ export default tseslint.config(
     },
 
     {
-        files: ['src/app/components/history/HistoryTableBody.tsx'],
+        basePath: REPO,
+        files: ['ZoeW/src/app/components/history/HistoryTableBody.tsx'],
         rules: { 'react-hooks/incompatible-library': 'off' }
     },
 
     {
-        files: ['src/app/behaviors/**/*.ts'],
+        basePath: REPO,
+        files: ['ZoeW/src/app/behaviors/**/*.ts'],
         languageOptions: { globals: { ZoeLicense: 'readonly' } },
         rules: { 'no-empty': 'off', 'prefer-const': 'off', '@typescript-eslint/no-unused-vars': 'off' }
     },
 
     {
-        files: ['src/sw/**/*.ts'],
+        basePath: REPO,
+        files: ['ZoeW/src/sw/**/*.ts'],
         extends: [js.configs.recommended, ...tseslint.configs.recommended],
         languageOptions: { ecmaVersion: 2023, globals: globals.serviceworker },
         rules: { '@typescript-eslint/no-explicit-any': 'off', 'no-empty': 'off', '@typescript-eslint/no-unused-vars': 'off' }
     },
 
     {
-        files: ['scripts/**/*.mjs'],
+        basePath: REPO,
+        files: ['ZoeW/scripts/**/*.mjs', 'audit-tools/zoew/scripts/**/*.mjs', 'audit-tools/zoew/prepare-dependencies.mjs'],
         extends: [js.configs.recommended],
         languageOptions: { ecmaVersion: 2023, sourceType: 'module', globals: { ...globals.node, ...globals.browser } },
         rules: { 'no-empty': 'off', 'no-useless-escape': 'off', 'no-unused-vars': ['warn', { argsIgnorePattern: '^_', caughtErrors: 'none' }] }
     },
 
     {
-        files: ['tools/**/*.cjs'],
+        basePath: REPO,
+        files: ['ZoeW/tools/**/*.cjs'],
         extends: [js.configs.recommended],
         languageOptions: { ecmaVersion: 2023, sourceType: 'commonjs', globals: { ...globals.node } },
         linterOptions: { reportUnusedDisableDirectives: false },
@@ -80,7 +91,8 @@ export default tseslint.config(
     },
 
     {
-        files: ['vite.config.mts', 'vitest.config.mts', 'capacitor.config.ts'],
+        basePath: REPO,
+        files: ['ZoeW/vite.config.mts', 'audit-tools/zoew/vitest.config.mts', 'ZoeW/capacitor.config.ts'],
         extends: [js.configs.recommended, ...tseslint.configs.recommended],
         languageOptions: { ecmaVersion: 2023, sourceType: 'module', globals: { ...globals.node } },
         rules: { '@typescript-eslint/no-explicit-any': 'off' }

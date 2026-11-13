@@ -2,7 +2,7 @@
 //        មិនមកដល់ — វាស់លើ **App ZoeW ពិត (build វាស់) + adapter Supabase ពិត + supabase-js ពិត + Postgres ពិត** ក្នុង Chromium។
 //
 // ⛔ ហេតុអ្វីតេស្តនេះចាំបាច់ ៖ `emu/app-network-e2e-test` វាស់ App ពិតលើ **Firebase** តែប៉ុណ្ណោះ · Supabase វាស់តែកម្រិត adapter ក្នុង node
-//    (`emu/supabase-adapter-parity` · `ZoeW/tests/supabase-*.test.ts`) ➜ ថ្នេរ adapter ↔ App (`.info/connected` · ការវាស់ភាពរស់ ·
+//    (`emu/supabase-adapter-parity` · `audit-tools/zoew/tests/supabase-*.test.ts`) ➜ ថ្នេរ adapter ↔ App (`.info/connected` · ការវាស់ភាពរស់ ·
 //    `forceDatabaseReconnect()` ➜ `goOffline/goOnline` · `onBrowserOnline` · ចំណុចស្ថានភាព) គ្មាននរណារត់ពីចុងមួយទៅចុងមួយទៀត។
 //
 // ឯកសារនេះរត់ ៖ fake GoTrue + PostgREST (`supabase-fake-server.js`) លើ Postgres ពិត (migration ពិត · rules ពិតដែល compile) ·

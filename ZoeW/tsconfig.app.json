@@ -16,7 +16,7 @@
 
     /* ⛔ `strictNullChecks` បិទដោយ *ចេតនា* ៖ កូដដែលផ្ទេរពី `app.js` មិនដែល
        ពិនិត្យ `null` ទេ ➜ ការបន្ថែមការពិនិត្យថ្មី ជាការប្តូរ **ឥរិយាបថ**
-       មិនមែនការបន្ថែមសុវត្ថិភាព។ មើល `docs/TYPESCRIPT.md` ៖ ផ្លូវតឹង
+       មិនមែនការបន្ថែមសុវត្ថិភាព។ មើល `docs/zoew/TYPESCRIPT.md` ៖ ផ្លូវតឹង
        បន្តិចម្តងៗ តាម module។ */
     "strictNullChecks": false,
     "noImplicitAny": false,
@@ -33,5 +33,5 @@
     },
     "types": ["vite/client"]
   },
-  "include": ["src", "tests", "vite.config.mts", "scripts"]
+  "include": ["src", "vite.config.mts", "scripts"]
 }

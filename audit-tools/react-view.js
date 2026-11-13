@@ -1,6 +1,6 @@
 // ⛔ ម៉ូឌុលរួម (មិនមែន checker) ៖ ស្រទាប់ React របស់ ZoeW សម្រាប់ checker ដែលស្រង់ function ចូល `vm`។
 //
-// ZoeW ជា React ➜ `app.js` ដែល checker អាន គឺជា **ទិដ្ឋភាពអត្ថបទ** ដែល `ZoeW/scripts/build-audit.mjs`
+// ZoeW ជា React ➜ `app.js` ដែល checker អាន គឺជា **ទិដ្ឋភាពអត្ថបទ** ដែល `audit-tools/zoew/scripts/build-audit.mjs`
 // សាងពីប្រភព TypeScript ពិត។ function អាជីវកម្មនៅដដែល តែការចូលប្រើ DOM ឆ្លងកាត់ helper តូចៗ ៖
 //
 //   - វាលបញ្ចូល ៖ `fieldValue('x')` ជំនួស `byId('x').value` (`src/app/refs.ts`)
@@ -15,7 +15,7 @@
 //     helper DOM/ប្រអប់ (`REACT_HELPERS`) ➜ អត្ថបទមួយសម្រាប់ `vm.runInContext()`
 //
 // ⛔ ក្នុងទិដ្ឋភាព `elementOf(name)` ជា `document.getElementById(name)` ហើយស្ថានភាពប្រអប់ជា `style.display`
-//    របស់ធាតុ (សមមូលដែល React គូរ — មើល `ZoeW/scripts/checker-view.mjs` ចំណុច ៦) ➜ DOM ក្លែងរបស់ checker
+//    របស់ធាតុ (សមមូលដែល React គូរ — មើល `audit-tools/zoew/scripts/checker-view.mjs` ចំណុច ៦) ➜ DOM ក្លែងរបស់ checker
 //    នៅតែជាអ្វីដែលត្រូវវាស់។
 // ⛔ តម្លៃដំបូងរបស់វាលឃ្លាំងដែលមិនមែន literal (ឧ. អានពី storage · object ដែលមានឈ្មោះខាងក្នុង) ក្លាយជា
 //    `undefined` (object/array literal ជាជាន់ៗនៅដដែល — `literalInit()`) ៖ វាលទាំងនោះជា state

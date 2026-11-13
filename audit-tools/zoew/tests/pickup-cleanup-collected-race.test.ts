@@ -1,0 +1,387 @@
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
+import { parse } from 'acorn';
+import { simple } from 'acorn-walk';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { dataState, firebaseState, uiState } from '../../../ZoeW/src/core/state';
+import { getServerNow } from '../../../ZoeW/src/core/clock';
+import { appLocalStore } from '../../../ZoeW/src/core/storage';
+import { dbListenerFailedPaths, dbListenerPendingPaths } from '../../../ZoeW/src/core/text';
+import { cleanupInFlight, claimAndCleanupItem } from '../../../ZoeW/src/domain/cleanup';
+import { collectedDayOfStamp, reconcileCollectedHistory } from '../../../ZoeW/src/domain/collected';
+import { pickupBarcodeKey } from '../../../ZoeW/src/domain/pickup';
+import { applyBarcodeCloseChange } from '../../../ZoeW/src/features/barcode-ops';
+import { toggleCloseStatus } from '../../../ZoeW/src/features/entry-ops';
+import { resetZtoTrashMode } from '../../../ZoeW/src/services/zto-trash-mode';
+
+const H = 'zoew_scan_history_cod_dod', T = 'zoew_recently_deleted_cod_dod', C = 'zoew_daily_collected_cod_dod';
+const DAY = '2026-10-20';
+const db = { name: 'collected-race' };
+let store: Record<string, any>, held: { path: string; release: Promise<void> } | null, onHeld: (() => void) | null;
+let lost: { path: string; landed: boolean } | null = null;
+let afterUpdate: (() => void) | null = null;
+let collectedWrites = 0;
+const clone = <V>(value: V): V => value === undefined ? value : JSON.parse(JSON.stringify(value));
+const at = (path: string) => clone(path.split('/').filter(Boolean).reduce((v: any, k) => v?.[k], store) ?? null);
+function put(path: string, value: any) {
+    const keys = path.split('/').filter(Boolean); let node = store;
+    for (const key of keys.slice(0, -1)) node = node[key] ||= {};
+    if (value == null) delete node[keys.at(-1)!]; else node[keys.at(-1)!] = clone(value);
+}
+const snap = (value: any) => ({ val: () => clone(value), exists: () => value != null });
+const ref = (_db: any, path = '') => ({ db: _db, path, key: path.split('/').at(-1), toString: () => `https://race.firebaseio.com/${path}` });
+function fb() {
+    return {
+        ref, increment: (n: number) => ({ inc: n }),
+        get: async (r: any) => snap(at(r.path)),
+        runTransaction: async (r: any, update: any) => {
+            const next = update(at(r.path));
+            if (next === undefined) return { committed: false, snapshot: snap(at(r.path)) };
+            if (lost && lost.path === r.path) {
+                const landed = lost.landed; lost = null;
+                if (landed) put(r.path, next);
+                throw Object.assign(new Error('disconnect'), { txOutcome: 'unknown', txServerUnread: false });
+            }
+            put(r.path, next);
+            const committedSnapshot = snap(at(r.path));
+            if (held && held.path === r.path) { const wait = held.release; held = null; onHeld?.(); await wait; }
+            return { committed: true, snapshot: committedSnapshot };
+        },
+        update: async (r: any, patch: any) => {
+            if (r.path === C || Object.keys(patch).some(key => key.startsWith(C + '/'))) collectedWrites++;
+            for (const [key, value] of Object.entries(patch)) {
+                const path = [r.path, key].filter(Boolean).join('/');
+                put(path, value && typeof value === 'object' && 'inc' in (value as any) ? Number(at(path) || 0) + Number((value as any).inc) : value);
+            }
+            if (afterUpdate && r.path === C) { const run = afterUpdate; afterUpdate = null; run(); }
+        },
+        set: async (r: any, value: any) => { put(r.path, value); },
+        onValue: () => () => {}, off: () => {}
+    };
+}
+function barcode(code: string, cod: number) {
+    const createdAt = getServerNow() - 60 * 60 * 1000;
+    return { code, cod, dod: 0, time: `08:00:00 (${DAY})`, locker: 'A1', createdAt, isClosed: false, isFromDeletion: false, isDeducted: false };
+}
+function install(codes: string[]) {
+    const createdAt = getServerNow() - 60 * 60 * 1000;
+    const item = { id: 'item1', phone: '012000111', scanDate: DAY, time: `08:00:00 (${DAY})`, createdAt, count: codes.length,
+        cod: codes.length * 5, dod: 0, price: codes.length * 5, isClosed: false, isCalled: false, barcode: codes[0], barcodes: codes.map((c) => barcode(c, 5)) };
+    store = { [H]: { item1: item }, [T]: {}, [C]: {} };
+    firebaseState.db = db as any; firebaseState.fb = fb() as any;
+    firebaseState.firebaseConfig = { databaseURL: 'https://race.firebaseio.com' } as any;
+    firebaseState.auth = { currentUser: { uid: 'u1', getIdToken: async () => 'tok' } } as any;
+    firebaseState.isDatabaseInitialized = true; firebaseState.isDatabaseConnected = true; firebaseState.serverClockTrusted = true;
+    firebaseState.hasEverConnectedToDatabase = true;
+    firebaseState.dbRefHistory = ref(db, H) as any; firebaseState.dbRefDeleted = ref(db, T) as any;
+    firebaseState.dbRefDailyRevenue = ref(db, 'zoew_daily_revenue_cod_dod') as any; firebaseState.dbRefMonthlyRevenue = ref(db, 'zoew_monthly_revenue_cod_dod') as any;
+    firebaseState.dbRefDailyPickup = ref(db, 'zoew_daily_pickup_cod_dod') as any; firebaseState.dbRefDailyCollected = ref(db, C) as any;
+    dataState.scanHistory = [clone(item)]; dataState.deletedItems = [];
+    dataState.dailyRevenueData = {}; dataState.monthlyRevenueData = {}; dataState.dailyPickupData = {}; dataState.dailyCollectedData = {};
+    appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true, url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' }));
+}
+function collectedDaysOf(code: string) {
+    const key = pickupBarcodeKey(code);
+    return Object.keys(store[C] || {}).filter((day) => store[C][day] && store[C][day][key]);
+}
+function signLocally(codes: string[]) {
+    const signedAt = getServerNow() - 1000;
+    const item = store[H].item1;
+    item.barcodes.forEach((b: any) => { if (codes.includes(b.code)) { b.ztoSignedAt = signedAt; b.ztoSignedExact = true; } });
+    dataState.scanHistory = [clone(item)];
+}
+async function settle() { for (let i = 0; i < 30; i++) await new Promise((r) => setTimeout(r, 0)); }
+
+beforeEach(() => {
+    firebaseState.sessionExpiryCheck = 'live';
+    appLocalStore.clear(); appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://race.firebaseio.com' })); uiState.toasts = []; firebaseState.authGeneration++; firebaseState.dbListenerGeneration++;
+    cleanupInFlight.clear(); dbListenerPendingPaths.clear(); dbListenerFailedPaths.clear();
+    held = null; onHeld = null; lost = null; afterUpdate = null; collectedWrites = 0;
+    vi.stubGlobal('confirm', () => true); vi.stubGlobal('alert', vi.fn());
+    vi.stubGlobal('fetch', async (url: string) => new Response(JSON.stringify(at(new URL(url).pathname.replace(/\.json$/, ''))), { status: 200 }));
+    (window as any).ZoeErrors = { capture: vi.fn() };
+    resetZtoTrashMode();
+});
+afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); resetZtoTrashMode(); appLocalStore.clear(); });
+
+describe('Cookie pickup cleanup never outruns the close that writes the collected record', () => {
+    it('a barcode closed on a slow ack, signed and swept meanwhile, still gets its daily-collected record and then leaves as pickup', async () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        install(['X1', 'Y1']);
+        let ack!: () => void;
+        held = { path: `${H}/item1`, release: new Promise<void>((resolve) => { ack = resolve; }) };
+        let closing = false; onHeld = () => { closing = true; };
+        const close = applyBarcodeCloseChange('item1', 'X1', true, { silent: true, showModal: false });
+        await vi.waitFor(() => expect(closing).toBe(true));
+        signLocally(['X1']);
+        vi.setSystemTime(Date.now() + 2 * 60 * 60 * 1000);
+        await claimAndCleanupItem('item1', 'close');
+        ack();
+        expect(await close).toBe(true);
+        await settle();
+        expect(collectedDaysOf('X1'), 'the close wrote the collected record for X1').toHaveLength(1);
+        await claimAndCleanupItem('item1', 'close');
+        await settle();
+        expect(at(`${H}/item1`).barcodes.map((b: any) => b.code)).toEqual(['Y1']);
+        const trash = Object.values(store[T] || {}) as any[];
+        expect(trash.flatMap((t) => (t.barcodes || []).map((b: any) => b.code))).toEqual(['X1']);
+        expect(trash[0].trashReason).toBe('pickup');
+        expect(collectedDaysOf('X1'), 'pickup cleanup keeps the collected record').toHaveLength(1);
+    });
+
+    it.each([['pickup', 1], ['remove', 0]])('another device moved the barcode to %s trash before the ack ➜ the record follows that trash copy (%i)', async (reason, expected) => {
+        install(['X4', 'Y4']);
+        let ack!: () => void;
+        held = { path: `${H}/item1`, release: new Promise<void>((resolve) => { ack = resolve; }) };
+        let closing = false; onHeld = () => { closing = true; };
+        const close = applyBarcodeCloseChange('item1', 'X4', true, { silent: true, showModal: false });
+        await vi.waitFor(() => expect(closing).toBe(true));
+        const item = store[H].item1;
+        const moved = item.barcodes.find((b: any) => b.code === 'X4');
+        item.barcodes = item.barcodes.filter((b: any) => b.code !== 'X4'); item.count = 1; item.cod = 5; item.price = 5; item.barcode = 'Y4';
+        const copy = { ...clone(item), id: 'id_1760000000000_other', barcodes: [{ ...moved, ztoSignedAt: getServerNow() - 500 }], isFromDeletion: reason === 'pickup',
+            trashReason: reason, deletedAt: getServerNow(), trashMode: 'cookie', restoreBlocked: true };
+        store[T][copy.id] = clone(copy); dataState.deletedItems = [clone(copy)];
+        ack();
+        await close; await settle();
+        expect(collectedDaysOf('X4')).toHaveLength(expected);
+    });
+
+    it('control: without a sweep during the ack the close writes the record (the harness can measure it)', async () => {
+        install(['X3', 'Y3']);
+        expect(await applyBarcodeCloseChange('item1', 'X3', true, { silent: true, showModal: false })).toBe(true);
+        await settle();
+        expect(collectedDaysOf('X3')).toHaveLength(1);
+        expect(collectedDaysOf('Y3')).toHaveLength(0);
+    });
+
+    it('closing the whole parcel on a slow ack keeps the collected records of every barcode', async () => {
+        install(['X2', 'Y2']);
+        let ack!: () => void;
+        held = { path: `${H}/item1`, release: new Promise<void>((resolve) => { ack = resolve; }) };
+        let closing = false; onHeld = () => { closing = true; };
+        const close = toggleCloseStatus('item1');
+        await vi.waitFor(() => expect(closing).toBe(true));
+        signLocally(['X2']);
+        await claimAndCleanupItem('item1', 'close');
+        ack();
+        await close;
+        await settle();
+        expect(collectedDaysOf('X2')).toHaveLength(1);
+        expect(collectedDaysOf('Y2')).toHaveLength(1);
+    });
+});
+
+describe('a close whose reply was lost (outcome unknown) reconciles the collected mirror from the server', () => {
+    it.each([[true, 1], [false, 0]])('one barcode · landed on the server %s ➜ %i record', async (landed, expected) => {
+        install(['X5', 'Y5']);
+        lost = { path: `${H}/item1`, landed };
+        expect(await applyBarcodeCloseChange('item1', 'X5', true, { silent: true, showModal: false })).toBe(false);
+        await settle();
+        expect(!!at(`${H}/item1`).barcodes.find((b: any) => b.code === 'X5').isClosed).toBe(landed);
+        expect(collectedDaysOf('X5')).toHaveLength(expected);
+        expect(collectedDaysOf('Y5')).toHaveLength(0);
+    });
+
+    it.each([[true, 1], [false, 0]])('whole row · landed on the server %s ➜ %i record per barcode', async (landed, expected) => {
+        install(['X6', 'Y6']);
+        lost = { path: `${H}/item1`, landed };
+        await toggleCloseStatus('item1');
+        await settle();
+        expect(collectedDaysOf('X6')).toHaveLength(expected);
+        expect(collectedDaysOf('Y6')).toHaveLength(expected);
+    });
+});
+
+describe('the verification read after the collected write follows a barcode another device moved to pickup trash', () => {
+    it('no false «not synced» warning and the record stays', async () => {
+        install(['X7', 'Y7']);
+        afterUpdate = () => {
+            const item = store[H].item1;
+            const moved = item.barcodes.find((b: any) => b.code === 'X7');
+            item.barcodes = item.barcodes.filter((b: any) => b.code !== 'X7'); item.count = 1; item.barcode = 'Y7';
+            const copy = { ...clone(item), id: 'id_1760000000000_late', barcodes: [{ ...moved, ztoSignedAt: getServerNow() - 500 }], isFromDeletion: true,
+                trashReason: 'pickup', deletedAt: getServerNow(), trashMode: 'cookie', restoreBlocked: true };
+            store[T][copy.id] = clone(copy); dataState.deletedItems = [clone(copy)];
+        };
+        expect(await applyBarcodeCloseChange('item1', 'X7', true, { silent: false, showModal: false })).toBe(true);
+        await settle();
+        expect(collectedDaysOf('X7')).toHaveLength(1);
+        const messages = (uiState.toasts || []).map((t: any) => String(t.msg || ''));
+        expect(messages.join(' ')).not.toContain('មិនទាន់ Sync');
+        expect(messages.join(' ')).toContain('✅');
+    });
+});
+
+
+describe('ចំណូលប្រចាំថ្ងៃ៖ ទម្រង់ barcode ពី server', () => {
+    it.each(['array', 'map'])('សង្គ្រោះចំណូលពី history ទម្រង់ %s', async (shape) => {
+        install(['TEST000002']);
+        const item = store[H].item1;
+        item.isClosed = true; item.closedAt = getServerNow();
+        item.barcodes[0].isClosed = true; item.barcodes[0].closedAt = item.closedAt;
+        if (shape === 'map') item.barcodes = { '7': item.barcodes[0] };
+        expect(await reconcileCollectedHistory('item1', [pickupBarcodeKey('TEST000002')])).toBe(true);
+        expect(collectedDaysOf('TEST000002')).toHaveLength(1);
+        expect(store[C][collectedDaysOf('TEST000002')[0]][pickupBarcodeKey('TEST000002')]).toEqual({ c: 5, d: 0 });
+    });
+
+    it.each(['map'])('កញ្ចប់បានទៅ trash pickup ទម្រង់ %s មុនសង្គ្រោះ', async (shape) => {
+        install(['TEST000003', 'TEST000004']);
+        const item = store[H].item1;
+        const moved = { ...item.barcodes[0], isClosed: true, closedAt: getServerNow() };
+        const trash: any = { id: 'test_pickup_copy', barcode: moved.code, cod: moved.cod, dod: moved.dod,
+            isClosed: true, closedAt: moved.closedAt, trashReason: 'pickup' };
+        if (shape === 'map') trash.barcodes = { '7': moved };
+        store[T][trash.id] = clone(trash); dataState.deletedItems = [clone(trash)];
+        item.barcodes.shift(); item.barcode = 'TEST000004';
+        expect(await reconcileCollectedHistory('item1', [pickupBarcodeKey('TEST000003')])).toBe(true);
+        expect(collectedDaysOf('TEST000003')).toHaveLength(1);
+        expect(collectedDaysOf('TEST000004')).toHaveLength(0);
+    });
+});
+
+
+describe('Palm cleanup រង់ចាំភស្តុតាងចំណូល មិនបង្កើតប្រាក់ថ្មី', () => {
+    afterEach(() => expect(collectedWrites).toBe(0));
+    function palmClosed(codes = ['PALM1'], cod = 5, ageDays = 0) {
+        install(codes);
+        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true,
+            url: window.location.origin + '/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}' }));
+        const item = store[H].item1;
+        const now = getServerNow(), closedAt = now - ageDays * 86400000;
+        item.createdAt = Math.min(closedAt, now - 3 * 3600000) - 3600000;
+        item.isClosed = true; item.closedAt = closedAt;
+        item.barcodes.forEach((b: any) => Object.assign(b, { createdAt: item.createdAt, isClosed: true, closedAt,
+            ztoSignedAt: now - Math.max(ageDays * 86400000, 3 * 3600000), ztoSignedExact: true, cod, dod: 0 }));
+        dataState.scanHistory = [clone(item)];
+        return { item, day: collectedDayOfStamp(closedAt) };
+    }
+
+    it.each([0, 5])('គ្មាន mirror ត្រូវទុក live រហូត close រក្សាប្រាក់ %s', async cod => {
+        const { day } = palmClosed(['PALM1'], cod);
+        await claimAndCleanupItem('item1', 'close');
+        expect(at(`${H}/item1`).barcodes).toHaveLength(1);
+        expect(Object.keys(store[T])).toHaveLength(0);
+        expect(collectedDaysOf('PALM1')).toHaveLength(0);
+        put(`${C}/${day}/PALM1`, { c: cod, d: 0 });
+        const before = clone(store[C]);
+        await claimAndCleanupItem('item1', 'close');
+        expect(at(`${H}/item1`)).toBeNull();
+        expect(Object.values(store[T])).toHaveLength(1);
+        expect(store[C]).toEqual(before);
+    });
+
+    it('partial cleanup ផ្លាស់តែ barcode ដែល mirror បានផ្ទៀង', async () => {
+        const { day } = palmClosed(['PALM1', 'PALM2']);
+        put(`${C}/${day}/PALM1`, { c: 5, d: 0 });
+        await claimAndCleanupItem('item1', 'close');
+        expect(at(`${H}/item1`).barcodes.map((b: any) => b.code)).toEqual(['PALM2']);
+        expect(Object.values(store[T]).flatMap((row: any) => row.barcodes.map((b: any) => b.code))).toEqual(['PALM1']);
+        expect(collectedDaysOf('PALM2')).toHaveLength(0);
+    });
+
+    it('ថ្ងៃបិទហួស retention មិនរង់ចាំ និងមិនបង្កើត mirror ចាស់', async () => {
+        palmClosed(['PALM1'], 5, 8);
+        await claimAndCleanupItem('item1', 'close');
+        expect(at(`${H}/item1`)).toBeNull();
+        expect(Object.values(store[T])).toHaveLength(1);
+        expect(collectedDaysOf('PALM1')).toHaveLength(0);
+    });
+
+    it.each([{ c: 4, d: 0 }, { c: '5', d: 0 }, { c: 5 }, { c: 5, d: 0, unknown: 1 }])('mirror ខុស %j មិនអនុញ្ញាត cleanup', async value => {
+        const { day } = palmClosed();
+        put(`${C}/${day}/PALM1`, value);
+        const before = clone(store[C]);
+        await claimAndCleanupItem('item1', 'close');
+        expect(at(`${H}/item1`).barcodes).toHaveLength(1);
+        expect(Object.keys(store[T])).toHaveLength(0);
+        expect(store[C]).toEqual(before);
+    });
+
+    it.each(['birth', 'intent', 'closedAt', 'price', 'session'])('source ប្តូរ %s ក្រោយ proof មិនអនុញ្ញាត cleanup', async changed => {
+        const { day } = palmClosed();
+        put(`${C}/${day}/PALM1`, { c: 5, d: 0 });
+        let observed = false;
+        vi.stubGlobal('fetch', async (url: string) => {
+            const path = new URL(url).pathname.replace(/\.json$/, '');
+            const snapshot = at(path);
+            if (path === `/${C}/${day}/PALM1` && !observed) {
+                observed = true;
+                const barcode = store[H].item1.barcodes[0];
+                if (changed === 'birth') barcode.createdAt++;
+                if (changed === 'intent') barcode.scanIntent = 'different-intent';
+                if (changed === 'closedAt') barcode.closedAt++;
+                if (changed === 'price') barcode.cod++;
+                if (changed === 'session') firebaseState.authGeneration++;
+            }
+            return new Response(JSON.stringify(snapshot), { status: 200 });
+        });
+        await claimAndCleanupItem('item1', 'close');
+        expect(observed).toBe(true);
+        expect(at(`${H}/item1`).barcodes).toHaveLength(1);
+        expect(Object.keys(store[T])).toHaveLength(0);
+    });
+
+    it.each([false, true])('ទិដ្ឋភាពមាន mirror តែ server មិនផ្ទៀង (offline=%s) ត្រូវ HOLD', async offline => {
+        const { day } = palmClosed();
+        dataState.dailyCollectedData = { [day]: { PALM1: { c: 5, d: 0 } } } as any;
+        if (offline) vi.stubGlobal('fetch', async () => { throw new Error('offline'); });
+        await claimAndCleanupItem('item1', 'close');
+        expect(at(`${H}/item1`).barcodes).toHaveLength(1);
+        expect(Object.keys(store[T])).toHaveLength(0);
+        expect(collectedDaysOf('PALM1')).toHaveLength(0);
+    });
+
+});
+
+
+it.each(['2026-10-31T16:59:59.000Z', '2026-10-31T17:00:04.000Z'])(
+    'Palm matrix រក្សាថ្ងៃបិទនិង mirror ពេលឆ្លងអធ្រាត្រ %s', async instant => {
+        vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(instant));
+        firebaseState.serverTimeOffsetMs = 0;
+        install(['PALMMIDNIGHT']);
+        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true,
+            url: window.location.origin + '/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}' }));
+        expect(await applyBarcodeCloseChange('item1', 'PALMMIDNIGHT', true, { silent: true, showModal: false })).toBe(true);
+        const original = clone(store[H].item1), mirror = clone(store[C]);
+        const day = collectedDayOfStamp(original.barcodes[0].closedAt);
+        expect(collectedDaysOf('PALMMIDNIGHT')).toEqual([day]);
+        const fixture = readFileSync('../audit-tools/money-cookie-blob.js', 'utf8'), blocks: string[] = [];
+        simple(parse(fixture, { ecmaVersion: 'latest' }) as any, { IfStatement(node: any) {
+            if (fixture.slice(node.test.start, node.test.end) === "movement === 'pickup2h'"
+                && fixture.slice(node.start, node.end).includes('/before-cleanup-boundary')) blocks.push(fixture.slice(node.start, node.end));
+        } });
+        expect(blocks).toHaveLength(1);
+        const syncView = () => { dataState.scanHistory = Object.values(clone(store[H])); };
+        const context = vm.createContext({ Date, structuredClone: clone, movement: 'pickup2h', authMode: 'palm', id: 'item1',
+            flow: 'pickup2h-signed', mode: 'slow', code: 'PALMMIDNIGHT',
+            read: async () => clone(store), write: async (ops: any[]) => { for (const op of ops) put(op.p.join('/'), op.v); },
+            sync: async () => syncView(), devices: [{ page: { evaluate: async () => { await claimAndCleanupItem('item1', 'close'); } } }],
+            verify: async () => { expect(at(`${H}/item1`)).not.toBeNull(); }
+        });
+        await vm.runInContext('(async () => {' + blocks[0] + '})()', context);
+        const fixtureClosedAt = store[H].item1.barcodes[0].closedAt;
+        expect(store[C]).toEqual(mirror);
+        store[H].item1.barcodes[0].ztoSignedAt = Date.now() - 3 * 3600000;
+        store[H].item1.barcodes[0].ztoSignedExact = true;
+        syncView(); await claimAndCleanupItem('item1', 'close');
+        expect(at(`${H}/item1`)).toBeNull();
+        expect(Object.values(store[T])).toHaveLength(1);
+        expect(store[C]).toEqual(mirror);
+        expect(fixtureClosedAt).toBe(original.barcodes[0].closedAt);
+    }
+);
+
+it('Palm បិទក្នុងស្រុកចាស់ជាង២ម៉ោង តែ unsigned នៅតែមិន cleanup', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-10-31T13:00:00.000Z'));
+    firebaseState.serverTimeOffsetMs = 0;
+    install(['PALMUNSIGNED']);
+    appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true,
+        url: window.location.origin + '/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}' }));
+    expect(await applyBarcodeCloseChange('item1', 'PALMUNSIGNED', true, { silent: true, showModal: false })).toBe(true);
+    const history = clone(store[H]), mirror = clone(store[C]);
+    vi.setSystemTime(Date.now() + 3 * 3600000);
+    dataState.scanHistory = Object.values(clone(store[H])); await claimAndCleanupItem('item1', 'close');
+    expect(store[H]).toEqual(history); expect(store[C]).toEqual(mirror); expect(Object.keys(store[T])).toHaveLength(0);
+});

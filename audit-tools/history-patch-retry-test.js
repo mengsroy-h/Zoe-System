@@ -268,7 +268,7 @@ async function scenario(label, fn) {
 
     // ⛔ ការព្យួរ **ដែល SDK មិនបានបដិសេធ `disconnect`** ៖ transaction នៅរស់ ➜ `pending` (SENTRY-1 ៖ មិន revert ខណៈ transaction
     //    នៅរស់ · មិនចូលជួរ ព្រោះ transaction ដដែលនឹង commit) ➜ commit/បរាជ័យយឺតសម្រេចដោយ `armLateCommit`
-    //    (`ZoeW/tests/history-patch-late-commit.test.ts`)។
+    //    (`audit-tools/zoew/tests/history-patch-late-commit.test.ts`)។
     await scenario('wrapper ៖ ការព្យួរសុទ្ធ', async () => {
         const item = { id: 'id1', phone: '012345678', callMark: 'wrong-number', callMarkTime: 111 };
         const ctx = build('hang', { server: { id1: { ...item } }, scanHistory: [{ ...item }], markingItemId: 'id1', timeScale: 100 });

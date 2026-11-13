@@ -484,7 +484,7 @@ Repo → Settings → General → Danger Zone → Change repository visibility �
 
 Self-hosted jobs នឹង skip បើ repo នៅ Public ហើយ job `ci-config` នឹងធ្លាក់ (workflow ក្រហម) ដើម្បីកុំឲ្យមានបៃតងក្លែងក្លាយ។ ផ្ដល់សិទ្ធិកែ source/workflow តែអ្នកដែលទុកចិត្ត ព្រោះ workflow អនុវត្តកូដលើ PC របស់អ្នក។
 
-Private បិទការទាញ source ពីអ្នកគ្មានសិទ្ធិ ប៉ុន្តែមិនដកច្បាប់ចម្លងដែលគេធ្លាប់ទាញរួចទេ ហើយ fork សាធារណៈដែលមានស្រាប់នៅ public បន្ត (GitHub បំបែកវាចេញ) ➜ មើល Insights → Forks មុនប្ដូរ។ GitHub Release ក្នុង repo Private ទាមទារសិទ្ធិ ➜ Release ផ្លូវការរបស់ APK ចេញទៅ repo Release public ដាច់ដោយឡែក (`ZOE_RELEASES_REPO` ក្នុង `android-release.yml` · secret `ZOE_RELEASES_TOKEN` · មើល `ZoeW/docs/ANDROID.md`) ដែល App probe ➜ ទូរស័ព្ទនៅ update ស្វ័យប្រវត្តិ។ ⛔ ប្ដូរ Private តែក្រោយកំណែដែល probe repo Release នោះដល់ទូរស័ព្ទទាំងអស់រួច (កំណែមុនៗ probe repo source ➜ 404 ➜ ត្រូវ sideload ដោយដៃ)។ នាទី Actions របស់ repo Private ចេញពី quota (GitHub-hosted) — ជំហាន ១៣ សម្រាប់ប្ដូរទៅ self-hosted។
+Private បិទការទាញ source ពីអ្នកគ្មានសិទ្ធិ ប៉ុន្តែមិនដកច្បាប់ចម្លងដែលគេធ្លាប់ទាញរួចទេ ហើយ fork សាធារណៈដែលមានស្រាប់នៅ public បន្ត (GitHub បំបែកវាចេញ) ➜ មើល Insights → Forks មុនប្ដូរ។ GitHub Release ក្នុង repo Private ទាមទារសិទ្ធិ ➜ Release ផ្លូវការរបស់ APK ចេញទៅ repo Release public ដាច់ដោយឡែក (`ZOE_RELEASES_REPO` ក្នុង `android-release.yml` · secret `ZOE_RELEASES_TOKEN` · មើល `docs/zoew/ANDROID.md`) ដែល App probe ➜ ទូរស័ព្ទនៅ update ស្វ័យប្រវត្តិ។ ⛔ ប្ដូរ Private តែក្រោយកំណែដែល probe repo Release នោះដល់ទូរស័ព្ទទាំងអស់រួច (កំណែមុនៗ probe repo source ➜ 404 ➜ ត្រូវ sideload ដោយដៃ)។ នាទី Actions របស់ repo Private ចេញពី quota (GitHub-hosted) — ជំហាន ១៣ សម្រាប់ប្ដូរទៅ self-hosted។
 
 Self-hosted compute មិនប្រើ quota នាទី GitHub-hosted; artifact/cache នៅ GitHub មាន quota ផ្សេង។ Self-hosted Audit រក្សា npm cache ក្នុង home volumes ហើយប្រើ Chromium/RTDB binary cache រួមក្នុង `audit-binaries` volume។ GitHub-hosted Audit ប្រើ explicit npm cache ដែល key ដេរីវេពី lockfiles របស់ ZoeW, supabase និង firebase-provision។ APK workflow បិទ automatic npm cache upload ហើយប្រើ cache របស់ម៉ាស៊ីនដែលរត់។
 
@@ -531,7 +531,7 @@ Self-hosted compute មិនប្រើ quota នាទី GitHub-hosted; arti
 | `ZOE_RELEASES_TOKEN` | PAT ដែលមាន Contents read/write តែលើ repo public `ZOE_RELEASES_REPO`; ចាំបាច់សម្រាប់ release ផ្លូវការពី `main` |
 | `ZOEW_GOOGLE_SERVICES_JSON` | ស្រេចចិត្ត សម្រាប់ FCM |
 
-**រក្សា keystore ដើម** ដើម្បីឱ្យ APK ថ្មីដំឡើងជាន់ App ចាស់បាន។ មើល [Android guide](../ZoeW/docs/ANDROID.md) សម្រាប់ការរៀបចំ signing។
+**រក្សា keystore ដើម** ដើម្បីឱ្យ APK ថ្មីដំឡើងជាន់ App ចាស់បាន។ មើល [Android guide](zoew/ANDROID.md) សម្រាប់ការរៀបចំ signing។
 
 ១. Actions → **Android APK**។
 

@@ -76,7 +76,7 @@ async function scenario(poison) {
   const runs=handles.map(h=>context.save(h,'0910000001','N/A',0).then(value=>results.set(h.record.id,value)));
   await flush(); assert.equal(starts,1); assert.equal(timers.size,1);
   async function tick(ms) {const end=now+ms; for (;;) {const due=[...timers].filter(([,t])=>t.at<=end).sort((a,b)=>a[1].at-b[1].at)[0]; if(!due)break; now=due[1].at;timers.delete(due[0]);due[1].fn();await flush();}now=end;await flush();}
-  const testSource = fs.readFileSync(path.join(ROOT, 'ZoeW/tests/scan-month-coordination.test.ts'), 'utf8');
+  const testSource = fs.readFileSync(path.join(ROOT, 'audit-tools/zoew/tests/scan-month-coordination.test.ts'), 'utf8');
   const at = testSource.indexOf("it('one bounded budget");
   assert.ok(at >= 0, 'រកតេស្តថវិកាមិនឃើញ');
   const end = testSource.indexOf("\nit('queued old-session", at);

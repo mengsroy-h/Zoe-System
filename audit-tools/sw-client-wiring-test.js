@@ -1,6 +1,6 @@
 // ថ្នាក់៖ **ខ្សែភ្ជាប់រវាង Service Worker និងទំព័រ ដែលគ្មាននរណារត់**។
 //
-// ចុងទាំង ២ មានតេស្តរៀងៗខ្លួន ៖ SW ផ្ញើសារ (`ZoeW/tests/push-client.test.tsx` ៖ `client.postMessage`) ·
+// ចុងទាំង ២ មានតេស្តរៀងៗខ្លួន ៖ SW ផ្ញើសារ (`audit-tools/zoew/tests/push-client.test.tsx` ៖ `client.postMessage`) ·
 // អ្នកដោះសារ (`handleServiceWorkerMessage()`) · ផ្ទាំងកំណែថ្មី (`showUpdateAvailableBanner()`)។ តែ **listener**
 // ដែលភ្ជាប់វាក្នុង `registerServiceWorker()` (`src/app/lifecycle/boot.ts`) គ្មានអ្នកណារត់ទេ ៖ mutation ដែលដក
 // `navigator.serviceWorker` ➜ `'message'` ចេញ **រស់រានលើ checker ទាំងអស់** (វាស់បាន 2.45.4 ៖ N28)។ ផលពិត ៖

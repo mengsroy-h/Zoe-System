@@ -2124,6 +2124,7 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 - Audit 1317 លើ `6e422ab`៖ extraction fixtures ៤ ខ្វះ `clearSecureKeySetup` ហើយ PIN fixture គាំងធ្វើឱ្យ meta checker ធ្លាក់តាម។ ភ្ជាប់ helper និង state ពិតទៅ `keygen-supabase-admin-test` · `keygen-pin-flow-test` · `keygen-notice-test` · `ZoeW/tests/keygen-sb-lock-ownership-fixes.test.ts` ដោយរក្សាអះអាងទាំងអស់។
 - `dom-hygiene` ផ្ទៀង AST នៃការហៅផ្ទាល់ពី logout ទៅ session invalidation និង helper ពិត រួចរាប់តែ id ក្នុងបញ្ជីដែលកំណត់ DOM ជាទទេ។ មិនបន្ថែមលើកលែង និងមិនកែ App ឬ Rules។ `ZoeW/tests/audit-dom-cleanup-reachability.test.ts` លើ checker មុនកែ៖ ១ ធ្លាក់/១២ ឆ្លង; ក្រោយកែ៖ ១៣ ឆ្លង។ Controls រក្សាករណីផ្លូវហៅបាត់ ឬមិនដល់ ការសម្អាតបាត់ id ខុស និងវាលថ្មីដែលមិនសម្អាតឱ្យធ្លាក់។
 - តេស្តដែលបានរត់៖ PIN ១៨/១៨ · notice ៨៩/៨៩ · lock ownership ៦/៦។ Supabase extraction smoke សម្អាត state/DOM បានដោយគ្មាន network; full Postgres checker មិនបានរត់។ PIN poison តាម meta helper ពិតបញ្ចប់ដោយ assertion failure ទាំង១៨ គ្មាន crash; full meta checker នៅទុកឱ្យ CI។
+- Audit 1318 ធ្លាក់តែ `doc-scope-test` ព្រោះខ្វះជួរលិបិក្រមសម្រាប់ test ដែលកំណត់ត្រាខាងលើយោង។ បំពេញជួរផ្នែក ២; assertion លិបិក្រមពិតស្កេនឯកសារទាំង២ និងបញ្ជី test ៥០១ ហើយឆ្លងដោយគ្មានជួរខ្វះ/លើសក្នុង ៦១០ ជួរ។ មិនកែ checker។
 - តេស្ត checker ប្រើ ZoeKeyGen source ពិតជាមួយ fixture ZoeW ទទេដើម្បីផ្ទៀងតែរបៀបស្កេននេះ មិនមែនភស្តុតាង measure tree ពេញទេ។ Full CI លើ commit ថ្មីនៅមិនទាន់ផ្ទៀង; មិន merge មិន deploy និងមិនប្ដូរ Firebase។
 
 ### 2026-11-13 — ការចេញ Key សុវត្ថិភាពថ្មី
@@ -5376,6 +5377,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/keygen-auth-recovery-owner.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/keygen-calendar.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/keygen-login-ownership.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/keygen-sb-lock-ownership-fixes.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/label-image.test.tsx` | — | ផ្នែក ៨ · ផ្នែក ៩ |
 | `ZoeW/tests/label-print.test.tsx` | ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/late-commit-stale-session.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |

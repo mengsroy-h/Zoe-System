@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.45';
+const APP_VERSION = '2.24.46';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -19,6 +19,9 @@ const ACTION_ALLOWLIST = [
     "dismissKeypairModal",
     "doLogin",
     "generateLicenseKey",
+    "refreshSecureKeySetup",
+    "inspectSecureKeyEnrollment",
+    "approveSecureKeyEnrollment",
     "generateNewKeypair",
     "generateSetupLink",
     "goToKgNext",
@@ -674,6 +677,7 @@ function liveToastState(key) {
 
 function invalidateSensitiveSession() {
     sensitiveSessionGeneration++;
+    clearSecureKeySetup();
     const setupSecret = document.getElementById('setupLookupSecretInput');
     if (setupSecret) setupSecret.value = '';
     const setupUrl = document.getElementById('setupLookupUrlInput');
@@ -762,6 +766,7 @@ function closeModal(id) {
         clearPinInputValues();
         pinTargetAction = null;
     }
+    if (id === 'secureKeySetupModal') clearSecureKeySetup();
     if (id === 'keypairModal') {
         clearKeypairOutputs();
     }
@@ -2391,13 +2396,15 @@ async function generateLicenseKey() {
         const publicRecord = {
             expiresAt: payload.exp * 1000,
             revoked: false,
-            maxDevices: maxDevices
+            maxDevices: maxDevices,
+            seatProtocol: 2
         };
         const metaRecord = {
             issuedAt: payload.iat * 1000,
             scope: appSelect,
             note: note || '',
-            createdBy: operation.user.email || operation.user.uid
+            createdBy: operation.user.email || operation.user.uid,
+            secureIssued: true
         };
 
         let generateAlreadyTimedOut = false;
@@ -2406,22 +2413,23 @@ async function generateLicenseKey() {
             [`license_keys/${p}/${payload.id}`]: publicRecord,
             [`license_keys_meta/${p}/${payload.id}`]: metaRecord
         })), 3, 1000)));
-        writePromise.then((bgResults) => {
+        writePromise.then(async (bgResults) => {
             if (!generateAlreadyTimedOut) return;
             if (myGeneration !== keyListSessionGeneration || !generateIsCurrent()) return;
             const bgSucceededPaths = targetPaths.filter((p, i) => bgResults[i].status !== 'rejected');
             if (bgSucceededPaths.length > 0) {
                 const landed = `⏱️ Key ${payload.id} ដែលអស់ពេលមុន ត្រូវបានបង្កើតជោគជ័យទីបំផុតសម្រាប់: ${bgSucceededPaths.join(', ')} — `;
                 if (myGenerate === generateLicenseKey.generation) {
-                    lastGeneratedKey = keyString;
-                    document.getElementById('genResultKey').textContent = keyString;
-                    document.getElementById('genResultBox').classList.remove('hidden');
+                    await publishSecureGeneratedKey({ database: operationDb, current: () => generateIsCurrent() && myGenerate === generateLicenseKey.generation }, payload.id, keyString);
+                    if (!generateIsCurrent()) return;
                     showToast(landed + 'Key បង្ហាញក្នុងប្រអប់លទ្ធផលហើយ សូមចម្លងវាប្រគល់អតិថិជន (កុំបង្កើត Key ត្រួតគ្នា)!');
                 } else {
                     showToast(landed + 'សូមកុំបង្កើត Key ត្រួតគ្នា, ពិនិត្យ Key List ជាមុនសិន!');
                 }
                 refreshKeyList();
             }
+        }).catch(() => {
+            if (generateIsCurrent()) showToast('⚠️ សូមចុច Refresh ហើយបន្តរៀបចំ Key សុវត្ថិភាពពីតារាង។');
         });
 
         let results;
@@ -2452,13 +2460,12 @@ async function generateLicenseKey() {
         }
 
         if (!generateIsCurrent()) return;
-        lastGeneratedKey = keyString;
-        document.getElementById('genResultKey').textContent = keyString;
-        document.getElementById('genResultBox').classList.remove('hidden');
+        await publishSecureGeneratedKey({ database: operationDb, current: () => generateIsCurrent() && myGenerate === generateLicenseKey.generation }, payload.id, keyString);
+        if (!generateIsCurrent()) return;
         document.getElementById('genNoteInput').value = '';
 
         if (failedPaths.length === 0) {
-            showToast('✅ Key ត្រូវបានបង្កើត និងកត់ត្រាទុករួចរាល់!');
+            showToast('✅ បានបង្កើត Key សុវត្ថិភាព។ សូមបន្តអនុម័តឧបករណ៍ក្នុងប្រអប់ណែនាំ។');
         } else {
             const extraWarning = appPathsTagFailed
                 ? '\n\n⚠️ បន្ថែមទៀត Key List នៅក្នុង App នេះប្រហែលជាមិនបង្ហាញត្រឹមត្រូវថា Key នេះ Active នៅ App ណាខ្លះទេ — សូមពិនិត្យផ្ទាល់នៅ Firebase Console (path license_keys) មុននឹង Revoke ឬបន្ថែមសុពលភាព Key នេះ។'
@@ -2476,7 +2483,7 @@ async function generateLicenseKey() {
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'generateLicenseKey' });
         alert(e && e.message === 'Generate key timed out'
             ? '⏳ ការបង្កើត Key មិនទាន់បញ្ជាក់ទេ (អ៊ីនធឺណិតយឺត ឬដាច់)។ Key អាចនឹងចុះដោយស្វ័យប្រវត្តិពេលភ្ជាប់វិញ — សូមចុច 🔄 Refresh មើល Key List មុនបង្កើតម្តងទៀត (កុំបង្កើត Key ត្រួតគ្នា)។'
-            : 'មិនអាចបង្កើត Key បានទេ! សូមពិនិត្យការភ្ជាប់ Firebase និងសិទ្ធិគណនី។');
+            : 'មិនទាន់បញ្ជាក់ការបង្កើត Key សុវត្ថិភាព។ សូម Refresh មើលតារាងមុនបង្កើតម្ដងទៀត។ បើគ្មាន Key សូមពិនិត្យ Firebase Rules សម្រាប់ Key សុវត្ថិភាព និងសិទ្ធិគណនី។');
     } finally {
         if (generateKeyOwner === owner) {
             generateKeyOwner = null;
@@ -3019,7 +3026,7 @@ function renderKeyList() {
                     <button class="btn-mini" data-key-id="${escapeHtml(row.id)}" data-action="extend">⏳ បន្ថែម</button>
                     <button class="btn-mini" data-key-id="${escapeHtml(row.id)}" data-action="devices">📱 ចំនួនឧបករណ៍</button>
                     <button class="btn-mini" data-key-id="${escapeHtml(row.id)}" data-action="release">🔓 ដោះឧបករណ៍</button>
-                    <button class="btn-mini" data-key-id="${escapeHtml(row.id)}" data-action="secure-seats">🔐 គ្រប់គ្រងឧបករណ៍សុវត្ថិភាព</button>
+                    <button class="btn-mini" data-key-id="${escapeHtml(row.id)}" data-action="${secure && row.secureIssued === true ? 'secure-setup' : 'secure-seats'}">${secure && row.secureIssued === true ? '🔐 រៀបចំ / បន្ត Key សុវត្ថិភាព' : '🔐 គ្រប់គ្រងឧបករណ៍សុវត្ថិភាព'}</button>
                 </div>
             </td>
         </tr>`;
@@ -3131,6 +3138,198 @@ async function seatSellerInspect(context, id) {
     return result;
 }
 
+let secureKeySetup = null;
+
+function clearSecureKeySetup() {
+    secureKeySetup = null;
+    ['secureKeyEnrollmentInput', 'secureKeySetupKey'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    ['secureKeyFingerprint', 'secureKeySetupStatus', 'secureKeySetupId'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = '';
+    });
+    const approve = document.getElementById('secureKeyApproveBtn');
+    if (approve) approve.disabled = true;
+}
+
+async function publishSecureGeneratedKey(context, id, keyString) {
+    const row = await seatSellerRow(context, id);
+    if (!context.current() || row.seatProtocol !== 2) throw new Error('seat-marker-unverified');
+    lastGeneratedKey = keyString;
+    document.getElementById('genResultKey').textContent = keyString;
+    document.getElementById('genResultBox').classList.remove('hidden');
+    await openSecureKeySetup(id);
+}
+
+function secureKeySetupCurrent(setup) {
+    return !!setup && secureKeySetup === setup && setup.context.current();
+}
+
+function secureKeySetupMessage(setup, text) {
+    if (secureKeySetupCurrent(setup)) document.getElementById('secureKeySetupStatus').textContent = text;
+}
+
+async function secureKeyReceiptReady(setup, inspected) {
+    const config = window.ZoeSeatConfig;
+    if (!config || !Array.isArray(config.receiptPublicKeys) || !config.receiptPublicKeys.length) throw new Error('seat-receipt-unconfigured');
+    for (const key of config.receiptPublicKeys) {
+        const fingerprint = await window.ZoeSeatClient.fingerprint(key);
+        if (!secureKeySetupCurrent(setup)) throw new Error('seat-session-changed');
+        if (fingerprint === inspected.receiptKeyFingerprint) return;
+    }
+    throw new Error('seat-receipt-mismatch');
+}
+
+async function secureKeySetupInspect(setup) {
+    const row = await seatSellerRow(setup.context, setup.id);
+    if (!secureKeySetupCurrent(setup) || row.seatProtocol !== 2) throw new Error('seat-marker-unverified');
+    const inspected = await seatSellerInspect(setup.context, setup.id);
+    if (!secureKeySetupCurrent(setup)) throw new Error('seat-session-changed');
+    await secureKeyReceiptReady(setup, inspected);
+    return inspected;
+}
+
+async function openSecureKeySetup(id) {
+    clearSecureKeySetup();
+    const context = seatSellerContext();
+    if (!context.current() || !context.privateKey || !/^[A-Z0-9]{16,40}$/.test(id)) return;
+    const setup = { id, context, busy: true, enrollment: null };
+    secureKeySetup = setup;
+    openModalHelper('secureKeySetupModal');
+    document.getElementById('secureKeySetupId').textContent = id;
+    secureKeySetupMessage(setup, 'កំពុងពិនិត្យ Key សុវត្ថិភាពពី Server...');
+    try {
+        const row = await seatSellerRow(context, id);
+        const metaSnap = await withTimeout(fb.get(fb.ref(context.database, 'license_keys_meta/ZOE/' + id)), 15000, 'Seat metadata timed out');
+        if (!secureKeySetupCurrent(setup) || row.seatProtocol !== 2) throw new Error('seat-marker-unverified');
+        const meta = metaSnap.val();
+        if (!meta || meta.secureIssued !== true || meta.scope !== 'ZOE' || !Number.isSafeInteger(meta.issuedAt) || meta.issuedAt <= 0 ||
+            meta.issuedAt % 1000 !== 0 || !Number.isSafeInteger(row.expiresAt) || row.expiresAt <= meta.issuedAt || row.expiresAt % 1000 !== 0 ||
+            !Number.isInteger(row.maxDevices) || row.maxDevices < 1 || row.maxDevices > 5 || row.revoked !== false) throw new Error('seat-issuance-invalid');
+        const payload = seatSellerEncode(new TextEncoder().encode(JSON.stringify({ a: 'ZOE', id, iat: meta.issuedAt / 1000, exp: row.expiresAt / 1000 })));
+        const previous = window.ZoeLicense.parseKeyString(lastGeneratedKey);
+        let keyString = previous && previous.payloadB64 === payload ? lastGeneratedKey : '';
+        if (!keyString) {
+            const key = await crypto.subtle.importKey('jwk', context.privateKey, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+            if (!secureKeySetupCurrent(setup)) return;
+            const signature = seatSellerEncode(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, new TextEncoder().encode(payload)));
+            keyString = window.ZoeLicense.KEY_PREFIX + payload + '.' + signature;
+        }
+        if (!secureKeySetupCurrent(setup)) return;
+        document.getElementById('secureKeySetupKey').value = keyString;
+        let inspected = await secureKeySetupInspect(setup);
+        if (inspected.state.revision === 0) {
+            await seatSellerCommand(context, id, 'configure', 0, { maxDevices: row.maxDevices, licenseExpiresAt: row.expiresAt, revoked: false });
+            inspected = await secureKeySetupInspect(setup);
+            if (inspected.state.revision < 1 || inspected.state.maxDevices !== row.maxDevices || inspected.state.licenseExpiresAt !== row.expiresAt || inspected.state.revoked !== false) throw new Error('seat-config-unverified');
+        }
+        secureKeySetupRender(setup, inspected.state);
+    } catch (error) {
+        secureKeySetupMessage(setup, 'មិនទាន់បញ្ជាក់លទ្ធផល។ Key នេះមិនផ្ដល់សិទ្ធិមុនអនុម័តឧបករណ៍ទេ។ សូមផ្ទៀងម៉ោង Signing Key និង Server រួចចុច «ពិនិត្យ និងបន្ត»។ កុំបង្កើត Key ត្រួតគ្នា។');
+    } finally {
+        if (secureKeySetupCurrent(setup)) setup.busy = false;
+    }
+}
+
+function secureKeySetupRender(setup, state) {
+    const count = Object.keys(state.seats).length;
+    const now = getTrustedServerNow();
+    secureKeySetupMessage(setup, (state.revoked ? '⛔ Key ត្រូវបានបិទ។' : now === null ? '⚠️ សូមផ្ទៀងម៉ោង Server។' : state.licenseExpiresAt <= now ? '⏳ Key ផុតកំណត់។ សូមបន្ថែមសុពលភាពពីតារាង។' : state.mode === 'active' ? '✅ Server សកម្ម។ ឧបករណ៍ដែលបានអនុម័តអាចចុច Activate។' : '⏳ រង់ចាំការអនុម័តឧបករណ៍។')
+        + ' ឧបករណ៍៖ ' + count + '/' + state.maxDevices + ' · ផុតកំណត់៖ ' + new Date(state.licenseExpiresAt).toLocaleDateString('km-KH', { timeZone: 'Asia/Phnom_Penh' }));
+}
+
+async function refreshSecureKeySetup() {
+    const setup = secureKeySetup;
+    if (!setup || setup.busy || !secureKeySetupCurrent(setup)) return;
+    await openSecureKeySetup(setup.id);
+}
+
+async function inspectSecureKeyEnrollment() {
+    const setup = secureKeySetup;
+    if (!setup || setup.busy || !secureKeySetupCurrent(setup)) return;
+    setup.busy = true;
+    setup.enrollment = null;
+    document.getElementById('secureKeyApproveBtn').disabled = true;
+    document.getElementById('secureKeyFingerprint').textContent = '';
+    const raw = document.getElementById('secureKeyEnrollmentInput').value;
+    try {
+        if (raw.length > 8192) throw new Error('seat-enrollment-size');
+        const enrollment = JSON.parse(raw);
+        if (!enrollment || typeof enrollment.payload !== 'string' || typeof enrollment.signature !== 'string' ||
+            !/^[A-Za-z0-9_-]+$/.test(enrollment.payload) || !/^[A-Za-z0-9_-]+$/.test(enrollment.signature)) throw new Error('seat-enrollment-invalid');
+        const body = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(atob(enrollment.payload.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0))));
+        if (body.domain !== 'zoe-license-enrollment-v1' || body.audience !== 'https://zoew.netlify.app' || body.app !== 'ZOE' || body.keyId !== setup.id ||
+            typeof body.nonce !== 'string' || !/^[A-Za-z0-9_-]{32,64}$/.test(body.nonce)) throw new Error('seat-enrollment-scope');
+        const fingerprint = await window.ZoeSeatClient.fingerprint(body.publicKey);
+        const key = await crypto.subtle.importKey('jwk', body.publicKey, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
+        const signature = Uint8Array.from(atob(enrollment.signature.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
+        if (fingerprint !== enrollment.fingerprint || signature.length !== 64 || !await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key, signature, new TextEncoder().encode(enrollment.payload))) throw new Error('seat-enrollment-proof');
+        if (!secureKeySetupCurrent(setup) || document.getElementById('secureKeyEnrollmentInput').value !== raw) return;
+        setup.enrollment = { raw, envelope: enrollment, publicKey: body.publicKey, fingerprint };
+        document.getElementById('secureKeyFingerprint').textContent = fingerprint;
+        document.getElementById('secureKeyApproveBtn').disabled = false;
+        secureKeySetupMessage(setup, 'សូមប្រៀបធៀបស្នាមសោខាងក្រោមជាមួយអេក្រង់ឧបករណ៍ផ្ទាល់ មុនចុចអនុម័ត។');
+    } catch (error) {
+        secureKeySetupMessage(setup, 'សំណើមិនត្រឹមត្រូវ ឬមិនមែនរបស់ Key នេះ។ សូមចម្លង JSON ពេញពីឧបករណ៍មកម្ដងទៀត។');
+    } finally {
+        if (secureKeySetupCurrent(setup)) setup.busy = false;
+    }
+}
+
+async function approveSecureKeyEnrollment() {
+    const setup = secureKeySetup;
+    if (!setup || setup.busy || !secureKeySetupCurrent(setup) || !setup.enrollment) return;
+    const enrollment = setup.enrollment;
+    if (document.getElementById('secureKeyEnrollmentInput').value !== enrollment.raw) {
+        setup.enrollment = null;
+        document.getElementById('secureKeyApproveBtn').disabled = true;
+        secureKeySetupMessage(setup, 'សំណើបានប្រែ។ សូមចុច «ពិនិត្យសំណើ» ម្ដងទៀត។');
+        return;
+    }
+    if (!confirm('ស្នាមសោនេះដូចនឹងលើឧបករណ៍ផ្ទាល់មែនទេ?\n' + enrollment.fingerprint + '\nអនុម័តឧបករណ៍នេះ និងបើកការប្រើ Key សុវត្ថិភាព?')) return;
+    if (!secureKeySetupCurrent(setup)) return;
+    setup.busy = true;
+    document.getElementById('secureKeyApproveBtn').disabled = true;
+    try {
+        let inspected = await secureKeySetupInspect(setup);
+        let state = inspected.state;
+        const now = getTrustedServerNow();
+        if (now === null || state.revoked || state.licenseExpiresAt <= now) throw new Error('seat-not-available');
+        const matches = (seat) => seat && seat.publicKey && seat.publicKey.x === enrollment.publicKey.x && seat.publicKey.y === enrollment.publicKey.y;
+        let slot = Object.keys(state.seats).find((name) => matches(state.seats[name]));
+        const epoch = state.releaseEpoch;
+        if (!slot) {
+            slot = LICENSE_SEAT_SLOT_NAMES.slice(0, state.maxDevices).find((name) => !state.seats[name]);
+            if (!slot) throw new Error('seat-limit');
+            await seatSellerCommand(setup.context, setup.id, 'enroll', state.revision, { slot, releaseEpoch: epoch, publicKey: enrollment.publicKey, enrollment: enrollment.envelope });
+            inspected = await secureKeySetupInspect(setup);
+            if (inspected.state.revision <= state.revision) throw new Error('seat-enrollment-unverified');
+            state = inspected.state;
+        }
+        if (!secureKeySetupCurrent(setup) || state.releaseEpoch !== epoch || !matches(state.seats[slot]) || state.revoked) throw new Error('seat-enrollment-unverified');
+        if (state.mode === 'staged') {
+            await seatSellerCommand(setup.context, setup.id, 'cutover', state.revision, { expectedDevices: Object.keys(state.seats).length, receiptKeyFingerprint: inspected.receiptKeyFingerprint });
+            const previousRevision = state.revision;
+            inspected = await secureKeySetupInspect(setup);
+            state = inspected.state;
+            if (state.revision <= previousRevision) throw new Error('seat-outcome-unverified');
+        }
+        if (!secureKeySetupCurrent(setup) || state.mode !== 'active' || state.releaseEpoch !== epoch || !matches(state.seats[slot]) || state.revoked) throw new Error('seat-outcome-unverified');
+        secureKeySetupRender(setup, state);
+        setup.enrollment = null;
+        document.getElementById('secureKeyEnrollmentInput').value = '';
+        document.getElementById('secureKeyFingerprint').textContent = '';
+        refreshKeyList();
+    } catch (error) {
+        if (secureKeySetupCurrent(setup)) setup.enrollment = null;
+        secureKeySetupMessage(setup, 'មិនទាន់បញ្ជាក់លទ្ធផល។ សូមចុច «ពិនិត្យ និងបន្ត» ដើម្បីអានស្ថានភាពថ្មី រួចផ្ទៀងសំណើដដែលម្ដងទៀត។ បើពេញឧបករណ៍ ឬ Key បិទ/ផុតកំណត់ សូមគ្រប់គ្រងវានៅតារាង Key។');
+    } finally {
+        if (secureKeySetupCurrent(setup)) setup.busy = false;
+    }
+}
+
 async function routeSecureSeatLifecycle(id, action, days) {
     const context = seatSellerContext();
     if (!context.current()) return true;
@@ -3138,7 +3337,15 @@ async function routeSecureSeatLifecycle(id, action, days) {
         const row = await seatSellerRow(context, id);
         if (row.seatProtocol !== 2) return false;
         const { state } = await seatSellerInspect(context, id);
-        if (!context.current() || state.mode !== 'active') throw new Error('seat-not-active');
+        if (!context.current()) throw new Error('seat-session-changed');
+        if (state.revision === 0) {
+            alert('សូមចុច «រៀបចំ / បន្ត Key សុវត្ថិភាព» ដើម្បីបញ្ចប់ការត្រៀម Server មុនគ្រប់គ្រង Key នេះ។');
+            return true;
+        }
+        if (state.mode !== 'active') {
+            const meta = await withTimeout(fb.get(fb.ref(context.database, 'license_keys_meta/ZOE/' + id)), 15000, 'Seat metadata timed out');
+            if (!context.current() || !meta.val() || meta.val().secureIssued !== true) throw new Error('seat-not-active');
+        }
         const fields = { maxDevices: state.maxDevices, licenseExpiresAt: state.licenseExpiresAt, revoked: state.revoked };
         if (action === 'revoke') {
             if (!confirm(state.revoked ? 'បើក Key នេះវិញ?' : 'បិទ Key នេះសម្រាប់ឧបករណ៍ទាំងអស់?')) return true;
@@ -3158,7 +3365,7 @@ async function routeSecureSeatLifecycle(id, action, days) {
         } else throw new Error('seat-action');
         await seatSellerCommand(context, id, action === 'release' ? 'release' : 'configure', state.revision, action === 'release' ? {} : fields);
         const verified = await seatSellerInspect(context, id);
-        if (!context.current() || verified.state.revision <= state.revision || verified.state.mode !== 'active') throw new Error('seat-outcome-unverified');
+        if (!context.current() || verified.state.revision <= state.revision || verified.state.mode !== state.mode) throw new Error('seat-outcome-unverified');
         if (action === 'release' ? verified.state.releaseEpoch <= state.releaseEpoch || Object.keys(verified.state.seats).length !== 0
             : verified.state.maxDevices !== fields.maxDevices || verified.state.licenseExpiresAt !== fields.licenseExpiresAt || verified.state.revoked !== fields.revoked) throw new Error('seat-outcome-unverified');
         showToast('✅ បានបញ្ជាក់ការកែប្រែពី Server។');
@@ -4648,6 +4855,7 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (btn.dataset.action === 'devices') setKeySeatLimit(id);
             else if (btn.dataset.action === 'release') releaseKeySeat(id);
             else if (btn.dataset.action === 'secure-seats') manageSecureSeats(id);
+            else if (btn.dataset.action === 'secure-setup') openSecureKeySetup(id);
         });
     }
 

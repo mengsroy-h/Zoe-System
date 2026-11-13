@@ -122,6 +122,15 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### ZoeKeyGen [2.24.46] — 2026-11-13 · ចេញ Key សុវត្ថិភាពដោយមានការណែនាំ
+
+**ZoeKeyGen** (`zoekeygen-v156` ➜ `zoekeygen-v157`)។ ZoeW និង Server រក្សាកំណែដដែល។
+
+- Generate Key បង្កើត public row ជា protocol 2 និង admin metadata ក្នុង write តែមួយ។ បង្ហាញ Key តែក្រោយអាន marker ពី Server; គ្មានការបញ្ចេញ Key ដែលអាចប្រើតាម legacy។ ការបង្កើតមិនផ្ដល់សិទ្ធិឧបករណ៍ទេ។
+- ប្រអប់ណែនាំបង្ហាញ Key, ទទួល JSON ដែលមានហត្ថលេខារបស់ឧបករណ៍ និងស្នាមសោសម្រាប់ម្ចាស់ប្រៀបធៀបផ្ទាល់។ ក្រោយការយល់ព្រម enroll និង cutover មានហត្ថលេខាអ្នកលក់ ហើយផ្ទៀងស្ថានភាពថ្មីមុនសារជោគជ័យ។
+- ប៊ូតុងក្នុងតារាងបន្ត Key ដដែលបានក្រោយបិទ ឬបាត់ចម្លើយ។ Metadata រក្សាតែថ្ងៃចេញ និងសញ្ញាចេញសុវត្ថិភាព មិនរក្សា raw Activation Key ឬ Signing Key។ ការបើកម្ដងទៀតមិនជាន់ revoke/extend/release ដែល Server កាន់ទេ។ ផ្លូវ migration និង management របស់ Key មានស្រាប់រក្សាដដែល។
+- **សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ ផ្ទៀង CI លើ commit ចុងក្រោយ ហើយ Publish `ZoeKeyGen/firebase-database.rules.json` ទៅ License Project **មុន** merge/deploy frontend។ ត្រូវមាន stage endpoint និង Receipt pins ដែលផ្គូផ្គងរួច; rules ចាស់បដិសេធ write ទាំងមូលដោយមិនបង្កើត legacy fallback។ គ្មាន live Firebase, secret ឬ deployment ក្នុងការកែនេះ។ ត្រូវសាកឧបករណ៍អតិថិជនពិតក្រោយ rollout ដែលអនុម័ត។
+
 ### ZoeKeyGen [2.24.45] — 2026-11-13 · ផ្ទៀង cache មុនប្ដូរ marker
 
 **ZoeKeyGen** (`zoekeygen-v155` ➜ `zoekeygen-v156`)។ ZoeW រក្សាកំណែដដែល។
@@ -2109,6 +2118,12 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-11-13 — ការចេញ Key សុវត្ថិភាពថ្មី
+
+- `ZoeW/tests/license-secure-issuance.test.ts` វាស់កូដ seller ពិតជាមួយ WebCrypto និង service/CAS ក្នុងសតិ៖ ការអនុម័តឧបករណ៍ សំណើខូច fingerprint ការបោះបង់ វគ្គប្រែ និងការបន្តពេលចម្លើយបាត់។ `emu/license-seat-rules-test` បន្ថែម creation/schema/permission controls និងរក្សាទិសផ្ទុយរបស់ legacy transition។
+- ស្លាក `secureIssued` ជាទិន្នន័យ admin សម្រាប់បង្ហាញ UI មិនមែនជាសិទ្ធិ។ Marker 2, seller signature, device proof និង Server revision/epoch នៅតែជាព្រំដែន។ Rules បន្ថែមតែ create-only branch និងវាល metadata; marker ដែលមានរួចមិនអាចកែបានដដែល។
+- **ភស្តុតាង local**៖ តេស្ត issuance ថ្មី ៣៨ ឆ្លង, seller/client/runtime/clock ឆ្លង និង session harness ៣៦៩ ឆ្លង។ ជុំចុងក្រោយ ១៩៦/១៩៧៖ តេស្ត stage ដែលមិនបានកែរំពឹង 409 ប៉ុន្តែទទួល 403 ក្នុងការប្រណាំង prove/release; មិនកែ server ឬតេស្តនោះក្នុងមុខងារនេះ។ Typecheck/lint និង static file/rules guards ឆ្លង។ Chromium មិនអាចបើក Unix socket ក្នុងបរិស្ថាននេះ ហើយគ្មាន emulator JAR ដែលបានរៀបចំ; browser/measurement/Rules runtime និង CI លើ commit ថ្មីនៅមិនទាន់ផ្ទៀង។
 
 ### 2026-11-13 — cache SDK របស់ seller marker
 
@@ -5367,6 +5382,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/license-clock-recovery.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/license-seat-runtime-context.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/license-seat-seller.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/license-secure-issuance.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/list-paging.test.tsx` | — | ផ្នែក ៧ |
 | `ZoeW/tests/list-render-scope.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៦ · ផ្នែក ៧ |
 | `ZoeW/tests/listener-leak-coverage.test.ts` | ផ្នែក ២ | — |

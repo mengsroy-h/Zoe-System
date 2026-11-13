@@ -5152,6 +5152,9 @@
     "ZoeW/tests/license-seat-seller.test.ts": {
       "policy": "license-seat-protocol"
     },
+    "ZoeW/tests/license-secure-issuance.test.ts": {
+      "policy": "license-seat-protocol"
+    },
     "ZoeW/tests/license-seat-idb.test.ts": {
       "policy": "license-seat-protocol"
     },

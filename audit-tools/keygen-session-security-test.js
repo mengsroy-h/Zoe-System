@@ -88,7 +88,7 @@ function build(options) {
     const license = {
         getTrustedServerNow: () => 1000, getServerTimeGeneration: () => 1, resetServerTime() {},
         generateKeyPair: () => Promise.resolve({ publicKeyJwk: { kty: 'EC', x: 'pub' }, privateKeyJwk: { kty: 'EC', crv: 'P-256', d: 'private' } }),
-        signNewKey: () => Promise.resolve({ keyString: 'signed-key', payload: { id: 'key-1', iat: 1, exp: 2592001 } }),
+        signNewKey: () => Promise.resolve({ keyString: 'signed-key', payload: { id: 'SYNTHETICKEY00001', iat: 1, exp: 2592001 } }),
         verifyKeyString: () => Promise.resolve({ valid: true })
     };
     const sandbox = {
@@ -162,10 +162,26 @@ function build(options) {
         __elements: elements,
         __storage: storage
     };
+    const committedRows = new Map();
+    let updateFixture = sandbox.fb.update;
+    Object.defineProperty(sandbox.fb, 'update', {
+        get: () => (ref, updates) => Promise.resolve(updateFixture(ref, updates)).then((result) => {
+            if (ref && updates && typeof updates === 'object') {
+                let rows = committedRows.get(ref.db);
+                if (!rows) { rows = new Map(); committedRows.set(ref.db, rows); }
+                for (const [key, value] of Object.entries(updates)) rows.set([ref.path, key].filter(Boolean).join('/'), value);
+            }
+            return result;
+        }),
+        set: (fixture) => { updateFixture = fixture; }
+    });
     let fetchFixture = async () => { throw new Error('unexpected request'); };
     Object.defineProperty(sandbox, 'fetch', { configurable: true, get: () => { const fixture = fetchFixture; return (url, init) => {
         if (/\/license_keys\/ZOE\/[A-Z0-9]{16,40}\.json$/.test(String(url)) && (!init || !init.method || init.method === 'GET')) {
-            return Promise.resolve({ ok: true, status: 200, json: async () => ({ maxDevices: 1, revoked: false, expiresAt: 1000 }) });
+            const urlValue = new URL(String(url));
+            const database = [...committedRows.keys()].find((db) => db.app.options.databaseURL === urlValue.origin);
+            const row = database && committedRows.get(database).get(urlValue.pathname.slice(1, -5));
+            return Promise.resolve({ ok: true, status: 200, json: async () => row || ({ maxDevices: 1, revoked: false, expiresAt: 1000 }) });
         }
         return fixture(url, init);
     }; }, set: (value) => { fetchFixture = value; } });
@@ -208,6 +224,7 @@ function build(options) {
         'safeStoreSet', 'safeStoreGet', 'safeStoreRemove',
         'safeStoreRemove',
         'invalidateSensitiveSession',
+        'clearSecureKeySetup', 'publishSecureGeneratedKey',
         ...(src.indexOf('function lookupSetupScrubUrl(') !== -1 ? ['lookupSetupScrubUrl', 'lookupSetupSecretName'] : []),
         'captureSensitiveSession',
         'isSensitiveSessionCurrent',
@@ -235,6 +252,7 @@ function build(options) {
         'tryRestoreSigningKeyFromSession'
     ]), ctx);
     if (src.includes('function seatSellerContext()')) vm.runInContext(src.slice(src.indexOf('function seatSellerContext()'), src.indexOf('async function toggleRevokeKey(')), ctx);
+    ctx.openSecureKeySetup = async (id) => { log.setupOpened = (log.setupOpened || []).concat(id); };
     return { ctx, license, log, elements, storage, getElementById, keyServer };
 }
 
@@ -827,10 +845,10 @@ async function run() {
         if (stage === 'write') h.ctx.fb.update = () => pending.promise;
         const oldGenerate = h.ctx.generateLicenseKey();
         await drain();
-        h.license.signNewKey = () => Promise.resolve({ keyString: 'synthetic-new-key', payload: { id: 'synthetic-new-id', iat: 1, exp: 2592001 } });
+        h.license.signNewKey = () => Promise.resolve({ keyString: 'synthetic-new-key', payload: { id: 'SYNTHETICKEY00003', iat: 1, exp: 2592001 } });
         h.getElementById('privateKeyInput').value = JSON.stringify(reloadKey);
         await h.ctx.loadSigningKey();
-        pending.resolve(stage === 'clock' ? true : { keyString: 'synthetic-old-key', payload: { id: 'synthetic-old-id', iat: 1, exp: 2592001 } });
+        pending.resolve(stage === 'clock' ? true : { keyString: 'synthetic-old-key', payload: { id: 'SYNTHETICKEY00004', iat: 1, exp: 2592001 } });
         await oldGenerate;
         ok(stage + '៖ Load Key ឡើងវិញមិនទុកសោ Generate ជាប់',
             h.ctx.isGeneratingKey === false && !h.getElementById('genGenerateBtn').disabled);
@@ -889,7 +907,7 @@ async function run() {
             { lastGeneratedKey: h.ctx.lastGeneratedKey, shown: h.getElementById('genResultKey').textContent });
         h.ctx.fb.update = () => { h.log.updates++; return Promise.resolve(); };
         h.ctx.waitForServerTimeSync = () => Promise.resolve(true);
-        h.license.signNewKey = () => Promise.resolve({ keyString: 'synthetic-after-pin', payload: { id: 'synthetic-after-pin-id', iat: 1, exp: 2592001 } });
+        h.license.signNewKey = () => Promise.resolve({ keyString: 'synthetic-after-pin', payload: { id: 'SYNTHETICKEY00005', iat: 1, exp: 2592001 } });
         await h.ctx.generateLicenseKey();
         ok(stage + ' ៖ Generate បន្ទាប់បង្ហាញ Key បាន', h.ctx.lastGeneratedKey === 'synthetic-after-pin', h.ctx.lastGeneratedKey);
     }
@@ -1086,7 +1104,7 @@ async function run() {
         if (newer === 'written') {
             h.ctx.fb.update = () => { h.log.updates++; return Promise.resolve(); };
             h.ctx.withTimeout = (promise) => promise;
-            h.license.signNewKey = () => Promise.resolve({ keyString: 'synthetic-newer-key', payload: { id: 'synthetic-newer-id', iat: 1, exp: 2592001 } });
+            h.license.signNewKey = () => Promise.resolve({ keyString: 'synthetic-newer-key', payload: { id: 'SYNTHETICKEY00002', iat: 1, exp: 2592001 } });
             await h.ctx.generateLicenseKey();
             ok(label + ' ៖ លក្ខខណ្ឌចាំបាច់ — Generate ថ្មីបង្ហាញ Key ថ្មី', h.ctx.lastGeneratedKey === 'synthetic-newer-key', h.ctx.lastGeneratedKey);
         } else if (newer !== 'none') {
@@ -1104,11 +1122,11 @@ async function run() {
         if (newer !== 'written') {
             ok('⛔ ' + label + ' ➜ ចុះយឺត ៖ Key string បង្ហាញក្នុងប្រអប់លទ្ធផល (ចម្លងបាន) · toast ប្រាប់ id · Refresh បញ្ជី',
                 h.ctx.lastGeneratedKey === 'signed-key' && h.getElementById('genResultKey').textContent === 'signed-key'
-                    && !h.getElementById('genResultBox').classList.contains('hidden') && /key-1/.test(lateToast) && h.log.refreshed >= 1,
+                    && !h.getElementById('genResultBox').classList.contains('hidden') && /SYNTHETICKEY00001/.test(lateToast) && h.log.refreshed >= 1,
                 { key: h.ctx.lastGeneratedKey, shown: h.getElementById('genResultKey').textContent, toasts: h.log.toasts, refreshed: h.log.refreshed });
         } else {
             ok(label + ' ➜ ចុះយឺត ៖ Key ចាស់មិនជាន់ Key ថ្មីក្នុងប្រអប់ · toast ប្រាប់ id ចាស់នៅ',
-                h.ctx.lastGeneratedKey === 'synthetic-newer-key' && h.getElementById('genResultKey').textContent === 'synthetic-newer-key' && /key-1/.test(lateToast),
+                h.ctx.lastGeneratedKey === 'synthetic-newer-key' && h.getElementById('genResultKey').textContent === 'synthetic-newer-key' && /SYNTHETICKEY00001/.test(lateToast),
                 { key: h.ctx.lastGeneratedKey, shown: h.getElementById('genResultKey').textContent, toasts: h.log.toasts });
         }
     }

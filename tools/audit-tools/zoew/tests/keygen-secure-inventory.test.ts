@@ -15,7 +15,7 @@ function mount() { document.body.innerHTML = html.replace(/<script[\s\S]*?<\/scr
 
 async function harness() {
     mount();
-    const ctx: any = { document, TextEncoder, TextDecoder, Uint8Array, crypto: webcrypto, btoa, atob, setTimeout, clearTimeout };
+    const ctx: any = { document, TextEncoder, TextDecoder, Uint8Array, crypto: webcrypto, btoa, atob, setTimeout, clearTimeout, alert: vi.fn() };
     ctx.window = ctx;
     vm.createContext(ctx);
     vm.runInContext(readFileSync(resolve(root, 'ZoeW/public/license-seat-client.js'), 'utf8'), ctx);
@@ -44,6 +44,14 @@ describe('បញ្ជីឧបករណ៍សុវត្ថិភាពរប�
         expect(document.getElementById('secureSeatInventoryList')?.textContent).not.toContain(h.publicKey.x);
         expect(document.querySelector('.secure-seat-card')?.textContent).toContain('មិនទាន់មានព័ត៌មាន');
         expect(h.ctx.seatSellerInspect).toHaveBeenCalledOnce();
+    });
+    it('ប្រាប់ឱ្យផ្ទុក Signing Key ពេលមិនទាន់មាន និងមិនផ្ញើសំណើ', async () => {
+        const h = await harness();
+        h.ctx.seatSellerContext = () => ({ privateKey: null, current: () => true });
+        await h.ctx.openSecureSeatInventory(keyId);
+        expect(h.ctx.alert).toHaveBeenCalledOnce();
+        expect(h.ctx.seatSellerRow).not.toHaveBeenCalled();
+        expect(h.ctx.seatSellerInspect).not.toHaveBeenCalled();
     });
     it('បង្ហាញម៉ូដែលនិងប្រព័ន្ធជាអក្សរ មានពិដាន និងមិនយក Serial', async () => {
         const h = await harness();

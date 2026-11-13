@@ -3204,7 +3204,8 @@ async function openSecureSeatInventory(id) {
     const modal = document.getElementById('secureSeatInventoryModal');
     if (!modal || (modal.inventoryOwner?.busy && modal.inventoryOwner.id === id)) return;
     const context = seatSellerContext();
-    if (!context.current() || !context.privateKey || !/^[A-Z0-9]{16,40}$/.test(id)) return;
+    if (!context.current() || !/^[A-Z0-9]{16,40}$/.test(id)) return;
+    if (!context.privateKey) { alert('សូមផ្ទុក Signing Key មុនមើលបញ្ជីឧបករណ៍សុវត្ថិភាព។'); return; }
     const owner = { id, busy: true };
     modal.inventoryOwner = owner;
     const current = () => modal.inventoryOwner === owner && context.current();

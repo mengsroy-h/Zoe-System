@@ -10,7 +10,7 @@ afterEach(() => vi.unstubAllEnvs());
 const keys = () => { const p = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' }); return { privateKey: p.privateKey, publicKey: p.publicKey.export({ format: 'jwk' }) }; };
 const sign = (key: any, c: any) => { const payload = Buffer.from(JSON.stringify(c)).toString('base64url'); return { payload, signature: crypto.sign('sha256', Buffer.from(payload), { key: key.privateKey, dsaEncoding: 'ieee-p1363' }).toString('base64url') }; };
 it('បិទនៅពេលគ្មានការកំណត់សម្ងាត់', async () => { expect((await createInvitationService({ enabled: true }).execute({})).status).toBe(503); });
-async function fixture() {
+async function fixture(display?: any) {
     const seller = keys(), device = keys(), receipt = keys(), stranger = keys();
     let time = 1800000000000, etag = 1;
     let row: any = { schema: 1, revision: 1, releaseEpoch: 0, maxDevices: 1, licenseExpiresAt: time + 86400000, revoked: false, mode: 'staged', seats: {} };
@@ -27,7 +27,7 @@ async function fixture() {
     const call = (who: any, action: string, extra: any = {}) => service.execute(sign(who, { ...base, action, expiresAt: time + 30000, publicKey: who.publicKey, ...extra }));
     const license = sign(seller, { a: 'ZOE', id: keyId, iat: time, exp: time + 86400000 });
     const keyString = 'ZOEKEY-' + license.payload + '.' + license.signature;
-    const enrollment = sign(device, { domain: 'zoe-license-enrollment-v1', audience: base.audience, app: 'ZOE', keyId, inviteId, target: 'pwa', nonce: '0123456789abcdef0123456789abcdef', publicKey: device.publicKey });
+    const enrollment = sign(device, { domain: 'zoe-license-enrollment-v1', audience: base.audience, app: 'ZOE', keyId, inviteId, target: 'pwa', nonce: '0123456789abcdef0123456789abcdef', publicKey: device.publicKey, ...(display ? { display } : {}) });
     const create = () => call(seller, 'create', { revision: 1, target: 'pwa', invitationExpiresAt: time + 60000, keyString });
     return { service, store, seller, device, receipt, stranger, base, call, keyString, enrollment, create, row: () => row, advance: (ms = 70000) => { time += ms; } };
 }
@@ -164,4 +164,23 @@ it('HTTP កំណត់ប្រភព ប្រភេទទិន្នន័�
     const signed = sign(f.device, { ...f.base, action: 'submit', expiresAt: 1800000030000, publicKey: f.device.publicKey, enrollment: f.enrollment });
     expect((await handleInvitationRequest(request('https://localhost', 'POST', 'application/json', signed), f.service)).status).toBe(403);
     expect((await handleInvitationRequest(request('https://localhost', 'OPTIONS'), f.service)).headers.get('Access-Control-Allow-Origin')).toBe('https://localhost');
+});
+
+it('ការអនុម័តរក្សាព័ត៌មានបង្ហាញរបស់ឧបករណ៍', async () => {
+    const f = await fixture({ model: ' Pixel 9 ', platform: 'Android 16' });
+    await f.create();
+    const submitted = await f.call(f.device, 'submit', { enrollment: f.enrollment });
+    const { requestId, fingerprint, enrollmentHash } = submitted.body;
+    expect((await f.call(f.seller, 'approve', { requestId, fingerprint, enrollmentHash, revision: f.row().revision, receiptKeyFingerprint: seatKeyFingerprint(f.receipt.publicKey) })).status).toBe(200);
+    expect(f.row().seats.d1.display).toEqual({ model: 'Pixel 9', platform: 'Android 16' });
+});
+
+it('ការអនុម័តសំណើចាស់រក្សាព័ត៌មានបង្ហាញដែលមាន', async () => {
+    const f = await fixture();
+    await f.create();
+    const submitted = await f.call(f.device, 'submit', { enrollment: f.enrollment });
+    f.row().seats.d1 = { publicKey: f.device.publicKey, display: { model: 'Pixel 9', platform: 'Android 16' } };
+    const { requestId, fingerprint, enrollmentHash } = submitted.body;
+    expect((await f.call(f.seller, 'approve', { requestId, fingerprint, enrollmentHash, revision: f.row().revision, receiptKeyFingerprint: seatKeyFingerprint(f.receipt.publicKey) })).status).toBe(200);
+    expect(f.row().seats.d1.display).toEqual({ model: 'Pixel 9', platform: 'Android 16' });
 });

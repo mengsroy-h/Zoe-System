@@ -30,6 +30,12 @@ function verifies(key, payload, signature) {
 export function seatKeyFingerprint(key) {
     return crypto.createHash('sha256').update(JSON.stringify(publicKey(key))).digest('hex');
 }
+export function seatDisplay(value) {
+    if (!object(value)) return null;
+    const clean = (text, max) => typeof text === 'string' ? text.replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u2069\ufeff]/g, '').replace(/\s+/g, ' ').trim().slice(0, max).trim() : '';
+    const model = clean(value.model, 80), platform = clean(value.platform, 40);
+    return model || platform ? { model, platform } : null;
+}
 function enrollmentMatches(enrollment, key, command) {
     try {
         const body = JSON.parse(decode(enrollment.payload).toString('utf8'));
@@ -127,8 +133,14 @@ export function createSeatStageService({ store, enabled = false, publicKeys = LI
                             if (!enrollmentMatches(command.enrollment, key, command)) return result(400, 'enrollment-proof-invalid');
                             if (Object.values(state.seats).some(seat => seat.publicKey.x === key.x && seat.publicKey.y === key.y)) return result(409, 'already-enrolled');
                             next.seats[command.slot] = { publicKey: key };
+                            const display = seatDisplay(JSON.parse(decode(command.enrollment.payload).toString('utf8')).display);
+                            if (display) next.seats[command.slot].display = display;
                         }
                     }
+                }
+                if (command.action === 'prove') {
+                    const display = seatDisplay(command.display);
+                    if (display) next.seats[command.slot].display = display;
                 }
                 if (command.action === 'prove' && state.mode === 'active' && !signer) return result(503, 'receipt-key-unavailable');
                 next.mode = next.mode || 'staged';

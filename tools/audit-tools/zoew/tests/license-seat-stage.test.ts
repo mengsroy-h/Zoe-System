@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import { webcrypto } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import licenseSeatStage from '../../../../ZoeW/netlify/functions/license-seat-stage.mjs';
-import { createSeatStageService, handleSeatStageRequest, seatKeyFingerprint } from '../../../../ZoeW/netlify/lib/license-seat-stage.mjs';
+import { createSeatStageService, handleSeatStageRequest, seatKeyFingerprint, seatDisplay } from '../../../../ZoeW/netlify/lib/license-seat-stage.mjs';
 const now = 1800000000000;
 async function keys() {
     const pair = await webcrypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign', 'verify']);
@@ -32,7 +32,7 @@ async function fixture(receipts = false) {
     const base = { domain: 'zoe-license-seat-stage-v1', audience: 'https://zoew.netlify.app', app: 'ZOE', keyId: 'SYNTHETICKEY123456789', expiresAt: now + 30000 };
     const request = async (who: any, action: string, revision: number, extra = {}) => service.execute(await signed(who.privateKey, { ...base, action, revision, ...extra }));
     const configure = () => request(seller, 'configure', 0, { licenseExpiresAt: now + 86400000, maxDevices: 1, revoked: false });
-    const enroll = async () => request(seller, 'enroll', 1, { slot: 'd1', publicKey: device.publicKey, releaseEpoch: 0, enrollment: await signed(device.privateKey, { domain: 'zoe-license-enrollment-v1', audience: 'https://zoew.netlify.app', app: base.app, keyId: base.keyId, publicKey: device.publicKey, nonce: '0123456789abcdef0123456789abcdef' }) });
+    const enroll = async (display?: any) => request(seller, 'enroll', 1, { slot: 'd1', publicKey: device.publicKey, releaseEpoch: 0, enrollment: await signed(device.privateKey, { domain: 'zoe-license-enrollment-v1', audience: 'https://zoew.netlify.app', app: base.app, keyId: base.keyId, publicKey: device.publicKey, nonce: '0123456789abcdef0123456789abcdef', ...(display ? { display } : {}) }) });
     return { service, seller, device, impostor, request, configure, enroll, row: () => row, store, base, receiptPublicKey };
 }
 describe('ការចុះឈ្មោះ License ជាដំណាក់កាល', () => {
@@ -250,4 +250,21 @@ describe('ការភ្ជាប់ជួសជុលកូនសោទៅអ�
         expect(await f.api.repairSeatIdentity(f.token, guard)).toEqual({ valid: true });
         expect(f.repairIdentity).toHaveBeenCalledWith(f.token, guard);
     });
+});
+
+it('រក្សាម៉ូដែលពីការចុះឈ្មោះ និងបន្តព័ត៌មានពេលផ្ទៀងផ្ទាត់', async () => {
+    const f = await fixture(); await f.configure();
+    await f.enroll({ model: '  Pixel\u0000  9 ', platform: 'Android 16', serial: 'private-id' });
+    expect(f.row().seats.d1.display).toEqual({ model: 'Pixel 9', platform: 'Android 16' });
+    const before = structuredClone(f.row().seats.d1);
+    expect((await f.request(f.device, 'prove', 2, { slot: 'd1', releaseEpoch: 0 })).status).toBe(200);
+    expect(f.row().seats.d1).toEqual(before);
+    expect((await f.request(f.device, 'prove', 3, { slot: 'd1', releaseEpoch: 0, display: { model: 'M'.repeat(100), platform: 'P'.repeat(60), serial: 'private-id' } })).status).toBe(200);
+    expect(f.row().seats.d1.display).toEqual({ model: 'M'.repeat(80), platform: 'P'.repeat(40) });
+    expect(f.row().seats.d1.publicKey).toEqual(before.publicKey);
+});
+
+it('ព័ត៌មានបង្ហាញជាជម្រើស ហើយសម្អាតមុនរក្សាទុក', () => {
+    for (const value of [null, undefined, [], 'Pixel', { model: 42, platform: false }, { serial: 'private-id' }]) expect(seatDisplay(value)).toBeNull();
+    expect(seatDisplay({ model: ' Pixel\u202e 9 ', platform: ' Android\n16 ', serial: 'private-id' })).toEqual({ model: 'Pixel 9', platform: 'Android16' });
 });

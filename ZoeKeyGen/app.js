@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.48';
+const APP_VERSION = '2.24.49';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -770,6 +770,13 @@ function closeModal(id) {
         pinTargetAction = null;
     }
     if (id === 'secureKeySetupModal') clearSecureKeySetup();
+    if (id === 'secureSeatInventoryModal') {
+        if (el) el.inventoryOwner = null;
+        ['secureSeatInventoryId', 'secureSeatInventoryStatus', 'secureSeatInventoryList'].forEach((name) => {
+            const field = document.getElementById(name);
+            if (field) field.textContent = '';
+        });
+    }
     if (id === 'keypairModal') {
         clearKeypairOutputs();
     }
@@ -2993,7 +3000,7 @@ function renderKeyList() {
 
         let seatHtml;
         if (secure) {
-            seatHtml = '';
+            seatHtml = `<button class="btn-mini seat-action-info" data-key-id="${escapeHtml(row.id)}" data-action="secure-inventory">📱 មើលឧបករណ៍ · ID / ម៉ូដែល</button>`;
         } else if (seatReadFailed) {
             seatHtml = `<span class="badge badge-scope" title="${escapeHtml('អាន license_seats មិនបានទេ — សូមប្រាកដថា Firebase Rules ថ្មីត្រូវបាន Publish រួច')}">⚠️ ពិនិត្យមិនបាន</span>`;
         } else if (row.seatDevices.length > 0) {
@@ -3029,7 +3036,7 @@ function renderKeyList() {
                     <button class="btn-mini" data-key-id="${escapeHtml(row.id)}" data-action="extend">⏳ បន្ថែម</button>
                     <button class="btn-mini" data-key-id="${escapeHtml(row.id)}" data-action="devices">📱 ចំនួនឧបករណ៍</button>
                     <button class="btn-mini" data-key-id="${escapeHtml(row.id)}" data-action="release">🔓 ដោះឧបករណ៍</button>
-                    <button class="btn-mini" data-key-id="${escapeHtml(row.id)}" data-action="${secure && row.secureIssued === true ? 'secure-setup' : 'secure-seats'}">${secure && row.secureIssued === true ? '🔐 រៀបចំ / បន្ត Key សុវត្ថិភាព' : '🔐 គ្រប់គ្រងឧបករណ៍សុវត្ថិភាព'}</button>
+                    <button class="btn-mini seat-action-info" data-key-id="${escapeHtml(row.id)}" data-action="${secure && row.secureIssued === true ? 'secure-setup' : 'secure-seats'}">${secure && row.secureIssued === true ? '🔐 រៀបចំ / បន្ត Key សុវត្ថិភាព' : '🔐 គ្រប់គ្រងឧបករណ៍សុវត្ថិភាព'}</button>
                 </div>
             </td>
         </tr>`;
@@ -3141,10 +3148,113 @@ async function seatSellerInspect(context, id) {
     return result;
 }
 
+async function secureSeatInventoryRows(state) {
+    if (!state || !state.seats || typeof state.seats !== 'object' || Array.isArray(state.seats) ||
+        !Number.isInteger(state.maxDevices) || state.maxDevices < 1 || state.maxDevices > 5) throw new Error('seat-state-invalid');
+    const slots = ['d1', 'd2', 'd3', 'd4', 'd5'];
+    if (Object.keys(state.seats).some(slot => !slots.slice(0, state.maxDevices).includes(slot))) throw new Error('seat-state-invalid');
+    const text = (value, max) => typeof value === 'string' ? value.replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, '').trim().slice(0, max) : '';
+    const rows = [];
+    for (const slot of slots) {
+        if (!Object.prototype.hasOwnProperty.call(state.seats, slot)) continue;
+        const seat = state.seats[slot];
+        if (!seat || typeof seat !== 'object' || Array.isArray(seat)) throw new Error('seat-state-invalid');
+        const fingerprint = await window.ZoeSeatClient.fingerprint(seat.publicKey);
+        if (!/^[a-f0-9]{64}$/.test(fingerprint)) throw new Error('seat-state-invalid');
+        const display = seat.display && typeof seat.display === 'object' && !Array.isArray(seat.display) ? seat.display : {};
+        rows.push({ slot, fingerprint, model: text(display.model, 80), platform: text(display.platform, 40) });
+    }
+    return rows;
+}
+
+function renderSecureSeatInventory(rows, state) {
+    const list = document.getElementById('secureSeatInventoryList');
+    list.replaceChildren();
+    const summary = document.createElement('p');
+    summary.className = 'secure-seat-count';
+    summary.textContent = 'ឧបករណ៍បានចុះឈ្មោះ៖ ' + rows.length + '/' + state.maxDevices + ' · ' + (state.revoked ? 'Key បិទ' : state.mode === 'active' ? 'Server សកម្ម' : 'Server កំពុងត្រៀម');
+    list.append(summary);
+    if (!rows.length) {
+        const empty = document.createElement('p');
+        empty.textContent = 'មិនទាន់មានឧបករណ៍បានចុះឈ្មោះ។';
+        list.append(empty);
+    }
+    for (const row of rows) {
+        const card = document.createElement('section');
+        card.className = 'secure-seat-card';
+        const title = document.createElement('h4');
+        title.textContent = row.slot + ' · ID ' + row.fingerprint.slice(0, 16).match(/.{4}/g).join('-');
+        const model = document.createElement('p');
+        model.textContent = 'ម៉ូដែល៖ ' + (row.model || 'មិនទាន់មានព័ត៌មាន');
+        const platform = document.createElement('p');
+        platform.textContent = 'ប្រព័ន្ធ៖ ' + (row.platform || 'មិនទាន់មានព័ត៌មាន');
+        const detail = document.createElement('details');
+        const label = document.createElement('summary');
+        label.textContent = 'មើលស្នាមសោពេញ';
+        const fingerprint = document.createElement('p');
+        fingerprint.className = 'secure-seat-fingerprint';
+        fingerprint.textContent = row.fingerprint;
+        detail.append(label, fingerprint);
+        card.append(title, model, platform, detail);
+        list.append(card);
+    }
+}
+
+async function openSecureSeatInventory(id) {
+    const modal = document.getElementById('secureSeatInventoryModal');
+    if (!modal || (modal.inventoryOwner?.busy && modal.inventoryOwner.id === id)) return;
+    const context = seatSellerContext();
+    if (!context.current() || !context.privateKey || !/^[A-Z0-9]{16,40}$/.test(id)) return;
+    const owner = { id, busy: true };
+    modal.inventoryOwner = owner;
+    const current = () => modal.inventoryOwner === owner && context.current();
+    document.getElementById('secureSeatInventoryId').textContent = id;
+    const status = document.getElementById('secureSeatInventoryStatus');
+    const refresh = document.getElementById('secureSeatInventoryRefresh');
+    document.getElementById('secureSeatInventoryList').replaceChildren();
+    status.textContent = 'កំពុងអានបញ្ជីឧបករណ៍ពី Server សុវត្ថិភាព...';
+    refresh.disabled = true;
+    openModalHelper('secureSeatInventoryModal');
+    try {
+        const row = await seatSellerRow(context, id);
+        if (!current() || row.seatProtocol !== 2) throw new Error('seat-marker-unverified');
+        const { state } = await seatSellerInspect(context, id);
+        if (!current()) return;
+        if (state.revision === 0) {
+            status.textContent = 'Server មិនទាន់បានត្រៀមសម្រាប់ Key នេះ។ សូមចុច «រៀបចំ / បន្ត Key សុវត្ថិភាព»។';
+            return;
+        }
+        const rows = await secureSeatInventoryRows(state);
+        if (!current()) return;
+        renderSecureSeatInventory(rows, state);
+        status.textContent = 'បញ្ជីពី Server សុវត្ថិភាព។ ID ជាស្នាមសោរបស់កម្មវិធី មិនមែន Serial ឧបករណ៍ទេ។ ម៉ូដែល និងប្រព័ន្ធជាព័ត៌មានពីឧបករណ៍ មិនប្រើផ្ដល់សិទ្ធិទេ។';
+    } catch {
+        if (current()) status.textContent = 'មិនអាចផ្ទៀងបញ្ជីឧបករណ៍បានទេ។ សូមពិនិត្យការតភ្ជាប់ ម៉ោង Server និង Signing Key រួចចុច «ពិនិត្យម្ដងទៀត»។';
+    } finally {
+        if (current()) { owner.busy = false; refresh.disabled = false; }
+    }
+}
+
+function refreshSecureSeatInventory() {
+    const owner = document.getElementById('secureSeatInventoryModal')?.inventoryOwner;
+    if (owner && !owner.busy) return openSecureSeatInventory(owner.id);
+}
+
+function openSetupSeatInventory() {
+    const setup = secureKeySetup;
+    if (secureKeySetupCurrent(setup)) return openSecureSeatInventory(setup.id);
+}
+
 let secureKeySetup = null;
 
 function clearSecureKeySetup() {
     secureKeySetup = null;
+    const inventory = document.getElementById('secureSeatInventoryModal');
+    if (inventory) inventory.inventoryOwner = null;
+    ['secureSeatInventoryId', 'secureSeatInventoryStatus', 'secureSeatInventoryList'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = '';
+    });
     const queue = document.getElementById('licenseInvitationQueue');
     if (queue) queue.replaceChildren();
     ['secureKeyEnrollmentInput', 'secureKeySetupKey', 'licenseInvitationReference'].forEach((id) => {
@@ -3201,17 +3311,18 @@ async function licenseInvitationList(setup) {
         const row = document.createElement('div');
         const label = document.createElement('p');
         label.textContent = invite.target + ' · ' + invite.inviteId + ' · ' + (invite.status === 'open' ? 'កំពុងរង់ចាំ' : invite.status === 'approved' ? 'បានអនុម័តឧបករណ៍' : invite.status === 'cancelled' ? 'បានបោះបង់' : 'ផុតសុពលភាព');
+        row.className = 'license-invitation-card';
         row.append(label);
         const button = (text, action, request) => {
             const el = document.createElement('button');
-            el.className = 'btn-secondary';
+            el.className = 'btn-secondary ' + (action === 'approve' ? 'seat-action-success' : 'seat-action-danger');
             el.textContent = text;
             el.onclick = () => actLicenseInvitation(setup, invite, action, request);
             row.append(el);
         };
         if (invite.status === 'open') {
             const copy = document.createElement('button');
-            copy.className = 'btn-secondary';
+            copy.className = 'btn-secondary seat-action-info';
             copy.textContent = 'ចម្លងកូដអញ្ជើញ';
             copy.onclick = () => {
                 if (!secureKeySetupCurrent(setup)) return;
@@ -5007,6 +5118,7 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (btn.dataset.action === 'extend') openExtendModal(id);
             else if (btn.dataset.action === 'devices') setKeySeatLimit(id);
             else if (btn.dataset.action === 'release') releaseKeySeat(id);
+            else if (btn.dataset.action === 'secure-inventory') openSecureSeatInventory(id);
             else if (btn.dataset.action === 'secure-seats') manageSecureSeats(id);
             else if (btn.dataset.action === 'secure-setup') openSecureKeySetup(id);
         });

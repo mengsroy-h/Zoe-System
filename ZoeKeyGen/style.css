@@ -203,6 +203,31 @@ body.boot-reveal .app-container { animation: bootFadeIn 420ms ease-out 70ms both
 .btn-mini { background: var(--body-bg); border: 1px solid var(--border-color); padding: 5px 9px; border-radius: 6px; font-size: calc(10.5 * var(--fs-unit)); font-weight: 600; }
 .btn-mini:disabled, .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
+.seat-action-info { background: var(--primary-light); color: var(--primary-hover); border: 1px solid var(--primary); }
+.seat-action-info:hover { background: #ddd6fe; }
+.seat-action-success { background: var(--success-light); color: #065f46; border: 1px solid #067a55; }
+.seat-action-success:hover { background: #a7f3d0; }
+.seat-action-danger { background: var(--danger-light); color: #9f1239; border: 1px solid #be123c; }
+.seat-action-danger:hover { background: #fecdd3; }
+.seat-action-neutral { background: var(--body-bg); color: #475569; border: 1px solid #94a3b8; }
+.secure-key-panel button { min-height: 44px; line-height: 1.6; white-space: normal; }
+.secure-key-panel button:disabled { opacity: 0.5; cursor: not-allowed; }
+.secure-key-panel button:focus-visible, .secure-key-panel summary:focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; }
+.secure-key-panel > button { margin-bottom: 10px; }
+.secure-key-panel .modal-btns { gap: 10px; flex-wrap: wrap; }
+.secure-key-options { margin-top: 18px; padding: 12px; border: 1px solid var(--border-color); border-radius: var(--radius-lg); background: var(--body-bg); text-align: left; }
+.secure-key-options > summary { min-height: 44px; padding: 10px 12px; border-radius: var(--radius-md); background: var(--primary-light); color: var(--primary-hover); cursor: pointer; font-weight: 700; line-height: 1.7; }
+.secure-key-options[open] > summary { margin-bottom: 12px; }
+.secure-key-options > button { margin: 4px 0 10px; }
+.license-invitation-card { display: flex; flex-wrap: wrap; gap: 10px; padding: 12px 0; border-top: 1px solid var(--border-color); }
+.license-invitation-card p { flex-basis: 100%; overflow-wrap: anywhere; }
+.license-invitation-card button { flex: 1 1 150px; }
+.secure-seat-card { margin: 12px 0; padding: 12px; border: 1px solid var(--border-color); border-radius: var(--radius-lg); text-align: left; background: var(--body-bg); }
+.secure-seat-card h4, .secure-seat-count { font-size: calc(13 * var(--fs-unit)); color: var(--text-main); line-height: 1.7; }
+.secure-seat-card p, .secure-seat-help { line-height: 1.7; overflow-wrap: anywhere; }
+.secure-seat-card summary { padding: 10px 0; min-height: 44px; cursor: pointer; color: var(--primary-hover); font-weight: 600; }
+.secure-seat-fingerprint { overflow-wrap: anywhere; font-family: monospace; font-size: calc(11.5 * var(--fs-unit)); user-select: text; }
+
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
 .form-grid > div { grid-column: span 2; }
 .form-grid .col-half { grid-column: span 1; }

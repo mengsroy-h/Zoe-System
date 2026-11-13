@@ -594,6 +594,11 @@
         return seatMetaState.meta ? { model: next.model, platform: next.platform, serial: next.serial } : null;
     }
 
+    function getDeviceDisplay() {
+        const meta = seatMetaState.meta;
+        return meta && (meta.model || meta.platform) ? { model: meta.model, platform: meta.platform } : null;
+    }
+
     function seatMetaSame(record, meta) {
         const cur = (record && typeof record === 'object' && record.meta && typeof record.meta === 'object') ? record.meta : null;
         return !!cur && cur.model === (meta.model || '-') && cur.platform === (meta.platform || '-') && cur.serial === (meta.serial || '-');
@@ -853,6 +858,7 @@
         getStatus: getStatus,
         getDeviceId: getDeviceId,
         setDeviceMeta: setDeviceMeta,
+        getDeviceDisplay: getDeviceDisplay,
         deactivate: deactivate,
         verifyKeyString: verifyKeyString,
         parseKeyString: parseKeyString,

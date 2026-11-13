@@ -176,6 +176,48 @@ for (const app of ['ZoeW', 'ZoeKeyGen']) {
         for (const m of body.matchAll(/'([A-Za-z][\w-]*)'/g)) cleared.add(m[1]);
     }
 
+    if (app === 'ZoeKeyGen') {
+        const functions = new Map(programs.flatMap(program => program.body)
+            .filter(node => node.type === 'FunctionDeclaration').map(node => [node.id.name, node]));
+        const callsDirectly = (caller, callee) => {
+            for (const statement of functions.get(caller)?.body.body || []) {
+                if (['ReturnStatement', 'ThrowStatement'].includes(statement.type)) break;
+                const call = statement.type === 'ExpressionStatement' && statement.expression;
+                if (call?.type === 'CallExpression' && call.callee.type === 'Identifier' && call.callee.name === callee) return true;
+            }
+            return false;
+        };
+        if (callsDirectly('showLoginModalWithPrefill', 'invalidateSensitiveSession') &&
+            callsDirectly('invalidateSensitiveSession', 'clearSecureKeySetup')) {
+            for (const statement of functions.get('clearSecureKeySetup')?.body.body || []) {
+                if (['ReturnStatement', 'ThrowStatement'].includes(statement.type)) break;
+                const call = statement.type === 'ExpressionStatement' && statement.expression;
+                if (call?.type !== 'CallExpression' || call.callee.type !== 'MemberExpression' ||
+                    call.callee.computed || call.callee.property.name !== 'forEach' || call.callee.object.type !== 'ArrayExpression') continue;
+                const callback = call.arguments[0];
+                if (!callback || !['ArrowFunctionExpression', 'FunctionExpression'].includes(callback.type) ||
+                    callback.params[0]?.type !== 'Identifier' || callback.body.type !== 'BlockStatement' || callback.body.body.length !== 2) continue;
+                const [declaration, guard] = callback.body.body;
+                const binding = declaration?.type === 'VariableDeclaration' && declaration.declarations.length === 1 && declaration.declarations[0];
+                const select = binding?.init;
+                if (binding?.id?.type !== 'Identifier' || select?.type !== 'CallExpression' ||
+                    select.callee.type !== 'MemberExpression' || select.callee.object.name !== 'document' ||
+                    select.callee.computed || select.callee.property.name !== 'getElementById' ||
+                    select.arguments[0]?.type !== 'Identifier' || select.arguments[0].name !== callback.params[0].name ||
+                    guard?.type !== 'IfStatement' || guard.test.type !== 'Identifier' || guard.test.name !== binding.id.name ||
+                    guard.alternate || guard.consequent.type !== 'ExpressionStatement') continue;
+                const blank = guard.consequent.expression;
+                if (blank.type !== 'AssignmentExpression' || blank.operator !== '=' || blank.left.type !== 'MemberExpression' ||
+                    blank.left.object.type !== 'Identifier' || blank.left.object.name !== binding.id.name || blank.left.computed ||
+                    !['value', 'innerText', 'textContent', 'innerHTML'].includes(blank.left.property.name) ||
+                    blank.right.type !== 'Literal' || blank.right.value !== '') continue;
+                for (const id of call.callee.object.elements) {
+                    if (id?.type === 'Literal' && typeof id.value === 'string') cleared.add(id.value);
+                }
+            }
+        }
+    }
+
     const gaps = [...written.entries()]
         .filter(([id]) => !cleared.has(id) && !ACCEPTED[id])
         .sort((a, b) => a[1] - b[1]);

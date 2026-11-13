@@ -2306,6 +2306,9 @@
     "ZoeW/tests/audit-module-ast.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/audit-dom-cleanup-reachability.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/audit-module-runtime-scope.test.ts": {
       "policy": "zoew-self-verification"
     },

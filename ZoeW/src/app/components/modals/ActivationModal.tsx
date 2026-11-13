@@ -21,11 +21,11 @@ export function ActivationModal() {
                     style={{ minHeight: "70px", fontFamily: "monospace", fontSize: "calc(11 * var(--fs-unit))" }}
                 ></textarea>
                 <div className="modal-btns">
-                    <button className="btn-confirm" id="activationSubmitBtn" disabled={v.activationBusy || v.seatEnrollmentBusy || v.invitationBusy} onClick={onAct("submitActivationKey")}>{v.activationBusy ? 'កំពុងផ្ទៀងផ្ទាត់...' : 'ដាក់ Active'}</button>
-                    <button className="btn-confirm" id="seatEnrollmentPrepareBtn" disabled={v.activationBusy || v.seatEnrollmentBusy || v.invitationBusy} onClick={onAct('prepareSeatEnrollment')}>{v.seatEnrollmentBusy ? 'កំពុងរៀបចំ...' : 'ចុះឈ្មោះឧបករណ៍'}</button>
-                    <button className="btn-cancel" id="seatIdentityRepairBtn" disabled={v.activationBusy || v.seatEnrollmentBusy || v.invitationBusy} onClick={onAct('repairSeatEnrollmentIdentity')}>ជួសជុលកូនសោឧបករណ៍ដែលខូច</button>
-                    {v.seatEnrollmentBusy && <button className="btn-cancel" onClick={onAct('clearSeatEnrollment')}>បោះបង់</button>}
-                    {v.seatEnrollmentOnly && <button className="btn-cancel" onClick={onAct('closeSeatEnrollment')}>បិទ</button>}
+                    <button className="btn-confirm activation-confirm" id="activationSubmitBtn" disabled={v.activationBusy || v.seatEnrollmentBusy || v.invitationBusy} onClick={onAct("submitActivationKey")}>{v.activationBusy ? 'កំពុងផ្ទៀងផ្ទាត់...' : 'ដាក់ Active'}</button>
+                    <button className="btn-confirm activation-primary" id="seatEnrollmentPrepareBtn" disabled={v.activationBusy || v.seatEnrollmentBusy || v.invitationBusy} onClick={onAct('prepareSeatEnrollment')}>{v.seatEnrollmentBusy ? 'កំពុងរៀបចំ...' : 'ចុះឈ្មោះឧបករណ៍'}</button>
+                    <button className="btn-cancel activation-warning" id="seatIdentityRepairBtn" disabled={v.activationBusy || v.seatEnrollmentBusy || v.invitationBusy} onClick={onAct('repairSeatEnrollmentIdentity')}>ជួសជុលកូនសោឧបករណ៍ដែលខូច</button>
+                    {v.seatEnrollmentBusy && <button className="btn-cancel activation-cancel" onClick={onAct('clearSeatEnrollment')}>បោះបង់</button>}
+                    {v.seatEnrollmentOnly && <button className="btn-cancel activation-cancel" onClick={onAct('closeSeatEnrollment')}>បិទ</button>}
 
                 </div>
                 <p role="status">{v.seatEnrollmentMessage}</p>
@@ -37,21 +37,29 @@ export function ActivationModal() {
                     <p>បើកូនសោឧបករណ៍បាត់ ឬខូច សូមឱ្យអ្នកលក់ដោះកៅអីចាស់ ហើយចុះឈ្មោះឡើងវិញ។ កុំលុប Storage ដើម្បីដោះស្រាយ។</p>
                 </div>}
                 </section>
-                {v.backendKind !== 'supabase' && <details open={!!v.invitationCode || !!v.invitationMessage || v.invitationBusy} aria-label="ការអញ្ជើញឧបករណ៍">
-                    <summary>ជម្រើសបន្ថែម · មានលេខកូដអញ្ជើញពីអ្នកលក់</summary>
-                    <p>ប្រើតែពេលអ្នកលក់បានបើកសេវាអញ្ជើញ។ បើមិនទាន់បើក សូមដាក់ Key នៅខាងលើ។</p>
-                    <label htmlFor="licenseInvitationCode">លេខកូដអញ្ជើញពីអ្នកលក់</label>
-                    <input id="licenseInvitationCode" value={v.invitationCode} onChange={onAct('editLicenseInvitation', { self: true })} autoComplete="off" autoCapitalize="characters" spellCheck={false} />
-                    <p>បើកក្នុង PWA ដែលបានដំឡើង ឬបិទភ្ជាប់លេខកូដនៅក្នុង APK។ កុំផ្ញើ Activation Key ឬទិន្នន័យ JSON។</p>
-                    <div className="modal-btns">
-                        <button className="btn-confirm" disabled={v.invitationBusy || v.activationBusy || v.seatEnrollmentBusy} onClick={onAct('submitLicenseInvitation')}>{v.invitationBusy ? 'កំពុងពិនិត្យ...' : 'ស្នើសុំ / ពិនិត្យម្ដងទៀត'}</button>
-                        <button className="btn-cancel" onClick={onAct('cancelLicenseInvitation')}>បោះបង់ការរង់ចាំ</button>
+                {v.backendKind !== 'supabase' && <details className="activation-options" open={!!v.invitationCode || !!v.invitationMessage || v.invitationBusy} aria-label="ការអញ្ជើញឧបករណ៍">
+                    <summary>
+                        <span className="activation-options-copy">
+                            <strong>ជម្រើសបន្ថែម</strong>
+                            <span className="activation-options-hint">មានលេខកូដអញ្ជើញពីអ្នកលក់</span>
+                        </span>
+                        <span className="activation-options-chevron" aria-hidden="true">⌄</span>
+                    </summary>
+                    <div className="activation-options-body">
+                        <p>ប្រើតែពេលអ្នកលក់បានបើកសេវាអញ្ជើញ។ បើមិនទាន់បើក សូមដាក់ Key នៅខាងលើ។</p>
+                        <label htmlFor="licenseInvitationCode">លេខកូដអញ្ជើញពីអ្នកលក់</label>
+                        <input id="licenseInvitationCode" value={v.invitationCode} onChange={onAct('editLicenseInvitation', { self: true })} autoComplete="off" autoCapitalize="characters" spellCheck={false} />
+                        <p>បើកក្នុង PWA ដែលបានដំឡើង ឬបិទភ្ជាប់លេខកូដនៅក្នុង APK។ កុំផ្ញើ Activation Key ឬទិន្នន័យ JSON។</p>
+                        <div className="modal-btns">
+                            <button className="btn-confirm activation-primary" disabled={v.invitationBusy || v.activationBusy || v.seatEnrollmentBusy} onClick={onAct('submitLicenseInvitation')}>{v.invitationBusy ? 'កំពុងពិនិត្យ...' : 'ស្នើសុំ / ពិនិត្យម្ដងទៀត'}</button>
+                            <button className="btn-cancel activation-cancel" onClick={onAct('cancelLicenseInvitation')}>បោះបង់ការរង់ចាំ</button>
+                        </div>
+                        <p role="status">{v.invitationMessage}</p>
+                        {v.invitationVerificationCode && <p>លេខផ្ទៀងផ្ទាត់ជាមួយអ្នកលក់៖ <strong>{v.invitationVerificationCode}</strong></p>}
                     </div>
-                    <p role="status">{v.invitationMessage}</p>
-                    {v.invitationVerificationCode && <p>លេខផ្ទៀងផ្ទាត់ជាមួយអ្នកលក់៖ <strong>{v.invitationVerificationCode}</strong></p>}
                 </details>}
                 <div className="modal-btns">
-                    <button className="btn-cancel" id="activationLogoutBtn" onClick={onAct("promptLogout")}>ចាកចេញ</button>
+                    <button className="btn-cancel activation-cancel" id="activationLogoutBtn" onClick={onAct("promptLogout")}>ចាកចេញ</button>
                 </div>
                 <p
                     style={{ marginTop: "10px", fontSize: "calc(11.5 * var(--fs-unit))", color: "var(--text-muted)", textAlign: "center" }}

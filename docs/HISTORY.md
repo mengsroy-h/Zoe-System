@@ -5431,6 +5431,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/queued-sign-photo-layout.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/queued-sign-photo-ui.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/queued-sign-photo.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/receipt-public-config.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/reclaim-strips-trash-claim.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/reconfig-invite-seam.test.tsx` | — | ផ្នែក ៧ |
 | `ZoeW/tests/recovery-toast-dedup.test.tsx` | — | ផ្នែក ៧ |

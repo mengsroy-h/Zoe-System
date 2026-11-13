@@ -122,9 +122,9 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### ZoeW [2.50.198] — 2026-11-13 · បរិបទ runtime របស់ License stage
+### 2026-11-13 · បរិបទ runtime របស់ License stage (Server)
 
-**ZoeW** (`zoew-v461` ➜ `zoew-v462`)។ **ZoeKeyGen មិនប្រែ**។
+កែតែ Netlify Function មិនចូលសំបក frontend; កំណែ App/cache និងសេចក្ដីជូនដំណឹងទាំងពីរ App រក្សាដដែល។
 
 - Endpoint ផ្ទៀង `context.deploy.context` ដែល Netlify ផ្ដល់នៅ runtime ជំនួស build variable `CONTEXT`។ Stage flag និង URL origin រក្សាដដែល; គ្មាន production context បិទជានិច្ច។
 - អ្នកយាម `ZoeW/tests/license-seat-runtime-context.test.ts` ផ្ទុក wrapper ពិត ដាក់ mock តែ Blobs និងប្រើ GET មិនប៉ះទិន្នន័យ។ មុនកែ ៨ បរាជ័យ/៧ ឆ្លង; ក្រោយកែ ១៥ ឆ្លង។ មិនរត់តេស្ត concurrent release/cutover ឬ full suite ក្នុងការងារនេះ។

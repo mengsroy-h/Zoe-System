@@ -43,12 +43,16 @@ export function ActivationModal() {
                     <label htmlFor="licenseInvitationCode">លេខកូដអញ្ជើញពីអ្នកលក់</label>
                     <input id="licenseInvitationCode" value={v.invitationCode} onChange={onAct('editLicenseInvitation', { self: true })} autoComplete="off" autoCapitalize="characters" spellCheck={false} />
                     <p>បើកក្នុង PWA ដែលបានដំឡើង ឬបិទភ្ជាប់លេខកូដនៅក្នុង APK។ កុំផ្ញើ Activation Key ឬទិន្នន័យ JSON។</p>
-                    <button className="btn-confirm" disabled={v.invitationBusy || v.activationBusy || v.seatEnrollmentBusy} onClick={onAct('submitLicenseInvitation')}>{v.invitationBusy ? 'កំពុងពិនិត្យ...' : 'ស្នើសុំ / ពិនិត្យម្ដងទៀត'}</button>
-                    <button className="btn-cancel" onClick={onAct('cancelLicenseInvitation')}>បោះបង់ការរង់ចាំ</button>
+                    <div className="modal-btns">
+                        <button className="btn-confirm" disabled={v.invitationBusy || v.activationBusy || v.seatEnrollmentBusy} onClick={onAct('submitLicenseInvitation')}>{v.invitationBusy ? 'កំពុងពិនិត្យ...' : 'ស្នើសុំ / ពិនិត្យម្ដងទៀត'}</button>
+                        <button className="btn-cancel" onClick={onAct('cancelLicenseInvitation')}>បោះបង់ការរង់ចាំ</button>
+                    </div>
                     <p role="status">{v.invitationMessage}</p>
                     {v.invitationVerificationCode && <p>លេខផ្ទៀងផ្ទាត់ជាមួយអ្នកលក់៖ <strong>{v.invitationVerificationCode}</strong></p>}
                 </details>}
-                <button className="btn-cancel" id="activationLogoutBtn" onClick={onAct("promptLogout")}>ចាកចេញ</button>
+                <div className="modal-btns">
+                    <button className="btn-cancel" id="activationLogoutBtn" onClick={onAct("promptLogout")}>ចាកចេញ</button>
+                </div>
                 <p
                     style={{ marginTop: "10px", fontSize: "calc(11.5 * var(--fs-unit))", color: "var(--text-muted)", textAlign: "center" }}
                 >

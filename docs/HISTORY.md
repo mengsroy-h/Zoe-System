@@ -123,6 +123,13 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### ZoeW [2.50.201] — 2026-11-13 · ទំហំប៊ូតុងការអញ្ជើញ
+
+**ZoeW** (`zoew-v464` ➜ `zoew-v465`)។ **ZoeKeyGen មិនប្រែ**។
+
+- ប៊ូតុងស្នើសុំ បោះបង់ការរង់ចាំ និងចាកចេញក្នុង Activation ប្រើជួរឈរពេញទទឹង និងទំហំប៊ូតុងស្តង់ដារ។ រក្សាពណ៌ចម្បង/បន្ទាប់ និងស្ថានភាព disabled ដើម; មិនកែ CSS ដែលបានចាក់សោ ឬ action handlers។ ផ្លូវអញ្ជើញ និងវិធីដាក់ Key ដោយដៃនៅដដែល។
+- **សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ ផ្ទៀង CI លើ commit ថ្មី និងរូបរាងលើ APK/PWA ពិត មុន rollout ដែលម្ចាស់អនុញ្ញាត។ គ្មាន rules/migration ឬការកំណត់ផលិតកម្មត្រូវប្ដូរក្នុង patch នេះ; មិនបើកមុខងារអញ្ជើញដោយស្វ័យប្រវត្តិ។
+
 ### ZoeW [2.50.200] · ZoeKeyGen [2.24.48] — 2026-11-13 · ផ្ទៀង CI ការអញ្ជើញ
 
 **ZoeW** (`zoew-v463` ➜ `zoew-v464`) និង **ZoeKeyGen** (`zoekeygen-v158` ➜ `zoekeygen-v159`)។ សំណើអញ្ជើញឆ្លង helper បណ្ដាញដែលមានពិដានពេលរហូតអានតួចប់; សារចម្លងបង្ហាញសញ្ញាជោគជ័យ ហើយវាលអញ្ជើញសម្អាតតាមបញ្ជីដដែលនឹងវាល Key។ កំណែ និង cache ឡើងតាមច្បាប់ ៨ ព្រោះមានកូដ ship ប្រែ។
@@ -2149,6 +2156,13 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-11-13 — ទំហំប៊ូតុង Activation
+
+- **មូលហេតុ**៖ controls ថ្មីនៅក្រៅ `.modal-btns` ដូច្នេះមិនទទួល min-height, padding, font scale, spacing និង disabled styles។ ដាក់ wrappers តាមរចនាសម្ព័ន្ធដែលមានស្រាប់ ដោយរក្សា handlers ដដែល។
+- **Regression**៖ `license-invitation-default-ui-test` render React component និង CSS ពិតក្នុង happy-dom; tree មុនកែបាន ៣១ PASS/២៧ FAIL ហើយក្រោយកែបាន ៥៨ PASS/០ FAIL សម្រាប់ធម្មតា និង busy ទាំងបី។ នេះជាការវាស់ computed style មិនមែន pixel geometry លើ browser ពិតទេ។
+- **ការផ្ទៀងក្នុងម៉ាស៊ីន**៖ focused tests ៧៨ ឆ្លង; typecheck, lint, production build, doc/notice check, Android source contract ១៣៥, slot ownership, React purity ១៥, file coverage ១០, comment stripping និង whitespace ឆ្លង។ Review diff ឯករាជ្យមិនឃើញបញ្ហា; button definitions ទាំង ៨ ដូចមុន ហើយ ZoeKeyGen, Server, invitation logic និង locked CSS មិនប្រែ។
+- **ព្រំដែន**៖ Chromium local បរាជ័យ `socket() Operation not permitted` ដូច្នេះ browser layout, screenshots, APK/PWA ពិត និង CI លើ patch នេះមិនទាន់ផ្ទៀង។ គ្មាន exploit, live mutation, remote write, merge, deploy ឬការបើក feature។
 
 ### 2026-11-13 — ប្រមូលមូលហេតុ CI ក្នុង PR #413
 
@@ -5233,7 +5247,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `license-clock-rollback-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `license-clock-trust-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `license-grace-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ · ផ្នែក ៩ |
-| `license-invitation-default-ui-test` | ផ្នែក ១ | — |
+| `license-invitation-default-ui-test` | ផ្នែក ១ · ២ | — |
 | `license-network-pressure-test` | — | ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `license-record-race-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ |
 | `license-seat-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៥ · ផ្នែក ៧ · ផ្នែក ៨ |

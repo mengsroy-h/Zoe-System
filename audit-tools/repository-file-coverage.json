@@ -5110,6 +5110,9 @@
     "ZoeW/netlify/lib/license-seat-stage.mjs": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/license-seat-runtime-context.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/license-seat-stage.test.ts": {
       "policy": "zoew-self-verification"
     },

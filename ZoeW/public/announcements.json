@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "id": "2.50.198",
+      "kind": "update",
+      "version": "2.50.198",
+      "date": "2026-11-13",
+      "title": "កំណែ 2.50.198៖ បរិបទ Server សម្រាប់ License",
+      "body": "Server ផ្ទៀងបរិបទ production របស់ Netlify និងការអនុញ្ញាត stage មុនទទួលសំណើ License។ ការរៀបចំ Server និងចុះឈ្មោះឧបករណ៍នៅតែតម្រូវឱ្យម្ចាស់ប្រព័ន្ធបញ្ចប់។",
+      "points": []
+    },
+    {
       "id": "2.50.197",
       "kind": "update",
       "version": "2.50.197",

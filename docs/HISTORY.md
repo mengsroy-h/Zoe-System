@@ -122,6 +122,15 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### ZoeKeyGen [2.24.46] — 2026-11-13 · ចេញ Key សុវត្ថិភាពដោយមានការណែនាំ
+
+**ZoeKeyGen** (`zoekeygen-v156` ➜ `zoekeygen-v157`)។ ZoeW និង Server រក្សាកំណែដដែល។
+
+- Generate Key បង្កើត public row ជា protocol 2 និង admin metadata ក្នុង write តែមួយ។ បង្ហាញ Key តែក្រោយអាន marker ពី Server; គ្មានការបញ្ចេញ Key ដែលអាចប្រើតាម legacy។ ការបង្កើតមិនផ្ដល់សិទ្ធិឧបករណ៍ទេ។
+- ប្រអប់ណែនាំបង្ហាញ Key, ទទួល JSON ដែលមានហត្ថលេខារបស់ឧបករណ៍ និងស្នាមសោសម្រាប់ម្ចាស់ប្រៀបធៀបផ្ទាល់។ ក្រោយការយល់ព្រម enroll និង cutover មានហត្ថលេខាអ្នកលក់ ហើយផ្ទៀងស្ថានភាពថ្មីមុនសារជោគជ័យ។
+- ប៊ូតុងក្នុងតារាងបន្ត Key ដដែលបានក្រោយបិទ ឬបាត់ចម្លើយ។ Metadata រក្សាតែថ្ងៃចេញ និងសញ្ញាចេញសុវត្ថិភាព មិនរក្សា raw Activation Key ឬ Signing Key។ ការបើកម្ដងទៀតមិនជាន់ revoke/extend/release ដែល Server កាន់ទេ។ ផ្លូវ migration និង management របស់ Key មានស្រាប់រក្សាដដែល។
+- **សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ ផ្ទៀង CI លើ commit ចុងក្រោយ ហើយ Publish `ZoeKeyGen/firebase-database.rules.json` ទៅ License Project **មុន** merge/deploy frontend។ ត្រូវមាន stage endpoint និង Receipt pins ដែលផ្គូផ្គងរួច; rules ចាស់បដិសេធ write ទាំងមូលដោយមិនបង្កើត legacy fallback។ គ្មាន live Firebase, secret ឬ deployment ក្នុងការកែនេះ។ ត្រូវសាកឧបករណ៍អតិថិជនពិតក្រោយ rollout ដែលអនុម័ត។
+
 ### ZoeKeyGen [2.24.45] — 2026-11-13 · ផ្ទៀង cache មុនប្ដូរ marker
 
 **ZoeKeyGen** (`zoekeygen-v155` ➜ `zoekeygen-v156`)។ ZoeW រក្សាកំណែដដែល។
@@ -2109,6 +2118,20 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-11-13 — fixture និង checker សម្អាតផ្ទាំង Key
+
+- Audit 1317 លើ `6e422ab`៖ extraction fixtures ៤ ខ្វះ `clearSecureKeySetup` ហើយ PIN fixture គាំងធ្វើឱ្យ meta checker ធ្លាក់តាម។ ភ្ជាប់ helper និង state ពិតទៅ `keygen-supabase-admin-test` · `keygen-pin-flow-test` · `keygen-notice-test` · `ZoeW/tests/keygen-sb-lock-ownership-fixes.test.ts` ដោយរក្សាអះអាងទាំងអស់។
+- `dom-hygiene` ផ្ទៀង AST នៃការហៅផ្ទាល់ពី logout ទៅ session invalidation និង helper ពិត រួចរាប់តែ id ក្នុងបញ្ជីដែលកំណត់ DOM ជាទទេ។ មិនបន្ថែមលើកលែង និងមិនកែ App ឬ Rules។ `ZoeW/tests/audit-dom-cleanup-reachability.test.ts` លើ checker មុនកែ៖ ១ ធ្លាក់/១២ ឆ្លង; ក្រោយកែ៖ ១៣ ឆ្លង។ Controls រក្សាករណីផ្លូវហៅបាត់ ឬមិនដល់ ការសម្អាតបាត់ id ខុស និងវាលថ្មីដែលមិនសម្អាតឱ្យធ្លាក់។
+- តេស្តដែលបានរត់៖ PIN ១៨/១៨ · notice ៨៩/៨៩ · lock ownership ៦/៦។ Supabase extraction smoke សម្អាត state/DOM បានដោយគ្មាន network; full Postgres checker មិនបានរត់។ PIN poison តាម meta helper ពិតបញ្ចប់ដោយ assertion failure ទាំង១៨ គ្មាន crash; full meta checker នៅទុកឱ្យ CI។
+- Audit 1318 ធ្លាក់តែ `doc-scope-test` ព្រោះខ្វះជួរលិបិក្រមសម្រាប់ test ដែលកំណត់ត្រាខាងលើយោង។ បំពេញជួរផ្នែក ២; assertion លិបិក្រមពិតស្កេនឯកសារទាំង២ និងបញ្ជី test ៥០១ ហើយឆ្លងដោយគ្មានជួរខ្វះ/លើសក្នុង ៦១០ ជួរ។ មិនកែ checker។
+- តេស្ត checker ប្រើ ZoeKeyGen source ពិតជាមួយ fixture ZoeW ទទេដើម្បីផ្ទៀងតែរបៀបស្កេននេះ មិនមែនភស្តុតាង measure tree ពេញទេ។ Full CI លើ commit ថ្មីនៅមិនទាន់ផ្ទៀង; មិន merge មិន deploy និងមិនប្ដូរ Firebase។
+
+### 2026-11-13 — ការចេញ Key សុវត្ថិភាពថ្មី
+
+- `ZoeW/tests/license-secure-issuance.test.ts` វាស់កូដ seller ពិតជាមួយ WebCrypto និង service/CAS ក្នុងសតិ៖ ការអនុម័តឧបករណ៍ សំណើខូច fingerprint ការបោះបង់ វគ្គប្រែ និងការបន្តពេលចម្លើយបាត់។ `emu/license-seat-rules-test` បន្ថែម creation/schema/permission controls និងរក្សាទិសផ្ទុយរបស់ legacy transition។
+- ស្លាក `secureIssued` ជាទិន្នន័យ admin សម្រាប់បង្ហាញ UI មិនមែនជាសិទ្ធិ។ Marker 2, seller signature, device proof និង Server revision/epoch នៅតែជាព្រំដែន។ Rules បន្ថែមតែ create-only branch និងវាល metadata; marker ដែលមានរួចមិនអាចកែបានដដែល។
+- **ភស្តុតាង local**៖ តេស្ត issuance ថ្មី ៣៨ ឆ្លង, seller/client/runtime/clock ឆ្លង និង session harness ៣៦៩ ឆ្លង។ ជុំចុងក្រោយ ១៩៦/១៩៧៖ តេស្ត stage ដែលមិនបានកែរំពឹង 409 ប៉ុន្តែទទួល 403 ក្នុងការប្រណាំង prove/release; មិនកែ server ឬតេស្តនោះក្នុងមុខងារនេះ។ Typecheck/lint និង static file/rules guards ឆ្លង។ Chromium មិនអាចបើក Unix socket ក្នុងបរិស្ថាននេះ ហើយគ្មាន emulator JAR ដែលបានរៀបចំ; browser/measurement/Rules runtime និង CI លើ commit ថ្មីនៅមិនទាន់ផ្ទៀង។
 
 ### 2026-11-13 — cache SDK របស់ seller marker
 
@@ -5265,6 +5288,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/apps-script-key-redaction.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/audit-checker-outcomes.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/audit-daily-report.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/audit-dom-cleanup-reachability.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/audit-exit-state.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/audit-lifecycle.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/audit-module-runtime-scope.test.ts` | ផ្នែក ២ | — |
@@ -5353,6 +5377,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/keygen-auth-recovery-owner.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/keygen-calendar.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/keygen-login-ownership.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/keygen-sb-lock-ownership-fixes.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/label-image.test.tsx` | — | ផ្នែក ៨ · ផ្នែក ៩ |
 | `ZoeW/tests/label-print.test.tsx` | ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/late-commit-stale-session.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
@@ -5367,6 +5392,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/license-clock-recovery.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/license-seat-runtime-context.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/license-seat-seller.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/license-secure-issuance.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/list-paging.test.tsx` | — | ផ្នែក ៧ |
 | `ZoeW/tests/list-render-scope.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៦ · ផ្នែក ៧ |
 | `ZoeW/tests/listener-leak-coverage.test.ts` | ផ្នែក ២ | — |

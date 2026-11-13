@@ -2306,6 +2306,9 @@
     "ZoeW/tests/audit-module-ast.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/audit-dom-cleanup-reachability.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/audit-module-runtime-scope.test.ts": {
       "policy": "zoew-self-verification"
     },
@@ -5150,6 +5153,9 @@
       "policy": "license-seat-protocol"
     },
     "ZoeW/tests/license-seat-seller.test.ts": {
+      "policy": "license-seat-protocol"
+    },
+    "ZoeW/tests/license-secure-issuance.test.ts": {
       "policy": "license-seat-protocol"
     },
     "ZoeW/tests/license-seat-idb.test.ts": {

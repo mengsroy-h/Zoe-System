@@ -49,13 +49,26 @@ function keygen(h){
     sbAdminIsCurrent:()=>true,sbInputValue:id=>elements[id]?.value||'',setSbAdminBusy(){},
     sbAdminRpc:async (s,name,payload)=>{c.__effects.rpc.push({name,payload});return {ok:true,body:{id:'synthetic-tenant'}};},sbIssueInvite:async()=>true,sbAdminRefresh:async()=>{},
     sbAdminErrorText:()=>'',invalidateSensitiveSession(){},updateSigningKeyBadge(){},requestSessionSigningKeyRestoreIfEligible(){},isPinFlowPending:()=>false,
+    openSecureKeySetup:async id=>{c.__effects.setupOpened=id;},
     hasUncopiedKeypair:()=>false,lockKeygenSession(){},logoutApp(){c.__effects.logout++;},sbAdminReset(){},sbAdminRevoke(){}
   });
   const names=['RELEASE_PENDING_TEXT','serverTimeOffsetMs','serverTimeSynced','serverTimeSyncWaiters','infoListenerGeneration','INFO_LISTENER_KEY_CONNECTED','INFO_LISTENER_KEY_OFFSET','infoListenerFailedPaths','LICENSE_APP_CODE','LICENSE_SEAT_SLOT_NAMES','LICENSE_SEAT_MAX','signingPrivateKeyJwk','signingKeyLastUseAt','SIGNING_KEY_IDLE_MS','isGeneratingKey','generateKeyOwner','lastGeneratedKey','KEYGEN_IDLE_LOGOUT_MS','keygenLastActivityAt','SB_TENANT_DAYS_MAX','SB_BRANCH_CODE_RE','SB_ADMIN_IDLE_MS','sbAdminBusy','sbAdminGeneration','sbAdminLastUseAt'];
-  c.fetch=async url=>{if(String(url)==='https://synthetic-license.firebaseio.com/license_keys/ZOE/SYNTHETICKEY123456789.json')return response({expiresAt:c.__expires||T+DAY,maxDevices:1,revoked:false});throw Error('Unexpected fixture route: '+url);};
-  const functions=['seatSellerContext','seatSellerRow','requireLegacySeat','routeSecureSeatLifecycle','databaseUrlOf','isFirebaseDatabaseHost','fetchWithTimeout','getTrustedServerNow','captureKeygenClock','keygenClockIsCurrent','getServerNow','waitForServerTimeSync','serverClockOffsetIsFromServer','detachInfoListeners','attachInfoListeners','seatLimitOf','generateLicenseKey','confirmExtendKey','releaseKeySeat','sbCreateTenant','elapsedSince','noteSigningKeyActivity','expireIdleSigningKey','noteKeygenActivity','expireIdleKeygenSession','khmerMinutes','expireIdleSbAdmin','sbAdminActivity'];
+  const committedRows=new Map();
+  c.fetch=async url=>{const u=new URL(String(url));if(u.origin==='https://synthetic-license.firebaseio.com' && committedRows.has(u.pathname))return response(committedRows.get(u.pathname));if(String(url)==='https://synthetic-license.firebaseio.com/license_keys/ZOE/SYNTHETICKEY123456789.json')return response({expiresAt:c.__expires||T+DAY,maxDevices:1,revoked:false});throw Error('Unexpected fixture route: '+url);};
+  let fetchFixture=c.fetch;
+  Object.defineProperty(c,'fetch',{get:()=>async(url,init)=>{
+    const u=new URL(String(url));
+    if(u.origin==='https://synthetic-license.firebaseio.com' && committedRows.has(u.pathname))return response(committedRows.get(u.pathname));
+    return fetchFixture(url,init);
+  },set:fixture=>{fetchFixture=fixture;}});
+  const functions=['publishSecureGeneratedKey','seatSellerContext','seatSellerRow','requireLegacySeat','routeSecureSeatLifecycle','databaseUrlOf','isFirebaseDatabaseHost','fetchWithTimeout','getTrustedServerNow','captureKeygenClock','keygenClockIsCurrent','getServerNow','waitForServerTimeSync','serverClockOffsetIsFromServer','detachInfoListeners','attachInfoListeners','seatLimitOf','generateLicenseKey','confirmExtendKey','releaseKeySeat','sbCreateTenant','elapsedSince','noteSigningKeyActivity','expireIdleSigningKey','noteKeygenActivity','expireIdleKeygenSession','khmerMinutes','expireIdleSbAdmin','sbAdminActivity'];
   const listeners={};
   c.__fb={off(){},onValue:(r,cb)=>listeners[r]=cb,ref:(d,p)=>p||'root',update:async (p,u)=>c.__effects.writes.push({p,u}),runTransaction:async(p,updater)=>{const val=updater(c.__expires);c.__effects.writes.push({p,val});return{committed:true,snapshot:{val:()=>val}};}};
+  let updateFixture=c.__fb.update;
+  Object.defineProperty(c.__fb,'update',{get:()=>(p,u)=>Promise.resolve(updateFixture(p,u)).then(result=>{
+    for(const [key,value] of Object.entries(u||{}))committedRows.set('/'+(p==='root'?'':p+'/')+key+'.json',value);
+    return result;
+  }),set:fixture=>{updateFixture=fixture;}});
   vm.runInContext(names.map(decl).join('\n')+`\nlet db={app:{options:{databaseURL:"https://synthetic-license.firebaseio.com"}}},fb=__fb,auth=null; let dbRefConnected='connected',dbRefServerTimeOffset='offset'; let isDatabaseConnected=false,hasEverConnectedToDatabase=false; let keyListSessionGeneration=1; let signingKeySessionKey=null; let authButtonIsLoggedIn=true; let extendTargetId='SYNTHETICKEY123456789'; let keyListCache=[];let seatReadFailed=false;let sbAdminSession={id:'synthetic'}; const SB_ADMIN_ERROR_TEXT={};\n`+functions.filter(name => ast.body.some(n => n.type === 'FunctionDeclaration' && n.id.name === name)).map(fn).join('\n'),c);
   c.document.getElementById('genDaysInput').value='30';c.document.getElementById('genDevicesInput').value='1';c.document.getElementById('genNoteInput').value='';
   c.document.getElementById('sbTenantNameInput').value='Synthetic';c.document.getElementById('sbTenantBranchInput').value='SYN';c.document.getElementById('sbTenantDaysInput').value='30';

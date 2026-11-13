@@ -30,13 +30,13 @@ function producerHarness() {
     const element = (id: string) => elements[id] ||= { value: '', checked: false, textContent: '', innerHTML: '', classList: { add() {}, remove() {} } };
     const ctx: any = { crypto: webcrypto, TextEncoder, Uint8Array, Uint32Array, URL, btoa, atob,
         auth: { currentUser: { uid: 'seller' } }, authGeneration: 1, sensitiveSessionGeneration: 1, isSignedInUiActive: true,
-        lookupSetupGeneration: 0, lastGeneratedSetupLink: '', SETUP_LINK_URL_KEY: 'base', appLocalStore: {},
+        lookupSetupGeneration: 0, lastGeneratedSetupLink: '', secureKeySetup: null, SETUP_LINK_URL_KEY: 'base', appLocalStore: {},
         document: { getElementById: element }, safeStoreSet: (_store: any, key: string, value: string) => writes.push([key, value]),
         sbTenantCache: [], sbAdminSession: null, sbTenantReadFailed: false,
         sbAdminIsCurrent: (session: any) => !!session && session === ctx.sbAdminSession,
         getServerNow: () => Date.now(), switchKgTab: vi.fn(), showToast: vi.fn(),
         renderQrInto: (_el: any, link: string) => { element('setupLinkQrContainer').textContent = link; }, alert: vi.fn() };
-    const names = ['captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession', 'generateLookupSetupLink', 'prepareSbLookupSetup', 'renderSbLookupTargets', 'sbTenantState', 'escapeHtml', 'sbAdminConfigProblem', 'sbAdminJwtRole'];
+    const names = ['captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession', 'clearSecureKeySetup', 'generateLookupSetupLink', 'prepareSbLookupSetup', 'renderSbLookupTargets', 'sbTenantState', 'escapeHtml', 'sbAdminConfigProblem', 'sbAdminJwtRole'];
     const declared = ast.body.filter((n: any) => n.type === 'FunctionDeclaration' && (names.includes(n.id.name) || /^(lookupSetup|encryptSetupLookup)/.test(n.id.name)));
     runInNewContext(declared.map((n: any) => source.slice(n.start, n.end)).join('\n'), ctx);
     element('setupLinkUrlInput').value = 'https://zoew.example/';

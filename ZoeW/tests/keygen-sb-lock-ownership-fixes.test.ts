@@ -17,10 +17,10 @@ for (const n of ast.body) {
   }
 }
 const fns = ['keygenIdleStamp', 'captureSensitiveSession', 'isSensitiveSessionCurrent', 'adminOwnerIsCurrent',
-  'invalidateSensitiveSession', 'clearSigningKey', 'lockKeygenSession', 'sbAdminLogin',
+  'invalidateSensitiveSession', 'clearSecureKeySetup', 'clearSigningKey', 'lockKeygenSession', 'sbAdminLogin',
   'sbAdminLogout', 'sbAdminReset', 'sbAdminConfigProblem', 'sbAdminJwtRole',
   'sbAdminRequest', 'setSbAdminBusy', 'sbInputValue'];
-const vars = [...decl.keys()].filter(n => /^(sb[A-Z]|SB_)/.test(n) && !/^\s*(async )?function/.test(decl.get(n)));
+const vars = ['secureKeySetup', ...[...decl.keys()].filter(n => /^(sb[A-Z]|SB_)/.test(n) && !/^\s*(async )?function/.test(decl.get(n)))];
 const code = [...vars, ...fns].map(n => {assert(decl.has(n), n); return decl.get(n);}).join('\n');
 function deferred() {let resolve; const promise = new Promise(r => {resolve = r;}); return {promise, resolve};}
 const drain = () => new Promise(r => setImmediate(r));

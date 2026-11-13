@@ -122,6 +122,14 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### ZoeW [2.50.197] · ZoeKeyGen [2.24.44] — 2026-11-13 · រៀបចំសោសាធារណៈ Receipt
+
+**ZoeW** (`zoew-v460` ➜ `zoew-v461`) និង **ZoeKeyGen** (`zoekeygen-v154` ➜ `zoekeygen-v155`)។
+
+- ដាក់ public JWK របស់ម្ចាស់ក្នុង `receiptPublicKeys` ទាំងពីរ App; `legacyProtocolEnabled:true` និង audience រក្សាដដែល។ គ្មានសោឯកជនក្នុងកូដ។
+- អ្នកយាម `receipt-public-config.test.ts` ផ្ទុក config ពិត ផ្ទៀង EC P-256 ស្នាមសោរបស់ម្ចាស់ ភាពដូចគ្នា និង legacy។ មិនផ្ទៀងគូសោឯកជន ឬ Server ផលិតកម្មទេ។
+- **សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ ការងារនេះរៀបចំសម្រាប់ review ដាច់ពី main មិន merge/deploy។ មុនចេញផ្សាយត្រូវទទួលការអនុញ្ញាត និង CI លើ commit ចុងក្រោយ; ក្រោយចេញផ្សាយដែលអនុញ្ញាត ត្រូវអាប់ដេត APK/PWA និង ZoeKeyGen ហើយផ្ទៀងគូសោជាមួយ Server។ មិនបើក stage មិនធ្វើ cutover និងមិនបិទ legacy ក្នុងការងារនេះ។
+
 ### ZoeW [2.50.196] — 2026-11-12 · PIN និងការចាកចេញពីផ្ទាំងឧបករណ៍
 
 - **ការកែតេស្តមុនចេញប្រើ**៖ `license-clock-recovery.test.ts` ដាច់ពេលប្រមូលតេស្ត ព្រោះ import PIN ថ្មីទាញ action registry ដែលត្រូវការ `retrySessionVerification` ពី session mock។ តេស្តនេះដាក់ mock តែផ្លូវចូល PIN ដែលមិនពាក់ព័ន្ធនឹងការសង្គ្រោះម៉ោង ហើយបរាជ័យភ្លាមបើផ្លូវនោះត្រូវហៅ។ មិនប្តូរកូដប្រើប្រាស់ ឬបន្ធូរ session guard។ វាស់ឡើងវិញ៖ clock recovery/continuity · enrollment · PIN · session ចំនួន ៩ ឯកសារ/២១៧ ករណីឆ្លង; មិនមែនលទ្ធផល CI ពេញលេញលើ commit ថ្មី។

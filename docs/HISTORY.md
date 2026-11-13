@@ -5366,6 +5366,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/ledger-writer-contract.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/license-clock-recovery.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/license-seat-runtime-context.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/license-seat-seller.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/list-paging.test.tsx` | — | ផ្នែក ៧ |
 | `ZoeW/tests/list-render-scope.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៦ · ផ្នែក ៧ |
 | `ZoeW/tests/listener-leak-coverage.test.ts` | ផ្នែក ២ | — |

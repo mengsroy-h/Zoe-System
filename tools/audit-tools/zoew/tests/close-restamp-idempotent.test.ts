@@ -1,0 +1,306 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { dataState, firebaseState, uiState, ztoState } from '../../../../ZoeW/src/core/state';
+import { viewState } from '../../../../ZoeW/src/core/view-state';
+import { appLocalStore } from '../../../../ZoeW/src/core/storage';
+import { dbListenerFailedPaths, dbListenerPendingPaths } from '../../../../ZoeW/src/core/text';
+import { getZoneDateKey } from '../../../../ZoeW/src/core/timezone';
+import { barcodeRegistryKey } from '../../../../ZoeW/src/domain/registry';
+import { clearCustomerDataTableCache } from '../../../../ZoeW/src/features/customer-table';
+import { clearZtoPickupStatusStore, runZtoStatusSweep } from '../../../../ZoeW/src/features/zto-status';
+import { applyBarcodeCloseChange } from '../../../../ZoeW/src/features/barcode-ops';
+import { toggleCloseStatus } from '../../../../ZoeW/src/features/entry-ops';
+import { pickupBarcodeKey } from '../../../../ZoeW/src/domain/pickup';
+
+const HISTORY = 'zoew_scan_history_cod_dod';
+const H = 60 * 60 * 1000;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const lab = { latMs: 5, store: {} as Record<string, any> };
+
+function getPath(path: string) {
+    const parts = path.split('/').filter(Boolean);
+    let cur: any = lab.store;
+    for (const p of parts) {
+        if (!cur || typeof cur !== 'object' || !(p in cur)) return null;
+        cur = cur[p];
+    }
+    return cur === undefined ? null : JSON.parse(JSON.stringify(cur));
+}
+function setPath(path: string, value: any) {
+    const parts = path.split('/').filter(Boolean);
+    let cur: any = lab.store;
+    if (value === null || value === undefined) {
+        for (let i = 0; i < parts.length - 1; i++) {
+            if (!cur[parts[i]] || typeof cur[parts[i]] !== 'object') return;
+            cur = cur[parts[i]];
+        }
+        delete cur[parts[parts.length - 1]];
+        return;
+    }
+    for (let i = 0; i < parts.length - 1; i++) {
+        if (!cur[parts[i]] || typeof cur[parts[i]] !== 'object') cur[parts[i]] = {};
+        cur = cur[parts[i]];
+    }
+    cur[parts[parts.length - 1]] = JSON.parse(JSON.stringify(value));
+}
+function makeFb() {
+    return {
+        getIdTokenResult: async () => ({ token: 't' }),
+        ref: (_db: unknown, path: string) => ({ path }),
+        get: async (ref: any) => {
+            await sleep(lab.latMs);
+            const v = getPath(ref.path);
+            return { val: () => v, exists: () => v !== null };
+        },
+        update: async (ref: any, payload: any) => {
+            await sleep(lab.latMs);
+            for (const k of Object.keys(payload)) setPath(ref.path + '/' + k, payload[k]);
+            return true;
+        },
+        set: async (ref: any, value: any) => {
+            await sleep(lab.latMs);
+            setPath(ref.path, value);
+            return true;
+        },
+        runTransaction: async (ref: any, fn: any) => {
+            await sleep(lab.latMs);
+            const cur = getPath(ref.path);
+            const next = fn(cur);
+            if (next === undefined) return { committed: false, snapshot: { val: () => cur }, txOutcome: 'not-applied' };
+            setPath(ref.path, next);
+            const v = getPath(ref.path);
+            return { committed: true, snapshot: { val: () => v }, txOutcome: 'committed' };
+        },
+        onValue: () => () => {},
+        off: () => {},
+        increment: (n: number) => n
+    };
+}
+const NOW = Date.UTC(2026, 9, 5, 17, 30, 0);
+
+beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(NOW));
+    lab.store = {};
+    appLocalStore.clear();
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://restamp-default-rtdb.firebaseio.com' }));
+    appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true,
+        url: 'https://example.invalid/.netlify/functions/zto-order-detail?barcode={barcode}' }));
+    appLocalStore.setItem('zoew_zto_listsync_v1', '1');
+    clearCustomerDataTableCache();
+    clearZtoPickupStatusStore();
+    dbListenerPendingPaths.clear();
+    dbListenerFailedPaths.clear();
+    ztoState.ztoListSyncInFlight = false;
+    ztoState.ztoListSyncResult = null;
+    ztoState.ztoStatusInFlight = false;
+    dataState.scanHistory = [];
+    dataState.deletedItems = [];
+    dataState.dailyRevenueData = {};
+    dataState.monthlyRevenueData = {};
+    dataState.dailyCollectedData = {};
+    dataState.dailyPickupData = {};
+    uiState.isModalOpen = false;
+    uiState.toasts = [];
+    viewState.ztoListSyncNote = '';
+    firebaseState.authGeneration++;
+    firebaseState.auth = { currentUser: { uid: 'restamp-user' } } as any;
+    firebaseState.db = { restamp: true } as any;
+    firebaseState.isDatabaseConnected = true;
+    firebaseState.serverClockTrusted = true;
+    firebaseState.serverTimeOffsetMs = 0;
+    firebaseState.fb = makeFb() as any;
+    for (const [name, path] of [['dbRefHistory', HISTORY], ['dbRefDeleted', 'zoew_recently_deleted_cod_dod'],
+        ['dbRefDailyRevenue', 'zoew_daily_revenue_cod_dod'], ['dbRefMonthlyRevenue', 'zoew_monthly_revenue_cod_dod'],
+        ['dbRefDailyCollected', 'zoew_daily_collected_cod_dod'], ['dbRefDailyPickup', 'zoew_daily_pickup_cod_dod'],
+        ['dbRefRegistry', 'zoew_barcode_registry']] as const) {
+        (firebaseState as any)[name] = { path };
+    }
+    firebaseState.dbLivenessProbe = Promise.resolve(null) as any;
+    vi.stubGlobal('confirm', () => true);
+    vi.stubGlobal('alert', () => undefined);
+    (window as any).ZoeErrors = { capture: () => {} };
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+});
+
+afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    delete (window as any).ZoeErrors;
+    firebaseState.dbLivenessProbe = null as any;
+    firebaseState.serverClockTrusted = false;
+    firebaseState.isDatabaseConnected = false;
+    appLocalStore.clear();
+});
+
+const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
+const T0 = NOW - 1 * H;
+function seed(codes: string[], closedCodes: string[]) {
+    const day = getZoneDateKey(T0, 0);
+    const barcodes = codes.map((code) => {
+        const closed = closedCodes.includes(code);
+        const b: any = { code, isClosed: closed, cod: 5, dod: 0, isDeducted: false, isFromDeletion: false, createdAt: T0 - 2 * H, time: '21:30:00' };
+        if (closed) b.closedAt = T0;
+        return b;
+    });
+    const allClosed = barcodes.every((b: any) => b.isClosed);
+    const item: any = { id: 'it1', phone: '0961234567', scanDate: day, isClosed: allClosed, createdAt: T0 - 2 * H,
+        cod: 5 * codes.length, dod: 0, price: 5 * codes.length, count: codes.length, barcode: codes[0], time: '21:30:00 (' + day + ')', barcodes };
+    if (allClosed) item.closedAt = T0;
+    setPath(HISTORY + '/it1', item);
+    codes.forEach((code) => setPath('zoew_barcode_registry/' + barcodeRegistryKey(code), true));
+    const stale = JSON.parse(JSON.stringify(item));
+    stale.isClosed = false;
+    delete stale.closedAt;
+    stale.barcodes.forEach((b: any) => { b.isClosed = false; delete b.closedAt; });
+    dataState.scanHistory = [stale];
+    return item;
+}
+const server = () => getPath(HISTORY + '/it1');
+const barcodeOf = (code: string) => server().barcodes.find((b: any) => b.code === code);
+
+describe('closing a barcode that the server already holds closed keeps its closedAt (ZTO-3)', () => {
+    it('1. ZTO sign-list sweep on a stale view ➜ server closedAt stays T0 (item and barcode) · no collected node on the new day', async () => {
+        const code = 'ZTR1000001';
+        seed([code], [code]);
+        vi.stubGlobal('fetch', vi.fn(async () => json({ success: true, list: true, enabled: true, kind: 'signed', page: 1, pages: 1, total: 1,
+            rows: [], otherScans: 0, signedScans: 1, signed: [code], signedOk: true })));
+        await runZtoStatusSweep(false);
+        await sleep(200);
+        expect(server().closedAt).toBe(T0);
+        expect(barcodeOf(code).closedAt).toBe(T0);
+        const collected = getPath('zoew_daily_collected_cod_dod') || {};
+        expect(Object.keys(collected)).not.toContain(getZoneDateKey(NOW, 0));
+    });
+
+    it('2. direct close on a stale view ➜ the server stamp is kept', async () => {
+        const code = 'ZTR1000002';
+        seed([code], [code]);
+        const out = await applyBarcodeCloseChange('it1', code, true, { silent: true, showModal: false });
+        expect(out).toBe(false);
+        expect(server().closedAt).toBe(T0);
+        expect(barcodeOf(code).closedAt).toBe(T0);
+        expect(barcodeOf(code).isClosed).toBe(true);
+    });
+
+    it('3. mixed parcel ៖ re-closing A (closed at T0) keeps T0 · closing B (open) stamps now and closes the parcel now', async () => {
+        seed(['ZTRA', 'ZTRB'], ['ZTRA']);
+        await applyBarcodeCloseChange('it1', 'ZTRA', true, { silent: true, showModal: false });
+        expect(barcodeOf('ZTRA').closedAt).toBe(T0);
+        expect(server().isClosed).toBe(false);
+        expect(server().closedAt).toBeUndefined();
+        await applyBarcodeCloseChange('it1', 'ZTRB', true, { silent: true, showModal: false });
+        expect(barcodeOf('ZTRA').closedAt).toBe(T0);
+        expect(barcodeOf('ZTRB').closedAt).toBe(NOW);
+        expect(server().isClosed).toBe(true);
+        expect(server().closedAt).toBe(NOW);
+    });
+
+    it('4. reverse ៖ an open server barcode is stamped now', async () => {
+        const code = 'ZTR1000004';
+        seed([code], []);
+        await applyBarcodeCloseChange('it1', code, true, { silent: true, showModal: false });
+        expect(barcodeOf(code).isClosed).toBe(true);
+        expect(barcodeOf(code).closedAt).toBe(NOW);
+        expect(server().closedAt).toBe(NOW);
+    });
+
+    it('5. reverse ៖ reopening a closed barcode removes its stamp', async () => {
+        const code = 'ZTR1000005';
+        seed([code], [code]);
+        const local = dataState.scanHistory[0];
+        local.isClosed = true;
+        local.closedAt = T0;
+        local.barcodes[0].isClosed = true;
+        local.barcodes[0].closedAt = T0;
+        await applyBarcodeCloseChange('it1', code, false, { silent: true, showModal: false });
+        expect(barcodeOf(code).isClosed).toBe(false);
+        expect(barcodeOf(code).closedAt).toBeUndefined();
+        expect(server().isClosed).toBe(false);
+        expect(server().closedAt).toBeUndefined();
+    });
+});
+
+describe('closing the whole row keeps the stamps of barcodes the server already holds closed (COL-4)', () => {
+    const collectedDaysOf = (code: string) => Object.keys(getPath('zoew_daily_collected_cod_dod') || {})
+        .filter((day) => (getPath('zoew_daily_collected_cod_dod/' + day) || {})[pickupBarcodeKey(code)]);
+
+    it('1. A closed at T0 · B open ➜ A keeps T0 and its collected day · B and the row are stamped now', async () => {
+        seed(['ZTWA', 'ZTWB'], ['ZTWA']);
+        dataState.scanHistory = [server()];
+        const dayA = getZoneDateKey(T0, 0);
+        setPath('zoew_daily_collected_cod_dod/' + dayA + '/' + pickupBarcodeKey('ZTWA'), { c: 5, d: 0 });
+        dataState.dailyCollectedData = getPath('zoew_daily_collected_cod_dod');
+        await toggleCloseStatus('it1');
+        await sleep(200);
+        expect(barcodeOf('ZTWA').closedAt).toBe(T0);
+        expect(barcodeOf('ZTWB').closedAt).toBe(NOW);
+        expect(server().isClosed).toBe(true);
+        expect(server().closedAt).toBe(NOW);
+        expect(collectedDaysOf('ZTWA'), 'A stays on its pickup day').toEqual([dayA]);
+        expect(collectedDaysOf('ZTWB')).toEqual([getZoneDateKey(NOW, 0)]);
+    });
+
+    it('2. after «Reset ចំនួនយករួច» closing the rest of the row never brings back the barcode closed before the Reset', async () => {
+        seed(['ZTWC', 'ZTWD'], ['ZTWC']);
+        dataState.scanHistory = [server()];
+        const day = server().scanDate;
+        setPath('zoew_daily_pickup_cod_dod/' + day, { packagesPickedUp: 0 });
+        dataState.dailyPickupData = getPath('zoew_daily_pickup_cod_dod');
+        await toggleCloseStatus('it1');
+        await sleep(200);
+        const record = getPath('zoew_daily_pickup_cod_dod/' + day) || {};
+        expect(Object.keys(record.pickedUpBarcodes || {})).toEqual([pickupBarcodeKey('ZTWD')]);
+        expect(record.packagesPickedUp).toBe(1);
+    });
+
+    it('3. a stale view showing the row open ➜ the server stamp of the closed barcode is kept', async () => {
+        seed(['ZTWE', 'ZTWF'], ['ZTWE']);
+        expect(await toggleCloseStatus('it1')).toBe(false);
+        expect(barcodeOf('ZTWE').closedAt).toBe(T0);
+        expect(barcodeOf('ZTWF').closedAt).toBeUndefined();
+        dataState.scanHistory = [server()];
+        expect(await toggleCloseStatus('it1')).toBe(true);
+        await sleep(200);
+        expect(barcodeOf('ZTWE').closedAt).toBe(T0);
+        expect(barcodeOf('ZTWF').closedAt).toBe(NOW);
+    });
+
+    it('4. reverse ៖ a fully closed row reopened and closed again is stamped now', async () => {
+        seed(['ZTWG'], ['ZTWG']);
+        dataState.scanHistory = [server()];
+        await toggleCloseStatus('it1');
+        await sleep(200);
+        expect(barcodeOf('ZTWG').isClosed).toBe(false);
+        dataState.scanHistory = [server()];
+        await toggleCloseStatus('it1');
+        await sleep(200);
+        expect(barcodeOf('ZTWG').closedAt).toBe(NOW);
+        expect(server().closedAt).toBe(NOW);
+    });
+});
+
+describe('M6 ៖ a close of a barcode both views already hold closed never brings a Reset count back', () => {
+    it('closed here and on the server · pickup stats reset ➜ the close preserves zero counts and only installs metadata fence', async () => {
+        const code = 'ZTRM600001';
+        const item = seed([code], [code]);
+        dataState.scanHistory = [JSON.parse(JSON.stringify(item))];
+        const day = item.scanDate;
+        setPath('zoew_daily_pickup_cod_dod/' + day, { packagesPickedUp: 0 });
+        dataState.dailyPickupData = { [day]: { packagesPickedUp: 0 } };
+        expect(await applyBarcodeCloseChange('it1', code, true, { silent: true, showModal: false })).toBe(true);
+        await sleep(100);
+        expect(getPath('zoew_daily_pickup_cod_dod/' + day)).toEqual({ packagesPickedUp: 0, pickupRevision: 1, pickupResetEpoch: 0 });
+        expect({ closedAt: barcodeOf(code).closedAt, collected: Object.keys(getPath('zoew_daily_collected_cod_dod/' + getZoneDateKey(T0, 0)) || {}) })
+            .toEqual({ closedAt: T0, collected: [pickupBarcodeKey(code)] });
+    });
+
+    it('control ៖ an open barcode closed here ➜ its pickup mark is written', async () => {
+        const code = 'ZTRM600002';
+        const item = seed([code], []);
+        const day = item.scanDate;
+        expect(await applyBarcodeCloseChange('it1', code, true, { silent: true, showModal: false })).toBe(true);
+        await sleep(100);
+        expect(Object.keys((getPath('zoew_daily_pickup_cod_dod/' + day) || {}).pickedUpBarcodes || {})).toEqual([pickupBarcodeKey(code)]);
+    });
+});

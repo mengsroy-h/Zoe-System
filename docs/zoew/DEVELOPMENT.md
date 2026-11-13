@@ -2,7 +2,7 @@
 
 ZoeW សរសេរលើ **React 19 + TypeScript + Vite**។ ឯកសារនេះសម្រាប់ **អ្នកអភិវឌ្ឍ** — របៀបប្រើ App
 ស្ថិតក្នុង [`README.md`](../../ZoeW/README.md)។ ឥរិយាបថ **ត្រូវបានវាស់** មិនមែនអះអាង ៖ ពាក្យបញ្ជាខាងក្រោម និង checker
-ក្នុង `audit-tools/` (`bash audit-tools/run-all.sh`) · លេខដែលវាស់បានរស់នៅ [`../HISTORY.md`](../HISTORY.md)
+ក្នុង `tools/audit-tools/` (`bash tools/audit-tools/run-all.sh`) · លេខដែលវាស់បានរស់នៅ [`../HISTORY.md`](../HISTORY.md)
 (ប្រវត្តិរស់នៅ `docs/HISTORY*.md` ប៉ុណ្ណោះ)។
 
 ### ឯកសារ
@@ -26,7 +26,7 @@ ZoeW សរសេរលើ **React 19 + TypeScript + Vite**។ ឯកសារ�
 | Node ដែលត្រូវការ | `^22.17` · `>=24` | `package.json` (`engines`) |
 
 ⛔ `dist/manifest.json` ទទួលកំណែពី `src/core/version.ts` អំឡុង build (`vite.config.mts`) ហើយ `index.html`
-គ្មានលេខកំណែជា literal។ `public/manifest.json` នៅផ្ទុក literal ➜ `audit-tools/version-check.js` ចាក់សោឲ្យស៊ី ·
+គ្មានលេខកំណែជា literal។ `public/manifest.json` នៅផ្ទុក literal ➜ `tools/audit-tools/version-check.js` ចាក់សោឲ្យស៊ី ·
 `version-bump-scope.js` ចាក់សោថា កូដ ship ប្រែ ➜ ត្រូវឡើងកំណែ (`CLAUDE.md` ច្បាប់ ៦)។
 
 ---
@@ -69,7 +69,7 @@ npm ci
 npm run dev              # server អភិវឌ្ឍន៍ (http://localhost:5173)
 ```
 
-Dependency របស់ App និងតេស្តប្រើកំណែដែលចាក់សោក្នុង `ZoeW/package-lock.json` តែមួយ។ `audit-tools/zoew/prepare-dependencies.mjs` រៀបចំ `audit-tools/zoew/node_modules` ជា symlink ទៅ `ZoeW/node_modules` (Windows ប្រើ junction); បើមានថត ឬតំណខុស គឺបដិសេធដោយមិនជាន់ទិន្នន័យ។ npm ហៅ hooks ខាងក្រោមដោយស្វ័យប្រវត្តិ។
+Dependency របស់ App និងតេស្តប្រើកំណែដែលចាក់សោក្នុង `ZoeW/package-lock.json` តែមួយ។ `tools/audit-tools/zoew/prepare-dependencies.mjs` រៀបចំ `tools/audit-tools/zoew/node_modules` ជា symlink ទៅ `ZoeW/node_modules` (Windows ប្រើ junction); បើមានថត ឬតំណខុស គឺបដិសេធដោយមិនជាន់ទិន្នន័យ។ npm ហៅ hooks ខាងក្រោមដោយស្វ័យប្រវត្តិ។
 
 | Hook | ពេលរត់ |
 |---|---|
@@ -95,15 +95,15 @@ npm run verify           # ការពិនិត្យ ZoeW រួម; មិ
 |---|---|
 | `npm run typecheck` | ពិនិត្យ TypeScript |
 | `npm run lint` | ESLint |
-| `npm test` | Vitest (រួមទាំងសោតំបន់ហាម `audit-tools/zoew/tests/forbidden-zone-lock.test.ts` ៖ PTR · ចលនាផ្ទាំង · ការរមូរ · `app.css` — ច្បាប់ ៖ `CLAUDE.md` «Forbidden zone») |
+| `npm test` | Vitest (រួមទាំងសោតំបន់ហាម `tools/audit-tools/zoew/tests/forbidden-zone-lock.test.ts` ៖ PTR · ចលនាផ្ទាំង · ការរមូរ · `app.css` — ច្បាប់ ៖ `CLAUDE.md` «Forbidden zone») |
 | `npm run rules:check` | វាស់ច្បាប់ **លុប/ដក** និងព្រំដែនពេលវេលា; matrix របៀប ZTO Login/Cookie រស់នៅ checker ពហុឧបករណ៍ (គោលការណ៍ក្នុង `CLAUDE.md`) ដោយទិន្នន័យសងខាងព្រំដែន (±១ នាទី) លើ build web និង Android រួចប្រៀប DB ចុងក្រោយ Android ទល់ web |
 | `npm run slot:check` | ផ្ទៀងផ្ទាត់ថាកូដ imperative **មិនប៉ះកូន** របស់ធាតុដែល React ជាម្ចាស់ (បើប៉ះ ➜ App ស) |
 | `npm run purity:check` | **React ១០០%** ៖ កូដមុខងារ (`core` · `domain` · `features` · `services` · `ui` · `platform`) ប៉ះ DOM **០** កន្លែង · ស្រទាប់ React (`src/app/**`) សរសេរ DOM **០** ក្រៅច្រកចេញ (`refs.ts` · `DocumentEffects` · ពិដានតឹង) · component មិនស្វែងរក DOM តាម id · ឈ្មោះ ref គ្រប់ឈ្មោះមាន `ref={…}` ពិតចង (មើល [`ARCHITECTURE.md`](ARCHITECTURE.md) ផ្នែក ១១) |
 | `npm run smoke` | Build tree ដែលចង់វាស់មុន; checker បដិសេធ manifest/SW version ខុសពី source មុនបើក browser · រកកំហុស runtime · ⛔ build ផលិតកម្មគ្មាន bridge វាស់ (`expose-globals` · `__auditRebind`) · syntax ក្នុង build ស្ថិតក្នុង `build.target` · design token CSS (`--x: value`) ទៅដល់ build ដូចដែលសរសេរ (minifier CSS មិនសរសេរតម្លៃឡើងវិញ) |
-| `npm run money:core` | ស្រង់កូដលុយពិតចូល `audit-tools/money-core.js` សម្រាប់ `check-money.cmd` (អ្នកយាមភាពស្រស់ធ្លាក់ពេលកូដលុយប្រែ) |
+| `npm run money:core` | ស្រង់កូដលុយពិតចូល `tools/audit-tools/money-core.js` សម្រាប់ `check-money.cmd` (អ្នកយាមភាពស្រស់ធ្លាក់ពេលកូដលុយប្រែ) |
 | `npm run sw:check` | Build មុន ហើយផ្ទៀង manifest/cache version, activated worker និងសំបកក្នុង cache ដែលរំពឹង; `DIST_DIR` ជ្រើស build ផ្សេង។ ការផ្ទៀងកំណែមិនជំនួស rebuild ពេល source ប្រែតែកំណែដដែលទេ |
 | `npm run doc:check` | ផ្ទៀងផ្ទាត់ថាការអះអាងក្នុងឯកសារស៊ីនឹងកូដ (បញ្ជី slot · កំណែ · ពាក្យបញ្ជា) |
-| `npm run audit:build` | build វាស់ (`dist-audit/ZoeW`) សម្រាប់ `audit-tools/` — ⛔ `bash audit-tools/run-all.sh` (ពី root) build វាដោយខ្លួនឯង ហើយរត់ checker ទាំងអស់ |
+| `npm run audit:build` | build វាស់ (`dist-audit/ZoeW`) សម្រាប់ `tools/audit-tools/` — ⛔ `bash tools/audit-tools/run-all.sh` (ពី root) build វាដោយខ្លួនឯង ហើយរត់ checker ទាំងអស់ |
 | `npm run build:only` | build ដោយរំលងការពិនិត្យ type (ប្រើក្នុង `verify` ដែលពិនិត្យរួច) |
 | `npm run notice:check` | build ជាមួយ sourcemap ចូលថតបណ្តោះអាសន្ន ➜ រាល់កញ្ចប់ npm ដែលចូល `dist/assets` និងឯកសារ vendor (`xlsx` · `zxing-wasm`) ត្រូវមាន `ឈ្មោះ@កំណែ` ដែល ship ពិតក្នុង `NOTICE` (root) |
 | `npm run preview` | បម្រើ `dist/` ក្នុងស្រុកដើម្បីសាកមើល |
@@ -131,7 +131,7 @@ npm run verify           # ការពិនិត្យ ZoeW រួម; មិ
 1. បើក PR ➜ Netlify សាង **deploy preview** (URL ដាច់ពីផលិតកម្ម) ➜ deploy log ត្រូវឃើញ `npm run build` · `vite build`
    ហើយ publish ថត `dist`។
 2. ⛔ PR ដែលប៉ះ PTR · ចលនាផ្ទាំងប្រវត្តិ · ការរមូរ · ផ្លូវ native ➜ សាកលើ **iPhone ពិត (PWA ដំឡើងលើអេក្រង់ដើម) និង Android
-   ពិត** មុន merge (`CLAUDE.md` ច្បាប់ ១១) ៖ checker ក្នុង `audit-tools/` វាស់ក្នុង Chromium ដែល **ធ្វើត្រាប់តាម** iOS មិនមែន
+   ពិត** មុន merge (`CLAUDE.md` ច្បាប់ ១១) ៖ checker ក្នុង `tools/audit-tools/` វាស់ក្នុង Chromium ដែល **ធ្វើត្រាប់តាម** iOS មិនមែន
    WebKit ពិត។
 3. ⚠️ Deploy preview មាន **origin ផ្សេង** ➜ storage ទទេ ៖ បញ្ចូល Config ហើយ **Activate** ម្តងទៀត។ ⛔ ការ Activate នោះស៊ីកៅអី
    ឧបករណ៍ (`maxDevices`) ដូចឧបករណ៍ថ្មីមួយ ➜ ប្រើ Key សាកល្បង ឬដោះកៅអីក្នុង ZoeKeyGen ក្រោយសាករួច។ ប្រើ **backend សាកល្បងដាច់ដោយឡែក** ជាមួយទិន្នន័យសំយោគ។
@@ -158,7 +158,7 @@ npm run verify           # ការពិនិត្យ ZoeW រួម; មិ
 
 F មិនត្រូវសម្អាតមុន pickup journal បញ្ចប់ដោយភស្តុតាង; ការសម្អាតផ្ទៀង token ដើម។ K នៅជាភស្តុតាង lifecycle តាម retention ដែលមានស្រាប់; គ្មាន TTL ថ្មីសម្រាប់ដោះ UNKNOWN។ ឧបករណ៍ថ្មីដែល storage ទទេអាចអានស្ថានភាព committed ប៉ុន្តែមិនអាចបង្កើត intent ដែលបាត់ពីឧបករណ៍ដើម ឬសម្រេច Restore ដោយគ្មាន journal/proof បានទេ។ រក្សា journals/receipts និងផ្ទៀង outcome ដាច់ដោយឡែកមុន rollback ឬការសង្គ្រោះដោយដៃ។
 
-ការវាស់ client recovery និង server guard ជាភស្តុតាងដាច់ពីគ្នា៖ [កាតាឡុកអ្នកយាម](../../audit-tools/README.md)។ Hosted rollout, old/new-client operation និងការបិទ/បើកលើឧបករណ៍ពិតនៅត្រូវការការផ្ទៀងក្នុងបរិស្ថានដែលបានអនុញ្ញាត។
+ការវាស់ client recovery និង server guard ជាភស្តុតាងដាច់ពីគ្នា៖ [កាតាឡុកអ្នកយាម](../../tools/audit-tools/README.md)។ Hosted rollout, old/new-client operation និងការបិទ/បើកលើឧបករណ៍ពិតនៅត្រូវការការផ្ទៀងក្នុងបរិស្ថានដែលបានអនុញ្ញាត។
 
 ### `src/` ជាប្រភពការពិត
 

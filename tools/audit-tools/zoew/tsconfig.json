@@ -1,0 +1,7 @@
+{
+  "extends": "../../../ZoeW/tsconfig.app.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "../../../ZoeW/node_modules/.cache/zoew-audit.tsbuildinfo"
+  },
+  "include": ["tests", "runtime", "vitest.config.mts", "../../../ZoeW/src/types"]
+}

@@ -2,7 +2,7 @@
   "name": "zoe-supabase",
   "private": true,
   "type": "module",
-  "description": "Supabase ៖ migration · Edge Functions · dependency សម្រាប់អ្នកយាម audit-tools/supabase-*",
+  "description": "Supabase ៖ migration · Edge Functions · dependency សម្រាប់អ្នកយាម tools/audit-tools/supabase-*",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
   },

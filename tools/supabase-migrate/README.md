@@ -1,7 +1,7 @@
 # ផ្ទេរទិន្នន័យហាងចូល Supabase (`tools/supabase-migrate`)
 
 CLI នាំទិន្នន័យរបស់ **ហាងមួយ** ចូលហាងមួយ (tenant) ក្នុង Supabase Project ៖ ពី **Firebase export** (អតិថិជនដែលជ្រើសប្តូរពី Firebase
-ទៅ Supabase) ឬពី **archive backup ហាង Supabase** ដែល [`firebase-backup/`](../../firebase-backup/README.md) បង្កើត (ស្តារហាង · ចម្លងហាង)។
+ទៅ Supabase) ឬពី **archive backup ហាង Supabase** ដែល [`tools/firebase-backup/`](../firebase-backup/README.md) បង្កើត (ស្តារហាង · ចម្លងហាង)។
 Firebase និង Supabase ជាជម្រើសរបស់អតិថិជនទាំងពីរ ➜ ឧបករណ៍នេះប្រើតែសម្រាប់អតិថិជនដែលសម្រេចប្តូរ ហើយវាមិនប៉ះ Firebase ទេ។
 
 > 📖 ឯកសារនេះសរសេរតែ **កំណែ · មុខងារ · របៀបប្រើប្រាស់ · ប្រព័ន្ធសុវត្ថិភាព · អាជ្ញាប័ណ្ណ**។ ប្រវត្តិ និងលេខដែលវាស់បាន ស្ថិតក្នុង
@@ -11,8 +11,8 @@ Firebase និង Supabase ជាជម្រើសរបស់អតិថិ�
 
 - CLI ដាច់ដោយឡែក ដែលម្ចាស់គម្រោងរត់លើម៉ាស៊ីនខ្លួនឯង ➜ **មិន deploy** ហើយ **មិនប៉ះ `APP_VERSION` ឬ `CACHE_VERSION`** របស់ App ណាមួយ។
 - **Node.js 18 ឬថ្មីជាងនេះ** · **គ្មាន dependency ខាងក្រៅ** (ប្រើតែ `fetch` · `zlib` · `crypto` ក្នុង Node) ➜ មិនចាំបាច់ `npm install`។
-- រត់ពី checkout របស់ repo នេះ ៖ វាប្រើ [`firebase-backup/supabase.js`](../../firebase-backup/supabase.js) (ទម្រង់ archive · ការហៅ RPC) ·
-  [`firebase-backup/crypt.js`](../../firebase-backup/crypt.js) (ឯកសារ `.enc`) និង [`firebase-database.rules.json`](../../firebase-database.rules.json)
+- រត់ពី checkout របស់ repo នេះ ៖ វាប្រើ [`tools/firebase-backup/supabase.js`](../firebase-backup/supabase.js) (ទម្រង់ archive · ការហៅ RPC) ·
+  [`tools/firebase-backup/crypt.js`](../firebase-backup/crypt.js) (ឯកសារ `.enc`) និង [`firebase-database.rules.json`](../../firebase-database.rules.json)
   (ការពិនិត្យរូបរាង record)។
 - Project Supabase ត្រូវមាន migration ទាំងអស់ក្នុង [`supabase/migrations/`](../../supabase/migrations) (RPC `zoe_admin_tenants` · `zoe_admin_export` ·
   `zoe_admin_write`) ➜ [`supabase/README.md`](../../supabase/README.md) ជំហានទី ២។
@@ -23,8 +23,8 @@ Firebase និង Supabase ជាជម្រើសរបស់អតិថិ�
 
 | Input | មកពីណា |
 |---|---|
-| `*.json` · `*.json.gz` | Firebase Console ➜ Realtime Database ➜ ⋮ ➜ **Export JSON** · ឬ dump របស់ `firebase-backup/` (Firebase Project របស់ហាងមួយ) |
-| `*.json.gz.enc` | artifact របស់ GitHub Actions (`firebase-backup/`) ➜ ស្រាយក្នុង memory ដោយ `ZOE_BACKUP_PASSPHRASE` (plaintext មិនចុះ Disk) |
+| `*.json` · `*.json.gz` | Firebase Console ➜ Realtime Database ➜ ⋮ ➜ **Export JSON** · ឬ dump របស់ `tools/firebase-backup/` (Firebase Project របស់ហាងមួយ) |
+| `*.json.gz.enc` | artifact របស់ GitHub Actions (`tools/firebase-backup/`) ➜ ស្រាយក្នុង memory ដោយ `ZOE_BACKUP_PASSPHRASE` (plaintext មិនចុះ Disk) |
 | archive ហាង Supabase | ឯកសារក្នុង `backups/<target>/<tenant-id>/` · ឬថតនោះផ្ទាល់ (CLI យកឯកសារថ្មីបំផុត) |
 
 ### ការពិនិត្យមុនសរសេរ (ជានិច្ច)
@@ -71,7 +71,7 @@ input ដែល **គ្មាន record ណាឆ្លងការពិនិ
 1. **ហាងគោលដៅ** ៖ បង្កើតក្នុង ZoeKeyGen (កាត «🏪 ហាង Supabase») ➜ ចំណាំ **លេខសាខា** (ជ្រើសហាងដោយ `--branch <លេខសាខា>`)។
 2. **Secret key** ៖ Supabase Dashboard ➜ **Project Settings ➜ API Keys ➜ Secret keys** ➜ បង្កើតសោថ្មីសម្រាប់ការងារនេះ (ឧ. `zoe-migrate`) ➜
    លុបវាចោលក្រោយផ្ទេររួច។ ⛔ កុំប្រើ Publishable key (CLI បដិសេធ)។
-3. **Input** ៖ Export JSON ពី Firebase Console · ឬ dump/archive របស់ `firebase-backup/`។
+3. **Input** ៖ Export JSON ពី Firebase Console · ឬ dump/archive របស់ `tools/firebase-backup/`។
 
 ### ជំហានទី ២ — dry-run (មិនសរសេរអ្វីទេ)
 
@@ -152,7 +152,7 @@ node tools/supabase-migrate/migrate.js backups/<target>/<tenant-id>/ --branch <�
   401/403/4xx មិន retry។
 - **rules មិនត្រូវរំលងដោយស្ងាត់** ៖ record ដែល ZoeW អានមិនបាន ត្រូវរាយ មិនមែននាំចូល។
 - **ឯកសារ `.enc`** ស្រាយក្នុង memory តែប៉ុណ្ណោះ ➜ plaintext មិនចុះ Disk។
-- អ្នកយាម ៖ `audit-tools/supabase-data-tools-test.js` (Postgres ពិត · CLI ពិត · ចម្លើយបាត់ · ព្យួរ · សោខុស · mutation)។
+- អ្នកយាម ៖ `tools/audit-tools/supabase-data-tools-test.js` (Postgres ពិត · CLI ពិត · ចម្លើយបាត់ · ព្យួរ · សោខុស · mutation)។
 
 ## អាជ្ញាប័ណ្ណ
 

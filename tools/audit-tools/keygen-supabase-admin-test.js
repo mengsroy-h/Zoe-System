@@ -1,0 +1,1038 @@
+// ថ្នាក់ ៖ **ផ្ទាំងអ្នកលក់ «🏪 ហាង Supabase» ក្នុង ZoeKeyGen** — Admin បង្កើតហាង · ចេញកូដអញ្ជើញ/Setup Link · ពន្យារ/បិទហាង ·
+// ចេញកូដប្តូរពាក្យសម្ងាត់។ កំហុសតែមួយ = អតិថិជនចុះឈ្មោះមិនបាន (Link ដែល ZoeW បដិសេធ) · ហាងចងសាខាខុស · Secret key លេចចូល Link ·
+// ឬកូដអញ្ជើញ/ពាក្យសម្ងាត់នៅសល់លើអេក្រង់ក្រោយចាកចេញ។
+//
+//   npm ci --prefix supabase
+//   M=$(ZOE_MEASURE_ONLY=1 bash tools/audit-tools/run-all.sh | tail -1); (cd "$M" && node tools/audit-tools/keygen-supabase-admin-test.js)
+//
+// វាស់ ២ ជាន់ ៖
+//   ១. ស្នាមភ្ជាប់ (គ្មាន Postgres) ៖ `ZoeKeyGen/app.js` ↔ `ZoeKeyGen/index.html` ↔ migration ពិត (regex សាខា · ប្រវែងឈ្មោះ · ថ្ងៃ ·
+//      ម៉ោងកូដ · ឈ្មោះគណនី · កូដកំហុសដែល RPC បោះ ទាំង ២ ទិស) និង ↔ ZoeW (`supabaseKeyIsSecret` · `supabaseUrlIsAllowed` ពី build វាស់)
+//      ➜ ZoeKeyGen មិនត្រូវទទួល URL/key ដែល ZoeW បដិសេធ (ឬផ្ទុយមកវិញ)។
+//   ២. ឥរិយាបថ ៖ function `sb*` ពិតក្នុង `vm` + DOM ក្លែងដែលដេរីវេពី index.html ពិត ទល់នឹង `supabase-fake-server.js` (JWT ពិត · RPC លើ
+//      **Postgres ពិត + migration ពិត**) ៖ Secret key · គណនីមិនមែន Admin · បង្កើតហាង (XSS) ➜ កូដអញ្ជើញក្នុង DB ប្រើចុះឈ្មោះបាន ·
+//      Setup Link ដែល **ZoeW ពិត** decode/normalize បាន · សាខាស្ទួន · ពន្យារ · បិទ/បើក · កូដប្តូរពាក្យសម្ងាត់ · JWT ផុត · ចាកចេញពី
+//      ZoeKeyGen (**`showLoginModalWithPrefill()` ពិត**) កណ្តាលការងារ ➜ គ្មាន toast/DOM ក្រោយ · `sbAdminReset()` លុបរាល់តម្លៃរសើប។
+// ⛔ គ្មាន `supabase/node_modules` (pg · Postgres) ➜ ផ្នែក ២ SKIP (PARTIAL) · `SUPABASE_STRICT=1` ➜ FAIL។
+'use strict';
+
+process.exitCode = 1;
+
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const acorn = require('acorn');
+
+const ROOT = process.env.KEYGEN_SBADMIN_APP_DIR ? path.resolve(process.env.KEYGEN_SBADMIN_APP_DIR) : path.join(__dirname, '../..');
+const REPO = process.env.ZOE_REPO_ROOT ? path.resolve(process.env.ZOE_REPO_ROOT) : path.join(__dirname, '../..');
+const STRICT = process.env.SUPABASE_STRICT === '1';
+const DEPS_DIRS = [process.env.SUPABASE_DEPS_DIR, path.join(ROOT, 'supabase', 'node_modules'), path.join(REPO, 'supabase', 'node_modules')].filter(Boolean);
+
+let pass = 0;
+let fail = 0;
+const skipped = [];
+function ok(label, condition, detail) {
+    if (condition) { console.log('   ok    ' + label); pass++; }
+    else { console.log('  FAIL   ' + label + (detail === undefined ? '' : '\n         ' + JSON.stringify(detail).slice(0, 900))); fail++; }
+}
+function finish() {
+    if (skipped.length) console.log('SKIP ' + skipped.join(' · ') + ' (រត់ ៖ npm ci --prefix supabase)');
+    console.log('\n' + (fail === 0 ? (skipped.length ? 'PARTIAL PASS (' + pass + '; SKIP ' + skipped.length + ')' : '✅ ជោគជ័យទាំងអស់ ' + pass)
+        : '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')'));
+    process.exitCode = fail === 0 ? 0 : 1;
+}
+process.on('unhandledRejection', (e) => { ok('គ្មាន promise ដែលបដិសេធដោយគ្មានអ្នកចាប់', false, String(e && e.stack || e)); });
+
+function readOr(rel) {
+    try { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); } catch (e) { return ''; }
+}
+const src = readOr('ZoeKeyGen/app.js');
+const html = readOr('ZoeKeyGen/index.html');
+const zoewView = readOr('ZoeW/app.js');
+const migDir = path.join(ROOT, 'supabase', 'migrations');
+const migrationFiles = fs.existsSync(migDir) ? fs.readdirSync(migDir).filter((f) => /^\d{14}_[a-z0-9_]+\.sql$/.test(f)).sort() : [];
+const migrationSql = migrationFiles.map((f) => fs.readFileSync(path.join(migDir, f), 'utf8')).join('\n;\n');
+const configToml = readOr('supabase/config.toml');
+
+function topLevel(source) {
+    const out = new Map();
+    let ast;
+    try { ast = acorn.parse(source, { ecmaVersion: 'latest', sourceType: 'script' }); } catch (e) { return out; }
+    for (const node of ast.body) {
+        if (node.type === 'FunctionDeclaration' && node.id) out.set(node.id.name, { kind: 'function', text: source.slice(node.start, node.end) });
+        if (node.type === 'VariableDeclaration' && node.declarations.length === 1 && node.declarations[0].id.type === 'Identifier') {
+            const text = source.slice(node.start, node.end).replace(/^(const|let)\s/, 'var ');
+            out.set(node.declarations[0].id.name, { kind: node.kind, text });
+        }
+    }
+    return out;
+}
+function sliceNested(source, name) {
+    const re = new RegExp('(^|\\n)[ \\t]*(?:async\\s+)?function\\s+' + name + '\\s*\\(');
+    const m = re.exec(source);
+    if (!m) return null;
+    const start = m.index + m[1].length;
+    let depth = 0;
+    let seen = false;
+    try {
+        for (const t of acorn.tokenizer(source.slice(start), { ecmaVersion: 'latest' })) {
+            if (t.type.label === '{' || t.type.label === '${') { depth++; seen = true; }
+            else if (t.type.label === '}') { depth--; if (seen && depth === 0) return source.slice(start, start + t.end).trim(); }
+        }
+    } catch (e) { return null; }
+    return null;
+}
+
+const decls = topLevel(src);
+const SB_FN_NAMES = [...decls.keys()].filter((n) => decls.get(n).kind === 'function' && /^sb[A-Z]|Sb[A-Z]/.test(n));
+const SB_VAR_NAMES = [...decls.keys()].filter((n) => decls.get(n).kind !== 'function' && /^(SB_|sb[A-Z])/.test(n));
+const HELPER_FNS = [...['keygenIdleStamp', 'keygenIdleElapsed', 'getTrustedServerNow', 'captureKeygenClock'].filter(n => decls.has(n)), 'fetchWithTimeout', 'elapsedSince', 'captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession', 'clearSecureKeySetup', ...(decls.has('lookupSetupScrubUrl') ? ['lookupSetupScrubUrl', 'lookupSetupSecretName'] : []), 'adminOwnerIsCurrent', 'safeStoreGet',
+    'safeStoreSet', 'escapeHtml', 'copySensitiveText', 'showLoginModalWithPrefill', 'makeQrCode', 'renderQrInto',
+    'downloadQrPng', 'saveQrImage', 'seatMetaText'];
+const HELPER_VARS = ['SETUP_LINK_URL_KEY', 'QR_MAX_MODULES', 'lookupSetupGeneration', 'secureKeySetup'];
+const REQUIRED_SB = ['sbAdminConfigProblem', 'sbAdminLogin', 'sbAdminLogout', 'sbAdminReset', 'sbAdminRefresh', 'renderSbTenantList', 'sbCreateTenant',
+    'sbTenantAction', 'sbIssueInvite', 'sbIssueResetCode', 'copySbInviteLink', 'copySbInviteCode', 'copySbResetCode', 'restoreSbAdminConfig'];
+const missing = REQUIRED_SB.filter((n) => SB_FN_NAMES.indexOf(n) === -1)
+    .concat(HELPER_FNS.filter((n) => !decls.has(n))).concat(HELPER_VARS.filter((n) => !decls.has(n)))
+    .concat(['SB_ADMIN_ERROR_TEXT', 'SB_BRANCH_CODE_RE', 'SB_TENANT_DAYS_MAX', 'SB_INVITE_VALID_HOURS', 'SB_RESET_VALID_HOURS'].filter((n) => !decls.has(n)));
+
+const ZOEW_FNS = ['jwtRole', 'supabaseKeyIsSecret', 'supabaseUrlIsAllowed', 'normalizeSupabaseConfig', 'decodeSetupPayload'];
+const zoewSources = ZOEW_FNS.map((n) => [n, sliceNested(zoewView, n)]);
+const zoewConfigKeys = (zoewView.match(/^[ \t]*const SB_CONFIG_KEYS = (\[[^\]\n]*\]);/m) || [])[1] || null;
+const zoewMissing = zoewSources.filter((x) => !x[1]).map((x) => x[0]).concat(zoewConfigKeys ? [] : ['SB_CONFIG_KEYS']);
+
+function htmlElements(text) {
+    const out = new Map();
+    for (const m of text.matchAll(/<([a-zA-Z][a-zA-Z0-9]*)\b([^>]*)>/g)) {
+        const attrs = m[2];
+        const id = (attrs.match(/\bid="([^"]+)"/) || [])[1];
+        if (!id) continue;
+        const attr = (name) => { const a = attrs.match(new RegExp('\\b' + name + '="([^"]*)"')); return a ? a[1] : null; };
+        out.set(id, { tag: m[1].toLowerCase(), cls: String(attr('class') || '').split(/\s+/).filter(Boolean), value: attr('value'), attr });
+    }
+    return out;
+}
+const HTML_EL = htmlElements(html);
+
+function zoewApi() {
+    const ctx = vm.createContext({ URL, atob, escape, decodeURIComponent, JSON, Error, Object, String, Array });
+    vm.runInContext('var SB_CONFIG_KEYS = ' + zoewConfigKeys + ';\n' + zoewSources.map((x) => x[1]).join('\n\n'), ctx);
+    return ctx;
+}
+
+console.log('=== keygen-supabase-admin ៖ ផ្ទាំងអ្នកលក់ ZoeKeyGen ↔ index.html ↔ migration ↔ ZoeW · Postgres ពិត ===');
+console.log('-- ០. លក្ខខណ្ឌចាំបាច់ --');
+ok('⛔ ស្រង់ function/ថេរ sb* និង helper ពី ZoeKeyGen/app.js បានគ្រប់ (parse ដោយ acorn)', missing.length === 0 && SB_FN_NAMES.length >= REQUIRED_SB.length, missing);
+ok('⛔ ស្រង់ helper Config Supabase ពិតរបស់ ZoeW ពី build វាស់ (ZoeW/app.js) បានគ្រប់', zoewMissing.length === 0, zoewMissing);
+ok('⛔ migration Supabase មាន (tenants · admin_create_tenant · admin_issue_invite · admin_issue_reset_code)',
+    /create table public\.tenants/.test(migrationSql) && /create function public\.admin_create_tenant\(/.test(migrationSql)
+    && /create function public\.admin_issue_invite\(/.test(migrationSql) && /create function public\.admin_issue_reset_code\(/.test(migrationSql));
+const SB_IDS = [...HTML_EL.keys()].filter((id) => /^sb[A-Z]/.test(id));
+ok('⛔ index.html មានកាត «ហាង Supabase» (ធាតុ id sb* ≥ 15)', SB_IDS.length >= 15, SB_IDS.length);
+
+// រាល់និយមន័យ (public · private · `create or replace` ក្នុង migration ក្រោយ) ➜ body ពិតរបស់ definer ក្នុង private មិនរលាយក្រោយ wrapper invoker
+function sqlFunctionBody(name) {
+    const re = new RegExp('create (?:or replace )?function (?:public|private)\\.' + name + '\\(', 'g');
+    const parts = [];
+    for (const m of migrationSql.matchAll(re)) {
+        const open = migrationSql.indexOf('$$', m.index);
+        const close = open === -1 ? -1 : migrationSql.indexOf('$$', open + 2);
+        if (close !== -1) parts.push(migrationSql.slice(m.index, close + 2));
+    }
+    return parts.join('\n');
+}
+
+function staticSeams() {
+    console.log('-- ១. ស្នាមភ្ជាប់ ZoeKeyGen ↔ index.html ↔ migration ↔ ZoeW --');
+    const C = vm.createContext({ URL, atob, JSON, Object, String, Number, RegExp });
+    vm.runInContext(SB_VAR_NAMES.filter((n) => /^SB_/.test(n)).map((n) => decls.get(n).text).join('\n')
+        + '\n' + decls.get('sbAdminJwtRole').text + '\n' + decls.get('sbAdminConfigProblem').text, C);
+
+    const sqlBranch = (migrationSql.match(/branch_code text not null unique check \(branch_code ~ '([^']+)'\)/) || [])[1];
+    ok('⛔ លក្ខខណ្ឌចាំបាច់ ៖ migration ចាក់សោទម្រង់ branch_code', !!sqlBranch);
+    ok('SB_BRANCH_CODE_RE = check របស់ tenants.branch_code (អក្សរដដែល)', !!sqlBranch && C.SB_BRANCH_CODE_RE.source === sqlBranch,
+        { app: C.SB_BRANCH_CODE_RE.source, sql: sqlBranch });
+    const branchMax = Number(((sqlBranch || '').match(/\{1,(\d+)\}/) || [])[1]);
+    const maxAttr = (id) => Number((HTML_EL.get(id) || { attr: () => null }).attr('maxlength'));
+    ok('#sbTenantBranchInput maxlength = ព្រំដែនក្នុង regex សាខា', branchMax > 0 && maxAttr('sbTenantBranchInput') === branchMax, maxAttr('sbTenantBranchInput'));
+    const nameMax = Number((migrationSql.match(/check \(char_length\(btrim\(name\)\) between 1 and (\d+)\)/) || [])[1]);
+    ok('#sbTenantNameInput maxlength = char_length(name) ក្នុង tenants', nameMax > 0 && maxAttr('sbTenantNameInput') === nameMax, { html: maxAttr('sbTenantNameInput'), sql: nameMax });
+    ok('sbCreateTenant() ពិនិត្យប្រវែងឈ្មោះដោយព្រំដែនដដែល', decls.get('sbCreateTenant').text.indexOf('name.length > ' + nameMax) !== -1);
+    const daysEl = HTML_EL.get('sbTenantDaysInput');
+    ok('#sbTenantDaysInput max = SB_TENANT_DAYS_MAX · min = 1', !!daysEl && Number(daysEl.attr('max')) === C.SB_TENANT_DAYS_MAX && Number(daysEl.attr('min')) === 1,
+        daysEl && { max: daysEl.attr('max'), min: daysEl.attr('min') });
+    const inviteBody = sqlFunctionBody('admin_issue_invite');
+    const inviteHours = inviteBody.match(/p_valid_hours not between (\d+) and (\d+)/);
+    ok('SB_INVITE_VALID_HOURS ក្នុងព្រំដែនរបស់ admin_issue_invite', !!inviteHours && C.SB_INVITE_VALID_HOURS >= Number(inviteHours[1])
+        && C.SB_INVITE_VALID_HOURS <= Number(inviteHours[2]), { app: C.SB_INVITE_VALID_HOURS, sql: inviteHours && inviteHours.slice(1) });
+    const resetBody = sqlFunctionBody('admin_issue_reset_code');
+    const resetHours = resetBody.match(/p_valid_hours not between (\d+) and (\d+)/);
+    ok('SB_RESET_VALID_HOURS ក្នុងព្រំដែនរបស់ admin_issue_reset_code', !!resetHours && C.SB_RESET_VALID_HOURS >= Number(resetHours[1])
+        && C.SB_RESET_VALID_HOURS <= Number(resetHours[2]), { app: C.SB_RESET_VALID_HOURS, sql: resetHours && resetHours.slice(1) });
+    const sqlUser = (migrationSql.match(/username text not null unique check \(username ~ '([^']+)'\)/) || [])[1];
+    const appUser = (decls.get('sbIssueResetCode').text.match(/if \(!\/(.+?)\/\.test\(username\)\)/) || [])[1];
+    ok('regex ឈ្មោះគណនីក្នុង sbIssueResetCode() = check របស់ tenant_members.username', !!sqlUser && appUser === sqlUser, { app: appUser, sql: sqlUser });
+    const resetInput = HTML_EL.get('sbResetUsernameInput');
+    ok('#sbResetUsernameInput maxlength = ព្រំដែនឈ្មោះគណនី', !!resetInput && Number(resetInput.attr('maxlength')) === Number(((sqlUser || '').match(/\{\d+,(\d+)\}/) || [])[1]));
+
+    const extendDays = sqlFunctionBody('admin_extend_tenant').match(/p_days not between (\d+) and (\d+)/);
+    ok('SB_TENANT_DAYS_MAX = ព្រំដែនថ្ងៃរបស់ admin_extend_tenant (1–' + (extendDays ? extendDays[2] : '?') + ')', !!extendDays
+        && Number(extendDays[1]) === 1 && Number(extendDays[2]) === C.SB_TENANT_DAYS_MAX, { app: C.SB_TENANT_DAYS_MAX, sql: extendDays && extendDays.slice(1) });
+
+    const called = ['admin_create_tenant', 'admin_update_tenant', 'admin_extend_tenant', 'admin_issue_invite', 'admin_issue_reset_code', 'admin_remove_member'];
+    const usedInApp = called.filter((fn) => src.indexOf("'" + fn + "'") !== -1);
+    ok('⛔ លក្ខខណ្ឌចាំបាច់ ៖ ZoeKeyGen ហៅ RPC admin_* ទាំង ' + called.length, usedInApp.length === called.length, usedInApp);
+    // ⛔ លើកលែងតែមួយ ៖ `*-collision` បោះតែក្រោយកូដ ~១០០ bit ប៉ះគ្នា ៥ ដងជាប់ (មិនកើតក្នុងការអនុវត្ត) ➜ សារទូទៅ «Supabase បដិសេធ (…)» គ្រប់គ្រាន់
+    const COLLISION_RE = /^[a-z]+-collision$/;
+    const raised = new Set();
+    for (const fn of called) for (const m of sqlFunctionBody(fn).matchAll(/raise exception '([a-z-]+)'/g)) raised.add(m[1]);
+    const texts = Object.keys(C.SB_ADMIN_ERROR_TEXT);
+    const noText = [...raised].filter((code) => texts.indexOf(code) === -1 && !COLLISION_RE.test(code));
+    ok('រាល់កូដដែល RPC admin_* បោះ មានអត្ថបទខ្មែរក្នុង SB_ADMIN_ERROR_TEXT (មិនរាយកូដឆៅដល់អ្នកលក់)', raised.size >= 8 && noText.length === 0,
+        { raised: [...raised], noText });
+    const deadText = texts.filter((code) => !raised.has(code));
+    ok('ទិសផ្ទុយ ៖ SB_ADMIN_ERROR_TEXT គ្មានកូដងាប់ (កូដដែល RPC មិនដែលបោះ)', deadText.length === 0, deadText);
+
+    const Z = zoewMissing.length ? null : zoewApi();
+    const jwt = (claims) => 'eyJhbGciOiJIUzI1NiJ9.' + Buffer.from(JSON.stringify(claims)).toString('base64url') + '.sig';
+    const PUB = 'sb_publishable_' + 'a'.repeat(30);
+    const samples = [
+        ['https://abc.supabase.co', PUB], ['https://abc.supabase.co/', PUB], ['http://127.0.0.1:54321', PUB], ['http://localhost:54321', PUB],
+        ['https://abc.supabase.co', 'sb_secret_' + 'b'.repeat(30)], ['https://abc.supabase.co', 'SB_SECRET_' + 'b'.repeat(30)],
+        ['https://abc.supabase.co', jwt({ role: 'service_role' })], ['https://abc.supabase.co', jwt({ role: 'anon' })],
+        ['http://abc.supabase.co', PUB], ['https://abc.supabase.co/rest/v1', PUB], ['https://abc.supabase.co/?x=1', PUB], ['https://abc.supabase.co/#x', PUB],
+        ['https://user@abc.supabase.co', PUB], ['https://:pw@abc.supabase.co', PUB], ['https://user:pw@abc.supabase.co', PUB], ['ftp://abc.supabase.co', PUB],
+        ['not a url', PUB], ['http://10.0.0.1', PUB]
+    ];
+    const verdicts = samples.map(([url, key]) => {
+        const keygen = C.sbAdminConfigProblem(url, key) === '';
+        const zoew = Z ? (Z.supabaseUrlIsAllowed(url) && !Z.supabaseKeyIsSecret(key)) : null;
+        return { url, key: key.slice(0, 18), keygen, zoew };
+    });
+    const mismatch = verdicts.filter((v) => v.keygen !== v.zoew);
+    ok('sbAdminConfigProblem() ស្របនឹង ZoeW (supabaseUrlIsAllowed · supabaseKeyIsSecret) លើគំរូ ' + samples.length + ' ➜ គ្មាន Link ដែល ZoeW បដិសេធ',
+        !!Z && mismatch.length === 0, mismatch);
+    ok('ទិសផ្ទុយ ៖ គំរូមានទាំង «ទទួល» និង «បដិសេធ» (≥ ៣ ម្ខាង)', verdicts.filter((v) => v.keygen).length >= 3 && verdicts.filter((v) => !v.keygen).length >= 3);
+    const secretText = C.sbAdminConfigProblem('https://abc.supabase.co', 'sb_secret_' + 'b'.repeat(30));
+    ok('Secret key ➜ សារប្រាប់ឲ្យ Rotate (មិនមែនសារ URL)', /Secret key/.test(secretText) && /Rotate/.test(secretText), secretText);
+}
+
+function deferred() {
+    let resolve;
+    const promise = new Promise((r) => { resolve = r; });
+    return { promise, resolve };
+}
+const flush = () => new Promise((resolve) => setImmediate(resolve));
+async function drain(n) { for (let i = 0; i < (n || 6); i++) await flush(); }
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function memStorage() {
+    const m = new Map();
+    return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => { m.set(k, String(v)); }, removeItem: (k) => { m.delete(k); }, _map: m };
+}
+
+function makeDom() {
+    const elements = new Map();
+    const rootClasses = new Set();
+    function element(id) {
+        if (elements.has(id)) return elements.get(id);
+        const spec = HTML_EL.get(id);
+        if (!spec) return null;
+        const classes = new Set(spec.cls);
+        const el = {
+            id, tagName: spec.tag.toUpperCase(), value: spec.value || '', textContent: '', innerHTML: '', disabled: false,
+            classList: {
+                add: (c) => classes.add(c), remove: (c) => classes.delete(c), contains: (c) => classes.has(c),
+                toggle: (c, on) => { const want = on === undefined ? !classes.has(c) : !!on; if (want) classes.add(c); else classes.delete(c); return want; }
+            },
+            hidden: () => classes.has('hidden')
+        };
+        elements.set(id, el);
+        return el;
+    }
+    return {
+        document: {
+            getElementById: element,
+            documentElement: { classList: {
+                add: (name) => rootClasses.add(name), remove: (name) => rootClasses.delete(name), contains: (name) => rootClasses.has(name),
+                toggle: (name, on) => { const enabled = on === undefined ? !rootClasses.has(name) : !!on; if (enabled) rootClasses.add(name); else rootClasses.delete(name); return enabled; }
+            } },
+            querySelectorAll: (selector) => selector === '.modal.active' ? [...elements.values()].filter((el) => el.classList.contains('modal') && el.classList.contains('active')) : [],
+            createElement: () => ({ value: '', setAttribute() {}, style: {}, select() {}, remove() {} }),
+            execCommand: () => false,
+            body: { appendChild() {} }
+        },
+        el: element,
+        texts: () => [...elements.values()].map((e) => ({ id: e.id, s: [e.value, e.textContent, e.innerHTML].join(' ') }))
+    };
+}
+
+function buildKeygen(env) {
+    const dom = makeDom();
+    const log = { alerts: [], toasts: [], confirms: [], prompts: [], fetches: [], clipboard: [], errors: [] };
+    const answers = { confirm: [], prompt: [] };
+    let gate = null;
+    let responseGate = null;
+    const store = memStorage();
+    const user = { uid: 'keygen-admin' };
+    const sandbox = {
+        console: { log() {}, warn() {}, error: (e) => log.errors.push(String(e && e.message || e)) },
+        Promise, Error, JSON, String, Number, Object, Array, Math, Date, RegExp, Set, Map, isFinite, setTimeout, clearTimeout, AbortController, URL,
+        atob, btoa, escape, unescape, encodeURIComponent, decodeURIComponent,
+        fetch: (url, init) => {
+            log.fetches.push({ url: String(url), method: init && init.method, body: init && init.body ? JSON.parse(init.body) : null, auth: init && init.headers && init.headers.Authorization });
+            const hold = responseGate && String(url).endsWith('/rest/v1/rpc/' + responseGate.fn) ? responseGate : null;
+            if (hold) responseGate = null;
+            const go = () => fetch(url, init).then((response) => {
+                if (!hold) return response;
+                hold.received.resolve();
+                return hold.promise.then(() => response);
+            });
+            return gate ? gate.promise.then(go) : go();
+        },
+        alert: (m) => log.alerts.push(String(m)),
+        confirm: (m) => { log.confirms.push(String(m)); return answers.confirm.length ? answers.confirm.shift() : true; },
+        prompt: (m, d) => { log.prompts.push(String(m)); return answers.prompt.length ? answers.prompt.shift() : d; },
+        showToast: (m) => log.toasts.push(String(m)),
+        getServerNow: () => Date.now(),
+        performance: { now: () => Date.now() },
+        waitForServerTimeSync: async () => true,
+        ZoeLicense: { getTrustedServerNow: () => Date.now(), getServerTimeGeneration: () => 1 },
+        document: dom.document,
+        navigator: { clipboard: { writeText: (t) => { log.clipboard.push(String(t)); return Promise.resolve(); } }, onLine: true },
+        auth: { currentUser: user },
+        appLocalStore: store,
+        hasUncopiedKeypair: () => false,
+        isPinFlowPending: () => false,
+        refreshLiveToasts() {}, closeModal() {}, clearGeneratedKeyResult() {}, clearSigningKey() {}, openModalHelper() {}, refreshKgStatus() {}
+    };
+    sandbox.window = sandbox;
+    sandbox.qrcode = (type, level) => {
+        const q = { data: '', addData(d) { q.data = d; }, make() {}, createSvgTag() { return '<svg data-qr-len="' + q.data.length + '"></svg>'; } };
+        log.qr = q;
+        return q;
+    };
+    const ctx = vm.createContext(sandbox);
+    vm.runInContext(`
+        var sensitiveSessionGeneration = 0, authGeneration = 1, isSignedInUiActive = true;
+        var keypairPrivateCopied = false, isGeneratingKey = false, pinTargetAction = null, keyListSessionGeneration = 0, keyListCache = [];
+        var noticeListCache = [], noticeReadFailed = false, noticeSendOwner = null, isSendingNotice = false, NOTICE_SEND_LABEL = 'send';
+        var lastGeneratedSetupLink = '';
+    `, ctx);
+    vm.runInContext(HELPER_VARS.concat(SB_VAR_NAMES).map((n) => decls.get(n).text).join('\n'), ctx);
+    vm.runInContext(HELPER_FNS.concat(SB_FN_NAMES).map((n) => decls.get(n).text).join('\n\n'), ctx);
+    return {
+        ctx, log, dom, store, answers, user,
+        gate() { gate = deferred(); return gate; },
+        holdResponse(fn) { responseGate = Object.assign(deferred(), { fn, received: deferred() }); return responseGate; },
+        open() { const g = gate; gate = null; if (g) g.resolve(); },
+        set(id, v) { const e = dom.el(id); if (e) e.value = v; },
+        relogin() { vm.runInContext('authGeneration++; isSignedInUiActive = true;', ctx); },
+        rpcCalls(fn) { return log.fetches.filter((f) => f.url.endsWith('/rest/v1/rpc/' + fn)).length; }
+    };
+}
+
+function decodeEntities(s) {
+    return String(s).replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
+}
+
+async function adminMutationFailureModes() {
+    const actions = ['sb-invite', 'sb-extend', 'sb-revoke', 'reset', 'remove'];
+    for (const action of actions) {
+        for (const mode of ['reject', 'absent', 'hang', 'late']) {
+            const K = buildKeygen();
+            const C = K.ctx;
+            C.sbAdminSession = { url: 'https://admin.zoe.test', key: 'publishable-test', token: 'test', operation: C.captureSensitiveSession(true) };
+            C.sbTenantCache = [{ id: 'tenant-test', name: 'ហាង', expires_at: new Date(Date.now() + 86400000).toISOString(), revoked: false }];
+            C.sbMemberCache = [{ tenant_id: 'tenant-test', username: 'sokha', role: 'member' }];
+            K.set('sbResetUsernameInput', 'sokha');
+            C.SB_ADMIN_TIMEOUT_MS = 20;
+            let finishResponse = null;
+            if (mode === 'reject') C.fetch = () => Promise.reject(new Error('offline'));
+            if (mode === 'absent') C.fetch = undefined;
+            if (mode === 'hang' || mode === 'late') C.fetch = () => new Promise((resolve) => { finishResponse = resolve; });
+            const pending = action === 'reset' ? C.sbIssueResetCode() : action === 'remove' ? C.sbRemoveMember('tenant-test', 'sokha') : C.sbTenantAction('tenant-test', action);
+            ok(action + ' / ' + mode + ' ៖ ការងារចាប់ផ្តើម ➜ ប៊ូតុងចេញកូដជាប់', C.sbAdminBusy === true && K.dom.el('sbIssueResetBtn').disabled === true);
+            await pending;
+            ok(action + ' / ' + mode + ' ៖ បរាជ័យ/ដល់ពិដាន ➜ ប្រាប់បញ្ហា · ដោះប៊ូតុង', C.sbAdminBusy === false && K.dom.el('sbIssueResetBtn').disabled === false && K.log.alerts.length === 1);
+            if (mode === 'late') {
+                const before = JSON.stringify([K.log.alerts, K.log.toasts, C.sbLastInvite, C.sbLastResetCode]);
+                finishResponse({ ok: true, status: 200, text: () => Promise.resolve(JSON.stringify([{ code: 'late-code', expires_at: new Date().toISOString() }])) });
+                await drain();
+                ok(action + ' ៖ ចម្លើយយឺតក្រោយពិដាន ➜ មិនជំនួសលទ្ធផល', JSON.stringify([K.log.alerts, K.log.toasts, C.sbLastInvite, C.sbLastResetCode]) === before);
+            }
+        }
+    }
+    const K = buildKeygen();
+    const C = K.ctx;
+    const session = { url: 'https://admin.zoe.test', key: 'publishable-test', token: 'test', operation: C.captureSensitiveSession(true) };
+    C.sbAdminSession = session;
+    K.set('sbResetUsernameInput', 'sokha');
+    const oldResult = deferred();
+    C.sbAdminRpc = () => oldResult.promise;
+    const oldWork = C.sbIssueResetCode();
+    ok('លក្ខខណ្ឌ ៖ ការងារចាស់ជាប់មុនចាកចេញ', C.sbAdminBusy === true);
+    C.sbAdminReset(false);
+    C.sbAdminSession = Object.assign({}, session);
+    K.set('sbResetUsernameInput', 'dara');
+    const newResult = deferred();
+    C.sbAdminRpc = () => newResult.promise;
+    const newWork = C.sbIssueResetCode();
+    oldResult.resolve({ ok: true, body: [{ code: 'old-code' }] });
+    await oldWork;
+    ok('ចាកចេញ/ចូលវិញ ➜ ចម្លើយចាស់មិនដោះការងារថ្មី ឬបង្ហាញកូដចាស់', C.sbAdminBusy === true && K.dom.el('sbIssueResetBtn').disabled === true && C.sbLastResetCode === '');
+    newResult.resolve({ ok: true, body: [{ code: 'new-code' }] });
+    await newWork;
+    ok('ការងារថ្មីចប់ ➜ ដោះប៊ូតុង និងបង្ហាញតែកូដថ្មី', C.sbAdminBusy === false && K.dom.el('sbIssueResetBtn').disabled === false && C.sbLastResetCode === 'new-code');
+}
+function rowButtons(innerHTML) {
+    return [...String(innerHTML).matchAll(/<button class="btn-mini" data-tenant-id="([^"]*)" data-action="([^"]*)">([^<]*)<\/button>/g)]
+        .map((m) => ({ id: decodeEntities(m[1]), action: m[2], text: m[3] }));
+}
+
+async function behavior() {
+    console.log('-- ២. ឥរិយាបថលើ Postgres ពិត + migration ពិត (supabase-fake-server) --');
+    const wantMajor = parseInt((configToml.match(/^major_version\s*=\s*(\d+)\s*$/m) || [])[1] || '0', 10);
+    const { createPgHarness } = require('./supabase-pg.js');
+    const { startFakeSupabase } = require('./supabase-fake-server.js');
+    const H = createPgHarness({ depsDirs: DEPS_DIRS, shimDir: path.join(__dirname, 'supabase-shim'), wantMajor });
+    const reason = H.unavailableReason();
+    if (reason) {
+        if (STRICT) ok('SUPABASE_STRICT=1 ៖ ' + reason, false);
+        else skipped.push(reason);
+        return;
+    }
+    let client = null;
+    let pool = null;
+    let fake = null;
+    try {
+        await H.start();
+        const { c, name } = await H.freshDb('default-grants');
+        client = c;
+        c.on('error', () => {});
+        await c.query(migrationSql);
+        const adminId = await H.makeAuthUser(c, 'boss@admin.zoe.test');
+        await c.query('insert into public.platform_admins (user_id) values ($1)', [adminId]);
+        const clerkId = await H.makeAuthUser(c, 'clerk@admin.zoe.test');
+        pool = new H.PG.Pool({ host: '127.0.0.1', port: c.connectionParameters.port, user: 'postgres', database: name, max: 8 });
+        pool.on('error', () => {});
+        fake = await startFakeSupabase({ pool, pgTypes: H.PG.types });
+        fake.addUser('boss@admin.zoe.test', 'boss-pass-123', adminId);
+        fake.addUser('clerk@admin.zoe.test', 'clerk-pass-123', clerkId);
+        const PUB = 'sb_publishable_' + 'k'.repeat(32);
+        const SERVICE = { role: 'service_role' };
+        // សួរ Server ដោយ token Admin ចាស់រហូតដល់ 401 (ការដក session ដោយ logout ប្រហែលមិនទាន់ចុះ) ឬអស់ពិដាន ➜ status ចុងក្រោយ
+        const revokedStatus = async (token) => {
+            let status = 0;
+            for (let i = 0; i < 40; i++) {
+                status = (await fetch(fake.url + '/rest/v1/tenants?select=id&limit=1', { headers: { apikey: PUB, Authorization: 'Bearer ' + token } })).status;
+                if (status === 401) break;
+                await sleep(25);
+            }
+            return status;
+        };
+
+        const K = buildKeygen();
+        const C = K.ctx;
+        const el = K.dom.el;
+        const fill = (url, key, email, pw) => { K.set('sbAdminUrlInput', url); K.set('sbAdminKeyInput', key); K.set('sbAdminEmailInput', email); K.set('sbAdminPasswordInput', pw); };
+        const panelOpen = () => !el('sbAdminPanel').hidden();
+        const alertsSince = (n) => K.log.alerts.slice(n);
+
+        console.log('   · Secret key / config ខុស');
+        ok('⛔ លក្ខខណ្ឌចាំបាច់ ៖ ផ្ទាំង Admin លាក់ពេលចាប់ផ្តើម (class hidden ក្នុង index.html)', !panelOpen() && el('sbAdminLogoutBtn').hidden());
+        const service = 'eyJhbGciOiJIUzI1NiJ9.' + Buffer.from(JSON.stringify({ role: 'service_role' })).toString('base64url') + '.x';
+        for (const [label, key] of [['sb_secret_…', 'sb_secret_' + 's'.repeat(30)], ['JWT service_role', service]]) {
+            fill(fake.url, key, 'boss@admin.zoe.test', 'boss-pass-123');
+            const a = K.log.alerts.length;
+            const f = K.log.fetches.length;
+            await C.sbAdminLogin();
+            ok('Secret key (' + label + ') ➜ បដិសេធ មុនបណ្តាញ · មិនរក្សាទុក · ផ្ទាំងនៅលាក់',
+                K.log.fetches.length === f && /Secret key/.test(alertsSince(a).join()) && !panelOpen()
+                && String(K.store.getItem(C.SB_ADMIN_CONFIG_KEY) || '').indexOf(key) === -1, { alerts: alertsSince(a), fetches: K.log.fetches.length - f });
+        }
+
+        console.log('   · ពាក្យសម្ងាត់ខុស · គណនីមិនមែន Admin');
+        fill(fake.url + '/', PUB, 'Boss@Admin.Zoe.Test', 'wrong-pass');
+        let a = K.log.alerts.length;
+        await C.sbAdminLogin();
+        ok('ពាក្យសម្ងាត់ខុស ➜ «មិនត្រឹមត្រូវ» · ផ្ទាំងលាក់ · វាលពាក្យសម្ងាត់ទទេ', /មិនត្រឹមត្រូវ/.test(alertsSince(a).join()) && !panelOpen()
+            && el('sbAdminPasswordInput').value === '', alertsSince(a));
+        fill(fake.url, PUB, 'clerk@admin.zoe.test', 'clerk-pass-123');
+        a = K.log.alerts.length;
+        await C.sbAdminLogin();
+        ok('គណនីមិនមែន Admin (គ្មានក្នុង platform_admins) ➜ សារ forbidden · ផ្ទាំងលាក់ · គ្មាន session',
+            alertsSince(a).join() === C.SB_ADMIN_ERROR_TEXT.forbidden && !panelOpen() && C.sbAdminSession === null, alertsSince(a));
+        ok('ពាក្យសម្ងាត់មិនសល់ក្នុងវាល · ក្នុង storage', el('sbAdminPasswordInput').value === '' && [...K.store._map.values()].join().indexOf('clerk-pass-123') === -1);
+
+        console.log('   · Admin ចូល ➜ បញ្ជីហាង');
+        fill(fake.url + '/', PUB, 'Boss@Admin.Zoe.Test', 'boss-pass-123');
+        a = K.log.alerts.length;
+        await C.sbAdminLogin();
+        await drain();
+        ok('Admin ➜ ផ្ទាំងបើក · ប៊ូតុងចាកចេញបង្ហាញ · ប៊ូតុងចូលលាក់ · toast ✅ · គ្មាន alert', panelOpen() && !el('sbAdminLogoutBtn').hidden()
+            && el('sbAdminLoginBtn').hidden()
+            && K.log.toasts.some((t) => /Admin/.test(t)) && alertsSince(a).length === 0, alertsSince(a));
+        ok('បញ្ជីហាងទទេ ➜ «មិនទាន់មានហាង» (មិនមែន «អានមិនបាន»)', /មិនទាន់មានហាង/.test(el('sbTenantListBody').innerHTML), el('sbTenantListBody').innerHTML);
+
+        // ⛔ បិទប្រអប់ PIN (`closeModal('pinModal')` ពិត ➜ invalidateSensitiveSession — ផ្លូវដដែលនឹង clearSigningKey · Signing Key ផុតពេលទំនេរ) មិនមែនការចាកចេញទេ ៖
+        //    ផ្ទាំង Supabase នៅបើក ➜ ប៊ូតុងត្រូវដើរ។ កូដមុនកែ ៖ sbAdminIsCurrent() ពិនិត្យជំនាន់ session រសើបដែលចាប់ពេលចូល ➜ ប៊ូតុងទាំងអស់ return ស្ងាត់។
+        console.log('   · បិទប្រអប់ PIN ក្រោយចូល Supabase ➜ ផ្ទាំងនៅប្រើបាន');
+        const realCloseModal = vm.runInContext('(function () {\n' + ['closeModal', 'clearPinInputValues', 'clearKeypairOutputs'].map((n) => decls.get(n).text).join('\n')
+            + '\nreturn closeModal;\n})()', C);
+        const genBeforePin = vm.runInContext('sensitiveSessionGeneration', C);
+        const pinModalEl = el('pinModal');
+        if (pinModalEl && !pinModalEl.style) pinModalEl.style = {};
+        realCloseModal('pinModal');
+        ok('⛔ លក្ខខណ្ឌចាំបាច់ ៖ closeModal(\'pinModal\') ពិតឡើងជំនាន់ session រសើប', vm.runInContext('sensitiveSessionGeneration', C) > genBeforePin);
+        const fPin = K.log.fetches.length;
+        await C.sbAdminRefresh();
+        await drain();
+        ok('⛔ បិទប្រអប់ PIN ➜ session Supabase នៅ · 🔄 Refresh អានបញ្ជីហាងពិត (មិន return ស្ងាត់)',
+            panelOpen() && C.sbAdminIsCurrent(C.sbAdminSession) && K.log.fetches.slice(fPin).some((f) => /\/rest\/v1\/tenants\?/.test(f.url)),
+            { current: C.sbAdminIsCurrent(C.sbAdminSession), fetches: K.log.fetches.slice(fPin).map((f) => f.url) });
+        const saved = JSON.parse(K.store.getItem(C.SB_ADMIN_CONFIG_KEY) || 'null');
+        ok('Config ដែលរក្សាទុក = URL (គ្មាន / ចុង) · key · អ៊ីមែលអក្សរតូច — គ្មានពាក្យសម្ងាត់', !!saved && saved.url === fake.url && saved.key === PUB
+            && saved.email === 'boss@admin.zoe.test' && Object.keys(saved).sort().join() === 'email,key,url', saved);
+        const K2 = buildKeygen();
+        K2.store.setItem(K2.ctx.SB_ADMIN_CONFIG_KEY, K.store.getItem(C.SB_ADMIN_CONFIG_KEY));
+        K2.ctx.restoreSbAdminConfig();
+        ok('restoreSbAdminConfig() បំពេញ URL/key/អ៊ីមែល ក្នុង tab ថ្មី (មិនមែនពាក្យសម្ងាត់)', K2.dom.el('sbAdminUrlInput').value === fake.url
+            && K2.dom.el('sbAdminKeyInput').value === PUB && K2.dom.el('sbAdminPasswordInput').value === '');
+
+        console.log('   · បង្កើតហាង (XSS) ➜ កូដអញ្ជើញម្ចាស់ហាង');
+        const XSS = 'ហាង <img src=x onerror=alert(1)> "សុខា"';
+        K.set('sbTenantNameInput', XSS);
+        K.set('sbTenantBranchInput', '881859');
+        K.set('sbTenantDaysInput', '30');
+        a = K.log.alerts.length;
+        const t0 = Date.now();
+        await C.sbCreateTenant();
+        await drain();
+        const tRow = (await c.query("select * from public.tenants where branch_code = '881859'")).rows[0];
+        ok('ហាងចុះក្នុង DB ៖ ឈ្មោះ · សាខា · ផុតកំណត់ ≈ ឥឡូវ + ៣០ ថ្ងៃ', !!tRow && tRow.name === XSS && !tRow.revoked
+            && Math.abs(tRow.expires_at.getTime() - (t0 + 30 * 86400000)) < 60000, tRow);
+        ok('toast ✅ · គ្មាន alert · វាលឈ្មោះ/សាខាសម្អាត', K.log.toasts.some((t) => /បានបង្កើតហាង/.test(t)) && alertsSince(a).length === 0
+            && el('sbTenantNameInput').value === '' && el('sbTenantBranchInput').value === '', alertsSince(a));
+        const firstCode = el('sbInviteCodeText').textContent;
+        const inv1 = (await c.query('select i.*, private.invite_code_hash($1) = i.code_hash as match from public.tenant_invites i where i.tenant_id = $2', [firstCode, tRow && tRow.id])).rows;
+        ok('កូដអញ្ជើញម្ចាស់ហាង ៖ ក្នុង DB (hash ត្រូវ) · role owner · ប្រើ ១ ដង · ផុត ≈ ' + C.SB_INVITE_VALID_HOURS + ' ម៉ោង',
+            inv1.length === 1 && inv1[0].match && inv1[0].role === 'owner' && inv1[0].max_uses === 1
+            && Math.abs(inv1[0].expires_at.getTime() - (t0 + C.SB_INVITE_VALID_HOURS * 3600000)) < 60000, inv1);
+        ok('ប្រអប់កូដបង្ហាញ · ស្លាក «ម្ចាស់ហាង»', !el('sbInviteResultBox').hidden() && /ម្ចាស់ហាង/.test(el('sbInviteResultLabel').textContent));
+        ok('គ្មាន Base URL ➜ Link ទទេ + សារណែនាំ ⚠️ · គ្មាន QR', C.sbLastInvite && C.sbLastInvite.link === '' && /⚠️/.test(el('sbInviteLinkText').textContent)
+            && el('sbInviteQrContainer').innerHTML === '');
+        const listHtml = el('sbTenantListBody').innerHTML;
+        ok('⛔ XSS ៖ ឈ្មោះហាងក្នុងបញ្ជី escape (គ្មាន <img ឆៅ)', listHtml.indexOf('<img') === -1 && listHtml.indexOf('&lt;img src=x onerror=alert(1)&gt;') !== -1);
+        const label1 = el('sbInviteResultLabel').textContent;
+        ok('ស្លាកកូដប្រើ textContent (ឈ្មោះហាងឆៅ ➜ មិនមែន HTML)', label1.indexOf(XSS) !== -1);
+        let btns = rowButtons(listHtml);
+        ok('⛔ លក្ខខណ្ឌចាំបាច់ ៖ ជួរដេកមានប៊ូតុង ៤ (sb-lookup · sb-invite · sb-extend · sb-revoke) ចង id ហាងពិត',
+            btns.length === 4 && btns.every((b) => b.id === tRow.id) && btns.map((b) => b.action).sort().join() === 'sb-extend,sb-invite,sb-lookup,sb-revoke', btns);
+        ok('ការចុចប៊ូតុងក្នុងបញ្ជីឆ្លង sbTenantAction(dataset.tenantId, dataset.action)',
+            /getElementById\('sbTenantListBody'\)[\s\S]{0,400}sbTenantAction\(btn\.dataset\.tenantId, btn\.dataset\.action\)/.test(src));
+
+        console.log('   · Setup Link ➜ ZoeW ពិត');
+        K.store.setItem(C.SETUP_LINK_URL_KEY, 'https://zoew.example.app/');
+        K.answers.confirm.push(true);
+        await C.sbTenantAction(btns.find((b) => b.action === 'sb-invite').id, 'sb-invite');
+        await drain();
+        const ownerCode = el('sbInviteCodeText').textContent;
+        const link = el('sbInviteLinkText').textContent;
+        ok('ហាងគ្មានម្ចាស់ ➜ sb-invite ចេញកូដ «ម្ចាស់ហាង» ម្តងទៀត', /ម្ចាស់ហាង/.test(K.log.confirms[K.log.confirms.length - 1]) && ownerCode && ownerCode !== firstCode);
+        const setupParam = (link.match(/^https:\/\/zoew\.example\.app\/#setup=([^&#]+)$/) || [])[1];
+        ok('Link = <Base URL>/#setup=… (គ្មាន / ស្ទួន · កូដអញ្ជើញក្នុង fragment មិនទៅ server log)', !!setupParam, link);
+        let decoded = null;
+        let normalized = null;
+        if (setupParam && !zoewMissing.length) {
+            const Z = zoewApi();
+            try { decoded = Z.decodeSetupPayload(decodeURIComponent(setupParam)); } catch (e) { decoded = { error: e.message }; }
+            try {
+                const linkConfig = Object.assign({}, decoded);
+                delete linkConfig.invite;
+                normalized = Z.normalizeSupabaseConfig(linkConfig);
+            } catch (e) { normalized = { error: e.message }; }
+        }
+        ok('decodeSetupPayload() ពិតរបស់ ZoeW ➜ {supabaseUrl, supabaseKey, invite} (គ្មាន dsn)', !!decoded && decoded.supabaseUrl === fake.url
+            && decoded.supabaseKey === PUB && decoded.invite === ownerCode
+            && Object.keys(decoded).sort().join() === 'invite,supabaseKey,supabaseUrl', decoded);
+        ok('normalizeSupabaseConfig() ពិតរបស់ ZoeW ទទួល Config ពី Link (គ្មាន extras)', !!normalized && normalized.config
+            && normalized.config.supabaseUrl === fake.url && normalized.extras.length === 0, normalized);
+        ok('⛔ Link គ្មានពាក្យសម្ងាត់ Admin · token · អ៊ីមែល Admin', link.indexOf('boss') === -1
+            && Buffer.from(decodeURIComponent(setupParam || ''), 'base64').toString('utf8').search(/boss|access_token|eyJ/) === -1);
+        ok('QR = Link ពេញ', !!K.log.qr && K.log.qr.data === link && /data-qr-len/.test(el('sbInviteQrContainer').innerHTML));
+        const firstState = (await c.query('select revoked from public.tenant_invites where code_hash = private.invite_code_hash($1)', [firstCode])).rows[0];
+        ok('កូដទី ១ នៅប្រើបាន (ការចេញថ្មីមិនបិទវា — ទាំង ២ ប្រើបាន ១ ដង)', !!firstState && firstState.revoked === false);
+
+        console.log('   · កូដអញ្ជើញ ➜ ចុះឈ្មោះ (finish_registration ពិត)');
+        const ownerUid = await H.makeAuthUser(c, 'sokha@users.zoew.invalid');
+        const ownerHash = (await c.query('select private.invite_code_hash($1) as h', [ownerCode])).rows[0].h;
+        const reg = await H.as(c, SERVICE, 'select * from public.finish_registration($1, $2, $3)', [ownerUid, ownerHash, 'sokha']);
+        ok('កូដពីអេក្រង់ ➜ finish_registration ➜ ម្ចាស់ហាងរបស់ហាងដដែល', !!reg.rows && reg.rows[0].tenant_id === tRow.id && reg.rows[0].role === 'owner', reg);
+        await C.sbAdminRefresh();
+        const ownerListHtml = el('sbTenantListBody').innerHTML;
+        ok('បញ្ជីបង្ហាញម្ចាស់ sokha ជាអក្សរដិត (sb-owner) · គ្មាន emoji នៅមុខឈ្មោះ',
+            /<span class="sb-member sb-owner" title="ម្ចាស់ហាង">sokha<\/span>/.test(ownerListHtml) && !/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]\s*sokha/u.test(ownerListHtml), ownerListHtml.slice(0, 300));
+        ok('ហាងគ្មានឧបករណ៍ ➜ គ្មានបន្ទាត់ឧបករណ៍ (មិនមែន «អានមិនបាន»)', ownerListHtml.indexOf('seat-device-line') === -1, ownerListHtml.slice(0, 400));
+        console.log('   · ឧបករណ៍របស់ហាង (note_my_device ពិត ➜ member_devices)');
+        const DEV_XSS = '<img src=x onerror=alert(2)> Pixel 8';
+        const noted = await H.as(c, { role: 'authenticated', sub: ownerUid }, 'select public.note_my_device($1, $2, $3) as ok', ['a1b2c3d4e5f60718', DEV_XSS, 'Android 15']);
+        ok('សមាជិកកត់ឧបករណ៍ (RPC ពិត)', !!noted.rows && noted.rows[0].ok === true, noted.error);
+        await C.sbAdminRefresh();
+        const devHtml = el('sbTenantListBody').innerHTML;
+        const devLine = (devHtml.match(/<div class="seat-device-line">([^<]*)<\/div>/) || [])[1] || '';
+        ok('បន្ទាត់ឧបករណ៍ក្រោមហាង ៖ model · ប្រព័ន្ធ · Serial · គណនី · ថ្ងៃប្រើចុងក្រោយ (គ្មាន emoji)',
+            decodeEntities(devLine).indexOf(DEV_XSS + ' · Android 15 · Serial a1b2c3d4e5f60718 · sokha · ប្រើចុងក្រោយ ') === 0
+            && !/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(decodeEntities(devLine)), devLine);
+        ok('⛔ XSS ៖ model ឧបករណ៍ escape (គ្មាន <img ឆៅ)', devHtml.indexOf('<img') === -1 && devHtml.indexOf('&lt;img src=x onerror=alert(2)&gt;') !== -1);
+        await c.query('revoke select on table public.member_devices from authenticated');
+        await C.sbAdminRefresh();
+        const devFailHtml = el('sbTenantListBody').innerHTML;
+        await c.query('grant select on table public.member_devices to authenticated');
+        await c.query('revoke select on table public.tenant_members from authenticated');
+        await C.sbAdminRefresh();
+        const memFailHtml = el('sbTenantListBody').innerHTML;
+        const aMem = K.log.alerts.length;
+        const rMem = K.rpcCalls('admin_issue_invite');
+        await C.sbTenantAction(tRow.id, 'sb-invite');
+        await drain();
+        await c.query('grant select on table public.tenant_members to authenticated');
+        ok('⛔ អានគណនីមិនបាន ➜ «⚠️ អានបញ្ជីគណនីមិនបាន» (មិនមែន «-» ដូចគ្មានគណនី) · 🎟️ មិនចេញកូដអញ្ជើញ (តួនាទីពីបញ្ជីដែលអានមិនបាន ➜ ម្ចាស់ទី ២) ➜ សារឲ្យ Refresh',
+            /អានបញ្ជីគណនីមិនបាន/.test(memFailHtml) && memFailHtml.indexOf('>sokha<') === -1 && K.rpcCalls('admin_issue_invite') === rMem
+            && /Refresh/.test(K.log.alerts.slice(aMem).join()), { html: memFailHtml.slice(0, 300), alerts: K.log.alerts.slice(aMem) });
+        ok('អានឧបករណ៍មិនបាន ➜ «⚠️ អានបញ្ជីឧបករណ៍មិនបាន» (មិនមែន «គ្មាន») · ហាង និងសមាជិកនៅបង្ហាញ',
+            /អានបញ្ជីឧបករណ៍មិនបាន/.test(devFailHtml) && /sb-owner" title="ម្ចាស់ហាង">sokha</.test(devFailHtml) && devFailHtml.indexOf('a1b2c3d4e5f60718') === -1, devFailHtml.slice(0, 400));
+        await C.sbAdminRefresh();
+        K.answers.confirm.push(true);
+        await C.sbTenantAction(tRow.id, 'sb-invite');
+        await drain();
+        const memberCode = el('sbInviteCodeText').textContent;
+        const memberInv = (await c.query('select role, tenant_id from public.tenant_invites where code_hash = private.invite_code_hash($1)', [memberCode])).rows[0];
+        ok('ហាងមានម្ចាស់ ➜ sb-invite ចេញកូដ «បុគ្គលិក» (role member ក្នុង DB)', /បុគ្គលិក/.test(K.log.confirms[K.log.confirms.length - 1])
+            && !!memberInv && memberInv.role === 'member' && memberInv.tenant_id === tRow.id && /បុគ្គលិក/.test(el('sbInviteResultLabel').textContent), memberInv);
+        const confirmsBefore = K.log.confirms.length;
+        K.answers.confirm.push(false);
+        const invCalls = K.rpcCalls('admin_issue_invite');
+        await C.sbTenantAction(tRow.id, 'sb-invite');
+        ok('បដិសេធ confirm ➜ គ្មាន RPC', K.rpcCalls('admin_issue_invite') === invCalls && K.log.confirms.length === confirmsBefore + 1);
+
+        console.log('   · ការផ្ទៀងផ្ទាត់ · សាខាស្ទួន · ចុចពីរដង');
+        const createCalls = () => K.rpcCalls('admin_create_tenant');
+        for (const [label, nm, br, days] of [['សាខាមានដកឃ្លា', 'X', '88 18', '30'], ['ឈ្មោះ ១២១ តួ', 'ក'.repeat(121), '990001', '30'],
+            ['ថ្ងៃ 0', 'X', '990001', '0'], ['ថ្ងៃ ' + (C.SB_TENANT_DAYS_MAX + 1), 'X', '990001', String(C.SB_TENANT_DAYS_MAX + 1)], ['ថ្ងៃ 1.5', 'X', '990001', '1.5']]) {
+            K.set('sbTenantNameInput', nm); K.set('sbTenantBranchInput', br); K.set('sbTenantDaysInput', days);
+            const before = createCalls();
+            a = K.log.alerts.length;
+            await C.sbCreateTenant();
+            ok('បដិសេធក្នុង App (' + label + ') ➜ alert · គ្មាន RPC', createCalls() === before && alertsSince(a).length === 1, alertsSince(a));
+        }
+        K.set('sbTenantNameInput', 'ហាងទី ២'); K.set('sbTenantBranchInput', '881859'); K.set('sbTenantDaysInput', '30');
+        a = K.log.alerts.length;
+        const toastsBefore = K.log.toasts.length;
+        await C.sbCreateTenant();
+        ok('សាខាស្ទួន ➜ សារ branch-taken (409 ពី Postgres ពិត) · គ្មាន toast · វាលមិនសម្អាត', alertsSince(a).length === 1
+            && alertsSince(a)[0].indexOf(C.SB_ADMIN_ERROR_TEXT['branch-taken']) !== -1 && K.log.toasts.length === toastsBefore
+            && el('sbTenantBranchInput').value === '881859', alertsSince(a));
+        K.set('sbTenantBranchInput', '770001');
+        const before2 = createCalls();
+        await Promise.all([C.sbCreateTenant(), C.sbCreateTenant()]);
+        await drain();
+        const n770 = (await c.query("select count(*)::int as n from public.tenants where branch_code = '770001'")).rows[0].n;
+        ok('ចុចពីរដងជាប់គ្នា ➜ RPC ១ · ហាង ១', createCalls() === before2 + 1 && n770 === 1, { calls: createCalls() - before2, n770 });
+        ok('ប៊ូតុងដោះក្រោយការងារចប់', el('sbCreateTenantBtn').disabled === false && el('sbAdminLoginBtn').disabled === false && C.sbAdminBusy === false);
+
+        console.log('   · ពន្យារ · បិទ/បើក');
+        const tid770 = (await c.query("select id from public.tenants where branch_code = '770001'")).rows[0].id;
+        const exp0 = (await c.query('select expires_at from public.tenants where id = $1', [tid770])).rows[0].expires_at.getTime();
+        K.answers.prompt.push('10');
+        await C.sbTenantAction(tid770, 'sb-extend');
+        const exp1 = (await c.query('select expires_at from public.tenants where id = $1', [tid770])).rows[0].expires_at.getTime();
+        ok('ពន្យារ ១០ ថ្ងៃលើហាងសកម្ម ➜ ចាស់ + ១០ ថ្ងៃ (មិនមែនឥឡូវ + ១០)', Math.abs(exp1 - (exp0 + 10 * 86400000)) < 2000, { exp0, exp1 });
+        await c.query("update public.tenants set expires_at = now() - interval '3 days' where id = $1", [tid770]);
+        await C.sbAdminRefresh();
+        btns = rowButtons(el('sbTenantListBody').innerHTML);
+        ok('ហាងផុតកំណត់ ➜ ស្លាក «ផុតកំណត់»', /badge-expired">ផុតកំណត់/.test(el('sbTenantListBody').innerHTML));
+        const t5 = Date.now();
+        K.answers.prompt.push(' 5 ');
+        await C.sbTenantAction(tid770, 'sb-extend');
+        const exp2 = (await c.query('select expires_at from public.tenants where id = $1', [tid770])).rows[0].expires_at.getTime();
+        ok('ពន្យារ ៥ ថ្ងៃលើហាងផុតកំណត់ ➜ ឥឡូវ + ៥ ថ្ងៃ', Math.abs(exp2 - (t5 + 5 * 86400000)) < 60000, { exp2, want: t5 + 5 * 86400000 });
+        const updCalls = () => K.rpcCalls('admin_update_tenant') + K.rpcCalls('admin_extend_tenant');
+        let u0 = updCalls();
+        K.answers.prompt.push(null);
+        await C.sbTenantAction(tid770, 'sb-extend');
+        a = K.log.alerts.length;
+        for (const raw of ['abc', '5abc', '2.5', '0']) {
+            K.answers.prompt.push(raw);
+            await C.sbTenantAction(tid770, 'sb-extend');
+        }
+        ok('prompt បោះបង់ · មិនមែនចំនួនគត់ពេញ («abc» · «5abc» · «2.5» · «0») ➜ alert · គ្មាន RPC', updCalls() === u0 && alertsSince(a).length === 4, alertsSince(a));
+        console.log('   · ពន្យារពីឧបករណ៍ ២ (ជួរ cache ចាស់)');
+        await C.sbAdminRefresh();
+        const expTxt = async () => (await c.query('select expires_at::text as e from public.tenants where id = $1', [tid770])).rows[0].e;
+        await c.query("update public.tenants set expires_at = expires_at + interval '365 days' where id = $1", [tid770]);
+        const expOther = await expTxt();
+        a = K.log.alerts.length;
+        K.answers.prompt.push('7');
+        await C.sbTenantAction(tid770, 'sb-extend');
+        const expStale = await expTxt();
+        ok('ឧបករណ៍ផ្សេងពន្យាររួច (cache ចាស់) ➜ +7 ត្រូវបដិសេធ (tenant-changed) · ថ្ងៃផុតកំណត់មិនខ្លីវិញ (៣៦៥ ថ្ងៃមិនបាត់)',
+            expStale === expOther && alertsSince(a).join().indexOf(C.SB_ADMIN_ERROR_TEXT['tenant-changed'] || '\u0000') !== -1, { alerts: alertsSince(a), expOther, expStale });
+        K.answers.prompt.push('7');
+        await C.sbTenantAction(tid770, 'sb-extend');
+        const exp7 = (await c.query("select expires_at = $2::timestamptz + interval '7 days' as ok from public.tenants where id = $1", [tid770, expOther])).rows[0].ok;
+        ok('ក្រោយបដិសេធ បញ្ជីធ្វើបច្ចុប្បន្នភាពខ្លួនឯង ➜ ពន្យារ +7 ពីថ្ងៃថ្មី (មិនមែនពីជួរចាស់)', exp7 === true);
+        K.answers.confirm.push(true);
+        await C.sbTenantAction(tid770, 'sb-revoke');
+        const rev1 = (await c.query('select revoked from public.tenants where id = $1', [tid770])).rows[0].revoked;
+        btns = rowButtons(el('sbTenantListBody').innerHTML);
+        const revBtn = btns.find((b) => b.id === tid770 && b.action === 'sb-revoke');
+        ok('បិទហាង ➜ revoked = true · ស្លាក «បិទ» · ប៊ូតុង «បើកវិញ»', rev1 === true && !!revBtn && /បើកវិញ/.test(revBtn.text), revBtn);
+        a = K.log.alerts.length;
+        K.answers.confirm.push(true);
+        await C.sbTenantAction(tid770, 'sb-invite');
+        ok('ហាងបិទ ➜ ចេញកូដអញ្ជើញមិនបាន (សារ tenant-inactive ពី RPC ពិត)', alertsSince(a).join().indexOf(C.SB_ADMIN_ERROR_TEXT['tenant-inactive']) !== -1, alertsSince(a));
+        K.answers.confirm.push(true);
+        await C.sbTenantAction(tid770, 'sb-revoke');
+        ok('បើកវិញ ➜ revoked = false', (await c.query('select revoked from public.tenants where id = $1', [tid770])).rows[0].revoked === false);
+        u0 = updCalls();
+        await C.sbTenantAction('00000000-0000-0000-0000-000000000000', 'sb-extend');
+        await C.sbTenantAction(tid770, 'sb-unknown');
+        ok('id ហាងមិនស្គាល់ · action មិនស្គាល់ ➜ គ្មាន RPC', updCalls() === u0);
+
+        console.log('   · កូដប្តូរពាក្យសម្ងាត់');
+        const resetCalls = () => K.rpcCalls('admin_issue_reset_code');
+        let r0 = resetCalls();
+        K.set('sbResetUsernameInput', 'A!');
+        a = K.log.alerts.length;
+        await C.sbIssueResetCode();
+        ok('ឈ្មោះខុសទម្រង់ ➜ alert · គ្មាន RPC', resetCalls() === r0 && alertsSince(a).length === 1);
+        K.set('sbResetUsernameInput', 'nobody');
+        a = K.log.alerts.length;
+        await C.sbIssueResetCode();
+        ok('ឈ្មោះមិនស្គាល់ ➜ សារ member-not-found (RPC ពិត)', alertsSince(a).join().indexOf(C.SB_ADMIN_ERROR_TEXT['member-not-found']) !== -1
+            && el('sbResetResultBox').hidden(), alertsSince(a));
+        K.set('sbResetUsernameInput', ' SoKha ');
+        await C.sbIssueResetCode();
+        const resetCode1 = C.sbLastResetCode;
+        const rc1 = (await c.query('select used, user_id from public.member_reset_codes where code_hash = private.reset_code_hash($1)', [resetCode1])).rows[0];
+        ok('កូដប្តូរពាក្យសម្ងាត់ ៖ ក្នុង DB សម្រាប់ sokha · មិនទាន់ប្រើ · បង្ហាញ «sokha ➜ កូដ»', !!rc1 && rc1.user_id === ownerUid && rc1.used === false
+            && el('sbResetCodeText').textContent === 'sokha ➜ ' + resetCode1 && !el('sbResetResultBox').hidden(), rc1);
+        await C.sbIssueResetCode();
+        const rcOld = (await c.query('select used from public.member_reset_codes where code_hash = private.reset_code_hash($1)', [resetCode1])).rows[0];
+        ok('ចេញកូដថ្មី ➜ កូដចាស់លែងប្រើបាន', !!rcOld && rcOld.used === true && C.sbLastResetCode !== resetCode1);
+
+        console.log('   · ចុចស្ទួនខណៈ RPC មិនទាន់ចប់ · ចម្លើយត្រឡប់យឺត');
+        const holdReset = K.holdResponse('admin_issue_reset_code');
+        const resetBefore = resetCalls();
+        const resetFirst = C.sbIssueResetCode();
+        await holdReset.received.promise;
+        ok('កូដចុះ server រួច តែចម្លើយមិនទាន់ដល់ ➜ ការងារនៅជាប់', C.sbAdminBusy === true);
+        await C.sbIssueResetCode();
+        holdReset.resolve();
+        await resetFirst;
+        const displayedReset = (await c.query('select used from public.member_reset_codes where code_hash = private.reset_code_hash($1)', [C.sbLastResetCode])).rows[0];
+        ok('ចុចចេញកូដប្តូរពាក្យសម្ងាត់ស្ទួន ➜ RPC តែមួយ · កូដដែលបង្ហាញនៅប្រើបាន', resetCalls() === resetBefore + 1 && displayedReset && displayedReset.used === false,
+            { calls: resetCalls() - resetBefore, displayedReset });
+        ok('ចម្លើយដល់ ➜ ដោះការងារ', C.sbAdminBusy === false);
+
+        for (const [action, rpc] of [['sb-invite', 'admin_issue_invite'], ['sb-extend', 'admin_extend_tenant'], ['sb-revoke', 'admin_update_tenant']]) {
+            await C.sbAdminRefresh();
+            const callsBefore = K.rpcCalls(rpc);
+            const invitesBefore = (await c.query('select count(*)::int as n from public.tenant_invites where tenant_id = $1', [tid770])).rows[0].n;
+            K.gate();
+            const first = C.sbTenantAction(tid770, action);
+            await drain();
+            ok(action + ' ៖ RPC កំពុងរង់ចាំ ➜ ការងារជាប់', C.sbAdminBusy === true);
+            const second = C.sbTenantAction(tid770, action);
+            await drain();
+            const callsPending = K.rpcCalls(rpc) - callsBefore;
+            K.open();
+            await Promise.all([first, second]);
+            const invitesAfter = (await c.query('select count(*)::int as n from public.tenant_invites where tenant_id = $1', [tid770])).rows[0].n;
+            ok(action + ' ៖ ចុចស្ទួន ➜ RPC តែមួយ · ដោះការងារក្រោយចប់', callsPending === 1 && C.sbAdminBusy === false, callsPending);
+            ok(action + ' ៖ មិនចេញកូដអញ្ជើញលើសសកម្មភាព', invitesAfter - invitesBefore === (action === 'sb-invite' ? 1 : 0), invitesAfter - invitesBefore);
+        }
+        await C.sbTenantAction(tid770, 'sb-revoke');
+
+        console.log('   · ចម្លង');
+        const clip0 = K.log.clipboard.length;
+        await C.copySbInviteLink();
+        await C.copySbInviteCode();
+        await C.copySbResetCode();
+        ok('ចម្លង Link · កូដអញ្ជើញ · កូដប្តូរពាក្យសម្ងាត់ ➜ តម្លៃដែលបង្ហាញ', JSON.stringify(K.log.clipboard.slice(clip0))
+            === JSON.stringify([C.sbLastInvite.link, C.sbLastInvite.code, C.sbLastResetCode]), K.log.clipboard.slice(clip0));
+
+        console.log('   · ចាកចេញពី Supabase ➜ DOM ស្អាត');
+        const secrets = [C.sbLastInvite.code, C.sbLastInvite.link, C.sbLastResetCode, 'sokha', 'ហាងទី ២', XSS, '881859', '770001'];
+        const holding = (t) => secrets.filter((s) => t.s.toLowerCase().indexOf(s.toLowerCase()) !== -1);
+        const holders = K.dom.texts().filter((t) => holding(t).length).map((t) => t.id);
+        ok('⛔ លក្ខខណ្ឌចាំបាច់ ៖ មុនចាកចេញ តម្លៃរសើបនៅលើអេក្រង់ពិត', holders.length >= 4, holders);
+        // ⛔ A504 ៖ Admin ដដែលចូល Supabase លើផ្ទាំង/ឧបករណ៍ទី ២ ➜ ការចាកចេញលើផ្ទាំងនេះ (🔒 ចាក់សោវគ្គ · ស្ងៀម ១៥ នាទី) ដកតែ session
+        //    របស់ខ្លួន (`scope=local`) ⛔ មិនមែន scope លំនាំដើមរបស់ GoTrue (`global`) ដែលដក session ទាំងអស់របស់ Admin ➜ RPC បន្ទាប់លើ
+        //    ផ្ទាំងទី ២ (ឧ. ចេញកូដអញ្ជើញក្រោយបង្កើតហាង) ធ្លាក់ 401 «ផុតកំណត់»
+        const Ktab = buildKeygen();
+        Ktab.set('sbAdminUrlInput', fake.url); Ktab.set('sbAdminKeyInput', PUB); Ktab.set('sbAdminEmailInput', 'boss@admin.zoe.test'); Ktab.set('sbAdminPasswordInput', 'boss-pass-123');
+        await Ktab.ctx.sbAdminLogin();
+        await drain();
+        ok('⛔ លក្ខខណ្ឌចាំបាច់ ៖ Admin ដដែលចូលលើផ្ទាំងទី ២ (session ទី ២) · អានបញ្ជីបាន', !!Ktab.ctx.sbAdminSession && Ktab.ctx.sbTenantCache.length > 0
+            && Ktab.ctx.sbAdminSession.token !== C.sbAdminSession.token);
+        const oldToken = C.sbAdminSession.token;
+        const f0 = K.log.fetches.length;
+        C.sbAdminLogout();
+        await drain();
+        const left = K.dom.texts().filter((t) => holding(t).length).map((t) => t.id + ' ⊃ ' + holding(t).join('|'));
+        ok('sbAdminLogout() ➜ គ្មានកូដ · Link · ឈ្មោះហាង · ឈ្មោះគណនី · សាខា នៅក្នុង DOM', left.length === 0, left);
+        ok('ផ្ទាំង · ប្រអប់លទ្ធផល លាក់ · ប៊ូតុងចូលបង្ហាញវិញ · session null · cache ទទេ', !panelOpen() && el('sbInviteResultBox').hidden() && el('sbResetResultBox').hidden()
+            && el('sbAdminLogoutBtn').hidden() && !el('sbAdminLoginBtn').hidden() && C.sbAdminSession === null && C.sbTenantCache.length === 0 && C.sbMemberCache.length === 0
+            && C.sbLastInvite === null && C.sbLastResetCode === '');
+        ok('POST /auth/v1/logout?scope=local ជាមួយ token ចាស់', K.log.fetches.slice(f0).some((f) => /\/auth\/v1\/logout\?scope=local$/.test(f.url) && f.auth === 'Bearer ' + oldToken),
+            K.log.fetches.slice(f0).map((f) => f.url));
+        const oldTokenStatus = await revokedStatus(oldToken);
+        ok('ចាកចេញ ➜ Server ដក session របស់ផ្ទាំងនេះ (token ចាស់ ➜ 401 ភ្លាម)', oldTokenStatus === 401, oldTokenStatus);
+        const a2 = Ktab.log.alerts.length;
+        Ktab.ctx.sbTenantCache = [];
+        await Ktab.ctx.sbAdminRefresh();
+        await drain();
+        ok('⛔ A504 ៖ ផ្ទាំងទី ២ របស់ Admin ដដែលនៅប្រើបាន (session ផ្ទាល់ខ្លួនមិនត្រូវដក) ៖ អានបញ្ជីបាន · គ្មាន «ផុតកំណត់»',
+            !!Ktab.ctx.sbAdminSession && Ktab.ctx.sbTenantReadFailed === false && Ktab.ctx.sbTenantCache.length > 0 && Ktab.log.alerts.length === a2,
+            { session: !!Ktab.ctx.sbAdminSession, readFailed: Ktab.ctx.sbTenantReadFailed, tenants: Ktab.ctx.sbTenantCache.length, alerts: Ktab.log.alerts.slice(a2) });
+        const clip1 = K.log.clipboard.length;
+        await C.copySbInviteLink(); await C.copySbInviteCode(); await C.copySbResetCode();
+        ok('ក្រោយចាកចេញ ➜ ចម្លងមិនបានអ្វីសោះ', K.log.clipboard.length === clip1);
+
+        console.log('   · ចាកចេញពី ZoeKeyGen កណ្តាលការងារ (showLoginModalWithPrefill ពិត)');
+        fill(fake.url, PUB, 'boss@admin.zoe.test', 'boss-pass-123');
+        await C.sbAdminLogin();
+        await drain();
+        ok('⛔ លក្ខខណ្ឌចាំបាច់ ៖ ចូលម្តងទៀតបាន', panelOpen() && !!C.sbAdminSession);
+        const midToken = C.sbAdminSession.token;
+        K.set('sbTenantNameInput', 'ហាងកណ្តាលទី'); K.set('sbTenantBranchInput', '660001'); K.set('sbTenantDaysInput', '30');
+        const invBeforeMid = K.rpcCalls('admin_issue_invite');
+        K.gate();
+        a = K.log.alerts.length;
+        let t1 = K.log.toasts.length;
+        const midCreate = C.sbCreateTenant();
+        await drain();
+        const fCreate = K.log.fetches.length;
+        C.showLoginModalWithPrefill();
+        const fMid = K.log.fetches.length;
+        K.open();
+        await midCreate;
+        await drain(12);
+        ok('⛔ លក្ខខណ្ឌចាំបាច់ ៖ RPC បង្កើតហាងកំពុងហោះពេលចាកចេញ', K.log.fetches[fCreate - 1] && /admin_create_tenant$/.test(K.log.fetches[fCreate - 1].url));
+        // ⛔ A504 ៖ ចាកចេញពី ZoeKeyGen (🚪 · Firebase ចេញ · តួនាទីបរាជ័យ ➜ showLoginModalWithPrefill) ដក session Supabase Admin លើ Server ដូច
+        //    «🔒 ចាក់សោវគ្គ» និងការស្ងៀម ១៥ នាទី ⛔ មិនមែនត្រឹមសម្អាតសតិ (token ចាស់ដែលបានលួចចម្លងនៅមានសិទ្ធិ admin_* រហូត JWT ផុត)
+        const logoutRevokes = K.log.fetches.slice(fCreate, fMid);
+        ok('⛔ ចាកចេញពី ZoeKeyGen ➜ POST /auth/v1/logout?scope=local ១ ដង ដោយ token Admin ចាស់', logoutRevokes.length === 1
+            && /\/auth\/v1\/logout\?scope=local$/.test(logoutRevokes[0].url) && logoutRevokes[0].auth === 'Bearer ' + midToken, logoutRevokes.map((f) => f.url));
+        const midTokenStatus = await revokedStatus(midToken);
+        ok('⛔ ចាកចេញពី ZoeKeyGen ➜ Server បដិសេធ token Admin ចាស់ភ្លាម (401) មិនរង់ចាំ JWT ផុត', midTokenStatus === 401, midTokenStatus);
+        ok('ក្រោយចាកចេញ ➜ គ្មានសំណើបន្ថែម (ចេញកូដ · អានបញ្ជី)', K.log.fetches.length === fMid, K.log.fetches.slice(fMid).map((f) => f.url));
+        ok('ចាកចេញកណ្តាលការបង្កើតហាង ➜ គ្មាន toast · alert · កូដ · បញ្ជី', K.log.toasts.length === t1 && alertsSince(a).length === 0
+            && el('sbInviteResultBox').hidden() && el('sbInviteCodeText').textContent === '' && el('sbTenantListBody').innerHTML === ''
+            && !panelOpen() && C.sbAdminSession === null, { toasts: K.log.toasts.slice(t1), alerts: alertsSince(a) });
+        ok('ការចាកចេញកណ្តាលទីមិនបន្ត RPC ចេញកូដអញ្ជើញ (ការងារក្រោយ await ឈប់)', K.rpcCalls('admin_issue_invite') === invBeforeMid
+            && (await c.query("select count(*)::int as n from public.tenant_invites i join public.tenants t on t.id = i.tenant_id where t.branch_code = '660001'")).rows[0].n === 0);
+        K.relogin();
+        fill(fake.url, PUB, 'boss@admin.zoe.test', 'boss-pass-123');
+        K.gate();
+        t1 = K.log.toasts.length;
+        const midLogin = C.sbAdminLogin();
+        await drain();
+        C.showLoginModalWithPrefill();
+        const fLogin = K.log.fetches.length;
+        K.open();
+        await midLogin;
+        await drain(12);
+        ok('ចាកចេញកណ្តាលការចូល ➜ មិនប្រើ token ថ្មីទៀត (គ្មានសំណើក្រោយ /token)', /\/auth\/v1\/token/.test(K.log.fetches[fLogin - 1].url)
+            && K.log.fetches.length === fLogin, K.log.fetches.slice(fLogin).map((f) => f.url));
+        ok('ចាកចេញកណ្តាលការចូល Supabase ➜ ផ្ទាំងនៅលាក់ · គ្មាន session · គ្មាន toast · ពាក្យសម្ងាត់ទទេ', !panelOpen() && C.sbAdminSession === null
+            && K.log.toasts.length === t1 && el('sbAdminPasswordInput').value === '' && C.sbAdminBusy === false && el('sbAdminLoginBtn').disabled === false);
+        K.relogin();
+        const r1 = resetCalls();
+        const c1 = createCalls();
+        await C.sbIssueResetCode();
+        await C.sbCreateTenant();
+        await C.sbAdminRefresh();
+        ok('គ្មាន session Supabase ➜ ប៊ូតុងផ្សេងមិនហៅ RPC/អានបញ្ជី', resetCalls() === r1 && createCalls() === c1 && el('sbTenantListBody').innerHTML === '');
+
+        console.log('   · JWT ផុត');
+        fill(fake.url, PUB, 'boss@admin.zoe.test', 'boss-pass-123');
+        await C.sbAdminLogin();
+        await drain();
+        fake.expireTokens();
+        a = K.log.alerts.length;
+        await C.sbAdminRefresh();
+        await drain();
+        ok('JWT ផុត (អានបញ្ជី 401) ➜ sbAdminReset(true) ៖ សារ «ផុតកំណត់» · ផ្ទាំងលាក់ · ប៊ូតុងចូលបង្ហាញវិញ · session null', /ផុតកំណត់/.test(alertsSince(a).join()) && !panelOpen()
+            && !el('sbAdminLoginBtn').hidden() && C.sbAdminSession === null, alertsSince(a));
+        await sleep(1200);
+        fill(fake.url, PUB, 'boss@admin.zoe.test', 'boss-pass-123');
+        await C.sbAdminLogin();
+        await drain();
+        ok('⛔ លក្ខខណ្ឌចាំបាច់ ៖ ចូលវិញក្រោយ token ផុត', panelOpen() && !!C.sbAdminSession);
+        fake.expireTokens();
+        K.set('sbResetUsernameInput', 'sokha');
+        a = K.log.alerts.length;
+        await C.sbIssueResetCode();
+        await drain();
+        ok('JWT ផុត (RPC 401) ➜ reset + សារ «ផុតកំណត់» តែមួយ (មិនមែន «ចេញកូដមិនបាន» ទៀត)', alertsSince(a).length === 1 && /ផុតកំណត់/.test(alertsSince(a)[0])
+            && !panelOpen() && C.sbAdminSession === null && el('sbResetResultBox').hidden(), alertsSince(a));
+        console.log('   · ពិដានស្ងៀម ១៥ នាទី (ដូច Signing Key)');
+        const run = (code) => { try { return vm.runInContext(code, C); } catch (e) { return 'ERR ' + e.message; } };
+        const signingIdle = Function('return (' + ((src.match(/const SIGNING_KEY_IDLE_MS = ([0-9 *]+);/) || [])[1] || '0') + ')')();
+        ok('SB_ADMIN_IDLE_MS = SIGNING_KEY_IDLE_MS (' + signingIdle + 'ms)', signingIdle > 0 && run('typeof SB_ADMIN_IDLE_MS === "number" ? SB_ADMIN_IDLE_MS : 0') === signingIdle);
+        K.relogin();
+        await sleep(1200);
+        fill(fake.url, PUB, 'boss@admin.zoe.test', 'boss-pass-123');
+        await C.sbAdminLogin();
+        await drain();
+        ok('⛔ លក្ខខណ្ឌចាំបាច់ ៖ ចូលវិញសម្រាប់ការសាកពិដានស្ងៀម', panelOpen() && !!C.sbAdminSession);
+        const idleBy = (ms) => run('sbAdminLastUseAt = keygenIdleStamp(); sbAdminLastUseAt.wall -= SB_ADMIN_IDLE_MS - (' + ms + '); sbAdminLastUseAt.mono -= SB_ADMIN_IDLE_MS - (' + ms + ')');
+        const expire = () => run('typeof expireIdleSbAdmin === "function" ? expireIdleSbAdmin() : null');
+        const activity = () => run('typeof sbAdminActivity === "function" ? sbAdminActivity() : null');
+        ok('ចូលរួច ➜ ត្រាពេលប្រើ = ឥឡូវ (Date.now)', Math.abs(Date.now() - Number(run('sbAdminLastUseAt.wall'))) < 5000);
+        idleBy(60000);
+        ok('ស្ងៀមតិចជាង ១៥ នាទី ➜ session នៅ', expire() === false && !!C.sbAdminSession && panelOpen());
+        idleBy(1000);
+        activity();
+        ok('សកម្មភាព (pointer/key) មុនដល់ពិដាន ➜ ត្រាពេលថ្មី · session នៅ', Math.abs(Date.now() - Number(run('sbAdminLastUseAt.wall'))) < 5000 && !!C.sbAdminSession);
+        idleBy(-1000);
+        const fIdle = K.log.fetches.length;
+        const tIdle = K.log.toasts.length;
+        const aIdle = K.log.alerts.length;
+        const expired = expire();
+        await drain();
+        ok('ស្ងៀម ១៥ នាទី ➜ sbAdminReset (ផ្ទាំងលាក់ · session null · បញ្ជី/កូដទទេ) · POST /auth/v1/logout?scope=local · toast ១ «ចូលម្តងទៀត» · គ្មាន alert',
+            expired === true && !panelOpen() && C.sbAdminSession === null && el('sbTenantListBody').innerHTML === ''
+            && K.log.fetches.slice(fIdle).some((f) => /\/auth\/v1\/logout\?scope=local$/.test(f.url)) && K.log.toasts.length === tIdle + 1
+            && /ចូល/.test(K.log.toasts[tIdle] || '') && K.log.alerts.length === aIdle, { expired, toasts: K.log.toasts.slice(tIdle), fetches: K.log.fetches.slice(fIdle).map((f) => f.url) });
+        ok('ក្រោយផុត ➜ ហៅម្តងទៀតមិនធ្វើអ្វី (គ្មាន toast ស្ទួន)', expire() === false && K.log.toasts.length === tIdle + 1);
+        K.relogin();
+        fill(fake.url, PUB, 'boss@admin.zoe.test', 'boss-pass-123');
+        await C.sbAdminLogin();
+        await drain();
+        idleBy(-1000);
+        activity();
+        ok('សកម្មភាពដំបូងក្រោយស្ងៀមលើស ១៥ នាទី (ភ្ញាក់ពីការដេក) ➜ ផុតមុន មិនពន្យារ session ចាស់', C.sbAdminSession === null && !panelOpen());
+        const visBlock = (src.match(/document\.addEventListener\('visibilitychange', \(\) => \{[\s\S]*?\n {4}\}\);/g) || []).join('\n');
+        ok('init ៖ setInterval(expireIdleSbAdmin) · visibilitychange ➜ expireIdleSbAdmin() · pointerdown/keydown ➜ sbAdminActivity',
+            /setInterval\(expireIdleSbAdmin, \d+\)/.test(src) && /expireIdleSbAdmin\(\);/.test(visBlock)
+            && /addEventListener\('pointerdown', sbAdminActivity, /.test(src) && /addEventListener\('keydown', sbAdminActivity, /.test(src));
+        console.log('   · ហាង/គណនីច្រើនជាងពិដាន Max rows របស់ PostgREST (Supabase លំនាំដើម ១០០០ ➜ កាត់ស្ងាត់)');
+        const bulk = fake.maxRows + 7;
+        await c.query("insert into public.tenants (name, branch_code, expires_at) select 'Bulk ' || g, 'BK' || g, now() + interval '30 days' from generate_series(1, $1::int) g", [bulk]);
+        await c.query(`with u as (insert into auth.users (instance_id, id, aud, role, email, encrypted_password, created_at, updated_at)
+            select '00000000-0000-0000-0000-000000000000', gen_random_uuid(), 'authenticated', 'authenticated', 'bk' || g || '@bulk.zoe.test', 'x', now(), now()
+            from generate_series(1, $1::int) g returning id, email)
+            insert into public.tenant_members (user_id, tenant_id, username, role)
+            select u.id, t.id, split_part(u.email, '@', 1), 'owner' from u join public.tenants t on t.branch_code = upper(split_part(u.email, '@', 1))`, [bulk]);
+        const dbTenants = (await c.query('select count(*)::int as n from public.tenants')).rows[0].n;
+        const dbMembers = (await c.query('select count(*)::int as n from public.tenant_members')).rows[0].n;
+        K.relogin();
+        fill(fake.url, PUB, 'boss@admin.zoe.test', 'boss-pass-123');
+        await C.sbAdminLogin();
+        await drain();
+        await C.sbAdminRefresh();
+        await drain();
+        const lastBulk = 'bk' + bulk;
+        ok('⛔ ហាង ' + dbTenants + ' · គណនី ' + dbMembers + ' (> ' + fake.maxRows + ') ➜ ផ្ទាំងទាញគ្រប់ជួរ (មិនកាត់ស្ងាត់ត្រឹម Max rows) · គណនីថ្មីបំផុតបង្ហាញ',
+            dbTenants > fake.maxRows && dbMembers > fake.maxRows && C.sbTenantCache.length === dbTenants && C.sbMemberCache.length === dbMembers
+            && C.sbTenantReadFailed === false && el('sbTenantListBody').innerHTML.indexOf('>' + lastBulk + '<') !== -1,
+            { tenants: C.sbTenantCache.length, dbTenants, members: C.sbMemberCache.length, dbMembers });
+        // ⛔ re-audit (K5) ៖ បញ្ជីឧបករណ៍ page តាមលំដាប់ដែលមិនប្រែ (tenant_id · serial) ➜ ឧបករណ៍ដែល `last_seen` ប្រែចំកណ្តាលការអាន page មិនស្ទួន មិនបាត់
+        //    (លំដាប់តាម `last_seen` ៖ ជួរដែលប្រែរំកិលចូល page ដែលអានរួច ➜ ជួរមួយស្ទួន ជួរមួយបាត់ស្ងាត់)
+        await c.query(`insert into public.member_devices (tenant_id, serial, model, platform, last_seen)
+            select t.id, md5(t.id::text), 'Bulk', 'Android', now() - (row_number() over (order by t.id)) * interval '1 minute'
+            from public.tenants t where t.branch_code like 'BK%'`);
+        const dbDevices = (await c.query('select count(*)::int as n from public.member_devices')).rows[0].n;
+        const realFetch = K.ctx.fetch;
+        let bumped = false;
+        K.ctx.fetch = (url, init) => Promise.resolve(realFetch(url, init)).then(async (response) => {
+            if (!bumped && /\/rest\/v1\/member_devices\?/.test(String(url)) && /[?&]offset=0(&|$)/.test(String(url))) {
+                bumped = true;
+                await c.query("update public.member_devices set last_seen = now() + interval '1 day' where serial = (select serial from public.member_devices order by last_seen asc, serial asc limit 1)");
+            }
+            return response;
+        });
+        try {
+            await C.sbAdminRefresh();
+            await drain();
+        } finally {
+            K.ctx.fetch = realFetch;
+        }
+        const seenDevices = new Set(C.sbDeviceCache.map((d) => d.tenant_id + '|' + d.serial));
+        ok('⛔ K5 ៖ ឧបករណ៍ ' + dbDevices + ' (> ' + fake.maxRows + ') · last_seen ប្រែចំកណ្តាល page ➜ គ្រប់ឧបករណ៍ · មិនស្ទួន',
+            bumped && dbDevices > fake.maxRows && C.sbDeviceCache.length === dbDevices && seenDevices.size === dbDevices,
+            { bumped, dbDevices, cached: C.sbDeviceCache.length, distinct: seenDevices.size });
+        console.log('   · ដកសមាជិក ៖ សិទ្ធិ · session · ម្ចាស់ចុងក្រោយ · ការដកព្រមគ្នា');
+        const removeTenant = (await c.query("insert into public.tenants(name,branch_code,expires_at) values('ដកសមាជិក','REMOVE',now()+interval '1 day') returning id")).rows[0].id;
+        const removeUsers = [];
+        const loginMember = async (email) => {
+            const response = await fetch(fake.url + '/auth/v1/token?grant_type=password', { method: 'POST', headers: { apikey: PUB, 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password: 'remove-pass' }) });
+            return (await response.json()).access_token;
+        };
+        for (const [username, role] of [['remove_one', 'owner'], ['remove_two', 'owner'], ['remove_staff', 'member']]) {
+            const email = username + '@users.zoew.invalid';
+            const uid = await H.makeAuthUser(c, email);
+            await c.query('insert into public.tenant_members(user_id,tenant_id,username,role) values($1,$2,$3,$4)', [uid, removeTenant, username, role]);
+            fake.addUser(email, 'remove-pass', uid);
+            removeUsers.push({ uid, username, token: await loginMember(email) });
+        }
+        const memberRequest = async (user, fn, args) => {
+            const response = await fetch(fake.url + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { apikey: PUB, Authorization: 'Bearer ' + user.token, 'Content-Type': 'application/json' }, body: JSON.stringify(args) });
+            return { status: response.status, body: await response.json() };
+        };
+        const argsRemove = (username) => ({ p_tenant_id: removeTenant, p_username: username });
+        const deniedRemove = await memberRequest(removeUsers[2], 'admin_remove_member', argsRemove('remove_one'));
+        ok('non-admin ដកសមាជិក ➜ forbidden', deniedRemove.body.message === 'forbidden', deniedRemove);
+        const noSession = await H.as(c, { role: 'authenticated', sub: adminId }, 'select public.admin_remove_member($1,$2)', [removeTenant, 'remove_staff']);
+        ok('platform admin គ្មាន active session ➜ session-revoked', noSession.error?.message === 'session-revoked', noSession);
+        await C.sbAdminRpc(C.sbAdminSession, 'admin_issue_reset_code', { p_username: 'remove_staff', p_valid_hours: 24 });
+        const seqBeforeRemove = (await c.query('select coalesce(max(seq),0) as seq from public.zoe_tenant_state where tenant_id=$1', [removeTenant])).rows[0].seq;
+        await C.sbAdminRefresh();
+        ok('បញ្ជីគណនីមានប៊ូតុងដកចេញពីហាង', el('sbTenantListBody').innerHTML.includes('data-username="remove_staff" data-action="sb-remove-member">ដកចេញពីហាង'));
+        K.answers.confirm.push(false);
+        await C.sbRemoveMember(removeTenant, 'remove_staff');
+        ok('បោះបង់ confirm ➜ សមាជិកនៅដដែល', (await c.query('select 1 from public.tenant_members where user_id=$1', [removeUsers[2].uid])).rowCount === 1);
+        await C.sbRemoveMember(removeTenant, 'remove_staff');
+        const seqAfterRemove = (await c.query('select seq from public.zoe_tenant_state where tenant_id=$1', [removeTenant])).rows[0].seq;
+        ok('ដក ➜ refresh បញ្ជី · លុប reset codes · seq កើន', !C.sbMemberCache.some((m) => m.username === 'remove_staff')
+            && (await c.query('select 1 from public.member_reset_codes where user_id=$1', [removeUsers[2].uid])).rowCount === 0 && Number(seqAfterRemove) > Number(seqBeforeRemove));
+        const removedRead = await memberRequest(removeUsers[2], 'zoe_read', { p_root: 'zoew_barcode_registry' });
+        ok('session ដែលដក ➜ request បន្ទាប់ 401', removedRead.status === 401, removedRead);
+        const removedWithoutSession = await H.as(c, { role: 'authenticated', sub: removeUsers[2].uid }, 'select public.zoe_read($1,null)', ['zoew_barcode_registry']);
+        ok('គ្មាន membership ➜ អានទិន្នន័យហាងមិនបាន ទោះគ្មាន session claim', removedWithoutSession.error?.message === 'forbidden', removedWithoutSession);
+        const unaffected = await memberRequest(removeUsers[0], 'zoe_read', { p_root: 'zoew_barcode_registry' });
+        ok('សមាជិកផ្សេងអានបានដដែល', unaffected.status === 200, unaffected);
+        const removeRace = await Promise.all(removeUsers.slice(0, 2).map((user) => C.sbAdminRpc(C.sbAdminSession, 'admin_remove_member', argsRemove(user.username))));
+        ok('ដកម្ចាស់ពីរនាក់ព្រមគ្នា ➜ មួយជោគជ័យ មួយ last-owner · នៅសល់ម្ចាស់មួយ', removeRace.filter((r) => r.ok).length === 1
+            && removeRace.filter((r) => r.body?.message === 'last-owner').length === 1
+            && (await c.query("select 1 from public.tenant_members where tenant_id=$1 and role='owner'", [removeTenant])).rowCount === 1, removeRace);
+        const unknownRemove = await C.sbAdminRpc(C.sbAdminSession, 'admin_remove_member', argsRemove('remove_staff'));
+        ok('ដកសមាជិកមិនស្គាល់ ➜ member-not-found ផ្ទាល់', unknownRemove.body?.message === 'member-not-found', unknownRemove);
+        const spare = await H.makeAuthUser(c, 'remove_duplicate@users.zoew.invalid');
+        await c.query("insert into public.tenant_members(user_id,tenant_id,username,role) values($1,$2,'remove_duplicate','member')", [spare, removeTenant]);
+        const duplicateRemove = await Promise.all([1, 2].map(() => C.sbAdminRpc(C.sbAdminSession, 'admin_remove_member', argsRemove('remove_duplicate'))));
+        ok('ដកម្នាក់ពីរដងព្រមគ្នា ➜ មួយជោគជ័យ មួយ member-not-found', duplicateRemove.filter((r) => r.ok).length === 1 && duplicateRemove.filter((r) => r.body?.message === 'member-not-found').length === 1, duplicateRemove);
+        ok('⛔ គ្មាន console.error ពីផ្លូវខាងលើ', K.log.errors.length === 0, K.log.errors);
+    } catch (e) {
+        ok('ការវាស់មិនគាំង', false, String(e && e.stack || e));
+    } finally {
+        if (fake) await fake.close();
+        if (pool) await pool.end().catch(() => {});
+        if (client) await client.end().catch(() => {});
+        H.stop();
+    }
+}
+
+(async () => {
+    if (!missing.length && SB_IDS.length) {
+        try { staticSeams(); } catch (e) { ok('ផ្នែក ១ មិនគាំង', false, String(e && e.stack || e)); }
+        try { await adminMutationFailureModes(); } catch (e) { ok('ការវាស់ចុចស្ទួន/បរាជ័យមិនគាំង', false, String(e && e.stack || e)); }
+        await behavior();
+    }
+    finish();
+    setTimeout(() => process.exit(process.exitCode), 300).unref();
+})();

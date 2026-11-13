@@ -124,7 +124,7 @@ oncePerPage('my-setup', setupSomething);         // ម្តងក្នុង�
 4. Activity ផ្សេងដែល plugin បើក (Share · Print · ជីវមាត្រ) ធ្វើឲ្យ App ទទួល
    `pause` ➜ ហៅ `noteAppLockExcuse()` មុនវា បើមិនដូច្នេះ ត្រឡប់មកនឹងសុំ PIN
 5. `npm run android:sync` ➜ plugin ចូល `android/` ➜ `npm run android:check`
-6. បន្ថែម `PluginHeaders` របស់វាក្នុង `audit-tools/zoew/scripts/native-check.mjs` ហើយសាកផ្លូវនោះ
+6. បន្ថែម `PluginHeaders` របស់វាក្នុង `tools/audit-tools/zoew/scripts/native-check.mjs` ហើយសាកផ្លូវនោះ
 
 ---
 
@@ -146,10 +146,10 @@ oncePerPage('my-setup', setupSomething);         // ម្តងក្នុង�
 | ប្រភេទ | កន្លែង | ពាក្យបញ្ជា |
 |---|---|---|
 | unit (helper សុទ្ធ · component) | `tests/**/*.test.ts(x)` | `npm test` |
-| App ពិតក្នុង Chromium ជាមួយ bridge Android ក្លែង | `audit-tools/zoew/scripts/native-check.mjs` | `npm run native:check` |
-| ស្នាមភ្ជាប់ Android (កំណែ · appId · សិទ្ធិ · logo · plugin) | `audit-tools/zoew/scripts/android-check.mjs` | `npm run android:check` |
-| ច្បាប់លុប/ដក និងការសម្អាត លើ web និង Android | `audit-tools/zoew/scripts/cleanup-rules-check.mjs` | `npm run rules:check` |
-| React ១០០% (កូដមុខងារមិនប៉ះ DOM · ref ចងពិត) | `audit-tools/zoew/scripts/react-purity-check.mjs` | `npm run purity:check` |
+| App ពិតក្នុង Chromium ជាមួយ bridge Android ក្លែង | `tools/audit-tools/zoew/scripts/native-check.mjs` | `npm run native:check` |
+| ស្នាមភ្ជាប់ Android (កំណែ · appId · សិទ្ធិ · logo · plugin) | `tools/audit-tools/zoew/scripts/android-check.mjs` | `npm run android:check` |
+| ច្បាប់លុប/ដក និងការសម្អាត លើ web និង Android | `tools/audit-tools/zoew/scripts/cleanup-rules-check.mjs` | `npm run rules:check` |
+| React ១០០% (កូដមុខងារមិនប៉ះ DOM · ref ចងពិត) | `tools/audit-tools/zoew/scripts/react-purity-check.mjs` | `npm run purity:check` |
 | ការពិនិត្យ ZoeW រួម (មិនរួម `rules:check` និង audit-tools ពេញ) | — | `npm run verify` |
 
 ⛔ តេស្តថ្មីត្រូវ **ធ្លាក់លើកូដមុនកែ** — ដកការកែចេញម្តង ហើយមើលវាក្រហម

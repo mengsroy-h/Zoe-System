@@ -23,7 +23,7 @@ set "REPOFILE=%CFG%\repo.txt"
 set "REPO="
 
 rem 1) normal case: this folder is still inside the project
-if exist "%~dp0..\..\audit-tools\money-reality-check.js" (
+if exist "%~dp0..\..\tools\audit-tools\money-reality-check.js" (
   for %%I in ("%~dp0..\..") do set "REPO=%%~fI"
 )
 
@@ -31,7 +31,7 @@ rem 2) a folder we were told about last time
 if not defined REPO if exist "%REPOFILE%" (
   for /f "usebackq delims=" %%L in ("%REPOFILE%") do set "REPO=%%L"
 )
-if defined REPO if not exist "!REPO!\audit-tools\money-reality-check.js" set "REPO="
+if defined REPO if not exist "!REPO!\tools\audit-tools\money-reality-check.js" set "REPO="
 
 rem 3) ask the user once, then remember it
 if not defined REPO (
@@ -47,10 +47,10 @@ if not defined REPO (
   if "!REPO:~-1!"=="\" set "REPO=!REPO:~0,-1!"
 )
 
-if not exist "!REPO!\audit-tools\money-reality-check.js" (
+if not exist "!REPO!\tools\audit-tools\money-reality-check.js" (
   echo.
   echo ERROR: that folder does not look like Zoe-System.
-  echo   Expected to find: audit-tools\money-reality-check.js
+  echo   Expected to find: tools\audit-tools\money-reality-check.js
   echo   You gave        : !REPO!
   echo.
   pause
@@ -58,11 +58,11 @@ if not exist "!REPO!\audit-tools\money-reality-check.js" (
 )
 set "MONEYCODE="
 if exist "!REPO!\ZoeW\app.js" set "MONEYCODE=1"
-if exist "!REPO!\audit-tools\money-core.js" set "MONEYCODE=1"
+if exist "!REPO!\tools\audit-tools\money-core.js" set "MONEYCODE=1"
 if not defined MONEYCODE (
   echo.
   echo ERROR: the money code was not found inside !REPO!
-  echo   Expected ZoeW\app.js or audit-tools\money-core.js
+  echo   Expected ZoeW\app.js or tools\audit-tools\money-core.js
   echo   The project folder looks incomplete.
   echo.
   pause
@@ -95,7 +95,7 @@ echo.
 echo Project : !REPO!
 echo Reading... (nothing is uploaded, nothing is written to Firebase)
 echo.
-node "!REPO!\audit-tools\money-reality-check.js" "!DUMP!" --report "%REPORT%"
+node "!REPO!\tools\audit-tools\money-reality-check.js" "!DUMP!" --report "%REPORT%"
 set "CODE=!ERRORLEVEL!"
 if !CODE! GEQ 2 (
   echo.
@@ -108,7 +108,7 @@ if !CODE! GEQ 2 (
 
 echo.
 echo Making a share-safe copy (phone numbers and barcodes removed)...
-node -e "try { const lines = require('fs').readFileSync(process.argv[1], 'utf8').split(/\r?\n/); process.exit(lines.includes('const clearOutput = process.argv[2] === \x27--clear-output\x27;') ? 0 : 1); } catch (_) { process.exit(1); }" "!REPO!\audit-tools\redact-dump.js" >nul 2>nul
+node -e "try { const lines = require('fs').readFileSync(process.argv[1], 'utf8').split(/\r?\n/); process.exit(lines.includes('const clearOutput = process.argv[2] === \x27--clear-output\x27;') ? 0 : 1); } catch (_) { process.exit(1); }" "!REPO!\tools\audit-tools\redact-dump.js" >nul 2>nul
 set "COMPAT_CODE=!ERRORLEVEL!"
 if not "!COMPAT_CODE!"=="0" (
   echo ERROR: update check-money.cmd and redact-dump.js together before running.
@@ -116,7 +116,7 @@ if not "!COMPAT_CODE!"=="0" (
   pause
   exit /b 3
 )
-node "!REPO!\audit-tools\redact-dump.js" --clear-output "!DUMP!" "%SAFE%"
+node "!REPO!\tools\audit-tools\redact-dump.js" --clear-output "!DUMP!" "%SAFE%"
 set "CLEAR_CODE=!ERRORLEVEL!"
 if not "!CLEAR_CODE!"=="0" (
   echo ERROR: the old output could not be safely cleared.
@@ -124,11 +124,11 @@ if not "!CLEAR_CODE!"=="0" (
   pause
   exit /b 3
 )
-node "!REPO!\audit-tools\redact-dump.js" "!DUMP!" "%SAFE%"
+node "!REPO!\tools\audit-tools\redact-dump.js" "!DUMP!" "%SAFE%"
 set "REDACT_CODE=!ERRORLEVEL!"
 if not exist "%SAFE%" set "REDACT_CODE=1"
 if not "!REDACT_CODE!"=="0" (
-  node "!REPO!\audit-tools\redact-dump.js" --clear-output "!DUMP!" "%SAFE%"
+  node "!REPO!\tools\audit-tools\redact-dump.js" --clear-output "!DUMP!" "%SAFE%"
   echo.
   echo ERROR: the share-safe copy could not be verified.
   echo DO NOT SEND: the dump or any unverified copy from this run.

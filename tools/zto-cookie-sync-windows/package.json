@@ -9,7 +9,7 @@
   },
   "scripts": {
     "setup": "setup.cmd",
-    "test": "node ../../audit-tools/zto-cookie-sync-test.js",
+    "test": "node ../../tools/audit-tools/zto-cookie-sync-test.js",
     "setup:android": "bash ./setup-termux.sh",
     "sync:android": "bash ./sync-zto-cookie-termux.sh",
     "check:android": "bash ./sync-zto-cookie-termux.sh --check"

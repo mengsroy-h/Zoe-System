@@ -172,11 +172,11 @@ interval ដែលដំណាក់ boot ចាក់ផ្ទាល់ ឆ្�
 
 | ឯកសារ | ផលិតដោយ | ហេតុអ្វី |
 |---|---|---|
-| `dist-audit/**` | `audit-tools/zoew/scripts/build-audit.mjs` | build វាស់សម្រាប់ `audit-tools/` (មិន commit) |
-| `audit-tools/money-core.js` | `npm run money:core` | កូដលុយពិតសម្រាប់ `check-money.cmd` (អ្នកយាមភាពស្រស់) |
+| `dist-audit/**` | `tools/audit-tools/zoew/scripts/build-audit.mjs` | build វាស់សម្រាប់ `tools/audit-tools/` (មិន commit) |
+| `tools/audit-tools/money-core.js` | `npm run money:core` | កូដលុយពិតសម្រាប់ `check-money.cmd` (អ្នកយាមភាពស្រស់) |
 | `src/_generated-state.json` | ⛔ **ស្ថិរ** (បញ្ជីវាល state ៖ ឈ្មោះ · តម្លៃដំបូង) | build វាស់ (`build-audit` · `checker-view` · `expose-globals`) ប្រើវាដើម្បីបង្ហាញវាលទាំងនោះជាឈ្មោះ global ដែល checker អាន |
 
-បញ្ជី slot (ផ្នែក ១០) រស់នៅ `audit-tools/zoew/scripts/slot-registry.cjs` ហើយ `slot:check` ផ្ទៀងផ្ទាត់វាទល់នឹង `REACT_OWNED_IDS`
+បញ្ជី slot (ផ្នែក ១០) រស់នៅ `tools/audit-tools/zoew/scripts/slot-registry.cjs` ហើយ `slot:check` ផ្ទៀងផ្ទាត់វាទល់នឹង `REACT_OWNED_IDS`
 (`src/app/slot-resets.ts`) និង component ដែល export ពិត ➜ វាមិនមែនបញ្ជីរឹងឯករាជ្យទេ។
 
 ---
@@ -184,7 +184,7 @@ interval ដែលដំណាក់ boot ចាក់ផ្ទាល់ ឆ្�
 ## ១០. ការគូរ ៖ slot និង element slot
 
 component របស់ React ឈរក្នុងសំបក (`AppShell`) តាម **id** — បញ្ជីរស់នៅ
-`audit-tools/zoew/scripts/slot-registry.cjs`។ មាន ២ រូបរាង ៖
+`tools/audit-tools/zoew/scripts/slot-registry.cjs`។ មាន ២ រូបរាង ៖
 
 | រូបរាង | React ជាម្ចាស់អ្វី | ហេតុអ្វីប្រើវា |
 |---|---|---|
@@ -263,7 +263,7 @@ React ចេញពីក្រោមវា ➜ ការគូរបន្ទា
 |---|---|
 | សម្អាតមាតិកា slot | កែ **store** (`uiState.xView = null`) — React សម្អាតខ្លួនឯង |
 | សម្អាតតាមបញ្ជី id (ឧ. ពេលចាកចេញ) | `blankElementById(id)` (`src/app/slot-resets.ts`) ៖ slot ➜ store · input ➜ ref · អត្ថបទ ➜ `viewState` — id មិនស្គាល់ ➜ `false` ➜ `npm test` ធ្លាក់ |
-| បន្ថែម slot ថ្មី | ចុះឈ្មោះក្នុង `audit-tools/zoew/scripts/slot-registry.cjs` · បន្ថែមករណីក្នុង `resetReactOwned()` និង `REACT_OWNED_IDS` (`slot:check` ធ្លាក់បើ ២ បញ្ជីឃ្លាតគ្នា) · បន្ថែមជួរក្នុងតារាងខាងលើ (`doc:check`) |
+| បន្ថែម slot ថ្មី | ចុះឈ្មោះក្នុង `tools/audit-tools/zoew/scripts/slot-registry.cjs` · បន្ថែមករណីក្នុង `resetReactOwned()` និង `REACT_OWNED_IDS` (`slot:check` ធ្លាក់បើ ២ បញ្ជីឃ្លាតគ្នា) · បន្ថែមជួរក្នុងតារាងខាងលើ (`doc:check`) |
 
 អ្នកយាម ៖ `npm run slot:check` (ក្នុង `verify`) ស្កេន AST នៃ `.ts` ទាំងអស់ក្នុង `src/`
 (រួម `src/app/` ដែល behavior កាន់ធាតុតាម ref) រកការប៉ះកូនរបស់ id ដែល **ដេរីវេពី
@@ -350,7 +350,7 @@ const pin = fieldValue('securityPinInput');
 
 ### អ្នកយាម
 
-`npm run purity:check` (`audit-tools/zoew/scripts/react-purity-check.mjs` · AST របស់ TypeScript) ៖
+`npm run purity:check` (`tools/audit-tools/zoew/scripts/react-purity-check.mjs` · AST របស់ TypeScript) ៖
 
 - កូដមុខងារប៉ះ DOM **០** កន្លែង (ការលើកលែងមានតែ `platform/document-io.ts` និង
   ការវាស់ផ្ទៃវីដេអូ/media — រាល់ធាតុមាន **ហេតុផល និងពិដានចំនួន**; ពិដានធូរ ឬធាតុងាប់ ➜ ធ្លាក់)
@@ -365,7 +365,7 @@ const pin = fieldValue('securityPinInput');
   React ស្តារតម្លៃក្រោយរាល់ការចុច ➜ អ្នកប្រើប្តូរវាមិនបាន (ឧ. ប្រអប់ធីក
   «ចងចាំអ៊ីមែល» ដោះធីកមិនបាន)
 
-⛔ **checker ខ្លះរបស់ `audit-tools/`** «ដាក់ App ក្នុងស្ថានភាព» ដោយសរសេរ class
-លើ DOM ផ្ទាល់ (ឧ. `.collapsed`)។ ក្នុង build វាស់តែប៉ុណ្ណោះ `audit-tools/zoew/runtime/audit-compat.ts`
+⛔ **checker ខ្លះរបស់ `tools/audit-tools/`** «ដាក់ App ក្នុងស្ថានភាព» ដោយសរសេរ class
+លើ DOM ផ្ទាល់ (ឧ. `.collapsed`)។ ក្នុង build វាស់តែប៉ុណ្ណោះ `tools/audit-tools/zoew/runtime/audit-compat.ts`
 បកប្រែការសរសេរនោះជា state ដដែល (ការបញ្ចូល) ខណៈ `contains()` អាន DOM ដែល React
 គូរពិត (លទ្ធផល) ➜ checker វាស់ App React ពិត។

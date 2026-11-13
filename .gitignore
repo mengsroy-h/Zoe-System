@@ -15,11 +15,11 @@ Thumbs.db
 
 # Firebase backup tool: real secrets/config/output must never be committed
 node_modules/
-firebase-backup/config.json
-firebase-backup/secrets/
-firebase-backup/backups/
-firebase-backup/backup.log
-audit-tools/emu/real.rules.json
+tools/firebase-backup/config.json
+tools/firebase-backup/secrets/
+tools/firebase-backup/backups/
+tools/firebase-backup/backup.log
+tools/audit-tools/emu/real.rules.json
 
 # Audit-tool dependencies (acorn, playwright-core) are installed on demand per
 # the runbook. Never commit them: Netlify publishes the repo root as static
@@ -27,11 +27,11 @@ audit-tools/emu/real.rules.json
 /package.json
 /package-lock.json
 
-# ឯកសារស្រមោលបណ្តោះអាសន្នរបស់ audit-tools/exit-code-integrity.js
+# ឯកសារស្រមោលបណ្តោះអាសន្នរបស់ tools/audit-tools/exit-code-integrity.js
 # (ការរត់ដែលត្រូវសម្លាប់អាចបន្សល់វា — វាមិនត្រូវចូល repo ឡើយ)
-audit-tools/.tmp-poison-*
-audit-tools/emu/.tmp-poison-*
-audit-tools/zto-import/.tmp-poison-*
+tools/audit-tools/.tmp-poison-*
+tools/audit-tools/emu/.tmp-poison-*
+tools/audit-tools/zto-import/.tmp-poison-*
 
 # Windows ZTO Cookie Sync: npm lock មូលដ្ឋាន (dependency ត្រូវបាន pin ក្នុង package.json)
 tools/zto-cookie-sync-windows/package-lock.json
@@ -44,8 +44,20 @@ tools/zto-cookie-sync-windows/package-lock.json
 tools/firebase-provision/state/
 
 # លទ្ធផល TypeScript និងភស្តុតាងរបស់ឧបករណ៍ audit
-audit-tools/zoew/*.tsbuildinfo
-audit-tools/zoew/test-results/
+tools/audit-tools/zoew/*.tsbuildinfo
+tools/audit-tools/zoew/test-results/
 
 # តំណ dependency និងថតដំឡើងជាទិន្នន័យមូលដ្ឋាន មិនចូល repo
 node_modules
+
+# ទិន្នន័យមូលដ្ឋាននៅផ្លូវចាស់មិនផ្លាស់ទីដោយ git pull ទេ; រក្សាការការពារដដែល
+firebase-backup/config.json
+firebase-backup/secrets/
+firebase-backup/backups/
+firebase-backup/backup.log
+audit-tools/emu/real.rules.json
+audit-tools/.tmp-poison-*
+audit-tools/emu/.tmp-poison-*
+audit-tools/zto-import/.tmp-poison-*
+audit-tools/zoew/*.tsbuildinfo
+audit-tools/zoew/test-results/

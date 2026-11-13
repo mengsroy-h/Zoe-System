@@ -246,7 +246,7 @@ Console ➜ **Publish** ដោយដៃ។ ⛔ វាមិន deploy ស្វ�
 ⚙️ របា Slide ➜ **🔌 API ស្វែងរកអតិថិជនស្វ័យប្រវត្តិ** (សុំ PIN)។
 
 **ក. ប្រភព Google Sheet** (តាម Apps Script) — មើល
-[`../zto-import/README.md`](../zto-import/README.md)។
+[`../tools/zto-import/README.md`](../tools/zto-import/README.md)។
 
 **ខ. ប្រភព ZTO Cambodia** (តាម Netlify Function) — តម្លៃវាលក្នុងប្រអប់ ការកំណត់ខាង server (Cookie ·
 Login ZTO · API token ផ្លូវការ) និងការផ្ទៀងផ្ទាត់ដោយ `?diag=1` ៖ **[ZTO-SETUP-KH.md](../docs/zoew/ZTO-SETUP-KH.md)** ផ្នែក ១–៣។ ពេល Cookie ផុតកំណត់ ៖

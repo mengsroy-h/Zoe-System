@@ -230,7 +230,7 @@ jobs:
           GITHUB_STEP_SUMMARY=$(cygpath -u "$GITHUB_STEP_SUMMARY")
           powershell.exe -NoProfile -Command '& "$env:ANDROID_HOME\build-tools\35.0.0\apksigner.bat" verify -v --print-certs "ZoeW\android\app\build\outputs\apk\release\app-release.apk"; exit $LASTEXITCODE'  > apk-certs.txt || { cat apk-certs.txt; echo "::error::apksigner verify ធ្លាក់ ➜ មិនបង្កើត Release"; exit 1; }
           cat apk-certs.txt
-          if ! GOT=$(node audit-tools/zoew/scripts/apk-cert-check.mjs apk-certs.txt ZoeW/android/release-cert.sha256 2> apk-cert-why.txt); then
+          if ! GOT=$(node tools/audit-tools/zoew/scripts/apk-cert-check.mjs apk-certs.txt ZoeW/android/release-cert.sha256 2> apk-cert-why.txt); then
             echo "::error::$(cat apk-cert-why.txt) ➜ secret ចង្អុលទៅ keystore ផ្សេង ឬ APK មិនត្រឹមត្រូវ ➜ មិនបង្កើត Release"
             exit 1
           fi

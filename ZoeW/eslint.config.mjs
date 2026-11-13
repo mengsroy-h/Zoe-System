@@ -12,7 +12,7 @@ export default tseslint.config(
 
     {
         basePath: REPO,
-        files: ['ZoeW/src/app/**/*.{ts,tsx}', 'ZoeW/src/platform/**/*.ts', 'ZoeW/src/main.tsx', 'ZoeW/src/core/store.ts', 'ZoeW/src/core/dom.ts', 'ZoeW/src/core/lifecycle.ts', 'audit-tools/zoew/tests/**/*.{ts,tsx}'],
+        files: ['ZoeW/src/app/**/*.{ts,tsx}', 'ZoeW/src/platform/**/*.ts', 'ZoeW/src/main.tsx', 'ZoeW/src/core/store.ts', 'ZoeW/src/core/dom.ts', 'ZoeW/src/core/lifecycle.ts', 'tools/audit-tools/zoew/tests/**/*.{ts,tsx}'],
         extends: [js.configs.recommended, ...tseslint.configs.recommended],
         languageOptions: { ecmaVersion: 2023, globals: { ...globals.browser, ZoeErrors: 'readonly', XLSX: 'readonly' } },
         plugins: { 'react-hooks': reactHooks },
@@ -75,7 +75,7 @@ export default tseslint.config(
 
     {
         basePath: REPO,
-        files: ['ZoeW/scripts/**/*.mjs', 'audit-tools/zoew/scripts/**/*.mjs', 'audit-tools/zoew/prepare-dependencies.mjs'],
+        files: ['ZoeW/scripts/**/*.mjs', 'tools/audit-tools/zoew/scripts/**/*.mjs', 'tools/audit-tools/zoew/prepare-dependencies.mjs'],
         extends: [js.configs.recommended],
         languageOptions: { ecmaVersion: 2023, sourceType: 'module', globals: { ...globals.node, ...globals.browser } },
         rules: { 'no-empty': 'off', 'no-useless-escape': 'off', 'no-unused-vars': ['warn', { argsIgnorePattern: '^_', caughtErrors: 'none' }] }
@@ -92,7 +92,7 @@ export default tseslint.config(
 
     {
         basePath: REPO,
-        files: ['ZoeW/vite.config.mts', 'audit-tools/zoew/vitest.config.mts', 'ZoeW/capacitor.config.ts'],
+        files: ['ZoeW/vite.config.mts', 'tools/audit-tools/zoew/vitest.config.mts', 'ZoeW/capacitor.config.ts'],
         extends: [js.configs.recommended, ...tseslint.configs.recommended],
         languageOptions: { ecmaVersion: 2023, sourceType: 'module', globals: { ...globals.node } },
         rules: { '@typescript-eslint/no-explicit-any': 'off' }

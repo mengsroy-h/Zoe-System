@@ -1,0 +1,305 @@
+const { modulePrograms } = require('./audit-module-ast');
+const fs = require('fs');
+const path = require('path');
+const acorn = require('acorn');
+
+// ថត app អាច override បាន ដើម្បីឲ្យ `run-all.sh <baseline>` និង
+// `checker-coverage.js` បញ្ជាក់បានថា checker នេះពិតជាអានកូដមែន។
+const ROOT = process.env.STATEHYG_APP_DIR ? path.resolve(process.env.STATEHYG_APP_DIR) : path.resolve(__dirname, '../..');
+
+// ⚠️ App `ZoeImport` ត្រូវលុបចេញពី repo ក្នុងកំណែ 2.21.0 — មុខងារនាំចូល
+// របស់វាផ្លាស់ចូល **ZoeW ផ្ទាល់**។ ដូច្នេះ **ពាក្យសម្ងាត់នាំចូល**
+// (`sheetImportPassword`) និង **កូនសោ AES** (`sheetImportKey`) ព្រមទាំងវាល
+// `siApiPasswordInput` ក្នុង DOM ឥឡូវរស់នៅក្នុង `ZoeW/app.js` ➜ ការស្កេន
+// ZoeW គ្របពួកវារួចហើយ។ ⛔ កុំបន្ថយវិសាលភាពនៃឯកសារដែលស្កេន — នោះជាថ្នាក់
+// «checker ស្កេនឯកសារណាខ្លះ» ដដែលនឹង 2.12.1 · 2.16.0 · 2.19.1។
+const APPS = {
+    ZoeW: { reset: ['showLoginModalWithPrefill', 'clearSensitiveModalFields'] },
+    ZoeKeyGen: { reset: ['showLoginModalWithPrefill', 'clearSigningKey'] }
+};
+
+const ACCEPTED = {
+    ZoeW: {
+        running: 'Sign outbox drain mutex; settles in finally after bounded IndexedDB reads. Do not reset on logout and overlap a drain; all callbacks check shop/auth/database/key/lifecycle identity (palm-sign-outbox.test.tsx).',
+        discardingUnreadable: 'Sign outbox owner-discard in-flight boolean; reset in its finally, no user data. Each discard derives a fresh authenticated context.',
+        rerun: 'Sign outbox wake boolean; consumed and reset in drain finally, no user data. The next drain derives a fresh authenticated context.',
+        lifecycle: 'Sign outbox page scope; listeners and timer live until boot disposal across sign-ins. Its disposed flag and captured scope identity fence old callbacks; it contains no parcel data.',
+        firebaseConfig: 'device provisioning, survives logout by design',
+        fb: 'SDK handle, not user data',
+        auth: 'SDK handle, reused by the next login',
+        db: 'SDK handle, reused by the next login',
+        dbRefConnected: 'kept live so the next session reuses the connection listener',
+        dbRefServerTimeOffset: 'kept live to keep getServerNow accurate',
+        dbRefHistory: 'ref object, detached via fb.off; holds no data',
+        dbRefDeleted: 'ref object, detached via fb.off; holds no data',
+        dbRefDailyRevenue: 'ref object, detached via fb.off; holds no data',
+        dbRefMonthlyRevenue: 'ref object, detached via fb.off; holds no data',
+        dbRefDailyPickup: 'ref object, detached via fb.off; holds no data',
+        dbRefExchangeRate: 'ref object, detached via fb.off; holds no data',
+        authUnsubscribe: 'the listener must survive logout to see the next login',
+        connectionRecoveryCleanup: 'page lifecycle cleanup, contains only online/offline/visibility handlers and no user data; survives logout for the next login and runs on app scope disposal; connection-flow-contract.test.ts checks replacement and disposal',
+        authRecoveryTimeout: 'cleared in the auth callback itself',
+        authGeneration: 'monotonic counter, resetting it would break generation guards',
+        appLockUnlockGeneration: 'លំដាប់ unlock កើនជានិច្ច; reset អាចឱ្យ derive/remember callback ចាស់ផ្គូផ្គងសំណើថ្មី។ មិនផ្ទុកទិន្នន័យឬ credentials; app-lock-ownership-fixes និង pin-flow-race ផ្ទៀង stale callbacks និង post-await fences។',
+        appLockLogoutOwner: 'ម្ចាស់ signOut កំពុងរង់ចាំក្នុង memory រក្សា auth/SDK references, UID និង authGeneration ដើម; មិនមែន object ទទេ។ Session ដដែលទប់សំណើស្ទួន; session ថ្មីអាចជំនួស ហើយ callback ចាស់ផ្ទៀង owner/UID/epoch មុនប៉ះ UI។ ដោះពេល settle ឬជំនួស និងមិន persist; promise ព្យួរអាចរក្សា references រហូតដល់ settle/reload។ Actual owner/refresh/late-result controls នៅ app-lock-ownership-fixes។',
+        pushBusyOwner: 'លំដាប់ម្ចាស់ busy របស់ Push កើនជានិច្ច · គ្មានទិន្នន័យ ឬ credentials ៖ reset នឹងឲ្យ flow ចាស់ដែលបោះបង់មានលេខដូច flow ថ្មី ហើយដោះ busy របស់វា (control ក្នុង tools/audit-tools/zoew/tests/push-client.test.tsx)',
+        lookupSaveGeneration: 'លំដាប់សំណើកើនជានិច្ច; reset អាចឱ្យ promise ចាស់មានលេខដូចសំណើថ្មី · គ្មានទិន្នន័យឬសោ',
+        lookupTestGeneration: 'លំដាប់សាក API កើនជានិច្ច; reset អាចឱ្យ promise ចាស់មានលេខដូចសំណើថ្មី · គ្មានទិន្នន័យឬសោ',
+        documentHiddenAt: 'page-visibility timestamp used only to measure time spent in the background before a database liveness probe; it describes the device tab, not the user, and holds no customer data',
+        sessionExpiryCheckInFlight: 'bounded request mutex that settles in finally; keeping it through logout prevents an old request from overlapping the next session and it holds no user data',
+        licenseRecheckInFlight: 'bounded request mutex that settles in finally; keeping it through logout prevents an old request from overlapping the next session and it holds no user data',
+        exchangeRateSaveInFlight: 'bounded Firebase write mutex that settles in finally or its late handlers; retaining it across logout prevents an older rate write from racing a newer session and it holds no customer data; a backend teardown (initFirebase ➜ deleteApp kills the queued write, so its late handlers never run) releases it (tools/audit-tools/zoew/tests/exchange-rate-backend-switch.test.ts)',
+        exchangeRateSaveOperation: 'សម្គាល់ម្ចាស់ write ជា object ទទេ គ្មានទិន្នន័យឬ credentials; រស់តាម mutex លើ backend ដដែលរហូតដល់ finally/late handler ហើយដោះតែសោរបស់ខ្លួន។ Backend ថ្មីដែលចាប់ write ថ្មីជំនួស owner ដើម្បីឱ្យ ACK/reject ចាស់មិនដោះសោថ្មី (tools/audit-tools/zoew/tests/exchange-rate-completion-race.test.ts)។',
+        accountOperation: 'សញ្ញាម្ចាស់ register/reset ជា object ទទេ គ្មាន username, password, code ឬទិន្នន័យអតិថិជន; ជំនួសរាល់សំណើថ្មី។ Callback ពិនិត្យ owner, authGeneration, auth, SDK, app និង Supabase scope មុនប្តូរ UI ឬដោះ busy; សញ្ញាដែលនៅសល់មិនរក្សា closure របស់សំណើ (tools/audit-tools/zoew/tests/account-session-race.test.ts)។',
+        pickupResumeOwner: 'ម្ចាស់ការស្តារ journal រក្សា database/SDK/authGeneration/scope/uid ដើម; resumePickupIntents បោះម្ចាស់ចាស់ពេល pickupContextIsCurrent មិនត្រូវ ហើយ finally ដោះតែម្ចាស់របស់ខ្លួន។ មិនផ្ទុកកញ្ចប់ ឬ credentials ហើយមិនអាចដោះ busy របស់ session ថ្មី។',
+        scanEvidenceNotice: 'memo ព្រមានមាន authGeneration និង scope+pending IDs; មិនមែនភស្តុតាងបញ្ចប់ ឬសិទ្ធិ replay។ Session ថ្មីត្រូវព្រមានម្ដងទៀត ទោះ shop/UID និង pending ដដែល (scan-pending tests); session ដដែលទប់ toast ស្ទួនប៉ុណ្ណោះ។',
+        pickupResetOwner: 'សញ្ញាម្ចាស់ Reset ជា object ទទេតែមួយ គ្មានទិន្នន័យអតិថិជនឬ credentials; រក្សាទុកក្រោយបញ្ចប់ ហើយជំនួសរាល់ Reset ថ្មី។ Logout បង្កើន authGeneration ភ្លាមៗ; updater/ACK/finally ចាស់ត្រូវផ្គូផ្គងទាំង owner, database និង authGeneration មុនសរសេរឬដោះ busy flag (tools/audit-tools/zoew/tests/pickup-reset-session.test.ts)។',
+        sessionExpiryCheck: 'the 4-hour session verdict for the CURRENT user; forceExpireSession sets it to "expired" and showLoginModalWithPrefill runs inside that path, so resetting it there would erase the very fact the login toast must report. proceedAfterLogin re-arms it to "pending" on the next sign-in',
+        exchangeRateRiel: 'business config, not user data; mirrored in localStorage',
+        exchangeRateObservedVersion: 'លេខជំនាន់ snapshot អត្រាប្រាក់ គ្មានទិន្នន័យគណនី; ការបរាជ័យយឺតស្តារបានតែពេលជំនាន់មិនប្រែ និង session ដើមនៅដដែល (tools/audit-tools/zoew/tests/exchange-rate-listener-race.test.ts)។',
+        serverTimeOffsetMs: 'clock offset, not user data',
+        isInitializingFirebase: 'init mutex, unrelated to session',
+        lastEnteredLocker: 'operator convenience, persisted in localStorage by design',
+        currentFilterMode: 'view preference, no customer data',
+        customFilterDate: 'view preference, no customer data',
+        lastScannedCode: 'debounce state, cleared by scanner teardown',
+        lastScanTime: 'debounce state',
+        codeReader: 'scanner handle, torn down by cleanupResources',
+        liveScanCodeReader: 'scanner handle, torn down by cleanupResources',
+        scanVideoResumeTimer: 'a 150ms setTimeout handle that always fires and nulls itself; also cleared by stopCurrentStream',
+        currentStream: 'camera handle, torn down by stopCurrentStream',
+        currentVideoTrack: 'camera handle, torn down by stopCurrentStream',
+        nativeDetector: 'stateless decoder instance',
+        pendingLoadedMetadataHandler: 'camera handle, torn down by stopCurrentStream',
+        palmSignWrites: 'ជួរសរសេរ Sign តាមម្ចាស់ database/authGeneration/shop; រក្សា tail ដើម្បីសរសេរម្តងមួយក្នុង scope ដដែល ហើយប្តូរម្ចាស់នៅសំណើដំបូងនៃ scope ថ្មី ដូច្នេះ write ចាស់ព្យួរមិនរារាំង ឬដោះ tail ថ្មី។ Promise ដែលមិនទាន់ចប់អាចរក្សា closure និងសេចក្តីយោងកញ្ចប់; recordSigned ពិនិត្យ current() និងអត្តសញ្ញាណកញ្ចប់មុនសរសេរ ហើយបញ្ជូន expectedSignIdentity ទៅ transaction។ current() ការពារ database/auth/shop, ជំនាន់ផ្ទាំង និង config/key; callback ចាស់មិនអាចប្រើ session ថ្មី។ វាស់ការសរសេរម្តងមួយ, write ចាស់ព្យួរពេលប្តូរ auth/database និងកញ្ចប់ស្តារជំនួសក្នុង tools/audit-tools/zoew/tests/zto-palm-sign.test.tsx។',
+        palmSignFontLoad: 'សន្យាផ្ទុក font សាធារណៈរបស់ App គ្មានទិន្នន័យគណនី; ប្រើដដែលគ្រប់ session',
+        palmSignLocationEpoch: 'លេខរាប់ឡើងសុទ្ធរារាំង GPS callback ពីផ្ទាំងចាស់; reset វិញអាចទទួល callback ចាស់',
+        scanBeepPlugin: 'Capacitor bridge proxy គ្មាន credential ឬទិន្នន័យអ្នកប្រើ; Java ដោះលែង tone/volume ពេល pause/destroy',
+        captureCleanupPlugin: 'Capacitor bridge proxy របស់ ZoeCaptureCleanup (APK) គ្មាន credential ឬទិន្នន័យអ្នកប្រើ; ប្រើដដែលគ្រប់ session ដូច scanBeepPlugin',
+        cameraReads: 'ចំនួនការអានរូបកាមេរ៉ា Sign ដែលកំពុងហោះ (លេខរាប់ គ្មានទិន្នន័យ) — readCameraCapture() ដកវាវិញក្នុង finally ផ្ទាល់ ៖ reset ពេលចាកចេញខណៈការអាននៅហោះធ្វើឲ្យវាអវិជ្ជមាន ➜ releaseCameraCaptures() បោសឯកសារកាមេរ៉ាដែលការអាននោះមិនទាន់អានចប់',
+        globalAudioCtx: 'audio handle, no user data',
+        ownCaptureCanvas: 'scratch canvas, overwritten on next frame',
+        ownCaptureCtx: 'scratch canvas context',
+        searchTimer: 'debounce timer, no user data',
+        isVerifyingPin: 'reset by the PIN flow itself',
+        configQrReader: 'torn down by closeConfigQrScanner',
+        configQrImageSeq: 'ជំនាន់នៃការឌិកូដ QR ពីរូបភាព — លេខរាប់ឡើងសុទ្ធ (គ្មានទិន្នន័យ) ៖ ការរស់រានក្រោយចាកចេញធ្វើឲ្យការឌិកូដចាស់ដែលកំពុងហោះ **មិនត្រូវ** បំពេញប្រអប់ (ការ reset វិញនឹងបើកវាឡើងវិញ)',
+        configQrScanActive: 'reset by closeConfigQrScanner',
+        sheetFileGeneration: 'ជំនាន់ការអានឯកសារ Excel (នាំចូលទៅ Sheet) — លេខរាប់ឡើងសុទ្ធ គ្មានទិន្នន័យ ៖ ការរស់រានក្រោយចាកចេញធ្វើឲ្យការអានចាស់ដែលកំពុងហោះ **មិនត្រូវ** បំពេញផ្ទាំង (reset វិញនឹងបើកវាឡើងវិញ)',
+        sheetPrepareGeneration: 'ជំនាន់ចម្លើយ `prepare` (ផ្គូផ្គង Column) — លេខរាប់ឡើងសុទ្ធ គ្មានទិន្នន័យ ៖ ចម្លើយយឺតរបស់ header ចាស់មិនជាន់ header ថ្មី (reset វិញនឹងបើកវាឡើងវិញ)',
+        lookupLockedNoticeShown: 'one-shot notice flag, no user data',
+        autoLookupLastFailedAt: 'cooldown timestamp, no user data',
+        customerDataTableFetchedAt: 'cleared via clearCustomerDataTableCache',
+        customerDataTableRows: 'cleared via clearCustomerDataTableCache',
+        customerDataTableFetchPromise: 'cleared via clearCustomerDataTableCache',
+        customerDataTableSessionGeneration: 'monotonic guard counter',
+        customerDataTableLastFailedAt: 'cooldown timestamp, no user data',
+        isModalOpen: 'recomputed from the DOM on every closeModal',
+        phoneModalDismissPromptOpen: 'single-tick reentrancy guard',
+        isCameraScanning: 'reset by stopCurrentStream',
+        isCameraStarting: 'reset by stopCurrentStream',
+        cameraRequestId: 'monotonic guard counter',
+        nativeLoopActive: 'reset by stopCurrentStream',
+        zxingLoopActive: 'reset by stopCurrentStream',
+        liveScanWidthIndex: 'scanner quality step, reset by resetLiveScanQuality inside stopCurrentStream',
+        liveScanCostEma: 'rolling decode cost in ms, reset by resetLiveScanQuality inside stopCurrentStream',
+        lastDecodedVideoTime: 'last decoded video frame stamp, reset by resetLiveScanQuality inside stopCurrentStream',
+        staleFrameStreak: 'counter for the fresh-frame gate, reset by resetLiveScanQuality inside stopCurrentStream',
+        freshFrameGateUsable: 'browser capability flag for video.currentTime, reset by resetLiveScanQuality inside stopCurrentStream',
+        perfSamplePending: 'frame-pace sampler mutex, clears itself when the sample finishes',
+        displayHz: 'measured display refresh rate, a device property not user data',
+        displayHzMeasured: 'flag saying the refresh rate has been measured; a device property',
+        displayHzPeak: 'highest refresh rate seen while the user scrolls, remembered per device (zoew_display_hz_peak_v1); a device property not user data',
+        keyboardOpen: 'soft keyboard currently shown (APK resize), a live device state that clears on the next resize back; not user data',
+        moreMenuInputAt: 'performance.now() stamp of the last user input outside the (...) menu; a timing guard, not user data',
+        moreMenuWheelAt: 'performance.now() stamp of the last wheel event (wheel-stream gap); a timing guard, not user data',
+        torchOn: 'reset by stopCurrentStream',
+        autoLoginAttempted: 'dead variable, never read',
+        isDatabaseConnected: 'live connection state, not user data',
+        isDatabaseInitialized: 'reset in the sign-out branch itself',
+        pdfExportOriginalTitle: 'reset by restoreAfterPdfExport',
+        lastRecallSignature: 'only suppresses a redundant re-render; login always does a full render anyway',
+        pendingHistoryViewRefresh: 'a 0ms setTimeout handle that always fires and nulls itself',
+        activeEditingBarcode: 'barcode label only; modal field blanked on logout',
+        editingItemId: 'cleared by closeModal when editPhoneModal itself closes, and whenever the modal stack empties; the logout path closes every modal in a loop so the last close clears it (locked by lookup-prefetch-test scenario "chakchenh")',
+        markingItemId: 'cleared by closeModal when callMarkModal itself closes, and whenever the modal stack empties; same logout loop as editingItemId',
+        pendingBarcode: 'cleared by closeModal when phoneModal itself closes, and whenever the modal stack empties; same logout loop as editingItemId',
+        scanHistory: 'cleared in the sign-out branch itself',
+        deletedItems: 'cleared in the sign-out branch itself',
+        dailyRevenueData: 'cleared in the sign-out branch itself',
+        monthlyRevenueData: 'cleared in the sign-out branch itself',
+        dailyPickupData: 'cleared in the sign-out branch itself',
+        activeLocker: 'operator convenience, persisted in localStorage by design',
+        entryScanMode: 'view preference, persisted in localStorage by design',
+        currentAppPage: 'view preference, no customer data',
+        lockerAssignGeneration: 'monotonic guard counter',
+        pluginLoad: 'cached load of the in-app APK update plugin (a promise of a plugin handle, no user or customer data)',
+        nativeDownload: 'សន្យាទាញ APK សាធារណៈរបស់ឧបករណ៍ មិនមែនទិន្នន័យហាងឬគណនី; រស់ឆ្លង logout ដើម្បីឱ្យ cancel រង់ចាំ native download បញ្ចប់ មុនដោះ busy។ Success/reject ដោះតែសន្យារបស់ខ្លួន; updateSeq រារាំង callback ចាស់។ កុំ reset តាម auth ព្រោះមិនបានបញ្ឈប់ native download (tools/audit-tools/zoew/tests/notify-apk-link.test.tsx)។',
+        updateSeq: 'monotonic guard counter of APK update runs (a number, no customer data)',
+        devicePending: 'cached read of this device\'s model and serial (device identity like firebaseConfig, no customer data); the serial is Android ID or a hash of the License device ID, never the ID itself',
+        searchTap: 'start point and id of the current touch on the phone search input (coordinates and a timestamp, no customer data); cleared on every touchend/touchcancel',
+        searchFocusRefused: 'per-page flag that iOS refused a programmatic focus (a boolean about the browser, no customer data); reset by listenIOSSearchFocus()',
+        keyboardPan: 'start point, id and the latched verdict of the current touch while the iOS keyboard pan is blocked (coordinates and a boolean, no customer data); cleared on every touchend/touchcancel',
+        keyboardPanScope: 'lifecycle scope holding the non-passive touchmove listener while the phone search is pulled up on iOS (a listener handle, no customer data); disposed when the search closes and on boot-scope dispose',
+        modalWasOpen: 'last seen uiState.isModalOpen in the modal ⟷ keyboard behavior (a boolean about the layout, no customer data); the store subscription re-measures only when it flips · reset by listenModalKeyboard() and re-read by every measure',
+        modalStackSeen: 'last seen uiState.modalStack array in the modal ⟷ keyboard behavior (modal ids only, no customer data); the store subscription re-measures only when the stack changes · reset by listenModalKeyboard() and re-read by every measure',
+        modalDisplaySeen: 'last seen uiState.modalDisplay map in the modal ⟷ keyboard behavior (modal ids ➜ flex/none, no customer data); same role as modalStackSeen',
+        measureQueued: 'true while one deferred modal ⟷ keyboard measure waits for its microtask (a boolean, no customer data); cleared when that microtask runs · reset by listenModalKeyboard()',
+        naturalBox: 'untouched position and size of the open modal card before the keyboard fit (pixel numbers and a modal id, no customer data); cleared when the keyboard closes or no modal is open (logout closes every modal) and on boot-scope dispose',
+        modalTap: 'start point, id and target field of the current touch on a modal text field on iOS (coordinates, a timestamp and an element handle — the field value is never read or kept); cleared on every touchstart/touchend/touchcancel and on dispose',
+        modalFocusRefused: 'per-page flag that iOS refused a programmatic focus of a modal field (a boolean about the browser, no customer data); reset by listenModalKeyboard()',
+        modalTapFocused: 'the modal text field this device focused from a tap on iOS (an element handle — the field value is never read or kept); cleared on the next focusin anywhere, by listenModalKeyboard() and on dispose · logout closes every modal, so a kept handle only compares identity with a field that is gone',
+        keyboardOpenSeen: 'last seen value of uiState.keyboardOpen (a boolean about the APK WebView layout, no customer data); the store subscription re-measures the modal keyboard fit only when it flips · reset by listenModalKeyboard()',
+        scanBurst: 'timing of the last hardware-scanner keystrokes (a count, a key event timestamp and the ref name of the field they went into, no characters, no customer data); decides only whether a Tab/Enter ends a scanner burst · reset by setupHardwareScanner() and by every non-character key',
+        heldBreak: 'the last break of a held burst: text carried untyped is taken over at once by the key that broke the burst, and the record of a head already typed is used only by a burst that starts within SCANNER_SUFFIX_GAP_MS of its last key (to take that head back) · older records are ignored and the next held key replaces it, so nothing of it acts after a logout',
+        heldKeys: 'keystrokes held while a modal is open (a scanner burst, or a human keystroke on its way into the focused field) for at most SCANNER_SUFFIX_GAP_MS: its own timer always empties it (typed into the field it was meant for) and a scanner suffix moves it into the scan queue · never outlives the next key or that timer, so nothing survives a logout',
+        orientationRequested: 'the screen orientation this page last asked an installed Android PWA for (portrait-primary on a phone · any on a tablet — a string about the device, no customer data); asked again only when the device class changes (a foldable opening)',
+        keyboardSession: 'the current Android on-screen keyboard (layout width and full height before it opened, the last inset seen and whether it settled — pixel numbers and booleans, no customer data); started when the visual viewport first shows a keyboard, ended when the keyboard closes, the width changes, on boot-scope dispose and by listenModalKeyboard()',
+        keyboardSettleTimer: 'timer handle that records the Android keyboard height once it stays unchanged (KEYBOARD_SETTLE_MS after the layout shrank · KEYBOARD_TRUST_MS in the visual viewport outside the APK; no customer data); cleared with keyboardSession',
+        touchesDown: 'the number of fingers on the screen from the last touch event (a count, no customer data); a page movement while a finger is down is the user scrolling, never reported · reset by listenModalKeyboard()',
+        caughtClick: 'the field a caught iOS tap focused and the performance.now() deadline (CAUGHT_CLICK_MS) for swallowing the synthetic mousedown/click WebKit may still deliver for that tap (a DOM element and a number, no field text, no customer data) · nulled by the next touchstart, the click, the deadline, listenModalKeyboard() and on boot-scope dispose',
+        pageRaise: 'the scan page field lifted inside #appPages on iOS standalone (a DOM element, the pixels lifted, the page key and the release of its snap-pause token — no field text, no customer data); cleared by the field\'s blur (which glides #appPages back and releases the hold), listenModalKeyboard() and on boot-scope dispose · logout ends every snap pause anyway (clearSensitiveModalFields() ➜ endPanelGlideSnapPause())',
+        pageRaiseTimer: 'timer handle that lifts a still-covered scan page field further once the iOS keyboard holds one height for IOS_KEYBOARD_SETTLE_MS (no customer data); cleared with pageRaise, on every visualViewport resize, by listenModalKeyboard() and on boot-scope dispose',
+        tabBackwards: 'direction of the last Tab key (a boolean: Shift held or not — no field text, no customer data) used by keepFocusInLayer() to send focus that left the topmost modal or the lock screen to its first or last element; overwritten by every Tab keydown and reset by listenModalFocusTrap() on boot',
+        lastTouchEndAt: 'performance.now() of the last touchend/touchcancel (a number, no customer data); a focus within NATIVE_TAP_FOCUS_MS of it is the tap\'s own (native) focus, never re-focused · reset by listenModalKeyboard()',
+        tapFocusTouch: 'id and start point of the current touch until the next focus event (a number and coordinates, no customer data); that first focus within NATIVE_TAP_FOCUS_MS of a touch that ended in place is the tap\'s own, a drag (beyond MODAL_TAP_SLOP_PX) or touchcancel clears it, later focuses (the keyboard ∨/∧) are re-focused with preventScroll · reset by listenModalKeyboard()',
+        appLockPinFocus: 'the focus-options provider boot wires into the App Lock (a function reference from modal-keyboard, no customer data); it only decides preventScroll for the PIN field',
+        lastTouchTarget: 'the element the last touchend ended on (a DOM element handle — no field text, no customer data); a modal field focused by a tap on itself forecasts the iOS keyboard · replaced by every touchend, nulled by touchcancel and listenModalKeyboard() · logout closes every modal, so a kept handle only compares identity with a field that is gone',
+        iosKeyboard: 'the current iOS on-screen keyboard (its inset, whether it settled and the inset the open card uses until then — pixel numbers and a boolean, no customer data); started when the visual viewport first shows a keyboard, ended when it closes, on boot-scope dispose and by listenModalKeyboard()',
+        iosForecast: 'the remembered keyboard height the open card glides to when a modal field is tapped or focused with the keyboard up (a pixel number, no customer data); cleared when the keyboard settles, on blur, on dispose and by listenModalKeyboard()',
+        iosForecastMissed: 'per-page flag that a forecast keyboard never appeared (a hardware keyboard — a boolean about the device, no customer data) ➜ no more forecasts until a keyboard is up · reset by listenModalKeyboard()',
+        iosClosing: 'true from a blur out of a modal text field until the iOS keyboard is gone or a text field gets focus (a boolean, no customer data) · reset with iosKeyboard',
+        iosKeyboardTimer: 'timer handle that settles the iOS keyboard IOS_KEYBOARD_SETTLE_MS after its last height (IOS_KEYBOARD_FORECAST_MS after a forecast; no customer data); cleared with iosKeyboard',
+        modalRest: 'the topmost modal card element and its last resting screen top and page width (pixel numbers and a DOM element of a modal, no customer data); the start of the next keyboard glide · replaced on every measure and resize, nulled when no modal is open, on boot-scope dispose and by listenModalKeyboard()',
+        modalGlide: 'the running keyboard glide of the topmost modal card (its element, target and start pixel offsets, duration, cubic-bezier numbers and the Web Animation handle, no customer data); its position and speed start the next glide · cancelled when another modal is on top, when a new glide starts, on boot-scope dispose and by listenModalKeyboard() · cleared by its own onfinish',
+        keyboardLayer: 'the topmost modal element and the visible height above its keyboard layer at the last measure (a DOM element of a modal and a pixel number, no customer data); decides whether the layer glides (same modal, height changed) · replaced on every measure, nulled when no modal is open, on boot-scope dispose and by listenModalKeyboard()',
+        layerGlide: 'the running glide of the keyboard layer (.modal::after) of the topmost modal (its element, pixel offsets, duration, cubic-bezier numbers and the Web Animation handle, no customer data); cancelled when the keyboard closes, another modal is on top, a new layer glide starts, on boot-scope dispose and by listenModalKeyboard() · cleared by its own onfinish',
+        modalWatched: 'the modal card the ResizeObserver watches (a DOM element of the topmost modal, no customer data); changes with the topmost modal · nulled on boot-scope dispose and by listenModalKeyboard()',
+        modalResizeObserver: 'ResizeObserver on the topmost modal card and its overlay (an observer handle, no customer data); records content size changes and glides the card on Android viewport changes · disconnected on boot-scope dispose and by listenModalKeyboard()',
+        keyboardMemory: 'cache of the device keyboard heights kept in zoew_keyboard_inset_v1 (screen size + keyboard kind ➜ the last settled height — on Android only a height that stayed unchanged (keyboardSession) · ≤ KEYBOARD_MEMORY_MAX numbers, no customer data · a device setting like zoew_display_hz_peak_v1); decides whether a tap on the scan page barcode field may skip the iOS reveal · re-read from storage by listenModalKeyboard()',
+        listRoomObserver: 'ResizeObserver on the active list scroller and the phone suggestion box while an iOS search locks the document (an observer handle, no customer data); disconnected and nulled by watchIOSKeyboardListRoom(false) when the search closes and on boot-scope dispose through armIOSKeyboardPanBlock(false)',
+        keyboardLocked: 'last seen value of iosSearchDocumentLocked() (a boolean about the layout, no customer data); the store subscription re-measures the keyboard inset only when it flips',
+        searchPulledUp: 'last seen value of iosSearchPulledUp() (a boolean about the layout, no customer data); the store subscription settles the #appPages scroll only on the true ➜ false flip; reset by listenIOSKeyboard()',
+        pullDownSettleTimer: 'timer handle of the late scroll check after the phone search is pulled down on iOS (no customer data); cleared on pull-up, on boot-scope dispose and by listenIOSKeyboard()',
+        pullDownTouchSeen: 'per-pull-down flag that a finger touched the page before the late scroll check (a boolean about input, no customer data); reset by settleIOSSearchPullDown() and listenIOSKeyboard()',
+        phoneSearchGlide: 'handle of the phone search card glide (an animation reference, no customer data); suggestions stay closed only while running() and drop in once it settles — a glide ends within PANEL_SEARCH_GLIDE_MS + PANEL_GLIDE_HOLD_MAX_MS and a settle for another glide or an unfocused field does nothing, so a stale handle after logout is ignored',
+        entrySearchCollapsed: 'flag that a scan-tab search field collapsed the scan panel on focus (a boolean about the layout, no customer data); cleared when the empty field blurs and the panel opens again, whenever the scan panel opens through any other door (listenEntrySearchPanel store subscription), and on every page load',
+        appIsLocked: 'app-lock screen state, recomputed from scratch by initAppLock() on every page load; it guards a screen shown BEFORE sign-in, so it holds no customer data. Resetting it on logout would visually unlock a locked screen',
+        appLockBusy: 'reentrancy guard for the unlock button; cleared by setAppLockBusy(false) in the finally of every unlock path',
+        // ⛔ React ៖ ស្រទាប់ឃ្លាំង (`core/store.ts`) — មិនមែនទិន្នន័យអតិថិជន
+        deletedCleanupCursor: 'Single ephemeral cleanup fairness cursor {owner,id}; retains only last attempted trash id plus session handles, not parcel/money evidence. Revalidated on every sweep against DB/SDK/auth generation/UID/shop scope, advances synchronously only for current owner. Retention across same-context completion prevents stalled head starving later rows; purge-restore-registry-race covers context changes, removed/new candidates and stale-owner callbacks.',
+        recoveryOwner: 'In-flight scan recovery mutex holding SDK/database handles, auth generation and UID/shop scope only; every read is bounded by readRestoreServerNode (REST timeout or dbOp), session-fenced before and after await. New context replaces owner; finally clears only identity-matching owner. scan-reboot-closure.test verifies old read cannot mutate or unlock replacement recovery; resetting on logout would permit overlap.',
+        immediateCommit: 'React store plumbing: the commitNow() hook registered once by the React layer (a function, no customer data)',
+        immediateDepth: 'React store plumbing: reentrancy depth of commitImmediately(), always back to 0 in its finally (a number, no customer data)',
+        pendingInvite: 'Supabase invite code from the Setup Link (device provisioning, like firebaseConfig): showLoginModalWithPrefill() — the logout path itself — reads it to open the register form, so clearing it there would break registration; cleared by clearPendingInvite() once registration succeeds'
+    }
+};
+ACCEPTED.ZoeKeyGen = Object.assign({}, ACCEPTED.ZoeW, {
+    isGeneratingKey: 'reset by generateLicenseKey itself',
+    generateAlreadyTimedOut: 'reset by generateLicenseKey itself',
+    keyListSessionGeneration: 'monotonic guard counter',
+    extendTargetId: 'key id only, modal blanked on logout',
+    isSignedInUiActive: 'reset in showLoginModalWithPrefill itself',
+    keypairPrivateCopied: 'reset in showLoginModalWithPrefill itself',
+    serverTimeSyncedAt: 'clock sync timestamp, not user data',
+    serverTimeSyncWaiters: 'each waiter has its own timeout and an idempotent finish(); never blocks',
+    serverTimeSynced: 'clock sync flag, not user data',
+    lastGeneratedKey: 'reset in showLoginModalWithPrefill itself',
+    lastGeneratedSetupLink: 'reset in showLoginModalWithPrefill itself',
+    keyListCache: 'reset in showLoginModalWithPrefill itself'
+});
+
+function parse(src) {
+    return acorn.parse(src, { ecmaVersion: 2022, sourceType: 'script' });
+}
+
+function collectModuleStateVars(ast) {
+    const names = new Map();
+    const scan = (body) => {
+        body.forEach((node) => {
+            if (node.type === 'VariableDeclaration' && node.kind !== 'const') {
+                node.declarations.forEach((d) => {
+                    if (d.id.type === 'Identifier') names.set(d.id.name, node.start);
+                });
+            }
+            if (node.type === 'ExpressionStatement' &&
+                node.expression.type === 'CallExpression' &&
+                (node.expression.callee.type === 'FunctionExpression' ||
+                 (node.expression.callee.type === 'ParenthesizedExpression'))) {
+                // top-level IIFE: skip, its vars are private
+            }
+        });
+    };
+    scan(ast.body);
+    return names;
+}
+
+function indexFunctions(ast) {
+    return new Map(ast.body.filter(node => node.type === 'FunctionDeclaration' && node.id)
+        .map(node => [node.id.name, node]));
+}
+
+function collectAssignedAndCalled(node, assigned, called) {
+    const walk = (n) => {
+        if (!n || typeof n.type !== 'string') return;
+        if (n.type === 'AssignmentExpression' && n.left.type === 'Identifier') assigned.add(n.left.name);
+        if (n.type === 'UpdateExpression' && n.argument.type === 'Identifier') assigned.add(n.argument.name);
+        if (n.type === 'CallExpression' && n.callee.type === 'Identifier') called.add(n.callee.name);
+        for (const k of Object.keys(n)) {
+            const v = n[k];
+            if (Array.isArray(v)) v.forEach((c) => c && typeof c.type === 'string' && walk(c));
+            else if (v && typeof v.type === 'string') walk(v);
+        }
+    };
+    walk(node);
+}
+
+let failed = 0;
+for (const [appName, cfg] of Object.entries(APPS)) {
+    const file = path.join(ROOT, appName, 'app.js');
+    const src = fs.readFileSync(file, 'utf8');
+    const programs = modulePrograms(src, file, { ecmaVersion: 2022, sourceType: 'script' });
+    const stateVars = new Map(programs.flatMap(ast => [...collectModuleStateVars(ast)]));
+    const fns = new Map();
+    for (const ast of programs) for (const [name, node] of indexFunctions(ast)) {
+        if (fns.has(name)) throw new Error('ambiguous function across modules: ' + name);
+        fns.set(name, node);
+    }
+
+    const assigned = new Set();
+    const seen = new Set();
+    const queue = [...cfg.reset];
+    // also treat the sign-out branch of the auth listener as reset code
+    const signOutMarkers = ['setupAuthListener', 'initFirebase'];
+    signOutMarkers.forEach((m) => queue.push(m));
+    while (queue.length) {
+        const name = queue.shift();
+        if (seen.has(name)) continue;
+        seen.add(name);
+        const fn = fns.get(name);
+        if (!fn) continue;
+        const called = new Set();
+        collectAssignedAndCalled(fn.body, assigned, called);
+        called.forEach((c) => { if (fns.has(c) && !seen.has(c)) queue.push(c); });
+    }
+
+    const accepted = ACCEPTED[appName] || {};
+    const missing = [];
+    for (const name of stateVars.keys()) {
+        if (assigned.has(name)) continue;
+        if (accepted[name]) continue;
+        missing.push(name);
+    }
+    console.log(`--- ${appName} --- module state vars: ${stateVars.size}   reset somewhere in the logout path: ${[...stateVars.keys()].filter((n) => assigned.has(n)).length}   documented-accepted: ${[...stateVars.keys()].filter((n) => !assigned.has(n) && accepted[n]).length}`);
+    if (missing.length) {
+        failed += missing.length;
+        missing.forEach((m) => console.log(`   ⚠️  ${m}  — neither reset on logout nor documented in ACCEPTED`));
+    }
+}
+
+if (failed) {
+    console.log(`\n❌ ${failed} state variable(s) survive logout with no documented reason.`);
+    process.exit(1);
+}
+console.log('\n✅ គ្មានអថេរ state ណាដែលរស់រានក្រោយចាកចេញ ដោយគ្មានហេតុផលកត់ត្រាទេ');
+process.exitCode = 0;

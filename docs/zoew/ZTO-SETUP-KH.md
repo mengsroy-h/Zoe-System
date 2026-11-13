@@ -571,7 +571,7 @@ Site `zoew` ➜ **Site configuration ➜ Environment variables** ៖
   នេះជាពិដាន allowlist របស់ proxy; ហាង Supabase យក tenant ពី `my_account()` ហើយមិនប្រើពិដានគម្រោង Firebase នេះទេ។
 - ZTO proxy cache អត្តសញ្ញាណ Supabase តាម token អតិបរមា **៥ នាទី** ឬដល់ token ផុតសុពលភាព។
   ការដកសិទ្ធិហាង/គណនីអាចរង់ចាំ cache នេះនៅ proxy; database ពិនិត្យសិទ្ធិហាងរាល់ request។
-- ការសាកច្រើនហាង និងព្រំដែននៃភស្តុតាងសមត្ថភាព ➜ [`audit-tools/README.md`](../../audit-tools/README.md)។
+- ការសាកច្រើនហាង និងព្រំដែននៃភស្តុតាងសមត្ថភាព ➜ [`tools/audit-tools/README.md`](../../tools/audit-tools/README.md)។
   ចំនួន concurrency/cache ក្នុងកូដមិនមែនការធានាល្បឿន ឬចំនួនហាងដែលប្រើបានលើ server ជាក់ស្តែងទេ។
 
 ### ជំហានទី ៤ — បើកមុខងារក្នុង ZoeW

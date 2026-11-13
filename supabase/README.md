@@ -87,7 +87,7 @@ ZoeKeyGen (គ្មាន SMS · គ្មានការបង់ប្រា�
 ### ជំហានទី ១ — Supabase Project
 
 1. បង្កើត Project (តំបន់ **Singapore** ជិតកម្ពុជា)។ ⚠️ គម្រោង **Free** ៖ 500 MB · 5 GB egress/ខែ · **ផ្អាក Project ក្រោយគ្មានសកម្មភាព ១ សប្តាហ៍** ·
-   **គ្មាន backup ស្វ័យប្រវត្តិរបស់ Supabase** ➜ backup ហាងនីមួយៗតាម [`firebase-backup/`](../firebase-backup/README.md) (target `"type": "supabase"` ·
+   **គ្មាន backup ស្វ័យប្រវត្តិរបស់ Supabase** ➜ backup ហាងនីមួយៗតាម [`tools/firebase-backup/`](../tools/firebase-backup/README.md) (target `"type": "supabase"` ·
    GitHub Actions អ៊ិនគ្រីប) · ស្តារ/ផ្ទេរតាម [`tools/supabase-migrate/`](../tools/supabase-migrate/README.md) · ពេលអតិថិជនច្រើន Upgrade ទៅ **Pro លើ Project ដដែល**
    (គ្មាន migration)។
 2. **Authentication ➜ Sign In / Providers** ៖ Email = បើក · **Allow new users to sign up = បិទ** · **Confirm email = បើក** · Anonymous sign-ins = បិទ ·
@@ -286,7 +286,7 @@ Environment variables ៖ `SUPABASE_URL` · `SUPABASE_PUBLISHABLE_KEY` ➜ «ទ
 
 ```bash
 npm ci --prefix ZoeW && npm ci --prefix supabase
-SUPABASE_STRICT=1 bash audit-tools/run-all.sh
+SUPABASE_STRICT=1 bash tools/audit-tools/run-all.sh
 ```
 
 `supabase-rls` · `supabase-datastore` · `supabase-functions` · `keygen-supabase-admin` · `supabase-data-tools` (Postgres ពិត) និង `emu/supabase-rules-parity` ·
@@ -349,17 +349,17 @@ where m.user_id is null and a.user_id is null;
   កូដអញ្ជើញ (⛔ គ្មាន token ឬពាក្យសម្ងាត់ Admin) · ចាកចេញ ➜ កូដ · Link · ឈ្មោះហាង លុបចេញពីអេក្រង់។
 - **HTTP** ៖ CORS តែ origin ក្នុង `ZOE_ALLOWED_ORIGINS` · body ≤ 8 KB · កំហុសខាងក្នុងមិនលេចក្នុងចម្លើយ · function មិនសរសេរ log (ពាក្យសម្ងាត់ · កូដ · secret)។
 - ⚠️ **ព្រំដែនដែលនៅសល់** ៖ signature របស់ JWT អាចនៅមានសុពលភាពរហូតដល់ token ផុតអាយុ សូម្បីក្រោយប្តូរពាក្យសម្ងាត់។ សិទ្ធិ Database របស់សមាជិក និង Admin នៅតែផ្ទៀង session ដែលនៅមានក្នុង `auth.sessions` ហើយបដិសេធ session ដែលដករួច នៅការផ្ទៀងថ្មីបន្ទាប់; វាមិនលុបសិទ្ធិដែល transaction ទទួលរួច ឬធានាថា Auth endpoint ទាំងអស់បដិសេធ JWT ភ្លាមទេ។ គណនី admin មានអំណាចលើ
-  គ្រប់ហាង ➜ ពាក្យសម្ងាត់ខ្លាំង និងកុំចែករំលែក · Free tier គ្មាន backup ពី Supabase ➜ backup ហាងតាម `firebase-backup/` ត្រូវការ secret key ដែល
+  គ្រប់ហាង ➜ ពាក្យសម្ងាត់ខ្លាំង និងកុំចែករំលែក · Free tier គ្មាន backup ពី Supabase ➜ backup ហាងតាម `tools/firebase-backup/` ត្រូវការ secret key ដែល
   មានសិទ្ធិពេញ ➜ បង្កើតសោដាច់សម្រាប់ backup ហើយទុកតែក្នុង GitHub secret។
 - **backup · ការផ្ទេរទិន្នន័យ** ៖ `zoe_admin_tenants` · `zoe_admin_export` · `zoe_admin_write` ហៅបានតែ service_role (anon/authenticated ➜ permission denied) ·
   ការ export មិនចេញ hash កូដ · គណនី · ពាក្យសម្ងាត់។
-- អ្នកយាម ៖ `audit-tools/supabase-rls-test.js` · `supabase-datastore-test.js` · `supabase-functions-test.js` · `keygen-supabase-admin-test.js` · `supabase-data-tools-test.js` ·
+- អ្នកយាម ៖ `tools/audit-tools/supabase-rls-test.js` · `supabase-datastore-test.js` · `supabase-functions-test.js` · `keygen-supabase-admin-test.js` · `supabase-data-tools-test.js` ·
   `emu/supabase-rules-parity-test.js` · `emu/supabase-adapter-parity-test.js` (រួម mutation ដែលត្រូវធ្វើឲ្យវាក្រហម)។
 
 ## អាជ្ញាប័ណ្ណ
 
 **កម្មសិទ្ធិឯកជន** — រក្សាសិទ្ធិគ្រប់យ៉ាង © 2026 **ហ៊ុន ម៉េង ស្រូយ (MENGSROY HEN)** — មើល [`LICENSE`](../LICENSE)។
 
-`audit-tools/supabase-shim/` ផ្ទុកច្បាប់ចម្លង SQL ពី Supabase (អ្នកយាមតែប៉ុណ្ណោះ · មិន ship) ក្រោមអាជ្ញាប័ណ្ណរបស់វា ៖
+`tools/audit-tools/supabase-shim/` ផ្ទុកច្បាប់ចម្លង SQL ពី Supabase (អ្នកយាមតែប៉ុណ្ណោះ · មិន ship) ក្រោមអាជ្ញាប័ណ្ណរបស់វា ៖
 [`LICENSES/PostgreSQL-supabase-postgres.txt`](../LICENSES/PostgreSQL-supabase-postgres.txt) ·
 [`LICENSES/MIT-supabase-auth.txt`](../LICENSES/MIT-supabase-auth.txt)។

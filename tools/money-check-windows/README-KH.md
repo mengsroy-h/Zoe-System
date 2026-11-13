@@ -12,7 +12,7 @@ Firebase** · និង **មិនផ្ញើទិន្នន័យទៅណ
 
 ## មុខងារ
 
-វាយកកូដលុយ **ពិត** របស់ App (`audit-tools/money-core.js` ដែលស្រង់ពីកូដ ZoeW ពិត) មករត់លើទិន្នន័យរបស់អ្នក រួចពិនិត្យ ៩ ៖
+វាយកកូដលុយ **ពិត** របស់ App (`tools/audit-tools/money-core.js` ដែលស្រង់ពីកូដ ZoeW ពិត) មករត់លើទិន្នន័យរបស់អ្នក រួចពិនិត្យ ៩ ៖
 
 | # | ការវាស់ | បើខុស អ្នកនឹងឃើញអ្វី |
 |---|---|---|
@@ -30,7 +30,7 @@ Firebase** · និង **មិនផ្ញើទិន្នន័យទៅណ
 
 **ជំហាន ១ — ទាញទិន្នន័យចុះ**
 
-> ⚠️ ឧបករណ៍នេះអាន **មែកធាងទិន្នន័យទម្រង់ Firebase Realtime Database** (`.json` ឬ `.json.gz`)។ Backup ហាង Supabase មានមែកធាងនេះក្នុងវាល `data` ប៉ុន្តែ checker មិនដោះ wrapper `zoe-supabase-tenant` ឬឯកសារ `.enc` ដោយខ្លួនឯងទេ។ កុំទម្លាក់ archive Supabase ផ្ទាល់ចូលឧបករណ៍នេះ; មើល [របៀប backup](../../firebase-backup/README.md) ហើយត្រៀមឯកសារ JSON ដែលមានតែ `data` ជាមុន។
+> ⚠️ ឧបករណ៍នេះអាន **មែកធាងទិន្នន័យទម្រង់ Firebase Realtime Database** (`.json` ឬ `.json.gz`)។ Backup ហាង Supabase មានមែកធាងនេះក្នុងវាល `data` ប៉ុន្តែ checker មិនដោះ wrapper `zoe-supabase-tenant` ឬឯកសារ `.enc` ដោយខ្លួនឯងទេ។ កុំទម្លាក់ archive Supabase ផ្ទាល់ចូលឧបករណ៍នេះ; មើល [របៀប backup](../firebase-backup/README.md) ហើយត្រៀមឯកសារ JSON ដែលមានតែ `data` ជាមុន។
 
 1. បើក [Firebase Console](https://console.firebase.google.com) ➜ ជ្រើស Project របស់អ្នក
 2. ម៉ឺនុយឆ្វេង ➜ **Realtime Database**
@@ -38,7 +38,7 @@ Firebase** · និង **មិនផ្ញើទិន្នន័យទៅណ
 4. ឯកសារ `.json` នឹងធ្លាក់ចូល **Downloads**
 
 > 🔴 **សំខាន់ ៖ ថតនេះត្រូវនៅ *ក្នុងគម្រោង Zoe-System*។**
-> ឧបករណ៍ត្រូវអាន `audit-tools/money-core.js` ក្នុងគម្រោង ដើម្បីយក **កូដលុយពិត** — ដូច្នេះវាឈរឯកឯងមិនបានទេ។
+> ឧបករណ៍ត្រូវអាន `tools/audit-tools/money-core.js` ក្នុងគម្រោង ដើម្បីយក **កូដលុយពិត** — ដូច្នេះវាឈរឯកឯងមិនបានទេ។
 > បើអ្នកចម្លងតែថតនេះចេញទៅកន្លែងផ្សេង (ឧ. `D:\money-check-windows`)
 > វានឹង **សួររកថតគម្រោង** ម្តង រួច **ចងចាំទុក** សម្រាប់លើកក្រោយ។
 > បើអ្នកមិនទាន់មានគម្រោង ➜ GitHub ➜ ប៊ូតុង **Code** ➜ **Download ZIP** ➜ ពន្លា

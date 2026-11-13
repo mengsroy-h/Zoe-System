@@ -11,7 +11,7 @@
 #    `ci-config.js` បដិសេធផ្លូវណាមួយក្នុង repo ➜ ការ commit ដោយចៃដន្យធ្វើមិនកើតតាមរចនាសម្ព័ន្ធ។
 #
 # Secret ២ ដែលត្រូវកំណត់ក្នុង Settings ➜ Secrets and variables ➜ Actions ៖
-#   · ZOE_BACKUP_TARGETS    — JSON array (មើល firebase-backup/README.md)
+#   · ZOE_BACKUP_TARGETS    — JSON array (មើល tools/firebase-backup/README.md)
 #   · ZOE_BACKUP_PASSPHRASE — ពាក្យសម្ងាត់ >= ១៦ តួ (រក្សាទុកក្រៅ repo)
 # បើ secret ណាមួយមិនទាន់មាន ➜ job ចេញដោយ **ជោគជ័យ** ព្រមទាំងសារណែនាំ
 # (មិនមែនក្រហមរាល់ថ្ងៃទេ រហូតដល់អ្នកប្រើរៀបចំរួច)។
@@ -56,7 +56,7 @@ jobs:
           [ -n "${ZOE_BACKUP_PASSPHRASE:-}" ] || missing="${missing} ZOE_BACKUP_PASSPHRASE"
           if [ -n "${missing}" ]; then
             echo "ready=no" >> "$GITHUB_OUTPUT"
-            echo "::notice::Backup is not configured yet. Missing secret(s):${missing}. See firebase-backup/README.md."
+            echo "::notice::Backup is not configured yet. Missing secret(s):${missing}. See tools/firebase-backup/README.md."
             exit 0
           fi
           if [ "${#ZOE_BACKUP_PASSPHRASE}" -lt 16 ]; then
@@ -75,7 +75,7 @@ jobs:
         continue-on-error: true
         env:
           ZOE_BACKUP_TARGETS: ${{ secrets.ZOE_BACKUP_TARGETS }}
-        run: node firebase-backup/ci-config.js "$RUNNER_TEMP/zoe-backup"
+        run: node tools/firebase-backup/ci-config.js "$RUNNER_TEMP/zoe-backup"
 
       # ⛔ `continue-on-error` ដោយចេតនា ៖ `backup.js` បន្តទៅ Project បន្ទាប់ពេល
       #    មួយធ្លាក់ រួចចេញ exit មិនមែន 0។ បើជំហាននេះបញ្ឈប់ job នោះអាជីវកម្ម
@@ -86,13 +86,13 @@ jobs:
         id: pull
         if: steps.guard.outputs.ready == 'yes'
         continue-on-error: true
-        run: node firebase-backup/backup.js "$RUNNER_TEMP/zoe-backup/config.json"
+        run: node tools/firebase-backup/backup.js "$RUNNER_TEMP/zoe-backup/config.json"
 
       - name: អ៊ិនគ្រីប រួចលុប plaintext
         if: steps.guard.outputs.ready == 'yes'
         env:
           ZOE_BACKUP_PASSPHRASE: ${{ secrets.ZOE_BACKUP_PASSPHRASE }}
-        run: node firebase-backup/crypt.js seal "$RUNNER_TEMP/zoe-backup/backups"
+        run: node tools/firebase-backup/crypt.js seal "$RUNNER_TEMP/zoe-backup/backups"
 
       # ⛔ ជាន់ការពារចុងក្រោយ ៖ បើ `seal` ខកខានឯកសារណាមួយ ជំហាននេះធ្លាក់
       #    មុន upload ➜ plaintext មិនអាចឡើងទៅ artifact បានឡើយ។
@@ -119,7 +119,7 @@ jobs:
             exit 1
           fi
           # ទំហំក្នុងមួយជុំ × ចំនួនថ្ងៃរក្សាទុក = ទំហំដែលស៊ីកូតា Actions
-          # (GitHub Free · repo ឯកជន = 500 MB) — មើល firebase-backup/README.md
+          # (GitHub Free · repo ឯកជន = 500 MB) — មើល tools/firebase-backup/README.md
           kb=$(du -sk "$RUNNER_TEMP/zoe-backup/backups" | cut -f1)
           echo "✅ ឯកសារអ៊ិនគ្រីប ${count} · ទំហំជុំនេះ ${kb} KB"
           echo "### Backup ${count} ឯកសារ · ${kb} KB · រក្សាទុក ${RETENTION_DAYS} ថ្ងៃ" >> "$GITHUB_STEP_SUMMARY"

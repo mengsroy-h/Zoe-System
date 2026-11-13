@@ -1,0 +1,256 @@
+// 🔑 បញ្ជីកូនសោ `zoew_barcode_registry` **កំព្រា** ➜ ឯកសារ payload សម្រាប់លុប
+//
+//   node tools/audit-tools/registry-orphan-list.js <dump.json ឬ dump.json.gz> [out.json]
+//
+// យក dump ៖ Firebase Console ➜ Realtime Database ➜ ⋮ ➜ Export JSON
+//
+// ⛔ **ឧបករណ៍នេះមិនភ្ជាប់បណ្តាញ និងមិនលុបអ្វីទាំងអស់។** វាបញ្ចេញតែឯកសារ
+// `{"KEY": null, …}` ដែលអ្នក **មើលដោយភ្នែកជាមុន** រួចផ្ញើដោយខ្លួនឯង ៖
+//
+//   curl -X PATCH 'https://<PROJECT>-default-rtdb.<REGION>.firebasedatabase.app/zoew_barcode_registry.json?auth=<SECRET>' \
+//        -H 'Content-Type: application/json' --data-binary @<out.json>
+//
+// ⛔ `PATCH` ជា **merge** ៖ កូនសោដែលមិនរៀបរាប់ **នៅដដែល**។ កុំប្រើ «Import
+// JSON» ក្នុង Console — នោះជា **REPLACE** ➜ វាលុប registry ទាំងមូល។
+//
+// ── ហេតុអ្វីវាមិនលុបឲ្យផ្ទាល់ ─────────────────────────────────────────────
+// `CLAUDE.md` ៖ «⛔ ការជួសជុលកូនសោ ដែលមើលទៅដូចកំព្រា ដោយស្វ័យប្រវត្តិ ត្រូវ
+// ច្រានចេញ — **ការជាប់អន្ទាក់ថ្លៃតិចជាងលុយស្ទួន**។» កូនសោ registry ជា
+// **ជាន់ការពារទី ៤** និងជាជាន់ **ខាង server តែមួយគត់** ប្រឆាំង barcode ស្ទួន
+// (ជាន់ ១–៣ អានសតិរបស់ទូរស័ព្ទនោះ)។ ការលុបខុសមួយ ➜ barcode នោះស្កេនចូល
+// បានម្តងទៀត ➜ **លុយបូកស្ទួន** ហើយ **គ្មានផ្លូវសាង registry ឡើងវិញក្នុងកូដទេ**។
+// ដូច្នេះការសម្រេចចុងក្រោយត្រូវជារបស់ **មនុស្ស** មិនមែនរបស់ script។
+//
+// ── ច្រកទ្វារសុវត្ថិភាព (ការបដិសេធជាលទ្ធផលត្រឹមត្រូវ) ─────────────────────
+//   ១. គ្មាន node `zoew_barcode_registry`          ➜ បដិសេធ
+//   ២. ប្រវត្តិ **និង** ធុងសំរាម ទទេទាំង ២          ➜ បដិសេធ (dump មិនពេញ
+//      ➜ អ្វីៗនឹងមើលទៅដូចកំព្រា)
+//   ៣. កំព្រា **១០០%**                              ➜ បដិសេធ ៖ នេះស្ទើរតែជានិច្ច
+//      ជាសញ្ញានៃ **ទម្រង់កូនសោមិនត្រូវគ្នា** (ឧ. dump ដែលសម្អាតរួច)
+//      មិនមែន barcode ជាប់អន្ទាក់ទេ — មេរៀនពិតពី commit `b6cc107`
+//
+// ⛔ អេក្រង់ **មិនបោះពុម្ពលេខ barcode ណាមួយឡើយ** (ច្បាប់ដដែលនឹង
+// `money-reality-check.js`) — មានតែចំនួន។ តម្លៃពិតរស់នៅ **ក្នុងឯកសារលទ្ធផល**
+// ដែលមិនត្រូវ commit និងមិនត្រូវផ្ញើឲ្យនរណាឡើយ។
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const zlib = require('zlib');
+
+const ROOT = process.env.REGORPHAN_APP_DIR ? path.resolve(process.env.REGORPHAN_APP_DIR) : path.join(__dirname, '../..');
+const APP_JS = path.join(ROOT, 'ZoeW', 'app.js');
+const REGISTRY_NODE = 'zoew_barcode_registry';
+const CHUNK_MAX = 5000;
+
+// ⛔ បច្ច័យរបស់ `redact-dump.js` ត្រូវអានចេញពីឯកសារពិត — កុំចាក់ literal
+function redactedPrefix() {
+    try {
+        const src = fs.readFileSync(path.join(ROOT, 'tools/audit-tools', 'redact-dump.js'), 'utf8');
+        const m = /const\s+r\s*=\s*'([A-Za-z0-9_]{1,12})'\s*\+\s*d\s*;/.exec(src);
+        if (m) return m[1];
+    } catch (e) {}
+    return 'id_';
+}
+
+const args = process.argv.slice(2).filter((a) => !a.startsWith('-'));
+const file = args[0];
+const outArg = args[1];
+
+function die(msg, code) {
+    console.log('ERROR: ' + msg);
+    process.exit(code === undefined ? 3 : code);
+}
+
+if (!file) {
+    console.log('Usage: node tools/audit-tools/registry-orphan-list.js <dump.json|dump.json.gz> [out.json]');
+    console.log('  Get the dump: Firebase Console -> Realtime Database -> menu -> Export JSON');
+    console.log('  Writes {"KEY": null, ...} for orphaned registry keys. It never deletes anything.');
+    process.exit(2);
+}
+if (!fs.existsSync(APP_JS)) die('ZoeW/app.js not found at ' + APP_JS);
+if (!fs.existsSync(file)) die('dump file not found: ' + file);
+
+let db, raw;
+try {
+    raw = fs.readFileSync(file);
+    if (file.endsWith('.gz')) raw = zlib.gunzipSync(raw);
+    db = JSON.parse(raw.toString('utf8'));
+} catch (e) { die('cannot read the input as JSON'); }
+if (!db || typeof db !== 'object') die('dump is not a JSON object');
+
+// ⛔ ស្រង់ **កូដពិត** ចេញពី app.js — កុំសរសេររូបមន្តកូនសោឡើងវិញក្នុងឧបករណ៍នេះ
+// (កូនសោ ២ រូបមន្ត = ការរាប់ស្ទួន · មេរៀនពិតពី `redact-dump.js`)
+const SRC = fs.readFileSync(APP_JS, 'utf8');
+function sliceFn(name) {
+    let s = SRC.indexOf('function ' + name + '(');
+    if (s === -1) return null;
+    if (SRC.slice(Math.max(0, s - 6), s) === 'async ') s -= 6;
+    let d = 0, started = false, i = SRC.indexOf('{', s);
+    for (; i < SRC.length; i++) {
+        if (SRC[i] === '{') { d++; started = true; }
+        else if (SRC[i] === '}') { d--; if (started && d === 0) { i++; break; } }
+    }
+    return SRC.slice(s, i);
+}
+const WANT = ['canonicalBarcodeRegistryKey', 'barcodeRegistryKey', 'rawSnapshotToItemList', 'collectItemBarcodes', 'barcodeEntriesOf'];
+const missing = [];
+const bodies = WANT.map((n) => {
+    const b = sliceFn(n);
+    if (b) return b;
+    missing.push(n);
+    return 'function ' + n + '() { return undefined; }';
+}).join('\n');
+
+// ⛔ រូបមន្តកូនសោជាបេះដូងនៃឧបករណ៍នេះ — បើវាបាត់ ចម្លើយគ្មានន័យទេ
+if (missing.includes('barcodeRegistryKey') || missing.includes('canonicalBarcodeRegistryKey')) {
+    die('registry key functions not found in ' + APP_JS + ' -> cannot derive registry keys');
+}
+
+// ⛔ `window` ទទេ ៖ `rawSnapshotToItemList()` រាយការណ៍ record ខូចតាម `window.ZoeErrors` ➜ Node គ្មាន `window` ➜ dump ដែលមាន record
+//    មិនមែន object នឹងគាំងជំនួសការរាយកំព្រា (`registry-orphan-list-test` ៣គ)
+const sb = { console, String, Object, Array, window: {} };
+vm.createContext(sb);
+vm.runInContext(bodies, sb);
+
+const toList = (node) => (sb.rawSnapshotToItemList ? sb.rawSnapshotToItemList(node) : [])
+    .filter((x) => x && typeof x === 'object');
+const history = toList(db.zoew_scan_history_cod_dod);
+const deleted = toList(db.zoew_recently_deleted_cod_dod);
+const registry = (db[REGISTRY_NODE] && typeof db[REGISTRY_NODE] === 'object') ? db[REGISTRY_NODE] : null;
+
+console.log('');
+console.log('=== registry orphan list (read-only) ===');
+console.log('dump          : ' + path.basename(file) + '  (' + (raw.length / 1024).toFixed(0) + ' KB)');
+console.log('real fns found: ' + (WANT.length - missing.length) + '/' + WANT.length
+    + (missing.length ? '  (missing: ' + missing.join(', ') + ')' : ''));
+console.log('history items : ' + history.length);
+console.log('trash items   : ' + deleted.length);
+
+// ── ច្រកទ្វារ ១ ៖ គ្មាន node registry ────────────────────────────────────
+if (!registry) die('no `' + REGISTRY_NODE + '` node in this dump -> nothing to compute', 4);
+
+// ── ច្រកទ្វារ ២ ៖ dump មិនពេញ ➜ អ្វីៗនឹងមើលទៅដូចកំព្រា ─────────────────
+if (!history.length && !deleted.length) {
+    console.log('registry keys : ' + Object.keys(registry).length);
+    die('this dump has NO history AND NO trash -> every key would look orphaned.\n'
+        + '       Export the WHOLE database, not a single node.', 4);
+}
+
+// ម្ចាស់ = barcode គ្រប់កន្លែងក្នុងប្រវត្តិ **និង** ធុងសំរាម (ទាំង ២ ខាង)
+// ⛔ អានពី record object **ទាំងអស់** ក្នុង dump មិនមែនបញ្ជីដែល App ឃើញទេ ៖ `rawSnapshotToItemList()` លាក់ជួរគ្មាន `barcodes`
+//    (ទម្រង់សម័យ vanilla) តែជួរនោះនៅក្នុង DB ហើយនៅកាន់ code របស់វា ➜ កុំស្នើលុបកូនសោរបស់វា (អន្ទាក់ថោកជាងលុយស្ទួន)។
+const rawRecords = (node) => (node && typeof node === 'object' ? (Array.isArray(node) ? node : Object.values(node)) : [])
+    .filter((x) => x && typeof x === 'object' && !Array.isArray(x));
+const owned = new Set();
+const addOwned = (code) => {
+    const k = sb.barcodeRegistryKey(code);
+    if (!k) return;
+    owned.add(k);
+    owned.add(k.replace(/%25/g, '%'));
+};
+[rawRecords(db.zoew_scan_history_cod_dod), rawRecords(db.zoew_recently_deleted_cod_dod)].forEach((list) => list.forEach((item) => {
+    if (Array.isArray(item.barcodes)) item.barcodes.forEach((b) => { if (b && b.code) addOwned(b.code); });
+    else if (item.barcodes && typeof item.barcodes === 'object') {
+        Object.keys(item.barcodes).forEach((k) => {
+            const b = item.barcodes[k];
+            if (b && b.code) addOwned(b.code);
+        });
+    }
+    if (item.barcode) addOwned(item.barcode);
+}));
+
+// ⛔ កូនសោក្នុង dump បាន encode រួចហើយ; កុំ encode % ម្ដងទៀត។
+const registryKeys = Object.keys(registry);
+const normalized = new Map();
+registryKeys.forEach((k) => { normalized.set(k, String(k).trim().toUpperCase()); });
+const unowned = registryKeys.filter((k) => !owned.has(normalized.get(k)));
+const retained = unowned.filter((k) => registry[k] !== true);
+const orphans = unowned.filter((k) => registry[k] === true);
+
+console.log('registry keys : ' + registryKeys.length);
+console.log('owned barcodes: ' + owned.size);
+console.log('orphan keys   : ' + orphans.length);
+console.log('unresolved nonlegacy claims retained: ' + retained.length);
+console.log('');
+
+// ── ច្រកទ្វារ ៤ ៖ dump ដែល `redact-dump.js` សម្អាតរួច ────────────────────
+// 🔴 វាស់បាន (2026-09-09, អ្នកប្រើរាយការណ៍) ៖ ការសម្អាតជំនួស barcode ដោយ
+// `<prefix><hash 8>` ហើយវា **រក្សាទំនាក់ទំនងម្ចាស់** (namespace តែមួយ) ➜
+// ច្រកទ្វារ «កំព្រា ១០០%» **មិនបាញ់** ➜ ឧបករណ៍បញ្ចេញ hash ដែលឥតប្រយោជន៍។
+// ⛔ កូនសោ registry ពិត **មិនអាចជាអក្សរតូចបានទេ** — `barcodeRegistryKey()`
+// ធ្វើ `.toUpperCase()` ជានិច្ច ➜ ទម្រង់ `<prefix>` + hex អក្សរតូច ជាស្នាម
+// ច្បាស់លាស់នៃការសម្អាត មិនមែន barcode ពិតទេ។
+const REDACT_RE = new RegExp('^' + redactedPrefix().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[0-9a-f]{6,}$');
+const redacted = registryKeys.filter((k) => REDACT_RE.test(k));
+if (redacted.length) {
+    console.log('REFUSED: this dump looks REDACTED (' + redacted.length + '/' + registryKeys.length
+        + ' keys match the redact-dump.js hash shape).');
+    console.log('  Those keys are hashes, not real barcodes: deleting them would do NOTHING');
+    console.log('  because they do not exist in the real registry (real keys are UPPERCASE).');
+    console.log('  Re-run this on the ORIGINAL Export JSON, not the redacted copy.');
+    process.exit(4);
+}
+
+if (!orphans.length) {
+    console.log(retained.length ? 'HOLD: nonlegacy claims require operation/lifecycle verification. Nothing to delete.' : 'OK: every registry key has an owner. Nothing to delete.');
+    process.exit(0);
+}
+
+// ── ច្រកទ្វារ ៣ ៖ ១០០% កំព្រា = ទម្រង់កូនសោមិនត្រូវគ្នា ─────────────────
+if (unowned.length === registryKeys.length) {
+    console.log('REFUSED: 100% of registry keys look orphaned.');
+    console.log('  That is almost always a KEY-FORMAT MISMATCH, not trapped barcodes');
+    console.log('  (for example a dump produced by an old redact-dump.js).');
+    console.log('  Re-run this on the ORIGINAL dump before deleting anything.');
+    process.exit(4);
+}
+
+const outBase = outArg || path.join(path.dirname(path.resolve(file)), 'registry-orphans.json');
+const chunks = [];
+for (let i = 0; i < orphans.length; i += CHUNK_MAX) chunks.push(orphans.slice(i, i + CHUNK_MAX));
+
+const targets = chunks.map((keys, idx) => chunks.length === 1
+    ? outBase : outBase.replace(/(\.json)?$/, '.' + (idx + 1) + '.json'));
+try {
+    const input = fs.statSync(file), inputPath = fs.realpathSync(file);
+    const identities = new Set(), paths = new Set();
+    for (const target of targets) {
+        const resolved = path.resolve(target);
+        if (resolved === path.resolve(file) || resolved === inputPath || paths.has(resolved)) throw new Error();
+        paths.add(resolved);
+        let stat = null;
+        try { stat = fs.statSync(target); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+        if (stat) {
+            const identity = stat.dev + ':' + stat.ino;
+            if (stat.dev === input.dev && stat.ino === input.ino || identities.has(identity)) throw new Error();
+            identities.add(identity);
+        }
+    }
+} catch (error) { die('unsafe or inaccessible output destination; input retained'); }
+
+const written = [];
+chunks.forEach((keys, idx) => {
+    const payload = {};
+    keys.forEach((k) => { payload[k] = null; });
+    const target = targets[idx];
+    fs.writeFileSync(target, JSON.stringify(payload, null, 1) + '\n', 'utf8');
+    written.push({ file: target, count: keys.length });
+});
+
+console.log('WROTE (review these BEFORE sending anything):');
+written.forEach((w) => console.log('  ' + w.file + '   (' + w.count + ' keys)'));
+console.log('');
+console.log('Then, for EACH file, send one PATCH request yourself:');
+console.log('');
+written.forEach((w) => {
+    console.log("  curl -X PATCH \\");
+    console.log("    'https://<PROJECT>-default-rtdb.<REGION>.firebasedatabase.app/" + REGISTRY_NODE + ".json?auth=<SECRET>' \\");
+    console.log("    -H 'Content-Type: application/json' \\");
+    console.log('    --data-binary @' + w.file);
+    console.log('');
+});
+console.log('NOTES');
+console.log('  * PATCH merges: keys NOT listed in the file are left untouched.');
+console.log('  * Do NOT use Console "Import JSON" on the registry node: that REPLACES it.');
+console.log('  * <SECRET> is a real credential. Revoke it when you are done.');
+console.log('  * The output file contains real barcodes: do not commit it, do not share it.');

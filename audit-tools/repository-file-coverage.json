@@ -830,6 +830,14 @@
       ],
       "evidence": "រត់ protocol និង verifier ពិតជាមួយសោសាក; ផ្ទៀង enrollment, receipt, cutover, owner races និង rules។",
       "limitation": "មិនបញ្ជាក់ production key provisioning, device fleet ឬការផ្ទេរ client ចាស់; rules ត្រូវការរត់ emulator ពិត។"
+    },
+    "receipt-public-config": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/zoew-suite-test.js"
+      ],
+      "evidence": "ផ្ទុកការកំណត់ App ទាំងពីរ ហើយផ្ទៀងសោសាធារណៈ ស្នាមសោ និង legacy។",
+      "limitation": "មិនផ្ទៀងគូសោឯកជន Server ឬការបើកប្រើផលិតកម្មទេ។"
     }
   },
   "files": {
@@ -5143,6 +5151,9 @@
     },
     "ZoeW/tests/license-seat-idb.test.ts": {
       "policy": "license-seat-protocol"
+    },
+    "ZoeW/tests/receipt-public-config.test.ts": {
+      "policy": "receipt-public-config"
     }
   }
 }

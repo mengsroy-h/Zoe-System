@@ -37,7 +37,7 @@ export function SideDrawer() {
     const open = useStoreValue(uiState, (s) => s.drawerOpen);
     const loggedIn = useStoreValue(firebaseState, (s) => s.authButtonIsLoggedIn);
     const versionLabel = useStoreValue(viewState, (s) => s.appVersionLabel);
-    const v = useStoreFields(viewState, ['backendKind', 'ztoAutoCloseOn', 'ztoAutoCloseVisible', 'ztoAutoCloseText', 'ztoListSyncOn',
+    const v = useStoreFields(viewState, ['ztoAutoCloseOn', 'ztoAutoCloseVisible', 'ztoAutoCloseText', 'ztoListSyncOn',
         'ztoListSyncDrawerVisible', 'ztoListSyncText', 'appLockToggleOn', 'appLockToggleText', 'biometricToggleOn',
         'biometricUnsupported', 'biometricToggleText', 'connectionPhase', 'scanEvidenceRetained', 'priceOperationsStuck']);
     return (
@@ -166,7 +166,6 @@ export function SideDrawer() {
                     <span className="ico">{loggedIn ? '🚪' : '🔑'}</span>
                     <span className="drawer-auth-label">{loggedIn ? 'ចាកចេញ' : 'ចូល'}</span>
                 </button>
-                {loggedIn && v.backendKind === 'firebase' && <button type="button" className="drawer-item" id="drawerSeatEnrollment" onClick={onAct('openSeatEnrollment')}>🔐 ចុះឈ្មោះឧបករណ៍</button>}
                 <a
                     className="app-version-line"
                     data-app-version=""

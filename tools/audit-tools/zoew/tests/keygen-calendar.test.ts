@@ -14,7 +14,7 @@ const fs=require('node:fs'), vm=require('node:vm');
 const root=process.argv[1], probes=JSON.parse(process.argv[2]);
 const source=fs.readFileSync(root+'/ZoeKeyGen/app.js','utf8');
 const ast=require(root+'/ZoeW/node_modules/acorn').parse(source,{ecmaVersion:'latest'});
-const names=['seatSellerContext','seatSellerRow','requireLegacySeat','routeSecureSeatLifecycle','databaseUrlOf','isFirebaseDatabaseHost','fetchWithTimeout','seatMetaText','seatDeviceLabel','escapeHtml','renderKeyList','confirmExtendKey','renderNoticeList','sbTenantState','sbDeviceLabel','sbDevicesHtml','renderSbTenantList','renderSbInviteResult','sbIssueInvite'];
+const names=['seatMetaText','seatDeviceLabel','escapeHtml','renderKeyList','confirmExtendKey','renderNoticeList','sbTenantState','sbDeviceLabel','sbDevicesHtml','renderSbTenantList','renderSbInviteResult','sbIssueInvite'];
 const pieces=names.map(name=>{
  const node=ast.body.find(n=>n.type==='FunctionDeclaration'&&n.id.name===name);
  if(!node) throw Error('Missing actual source function: '+name);
@@ -22,18 +22,17 @@ const pieces=names.map(name=>{
 });
 function fixture(ms){
  const nodes={}, effects={toasts:[],writes:[],rpc:[]};
- const c={Date,Intl,console,Promise,Number,String,Math,Map,Set,JSON,Object,Array,isFinite,isNaN,URL,AbortController,setTimeout,clearTimeout,
-  fetch:async url=>{if(String(url)!=='https://synthetic-license.firebaseio.com/license_keys/ZOE/SYNTHETICKEY123456789.json')throw Error('Unexpected fixture route: '+url);return{ok:true,json:async()=>({expiresAt:ms-86400000,maxDevices:1,revoked:false})};},
+ const c={Date,Intl,console,Promise,Number,String,Math,Map,Set,JSON,Object,Array,isFinite,isNaN,
   document:{getElementById:id=>nodes[id]||(nodes[id]={innerHTML:'',textContent:'',value:'1',classList:{toggle(){},add(){},remove(){}}})},
-  getServerNow:()=>ms-86400000,captureSensitiveSession:()=>({}),adminOperationIsCurrent:()=>true,isSensitiveSessionCurrent:()=>true,signingPrivateKeyJwk:null,
+  getServerNow:()=>ms-86400000,captureSensitiveSession:()=>({}),adminOperationIsCurrent:()=>true,
   waitForServerTimeSync:async()=>true,captureKeygenClock:()=>({now:ms-86400000}),keygenClockIsCurrent:()=>true,
   withTimeout:async p=>p,showToast:message=>effects.toasts.push(message),alert:message=>{throw Error(message);},
   closeModal(){},refreshKeyList(){},renderSbLookupTargets(){},setSbAdminBusy(){},sbAdminIsCurrent:()=>true,
   sbAdminRpc:async(session,name,payload)=>{effects.rpc.push({name,payload});return{ok:true,body:[{code:'synthetic',expires_at:new Date(ms).toISOString()}]};},
   sbInviteSetupLink:()=>'',renderQrInto(){},sbAdminErrorText:()=>'',
   fb:{ref:(db,p)=>p,runTransaction:async(p,updater)=>{const value=updater(ms-86400000);effects.writes.push({p,value});return{committed:true,snapshot:{val:()=>value}};}},
-  db:{app:{options:{databaseURL:"https://synthetic-license.firebaseio.com"}}},keyListCache:[{id:'SYNTHETICKEY123456789',expiresAt:ms,paths:['ZOE','ALL'],perApp:{ZOE:{expiresAt:ms-86400000},ALL:{expiresAt:ms-86400000}},seatDevices:[],maxDevices:1,scope:'ZOE',inconsistent:true}],
-  seatReadFailed:false,APP_LABELS:{ZOE:'ZoeW',ALL:'ទាំងអស់'},extendTargetId:'SYNTHETICKEY123456789',
+  db:{},keyListCache:[{id:'synthetic-key',expiresAt:ms,paths:['ZOE','ALL'],perApp:{ZOE:{expiresAt:ms-86400000},ALL:{expiresAt:ms-86400000}},seatDevices:[],maxDevices:1,scope:'ZOE',inconsistent:true}],
+  seatReadFailed:false,APP_LABELS:{ZOE:'ZoeW',ALL:'ទាំងអស់'},extendTargetId:'synthetic-key',
   NOTICE_KIND_LABELS:{notice:'ដំណឹង'},noticeReadFailed:false,noticeListCache:[{id:'synthetic',at:ms,kind:'notice',title:'ដំណឹង',body:''}],
   sbMemberCache:[],sbDeviceReadFailed:false,sbDeviceCache:[],sbTenantReadFailed:false,sbMemberReadFailed:false,sbAdminBusy:false,
   sbTenantCache:[{id:'synthetic-tenant',name:'ហាង',branch_code:'SYN',expires_at:new Date(ms).toISOString()}],

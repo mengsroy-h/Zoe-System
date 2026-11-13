@@ -19,8 +19,7 @@ import { openBatchScanModal, startBatchScan, stopBatchScan, updateBatchScanCount
 import { printLabelsFromModal, saveLabelImagesFromModal, updateLabelPrintPreview } from '../features/label-print';
 import { openHealthCheck, runHealthCheck } from '../features/health-check';
 import { toggleRememberPassword } from '../features/password-memory';
-import { submitLicenseInvitation, cancelLicenseInvitation, editLicenseInvitation } from '../features/license-invitations';
-import { submitActivationKey, repairSeatEnrollmentIdentity, prepareSeatEnrollment, clearSeatEnrollment, openSeatEnrollment, closeSeatEnrollment } from '../features/license';
+import { submitActivationKey } from '../features/license';
 import { openLockerPicker, saveLockerSettings, selectCustomLocker } from '../features/locker';
 import { cancelLocationChange, confirmLocationChange } from '../features/locker-assign';
 import { saveLookupApiConfig, testLookupApiConfig } from '../features/lookup-config';
@@ -184,15 +183,7 @@ export const ACTION_REGISTRY: Record<string, (...args: any[]) => any> = Object.f
     startApkUpdate,
     startBatchScan,
     stopBatchScan,
-    submitLicenseInvitation,
-    cancelLicenseInvitation,
-    editLicenseInvitation,
     submitActivationKey,
-    repairSeatEnrollmentIdentity,
-    prepareSeatEnrollment,
-    clearSeatEnrollment,
-    openSeatEnrollment,
-    closeSeatEnrollment,
     submitAppLockForm,
     submitLoginForm,
     submitManualAdjustment,

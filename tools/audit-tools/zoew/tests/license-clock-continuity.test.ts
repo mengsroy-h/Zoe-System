@@ -23,7 +23,7 @@ function harness(file: string) {
         localStorage: { getItem: (k: string) => store.get(k) || null, setItem: (k: string, v: string) => store.set(k, v), removeItem: (k: string) => store.delete(k) },
         setTimeout: (f: () => void) => { timers.set(++timerId, f); return timerId; }, clearTimeout: (id: number) => timers.delete(id),
         fetch: async () => { throw Error('បណ្ដាញក្លែងមិនបានរៀបចំ'); } };
-    ctx.ZoeSeatConfig = { legacyProtocolEnabled: true }; ctx.window = ctx; vm.createContext(ctx); vm.runInContext(readFileSync(resolve(ROOT, file), 'utf8'), ctx);
+    ctx.window = ctx; vm.createContext(ctx); vm.runInContext(readFileSync(resolve(ROOT, file), 'utf8'), ctx);
     const payload = { a: 'ZOE', id: 'SYNTHETICKEY', iat: T / 1000, exp: (T + 30 * DAY) / 1000 };
     const key = 'ZOEKEY-' + Buffer.from(JSON.stringify(payload)).toString('base64url') + '.AA';
     const record = { keyString: key, ...payload, activatedAt: T, lastOnlineCheck: T, onlineExp: T + 30 * DAY, seenMax: T, releaseEpoch: 0 };
@@ -110,26 +110,4 @@ describe.each(paths)('License នាឡិកា %s', file => {
         expect(h.api.getServerTimeGeneration()).toBe(generation);
     });
 
-});
-
-
-describe.each(paths)('ការពារការរក្សា Key ក្រោយបោះបង់ %s', file => {
-    it('មិនសរសេរ activation record បើម្ចាស់ប្ដូរពេល verify កំពុងរង់ចាំ', async () => {
-        const h = harness(file); h.route();
-        const original = h.store.get(RECORD);
-        let current = true;
-        h.ctx.crypto.subtle.verify = async () => { current = false; return true; };
-        const result = await h.api.activate(h.record.keyString, 'ZOE', () => current);
-        expect(result.valid).toBe(false);
-        expect(h.store.get(RECORD)).toBe(original);
-    });
-});
-
-
-describe.each(paths)('ការអញ្ជើញត្រូវការ protocol 2 %s', file => {
-    it('legacy seat មិនអាចផ្ដល់សិទ្ធិតាម invitation', async () => {
-        const h = harness(file); h.route(); const original = h.store.get(RECORD);
-        const result = await h.api.activate(h.record.keyString, 'ZOE', () => true, 2);
-        expect(result.valid).toBe(false); expect(h.store.get(RECORD)).toBe(original);
-    });
 });

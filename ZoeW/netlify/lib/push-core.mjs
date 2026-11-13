@@ -287,23 +287,7 @@ export function createPushService(deps) {
         const rec = res.body;
         let verdict;
         if (!rec || typeof rec !== 'object') verdict = { ok: false, status: 403, reason: 'license:unknown' };
-        else if (rec.seatProtocol === 2) {
-            const read = await settleWithin(async () => {
-                const seatStore = d.seatStore || (await import('@netlify/blobs')).getStore({ name: 'zoew-license-seat-stage-v1', consistency: 'strong' });
-                return seatStore.getWithMetadata(LICENSE_APP_CODE + '/' + keyId, { type: 'json', consistency: 'strong' });
-            }, PUSH_READ_TIMEOUT_MS);
-            const state = read.ok && read.value ? read.value.data : null;
-            if (!state || typeof state !== 'object' || Array.isArray(state) || state.schema !== 1 || state.mode !== 'active'
-                || !Number.isSafeInteger(state.revision) || state.revision < 1
-                || !Number.isSafeInteger(state.releaseEpoch) || state.releaseEpoch < 0
-                || !Number.isSafeInteger(state.maxDevices) || state.maxDevices < 1 || state.maxDevices > 5
-                || !state.seats || typeof state.seats !== 'object' || Array.isArray(state.seats)
-                || typeof state.revoked !== 'boolean' || !Number.isSafeInteger(state.licenseExpiresAt) || state.licenseExpiresAt <= 0) {
-                return { ok: false, status: 503, reason: 'license:unverified' };
-            }
-            if (state.revoked) return { ok: false, status: 403, reason: 'license:revoked' };
-            return state.licenseExpiresAt > now() ? { ok: true, keyId: keyId } : { ok: false, status: 403, reason: 'license:expired' };
-        }
+        else if (rec.seatProtocol === 2) return { ok: false, status: 503, reason: 'license:unverified' };
         else if (rec.revoked === true) verdict = { ok: false, status: 403, reason: 'license:revoked' };
         else {
             const expiresAt = typeof rec.expiresAt === 'number' && rec.expiresAt > 0 ? rec.expiresAt : parsed.payload.exp * 1000;

@@ -9,9 +9,6 @@ import { setFieldValue } from '../../../../ZoeW/src/app/refs';
 import { showLoginModalWithPrefill, clearRememberedSession } from '../../../../ZoeW/src/features/session';
 
 vi.mock('../../../../ZoeW/src/features/license', () => ({ proceedAfterLogin: vi.fn() }));
-vi.mock('../../../../ZoeW/src/features/license-invitations', () => ({
-  cancelLicenseInvitation: vi.fn(), clearLicenseInvitationIntent: vi.fn()
-}));
 vi.mock('../../../../ZoeW/src/features/session', () => ({
   armSessionExpiryCheck: vi.fn(() => true),
   showLoginModalWithPrefill: vi.fn(),

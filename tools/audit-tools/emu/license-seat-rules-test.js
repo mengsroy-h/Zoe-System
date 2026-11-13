@@ -70,21 +70,17 @@ function loadSeatReleaser(onRequest) {
     const releasePendingDecl = (src.match(/^const RELEASE_PENDING_TEXT = .*;$/m) || [])[0] || "const RELEASE_PENDING_TEXT = '(អវត្តមាន RELEASE_PENDING_TEXT)';";
     const names = ['releaseKeySeat', 'getTrustedServerNow', 'captureKeygenClock', 'keygenClockIsCurrent', 'patchLicenseViaRest', 'readKeyReleaseViaRest', 'databaseUrlOf', 'isFirebaseDatabaseHost', 'fetchWithTimeout'];
     const fns = names.map((name) => sliceShippedFn(src, name)).filter(Boolean);
-    const sellerStart = src.indexOf('function seatSellerContext()');
-    const sellerEnd = src.indexOf('async function toggleRevokeKey(', sellerStart);
-    if (sellerStart !== -1 && sellerEnd > sellerStart) fns.push(src.slice(sellerStart, sellerEnd));
     if (!pendingDecl || !fns.length || fns[0].indexOf('releaseKeySeat') === -1) return null;
     const log = { alerts: [], toasts: [], refreshed: 0, sdk: [] };
     const user = { uid: 'adminUid', email: 'admin@example.test', getIdToken: () => Promise.resolve('emu-admin-token') };
     const ctx = {
         console: { error() {}, log() {}, warn() {} }, Promise, Error, JSON, Object, Array, String, Number, Math, Date, performance, URL, AbortController,
         setTimeout, clearTimeout, encodeURIComponent,
-        window: {}, ZoeErrors: { capture() {} }, signingPrivateKeyJwk: null,
+        window: {}, ZoeErrors: { capture() {} },
         db: { app: { options: { databaseURL: 'https://licseat-emu.firebaseio.com/' } } },
         auth: { currentUser: user },
         captureSensitiveSession: () => ({ user }),
         adminOperationIsCurrent: () => true,
-        isSensitiveSessionCurrent: () => true,
         withTimeout: (promise) => promise,
         retryAsync: (fn) => fn(),
         serverTimeSynced: true,
@@ -195,10 +191,7 @@ async function testSeatClockFixture() {
                 }
                 throw new TypeError('ចម្លើយបាត់');
             }
-            const markerRead = new URL(String(url)).pathname === '/license_keys/' + APP + '/' + id + '.json';
-            return { ok: true, status: 200, json: async () => markerRead
-                ? { maxDevices: 1, revoked: false, expiresAt: 4102444800000 }
-                : String(url).includes('/releasedAt') ? Date.now() + 10000 : null };
+            return { ok: true, status: 200, json: async () => String(url).includes('/releasedAt') ? Date.now() + 10000 : null };
         };
         await releaser.ctx.releaseKeySeat(id);
         check(patches === 1 && releaser.log.sdk.length === 0, 'ចម្លើយបាត់ ➜ PATCH តែមួយ គ្មាន SDK — ' + mode);
@@ -603,64 +596,6 @@ async function testSeatClockFixture() {
                 'A505 ៖ ' + label + ' ➜ កៅអីទំនេរ · releasedAt ម៉ោង server · ✅ (ចម្លើយបាត់ ➜ អានត្រលប់ពី Database ដដែល)', shown);
         }
     }
-
-    {
-        const freshPath = (suffix) => keyPath('SECUREISSUANCE' + suffix);
-        const payload = { expiresAt: 4102444800000, revoked: false, maxDevices: 1, seatProtocol: 2 };
-        check(denied(await anon('PUT', freshPath('ANON'), payload)), 'គ្មាន auth មិនអាចបង្កើត Key protocol 2');
-        check(denied(await asUser('PUT', freshPath('PLAIN'), payload, PLAIN)), 'អ្នកមិនមែន admin មិនអាចបង្កើត Key protocol 2');
-        for (const maxDevices of [1, 5]) {
-            const createdPath = freshPath('ADMIN' + maxDevices);
-            check(allowed(await asUser('PUT', createdPath, Object.assign({}, payload, { maxDevices }), ADMIN)), 'admin បង្កើត Key protocol 2 ពេញលេញ៖ ' + maxDevices);
-            for (const [field, value] of [['expiresAt', 4202444800000], ['revoked', true], ['maxDevices', 2], ['seatProtocol', null]]) {
-                check(denied(await asUser('PUT', createdPath.replace('.json', '/' + field + '.json'), value, ADMIN)), 'Key protocol 2 ថ្មីមិនអាចកែ៖ ' + field);
-            }
-            check(denied(await asUser('DELETE', createdPath, null, ADMIN)), 'Key protocol 2 ថ្មីមិនអាចលុប');
-        }
-        const invalid = [];
-        for (const field of ['expiresAt', 'revoked', 'maxDevices']) {
-            const incomplete = Object.assign({}, payload);
-            delete incomplete[field];
-            invalid.push(['ខ្វះ ' + field, incomplete]);
-        }
-        for (const fields of [{ revoked: true }, { maxDevices: 0 }, { maxDevices: 6 }, { maxDevices: 1.5 }, { maxDevices: '1' }, { expiresAt: 0 }, { seatProtocol: 1 }, { rawKey: 'synthetic' }]) {
-            invalid.push([JSON.stringify(fields), Object.assign({}, payload, fields)]);
-        }
-        for (let i = 0; i < invalid.length; i++) {
-            check(denied(await asUser('PUT', freshPath('BAD' + i), invalid[i][1], ADMIN)), 'Key protocol 2 មិនពេញលេញ/មិនត្រឹមត្រូវ បដិសេធ៖ ' + invalid[i][0]);
-        }
-        const legacyPath = freshPath('LEGACY');
-        const legacy = { expiresAt: payload.expiresAt, revoked: true, maxDevices: 1.5, releasedAt: 1700000000000 };
-        await owner('PUT', legacyPath, legacy);
-        for (const [field, value] of [['expiresAt', 4202444800000], ['revoked', false], ['maxDevices', 2], ['releasedAt', 1700000000001]]) {
-            check(denied(await asUser('PUT', legacyPath, Object.assign({}, legacy, { seatProtocol: 2, [field]: value }), ADMIN)), 'ផ្ទេរ legacy ត្រូវរក្សាវាលដដែល៖ ' + field);
-        }
-        check(allowed(await asUser('PUT', legacyPath, Object.assign({}, legacy, { seatProtocol: 2 }), ADMIN)), 'ផ្ទេរ legacy រក្សា config ដដែល ទោះ revoked និងចំនួនទសភាគ');
-        const metaPath = '/license_keys_meta/' + APP + '/SECUREISSUANCEMETA.json';
-        const metadata = { issuedAt: 1700000000000, scope: 'ZOE', appPaths: [APP], secureIssued: true };
-        check(denied(await anon('PUT', metaPath, metadata)), 'គ្មាន auth មិនអាចសរសេរ secureIssued');
-        check(denied(await asUser('PUT', metaPath, metadata, PLAIN)), 'អ្នកមិនមែន admin មិនអាចសរសេរ secureIssued');
-        check(allowed(await asUser('PUT', metaPath, metadata, ADMIN)), 'admin អាចសរសេរ secureIssued true');
-        for (const value of [false, 2, 'true']) {
-            check(denied(await asUser('PUT', metaPath.replace('.json', '/secureIssued.json'), value, ADMIN)), 'secureIssued ទទួលតែ boolean true៖ ' + value);
-        }
-    }
-
-    const MIGRATED_KEY = 'MIGRATEDKEY1234567890';
-    await owner('PUT', keyPath(MIGRATED_KEY), { expiresAt: 4102444800000, revoked: false, maxDevices: 1 });
-    await owner('PUT', seatPath(MIGRATED_KEY, SLOTS[0]), { device: DEV_A, at: Date.now() });
-    check(allowed(await anon('GET', seatPath(MIGRATED_KEY))), 'Legacy មុន cutover នៅអានកៅអីបាន');
-    const markerPath = keyPath(MIGRATED_KEY).replace('.json', '/seatProtocol.json');
-    check(denied(await anon('PUT', markerPath, 2)), 'អ្នកប្រើមិនអាចកំណត់ marker ដោយខ្លួនឯង');
-    check(denied(await asUser('PUT', markerPath, 1, ADMIN)), 'marker ទទួលតែ protocol 2');
-    check(allowed(await asUser('PUT', markerPath, 2, ADMIN)), 'អ្នកលក់អាចបញ្ជាក់ cutover ដោយរក្សា config');
-    check(allowed(await anon('GET', keyPath(MIGRATED_KEY))), 'marker discovery នៅអានបាន');
-    check(denied(await anon('GET', seatPath(MIGRATED_KEY))), 'កៅអី legacy មិនបង្ហាញ device ID ក្រោយ cutover');
-    check(denied(await anon('PUT', seatPath(MIGRATED_KEY, SLOTS[0]), { device: DEV_A, at: Date.now() })), 'ចម្លង device ID មិនអាចកក់ legacy seat ក្រោយ cutover');
-    for (const [field, value] of [['expiresAt', 4202444800000], ['revoked', true], ['maxDevices', 2], ['releasedAt', Date.now()], ['seatProtocol', null]]) {
-        check(denied(await asUser('PUT', keyPath(MIGRATED_KEY).replace('.json', '/' + field + '.json'), value, ADMIN)), 'អ្នកលក់ចាស់មិនអាចប្ដូរ authority ដែលបានផ្ទេរ៖ ' + field);
-    }
-    check(denied(await asUser('DELETE', keyPath(MIGRATED_KEY), null, ADMIN)), 'មិនអាចលុប marker ដើម្បីបើក legacy វិញ');
 
     console.log('\n' + pass + ' ok, ' + fail + ' FAIL');
     process.exitCode = fail === 0 ? 0 : 1;

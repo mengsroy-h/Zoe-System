@@ -46,8 +46,7 @@ function build(opts) {
     FakeDate.prototype = Date.prototype;
 
     const ctx = {
-        ZoeSeatConfig: { legacyProtocolEnabled: true },
-        window: { ZoeSeatConfig: { legacyProtocolEnabled: true } }, console, setTimeout, clearTimeout,
+        window: {}, console, setTimeout, clearTimeout,
         atob: (x) => Buffer.from(x, 'base64').toString('binary'),
         btoa: (x) => Buffer.from(x, 'binary').toString('base64'),
         TextEncoder, TextDecoder, AbortController,

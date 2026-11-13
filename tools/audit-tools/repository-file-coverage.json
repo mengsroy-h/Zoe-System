@@ -831,23 +831,6 @@
       "evidence": "Vitest រត់ account session លើ PostgreSQL ពិត និង Netlify mocks៖ session UUID ម្ចាស់ សុពលភាព ការដកសិទ្ធិ និងសាលក្រមថ្មី។",
       "limitation": "PostgREST និងសេវា Netlify ពិតមិនបានប្រើ; hosted rollout ត្រូវផ្ទៀងដាច់ដោយឡែក។"
     },
-    "license-seat-protocol": {
-      "category": "behavior",
-      "guards": [
-        "tools/audit-tools/zoew-suite-test.js",
-        "tools/audit-tools/emu/license-seat-rules-test.js"
-      ],
-      "evidence": "រត់ protocol និង verifier ពិតជាមួយសោសាក; ផ្ទៀង enrollment, receipt, cutover, owner races និង rules។",
-      "limitation": "មិនបញ្ជាក់ production key provisioning, device fleet ឬការផ្ទេរ client ចាស់; rules ត្រូវការរត់ emulator ពិត។"
-    },
-    "receipt-public-config": {
-      "category": "behavior",
-      "guards": [
-        "tools/audit-tools/zoew-suite-test.js"
-      ],
-      "evidence": "ផ្ទុកការកំណត់ App ទាំងពីរ ហើយផ្ទៀងសោសាធារណៈ ស្នាមសោ និង legacy។",
-      "limitation": "មិនផ្ទៀងគូសោឯកជន Server ឬការបើកប្រើផលិតកម្មទេ។"
-    },
     "audit-glob-coverage": {
       "category": "behavior",
       "guards": [
@@ -5135,18 +5118,6 @@
     "supabase/migrations/20261109122019_zoe_rules.sql": {
       "policy": "supabase-rules-generator"
     },
-    "ZoeW/netlify/functions/license-seat-stage.mjs": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/netlify/lib/license-seat-stage.mjs": {
-      "policy": "zoew-self-verification"
-    },
-    "tools/audit-tools/zoew/tests/license-seat-runtime-context.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "tools/audit-tools/zoew/tests/license-seat-stage.test.ts": {
-      "policy": "zoew-self-verification"
-    },
     "tools/audit-tools/zoew/tests/supabase-account-session.pg.test.ts": {
       "policy": "supabase-account-session"
     },
@@ -5158,39 +5129,6 @@
     },
     "supabase/migrations/20261112054956_zoe_account_active_session.sql": {
       "policy": "supabase-account-session"
-    },
-    "ZoeKeyGen/license-seat-client.js": {
-      "policy": "license-seat-protocol"
-    },
-    "ZoeKeyGen/license-seat-config.js": {
-      "policy": "license-seat-protocol"
-    },
-    "ZoeW/public/license-seat-client.js": {
-      "policy": "license-seat-protocol"
-    },
-    "ZoeW/public/license-seat-config.js": {
-      "policy": "license-seat-protocol"
-    },
-    "tools/audit-tools/zoew/tests/license-seat-client.test.ts": {
-      "policy": "license-seat-protocol"
-    },
-    "tools/audit-tools/zoew/tests/enrollment-entry-controls.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "tools/audit-tools/zoew/tests/license-seat-enrollment.test.ts": {
-      "policy": "license-seat-protocol"
-    },
-    "tools/audit-tools/zoew/tests/license-seat-seller.test.ts": {
-      "policy": "license-seat-protocol"
-    },
-    "tools/audit-tools/zoew/tests/license-secure-issuance.test.ts": {
-      "policy": "license-seat-protocol"
-    },
-    "tools/audit-tools/zoew/tests/license-seat-idb.test.ts": {
-      "policy": "license-seat-protocol"
-    },
-    "tools/audit-tools/zoew/tests/receipt-public-config.test.ts": {
-      "policy": "receipt-public-config"
     },
     "AGENTS.md": {
       "policy": "guard-12"
@@ -5210,28 +5148,16 @@
     "tools/audit-tools/zoew/tests/relocated-checker-paths.test.ts": {
       "policy": "relocated-checker-paths"
     },
-    "tools/audit-tools/license-invitation-default-ui-test.js": {
+    "tools/audit-tools/zoew/tests/import-instrumentation-identifiers.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/license-key-activation-default-test.js": {
       "policy": "guard-1"
     },
-    "ZoeW/netlify/lib/license-invitations.mjs": {
-      "policy": "license-seat-protocol"
+    "tools/audit-tools/zoew/tests/license-key-activation-restore.test.ts": {
+      "policy": "zoew-self-verification"
     },
-    "ZoeW/netlify/functions/license-invitations.mjs": {
-      "policy": "license-seat-protocol"
-    },
-    "ZoeW/src/features/license-invitations.ts": {
-      "policy": "license-seat-protocol"
-    },
-    "tools/audit-tools/zoew/tests/license-invitations-server.test.ts": {
-      "policy": "license-seat-protocol"
-    },
-    "tools/audit-tools/zoew/tests/license-invitations-seller.test.ts": {
-      "policy": "license-seat-protocol"
-    },
-    "tools/audit-tools/zoew/tests/license-invitations.test.ts": {
-      "policy": "license-seat-protocol"
-    },
-    "tools/audit-tools/zoew/tests/import-instrumentation-identifiers.test.ts": {
+    "tools/audit-tools/zoew/tests/activation-logout-controls.test.tsx": {
       "policy": "zoew-self-verification"
     }
   }

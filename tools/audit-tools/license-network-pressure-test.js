@@ -108,7 +108,7 @@ function servePage(licSrc) {
                 return rsp.end(licSrc);
             }
             rsp.writeHead(200, { 'Content-Type': 'text/html' });
-            rsp.end('<!doctype html><meta charset=utf-8><title>lic</title><script>window.ZoeSeatConfig={legacyProtocolEnabled:true};</script><script src="/license-verify.js"></script>');
+            rsp.end('<!doctype html><meta charset=utf-8><title>lic</title><script src="/license-verify.js"></script>');
         });
         s.listen(0, '127.0.0.1', () => res({ server: s, port: s.address().port }));
     });

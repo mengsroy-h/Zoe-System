@@ -73,8 +73,7 @@ async function main() {
                     static now() { return NOW; }
                 }
                 const context = vm.createContext({
-                    ZoeSeatConfig: { legacyProtocolEnabled: true },
-                    window: { ZoeSeatConfig: { legacyProtocolEnabled: true } }, Date: Clock, performance: { now: () => 0 }, TextEncoder, TextDecoder, AbortController, setTimeout, clearTimeout,
+                    window: {}, Date: Clock, performance: { now: () => 0 }, TextEncoder, TextDecoder, AbortController, setTimeout, clearTimeout,
                     Uint8Array, atob: (value) => Buffer.from(value, 'base64').toString('binary'),
                     btoa: (value) => Buffer.from(value, 'binary').toString('base64'),
                     navigator: { get onLine() { return state.online; } },

@@ -86,10 +86,10 @@ function sliceNested(source, name) {
 const decls = topLevel(src);
 const SB_FN_NAMES = [...decls.keys()].filter((n) => decls.get(n).kind === 'function' && /^sb[A-Z]|Sb[A-Z]/.test(n));
 const SB_VAR_NAMES = [...decls.keys()].filter((n) => decls.get(n).kind !== 'function' && /^(SB_|sb[A-Z])/.test(n));
-const HELPER_FNS = [...['keygenIdleStamp', 'keygenIdleElapsed', 'getTrustedServerNow', 'captureKeygenClock'].filter(n => decls.has(n)), 'fetchWithTimeout', 'elapsedSince', 'captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession', 'clearSecureKeySetup', ...(decls.has('lookupSetupScrubUrl') ? ['lookupSetupScrubUrl', 'lookupSetupSecretName'] : []), 'adminOwnerIsCurrent', 'safeStoreGet',
+const HELPER_FNS = [...['keygenIdleStamp', 'keygenIdleElapsed', 'getTrustedServerNow', 'captureKeygenClock'].filter(n => decls.has(n)), 'fetchWithTimeout', 'elapsedSince', 'captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession', ...(decls.has('lookupSetupScrubUrl') ? ['lookupSetupScrubUrl', 'lookupSetupSecretName'] : []), 'adminOwnerIsCurrent', 'safeStoreGet',
     'safeStoreSet', 'escapeHtml', 'copySensitiveText', 'showLoginModalWithPrefill', 'makeQrCode', 'renderQrInto',
     'downloadQrPng', 'saveQrImage', 'seatMetaText'];
-const HELPER_VARS = ['SETUP_LINK_URL_KEY', 'QR_MAX_MODULES', 'lookupSetupGeneration', 'secureKeySetup'];
+const HELPER_VARS = ['SETUP_LINK_URL_KEY', 'QR_MAX_MODULES', 'lookupSetupGeneration'];
 const REQUIRED_SB = ['sbAdminConfigProblem', 'sbAdminLogin', 'sbAdminLogout', 'sbAdminReset', 'sbAdminRefresh', 'renderSbTenantList', 'sbCreateTenant',
     'sbTenantAction', 'sbIssueInvite', 'sbIssueResetCode', 'copySbInviteLink', 'copySbInviteCode', 'copySbResetCode', 'restoreSbAdminConfig'];
 const missing = REQUIRED_SB.filter((n) => SB_FN_NAMES.indexOf(n) === -1)
@@ -241,7 +241,6 @@ function makeDom() {
         const classes = new Set(spec.cls);
         const el = {
             id, tagName: spec.tag.toUpperCase(), value: spec.value || '', textContent: '', innerHTML: '', disabled: false,
-            childNodes: [], replaceChildren(...nodes) { this.childNodes = nodes; this.innerHTML = ''; this.textContent = nodes.map(node => typeof node === 'string' ? node : node.textContent || '').join(''); },
             classList: {
                 add: (c) => classes.add(c), remove: (c) => classes.delete(c), contains: (c) => classes.has(c),
                 toggle: (c, on) => { const want = on === undefined ? !classes.has(c) : !!on; if (want) classes.add(c); else classes.delete(c); return want; }
@@ -266,23 +265,6 @@ function makeDom() {
         el: element,
         texts: () => [...elements.values()].map((e) => ({ id: e.id, s: [e.value, e.textContent, e.innerHTML].join(' ') }))
     };
-}
-
-{
-    const dom = makeDom();
-    const queue = dom.el('licenseInvitationQueue');
-    const reference = dom.el('licenseInvitationReference');
-    ok('លក្ខខណ្ឌសម្អាត៖ មានជួរសំណើ និងលេខយោងក្នុង HTML', !!queue && !!reference);
-    if (queue && reference) {
-        const row = { textContent: 'សំណើសាកល្បង' };
-        queue.replaceChildren(row);
-        reference.value = 'synthetic-reference';
-        ok('មុនសម្អាត៖ ជួរសំណើមានធាតុសាកល្បង', queue.childNodes.length === 1 && queue.childNodes[0] === row);
-        const cleanup = vm.createContext({ document: dom.document });
-        vm.runInContext('var secureKeySetup = {};\n' + decls.get('clearSecureKeySetup').text, cleanup);
-        cleanup.clearSecureKeySetup();
-        ok('សម្អាតការអញ្ជើញ៖ ដកធាតុ និងលេខយោង', queue.childNodes.length === 0 && queue.textContent === '' && queue.innerHTML === '' && reference.value === '');
-    }
 }
 
 function buildKeygen(env) {

@@ -1,4 +1,3 @@
-import { cancelLicenseInvitation } from '../../features/license-invitations';
 import { securityState, uiState } from '../../core/state';
 import { sessionVerificationRequired } from '../../core/session-verification';
 import { viewState } from '../../core/view-state';
@@ -78,11 +77,6 @@ export function setupNativeShell(scope: LifecycleScope): void {
 }
 
 export function handleNativeBack(minimize: () => void, history?: BackHistory): void {
-    if (topmostModal() === 'activationModal') {
-        cancelLicenseInvitation();
-        viewState.seatEnrollmentEpoch++;
-        viewState.seatEnrollmentBusy = false;
-    }
     if (securityState.appIsLocked || sessionVerificationRequired()) { minimize(); return; }
     if (!uiState.moreMenuOpen && ROOT_SCREEN_MODALS.includes(topmostModal())) { minimize(); return; }
     if (closeTopmostLayer({ includeMoreMenu: true })) return;

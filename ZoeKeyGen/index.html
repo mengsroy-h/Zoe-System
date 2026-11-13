@@ -32,8 +32,6 @@
     <script src="./boot-flags.js"></script>
     <script type="module" src="./firebase-loader.js"></script>
     <script src="./license-verify.js"></script>
-    <script src="./license-seat-config.js"></script>
-    <script src="./license-seat-client.js"></script>
     <script src="./error-reporting.js"></script>
     <script src="./qrcode.js"></script>
 
@@ -132,7 +130,6 @@
                 <input type="text" id="genNoteInput" placeholder="ឧ. ម៉ាស៊ីនស្កេនកន្លែងទី ១">
             </div>
         </div>
-        <p>Key សុវត្ថិភាពត្រូវការអនុម័តសំណើពីឧបករណ៍ផ្ទាល់ មុនប្រើប្រាស់។</p>
         <button class="btn-primary w-full" id="genGenerateBtn" data-act="generateLicenseKey">🔐 Generate Key</button>
 
         <div id="genResultBox" class="hidden mt-12">
@@ -458,43 +455,6 @@ const firebaseConfig = {
 
         <div class="modal-btns mt-12">
             <button class="btn-cancel" data-act="dismissKeypairModal">បិទ</button>
-        </div>
-    </div>
-</div>
-
-<div id="secureKeySetupModal" class="modal">
-    <div class="modal-content modal-w-460">
-        <h3>🔐 រៀបចំ Key សុវត្ថិភាព</h3>
-        <p id="secureKeySetupId"></p>
-        <p id="secureKeySetupStatus" role="status" aria-live="polite"></p>
-        <label for="secureKeySetupKey">១ · ចម្លង Key ទៅឧបករណ៍ដែលត្រូវអនុម័ត</label>
-        <textarea id="secureKeySetupKey" readonly class="min-h-70"></textarea>
-        <button class="btn-secondary w-full" data-act="copyTextarea" data-args='["secureKeySetupKey"]'>📋 ចម្លង Key</button>
-        <p>លើ ZoeW៖ បិទភ្ជាប់ Key ហើយចុច «ចុះឈ្មោះឧបករណ៍»។ ផ្ញើ JSON និងផ្ទៀងស្នាមសោជាមួយអ្នកលក់។</p>
-        <label for="secureKeyEnrollmentInput">២ · បិទភ្ជាប់សំណើ JSON ពីឧបករណ៍</label>
-        <textarea id="secureKeyEnrollmentInput" class="min-h-90" maxlength="8192" autocomplete="off" spellcheck="false"></textarea>
-        <button class="btn-secondary w-full" data-act="inspectSecureKeyEnrollment">🔎 ពិនិត្យសំណើ</button>
-        <label>៣ · ប្រៀបធៀបស្នាមសោជាមួយអេក្រង់ឧបករណ៍ផ្ទាល់</label>
-        <div id="secureKeyFingerprint" class="key-output"></div>
-        <button id="secureKeyApproveBtn" class="btn-primary w-full" data-act="approveSecureKeyEnrollment" disabled>✅ ស្នាមសោត្រូវគ្នា · អនុម័តឧបករណ៍</button>
-        <details>
-            <summary>ជម្រើសបន្ថែម · ការអញ្ជើញអតិថិជន</summary>
-            <p>ប្រើតែពេលសេវាអញ្ជើញបានបើក។ វិធីដោយដៃនៅខាងលើអាចប្រើដដែល។</p>
-        <label for="licenseInvitationTarget">កម្មវិធីអតិថិជន</label>
-        <select id="licenseInvitationTarget"><option value="pwa">PWA</option><option value="apk">APK</option></select>
-        <label for="licenseInvitationHours">សុពលភាពអញ្ជើញ · ម៉ោង (អតិបរមា 24)</label>
-        <input id="licenseInvitationHours" type="number" min="1" max="24" value="24">
-        <button class="btn-primary w-full" data-act="createLicenseInvitation">បង្កើតការអញ្ជើញ</button>
-        <input id="licenseInvitationReference" readonly>
-        <button class="btn-secondary" data-act="copyLicenseInvitation" data-args='[false]'>ចម្លងកូដ</button>
-        <button class="btn-secondary" data-act="copyLicenseInvitation" data-args='[true]'>ចម្លងតំណ PWA</button>
-        <p>APK៖ បិទភ្ជាប់កូដក្នុងកម្មវិធីដែលបានដំឡើង។ ផ្ទៀងលេខជាមួយអតិថិជនផ្ទាល់ មុនអនុម័ត។</p>
-        <button class="btn-secondary w-full" data-act="refreshLicenseInvitations">ពិនិត្យសំណើអតិថិជន</button>
-        <div id="licenseInvitationQueue"></div>
-        </details>
-        <div class="modal-btns mt-12">
-            <button class="btn-secondary" data-act="refreshSecureKeySetup">🔄 ពិនិត្យ និងបន្ត</button>
-            <button class="btn-cancel" data-act="closeModal" data-args='["secureKeySetupModal"]'>បិទ · បន្តពីតារាងបាន</button>
         </div>
     </div>
 </div>

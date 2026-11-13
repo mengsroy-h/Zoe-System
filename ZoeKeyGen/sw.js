@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoekeygen-v159';
+const CACHE_VERSION = 'zoekeygen-v160';
 
 const CORE_SHELL = [
     './',
@@ -8,8 +8,6 @@ const CORE_SHELL = [
     './boot-flags.js',
     './firebase-loader.js',
     './license-verify.js',
-    './license-seat-config.js',
-    './license-seat-client.js',
     './error-reporting.js',
     './qrcode.js',
     './icon-192.png'

@@ -1,5 +1,3 @@
-import { cancelLicenseInvitation } from '../features/license-invitations';
-import { viewState } from '../core/view-state';
 import { cancelZtoPalmSign } from '../features/zto-palm-sign';
 import { videoElement } from '../app/refs';
 import { modalIsOpen, openModalIds, setModalDisplay } from '../core/modals';
@@ -38,11 +36,6 @@ export function onScanVideoPause() {
 }
 
 export function closeModal(modalId?) {
-    if (modalId === 'activationModal' || !modalId) {
-        cancelLicenseInvitation();
-        viewState.seatEnrollmentEpoch++;
-        viewState.seatEnrollmentBusy = false;
-    }
     if (modalId === 'ztoPalmSignModal') cancelZtoPalmSign();
     if (modalId === 'lookupApiConfigModal') cancelZtoPalmLogin();
     setModalDisplay(modalId, 'none');

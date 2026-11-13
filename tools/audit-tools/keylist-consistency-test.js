@@ -95,13 +95,13 @@ async function build(publicData, metaData, seatData) {
 }
 
 const consistent = {
-    [APP]: { KKKKKKKKKKKKKKKK: { expiresAt: 2000, revoked: true } }
+    [APP]: { K1: { expiresAt: 2000, revoked: true } }
 };
 const activeKey = {
-    [APP]: { KKKKKKKKKKKKKKKK: { expiresAt: 2000, revoked: false } }
+    [APP]: { K1: { expiresAt: 2000, revoked: false } }
 };
 const singleApp = { [APP]: { K2: { expiresAt: 3000, revoked: false } } };
-const meta = { [APP]: { KKKKKKKKKKKKKKKK: { issuedAt: 5, scope: 'ALL', note: 'ហាង A' }, K2: { issuedAt: 4, scope: APP, note: 'ហាង B' } } };
+const meta = { [APP]: { K1: { issuedAt: 5, scope: 'ALL', note: 'ហាង A' }, K2: { issuedAt: 4, scope: APP, note: 'ហាង B' } } };
 
 (async () => {
     console.log('===== ZoeKeyGen key list: buckets must not be collapsed =====');
@@ -155,7 +155,7 @@ const meta = { [APP]: { KKKKKKKKKKKKKKKK: { issuedAt: 5, scope: 'ALL', note: '�
     r = await build(activeKey, meta, null);
     ok('គ្មានកៅអី ➜ ស្លាក «ទំនេរ»', r.html.indexOf('ទំនេរ') !== -1 && r.html.indexOf('ចងរួច') === -1, r.html.slice(0, 200));
 
-    r = await build(activeKey, meta, { [APP]: { KKKKKKKKKKKKKKKK: { d1: { device: 'DEVICEAAAAAAAAAAAAAA', at: 1700000000000 } } } });
+    r = await build(activeKey, meta, { [APP]: { K1: { d1: { device: 'DEVICEAAAAAAAAAAAAAA', at: 1700000000000 } } } });
     ok('មានកៅអី ➜ ស្លាករាយ ១/១', r.html.indexOf('1/1') !== -1 && r.html.indexOf('ទំនេរ') === -1, r.html.slice(0, 200));
     ok('ហើយ row ផ្ទុកឧបករណ៍', !!(r.rendered[0] && r.rendered[0].seatDevices
         && r.rendered[0].seatDevices.length === 1
@@ -168,12 +168,12 @@ const meta = { [APP]: { KKKKKKKKKKKKKKKK: { issuedAt: 5, scope: 'ALL', note: '�
         const appSrc = fs.readFileSync(APP_FILE, 'utf8');
         ok('មាន ' + SEAT_META_FNS.join(' · ') + ' ក្នុង ZoeKeyGen', SEAT_META_FNS.every((n) => appSrc.includes('function ' + n + '(')),
             SEAT_META_FNS.filter((n) => !appSrc.includes('function ' + n + '(')));
-        const metaSeats = { [APP]: { KKKKKKKKKKKKKKKK: {
+        const metaSeats = { [APP]: { K1: {
             d1: { device: 'DEVICEAAAAAAAAAAAAAA', at: 1700000000000, meta: { model: 'Samsung SM-A546E', platform: 'Android 14', serial: '1a2b3c4d5e6f7890', at: 1 } },
             d2: { device: 'DEVICEBBBBBBBBBBBBBB', at: 1700000000000, meta: { model: '<img src=x onerror=alert(1)>', platform: '-', serial: 'abcd', at: 1 } },
             d3: { device: 'DEVICECCCCCCCCCCCCCC', at: 1700000000000 }
         } } };
-        const rm = await build({ [APP]: { KKKKKKKKKKKKKKKK: { expiresAt: 2000, revoked: false, maxDevices: 3 } } }, meta, metaSeats);
+        const rm = await build({ [APP]: { K1: { expiresAt: 2000, revoked: false, maxDevices: 3 } } }, meta, metaSeats);
         const lines = rm.html.match(/class="seat-device-line"/g) || [];
         ok('កៅអីនីមួយៗមានបន្ទាត់មើលឃើញ (មិនមែនតែ title ដែលទូរស័ព្ទមើលមិនឃើញ) ៖ ៣', lines.length === 3, lines.length);
         ok('⛔ បន្ទាត់ d1 ៖ model · platform · serial', ['Samsung SM-A546E', 'Android 14', '1a2b3c4d5e6f7890'].every((t) => rm.html.includes(t)), rm.html.slice(0, 400));
@@ -189,8 +189,8 @@ const meta = { [APP]: { KKKKKKKKKKKKKKKK: { issuedAt: 5, scope: 'ALL', note: '�
     // ── ពិដានច្រើនឧបករណ៍ ៖ ស្លាកត្រូវរាយ n/max ពិត ────────────────────
     // ⛔ ការរាប់ត្រូវឈរក្នុងពិដាន ៖ slot ក្រៅពិដាន **មិនត្រូវរាប់** បើអត់
     //    អ្នកលក់ដែលបន្ថយពិដាន នឹងឃើញលេខធំជាងអ្វីដែល server ទទួល។
-    const multiKey = { [APP]: { KKKKKKKKKKKKKKKK: { expiresAt: 2000, revoked: false, maxDevices: 3 } } };
-    r = await build(multiKey, meta, { [APP]: { KKKKKKKKKKKKKKKK: {
+    const multiKey = { [APP]: { K1: { expiresAt: 2000, revoked: false, maxDevices: 3 } } };
+    r = await build(multiKey, meta, { [APP]: { K1: {
         d1: { device: 'DEVICEAAAAAAAAAAAAAA', at: 1700000000000 },
         d2: { device: 'DEVICEBBBBBBBBBBBBBB', at: 1700000000000 }
     } } });
@@ -198,14 +198,14 @@ const meta = { [APP]: { KKKKKKKKKKKKKKKK: { issuedAt: 5, scope: 'ALL', note: '�
     ok('ហើយ row ផ្ទុកឧបករណ៍ទាំង ២', r.rendered[0] && r.rendered[0].seatDevices.length === 2, r.rendered[0] && r.rendered[0].seatDevices);
     ok('⛔ លេខសម្គាល់ឧបករណ៍ទី ២ ក៏មិនឡើងដល់ DOM ដែរ', r.html.indexOf('DEVICEBBBBBBBBBBBBBB') === -1);
 
-    r = await build({ [APP]: { KKKKKKKKKKKKKKKK: { expiresAt: 2000, revoked: false, maxDevices: 1 } } }, meta, { [APP]: { KKKKKKKKKKKKKKKK: {
+    r = await build({ [APP]: { K1: { expiresAt: 2000, revoked: false, maxDevices: 1 } } }, meta, { [APP]: { K1: {
         d1: { device: 'DEVICEAAAAAAAAAAAAAA', at: 1700000000000 },
         d2: { device: 'DEVICEBBBBBBBBBBBBBB', at: 1700000000000 }
     } } });
     ok('⛔ slot ក្រៅពិដាន មិនត្រូវរាប់ (បន្ថយពិដាន ➜ 1/1)', r.html.indexOf('1/1') !== -1, r.html.slice(0, 300));
 
     // ⛔ ទិសផ្ទុយ ៖ ពិដានមិនត្រឹមត្រូវ ➜ ធ្លាក់ចុះទៅ ១ មិនមែនបើកចំហ
-    r = await build({ [APP]: { KKKKKKKKKKKKKKKK: { expiresAt: 2000, revoked: false, maxDevices: 99 } } }, meta, { [APP]: { KKKKKKKKKKKKKKKK: {
+    r = await build({ [APP]: { K1: { expiresAt: 2000, revoked: false, maxDevices: 99 } } }, meta, { [APP]: { K1: {
         d1: { device: 'DEVICEAAAAAAAAAAAAAA', at: 1700000000000 }
     } } });
     ok('⛔ ពិដានលើសជួរ ➜ clamp ត្រឹមចំនួន slot ពិត',
@@ -229,7 +229,7 @@ const meta = { [APP]: { KKKKKKKKKKKKKKKK: { issuedAt: 5, scope: 'ALL', note: '�
             const sb = {
                 console, Promise, Error, JSON, Object, Array, Date, Number, String, Boolean,
                 isNaN, isFinite, Math, setTimeout, clearTimeout,
-                signingPrivateKeyJwk: null, db: {}, window: {ZoeLicense: {getTrustedServerNow: () => 1700000000000, getServerTimeGeneration: () => 1}},
+                db: {}, window: {ZoeLicense: {getTrustedServerNow: () => 1700000000000, getServerTimeGeneration: () => 1}},
                 keyListCache: [row],
                 seatReadFailed: !!seatFail,
                 prompt: () => answer,
@@ -252,7 +252,6 @@ const meta = { [APP]: { KKKKKKKKKKKKKKKK: { issuedAt: 5, scope: 'ALL', note: '�
                 },
                 // ⛔ A505 ៖ «🔓 ដោះឧបករណ៍» ផ្ញើតាម REST PATCH ទៅ root របស់ Database ប្រតិបត្តិការ ➜ កត់ត្រាជា ['patch', '', body] (root)
                 fetch: (url, init) => {
-                    if (/\/license_keys\/ZOE\/[A-Z0-9]{16,40}\.json$/.test(String(url))) return Promise.resolve({ ok: true, json: async () => ({ maxDevices: row.maxDevices, revoked: false, expiresAt: 1800000000000 }) });
                     if (init && init.method === 'PATCH') calls.push(['patch', new URL(String(url)).pathname === '/.json' ? '' : String(url), JSON.parse(init.body)]);
                     else calls.push(['get', String(url)]);
                     return Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve(init && init.body ? init.body : 'null'), json: () => Promise.resolve(null) });
@@ -260,7 +259,6 @@ const meta = { [APP]: { KKKKKKKKKKKKKKKK: { issuedAt: 5, scope: 'ALL', note: '�
             };
             sb.db = { app: { options: { databaseURL: 'https://keylist-probe.firebaseio.com' } } };
             const c = vm.createContext(sb);
-            if (src2.includes('function seatSellerContext()')) vm.runInContext(src2.slice(src2.indexOf('function seatSellerContext()'), src2.indexOf('async function toggleRevokeKey(')), c);
             vm.runInContext([realDecl(src2, 'LICENSE_SEAT_SLOT_NAMES'), realDecl(src2, 'LICENSE_SEAT_MAX'), realDecl(src2, 'ADMIN_WRITE_PENDING_TEXT'), realDecl(src2, 'RELEASE_PENDING_TEXT')].join('\n'), c);
             const restHelpers = ['getTrustedServerNow', 'captureKeygenClock', 'keygenClockIsCurrent', 'databaseUrlOf', 'isFirebaseDatabaseHost', 'fetchWithTimeout', 'patchLicenseViaRest', 'readKeyReleaseViaRest']
                 .filter((name) => src2.indexOf('function ' + name + '(') !== -1);
@@ -268,7 +266,7 @@ const meta = { [APP]: { KKKKKKKKKKKKKKKK: { issuedAt: 5, scope: 'ALL', note: '�
             return vm.runInContext(fnName + "('" + row.id + "')", c).then(() => ({ calls, box }));
         }
         const baseRow = (over) => Object.assign({
-            id: 'KKKKKKKKKKKKKKKK', paths: [APP], maxDevices: 1, seatDevices: [], perApp: {}
+            id: 'K1', paths: [APP], maxDevices: 1, seatDevices: [], perApp: {}
         }, over);
         results.push(await run('setKeySeatLimit', baseRow(), '3', true));
         results.push(await run('setKeySeatLimit', baseRow(), '0', true));
@@ -290,7 +288,7 @@ const meta = { [APP]: { KKKKKKKKKKKKKKKK: { issuedAt: 5, scope: 'ALL', note: '�
     const [wOk, wZero, wBig, wText, wCancel, wSame, wLower, wRel, wRelEmpty, wRelFail, wRelStamped, wRelEmptyNo] = writes;
     ok('ពិដានថ្មីត្រឹមត្រូវ ➜ សរសេរ `maxDevices` ទៅ `license_keys`',
         wOk.calls.length === 1 && wOk.calls[0][0] === 'update'
-        && wOk.calls[0][1] === 'license_keys/' + APP + '/KKKKKKKKKKKKKKKK'
+        && wOk.calls[0][1] === 'license_keys/' + APP + '/K1'
         && wOk.calls[0][2].maxDevices === 3, wOk.calls);
     ok('⛔ លេខក្រៅជួរ (0) ➜ **មិនសរសេរ** ហើយប្រាប់អ្នកប្រើ',
         wZero.calls.length === 0 && wZero.box.alerted === 1, wZero.calls);
@@ -310,16 +308,16 @@ const meta = { [APP]: { KKKKKKKKKKKKKKKK: { issuedAt: 5, scope: 'ALL', note: '�
         : [String(c[1] || '')]);
     const relPayload = wRel.calls.length === 1 && wRel.calls[0][0] === 'patch' && !wRel.calls[0][1] ? wRel.calls[0][2] : null;
     ok('ដោះឧបករណ៍ ➜ update root តែមួយ (REST PATCH · ⛔ គ្មាន SDK) ៖ លុប node `license_seats` ទាំងមូល + `releasedAt` ម៉ោង server',
-        !!relPayload && relPayload['license_seats/' + APP + '/KKKKKKKKKKKKKKKK'] === null
-        && JSON.stringify(relPayload['license_keys/' + APP + '/KKKKKKKKKKKKKKKK/releasedAt']) === JSON.stringify({ '.sv': 'timestamp' }), wRel.calls);
+        !!relPayload && relPayload['license_seats/' + APP + '/K1'] === null
+        && JSON.stringify(relPayload['license_keys/' + APP + '/K1/releasedAt']) === JSON.stringify({ '.sv': 'timestamp' }), wRel.calls);
     ok('⛔ ទិសផ្ទុយ ៖ ការដោះ **មិនប៉ះ** ពិដាន ឬវាលផ្សេងរបស់ `license_keys` (តែ `releasedAt`)',
         wRel.calls.every((c) => writtenPaths(c).every((p) => p.indexOf('license_keys') !== 0
-            || p === 'license_keys/' + APP + '/KKKKKKKKKKKKKKKK/releasedAt')), wRel.calls);
+            || p === 'license_keys/' + APP + '/K1/releasedAt')), wRel.calls);
     // ⛔ re-audit (K2) ៖ Key គ្មានឧបករណ៍ក្នុងបញ្ជី តែគ្មាន `releasedAt` (ការដោះតាម rules ចាស់លុបកៅអី) ➜ សួរ ហើយចុះត្រាដោះ ·
     //    មានត្រារួចគ្រប់ App ➜ មិនសរសេរ ហើយប្រាប់អ្នកប្រើ · បដិសេធប្រអប់ ➜ មិនសរសេរ
     const emptyPayload = wRelEmpty.calls.length === 1 && wRelEmpty.calls[0][0] === 'patch' && !wRelEmpty.calls[0][1] ? wRelEmpty.calls[0][2] : null;
     ok('⛔ គ្មានឧបករណ៍ · គ្មាន `releasedAt` ➜ ចុះត្រាដោះ (update root តែមួយ · ម៉ោង server) មិនមែន «គ្មានអ្វីត្រូវដោះ»',
-        !!emptyPayload && JSON.stringify(emptyPayload['license_keys/' + APP + '/KKKKKKKKKKKKKKKK/releasedAt']) === JSON.stringify({ '.sv': 'timestamp' })
+        !!emptyPayload && JSON.stringify(emptyPayload['license_keys/' + APP + '/K1/releasedAt']) === JSON.stringify({ '.sv': 'timestamp' })
         && wRelEmpty.box.alerted === 0, wRelEmpty.calls);
     ok('⛔ គ្មានឧបករណ៍ · មាន `releasedAt` រួច ➜ មិនសរសេរ ហើយប្រាប់អ្នកប្រើ',
         wRelStamped.calls.length === 0 && wRelStamped.box.alerted === 1, wRelStamped.calls);

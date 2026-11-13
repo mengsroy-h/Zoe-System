@@ -1887,7 +1887,7 @@ testToastAdmissionFixture();
             'let pendingBarcode = "OLD_SHOP_SCAN", editingItemId = "old-shop-row", pinTargetAction = () => {}; securityState.pinFlowGeneration = 7; scanState.pendingScanSession = { db: "old", auth: 0 };',
             'const expandedTrashGroups = new Set(), ztoListSignedProbe = new Map();',
             sliceConst('ENTRY_SCAN_MODE_KEY'),
-            ...['cancelLicenseInvitation', 'clearLicenseInvitationIntent', 'resetHealthCheck', 'hidePhoneSuggestions', 'setPhoneSearchPulledUp', 'resetPushScheduleSession', 'restoreAfterPdfExport', 'resetBatchScan', 'resetZtoPalmRefresh', 'resetLabelPrint', 'invalidateLookupKeyRestore', 'cancelPendingLookupUnlock', 'clearLookupStatus', 'clearSheetImportSession', 'forgetSupabaseDocsCache', 'resetScanConfirm', 'endPanelGlideSnapPause', 'showAppChrome', 'closeConfigQrScanner', 'cancelZtoPalmSign', 'cancelZtoPalmLogin', 'safeFocusScanner', 'resumeScanVideo'].map(name => 'function ' + name + '() { (__log.leafCalls = __log.leafCalls || []).push("' + name + '"); }'),
+            ...['resetHealthCheck', 'hidePhoneSuggestions', 'setPhoneSearchPulledUp', 'resetPushScheduleSession', 'restoreAfterPdfExport', 'resetBatchScan', 'resetZtoPalmRefresh', 'resetLabelPrint', 'invalidateLookupKeyRestore', 'cancelPendingLookupUnlock', 'clearLookupStatus', 'clearSheetImportSession', 'forgetSupabaseDocsCache', 'resetScanConfirm', 'endPanelGlideSnapPause', 'showAppChrome', 'closeConfigQrScanner', 'cancelZtoPalmSign', 'cancelZtoPalmLogin', 'safeFocusScanner', 'resumeScanVideo'].map(name => 'function ' + name + '() { (__log.leafCalls = __log.leafCalls || []).push("' + name + '"); }'),
             sliceFn('isPinFlowPending'),
             sliceFn('closeModal'),
             'const fixtureCloseModal = closeModal; closeModal = id => { (__log.closed = __log.closed || []).push(id); return fixtureCloseModal(id); };',
@@ -2111,10 +2111,6 @@ testToastAdmissionFixture();
             reconfigured.ctx.__uiState().editingItemId === null && reconfigured.ctx.__uiState().pinFlowGeneration > 7
             && !reconfigured.ctx.__uiState().hasPinAction && reconfigured.ctx.__elements.editPhoneInput.value === ''
             && reconfigured.ctx.__elements.editPhoneModal.style.display === 'none', reconfigured.ctx.__uiState());
-        ok('ប្តូរ Config៖ ហៅការបោះបង់ការអញ្ជើញ',
-            (reconfigured.log.leafCalls || []).includes('cancelLicenseInvitation') && (reconfigured.log.leafCalls || []).includes('clearLicenseInvitationIntent'));
-        ok('ចាប់ផ្តើមដោយគ្មាន App ចាស់៖ មិនបោះបង់ការអញ្ជើញ',
-            !(same.log.leafCalls || []).includes('cancelLicenseInvitation') && !(same.log.leafCalls || []).includes('clearLicenseInvitationIntent'));
         const noCleanup = runInit(false, true, true);
         for (let i = 0; i < 8; i++) { await Promise.resolve(); noCleanup.release(); }
         ok('Negative control: omitted session cleanup retains stale edit and PIN intent',

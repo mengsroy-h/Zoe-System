@@ -205,7 +205,6 @@ function build(server, opts) {
         static now() { return clock.now; }
     }
     const sandbox = {
-        LEGACY_PROTOCOL_ENABLED: true, ZoeSeatConfig: { legacyProtocolEnabled: true },
         console, Promise, Error, JSON, Object, Array, Number, String, Boolean, isNaN, isFinite,
         setTimeout, clearTimeout, Date: Clock, performance: { now: () => clock.mono }, AbortController, Map, Set, TextEncoder, RegExp, Math, Uint8Array,
         crypto: { getRandomValues: ((seed) => (a) => { for (let i = 0; i < a.length; i++) a[i] = (i * 37 + seed * 101 + 11) & 255; return a; })(++buildSeed) },

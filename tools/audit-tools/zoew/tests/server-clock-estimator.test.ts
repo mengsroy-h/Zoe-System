@@ -241,7 +241,6 @@ it('Supabase រក្សា midpoint សម្រាប់ timestamp និង 
 it('Supabase interval ឆ្លងពេលផុត License រក្សា Activation ជំនួសការលុប', async () => {
     vi.spyOn(crypto.subtle, 'importKey').mockResolvedValue({} as any);
     vi.spyOn(crypto.subtle, 'verify').mockResolvedValue(true);
-    vi.stubGlobal('ZoeSeatConfig', { legacyProtocolEnabled: true });
     new Function(readFileSync('public/license-verify.js', 'utf8'))();
     const device = 'SYNTHETICDEVICE1234567890';
     const payload = { a: 'ZOE', id: 'SYNTHETICKEY', iat: START / 1000, exp: (START + DAY) / 1000 };

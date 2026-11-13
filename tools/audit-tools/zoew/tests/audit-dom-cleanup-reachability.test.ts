@@ -35,35 +35,53 @@ function check(text: string) {
     }
 }
 
-describe('DOM checker៖ ផ្លូវសម្អាតផ្ទាំង Key ពិត', () => {
-    it('ទទួលកូដ ZoeKeyGen ពិតដែលចាកចេញតាម helper សម្អាត', () => {
-        const result = check(source);
+const fixtureSource = replaceFunction(source, 'showLoginModalWithPrefill', body => body.replace('{', '{ fixtureInvalidateSession();')) + `
+function fixtureInvalidateSession() { fixtureClearOutput(); }
+function fixtureWriteOutput(value) {
+    document.getElementById('fixtureKeyOutput').value = value;
+    document.getElementById('fixtureFingerprint').textContent = value;
+}
+function fixtureClearOutput() {
+    ['fixtureKeyOutput'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    ['fixtureFingerprint'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = '';
+    });
+}
+`;
+
+describe('DOM checker៖ ផ្លូវសម្អាតតាម helper', () => {
+    it.each([['កូដ ZoeKeyGen ពិត', source], ['វាលសាកល្បង និង helper សម្អាត', fixtureSource]])('ទទួល %s', (_label, input) => {
+        const result = check(input);
         expect(result.output).toContain('ZoeKeyGen --- ids written with data but never blanked on logout: 0');
         expect(result.status).toBe(0);
     });
-    for (const [name, call] of [['showLoginModalWithPrefill', 'invalidateSensitiveSession();'], ['invalidateSensitiveSession', 'clearSecureKeySetup();']]) {
+    for (const [name, call] of [['showLoginModalWithPrefill', 'fixtureInvalidateSession();'], ['fixtureInvalidateSession', 'fixtureClearOutput();']]) {
         for (const replacement of ['', `void '${call}';`, `if (false) ${call}`, `return; ${call}`]) {
             it(`${name}៖ មិនរាប់ការហៅដែលដកចេញ ឬមិនអាចដល់ (${replacement || 'ដក'})`, () => {
-                const result = check(replaceFunction(source, name, body => body.replace(call, replacement)));
+                const result = check(replaceFunction(fixtureSource, name, body => body.replace(call, replacement)));
                 expect(result.status).toBe(1);
-                expect(result.output).toContain('⚠ secureKeySetupKey');
+                expect(result.output).toContain('⚠ fixtureKeyOutput');
             });
         }
     }
-    for (const [property, id] of [['value', 'secureKeySetupKey'], ['textContent', 'secureKeyFingerprint']]) {
+    for (const [property, id] of [['value', 'fixtureKeyOutput'], ['textContent', 'fixtureFingerprint']]) {
         it(`${property}៖ ខ្វះការសម្អាតនៅតែធ្លាក់ ទោះ helper នៅត្រូវហៅ`, () => {
-            const result = check(replaceFunction(source, 'clearSecureKeySetup', body => body.replace(`el.${property} = '';`, `el.${property} = 'នៅសល់';`)));
+            const result = check(replaceFunction(fixtureSource, 'fixtureClearOutput', body => body.replace(`el.${property} = '';`, `el.${property} = 'នៅសល់';`)));
             expect(result.status).toBe(1);
             expect(result.output).toContain(`⚠ ${id}`);
         });
     }
     it('រាប់តែ id ក្នុងបញ្ជីសម្អាតពិត', () => {
-        const result = check(replaceFunction(source, 'clearSecureKeySetup', body => body.replace("'secureKeySetupKey'", "'fixtureOtherField'")));
+        const result = check(replaceFunction(fixtureSource, 'fixtureClearOutput', body => body.replace("'fixtureKeyOutput'", "'fixtureOtherField'")));
         expect(result.status).toBe(1);
-        expect(result.output).toContain('⚠ secureKeySetupKey');
+        expect(result.output).toContain('⚠ fixtureKeyOutput');
     });
     it('វាលថ្មីក្រៅ helper មិនត្រូវបានលើកលែង', () => {
-        const result = check(source + "\nfunction fixtureWrite(value) { document.getElementById('fixtureUncleared').textContent = value; }\n");
+        const result = check(fixtureSource + "\nfunction fixtureWrite(value) { document.getElementById('fixtureUncleared').textContent = value; }\n");
         expect(result.status).toBe(1);
         expect(result.output).toContain('⚠ fixtureUncleared');
     });

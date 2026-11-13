@@ -56,7 +56,7 @@ function realDecl(name) {
 
 const FN_NAMES = [...['getTrustedServerNow', 'captureKeygenClock', 'keygenClockIsCurrent'].filter(name => src.includes('function ' + name + '(')), 'noticeBucketPath', 'cleanNoticeText', 'buildNoticePayload', 'noticeErrorMessage', 'newNoticeId',
     'noticeIdsToTrim', 'noticeRowsOf', 'kickNoticePush', 'fetchWithTimeout', 'setNoticeSendBusy', 'refreshNoticeList', 'renderNoticeList',
-    'sendNotice', 'deleteNotice', 'escapeHtml', 'captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession', 'clearSecureKeySetup', ...(src.indexOf('function lookupSetupScrubUrl(') !== -1 ? ['lookupSetupScrubUrl', 'lookupSetupSecretName'] : []),
+    'sendNotice', 'deleteNotice', 'escapeHtml', 'captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession', ...(src.indexOf('function lookupSetupScrubUrl(') !== -1 ? ['lookupSetupScrubUrl', 'lookupSetupSecretName'] : []),
     'closeModal', 'clearPinInputValues',
     ...(src.indexOf('function adminOperationIsCurrent(') !== -1 ? ['adminOwnerIsCurrent', 'adminOperationIsCurrent'] : [])];
 const DECL_NAMES = ['LICENSE_APP_CODE', 'NOTICE_TITLE_MAX', 'NOTICE_BODY_MAX', 'NOTICE_KEEP_MAX', 'NOTICE_KIND_LABELS', 'NOTICE_ID_ALPHABET', 'NOTICE_SEND_LABEL',
@@ -92,9 +92,7 @@ function build(options) {
     const getElementById = (id) => {
         if (!elements[id]) {
             const classes = new Set();
-            elements[id] = { id, value: '', textContent: '', innerHTML: '', disabled: false,
-                childNodes: [], replaceChildren(...nodes) { this.childNodes = nodes; this.innerHTML = ''; this.textContent = nodes.map(node => typeof node === 'string' ? node : node.textContent || '').join(''); },
-                style: {}, classList: {
+            elements[id] = { id, value: '', textContent: '', innerHTML: '', disabled: false, style: {}, classList: {
                 add: (name) => classes.add(name), remove: (name) => classes.delete(name), contains: (name) => classes.has(name),
                 toggle: (name, on) => { const enabled = on === undefined ? !classes.has(name) : !!on; if (enabled) classes.add(name); else classes.delete(name); return enabled; }
             } };
@@ -132,7 +130,6 @@ function build(options) {
     const ctx = vm.createContext(sandbox);
     vm.runInContext(`
         var sensitiveSessionGeneration = 0;
-        var secureKeySetup = null;
         var authGeneration = 3;
         var isSignedInUiActive = true;
         var keyListSessionGeneration = 0;
@@ -158,16 +155,6 @@ function fill(h, kind, title, body) {
 
 async function run() {
     if (missing.length) return;
-    {
-        const cleanup = build();
-        const row = { textContent: 'សំណើសាកល្បង' };
-        const queue = cleanup.el('licenseInvitationQueue');
-        queue.replaceChildren(row);
-        cleanup.el('licenseInvitationReference').value = 'synthetic-reference';
-        ok('មុនសម្អាត៖ ជួរសំណើមានធាតុសាកល្បង', queue.childNodes.length === 1 && queue.childNodes[0] === row);
-        cleanup.ctx.clearSecureKeySetup();
-        ok('សម្អាតការអញ្ជើញ៖ ដកធាតុ និងលេខយោង', queue.childNodes.length === 0 && queue.textContent === '' && cleanup.el('licenseInvitationReference').value === '');
-    }
     const probe = build();
     const C = probe.ctx;
     const kinds = Object.keys(C.NOTICE_KIND_LABELS);

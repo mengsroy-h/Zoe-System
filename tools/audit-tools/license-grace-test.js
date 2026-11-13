@@ -49,7 +49,6 @@ function build(serverRecord, opts) {
         static now() { return clock.now; }
     }
     const sandbox = {
-        LEGACY_PROTOCOL_ENABLED: true, ZoeSeatConfig: { legacyProtocolEnabled: true },
         console, Promise, Error, JSON, Object, Array, Number, String, Boolean, isNaN,
         setTimeout, clearTimeout, Date: Clock, performance: { now: () => clock.mono }, AbortController, Map, Set, Math, RegExp, Uint8Array,
         crypto: { getRandomValues: (a) => { for (let i = 0; i < a.length; i++) a[i] = (i * 29 + 7) & 255; return a; } },
@@ -214,8 +213,7 @@ const LIVE = { revoked: false, expiresAt: 1000000 + 30 * 86400000 };
     function buildLic(verifyResult, importThrows) {
         const store = {};
         const ctx = {
-            ZoeSeatConfig: { legacyProtocolEnabled: true },
-            window: { ZoeSeatConfig: { legacyProtocolEnabled: true } }, console, setTimeout, clearTimeout,
+            window: {}, console, setTimeout, clearTimeout,
             atob: (x) => Buffer.from(x, 'base64').toString('binary'),
             btoa: (x) => Buffer.from(x, 'binary').toString('base64'),
             TextEncoder, TextDecoder, AbortController,

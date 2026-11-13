@@ -64,8 +64,6 @@ function serviceWorkerPlugin(): Plugin {
                 p === './boot-flags.js' ||
                 p === './firebase-loader.js' ||
                 p === './license-verify.js' ||
-                p === './license-seat-config.js' ||
-                p === './license-seat-client.js' ||
                 p === './error-reporting.js' ||
                 p === './vendor/zxing-wasm.js' ||
                 p === './vendor/zxing_reader.wasm' ||

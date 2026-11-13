@@ -10,7 +10,6 @@ import { applySetupLinkFromUrl } from '../../features/config';
 import { prefetchCustomerDataTableRowsIfConfigured } from '../../features/customer-table';
 import { CUSTOMER_TABLE_CACHE_MS } from '../../features/customer-table-prefetch';
 import { setupHardwareScanner, setupVisibilityHandling } from '../behaviors/scanner-input';
-import { routeLicenseInvitation, resumeLicenseInvitation, cancelLicenseInvitation } from '../../features/license-invitations';
 import { LICENSE_RECHECK_INTERVAL_MS, runPeriodicLicenseCheck } from '../../features/license';
 import { warmZtoLookupProxyNow } from '../../features/lookup-api';
 import { refreshShopBoundUi, refreshZtoTrashModeMark } from '../../features/lookup-config';
@@ -61,10 +60,6 @@ export function bootApplication(scope: LifecycleScope): void {
     scope.onLoad(() => {
         startCoreServices();
         listenSetupLinkNavigation(scope);
-        routeLicenseInvitation();
-        scope.listen(window, 'hashchange', routeLicenseInvitation);
-        scope.listen(window, 'online', () => { void resumeLicenseInvitation(); });
-        scope.onDispose(cancelLicenseInvitation);
         listenPushNetwork(scope);
         startPeriodicTasks(scope);
         scope.onDispose(setupConnectionRecovery());

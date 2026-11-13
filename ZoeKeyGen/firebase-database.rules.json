@@ -19,7 +19,6 @@
           ".read": true,
           ".write": "auth != null && root.child('user_roles').child(auth.uid).val() === 'admin' && data.child('seatProtocol').val() !== 2",
           ".validate": "newData.hasChildren()",
-          "seatProtocol": { ".validate": "newData.isNumber() && newData.val() === 2 && ((!data.parent().exists() && newData.parent().hasChildren(['expiresAt', 'revoked', 'maxDevices']) && newData.parent().child('revoked').val() === false && newData.parent().child('maxDevices').isNumber() && newData.parent().child('maxDevices').val() >= 1 && newData.parent().child('maxDevices').val() <= 5 && newData.parent().child('maxDevices').val() % 1 === 0) || (data.parent().exists() && newData.parent().child('expiresAt').val() === data.parent().child('expiresAt').val() && newData.parent().child('revoked').val() === data.parent().child('revoked').val() && newData.parent().child('maxDevices').val() === data.parent().child('maxDevices').val() && newData.parent().child('releasedAt').val() === data.parent().child('releasedAt').val()))" },
           "expiresAt":  { ".validate": "newData.isNumber() && newData.val() > 0" },
           "revoked":    { ".validate": "newData.isBoolean()" },
           "maxDevices": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 5" },
@@ -78,7 +77,6 @@
         "$keyId": {
           ".write": "auth != null && root.child('user_roles').child(auth.uid).val() === 'admin'",
           ".validate": "newData.hasChildren()",
-          "secureIssued": { ".validate": "newData.isBoolean() && newData.val() === true" },
           "issuedAt":  { ".validate": "newData.isNumber() && newData.val() > 0" },
           "scope":     { ".validate": "newData.isString() && (newData.val() === 'ZOE' || newData.val() === 'ALL')" },
           "note":      { ".validate": "newData.isString()" },

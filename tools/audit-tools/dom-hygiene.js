@@ -179,17 +179,18 @@ for (const app of ['ZoeW', 'ZoeKeyGen']) {
     if (app === 'ZoeKeyGen') {
         const functions = new Map(programs.flatMap(program => program.body)
             .filter(node => node.type === 'FunctionDeclaration').map(node => [node.id.name, node]));
-        const callsDirectly = (caller, callee) => {
-            for (const statement of functions.get(caller)?.body.body || []) {
+        const reachable = new Set(['showLoginModalWithPrefill']);
+        for (const name of reachable) {
+            for (const statement of functions.get(name)?.body.body || []) {
                 if (['ReturnStatement', 'ThrowStatement'].includes(statement.type)) break;
                 const call = statement.type === 'ExpressionStatement' && statement.expression;
-                if (call?.type === 'CallExpression' && call.callee.type === 'Identifier' && call.callee.name === callee) return true;
+                if (call?.type === 'CallExpression' && call.callee.type === 'Identifier' && functions.has(call.callee.name)) {
+                    reachable.add(call.callee.name);
+                }
             }
-            return false;
-        };
-        if (callsDirectly('showLoginModalWithPrefill', 'invalidateSensitiveSession') &&
-            callsDirectly('invalidateSensitiveSession', 'clearSecureKeySetup')) {
-            for (const statement of functions.get('clearSecureKeySetup')?.body.body || []) {
+        }
+        for (const name of reachable) {
+            for (const statement of functions.get(name)?.body.body || []) {
                 if (['ReturnStatement', 'ThrowStatement'].includes(statement.type)) break;
                 const call = statement.type === 'ExpressionStatement' && statement.expression;
                 if (call?.type !== 'CallExpression' || call.callee.type !== 'MemberExpression' ||

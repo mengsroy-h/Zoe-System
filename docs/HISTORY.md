@@ -43,19 +43,17 @@
 ## 📌 ការងារដែលនៅសល់ — ការផ្ទៀងផ្ទាត់ដោយអ្នកប្រើ
 - 🔍 **Audit #1322 ក្រោយផ្លាស់ `tools/`**៖ shards ទាំងប្រាំលើ `e9f5300` ធ្លាក់សរុប 52 checker និងឆ្លង 201។ កែ glob របស់ audit bridge, paths/fixtures, doc selector និង pin ដែលបាន review ក្នុងម៉ាស៊ីន; focused non-browser regression ឆ្លង ប៉ុន្តែមិនទាន់ផ្សាយ ឬផ្ទៀង browser CI ឡើងវិញ។ ករណី child revenue-fuzz ពីរមិនមាន assertion logs ពេញ ដូច្នេះនៅមិនទាន់បញ្ជាក់មូលហេតុទាំងអស់។ Palm mock caveat ចាស់ និង full CI នៅបើក; មិនរត់ security/race/upstream reproduction បន្ថែម។
 - 🔍 **Audit 2026-11-12 មិនទាន់ចេញផ្សាយ**៖ កែ session modal, សោ price operation, `my_account` និង Netlify session authorization, parser Google Sheets។ ត្រូវអនុវត្ត migration `20261112054956_zoe_account_active_session.sql` និង deploy functions/App ក្រោយការផ្ទៀងពេញលេញ; Apps Script reader ត្រូវ copy និង Deploy ជាកំណែថ្មី។ គ្មានការប្ដូរផលិតកម្មក្នុង session នេះ។
-- 🔍 **ការផ្ទៀង commit ចុងក្រោយ**៖ ZTO guards និង native/browser លើ commit ដំបូងឆ្លងក្នុង CI ហើយ hash lock បានធ្វើបច្ចុប្បន្នភាពតាមភស្តុតាង។ ការកែ license និង fixtures បន្ទាប់ត្រូវការ strict CI ថ្មីលើ exact head មុនអះអាង release-ready។
-- 🔍 **License rollout**៖ enrollment, signed receipt និង cutover code រៀបចំរួចក្នុង PR; defaults មិនបើក production។ ត្រូវ provision receipt key/public pins, Publish License rules, ផ្ទេរគ្រប់ Key/ឧបករណ៍ ហើយចូលនិវត្តន៍ legacy ដោយ `legacyProtocolEnabled:false` មុនចាត់ទុក offline bypass បានបិទ។ APK gate ទុកដដែលតាមម្ចាស់គម្រោង។
+- 🔍 **ការផ្ទៀង commit ចុងក្រោយ**៖ ការត្រឡប់ License ឆ្លងតេស្ត local ដែលរាយក្នុងកំណែ [2.50.201]; ត្រូវការ strict CI ថ្មីលើ SHA ចុងក្រោយមុនអះអាង release-ready។ CI និង hash locks ក្នុងប្រវត្តិមិនជំនួសការផ្ទៀងកូដថ្មីទេ។
+- 🔍 **Key ➜ Activate [2.50.201 · ZoeKeyGen 2.24.49]**៖ ត្រូវផ្ទៀង Key ថ្មី, ពិដានឧបករណ៍, Extend/Revoke/ដោះឧបករណ៍ និង cache update លើ PWA/iPhone/APK។ Key `seatProtocol:2` រួមទាំងកំណត់ត្រាក្នុងឧបករណ៍ត្រូវបដិសេធ; ម្ចាស់ចេញ Key ថ្មីដោយខ្លួនឯង។ Rules និងកំណែដែលកំពុងដាក់ប្រើពិតនៅមិនទាន់ផ្ទៀង; លំដាប់ចេញប្រើនៅផ្នែក ១។
 - 🔍 **Clock/ឧបករណ៍ពិត**៖ ផ្ទៀង history loading ក្រោយ session verification លើ iPhone/Android មុន merge។ Exact-SHA strict CI ជាភស្តុតាងក្នុងវិសាលភាព checker របស់វា; លទ្ធផលចាស់រក្សាក្នុងផ្នែកប្រវត្តិ។
 - 🔍 **Registration rollout**៖ Hosted project ដែលភ្ជាប់មាន migration versions ទាំង៦២ និង protocol 1/accepting/deferred trigger; មិនជំនួស hosted backup/restore ឬការរង់ចាំ handler ចាស់ឱ្យចប់។ មូលហេតុ F03 បរាជ័យដំបូងក្នុង session ចាស់នៅមិនទាន់បញ្ជាក់; dead-code ដែល dynamic references មិនអាចសម្រេចបាននៅរក្សាទុក។
 > ⛔ **ផ្នែកនេះកាន់តែការងារដែលនៅបើក** ៖ ស្ថានភាព git · អ្វីដែលអ្នកប្រើមិនទាន់បញ្ជាក់ · សកម្មភាពដោយដៃដែលមិនទាន់ធ្វើ · ការសម្រេចដែលនៅរស់។
 > អ្នកប្រើបញ្ជាក់ ឬធ្វើរួច ➜ **លុបធាតុនោះ** (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុងផ្នែក ១ · ២) ⛔ កុំបន្ថែមខ្សែ branch/PR ចាស់ (git ជាភស្តុតាង) ·
 > ⛔ ≤ ៨០ បន្ទាត់ (`doc-scope-test`)។
 ### 🤝 Handoff
-
 - ⛔ **ផ្ទៀងផ្ទាត់ git មុនជឿអត្ថបទនេះ** (`git log --oneline -3 origin/main` · `git rev-list --count origin/main..origin/<branch>`) · ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង ·
   ឆ្លើយជាខ្មែរ · ផ្ទៀងវិសាលភាពការអនុញ្ញាតមុន publication; PR មិនមានន័យថាអនុញ្ញាត merge ឬ deploy ដោយដៃទេ។
 - ⛔ លទ្ធផល local ត្រូវភ្ជាប់ source/tree និងវិសាលភាព checks; មិនជំនួស CI ៤ ផ្នែក ឬការផ្ទៀង live runtime/ឧបករណ៍ពិត។ ការអនុញ្ញាត និងព្រំដែនជុំបច្ចុប្បន្នយកពីសន្ទនា; ឯកសារចាស់មិនផ្ដល់សិទ្ធិថ្មី ឬដាក់កម្រិតជំនួសសំណើបច្ចុប្បន្នទេ។
-
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
 - ⏳ **Launch audit និង preview**៖ កំណែសាក ZoeW `2.50.194` / ZoeKeyGen `2.24.40`៖ ផ្ទៀង exact-commit deploy/CI តាម [PR400](https://github.com/mengsroy-h/Zoe-System/pull/400) និង evidence bundle ថ្មីដែល Audit 1242 យោង; ភស្តុតាង Audit 1241 នៅជារបស់ commit `61db3ff21734a784d1ce0bf9bb281a2170d5e672`។ Sustained hosted parcel workload, ZTO/push ពិត និងទូរស័ព្ទពិតនៅមិនទាន់ផ្ទៀង។ រក្សាសកម្មភាព rollout របស់ Audit 1238–1240 ដែលនៅបើក និង pending journals; សិទ្ធិ publication/merge/deploy ត្រូវយកពីសន្ទនាបច្ចុប្បន្ន។
@@ -122,6 +120,18 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ archive ផ្នែក ៩ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### ZoeW [2.50.201] · ZoeKeyGen [2.24.49] — 2026-11-13 · ត្រឡប់ទៅ Key ➜ Activate
+
+**ZoeW** (`zoew-v464` ➜ `zoew-v465`) និង **ZoeKeyGen** (`zoekeygen-v159` ➜ `zoekeygen-v160`)។ តាមសំណើម្ចាស់ ត្រឡប់តែផ្លូវ License ទៅមូលដ្ឋាន `7b66aa1` ដោយរក្សាការកែអាជីវកម្ម និងការរៀបចំ repository បច្ចុប្បន្ន។
+
+- អ្នកលក់ចេញ Key ដែលចុះហត្ថលេខា ➜ អតិថិជនបិទភ្ជាប់ ➜ ចុច **ដាក់ Active** ដោយមានអ៊ីនធឺណិត។ ដកផ្លូវ enrollment, signed receipt, cutover និងការអញ្ជើញ License ពី App និង server; កូដអញ្ជើញហាង Supabase និង Setup Link នៅដដែល។
+- រក្សាការផ្ទៀងហត្ថលេខា, Server clock, សុពលភាព, ពិដានឧបករណ៍, Extend, Revoke និងការដោះឧបករណ៍តាមផ្លូវ Key ដើម។ កំណត់ត្រា `seatProtocol:2` រួមទាំង local cache ត្រូវបដិសេធ; គ្មានការបម្លែង ឬបន្ថយ marker ដោយស្វ័យប្រវត្តិ។ ម្ចាស់ទទួលយកថា License ប្រភេទនេះអាចឈប់ដំណើរការ ហើយលុប/ចេញ Key ថ្មីដោយខ្លួនឯងបើចាំបាច់។
+- **សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ ក្រោយ review និងការអនុញ្ញាតចេញប្រើ ត្រូវផ្ទៀង License rules ដែលកំពុងប្រើពិត។ Key ថ្មីធម្មតាត្រូវបានគាំទ្រដោយ rules ក្នុង repository មុនការត្រឡប់នេះ; មិនទាមទារ Publish rules ដើម្បីចេញ Key ថ្មីតែប៉ុណ្ណោះទេ។ បើត្រូវការប្ដូរ rules តាមការកែដែលបាន review ត្រូវ paste `ZoeKeyGen/firebase-database.rules.json` ក្នុង License Project ➜ **Publish មុន**ដាក់ ZoeKeyGen/ZoeW ជាកំណែសម្របគ្នាឱ្យប្រើ។ Update PWA និង APK ហើយផ្ទៀង Key ថ្មី និងសកម្មភាពគ្រប់គ្រងលើឧបករណ៍ពិត។
+- **រក្សាទិន្នន័យ**៖ មិនលុប App/site data, មិន reset migrations, មិនប្ដូរ Signing Key និងមិនលុប License ឬទិន្នន័យពិតក្នុងការងារនេះ។ ការចេញ Key ជំនួសជាការងាររបស់ម្ចាស់; មិនមែនការអនុញ្ញាតឱ្យ script ធ្វើដោយស្វ័យប្រវត្តិទេ។
+- **ការផ្ទៀង local**៖ `license-key-activation-default-test` render ប្រអប់ពិត និងរត់ generator ពិតជាមួយ signer សំយោគ៖ មុនត្រឡប់ ៩ PASS/១០ FAIL ➜ ក្រោយត្រឡប់ ១៩/១៩។ `tools/audit-tools/zoew/tests/license-key-activation-restore.test.ts` ផ្ទៀង verifier ទាំងពីរ ដោយ ECDSA ពិត និង expressions នៃ rules ក្នុង repo ជាមួយ transport ក្លែង៖ ១០/១០; មិនមែន Firebase emulator ទេ។ Focused Vitest រួម `tools/audit-tools/zoew/tests/activation-logout-controls.test.tsx`, native Back និង hash locks៖ ១៥ ឯកសារ/៤២២ ករណីឆ្លងដោយ worker មួយ។ ពេលរត់ស្របគ្នាជាមួយ build checks មាន setup lookup ២ ករណី timeout ៥ វិនាទី; រត់ដាច់ដោយឡែក ៤២/៤២ និងសំណុំពេញខាងលើឆ្លងដោយមិនប្ដូរពិដាន។ Typecheck, lint, production build, doc:check, android:check ១៣៥/១៣៥, coverage ១០/១០ និង source checkers សម្រាប់ Key/clock/device-seat/Logout ឆ្លង។
+- **Netlify**៖ ត្រូវដាក់ ZoeW រួម functions និង ZoeKeyGen ពី commit ដូចគ្នាក្រោយអនុម័ត។ កំណែនេះដក endpoints `license-seat-stage` និង `license-invitations`; មិនទាមទារ receipt/invitation config ឬ secrets ថ្មីទេ។ កំណត់ត្រា Blob និងការកំណត់ដែលមានស្រាប់មិនត្រូវបានលុប ឬប្ដូរ។
+- **ព្រំដែន**៖ ការងារនេះនៅក្នុងម៉ាស៊ីនប៉ុណ្ណោះ; គ្មាន push, merge, deploy ឬការកែ live rules/config/data។ Audit browser build ជាប់ Chromium `socket(): Operation not permitted`; generated-tree checks (version/doc scope/connection recovery), Firebase emulator, ស្ថានភាពផលិតកម្ម, CI លើកូដថ្មី និង PWA/iPhone/APK លើឧបករណ៍ពិតនៅមិនទាន់ផ្ទៀង។ ប្រវត្តិកំណែ License មុននៅរក្សាជាឯកសារយោង មិនមែនជាផែនការ rollout បច្ចុប្បន្នទេ។
 
 ### ZoeW [2.50.200] · ZoeKeyGen [2.24.48] — 2026-11-13 · ផ្ទៀង CI ការអញ្ជើញ
 
@@ -5234,6 +5244,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `license-clock-trust-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `license-grace-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ · ផ្នែក ៩ |
 | `license-invitation-default-ui-test` | ផ្នែក ១ | — |
+| `license-key-activation-default-test` | ផ្នែក ១ | — |
 | `license-network-pressure-test` | — | ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `license-record-race-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ |
 | `license-seat-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៥ · ផ្នែក ៧ · ផ្នែក ៨ |
@@ -5367,6 +5378,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `zto-signed-status-test` | — | ផ្នែក ១ · ផ្នែក ៥ |
 | `zto-sync-banner-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `tools/audit-tools/zoew/tests/account-session-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `tools/audit-tools/zoew/tests/activation-logout-controls.test.tsx` | ផ្នែក ១ | — |
 | `tools/audit-tools/zoew/tests/activation-retry.test.ts` | — | ផ្នែក ៧ |
 | `tools/audit-tools/zoew/tests/adaptive-refresh.test.ts` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/app-icon-logo.test.tsx` | — | ផ្នែក ៧ |
@@ -5481,6 +5493,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `tools/audit-tools/zoew/tests/license-invitations-seller.test.ts` | ផ្នែក ១ | — |
 | `tools/audit-tools/zoew/tests/license-invitations-server.test.ts` | ផ្នែក ១ | — |
 | `tools/audit-tools/zoew/tests/license-invitations.test.ts` | ផ្នែក ១ | — |
+| `tools/audit-tools/zoew/tests/license-key-activation-restore.test.ts` | ផ្នែក ១ | — |
 | `tools/audit-tools/zoew/tests/license-seat-runtime-context.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/license-seat-seller.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/license-secure-issuance.test.ts` | ផ្នែក ២ | — |

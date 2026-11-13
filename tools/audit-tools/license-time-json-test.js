@@ -26,7 +26,7 @@ function fixture(file, responder, overrides = {}) {
     const savedActivation = JSON.stringify({ keyString: "existing-activation", id: "existing-id", exp: 2000000000 });
     const storage = new Map([["zoe_license_activation_ZOE", savedActivation]]);
     let id = 0;
-    const sandbox = { ZoeSeatConfig: { legacyProtocolEnabled: true }, console, Date: FixedDate, performance: { now: () => 1000 }, crypto: webcrypto, URL, AbortController, TextEncoder, TextDecoder,
+    const sandbox = { console, Date: FixedDate, performance: { now: () => 1000 }, crypto: webcrypto, URL, AbortController, TextEncoder, TextDecoder,
         navigator: { onLine: true },
         localStorage: { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) },
         setTimeout(fn, delay) { pendingTimers.set(++id, { fn, delay }); return id; },

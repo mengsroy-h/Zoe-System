@@ -34,7 +34,6 @@ function build(savedPin, savedSigningKey) {
             const classes = {};
             els[id] = {
                 id, value: '', textContent: '', style: {},
-                childNodes: [], replaceChildren(...nodes) { this.childNodes = nodes; this.textContent = nodes.map(node => typeof node === 'string' ? node : node.textContent || '').join(''); },
                 classList: {
                     add: (c) => { classes[c] = true; },
                     remove: (c) => { delete classes[c]; },
@@ -66,22 +65,12 @@ function build(savedPin, savedSigningKey) {
     // ⛔ កំណែ 2.22.5 ៖ storage ចូលប្រើតាម shim `appLocalStore` / `appSessionStore`
     // បូក `safeStoreGet()` ថ្មី ➜ sandbox ត្រូវផ្តល់ពួកវា។
     vm.runInContext('if (typeof appLocalStore === \'undefined\') globalThis.appLocalStore = (typeof localStorage !== \'undefined\' ? localStorage : null); if (typeof appSessionStore === \'undefined\') globalThis.appSessionStore = (typeof sessionStorage !== \'undefined\' ? sessionStorage : null); if (typeof safeStoreGet !== \'function\') globalThis.safeStoreGet = function (s, k) { try { return s ? s.getItem(k) : null; } catch (e) { return null; } }; if (typeof safeStoreSet !== \'function\') globalThis.safeStoreSet = function (s, k, v) { try { return s ? (s.setItem(k, String(v)), true) : false; } catch (e) { return false; } }; if (typeof safeStoreRemove !== \'function\') globalThis.safeStoreRemove = function (s, k) { try { return s ? (s.removeItem(k), true) : false; } catch (e) { return false; } };', ctx);
-    vm.runInContext('var pinTargetAction = null; var sensitiveSessionGeneration = 0; var secureKeySetup = null; var isSignedInUiActive = false; var auth = { currentUser: null }; var signingPrivateKeyJwk = null; var SIGNING_KEY_SESSION_STORAGE_KEY = "zoekeygen_signing_key_enc";', ctx);
+    vm.runInContext('var pinTargetAction = null; var sensitiveSessionGeneration = 0; var isSignedInUiActive = false; var auth = { currentUser: null }; var signingPrivateKeyJwk = null; var SIGNING_KEY_SESSION_STORAGE_KEY = "zoekeygen_signing_key_enc";', ctx);
     const baseZ = src.match(/^const MODAL_BASE_Z = \d+;$/m);
-    vm.runInContext((baseZ ? baseZ[0] + '\n' : '') + slice(['invalidateSensitiveSession', 'clearSecureKeySetup', ...(src.indexOf('function lookupSetupScrubUrl(') !== -1 ? ['lookupSetupScrubUrl', 'lookupSetupSecretName'] : []), 'clearPinInputValues', 'openModalHelper', 'closeModal', 'isPinFlowPending', 'requestPinBeforeConfig', 'requestSessionSigningKeyRestoreIfEligible', 'checkPinAndOpenConfig']), ctx);
+    vm.runInContext((baseZ ? baseZ[0] + '\n' : '') + slice(['invalidateSensitiveSession', ...(src.indexOf('function lookupSetupScrubUrl(') !== -1 ? ['lookupSetupScrubUrl', 'lookupSetupSecretName'] : []), 'clearPinInputValues', 'openModalHelper', 'closeModal', 'isPinFlowPending', 'requestPinBeforeConfig', 'requestSessionSigningKeyRestoreIfEligible', 'checkPinAndOpenConfig']), ctx);
     return { ctx, els, getEl };
 }
 
-{
-    const cleanup = build();
-    const row = { textContent: 'សំណើសាកល្បង' };
-    const queue = cleanup.getEl('licenseInvitationQueue');
-    queue.replaceChildren(row);
-    cleanup.getEl('licenseInvitationReference').value = 'synthetic-reference';
-    ok('មុនសម្អាត៖ ជួរសំណើមានធាតុសាកល្បង', queue.childNodes.length === 1 && queue.childNodes[0] === row);
-    cleanup.ctx.clearSecureKeySetup();
-    ok('សម្អាតការអញ្ជើញ៖ ដកធាតុ និងលេខយោង', queue.childNodes.length === 0 && queue.textContent === '' && cleanup.getEl('licenseInvitationReference').value === '');
-}
 console.log('-- checkPinAndOpenConfig មិនត្រូវទទួលមរតក callback ចាស់ --');
 let h = build(null);
 h.ctx.requestPinBeforeConfig(h.ctx.persistSigningKeyForSession, 'ចងចាំ Signing Key');

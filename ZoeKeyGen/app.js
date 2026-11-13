@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.48';
+const APP_VERSION = '2.24.49';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -19,12 +19,6 @@ const ACTION_ALLOWLIST = [
     "dismissKeypairModal",
     "doLogin",
     "generateLicenseKey",
-    "refreshSecureKeySetup",
-    "inspectSecureKeyEnrollment",
-    "createLicenseInvitation",
-    "refreshLicenseInvitations",
-    "copyLicenseInvitation",
-    "approveSecureKeyEnrollment",
     "generateNewKeypair",
     "generateSetupLink",
     "goToKgNext",
@@ -680,7 +674,6 @@ function liveToastState(key) {
 
 function invalidateSensitiveSession() {
     sensitiveSessionGeneration++;
-    clearSecureKeySetup();
     const setupSecret = document.getElementById('setupLookupSecretInput');
     if (setupSecret) setupSecret.value = '';
     const setupUrl = document.getElementById('setupLookupUrlInput');
@@ -769,7 +762,6 @@ function closeModal(id) {
         clearPinInputValues();
         pinTargetAction = null;
     }
-    if (id === 'secureKeySetupModal') clearSecureKeySetup();
     if (id === 'keypairModal') {
         clearKeypairOutputs();
     }
@@ -2399,15 +2391,13 @@ async function generateLicenseKey() {
         const publicRecord = {
             expiresAt: payload.exp * 1000,
             revoked: false,
-            maxDevices: maxDevices,
-            seatProtocol: 2
+            maxDevices: maxDevices
         };
         const metaRecord = {
             issuedAt: payload.iat * 1000,
             scope: appSelect,
             note: note || '',
-            createdBy: operation.user.email || operation.user.uid,
-            secureIssued: true
+            createdBy: operation.user.email || operation.user.uid
         };
 
         let generateAlreadyTimedOut = false;
@@ -2416,23 +2406,22 @@ async function generateLicenseKey() {
             [`license_keys/${p}/${payload.id}`]: publicRecord,
             [`license_keys_meta/${p}/${payload.id}`]: metaRecord
         })), 3, 1000)));
-        writePromise.then(async (bgResults) => {
+        writePromise.then((bgResults) => {
             if (!generateAlreadyTimedOut) return;
             if (myGeneration !== keyListSessionGeneration || !generateIsCurrent()) return;
             const bgSucceededPaths = targetPaths.filter((p, i) => bgResults[i].status !== 'rejected');
             if (bgSucceededPaths.length > 0) {
                 const landed = `⏱️ Key ${payload.id} ដែលអស់ពេលមុន ត្រូវបានបង្កើតជោគជ័យទីបំផុតសម្រាប់: ${bgSucceededPaths.join(', ')} — `;
                 if (myGenerate === generateLicenseKey.generation) {
-                    await publishSecureGeneratedKey({ database: operationDb, current: () => generateIsCurrent() && myGenerate === generateLicenseKey.generation }, payload.id, keyString);
-                    if (!generateIsCurrent()) return;
+                    lastGeneratedKey = keyString;
+                    document.getElementById('genResultKey').textContent = keyString;
+                    document.getElementById('genResultBox').classList.remove('hidden');
                     showToast(landed + 'Key បង្ហាញក្នុងប្រអប់លទ្ធផលហើយ សូមចម្លងវាប្រគល់អតិថិជន (កុំបង្កើត Key ត្រួតគ្នា)!');
                 } else {
                     showToast(landed + 'សូមកុំបង្កើត Key ត្រួតគ្នា, ពិនិត្យ Key List ជាមុនសិន!');
                 }
                 refreshKeyList();
             }
-        }).catch(() => {
-            if (generateIsCurrent()) showToast('⚠️ សូមចុច Refresh ហើយបន្តរៀបចំ Key សុវត្ថិភាពពីតារាង។');
         });
 
         let results;
@@ -2463,12 +2452,13 @@ async function generateLicenseKey() {
         }
 
         if (!generateIsCurrent()) return;
-        await publishSecureGeneratedKey({ database: operationDb, current: () => generateIsCurrent() && myGenerate === generateLicenseKey.generation }, payload.id, keyString);
-        if (!generateIsCurrent()) return;
+        lastGeneratedKey = keyString;
+        document.getElementById('genResultKey').textContent = keyString;
+        document.getElementById('genResultBox').classList.remove('hidden');
         document.getElementById('genNoteInput').value = '';
 
         if (failedPaths.length === 0) {
-            showToast('✅ បានបង្កើត Key សុវត្ថិភាព។ សូមបន្តអនុម័តឧបករណ៍ក្នុងប្រអប់ណែនាំ។');
+            showToast('✅ Key ត្រូវបានបង្កើត និងកត់ត្រាទុករួចរាល់!');
         } else {
             const extraWarning = appPathsTagFailed
                 ? '\n\n⚠️ បន្ថែមទៀត Key List នៅក្នុង App នេះប្រហែលជាមិនបង្ហាញត្រឹមត្រូវថា Key នេះ Active នៅ App ណាខ្លះទេ — សូមពិនិត្យផ្ទាល់នៅ Firebase Console (path license_keys) មុននឹង Revoke ឬបន្ថែមសុពលភាព Key នេះ។'
@@ -2486,7 +2476,7 @@ async function generateLicenseKey() {
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'generateLicenseKey' });
         alert(e && e.message === 'Generate key timed out'
             ? '⏳ ការបង្កើត Key មិនទាន់បញ្ជាក់ទេ (អ៊ីនធឺណិតយឺត ឬដាច់)។ Key អាចនឹងចុះដោយស្វ័យប្រវត្តិពេលភ្ជាប់វិញ — សូមចុច 🔄 Refresh មើល Key List មុនបង្កើតម្តងទៀត (កុំបង្កើត Key ត្រួតគ្នា)។'
-            : 'មិនទាន់បញ្ជាក់ការបង្កើត Key សុវត្ថិភាព។ សូម Refresh មើលតារាងមុនបង្កើតម្ដងទៀត។ បើគ្មាន Key សូមពិនិត្យ Firebase Rules សម្រាប់ Key សុវត្ថិភាព និងសិទ្ធិគណនី។');
+            : 'មិនអាចបង្កើត Key បានទេ! សូមពិនិត្យការភ្ជាប់ Firebase និងសិទ្ធិគណនី។');
     } finally {
         if (generateKeyOwner === owner) {
             generateKeyOwner = null;
@@ -2982,19 +2972,15 @@ function renderKeyList() {
     }
     const now = getServerNow();
     tbody.innerHTML = keyListCache.map((row) => {
-        const secure = row.paths.some((p) => row.perApp[p] && row.perApp[p].seatProtocol === 2);
         let statusHtml;
-        if (secure) statusHtml = '<span class="badge badge-scope">🔐 សូមពិនិត្យតាមគ្រប់គ្រងឧបករណ៍សុវត្ថិភាព</span>';
-        else if (row.revoked) statusHtml = '<span class="badge badge-revoked">Revoked</span>';
+        if (row.revoked) statusHtml = '<span class="badge badge-revoked">Revoked</span>';
         else if (row.expiresAt && now > row.expiresAt) statusHtml = '<span class="badge badge-expired">ផុតកំណត់</span>';
         else statusHtml = '<span class="badge badge-active">Active</span>';
 
-        const expStr = secure ? 'ពិនិត្យពី Server សុវត្ថិភាព' : row.expiresAt ? new Date(row.expiresAt).toLocaleDateString('km-KH', { timeZone: 'Asia/Phnom_Penh' }) : '-';
+        const expStr = row.expiresAt ? new Date(row.expiresAt).toLocaleDateString('km-KH', { timeZone: 'Asia/Phnom_Penh' }) : '-';
 
         let seatHtml;
-        if (secure) {
-            seatHtml = '';
-        } else if (seatReadFailed) {
+        if (seatReadFailed) {
             seatHtml = `<span class="badge badge-scope" title="${escapeHtml('អាន license_seats មិនបានទេ — សូមប្រាកដថា Firebase Rules ថ្មីត្រូវបាន Publish រួច')}">⚠️ ពិនិត្យមិនបាន</span>`;
         } else if (row.seatDevices.length > 0) {
             const boundText = row.seatDevices.map(seatDeviceLabel).join(' · ');
@@ -3004,7 +2990,7 @@ function renderKeyList() {
             seatHtml = `<span class="badge badge-scope">📱 ទំនេរ (0/${escapeHtml(String(row.maxDevices))})</span>`;
         }
 
-        if (!secure && row.inconsistent) {
+        if (row.inconsistent) {
             const perAppText = row.paths.map((p) => (APP_LABELS[p] || p) + ' = '
                 + (row.perApp[p].revoked ? 'Revoked' : 'Active') + ', ផុតកំណត់ '
                 + (row.perApp[p].expiresAt ? new Date(row.perApp[p].expiresAt).toLocaleDateString('km-KH', { timeZone: 'Asia/Phnom_Penh' }) : '-')).join(' · ');
@@ -3025,586 +3011,17 @@ function renderKeyList() {
             <td>${statusHtml} ${seatHtml}</td>
             <td>
                 <div class="btn-row">
-                    <button class="btn-mini" data-key-id="${escapeHtml(row.id)}" data-action="revoke">${secure ? '⛔ បិទ / បើក' : row.revoked ? '✅ សង្គ្រោះ' : '⛔ Revoke'}</button>
+                    <button class="btn-mini" data-key-id="${escapeHtml(row.id)}" data-action="revoke">${row.revoked ? '✅ សង្គ្រោះ' : '⛔ Revoke'}</button>
                     <button class="btn-mini" data-key-id="${escapeHtml(row.id)}" data-action="extend">⏳ បន្ថែម</button>
                     <button class="btn-mini" data-key-id="${escapeHtml(row.id)}" data-action="devices">📱 ចំនួនឧបករណ៍</button>
                     <button class="btn-mini" data-key-id="${escapeHtml(row.id)}" data-action="release">🔓 ដោះឧបករណ៍</button>
-                    <button class="btn-mini" data-key-id="${escapeHtml(row.id)}" data-action="${secure && row.secureIssued === true ? 'secure-setup' : 'secure-seats'}">${secure && row.secureIssued === true ? '🔐 រៀបចំ / បន្ត Key សុវត្ថិភាព' : '🔐 គ្រប់គ្រងឧបករណ៍សុវត្ថិភាព'}</button>
                 </div>
             </td>
         </tr>`;
     }).join('');
 }
 
-function seatSellerContext() {
-    const operation = captureSensitiveSession(true);
-    const database = db;
-    const privateKey = signingPrivateKeyJwk;
-    const current = () => !!operation && adminOperationIsCurrent(operation) && isSensitiveSessionCurrent(operation, true) && db === database && signingPrivateKeyJwk === privateKey;
-    return { operation, database, privateKey, current };
-}
-
-async function seatSellerRow(context, id) {
-    if (!context.current()) throw Object.assign(new Error('seat-session-changed'), { noRetry: true });
-    const base = databaseUrlOf(context.database);
-    if (!base || !isFirebaseDatabaseHost(base) || !/^[A-Z0-9]{16,40}$/.test(id)) throw new Error('seat-scope');
-    const out = await fetchWithTimeout(base + '/license_keys/ZOE/' + id + '.json', { cache: 'no-store' }, 10000, 'Seat read timed out',
-        (res) => res.ok ? res.json() : Promise.reject(new Error('seat-read-failed')));
-    if (!context.current()) throw Object.assign(new Error('seat-session-changed'), { noRetry: true });
-    if (!out.body || typeof out.body !== 'object' || (out.body.seatProtocol !== undefined && out.body.seatProtocol !== 1 && out.body.seatProtocol !== 2)) throw new Error('seat-row-invalid');
-    return out.body;
-}
-
-async function requireLegacySeat(context, id) {
-    const row = await seatSellerRow(context, id);
-    if (!context.current() || row.seatProtocol === 2) throw Object.assign(new Error('seat-authority-changed'), { noRetry: true });
-    return row;
-}
-
-function seatLegacyExpiresAt(value) {
-    if (!Number.isFinite(value) || value <= 0) return null;
-    const expiresAt = Math.floor(value);
-    return Number.isSafeInteger(expiresAt) && expiresAt > 0 ? expiresAt : null;
-}
-
-async function seatSellerMark(context, id, state) {
-    const markerClock = captureKeygenClock();
-    if (!markerClock) throw new Error('seat-clock');
-    const latest = await seatSellerRow(context, id);
-    const sdk = fb;
-    let watching = true;
-    let watchError = null;
-    let unsubscribe = () => {};
-    const current = () => watching && !watchError && context.current() && fb === sdk && signingPrivateKeyJwk === context.privateKey && keygenClockIsCurrent(markerClock);
-    if (!current()) throw new Error('seat-session-changed');
-    const target = sdk.ref(context.database, 'license_keys/ZOE/' + id);
-    let failWatch;
-    const failed = new Promise((_, reject) => { failWatch = (error) => { watchError = error; reject(error); }; });
-    try {
-        const ready = new Promise((resolve) => {
-            unsubscribe = sdk.onValue(target, (snapshot) => {
-                const value = snapshot.val();
-                if (!value || typeof value !== 'object' || Array.isArray(value) || (value.seatProtocol !== undefined && value.seatProtocol !== 1 && value.seatProtocol !== 2)) {
-                    failWatch(new Error('seat-row-invalid'));
-                    return;
-                }
-                resolve();
-            }, failWatch);
-        });
-        await withTimeout(Promise.race([ready, failed]), 15000, 'Seat marker read timed out');
-        if (!current()) throw new Error('seat-session-changed');
-        if (latest.seatProtocol !== 2) {
-            const result = await withTimeout(Promise.race([sdk.runTransaction(target, (value) => {
-                if (!current() || !value || typeof value !== 'object' || Array.isArray(value)) return;
-                if (value.seatProtocol === 2) return;
-                if (value.seatProtocol !== undefined && value.seatProtocol !== 1) return;
-                if ((value.maxDevices || 1) !== state.maxDevices || value.expiresAt !== latest.expiresAt || seatLegacyExpiresAt(value.expiresAt) !== state.licenseExpiresAt || !!value.revoked !== state.revoked) return;
-                return { ...value, seatProtocol: 2 };
-            }, { applyLocally: false }), failed]), 15000, 'Seat marker outcome unknown');
-            if (!current()) throw new Error('seat-session-changed');
-            if (!result || typeof result.committed !== 'boolean' || !result.snapshot || result.snapshot.val()?.seatProtocol !== 2) throw new Error('seat-marker-unverified');
-        }
-        const verified = await Promise.race([seatSellerRow(context, id), failed]);
-        if (!current() || verified.seatProtocol !== 2) throw new Error('seat-marker-unverified');
-    } finally {
-        watching = false;
-        unsubscribe();
-    }
-}
-
-function seatSellerEncode(bytes) {
-    return btoa(Array.from(new Uint8Array(bytes), (byte) => String.fromCharCode(byte)).join('')).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-async function seatSellerCommand(context, id, action, revision, fields = {}) {
-    const clock = captureKeygenClock();
-    const current = () => context.current() && context.privateKey && signingPrivateKeyJwk === context.privateKey && keygenClockIsCurrent(clock);
-    if (!clock || !current()) throw new Error('seat-signing-unavailable');
-    const command = { ...fields, domain: 'zoe-license-seat-stage-v1', audience: 'https://zoew.netlify.app', app: 'ZOE', keyId: id, action, revision, expiresAt: Math.floor(clock.now) + 45000 };
-    const payload = seatSellerEncode(new TextEncoder().encode(JSON.stringify(command)));
-    const key = await crypto.subtle.importKey('jwk', context.privateKey, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
-    if (!current()) throw new Error('seat-session-changed');
-    const signature = seatSellerEncode(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, new TextEncoder().encode(payload)));
-    if (!current() || getTrustedServerNow() >= command.expiresAt) throw new Error('seat-session-changed');
-    const out = await fetchWithTimeout('https://zoew.netlify.app/.netlify/functions/license-seat-stage', {
-        method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payload, signature })
-    }, 15000, 'Seat outcome unknown', (res) => res.json());
-    if (!current()) throw new Error('seat-session-changed');
-    if (!out.res.ok) throw new Error('seat-outcome-unverified');
-    return out.body;
-}
-
-async function seatSellerInspect(context, id) {
-    const result = await seatSellerCommand(context, id, 'inspect', 0);
-    const state = result && result.state;
-    if (!state || !Number.isSafeInteger(state.revision) || state.revision < 0 || !['staged', 'active'].includes(state.mode) || !state.seats || typeof state.seats !== 'object') throw new Error('seat-state-invalid');
-    return result;
-}
-
-let secureKeySetup = null;
-
-function clearSecureKeySetup() {
-    secureKeySetup = null;
-    const queue = document.getElementById('licenseInvitationQueue');
-    if (queue) queue.replaceChildren();
-    ['secureKeyEnrollmentInput', 'secureKeySetupKey', 'licenseInvitationReference'].forEach((id) => {
-        const el = document.getElementById(id);
-        if (el) el.value = '';
-    });
-    ['secureKeyFingerprint', 'secureKeySetupStatus', 'secureKeySetupId'].forEach((id) => {
-        const el = document.getElementById(id);
-        if (el) el.textContent = '';
-    });
-    const approve = document.getElementById('secureKeyApproveBtn');
-    if (approve) approve.disabled = true;
-}
-
-async function licenseInvitationCommand(setup, action, fields = {}) {
-    const clock = captureKeygenClock();
-    const current = () => secureKeySetupCurrent(setup) && keygenClockIsCurrent(clock) && signingPrivateKeyJwk === setup.context.privateKey;
-    if (!clock || !current()) throw new Error('invitation-session');
-    const command = { ...fields, domain: 'zoe-license-invitation-v1', audience: 'https://zoew.netlify.app', app: 'ZOE', keyId: setup.id, action, expiresAt: Math.floor(clock.now) + 45000 };
-    const payload = seatSellerEncode(new TextEncoder().encode(JSON.stringify(command)));
-    const key = await crypto.subtle.importKey('jwk', setup.context.privateKey, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
-    if (!current()) throw new Error('invitation-session');
-    const signature = seatSellerEncode(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, new TextEncoder().encode(payload)));
-    if (!current() || getTrustedServerNow() >= command.expiresAt) throw new Error('invitation-session');
-    const out = await fetchWithTimeout('https://zoew.netlify.app/.netlify/functions/license-invitations', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payload, signature }) }, 15000, 'Invitation outcome unknown', res => res.json());
-    if (!current() || !out.res.ok) throw new Error('invitation-unverified');
-    return out.body;
-}
-
-async function verifyLicenseInvitationRequest(setup, invite, request) {
-    const envelope = request.enrollment;
-    if (!envelope || typeof envelope.payload !== 'string' || typeof envelope.signature !== 'string') throw new Error('invitation-proof');
-    const decode = value => Uint8Array.from(atob(value.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
-    const body = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(decode(envelope.payload)));
-    if (body.domain !== 'zoe-license-enrollment-v1' || body.audience !== 'https://zoew.netlify.app' || body.app !== 'ZOE' || body.keyId !== setup.id || body.inviteId !== invite.inviteId || body.target !== invite.target) throw new Error('invitation-scope');
-    const fingerprint = await window.ZoeSeatClient.fingerprint(body.publicKey);
-    const key = await crypto.subtle.importKey('jwk', body.publicKey, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
-    if (!await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key, decode(envelope.signature), new TextEncoder().encode(envelope.payload))) throw new Error('invitation-proof');
-    const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify({ payload: envelope.payload, signature: envelope.signature })))), byte => byte.toString(16).padStart(2, '0')).join('');
-    const code = String(BigInt('0x' + hash) % BigInt(100000000)).padStart(8, '0');
-    if (!secureKeySetupCurrent(setup) || fingerprint !== request.fingerprint || hash !== request.enrollmentHash || hash !== request.requestId || code !== request.verificationCode) throw new Error('invitation-proof');
-    return code;
-}
-
-async function licenseInvitationList(setup) {
-    const list = await licenseInvitationCommand(setup, 'list');
-    if (!Array.isArray(list.invitations) || !Number.isSafeInteger(list.revision)) throw new Error('invitation-invalid');
-    await secureKeyReceiptReady(setup, list);
-    if (!secureKeySetupCurrent(setup)) throw new Error('invitation-session');
-    setup.invitationList = list;
-    const queue = document.getElementById('licenseInvitationQueue');
-    queue.replaceChildren();
-    for (const invite of list.invitations) {
-        const row = document.createElement('div');
-        const label = document.createElement('p');
-        label.textContent = invite.target + ' · ' + invite.inviteId + ' · ' + (invite.status === 'open' ? 'កំពុងរង់ចាំ' : invite.status === 'approved' ? 'បានអនុម័តឧបករណ៍' : invite.status === 'cancelled' ? 'បានបោះបង់' : 'ផុតសុពលភាព');
-        row.append(label);
-        const button = (text, action, request) => {
-            const el = document.createElement('button');
-            el.className = 'btn-secondary';
-            el.textContent = text;
-            el.onclick = () => actLicenseInvitation(setup, invite, action, request);
-            row.append(el);
-        };
-        if (invite.status === 'open') {
-            const copy = document.createElement('button');
-            copy.className = 'btn-secondary';
-            copy.textContent = 'ចម្លងកូដអញ្ជើញ';
-            copy.onclick = () => {
-                if (!secureKeySetupCurrent(setup)) return;
-                setup.invitationReference = { id: invite.inviteId, target: invite.target };
-                return copyLicenseInvitation(false);
-            };
-            row.append(copy);
-            button('បោះបង់ការអញ្ជើញ', 'cancel');
-        }
-        for (const request of invite.requests || []) {
-            if (request.status !== 'pending') continue;
-            await verifyLicenseInvitationRequest(setup, invite, request);
-            const code = document.createElement('p');
-            code.textContent = 'លេខផ្ទៀងផ្ទាត់៖ ' + request.verificationCode;
-            row.append(code);
-            button('លេខត្រូវគ្នា · អនុម័ត', 'approve', request);
-            button('បដិសេធ', 'reject', request);
-        }
-        if (!secureKeySetupCurrent(setup)) throw new Error('invitation-session');
-        queue.append(row);
-    }
-    return list;
-}
-
-async function refreshLicenseInvitations() {
-    const setup = secureKeySetup;
-    if (!secureKeySetupCurrent(setup) || setup.busy) return;
-    setup.busy = true;
-    try {
-        await licenseInvitationList(setup);
-        secureKeySetupMessage(setup, 'បានអានសំណើថ្មី។ ផ្ទៀងលេខ និងកម្មវិធីជាមួយអតិថិជនដែលអ្នកស្គាល់មុនអនុម័ត។');
-    } catch {
-        secureKeySetupMessage(setup, 'ការអញ្ជើញមិនទាន់អាចប្រើបាន ឬលទ្ធផលមិនទាន់ច្បាស់។ សូមពិនិត្យម្ដងទៀត ឬប្រើវិធីដោយដៃ។');
-    } finally { if (secureKeySetupCurrent(setup)) setup.busy = false; }
-}
-
-async function createLicenseInvitation() {
-    const setup = secureKeySetup;
-    if (!secureKeySetupCurrent(setup) || setup.busy) return;
-    setup.busy = true;
-    try {
-        const list = await licenseInvitationList(setup);
-        const inspected = await secureKeySetupInspect(setup);
-        if (!setup.invitationDraft) {
-            const target = document.getElementById('licenseInvitationTarget').value;
-            const hours = Number(document.getElementById('licenseInvitationHours').value);
-            const now = getTrustedServerNow();
-            if (!['pwa', 'apk'].includes(target) || !Number.isFinite(hours) || hours <= 0 || hours > 24 || now === null) throw new Error('invitation-invalid');
-            const alphabet = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
-            const code = Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => alphabet[byte & 31]).join('');
-            setup.invitationDraft = { inviteId: setup.id + '.' + code, target, invitationExpiresAt: Math.min(Math.floor(now + hours * 3600000 - 60000), inspected.state.licenseExpiresAt) };
-        }
-        const draft = setup.invitationDraft;
-        let found = list.invitations.find(i => i.inviteId === draft.inviteId);
-        if (!found) {
-            await licenseInvitationCommand(setup, 'create', { ...draft, keyString: document.getElementById('secureKeySetupKey').value, revision: list.revision, releaseEpoch: list.releaseEpoch });
-            found = (await licenseInvitationList(setup)).invitations.find(i => i.inviteId === draft.inviteId);
-        }
-        if (!found || found.status !== 'open') throw new Error('invitation-unverified');
-        setup.invitationReference = { id: found.inviteId, target: found.target };
-        setup.invitationDraft = null;
-        document.getElementById('licenseInvitationReference').value = found.inviteId;
-        secureKeySetupMessage(setup, found.target === 'apk' ? 'ចម្លងកូដនេះទៅបិទភ្ជាប់ក្នុង APK ដែលបានដំឡើង។' : 'ផ្ញើតំណ ឬកូដនេះទៅអតិថិជន។');
-    } catch {
-        secureKeySetupMessage(setup, 'មិនទាន់បញ្ជាក់ការអញ្ជើញ។ ពិនិត្យសំណើមុនសាកម្ដងទៀត។ កូដដដែលត្រូវបានរក្សាក្នុងផ្ទាំងនេះ។ វិធីដោយដៃនៅខាងក្រោម។');
-    } finally { if (secureKeySetupCurrent(setup)) setup.busy = false; }
-}
-
-async function copyLicenseInvitation(link) {
-    const setup = secureKeySetup;
-    const ref = setup && setup.invitationReference;
-    if (!ref || !secureKeySetupCurrent(setup) || (link && ref.target !== 'pwa')) return;
-    const value = link ? 'https://zoew.netlify.app/#license-invite=' + ref.id : ref.id;
-    return copySensitiveText(value, () => secureKeySetupCurrent(setup) && setup.invitationReference === ref, () => showToast('✅ បានចម្លង'));
-}
-
-async function actLicenseInvitation(setup, invite, action, request) {
-    if (!secureKeySetupCurrent(setup) || setup.busy) return;
-    setup.busy = true;
-    try {
-        const list = await licenseInvitationList(setup);
-        const fresh = list.invitations.find(i => i.inviteId === invite.inviteId);
-        const r = request && fresh && fresh.requests.find(r => r.requestId === request.requestId);
-        if (!fresh || fresh.status !== 'open' || (request && (!r || r.status !== 'pending' || r.enrollmentHash !== request.enrollmentHash || r.fingerprint !== request.fingerprint || r.verificationCode !== request.verificationCode))) throw new Error('invitation-changed');
-        if (r) await verifyLicenseInvitationRequest(setup, fresh, r);
-        if (!confirm(action === 'approve' ? 'តើអតិថិជនដែលអ្នកស្គាល់បានបញ្ជាក់លេខ ' + r.verificationCode + ' និងកម្មវិធី ' + fresh.target + ' ដូចគ្នាមែនទេ?' : 'តើអ្នកចង់បដិសេធ ឬបោះបង់សំណើនេះមែនទេ?')) return;
-        if (!secureKeySetupCurrent(setup)) return;
-        await licenseInvitationCommand(setup, action, { inviteId: fresh.inviteId, revision: list.revision, releaseEpoch: list.releaseEpoch, ...(r ? { requestId: r.requestId, fingerprint: r.fingerprint, enrollmentHash: r.enrollmentHash, receiptKeyFingerprint: list.receiptKeyFingerprint } : {}) });
-        await licenseInvitationList(setup);
-        secureKeySetupMessage(setup, 'Server បានបញ្ជាក់សកម្មភាព។');
-    } catch {
-        secureKeySetupMessage(setup, 'លទ្ធផលមិនទាន់ច្បាស់។ ចុចពិនិត្យសំណើមុនធ្វើសកម្មភាពម្ដងទៀត។');
-    } finally { if (secureKeySetupCurrent(setup)) setup.busy = false; }
-}
-
-async function publishSecureGeneratedKey(context, id, keyString) {
-    const row = await seatSellerRow(context, id);
-    if (!context.current() || row.seatProtocol !== 2) throw new Error('seat-marker-unverified');
-    lastGeneratedKey = keyString;
-    document.getElementById('genResultKey').textContent = keyString;
-    document.getElementById('genResultBox').classList.remove('hidden');
-    await openSecureKeySetup(id);
-}
-
-function secureKeySetupCurrent(setup) {
-    return !!setup && secureKeySetup === setup && setup.context.current();
-}
-
-function secureKeySetupMessage(setup, text) {
-    if (secureKeySetupCurrent(setup)) document.getElementById('secureKeySetupStatus').textContent = text;
-}
-
-async function secureKeyReceiptReady(setup, inspected) {
-    const config = window.ZoeSeatConfig;
-    if (!config || !Array.isArray(config.receiptPublicKeys) || !config.receiptPublicKeys.length) throw new Error('seat-receipt-unconfigured');
-    for (const key of config.receiptPublicKeys) {
-        const fingerprint = await window.ZoeSeatClient.fingerprint(key);
-        if (!secureKeySetupCurrent(setup)) throw new Error('seat-session-changed');
-        if (fingerprint === inspected.receiptKeyFingerprint) return;
-    }
-    throw new Error('seat-receipt-mismatch');
-}
-
-async function secureKeySetupInspect(setup) {
-    const row = await seatSellerRow(setup.context, setup.id);
-    if (!secureKeySetupCurrent(setup) || row.seatProtocol !== 2) throw new Error('seat-marker-unverified');
-    const inspected = await seatSellerInspect(setup.context, setup.id);
-    if (!secureKeySetupCurrent(setup)) throw new Error('seat-session-changed');
-    await secureKeyReceiptReady(setup, inspected);
-    return inspected;
-}
-
-async function openSecureKeySetup(id) {
-    clearSecureKeySetup();
-    const context = seatSellerContext();
-    if (!context.current() || !context.privateKey || !/^[A-Z0-9]{16,40}$/.test(id)) return;
-    const setup = { id, context, busy: true, enrollment: null };
-    secureKeySetup = setup;
-    openModalHelper('secureKeySetupModal');
-    document.getElementById('secureKeySetupId').textContent = id;
-    secureKeySetupMessage(setup, 'កំពុងពិនិត្យ Key សុវត្ថិភាពពី Server...');
-    try {
-        const row = await seatSellerRow(context, id);
-        const metaSnap = await withTimeout(fb.get(fb.ref(context.database, 'license_keys_meta/ZOE/' + id)), 15000, 'Seat metadata timed out');
-        if (!secureKeySetupCurrent(setup) || row.seatProtocol !== 2) throw new Error('seat-marker-unverified');
-        const meta = metaSnap.val();
-        if (!meta || meta.secureIssued !== true || meta.scope !== 'ZOE' || !Number.isSafeInteger(meta.issuedAt) || meta.issuedAt <= 0 ||
-            meta.issuedAt % 1000 !== 0 || !Number.isSafeInteger(row.expiresAt) || row.expiresAt <= meta.issuedAt || row.expiresAt % 1000 !== 0 ||
-            !Number.isInteger(row.maxDevices) || row.maxDevices < 1 || row.maxDevices > 5 || row.revoked !== false) throw new Error('seat-issuance-invalid');
-        const payload = seatSellerEncode(new TextEncoder().encode(JSON.stringify({ a: 'ZOE', id, iat: meta.issuedAt / 1000, exp: row.expiresAt / 1000 })));
-        const previous = window.ZoeLicense.parseKeyString(lastGeneratedKey);
-        let keyString = previous && previous.payloadB64 === payload ? lastGeneratedKey : '';
-        if (!keyString) {
-            const key = await crypto.subtle.importKey('jwk', context.privateKey, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
-            if (!secureKeySetupCurrent(setup)) return;
-            const signature = seatSellerEncode(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, new TextEncoder().encode(payload)));
-            keyString = window.ZoeLicense.KEY_PREFIX + payload + '.' + signature;
-        }
-        if (!secureKeySetupCurrent(setup)) return;
-        document.getElementById('secureKeySetupKey').value = keyString;
-        let inspected = await secureKeySetupInspect(setup);
-        if (inspected.state.revision === 0) {
-            await seatSellerCommand(context, id, 'configure', 0, { maxDevices: row.maxDevices, licenseExpiresAt: row.expiresAt, revoked: false });
-            inspected = await secureKeySetupInspect(setup);
-            if (inspected.state.revision < 1 || inspected.state.maxDevices !== row.maxDevices || inspected.state.licenseExpiresAt !== row.expiresAt || inspected.state.revoked !== false) throw new Error('seat-config-unverified');
-        }
-        secureKeySetupRender(setup, inspected.state);
-    } catch (error) {
-        secureKeySetupMessage(setup, 'មិនទាន់បញ្ជាក់លទ្ធផល។ Key នេះមិនផ្ដល់សិទ្ធិមុនអនុម័តឧបករណ៍ទេ។ សូមផ្ទៀងម៉ោង Signing Key និង Server រួចចុច «ពិនិត្យ និងបន្ត»។ កុំបង្កើត Key ត្រួតគ្នា។');
-    } finally {
-        if (secureKeySetupCurrent(setup)) setup.busy = false;
-    }
-}
-
-function secureKeySetupRender(setup, state) {
-    const count = Object.keys(state.seats).length;
-    const now = getTrustedServerNow();
-    secureKeySetupMessage(setup, (state.revoked ? '⛔ Key ត្រូវបានបិទ។' : now === null ? '⚠️ សូមផ្ទៀងម៉ោង Server។' : state.licenseExpiresAt <= now ? '⏳ Key ផុតកំណត់។ សូមបន្ថែមសុពលភាពពីតារាង។' : state.mode === 'active' ? '✅ Server សកម្ម។ ឧបករណ៍ដែលបានអនុម័តអាចចុច Activate។' : '⏳ រង់ចាំការអនុម័តឧបករណ៍។')
-        + ' ឧបករណ៍៖ ' + count + '/' + state.maxDevices + ' · ផុតកំណត់៖ ' + new Date(state.licenseExpiresAt).toLocaleDateString('km-KH', { timeZone: 'Asia/Phnom_Penh' }));
-}
-
-async function refreshSecureKeySetup() {
-    const setup = secureKeySetup;
-    if (!setup || setup.busy || !secureKeySetupCurrent(setup)) return;
-    await openSecureKeySetup(setup.id);
-}
-
-async function inspectSecureKeyEnrollment() {
-    const setup = secureKeySetup;
-    if (!setup || setup.busy || !secureKeySetupCurrent(setup)) return;
-    setup.busy = true;
-    setup.enrollment = null;
-    document.getElementById('secureKeyApproveBtn').disabled = true;
-    document.getElementById('secureKeyFingerprint').textContent = '';
-    const raw = document.getElementById('secureKeyEnrollmentInput').value;
-    try {
-        if (raw.length > 8192) throw new Error('seat-enrollment-size');
-        const enrollment = JSON.parse(raw);
-        if (!enrollment || typeof enrollment.payload !== 'string' || typeof enrollment.signature !== 'string' ||
-            !/^[A-Za-z0-9_-]+$/.test(enrollment.payload) || !/^[A-Za-z0-9_-]+$/.test(enrollment.signature)) throw new Error('seat-enrollment-invalid');
-        const body = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(atob(enrollment.payload.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0))));
-        if (body.domain !== 'zoe-license-enrollment-v1' || body.audience !== 'https://zoew.netlify.app' || body.app !== 'ZOE' || body.keyId !== setup.id ||
-            typeof body.nonce !== 'string' || !/^[A-Za-z0-9_-]{32,64}$/.test(body.nonce)) throw new Error('seat-enrollment-scope');
-        const fingerprint = await window.ZoeSeatClient.fingerprint(body.publicKey);
-        const key = await crypto.subtle.importKey('jwk', body.publicKey, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
-        const signature = Uint8Array.from(atob(enrollment.signature.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
-        if (fingerprint !== enrollment.fingerprint || signature.length !== 64 || !await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key, signature, new TextEncoder().encode(enrollment.payload))) throw new Error('seat-enrollment-proof');
-        if (!secureKeySetupCurrent(setup) || document.getElementById('secureKeyEnrollmentInput').value !== raw) return;
-        setup.enrollment = { raw, envelope: enrollment, publicKey: body.publicKey, fingerprint };
-        document.getElementById('secureKeyFingerprint').textContent = fingerprint;
-        document.getElementById('secureKeyApproveBtn').disabled = false;
-        secureKeySetupMessage(setup, 'សូមប្រៀបធៀបស្នាមសោខាងក្រោមជាមួយអេក្រង់ឧបករណ៍ផ្ទាល់ មុនចុចអនុម័ត។');
-    } catch (error) {
-        secureKeySetupMessage(setup, 'សំណើមិនត្រឹមត្រូវ ឬមិនមែនរបស់ Key នេះ។ សូមចម្លង JSON ពេញពីឧបករណ៍មកម្ដងទៀត។');
-    } finally {
-        if (secureKeySetupCurrent(setup)) setup.busy = false;
-    }
-}
-
-async function approveSecureKeyEnrollment() {
-    const setup = secureKeySetup;
-    if (!setup || setup.busy || !secureKeySetupCurrent(setup) || !setup.enrollment) return;
-    const enrollment = setup.enrollment;
-    if (document.getElementById('secureKeyEnrollmentInput').value !== enrollment.raw) {
-        setup.enrollment = null;
-        document.getElementById('secureKeyApproveBtn').disabled = true;
-        secureKeySetupMessage(setup, 'សំណើបានប្រែ។ សូមចុច «ពិនិត្យសំណើ» ម្ដងទៀត។');
-        return;
-    }
-    if (!confirm('ស្នាមសោនេះដូចនឹងលើឧបករណ៍ផ្ទាល់មែនទេ?\n' + enrollment.fingerprint + '\nអនុម័តឧបករណ៍នេះ និងបើកការប្រើ Key សុវត្ថិភាព?')) return;
-    if (!secureKeySetupCurrent(setup)) return;
-    setup.busy = true;
-    document.getElementById('secureKeyApproveBtn').disabled = true;
-    try {
-        let inspected = await secureKeySetupInspect(setup);
-        let state = inspected.state;
-        const now = getTrustedServerNow();
-        if (now === null || state.revoked || state.licenseExpiresAt <= now) throw new Error('seat-not-available');
-        const matches = (seat) => seat && seat.publicKey && seat.publicKey.x === enrollment.publicKey.x && seat.publicKey.y === enrollment.publicKey.y;
-        let slot = Object.keys(state.seats).find((name) => matches(state.seats[name]));
-        const epoch = state.releaseEpoch;
-        if (!slot) {
-            slot = LICENSE_SEAT_SLOT_NAMES.slice(0, state.maxDevices).find((name) => !state.seats[name]);
-            if (!slot) throw new Error('seat-limit');
-            await seatSellerCommand(setup.context, setup.id, 'enroll', state.revision, { slot, releaseEpoch: epoch, publicKey: enrollment.publicKey, enrollment: enrollment.envelope });
-            inspected = await secureKeySetupInspect(setup);
-            if (inspected.state.revision <= state.revision) throw new Error('seat-enrollment-unverified');
-            state = inspected.state;
-        }
-        if (!secureKeySetupCurrent(setup) || state.releaseEpoch !== epoch || !matches(state.seats[slot]) || state.revoked) throw new Error('seat-enrollment-unverified');
-        if (state.mode === 'staged') {
-            await seatSellerCommand(setup.context, setup.id, 'cutover', state.revision, { expectedDevices: Object.keys(state.seats).length, receiptKeyFingerprint: inspected.receiptKeyFingerprint });
-            const previousRevision = state.revision;
-            inspected = await secureKeySetupInspect(setup);
-            state = inspected.state;
-            if (state.revision <= previousRevision) throw new Error('seat-outcome-unverified');
-        }
-        if (!secureKeySetupCurrent(setup) || state.mode !== 'active' || state.releaseEpoch !== epoch || !matches(state.seats[slot]) || state.revoked) throw new Error('seat-outcome-unverified');
-        secureKeySetupRender(setup, state);
-        setup.enrollment = null;
-        document.getElementById('secureKeyEnrollmentInput').value = '';
-        document.getElementById('secureKeyFingerprint').textContent = '';
-        refreshKeyList();
-    } catch (error) {
-        if (secureKeySetupCurrent(setup)) setup.enrollment = null;
-        secureKeySetupMessage(setup, 'មិនទាន់បញ្ជាក់លទ្ធផល។ សូមចុច «ពិនិត្យ និងបន្ត» ដើម្បីអានស្ថានភាពថ្មី រួចផ្ទៀងសំណើដដែលម្ដងទៀត។ បើពេញឧបករណ៍ ឬ Key បិទ/ផុតកំណត់ សូមគ្រប់គ្រងវានៅតារាង Key។');
-    } finally {
-        if (secureKeySetupCurrent(setup)) setup.busy = false;
-    }
-}
-
-async function routeSecureSeatLifecycle(id, action, days) {
-    const context = seatSellerContext();
-    if (!context.current()) return true;
-    try {
-        const row = await seatSellerRow(context, id);
-        if (row.seatProtocol !== 2) return false;
-        const { state } = await seatSellerInspect(context, id);
-        if (!context.current()) throw new Error('seat-session-changed');
-        if (state.revision === 0) {
-            alert('សូមចុច «រៀបចំ / បន្ត Key សុវត្ថិភាព» ដើម្បីបញ្ចប់ការត្រៀម Server មុនគ្រប់គ្រង Key នេះ។');
-            return true;
-        }
-        if (state.mode !== 'active') {
-            const meta = await withTimeout(fb.get(fb.ref(context.database, 'license_keys_meta/ZOE/' + id)), 15000, 'Seat metadata timed out');
-            if (!context.current() || !meta.val() || meta.val().secureIssued !== true) throw new Error('seat-not-active');
-        }
-        const fields = { maxDevices: state.maxDevices, licenseExpiresAt: state.licenseExpiresAt, revoked: state.revoked };
-        if (action === 'revoke') {
-            if (!confirm(state.revoked ? 'បើក Key នេះវិញ?' : 'បិទ Key នេះសម្រាប់ឧបករណ៍ទាំងអស់?')) return true;
-            fields.revoked = !state.revoked;
-        } else if (action === 'devices') {
-            const answer = prompt('ចំនួនឧបករណ៍ (1 ដល់ 5)', String(state.maxDevices));
-            if (answer === null) return true;
-            fields.maxDevices = Number(answer);
-            if (!Number.isInteger(fields.maxDevices) || fields.maxDevices < 1 || fields.maxDevices > 5) throw new Error('seat-limit');
-        } else if (action === 'extend') {
-            const now = getTrustedServerNow();
-            if (now === null || !Number.isFinite(days) || days <= 0) throw new Error('seat-clock');
-            fields.licenseExpiresAt = Math.floor(Math.max(now, state.licenseExpiresAt)) + Math.round(days * 86400000);
-            if (!confirm('បន្ថែមសុពលភាព ' + days + ' ថ្ងៃ?')) return true;
-        } else if (action === 'release') {
-            if (!confirm('ដោះឧបករណ៍ទាំងអស់? ត្រូវចុះឈ្មោះឧបករណ៍ឡើងវិញ មុនប្រើ Key នេះ។')) return true;
-        } else throw new Error('seat-action');
-        await seatSellerCommand(context, id, action === 'release' ? 'release' : 'configure', state.revision, action === 'release' ? {} : fields);
-        const verified = await seatSellerInspect(context, id);
-        if (!context.current() || verified.state.revision <= state.revision || verified.state.mode !== state.mode) throw new Error('seat-outcome-unverified');
-        if (action === 'release' ? verified.state.releaseEpoch <= state.releaseEpoch || Object.keys(verified.state.seats).length !== 0
-            : verified.state.maxDevices !== fields.maxDevices || verified.state.licenseExpiresAt !== fields.licenseExpiresAt || verified.state.revoked !== fields.revoked) throw new Error('seat-outcome-unverified');
-        showToast('✅ បានបញ្ជាក់ការកែប្រែពី Server។');
-        if (action === 'extend') closeModal('extendModal');
-        refreshKeyList();
-    } catch (error) {
-        if (context.current()) alert('មិនទាន់បញ្ជាក់លទ្ធផល។ សូមពិនិត្យម៉ោង Server សោហត្ថលេខា និងការតភ្ជាប់ រួចចុចគ្រប់គ្រងឧបករណ៍ដើម្បីពិនិត្យ។ មិនផ្ញើឡើងវិញដោយស្វ័យប្រវត្តិទេ។');
-    }
-    return true;
-}
-
-async function manageSecureSeats(id) {
-    if (manageSecureSeats.busy) return;
-    manageSecureSeats.busy = true;
-    const context = seatSellerContext();
-    try {
-        if (!context.current()) return;
-        const row = await seatSellerRow(context, id);
-        let inspected = await seatSellerInspect(context, id);
-        let state = inspected.state;
-        const originalRevision = state.revision;
-        let verifyState = () => true;
-        const count = Object.keys(state.seats).length;
-        const choice = prompt('ស្ថានភាព៖ ' + (state.mode === 'active' ? 'សកម្ម' : 'ត្រៀម') + '\nឧបករណ៍៖ ' + count + '\nលំដាប់កែប្រែ៖ ' + state.revision + '\nចំនួនអនុញ្ញាត៖ ' + (state.maxDevices || 'មិនទាន់កំណត់') + '\nថ្ងៃផុតកំណត់៖ ' + (state.licenseExpiresAt ? new Date(state.licenseExpiresAt).toLocaleDateString('km-KH') : 'មិនទាន់កំណត់') + '\nស្ថានភាពបិទ៖ ' + (state.revoked ? 'បិទ' : 'បើក') + '\nជំនាន់ដោះឧបករណ៍៖ ' + state.releaseEpoch + '\n\n1 = ត្រៀម ឬផ្ទៀងផ្ទាត់ការកំណត់\n2 = ចុះឈ្មោះឧបករណ៍\n3 = ដោះឧបករណ៍ទាំងអស់\n4 = ប្ដូរទៅការផ្ទៀងផ្ទាត់សុវត្ថិភាព\nបោះបង់ = បិទ');
-        if (choice === null || !context.current()) return;
-        if (choice === '1') {
-            if (row.seatProtocol === 2) throw new Error('seat-already-active');
-            if (!confirm('ចម្លងចំនួនឧបករណ៍ សុពលភាព និងស្ថានភាព Key បច្ចុប្បន្នទៅ Server សុវត្ថិភាព? មិនប្ដូរ marker របស់ Key ទេ។')) return;
-            const latest = await requireLegacySeat(context, id);
-            const expiresAt = seatLegacyExpiresAt(latest.expiresAt);
-            if (expiresAt === null) throw new Error('seat-expiry-invalid');
-            verifyState = (checked) => checked.maxDevices === (latest.maxDevices || 1) && checked.licenseExpiresAt === expiresAt && checked.revoked === !!latest.revoked;
-            await seatSellerCommand(context, id, 'configure', state.revision, { maxDevices: latest.maxDevices || 1, licenseExpiresAt: expiresAt, revoked: !!latest.revoked });
-        } else if (choice === '2') {
-            const raw = prompt('បិទភ្ជាប់សំណើចុះឈ្មោះ JSON ពីឧបករណ៍ដែលអ្នកបានផ្ទៀងផ្ទាត់៖');
-            if (raw === null) return;
-            if (raw.length > 8192) throw new Error('seat-enrollment-size');
-            const enrollment = JSON.parse(raw);
-            const body = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(enrollment.payload.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0))));
-            if (body.domain !== 'zoe-license-enrollment-v1' || body.audience !== 'https://zoew.netlify.app' || body.app !== 'ZOE' || body.keyId !== id) throw new Error('seat-enrollment-scope');
-            const fingerprint = await window.ZoeSeatClient.fingerprint(body.publicKey);
-            if (!context.current() || signingPrivateKeyJwk !== context.privateKey) throw new Error('seat-session-changed');
-            if (fingerprint !== enrollment.fingerprint) throw new Error('seat-enrollment-fingerprint');
-            const slot = ['d1', 'd2', 'd3', 'd4', 'd5'].slice(0, state.maxDevices).find((value) => !state.seats[value]);
-            if (!slot || !confirm('ចុះឈ្មោះឧបករណ៍នៅ ' + slot + '?\nស្នាមសោ៖ ' + enrollment.fingerprint + '\nសូមផ្ទៀងផ្ទាត់ស្នាមសោជាមួយឧបករណ៍ផ្ទាល់។')) return;
-            verifyState = (checked) => checked.releaseEpoch === state.releaseEpoch && checked.seats[slot] && checked.seats[slot].publicKey && checked.seats[slot].publicKey.x === body.publicKey.x && checked.seats[slot].publicKey.y === body.publicKey.y;
-            await seatSellerCommand(context, id, 'enroll', state.revision, { slot, releaseEpoch: state.releaseEpoch, publicKey: body.publicKey, enrollment });
-        } else if (choice === '3') {
-            if (!confirm('ដោះឧបករណ៍ទាំងអស់ពីការផ្ទៀងផ្ទាត់សុវត្ថិភាព? ត្រូវចុះឈ្មោះឡើងវិញ។')) return;
-            verifyState = (checked) => checked.releaseEpoch === state.releaseEpoch + 1 && Object.keys(checked.seats).length === 0;
-            await seatSellerCommand(context, id, 'release', state.revision);
-        } else if (choice === '4') {
-            if (!window.ZoeSeatConfig || !Array.isArray(window.ZoeSeatConfig.receiptPublicKeys) || !window.ZoeSeatConfig.receiptPublicKeys.length) throw new Error('seat-receipt-unconfigured');
-            const fingerprints = [];
-            for (const key of window.ZoeSeatConfig.receiptPublicKeys) {
-                const bytes = new TextEncoder().encode(JSON.stringify({ kty: key.kty, crv: key.crv, x: key.x, y: key.y }));
-                const digest = await crypto.subtle.digest('SHA-256', bytes);
-                if (!context.current() || signingPrivateKeyJwk !== context.privateKey) throw new Error('seat-session-changed');
-                fingerprints.push(Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join(''));
-            }
-            if (!fingerprints.includes(inspected.receiptKeyFingerprint) || count < 1) throw new Error('seat-cutover-not-ready');
-            if (state.mode === 'staged') {
-                const latest = await requireLegacySeat(context, id);
-                if ((latest.maxDevices || 1) !== state.maxDevices || seatLegacyExpiresAt(latest.expiresAt) !== state.licenseExpiresAt || !!latest.revoked !== state.revoked) throw new Error('seat-config-changed');
-                if (!confirm('បើកការផ្ទៀងផ្ទាត់សុវត្ថិភាពលើ Server សម្រាប់ឧបករណ៍ ' + count + '? សូមបញ្ជាក់ថាគ្រប់ឧបករណ៍បានដំឡើង App ដែលគាំទ្រ។')) return;
-                await seatSellerCommand(context, id, 'cutover', state.revision, { expectedDevices: count, receiptKeyFingerprint: inspected.receiptKeyFingerprint });
-            }
-            inspected = await seatSellerInspect(context, id);
-            state = inspected.state;
-            if (!context.current() || state.mode !== 'active') throw new Error('seat-cutover-unverified');
-            if (!confirm('Server បានបញ្ជាក់សកម្ម។ ប្ដូរ Key នេះទៅប្រព័ន្ធសុវត្ថិភាពឥឡូវ? ឧបករណ៍ដែលមិនទាន់ចុះឈ្មោះនឹងចូលមិនបាន។ មិនអាចប្ដូរត្រឡប់បានទេ។')) return;
-            await seatSellerMark(context, id, state);
-        } else return;
-        if (!context.current()) return;
-        const checked = await seatSellerInspect(context, id);
-        if (!context.current()) return;
-        if (!verifyState(checked.state) || (choice !== '4' && checked.state.revision <= originalRevision)) throw new Error('seat-outcome-unverified');
-        showToast('✅ បានពិនិត្យស្ថានភាពពី Server។');
-        refreshKeyList();
-    } catch (error) {
-        if (context.current()) alert('មិនទាន់បញ្ជាក់លទ្ធផល។ សូមផ្ទៀងផ្ទាត់ការកំណត់ Server សោហត្ថលេខា ម៉ោង និងសំណើឧបករណ៍ រួចបើកពិនិត្យម្ដងទៀត។ មិនប្ដូរប្រព័ន្ធដោយស្វ័យប្រវត្តិទេ។');
-    } finally { manageSecureSeats.busy = false; }
-}
-
 async function toggleRevokeKey(id) {
-    if (await routeSecureSeatLifecycle(id, 'revoke')) return;
     const operation = captureSensitiveSession(true);
     const operationDb = db;
     if (!operation || !operationDb) return;
@@ -3615,8 +3032,6 @@ async function toggleRevokeKey(id) {
     const isCurrent = () => adminOperationIsCurrent(operation) && db === operationDb;
     let write = null;
     try {
-        await requireLegacySeat({ database: operationDb, current: isCurrent }, id);
-        if (!isCurrent()) return;
         write = Promise.allSettled(row.paths.map((p) => fb.update(fb.ref(operationDb, `license_keys/${p}/${id}`), { revoked: newRevoked })));
         const results = await withTimeout(write, 15000, 'Update timed out');
         if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
@@ -3644,7 +3059,6 @@ async function toggleRevokeKey(id) {
 }
 
 async function setKeySeatLimit(id) {
-    if (await routeSecureSeatLifecycle(id, 'devices')) return;
     const operation = captureSensitiveSession(true);
     const operationDb = db;
     if (!operation || !operationDb) return;
@@ -3663,11 +3077,9 @@ async function setKeySeatLimit(id) {
     const isCurrent = () => adminOperationIsCurrent(operation) && db === operationDb;
     let write = null;
     try {
-        write = retryAsync(async () => {
-            await requireLegacySeat({ database: operationDb, current: isCurrent }, id);
-            if (!isCurrent()) throw Object.assign(new Error('Seat limit session changed'), { noRetry: true });
-            return Promise.all(row.paths.map((p) => fb.update(fb.ref(operationDb, `license_keys/${p}/${id}`), { maxDevices: next })));
-        }, 3, 1000);
+        write = retryAsync(() => isCurrent()
+            ? Promise.all(row.paths.map((p) => fb.update(fb.ref(operationDb, `license_keys/${p}/${id}`), { maxDevices: next })))
+            : Promise.reject(Object.assign(new Error('Seat limit session changed'), { noRetry: true })), 3, 1000);
         await withTimeout(write, 15000, 'Seat limit update timed out');
         if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
         showToast('✅ Key នេះ Activate បានលើឧបករណ៍ ' + next + ' ហើយ!');
@@ -3686,7 +3098,6 @@ async function setKeySeatLimit(id) {
 }
 
 async function releaseKeySeat(id) {
-    if (await routeSecureSeatLifecycle(id, 'release')) return;
     if (releaseKeySeat.busy) {
         showToast('⏳ កំពុងដោះឧបករណ៍មួយ — សូមរង់ចាំលទ្ធផលសិន រួចសាកល្បងម្តងទៀត។');
         return;
@@ -3776,11 +3187,6 @@ async function patchLicenseViaRest(operation, database, body, isCurrent) {
     if (!isCurrent()) return { outcome: 'stale' };
     let out;
     try {
-        const keyIds = [...new Set(Object.keys(body).map((path) => path.split('/')[2]))];
-        for (const id of keyIds) {
-            await requireLegacySeat({ database, current: isCurrent }, id);
-            if (!isCurrent()) return { outcome: 'stale' };
-        }
         out = await fetchWithTimeout(base + '/.json?auth=' + encodeURIComponent(token),
             { method: 'PATCH', cache: 'no-store', body: JSON.stringify(body) }, 15000, 'Release timed out',
             (r) => Promise.resolve().then(() => r.text()).catch(() => ''));
@@ -3852,7 +3258,6 @@ async function confirmExtendKey() {
         if (!row) { closeModal('extendModal'); return; }
         const days = parseFloat(document.getElementById('extendDaysInput').value);
         if (isNaN(days) || days <= 0) { alert('សុពលភាពត្រូវធំជាង 0 ថ្ងៃ!'); return; }
-        if (await routeSecureSeatLifecycle(targetId, 'extend', days)) return;
         const timeSynced = await waitForServerTimeSync(15000);
         if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
         const clock = captureKeygenClock();
@@ -3863,8 +3268,7 @@ async function confirmExtendKey() {
         const addMs = Math.round(days * 86400000);
         const from = clock.now;
         const isCurrent = () => adminOperationIsCurrent(operation) && db === operationDb;
-        const extendPath = async (p) => {
-            await requireLegacySeat({ database: operationDb, current: isCurrent }, targetId);
+        const extendPath = (p) => {
             if (!isCurrent() || !keygenClockIsCurrent(clock)) return Promise.reject(Object.assign(new Error('Extend clock changed'), { extendOutcome: 'clock' }));
             const shown = row.perApp && row.perApp[p] ? row.perApp[p].expiresAt : undefined;
             let outcome = 'missing';
@@ -5007,8 +4411,6 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (btn.dataset.action === 'extend') openExtendModal(id);
             else if (btn.dataset.action === 'devices') setKeySeatLimit(id);
             else if (btn.dataset.action === 'release') releaseKeySeat(id);
-            else if (btn.dataset.action === 'secure-seats') manageSecureSeats(id);
-            else if (btn.dataset.action === 'secure-setup') openSecureKeySetup(id);
         });
     }
 

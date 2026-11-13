@@ -41,7 +41,7 @@
 ---
 
 ## 📌 ការងារដែលនៅសល់ — ការផ្ទៀងផ្ទាត់ដោយអ្នកប្រើ
-- ⏸️ **បន្តកែផ្លូវ CI ក្រោយផ្លាស់ `tools/`**៖ bundle local `32c02a4` ត្រូវផ្អាក និងលែងតំណាងការកែចុងក្រោយ មិនត្រៀមផ្សាយ។ Palm outbox 288/289 នៅសល់ readonly-refresh assertion មួយលើ mock ហើយ full measurement/CI មិនទាន់ផ្ទៀង។ បញ្ហា Palm/security/race/upstream-write ដែលនៅសល់អនុញ្ញាតតែ static review មិនរត់ reproduction/probe បន្ថែម; តេស្តឯកសារ/metadata/parity ធម្មតានៅអនុញ្ញាត។ លម្អិតក្នុងផ្នែក ២។
+- 🔍 **Audit #1322 ក្រោយផ្លាស់ `tools/`**៖ shards ទាំងប្រាំលើ `e9f5300` ធ្លាក់សរុប 52 checker និងឆ្លង 201។ កែ glob របស់ audit bridge, paths/fixtures, doc selector និង pin ដែលបាន review ក្នុងម៉ាស៊ីន; focused non-browser regression ឆ្លង ប៉ុន្តែមិនទាន់ផ្សាយ ឬផ្ទៀង browser CI ឡើងវិញ។ ករណី child revenue-fuzz ពីរមិនមាន assertion logs ពេញ ដូច្នេះនៅមិនទាន់បញ្ជាក់មូលហេតុទាំងអស់។ Palm mock caveat ចាស់ និង full CI នៅបើក; មិនរត់ security/race/upstream reproduction បន្ថែម។
 - 🔍 **Audit 2026-11-12 មិនទាន់ចេញផ្សាយ**៖ កែ session modal, សោ price operation, `my_account` និង Netlify session authorization, parser Google Sheets។ ត្រូវអនុវត្ត migration `20261112054956_zoe_account_active_session.sql` និង deploy functions/App ក្រោយការផ្ទៀងពេញលេញ; Apps Script reader ត្រូវ copy និង Deploy ជាកំណែថ្មី។ គ្មានការប្ដូរផលិតកម្មក្នុង session នេះ។
 - 🔍 **ការផ្ទៀង commit ចុងក្រោយ**៖ ZTO guards និង native/browser លើ commit ដំបូងឆ្លងក្នុង CI ហើយ hash lock បានធ្វើបច្ចុប្បន្នភាពតាមភស្តុតាង។ ការកែ license និង fixtures បន្ទាប់ត្រូវការ strict CI ថ្មីលើ exact head មុនអះអាង release-ready។
 - 🔍 **License rollout**៖ enrollment, signed receipt និង cutover code រៀបចំរួចក្នុង PR; defaults មិនបើក production។ ត្រូវ provision receipt key/public pins, Publish License rules, ផ្ទេរគ្រប់ Key/ឧបករណ៍ ហើយចូលនិវត្តន៍ legacy ដោយ `legacyProtocolEnabled:false` មុនចាត់ទុក offline bypass បានបិទ។ APK gate ទុកដដែលតាមម្ចាស់គម្រោង។
@@ -2127,6 +2127,16 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-11-13 — ស្តារ browser audit bridge និងផ្លូវ fixture
+
+- **ភស្តុតាង**៖ [Audit #1322 shard 2/5](https://github.com/mengsroy-h/Zoe-System/actions/runs/43425068986/job/131884426796) លើ `e9f5300`៖ 12 checker បរាជ័យ និង 70 ឆ្លង។ Wildcard glob ទាំងប្រាំមួយក្នុង `expose-globals.ts` នៅខ្វះ `../` មួយក្រោយផ្លាស់ទៅ `tools/`; Vite មិនបរាជ័យ build តែរកបានតែ explicit modules 3 ជំនួសសំណុំពេញ 157។
+- **ការកែ**៖ ប្តូរតែ prefix ទាំងប្រាំមួយទៅ root `ZoeW/src/`; មិនកែ App logic, guards, thresholds, version ឬ cache។ `tools/audit-tools/zoew/tests/audit-glob-coverage.test.ts` ដំណើរការ Vite ពិតដោយ externalize imports ទាំងអស់ មិនប្រតិបត្តិ App និងមិនសរសេរ build output។ Regression ផ្ទៀងសំណុំ module ពេញតាម filesystem និង wrong-depth controls ដាច់ដោយឡែកសម្រាប់ core/domain/features/services/ui/app-behaviors; មុនកែបរាជ័យ ហើយក្រោយកែឆ្លង 7/7។
+- **វិសាលភាពសេចក្តីសន្និដ្ឋាន**៖ 7 checker រាយ missing audit globals ផ្ទាល់; duplicate-money timeout, stats-truth null និង multi-shop phase=null ត្រូវនឹងការបាត់ exported helpers តាម static tracing។ Emulator wrappers ពីររាយតែ revenue-fuzz child summary (5 និង 6 បរាជ័យ) ហើយ artifact គ្មាន assertion details របស់ child; មិនអះអាងថាបញ្ហាទាំងអស់របស់វាដោះស្រាយ។ ZTO/native CI លើ head ដដែលឆ្លង ប៉ុន្តែមិនជំនួស shard ដែលនៅក្រហម។
+- **ចាត់ថ្នាក់ shards ទាំងប្រាំ**៖ failed/passed តាមលំដាប់ 1–5 = 12/17, 12/70, 8/29, 11/16 និង 9/69។ បន្ថែមលើ glob៖ breadcrumb និង PEM fixtures មាន root ខុសមួយជាន់; diagnostics test មាន Vitest CLI path ចាស់; daily-report fixture មាន dirname មិនត្រូវនឹង filename; doc-scope ជ្រើស Firebase heading ខុសក្រោយ prefix `tools/`; hang-guard មាន mkdir ពីរមិនបង្កើត parent។ កែតែ path/fixture routing និង recursive mkdir ដោយរក្សា assertions ដដែល។
+- **Pin ដាច់ដោយឡែក**៖ source native counterpart នៅ main `c4e4bd5` និង `61136ba` ត្រូវនឹង SHA-256 ចាស់ `c343877e15899c1d90f385dda37ca0df37275bb58043a8cdc84e2e29a01965eb`។ Diff ពេញមានតែបន្ទាត់ផ្លូវ 4; review ឯករាជ្យបញ្ជាក់គ្មាន assertion/scenario/logic ប្រែ។ ប្តូរតែ expected digest ទៅ `4278ac44652e01a03a0e9422e0125694510c6aa92f6c088699b12e06978d2489` រក្សា exact hash guard; មិនប្រតិបត្តិ paired SDK test។
+- **Regression និង checks**៖ `tools/audit-tools/zoew/tests/relocated-checker-paths.test.ts` អាន URL expressions ពិតរបស់ fixtures ទាំងពីរ និងប្លុក mkdir ពិតទាំងពីរ មិនប្រតិបត្តិ telemetry/security code; មុនកែ path failures និង ENOENT ត្រូវបានចាប់។ Focused diagnostics/report 47/47 ឆ្លងពី 4 បរាជ័យមុនកែ; hang-guard 16/16 ឆ្លងក្រោយកែ mkdir ទាំងពីរ។ Combined focused regression ចុងក្រោយ 60/60 ឆ្លង; typecheck, lint, placement 4/4, file coverage 10/10 និង doc:check ឆ្លង។ Inventory រក្សាតេស្តដើម 502 និងបន្ថែម regression 2 ទៅ 504; app source/version/cache និង README ទាំងពីរមិនប្រែ។ Doc-scope លើ source នៅ 109 ឆ្លង/12 បរាជ័យដោយខ្វះ generated app prerequisites; Firebase contract ដែលធ្លាក់ពិតក្នុង CI ឆ្លងក្រោយកែ selector តែមួយ។ មិនរាប់ source-only diagnostic ជា full checker បៃតង។ លិបិក្រមត្រូវបានផ្ទៀងដោយប្លុកពិតរបស់ doc-scope៖ 613 ជួរ គ្មានខុស និង wrong-part controls សម្រាប់ regression ថ្មីទាំងពីរត្រូវបដិសេធ។
+- **ដែនកំណត់**៖ មិនរត់ browser, money/backend, security/race/upstream tests ឡើងវិញ; មិនកែឬទាក់ទងសេវាពិត។ ការកែនេះត្រៀមជា local commit និង incremental bundle លើ `e9f5300` តាមការអនុញ្ញាត; មិន push, rerun CI, merge ឬ deploy។ ត្រូវផ្ទៀង strict CI លើ exact commit ដែលមានការកែនេះមុនអះអាងថា shard ទាំងមូលឆ្លង។
 
 ### 2026-11-13 — បន្តកែផ្លូវ CI ចាស់ · ការផ្ទៀងនៅរង់ចាំ
 
@@ -5334,6 +5344,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `tools/audit-tools/zoew/tests/audit-daily-report.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/audit-dom-cleanup-reachability.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/audit-exit-state.test.ts` | ផ្នែក ២ | — |
+| `tools/audit-tools/zoew/tests/audit-glob-coverage.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/audit-lifecycle.test.ts` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/audit-module-runtime-scope.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/audit-poison-reachability.test.ts` | ផ្នែក ២ | — |
@@ -5539,6 +5550,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `tools/audit-tools/zoew/tests/registry-flush-scale.test.ts` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/registry-purge-large-group-native.test.ts` | ផ្នែក ១ | — |
 | `tools/audit-tools/zoew/tests/registry-session-race.test.ts` | ផ្នែក ១ | ផ្នែក ៧ |
+| `tools/audit-tools/zoew/tests/relocated-checker-paths.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/remember-password.test.tsx` | — | ផ្នែក ៧ · ផ្នែក ៩ |
 | `tools/audit-tools/zoew/tests/remove-pickup-key.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/remove-stale-session.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |

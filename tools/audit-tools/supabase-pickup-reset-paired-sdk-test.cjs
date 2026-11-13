@@ -286,7 +286,7 @@ function readMigrationManifest() {
 function loadNativeContract() {
     const file = path.join(ROOT, 'tools/audit-tools/emu/pickup-reset-applied-sdk-test.js'), source = fs.readFileSync(file, 'utf8');
     const sourceHash = crypto.createHash('sha256').update(source).digest('hex');
-    if (sourceHash !== 'c343877e15899c1d90f385dda37ca0df37275bb58043a8cdc84e2e29a01965eb') throw new Error('native counterpart changed; independently review matched contract before accepting it');
+    if (sourceHash !== '4278ac44652e01a03a0e9422e0125694510c6aa92f6c088699b12e06978d2489') throw new Error('native counterpart changed; independently review matched contract before accepting it');
     const nodes = [], env = {}, parse = require(path.join(DEPS, 'acorn')).parse;
     function walk(node) { if (!node || typeof node !== 'object') return; if (node.type) nodes.push(node);
         for (const value of Object.values(node)) { if (Array.isArray(value)) value.forEach(walk); else if (value?.type) walk(value); } }

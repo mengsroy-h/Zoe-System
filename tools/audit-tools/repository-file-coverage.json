@@ -443,10 +443,11 @@
       "guards": [
         "tools/audit-tools/wiring.js",
         "tools/audit-tools/ui-flow-test.js",
-        "tools/audit-tools/zto-sync-banner-test.js"
+        "tools/audit-tools/zto-sync-banner-test.js",
+        "tools/audit-tools/zoew-suite-test.js"
       ],
-      "evidence": "ស្ពាន build វាស់ (expose-globals · audit-compat · build-audit · checker-view) ត្រូវ checker ទាំងនេះប្រើផ្ទាល់ ៖ បើវាខូច ការស្រង់ app.js ឬ window.<fn> ធ្លាក់មានឈ្មោះ។",
-      "limitation": "ស្ពាននេះមិន ship ក្នុងផលិតកម្ម។ ភាពត្រឹមត្រូវរបស់វាបញ្ជាក់តាមរយៈ checker ដែលប្រើវា មិនមែនតេស្តដាច់ដោយឡែក។"
+      "evidence": "ស្ពាន build វាស់ (expose-globals · audit-compat · build-audit · checker-view) ត្រូវ checker ទាំងនេះប្រើផ្ទាល់ ៖ បើវាខូច ការស្រង់ app.js ឬ window.<fn> ធ្លាក់មានឈ្មោះ។ audit-glob-coverage.test.ts ផ្ទៀង Vite glob expansion ពិត និង wrong-depth controls។",
+      "limitation": "ស្ពាននេះមិន ship ក្នុងផលិតកម្ម។ Glob regression មិនប្រតិបត្តិ App; runtime នៅត្រូវការលទ្ធផល checker browser ដដែល។"
     },
     "zoew-build": {
       "category": "behavior",
@@ -846,6 +847,22 @@
       ],
       "evidence": "ផ្ទុកការកំណត់ App ទាំងពីរ ហើយផ្ទៀងសោសាធារណៈ ស្នាមសោ និង legacy។",
       "limitation": "មិនផ្ទៀងគូសោឯកជន Server ឬការបើកប្រើផលិតកម្មទេ។"
+    },
+    "audit-glob-coverage": {
+      "category": "behavior",
+      "guards": [
+        "tools/audit-tools/zoew-suite-test.js"
+      ],
+      "evidence": "Vitest រត់ Vite ពិតលើ expose-globals.ts ដោយមិនប្រតិបត្តិ module របស់ App; ផ្ទៀងសំណុំ module ដែល glob ពង្រីក និងបដិសេធផ្លូវខុសមួយជាន់ក្នុងថតទាំងប្រាំមួយ។",
+      "limitation": "វាស់ការរក module របស់ audit bridge ប៉ុណ្ណោះ; មិនអះអាង browser, runtime ឬ backend ឆ្លងទេ។"
+    },
+    "relocated-checker-paths": {
+      "category": "behavior",
+      "guards": [
+        "tools/audit-tools/zoew-suite-test.js"
+      ],
+      "evidence": "Vitest ប្រតិបត្តិ URL expression របស់ redaction fixtures និងប្លុក mkdir ពិតរបស់ hang-guard លើថតទទេ; មុនកែផ្លូវត្រូវបរាជ័យ។",
+      "limitation": "មិនប្រតិបត្តិ telemetry/security ឬ backend scenarios; វាស់តែ path resolution និងការបង្កើតថត fixture។"
     }
   },
   "files": {
@@ -5186,6 +5203,12 @@
     },
     "tools/audit-tools/test-placement-test.js": {
       "policy": "guard-1"
+    },
+    "tools/audit-tools/zoew/tests/audit-glob-coverage.test.ts": {
+      "policy": "audit-glob-coverage"
+    },
+    "tools/audit-tools/zoew/tests/relocated-checker-paths.test.ts": {
+      "policy": "relocated-checker-paths"
     }
   }
 }

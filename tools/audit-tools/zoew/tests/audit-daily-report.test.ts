@@ -16,7 +16,7 @@ function emit({ filename = 'supabase-datastore-test.js', writeFails = false, out
     const canonical = {};
     const run = () => vm.runInNewContext(report, {
         ROOT: '/measure', path, JSON, sizes: [{ count: 300, oldBytes: 100, newBytes: 1 }],
-        __filename: '/measure/tools/audit-tools/' + filename, __dirname: '/measure/audit-tools',
+        __filename: '/measure/tools/audit-tools/' + filename, __dirname: '/measure/tools/audit-tools',
         module: canonical, require: { main: main ? canonical : {} },
         process: { env: github ? { GITHUB_OUTPUT: '/job-output' } : {} },
         fs: {

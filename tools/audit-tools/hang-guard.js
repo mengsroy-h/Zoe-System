@@ -182,7 +182,7 @@ if (process.env.EXITCODE_CHILD) {
 } else {
     const fx = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-eci-fixture-'));
     const fxTools = path.join(fx, 'tools/audit-tools');
-    fs.mkdirSync(fxTools);
+    fs.mkdirSync(fxTools, { recursive: true });
     const names = [];
     for (let i = 1; i <= 40; i++) {
         const name = 'c' + String(i).padStart(2, '0');
@@ -227,7 +227,7 @@ if (process.env.EXITCODE_CHILD) {
     //    កូនយឺត ៧ វិ. ទទួលសាលក្រមពិត (មិនមែន unverified)។ tree មុនកែ ៖ ថវិកា ៦០ វិ. ➜ meta-checker លើសពិដាន job (៣០ វិ.)។
     const fx2 = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-eci-deadline-'));
     const fx2Tools = path.join(fx2, 'tools/audit-tools');
-    fs.mkdirSync(fx2Tools);
+    fs.mkdirSync(fx2Tools, { recursive: true });
     const names2 = [];
     for (let i = 1; i <= 40; i++) {
         const name = 'd' + String(i).padStart(2, '0');

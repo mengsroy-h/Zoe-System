@@ -1460,7 +1460,7 @@ function emuRunnerTargets(runAll) {
         'registry guide distinguishes legacy candidates from unresolved claims');
     for (const rel of ['tools/firebase-backup/README.md', 'tools/supabase-migrate/README.md']) {
         const document = fs.readFileSync(path.join(ROOT, rel), 'utf8');
-        const guide = document.split(rel.startsWith('firebase') ? '### ការស្តារទិន្នន័យមកវិញ' : '### ស្តារហាង Supabase ពី backup')[1]?.split('\n##')[0] || '';
+        const guide = document.split(rel.startsWith('tools/firebase') ? '### ការស្តារទិន្នន័យមកវិញ' : '### ស្តារហាង Supabase ពី backup')[1]?.split('\n##')[0] || '';
         check(/zoe_docs/.test(guide) && /zoe_ops/.test(guide) && /pending\/unknown/.test(guide),
             rel + ' states archive and recovery-proof limits');
     }

@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 
 for (const app of ['ZoeW/public', 'ZoeKeyGen']) describe(app + ' ៖ breadcrumb ត្រូវលាក់លើច្បាប់ចម្លង មិនកែវត្ថុរស់របស់ App', () => {
     it('the breadcrumb is redacted · the logged objects keep their values', async () => {
-        const source = fs.readFileSync(new URL('../../../' + app + '/error-reporting.js', import.meta.url), 'utf8');
+        const source = fs.readFileSync(new URL('../../../../' + app + '/error-reporting.js', import.meta.url), 'utf8');
         let options: any = null;
         const window: any = { Sentry: { onLoad: (fn: () => void) => fn(), init: (o: any) => { options = o; }, setTag: () => {} } };
         const context = vm.createContext({ window, setTimeout, clearTimeout, console, document: { querySelector: () => null, createElement: () => ({}), head: { appendChild: () => {} } }, localStorage: { getItem: () => null, setItem: () => {} } });

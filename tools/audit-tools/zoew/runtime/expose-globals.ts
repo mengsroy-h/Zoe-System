@@ -5,8 +5,8 @@ import { commitNow } from '../../../../ZoeW/src/app/flush';
 
 export function exposeGlobals() {
     const modules = import.meta.glob(
-        ['../../../ZoeW/src/core/**/*.ts', '../../../ZoeW/src/domain/**/*.ts', '../../../ZoeW/src/features/**/*.ts', '../../../ZoeW/src/services/**/*.ts', '../../../ZoeW/src/ui/**/*.ts',
-            '../../../ZoeW/src/app/behaviors/**/*.ts', '../../../../ZoeW/src/app/lifecycle/layers.ts', '../../../../ZoeW/src/app/refs.ts', '../../../../ZoeW/src/app/flush.ts'],
+        ['../../../../ZoeW/src/core/**/*.ts', '../../../../ZoeW/src/domain/**/*.ts', '../../../../ZoeW/src/features/**/*.ts', '../../../../ZoeW/src/services/**/*.ts', '../../../../ZoeW/src/ui/**/*.ts',
+            '../../../../ZoeW/src/app/behaviors/**/*.ts', '../../../../ZoeW/src/app/lifecycle/layers.ts', '../../../../ZoeW/src/app/refs.ts', '../../../../ZoeW/src/app/flush.ts'],
         { eager: true }
     );
     const w = window as any;

@@ -205,7 +205,7 @@ it.each([[1, 1], [3, 2], [4, 3], [5, 4]])('zoew-suite៖ ផ្នែក %s ត�
 
 it('zoew-suite៖ Vitest ពិតបែងឯកសារទាំងអស់ម្តងគត់ មិនខ្វះ មិនស្ទួន', async () => {
     const root = fileURLToPath(new URL('../../../../ZoeW', import.meta.url)).replace(/\/$/, '');
-    const cli = fileURLToPath(new URL('../../../ZoeW/node_modules/vitest/vitest.mjs', import.meta.url));
+    const cli = fileURLToPath(new URL('../../../../ZoeW/node_modules/vitest/vitest.mjs', import.meta.url));
     const files = JSON.parse(execFileSync(process.execPath, [cli, 'list', '--config', '../tools/audit-tools/zoew/vitest.config.mts', '--filesOnly', '--json'], { cwd: root, encoding: 'utf8', timeout: 30000 })) as { file: string }[];
     const specifications = files.map(file => ({ moduleId: file.file }));
     const groups = await Promise.all([1, 2, 3, 4].map(index => new BaseSequencer({ config: { root, shard: { index, count: 4 } } } as never).shard(specifications as never)));

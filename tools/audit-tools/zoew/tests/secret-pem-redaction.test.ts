@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import { describe, expect, it } from 'vitest';
 
 for (const app of ['ZoeW/public', 'ZoeKeyGen']) describe(app + ' ៖ PEM ឯកជនមិនចេញតាម telemetry', () => {
-    const source = fs.readFileSync(new URL('../../../' + app + '/error-reporting.js', import.meta.url), 'utf8');
+    const source = fs.readFileSync(new URL('../../../../' + app + '/error-reporting.js', import.meta.url), 'utf8');
     const context = vm.createContext({ window: {}, setTimeout, clearTimeout, console });
     vm.runInContext(source, context);
     const api = context.window.ZoeErrors;

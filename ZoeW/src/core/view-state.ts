@@ -110,6 +110,10 @@ export interface ViewState {
 
     activationMessage: string;
     activationBusy: boolean;
+    invitationCode: string;
+    invitationMessage: string;
+    invitationVerificationCode: string;
+    invitationBusy: boolean;
     seatEnrollmentEpoch: number;
     seatEnrollmentBusy: boolean;
     seatEnrollmentOnly: boolean;
@@ -250,6 +254,10 @@ export const viewState = createStore<ViewState>('viewState', {
     exportFilterLabel: 'ថ្ងៃនេះ',
     activationMessage: 'សូមបញ្ចូល Activation Key សម្រាប់ ZoeW ដើម្បីបន្ត។',
     activationBusy: false,
+    invitationCode: '',
+    invitationMessage: '',
+    invitationVerificationCode: '',
+    invitationBusy: false,
     seatEnrollmentEpoch: 0,
     seatEnrollmentBusy: false,
     seatEnrollmentOnly: false,

@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.46';
+const APP_VERSION = '2.24.48';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -21,6 +21,9 @@ const ACTION_ALLOWLIST = [
     "generateLicenseKey",
     "refreshSecureKeySetup",
     "inspectSecureKeyEnrollment",
+    "createLicenseInvitation",
+    "refreshLicenseInvitations",
+    "copyLicenseInvitation",
     "approveSecureKeyEnrollment",
     "generateNewKeypair",
     "generateSetupLink",
@@ -3142,7 +3145,9 @@ let secureKeySetup = null;
 
 function clearSecureKeySetup() {
     secureKeySetup = null;
-    ['secureKeyEnrollmentInput', 'secureKeySetupKey'].forEach((id) => {
+    const queue = document.getElementById('licenseInvitationQueue');
+    if (queue) queue.replaceChildren();
+    ['secureKeyEnrollmentInput', 'secureKeySetupKey', 'licenseInvitationReference'].forEach((id) => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
@@ -3152,6 +3157,154 @@ function clearSecureKeySetup() {
     });
     const approve = document.getElementById('secureKeyApproveBtn');
     if (approve) approve.disabled = true;
+}
+
+async function licenseInvitationCommand(setup, action, fields = {}) {
+    const clock = captureKeygenClock();
+    const current = () => secureKeySetupCurrent(setup) && keygenClockIsCurrent(clock) && signingPrivateKeyJwk === setup.context.privateKey;
+    if (!clock || !current()) throw new Error('invitation-session');
+    const command = { ...fields, domain: 'zoe-license-invitation-v1', audience: 'https://zoew.netlify.app', app: 'ZOE', keyId: setup.id, action, expiresAt: Math.floor(clock.now) + 45000 };
+    const payload = seatSellerEncode(new TextEncoder().encode(JSON.stringify(command)));
+    const key = await crypto.subtle.importKey('jwk', setup.context.privateKey, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+    if (!current()) throw new Error('invitation-session');
+    const signature = seatSellerEncode(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, new TextEncoder().encode(payload)));
+    if (!current() || getTrustedServerNow() >= command.expiresAt) throw new Error('invitation-session');
+    const out = await fetchWithTimeout('https://zoew.netlify.app/.netlify/functions/license-invitations', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payload, signature }) }, 15000, 'Invitation outcome unknown', res => res.json());
+    if (!current() || !out.res.ok) throw new Error('invitation-unverified');
+    return out.body;
+}
+
+async function verifyLicenseInvitationRequest(setup, invite, request) {
+    const envelope = request.enrollment;
+    if (!envelope || typeof envelope.payload !== 'string' || typeof envelope.signature !== 'string') throw new Error('invitation-proof');
+    const decode = value => Uint8Array.from(atob(value.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+    const body = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(decode(envelope.payload)));
+    if (body.domain !== 'zoe-license-enrollment-v1' || body.audience !== 'https://zoew.netlify.app' || body.app !== 'ZOE' || body.keyId !== setup.id || body.inviteId !== invite.inviteId || body.target !== invite.target) throw new Error('invitation-scope');
+    const fingerprint = await window.ZoeSeatClient.fingerprint(body.publicKey);
+    const key = await crypto.subtle.importKey('jwk', body.publicKey, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
+    if (!await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key, decode(envelope.signature), new TextEncoder().encode(envelope.payload))) throw new Error('invitation-proof');
+    const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify({ payload: envelope.payload, signature: envelope.signature })))), byte => byte.toString(16).padStart(2, '0')).join('');
+    const code = String(BigInt('0x' + hash) % BigInt(100000000)).padStart(8, '0');
+    if (!secureKeySetupCurrent(setup) || fingerprint !== request.fingerprint || hash !== request.enrollmentHash || hash !== request.requestId || code !== request.verificationCode) throw new Error('invitation-proof');
+    return code;
+}
+
+async function licenseInvitationList(setup) {
+    const list = await licenseInvitationCommand(setup, 'list');
+    if (!Array.isArray(list.invitations) || !Number.isSafeInteger(list.revision)) throw new Error('invitation-invalid');
+    await secureKeyReceiptReady(setup, list);
+    if (!secureKeySetupCurrent(setup)) throw new Error('invitation-session');
+    setup.invitationList = list;
+    const queue = document.getElementById('licenseInvitationQueue');
+    queue.replaceChildren();
+    for (const invite of list.invitations) {
+        const row = document.createElement('div');
+        const label = document.createElement('p');
+        label.textContent = invite.target + ' · ' + invite.inviteId + ' · ' + (invite.status === 'open' ? 'កំពុងរង់ចាំ' : invite.status === 'approved' ? 'បានអនុម័តឧបករណ៍' : invite.status === 'cancelled' ? 'បានបោះបង់' : 'ផុតសុពលភាព');
+        row.append(label);
+        const button = (text, action, request) => {
+            const el = document.createElement('button');
+            el.className = 'btn-secondary';
+            el.textContent = text;
+            el.onclick = () => actLicenseInvitation(setup, invite, action, request);
+            row.append(el);
+        };
+        if (invite.status === 'open') {
+            const copy = document.createElement('button');
+            copy.className = 'btn-secondary';
+            copy.textContent = 'ចម្លងកូដអញ្ជើញ';
+            copy.onclick = () => {
+                if (!secureKeySetupCurrent(setup)) return;
+                setup.invitationReference = { id: invite.inviteId, target: invite.target };
+                return copyLicenseInvitation(false);
+            };
+            row.append(copy);
+            button('បោះបង់ការអញ្ជើញ', 'cancel');
+        }
+        for (const request of invite.requests || []) {
+            if (request.status !== 'pending') continue;
+            await verifyLicenseInvitationRequest(setup, invite, request);
+            const code = document.createElement('p');
+            code.textContent = 'លេខផ្ទៀងផ្ទាត់៖ ' + request.verificationCode;
+            row.append(code);
+            button('លេខត្រូវគ្នា · អនុម័ត', 'approve', request);
+            button('បដិសេធ', 'reject', request);
+        }
+        if (!secureKeySetupCurrent(setup)) throw new Error('invitation-session');
+        queue.append(row);
+    }
+    return list;
+}
+
+async function refreshLicenseInvitations() {
+    const setup = secureKeySetup;
+    if (!secureKeySetupCurrent(setup) || setup.busy) return;
+    setup.busy = true;
+    try {
+        await licenseInvitationList(setup);
+        secureKeySetupMessage(setup, 'បានអានសំណើថ្មី។ ផ្ទៀងលេខ និងកម្មវិធីជាមួយអតិថិជនដែលអ្នកស្គាល់មុនអនុម័ត។');
+    } catch {
+        secureKeySetupMessage(setup, 'ការអញ្ជើញមិនទាន់អាចប្រើបាន ឬលទ្ធផលមិនទាន់ច្បាស់។ សូមពិនិត្យម្ដងទៀត ឬប្រើវិធីដោយដៃ។');
+    } finally { if (secureKeySetupCurrent(setup)) setup.busy = false; }
+}
+
+async function createLicenseInvitation() {
+    const setup = secureKeySetup;
+    if (!secureKeySetupCurrent(setup) || setup.busy) return;
+    setup.busy = true;
+    try {
+        const list = await licenseInvitationList(setup);
+        const inspected = await secureKeySetupInspect(setup);
+        if (!setup.invitationDraft) {
+            const target = document.getElementById('licenseInvitationTarget').value;
+            const hours = Number(document.getElementById('licenseInvitationHours').value);
+            const now = getTrustedServerNow();
+            if (!['pwa', 'apk'].includes(target) || !Number.isFinite(hours) || hours <= 0 || hours > 24 || now === null) throw new Error('invitation-invalid');
+            const alphabet = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+            const code = Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => alphabet[byte & 31]).join('');
+            setup.invitationDraft = { inviteId: setup.id + '.' + code, target, invitationExpiresAt: Math.min(Math.floor(now + hours * 3600000 - 60000), inspected.state.licenseExpiresAt) };
+        }
+        const draft = setup.invitationDraft;
+        let found = list.invitations.find(i => i.inviteId === draft.inviteId);
+        if (!found) {
+            await licenseInvitationCommand(setup, 'create', { ...draft, keyString: document.getElementById('secureKeySetupKey').value, revision: list.revision, releaseEpoch: list.releaseEpoch });
+            found = (await licenseInvitationList(setup)).invitations.find(i => i.inviteId === draft.inviteId);
+        }
+        if (!found || found.status !== 'open') throw new Error('invitation-unverified');
+        setup.invitationReference = { id: found.inviteId, target: found.target };
+        setup.invitationDraft = null;
+        document.getElementById('licenseInvitationReference').value = found.inviteId;
+        secureKeySetupMessage(setup, found.target === 'apk' ? 'ចម្លងកូដនេះទៅបិទភ្ជាប់ក្នុង APK ដែលបានដំឡើង។' : 'ផ្ញើតំណ ឬកូដនេះទៅអតិថិជន។');
+    } catch {
+        secureKeySetupMessage(setup, 'មិនទាន់បញ្ជាក់ការអញ្ជើញ។ ពិនិត្យសំណើមុនសាកម្ដងទៀត។ កូដដដែលត្រូវបានរក្សាក្នុងផ្ទាំងនេះ។ វិធីដោយដៃនៅខាងក្រោម។');
+    } finally { if (secureKeySetupCurrent(setup)) setup.busy = false; }
+}
+
+async function copyLicenseInvitation(link) {
+    const setup = secureKeySetup;
+    const ref = setup && setup.invitationReference;
+    if (!ref || !secureKeySetupCurrent(setup) || (link && ref.target !== 'pwa')) return;
+    const value = link ? 'https://zoew.netlify.app/#license-invite=' + ref.id : ref.id;
+    return copySensitiveText(value, () => secureKeySetupCurrent(setup) && setup.invitationReference === ref, () => showToast('✅ បានចម្លង'));
+}
+
+async function actLicenseInvitation(setup, invite, action, request) {
+    if (!secureKeySetupCurrent(setup) || setup.busy) return;
+    setup.busy = true;
+    try {
+        const list = await licenseInvitationList(setup);
+        const fresh = list.invitations.find(i => i.inviteId === invite.inviteId);
+        const r = request && fresh && fresh.requests.find(r => r.requestId === request.requestId);
+        if (!fresh || fresh.status !== 'open' || (request && (!r || r.status !== 'pending' || r.enrollmentHash !== request.enrollmentHash || r.fingerprint !== request.fingerprint || r.verificationCode !== request.verificationCode))) throw new Error('invitation-changed');
+        if (r) await verifyLicenseInvitationRequest(setup, fresh, r);
+        if (!confirm(action === 'approve' ? 'តើអតិថិជនដែលអ្នកស្គាល់បានបញ្ជាក់លេខ ' + r.verificationCode + ' និងកម្មវិធី ' + fresh.target + ' ដូចគ្នាមែនទេ?' : 'តើអ្នកចង់បដិសេធ ឬបោះបង់សំណើនេះមែនទេ?')) return;
+        if (!secureKeySetupCurrent(setup)) return;
+        await licenseInvitationCommand(setup, action, { inviteId: fresh.inviteId, revision: list.revision, releaseEpoch: list.releaseEpoch, ...(r ? { requestId: r.requestId, fingerprint: r.fingerprint, enrollmentHash: r.enrollmentHash, receiptKeyFingerprint: list.receiptKeyFingerprint } : {}) });
+        await licenseInvitationList(setup);
+        secureKeySetupMessage(setup, 'Server បានបញ្ជាក់សកម្មភាព។');
+    } catch {
+        secureKeySetupMessage(setup, 'លទ្ធផលមិនទាន់ច្បាស់។ ចុចពិនិត្យសំណើមុនធ្វើសកម្មភាពម្ដងទៀត។');
+    } finally { if (secureKeySetupCurrent(setup)) setup.busy = false; }
 }
 
 async function publishSecureGeneratedKey(context, id, keyString) {

@@ -316,19 +316,27 @@ async function runCore(backend,spec,batchInput){
  }
 }
 function instrumentSweep(code){const call='ztoState.ztoStatusSweepTimer = setTimeout(() => {\n    ztoState.ztoStatusSweepTimer = null;\n    runZtoStatusSweep(false);',pieces=code.split(call);assert.equal(pieces.length,2,'exactly one expected scheduled sweep closure must be instrumented');return pieces.join(call.replace('runZtoStatusSweep(false);','__observeSweep(runZtoStatusSweep(false));'));}
-function instrumentTransport(code){const replacements=[
- ['client.auth.initialize().then(() => {\n    if (closed) return client.auth.dispose();\n  }).catch','__observeTransportCall(() => client.auth.initialize().then(() => {\n    if (closed) return client.auth.dispose();\n  })).catch'],
- ['Promise.resolve(client.removeChannel(channel)).catch','__observeTransportCall(() => Promise.resolve(client.removeChannel(channel))).catch'],
- ['client.removeAllChannels().catch','__observeTransportCall(() => client.removeAllChannels()).catch'],
- ['client.auth.dispose().catch','__observeTransportCall(() => client.auth.dispose()).catch']];
+function transportClientIdentifier(code){
+ // ស្រង់តែ binding ក្នុង transport ដែលបាន compile មិនមែន client កន្លែងផ្សេង។
+ const functions=[...code.matchAll(/^function createSupabaseTransport\(config, deps\) \{[\s\S]*?^\}/gm)];
+ assert.equal(functions.length,1,'expected exactly one transport function');
+ const bindings=[...functions[0][0].matchAll(/^  const ([$A-Z_a-z][$\w]*) = clientOwner\.value;$/gm)];
+ assert.equal(bindings.length,1,'expected exactly one transport client binding');
+ return bindings[0][1];
+}
+function instrumentTransport(code){const client=transportClientIdentifier(code);const replacements=[
+ [`${client}.auth.initialize().then(() => {\n    if (closed) return ${client}.auth.dispose();\n  }).catch`,`__observeTransportCall(() => ${client}.auth.initialize().then(() => {\n    if (closed) return ${client}.auth.dispose();\n  })).catch`],
+ [`Promise.resolve(${client}.removeChannel(channel)).catch`,`__observeTransportCall(() => Promise.resolve(${client}.removeChannel(channel))).catch`],
+ [`${client}.removeAllChannels().catch`,`__observeTransportCall(() => ${client}.removeAllChannels()).catch`],
+ [`${client}.auth.dispose().catch`,`__observeTransportCall(() => ${client}.auth.dispose()).catch`]];
  for(const [before,after] of replacements){const parts=code.split(before);assert.equal(parts.length,2,'expected exactly one transport instrumentation site');code=parts.join(after);}return code;}
 function instrumentSubscribe(code){const start='const isCurrent = () => !cancelled && !closed && !boundEnded && epoch === generation;\n      (async () => {',end='if (isCurrent()) onStatus("CHANNEL_ERROR");\n        }\n      })();\n      return () => {\n        cancelled = true;';for(const [before,after] of [[start,start.replace('(async () => {','__observeTransportCall(() => (async () => {')],[end,end.replace('if (isCurrent())','__captureTransportError(e);\n          if (isCurrent())').replace('})();','})());')]]){const parts=code.split(before);assert.equal(parts.length,2,'expected exactly one subscription IIFE site');code=parts.join(after);}return code;}
-function instrumentAuth(code){const replacements=[
+function instrumentAuth(code){const client=transportClientIdentifier(code);const replacements=[
  ['transport.restoreSession().then((restored) => {','__observeTransportCall(() => transport.restoreSession().then((restored) => {'],
  ['if (auth.currentUser) auth._verifyAccount();\n  });\n  auth._close = () => {','if (auth.currentUser) auth._verifyAccount();\n  }));\n  auth._close = () => {'],
  ['if (!verifying) verifying = verifyAccountNow().finally(() => {\n      verifying = null;\n    });','if (!verifying) verifying = __observeTransportCall(() => verifyAccountNow().finally(() => {\n      verifying = null;\n    }));'],
  ['if (auth._ready) Promise.resolve().then(() => {\n      if (!closed && auth._listeners.has(cb)) cb(auth.currentUser);\n    });','if (auth._ready) __observeTransportCall(() => Promise.resolve().then(() => {\n      if (!closed && auth._listeners.has(cb)) cb(auth.currentUser);\n    }));'],
- ['const loaded = client.auth.getSession().then((out2) => ({ out: out2 }), () => null);','const loaded = __observeTransportCall(() => client.auth.getSession()).then((out2) => ({ out: out2 }), () => null);']];
+ [`const loaded = ${client}.auth.getSession().then((out2) => ({ out: out2 }), () => null);`,`const loaded = __observeTransportCall(() => ${client}.auth.getSession()).then((out2) => ({ out: out2 }), () => null);`]];
  for(const [before,after] of replacements){const parts=code.split(before);assert.equal(parts.length,2,'expected exactly one auth instrumentation site');code=parts.join(after);}return code;}
 function instrumentRecovery(code){const start='recoveringWrites = running;\n    running.finally(() => {\n      if (recoveringWrites === running) recoveringWrites = null;',end='}).catch(() => {\n    });\n    return running;\n  };\n  const waitForWriteRecovery = async () => {',sync='function requestSync() {\n    if (closed) return;\n    wantSync = true;\n    if (!syncing) runSync();';for(const [before,after] of [[start,start.replace('running.finally(', '__observeTransportCall(() => running.finally(')],[end,end.replace('}).catch(', '})).catch(')],[sync,sync.replace('if (!syncing) runSync();','if (!syncing) __observeTransportCall(() => runSync());')]]){const parts=code.split(before);assert.equal(parts.length,2,'expected exactly one recovery or sync producer');code=parts.join(after);}return code;}
 function publicOwned(value){if(!value)return null;return {outcome:value.outcome,stopped:value.stopped===true,pid:value.pid??null,sizeBytes:value.sizeBytes??null,sizeStatus:value.sizeStatus??null,errorCount:Array.isArray(value.errors)?value.errors.length:0};}

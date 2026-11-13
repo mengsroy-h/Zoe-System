@@ -543,7 +543,7 @@ RUNALL_HINTS="emu/money-multidevice-emu-test:534 supabase-money-multishop-test:4
     css-media-override:1 css-var-test:1 dependency-security-test:1 devtools-guard-test:1 dom-hygiene:1
     export-cells-test:1 firebase-config-paste-test:1 google-sheets-cache-test:1 keygen-biometric-test:1 keygen-notice-test:1
     keygen-pin-flow-test:1 keygen-session-security-test:1 keylist-consistency-test:1 khmer-timezone-test:1 ledger-failed-apply-revert-test:1
-    license-app-code-test:1 license-clock-rollback-test:1 license-grace-test:1 license-record-race-test:1 license-time-endpoint-test:1
+    license-app-code-test:1 license-clock-rollback-test:1 license-grace-test:1 license-invitation-default-ui-test:1 license-record-race-test:1 license-time-endpoint-test:1
     license-time-json-test:1 locker-claim-guard-test:1 lookup-config-secret-test:1 module-runtime-scope-test:1 monthly-ledger-agreement-test:1
     monthly-report-test:1 netlify-config-scope-test:1 phone-suggest-test:1 pickup-ledger-test:1 pickup-reset-test:1
     pin-prompt-test:1 policy-test:1 reconnect-ladder-test:1 repository-file-coverage:1 restore-finalization-fence-test:1
@@ -1119,6 +1119,7 @@ run "money-guardian 5/6" node tools/audit-tools/money-guardian-test.js --part=5/
 run "money-guardian 6/6" node tools/audit-tools/money-guardian-test.js --part=6/6
 run "money-reality" node tools/audit-tools/money-reality-test.js
 run "repository-file-coverage" node tools/audit-tools/repository-file-coverage.js
+run "license-invitation-default-ui" node tools/audit-tools/license-invitation-default-ui-test.js
 run "module-runtime-scope" node tools/audit-tools/module-runtime-scope-test.js
 run "repository-contract" node tools/audit-tools/repository-contract-test.js
 run "security-guard (repo public · bundle ផលិតកម្ម · APK)" node tools/audit-tools/security-guard-test.js
@@ -1369,6 +1370,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     MONEYGUARD_APP_DIR="$BASE" runall_owned node tools/audit-tools/money-guardian-test.js 2>&1 | tail -1 | sed 's/^/   money-guardian:  /'
     MONEYREALTEST_APP_DIR="$BASE" node tools/audit-tools/money-reality-test.js 2>&1 | tail -1 | sed 's/^/   money-reality:   /'
     REPOCOVER_APP_DIR="$BASE" node tools/audit-tools/repository-file-coverage.js 2>&1 | tail -1 | sed 's/^/   file-coverage:   /'
+    LICENSE_INVITATION_UI_APP_DIR="$BASE" node tools/audit-tools/license-invitation-default-ui-test.js 2>&1 | tail -1 | sed 's/^/   invitation-ui:   /'
     MODULE_RUNTIME_SCOPE_APP_DIR="$BASE" node tools/audit-tools/module-runtime-scope-test.js 2>&1 | tail -1 | sed 's/^/   module-runtime:  /'
     REPOCONTRACT_APP_DIR="$BASE" node tools/audit-tools/repository-contract-test.js 2>&1 | tail -1 | sed 's/^/   repo-contract:   /'
     SECURITYGUARD_APP_DIR="$BASE" node tools/audit-tools/security-guard-test.js 2>&1 | tail -1 | sed 's/^/   security-guard:  /'

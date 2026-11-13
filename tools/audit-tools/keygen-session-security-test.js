@@ -68,6 +68,7 @@ function build(options) {
                 textContent: '',
                 disabled: false,
                 checked: false,
+                childNodes: [], replaceChildren(...nodes) { this.childNodes = nodes; this.textContent = nodes.map(node => typeof node === 'string' ? node : node.textContent || '').join(''); },
                 style: {},
                 classList: {
                     add: (name) => { classes[name] = true; },
@@ -758,6 +759,16 @@ async function run() {
             /invalidateSensitiveSession\(\)/.test(body('showLoginModalWithPrefill')) && /isSignedInUiActive = false/.test(body('showLoginModalWithPrefill')));
     }
     console.log('-- ចាក់សោ/ចាកចេញ ➜ key Apps Script មិននៅក្នុងវាល URL API ស្វែងរក --');
+    {
+        const cleanup = build();
+        const row = { textContent: 'សំណើសាកល្បង' };
+        const queue = cleanup.getElementById('licenseInvitationQueue');
+        queue.replaceChildren(row);
+        cleanup.getElementById('licenseInvitationReference').value = 'synthetic-reference';
+        ok('មុនសម្អាត៖ ជួរសំណើមានធាតុសាកល្បង', queue.childNodes.length === 1 && queue.childNodes[0] === row);
+        cleanup.ctx.clearSecureKeySetup();
+        ok('សម្អាតការអញ្ជើញ៖ ដកធាតុ និងលេខយោង', queue.childNodes.length === 0 && queue.textContent === '' && cleanup.getElementById('licenseInvitationReference').value === '');
+    }
     let h = build();
     h.getElementById('setupLookupUrlInput').value = 'https://script.google.com/macros/s/X/exec?code={barcode}&key=SHEETKEY99&auth_token=TOK1&mode=1';
     h.ctx.invalidateSensitiveSession();

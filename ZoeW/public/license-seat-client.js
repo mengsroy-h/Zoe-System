@@ -245,6 +245,29 @@
         return envelope;
     }
 
+    async function invitationEnrollmentRequest(app, keyId, inviteId, target) {
+        scope(app, keyId);
+        if (typeof inviteId !== 'string' || !new RegExp('^' + keyId + '\\.[0-9A-HJKMNP-TV-Z]{16}$').test(inviteId) || !['pwa', 'apk'].includes(target)) throw new Error('invitation-scope');
+        const identity = await loadIdentity(app, keyId);
+        if (!identity) throw new Error('identity-missing');
+        const command = { domain: 'zoe-license-enrollment-v1', audience: AUDIENCE, app: app, keyId: keyId, publicKey: identity.publicKey, nonce: encode(crypto.getRandomValues(new Uint8Array(24))), inviteId: inviteId, target: target };
+        const envelope = await signed(identity, command);
+        envelope.fingerprint = await fingerprint(identity.publicKey);
+        return envelope;
+    }
+
+    async function signInvitationCommand(app, keyId, command) {
+        scope(app, keyId);
+        const snapshot = JSON.parse(JSON.stringify(command));
+        if (!snapshot || snapshot.domain !== 'zoe-license-invitation-v1' || snapshot.audience !== AUDIENCE || snapshot.app !== app || snapshot.keyId !== keyId ||
+            !['submit', 'status'].includes(snapshot.action) || typeof snapshot.inviteId !== 'string' || !new RegExp('^' + keyId + '\\.[0-9A-HJKMNP-TV-Z]{16}$').test(snapshot.inviteId) ||
+            !Number.isSafeInteger(snapshot.expiresAt) || snapshot.expiresAt <= 0) throw new Error('invitation-scope');
+        const identity = await loadIdentity(app, keyId);
+        if (!identity) throw new Error('identity-missing');
+        snapshot.publicKey = identity.publicKey;
+        return signed(identity, snapshot);
+    }
+
     async function verifyReceipt(receipt, pinnedPublicKeys, expected, now) {
         if (!receipt || typeof receipt.payload !== 'string' || receipt.payload.length > 8192 || !expected ||
             !Number.isSafeInteger(now) || now <= 0 || !Array.isArray(pinnedPublicKeys) || !pinnedPublicKeys.length) throw new Error('receipt-invalid');
@@ -270,5 +293,5 @@
         return payload;
     }
 
-    global.ZoeSeatClient = { loadIdentity: loadIdentity, createIdentity: createIdentity, inspectCorruptIdentity: inspectCorruptIdentity, repairIdentity: repairIdentity, enrollmentRequest: enrollmentRequest, signCommand: signCommand, fingerprint: fingerprint, verifyReceipt: verifyReceipt };
+    global.ZoeSeatClient = { invitationEnrollmentRequest: invitationEnrollmentRequest, signInvitationCommand: signInvitationCommand, loadIdentity: loadIdentity, createIdentity: createIdentity, inspectCorruptIdentity: inspectCorruptIdentity, repairIdentity: repairIdentity, enrollmentRequest: enrollmentRequest, signCommand: signCommand, fingerprint: fingerprint, verifyReceipt: verifyReceipt };
 })(window);

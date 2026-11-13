@@ -3884,7 +3884,7 @@
     },
     "tools/audit-tools/emu/import-paired-sdk-test.js": {
       "policy": "import-paired-harness-integrity",
-      "sha256": "8bd7317172660e75f29fe1add9ed8b42ebc2100539bf92e6cb06fe55d24d6c6d"
+      "sha256": "c478200c053babfdfc1cf11402ae9a1add135ea7d4557df98108d5b7eaf8fff7"
     },
     "tools/audit-tools/emu/ledger-revert-emu-test.js": {
       "policy": "guard-1"
@@ -5209,6 +5209,30 @@
     },
     "tools/audit-tools/zoew/tests/relocated-checker-paths.test.ts": {
       "policy": "relocated-checker-paths"
+    },
+    "tools/audit-tools/license-invitation-default-ui-test.js": {
+      "policy": "guard-1"
+    },
+    "ZoeW/netlify/lib/license-invitations.mjs": {
+      "policy": "license-seat-protocol"
+    },
+    "ZoeW/netlify/functions/license-invitations.mjs": {
+      "policy": "license-seat-protocol"
+    },
+    "ZoeW/src/features/license-invitations.ts": {
+      "policy": "license-seat-protocol"
+    },
+    "tools/audit-tools/zoew/tests/license-invitations-server.test.ts": {
+      "policy": "license-seat-protocol"
+    },
+    "tools/audit-tools/zoew/tests/license-invitations-seller.test.ts": {
+      "policy": "license-seat-protocol"
+    },
+    "tools/audit-tools/zoew/tests/license-invitations.test.ts": {
+      "policy": "license-seat-protocol"
+    },
+    "tools/audit-tools/zoew/tests/import-instrumentation-identifiers.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

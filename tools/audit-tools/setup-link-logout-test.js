@@ -193,6 +193,12 @@ for (const app of ['ZoeW']) {
         ok(!!scanFlowDecl && !!endScanFlowFn, 'រកឃើញ endScanFlow() និង SCAN_FLOW_MODALS ពិត');
         if (scanFlowDecl) vm.runInContext(scanFlowDecl, ctx);
         if (endScanFlowFn) vm.runInContext(endScanFlowFn, ctx);
+        vm.runInContext(moduleRuntime(ROOT, src, [{ path: 'src/features/license-invitations.ts', expose: ['cancelLicenseInvitation', 'clearLicenseInvitationIntent', 'operation', 'timer', 'activationOwner', 'pendingLink'] }]).code, ctx);
+        ctx.invitationAborted = 0;
+        vm.runInContext('operation = { abort: { abort() { invitationAborted++; } } }; activationOwner = operation; timer = 123;'
+            + ' pendingLink = { code: "ABCDEFGHIJKLMNOP.0123456789ABCDEF", at: 1 };'
+            + ' viewState.invitationCode = "ABCDEFGHIJKLMNOP.0123456789ABCDEF"; viewState.invitationBusy = true;'
+            + ' viewState.activationBusy = true; viewState.invitationVerificationCode = "12345678"; viewState.invitationMessage = "waiting";', ctx);
         const clearFn = sliceFn(src, 'clearSensitiveModalFields');
         if (clearFn) vm.runInContext(clearFn, ctx);
         // ស្ថានភាព និងមុខងារ toast/session ពិតត្រូវនៅក្នុង scope របស់ម៉ូឌុលដើម។
@@ -264,6 +270,16 @@ for (const app of ['ZoeW']) {
         ok(glideState.tokens === 0 && glideState.release === null,
             'ចាកចេញ ➜ ស្ថានភាពចលនាផ្ទាំងត្រូវសម្អាតអស់', glideState);
         ok(!threw, 'logout runs without throwing', threw && threw.message);
+        const invitationAfter = vm.runInContext('({ operation, timer, activationOwner, pendingLink, code: viewState.invitationCode, busy: viewState.invitationBusy, active: viewState.activationBusy, verification: viewState.invitationVerificationCode, message: viewState.invitationMessage })', ctx);
+        ok(ctx.invitationAborted === 1 && invitationAfter.operation === null && invitationAfter.timer === null && invitationAfter.activationOwner === null
+            && invitationAfter.code === '' && invitationAfter.busy === false && invitationAfter.active === false && invitationAfter.verification === '' && invitationAfter.message === '',
+            'ការបើក Login បោះបង់សំណើអញ្ជើញដែលកំពុងរង់ចាំ និងសម្អាតព័ត៌មានអេក្រង់', invitationAfter);
+        ok(invitationAfter.pendingLink && invitationAfter.pendingLink.code === 'ABCDEFGHIJKLMNOP.0123456789ABCDEF',
+            'ការបើក Login ដំបូងរក្សាតែ locator របស់តំណដែលរង់ចាំ');
+        ctx.auth = { currentUser: { uid: 'invitation-cleanup-fixture' } };
+        ctx.clearSensitiveModalFields();
+        ok(vm.runInContext('pendingLink === null && viewState.invitationCode === ""', ctx),
+            'ការចាកចេញពិតលុប locator របស់តំណអញ្ជើញផងដែរ');
         const healthState = vm.runInContext('({ active: healthActiveRun, completed: healthCompletedRun, task: healthCheckTask,'
             + ' seq: uiState.healthRunSeq, busy: viewState.healthRecheckBusy, rows: uiState.healthRows, advice: uiState.healthAdvice })', ctx);
         ok(healthState.active === 0 && healthState.completed === 0 && healthState.task === null

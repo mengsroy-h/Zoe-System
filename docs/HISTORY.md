@@ -123,6 +123,28 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### ZoeW [2.50.200] · ZoeKeyGen [2.24.48] — 2026-11-13 · ផ្ទៀង CI ការអញ្ជើញ
+
+**ZoeW** (`zoew-v463` ➜ `zoew-v464`) និង **ZoeKeyGen** (`zoekeygen-v158` ➜ `zoekeygen-v159`)។ សំណើអញ្ជើញឆ្លង helper បណ្ដាញដែលមានពិដានពេលរហូតអានតួចប់; សារចម្លងបង្ហាញសញ្ញាជោគជ័យ ហើយវាលអញ្ជើញសម្អាតតាមបញ្ជីដដែលនឹងវាល Key។ កំណែ និង cache ឡើងតាមច្បាប់ ៨ ព្រោះមានកូដ ship ប្រែ។
+
+- ការកែ fixtures និងឧបករណ៍ CI រក្សា assertions/gates ដើម; ភស្តុតាង និងព្រំដែននៅផ្នែក ២។
+- **សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ ម្ចាស់ push commit បន្ថែមទៅ PR #413 ហើយផ្ទៀង CI ថ្មីលើ SHA នោះមុន merge។ គ្មាន rules/migration ឬការកំណត់ផលិតកម្មថ្មីក្នុងការកែនេះ។ ការអញ្ជើញនៅបិទជាលំនាំដើម; មិនបាន push, rerun, preview ឬ deploy ដោយស្វ័យប្រវត្តិ។
+
+### ZoeW [2.50.199] · ZoeKeyGen [2.24.47] — 2026-11-13 · ការអញ្ជើញអាជ្ញាប័ណ្ណ និងសំណើរង់ចាំ
+
+**ZoeW** (`zoew-v462` ➜ `zoew-v463`) និង **ZoeKeyGen** (`zoekeygen-v157` ➜ `zoekeygen-v158`)។ ការងារលើ main `8527753` សម្រាប់ review និងសាកល្បង; មិន merge, deploy ផលិតកម្ម បើកមុខងារលើ Server ឬប៉ះទិន្នន័យពិត។
+
+- អ្នកលក់ចេញការអញ្ជើញដែលចង Key, ជំនាន់ដោះឧបករណ៍, PWA/APK និងសុពលភាពអតិបរមា ២៤ ម៉ោង។ អតិថិជនស្នើសុំក្នុង App ដោយសោ IndexedDB ដើម ហើយមើលលេខប្រៀបធៀប ៨ ខ្ទង់; អ្នកលក់អានសំណើថ្មី ផ្ទៀងហត្ថលេខា និងលេខដដែល មុនអនុម័ត។ Approval និងការចងកៅអីសរសេរក្នុង Blob CAS ដូចគ្នា ដោយរក្សាពិដានឧបករណ៍ និង release epoch។
+- Link មាន locator ក្នុង fragment ដាច់ពី Setup Link។ APK គ្មាន deep-link handler ហើយត្រូវបិទភ្ជាប់កូដក្នុង APK; browser tab មិនបង្កើតសោជំនួស PWA ដែលដំឡើងទេ។ មិនប្ដូរច្រកចូល Supabase ឬ fallback ដោយដៃ។
+- Activation Key រក្សាតែ ciphertext AES-256-GCM ក្នុង private Blob; AAD ចងវិសាលភាពការអញ្ជើញ។ Server បញ្ចេញតែទៅសំណើដែលបានអនុម័ត និងមានហត្ថលេខារបស់ឧបករណ៍នោះ; client ត្រូវផ្ទៀង Key និង secure Receipt តាមផ្លូវធម្មតាមុនផ្ដល់សិទ្ធិ។ Raw Key, receipt និង enrollment មិនចូល URL ឬ log។
+- សំណើក្នុងឧបករណ៍រក្សា envelope ដដែលមុនផ្ញើ ដើម្បីបន្តក្រោយបាត់ចម្លើយ; លទ្ធផលមិនច្បាស់មិនក្លាយជាការបរាជ័យដាច់ខាត ឬការអនុម័តដោយខ្លួនឯង។ Cancel, logout និងការប្ដូរវគ្គរារាំងការទទួលលទ្ធផលយឺត។
+- **សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ feature បិទជាលំនាំដើម។ មុនសាក rollout ដែលម្ចាស់អនុញ្ញាត ត្រូវផ្ទៀង stage/Receipt pins ដែលមានស្រាប់, ដាក់ server-only `ZOE_LICENSE_INVITE_ENCRYPTION_KEY` (៣២ bytes base64url) និងបើក `ZOE_LICENSE_INVITATIONS=enabled` ក្នុង production context របស់ ZoeW។ មិនមាន Firebase rules path ថ្មី។ ត្រូវកំណត់ platform rate limiting និងផែនការសម្អាត; cancellation លុប ciphertext ភ្លាម, expiry បដិសេធការប្រើជានិច្ច ហើយ seller operations សម្អាត expired records មានព្រំដែន ប៉ុន្តែមិនមាន scheduler ធានាលុប physical bytes ពេលគ្មានអ្នកប្រើទេ។ បិទ feature មិនប៉ះ License ដែល Activate រួច។
+- Default-off UI រក្សាប្រអប់ Key និងផ្លូវដោយដៃនៅមុខ និងមើលឃើញជានិច្ចក្នុង App ទាំងពីរ។ ការអញ្ជើញជាជម្រើសបន្ថែមបិទជាលំនាំដើម; កូដ/សារសំណើលើ ZoeW បើកផ្នែកនោះ ដូច្នេះសារមិនទាន់បើកប្រើមិនត្រូវលាក់។ `license-invitation-default-ui-test` render React component ពិត និងអាន HTML អ្នកលក់៖ មុនកែ ៦ PASS/១៦ FAIL; ក្រោយកែ ២២ PASS/០ FAIL។ តេស្តថ្មីនេះរស់នៅ `tools/audit-tools/`។
+- ការផ្ទេរក្រោយ PR #412 រក្សា worktree ដើមទាំង ៤៤ ឯកសារដោយ hashes ដដែល។ ការងារថ្មីដាក់ tests/helpers តែក្នុង `tools/audit-tools/` ហើយរក្សា runner/config និងឯកសាររបស់ main។ ការបោះបង់ក្រោយបាត់ចម្លើយ ឬផុតវគ្គ polling រក្សា scoped pending handle ដើម្បីកុំឱ្យ online event បន្តដោយខ្លួនឯង; ការបោះបង់ពេល retry កំពុងគណនា scope ក៏ផ្អាកសំណើដើម។ តេស្តធម្មតា ៣ ករណីបន្ថែម និងការផ្ទៀង exhausted polling ចាក់សោឥរិយាបថនេះ។
+- អ្នកយាមថ្មី៖ `tools/audit-tools/zoew/tests/license-invitations.test.ts`, `tools/audit-tools/zoew/tests/license-invitations-server.test.ts` និង `tools/audit-tools/zoew/tests/license-invitations-seller.test.ts` គ្រប request/retry/session, ការរក្សាសិទ្ធិរបស់ Server និងការផ្ទៀងមុនអនុម័ត។
+- **ព្រំដែនផ្ទៀង**៖ តេស្ត fixture សំយោគ ៣៤០ ករណីក្នុង ១២ ឯកសារឆ្លងក្រោយផ្ទេរទៅ layout ថ្មី; shared activation guard/protocol regressions ថ្មី ៤ ករណីបរាជ័យលើ baseline `c4e4bd5` ហើយឆ្លងលើកូដថ្មី។ TypeScript, lint និង production build ឆ្លង។ Cleanup guard លើ generated source view ពិតបាន ១០០/១០០; audit browser build ផ្អាកនៅ Chromium `socket(): Operation not permitted` ដូច្នេះមិនមែន full measure-root ឬ browser PASS។ CI លើ main មិនស្ថិតក្នុងការងារនេះ។ Netlify/Blob ពិត, standalone PWA/iPhone និង APK លើឧបករណ៍ពិតនៅមិនទាន់ផ្ទៀង ហើយត្រូវធ្វើក្នុង rollout ដែលបានអនុម័ត។
+
+
 ### ZoeW [2.50.198] — 2026-11-13 · ប្រមូលឧបករណ៍តេស្ត និងឯកសារ
 
 **ZoeW** (`zoew-v461` ➜ `zoew-v462`)។ ZoeKeyGen រក្សាកំណែដដែល។
@@ -2127,6 +2149,16 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-11-13 — ប្រមូលមូលហេតុ CI ក្នុង PR #413
+
+- **ប្រភព**៖ [Audit 43445044200](https://github.com/mengsroy-h/Zoe-System/actions/runs/43445044200) លើ head `74eda82e8ac204af5f1565556719f19d785577a1` ចប់ដោយធ្លាក់ shards ទាំង ៥ និង ZTO/native; Registration Auth និង F03 ឆ្លង។ មិន rerun ឬប៉ះ remote។ Local `375dd864` រក្សាដាច់ដោយឡែក; ការកែសរុបចាប់ពី head ដើម។
+- **Fixtures**៖ DOM ក្លែងរបស់ KeyGen ខ្វះ `replaceChildren`; បន្ថែមវិធីដែលសម្អាត children ពិត និង assertion លើជួរអញ្ជើញ/លេខយោង។ VM របស់ connection, periodic និង boot ខ្វះ leaf dependencies ថ្មី; auth fixture ត្រូវ isolate invitation boundary ដើម្បីមិនបញ្ចូល action registry ពេញតាម mock មិនពេញ។
+- **បណ្ដាញ និង metadata**៖ invitation POST ប្រើ fetch ឆៅក្រៅ helper រួម។ តេស្តធម្មតា headers/body ដែលព្យួរធ្លាក់ ២ មុនកែ ហើយឆ្លងក្រោយ helper settle និង abort នៅពិដាន។ រក្សា status handling និង envelope ដើម។ សារចម្លងត្រូវមានសញ្ញា ✅; announcements ទុក update ថ្មីតែមួយ; កាតាឡុក audit បន្ថែមឧបករណ៍ UI ដែលខ្វះ។
+- **ការស្រង់ native**៖ esbuild ប្តូរ transport `client` ទៅ `client2` ដោយសារ function `client()` ថ្មី។ Compile-only បញ្ជាក់ថា matcher ចាស់រកមិនឃើញ; harness ថ្មីស្រង់ឈ្មោះ binding ក្នុង function ពិត ហើយរក្សាពិដាន exactly-one។ តេស្ត compile/transform ៣ ឆ្លង ដោយមិន execute bundle ឬ emulator។
+- **Keyboard fixture**៖ log បញ្ជាក់ `outside:[]`, `drawer:false`, `ran:0`, `stays:true`; Enter បើក logout confirmation ក្នុង activation modal ផ្ទាល់។ Fixture កំណត់ focus ទៅ field មើលឃើញមុន Enter ហើយរក្សា Tab containment និង assertion ចុងក្រោយដើម។ មិនកែ modal protection របស់ App។
+- **ការផ្ទៀង tree ចុងក្រោយ**៖ focused routine tests ៥៧ ឆ្លង (invitation/setup ១៧, notifications/push/compile-only ៣៩, DOM checker positive ១); default-off UI ២២ ឆ្លង។ Typecheck, lint, production build, doc check, Android source contract ១៣៥, slot ownership, purity ១៥, file coverage ១០, syntax និង whitespace ឆ្លង។ Hash integrity របស់ harness ធ្វើបច្ចុប្បន្នភាពក្រោយ review ឯករាជ្យ; គ្មាន gate ឬ assertion ដើមត្រូវដក។
+- **ព្រំដែន**៖ audit build ដល់ Chromium launch ហើយត្រូវបានទប់ដោយ sandbox socket permission; មិនអះអាងថា browser audit ឬ full doc-scope បានរត់។ មិនរត់ security/poison/mutation/native-emulator/full-CI ឬសាកឧបករណ៍ពិត; local pass និង compile-only មិនជំនួស CI ថ្មី។ Timeout test វាស់ពិដានរួម ៤៥ វិនាទី និង source abort មិនបំបែក timer របស់ helper ដោយឡែកទេ។
 
 ### 2026-11-13 — ស្តារ browser audit bridge និងផ្លូវ fixture
 
@@ -5201,6 +5233,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `license-clock-rollback-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `license-clock-trust-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `license-grace-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ · ផ្នែក ៩ |
+| `license-invitation-default-ui-test` | ផ្នែក ១ | — |
 | `license-network-pressure-test` | — | ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `license-record-race-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ |
 | `license-seat-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៥ · ផ្នែក ៧ · ផ្នែក ៨ |
@@ -5445,6 +5478,9 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `tools/audit-tools/zoew/tests/ledger-unknown-no-retry.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/ledger-writer-contract.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/license-clock-recovery.test.ts` | ផ្នែក ១ | — |
+| `tools/audit-tools/zoew/tests/license-invitations-seller.test.ts` | ផ្នែក ១ | — |
+| `tools/audit-tools/zoew/tests/license-invitations-server.test.ts` | ផ្នែក ១ | — |
+| `tools/audit-tools/zoew/tests/license-invitations.test.ts` | ផ្នែក ១ | — |
 | `tools/audit-tools/zoew/tests/license-seat-runtime-context.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/license-seat-seller.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/license-secure-issuance.test.ts` | ផ្នែក ២ | — |

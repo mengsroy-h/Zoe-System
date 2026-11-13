@@ -39,7 +39,7 @@ async function harness(receipts = true) {
     const service = createSeatStageService({ store, enabled: true, publicKeys: [seller.publicKey], now: () => now,
         receiptPrivateJwk: receipts ? receipt.privateKey : null });
     const elements: Record<string, any> = {};
-    const element = (name: string) => elements[name] ||= { value: '', textContent: '', disabled: false, style: {}, classList: { add: vi.fn(), remove: vi.fn(), toggle: vi.fn() }, focus: vi.fn() };
+    const element = (name: string) => elements[name] ||= { children: [] as unknown[], replaceChildren(...nodes: unknown[]) { this.children = nodes; }, append(...nodes: unknown[]) { this.children.push(...nodes); }, value: '', textContent: '', disabled: false, style: {}, classList: { add: vi.fn(), remove: vi.fn(), toggle: vi.fn() }, focus: vi.fn() };
     const writes: any[] = [];
     const ctx: any = {
         TextEncoder, TextDecoder, Uint8Array, crypto: webcrypto, btoa, atob, setTimeout, clearTimeout,
@@ -301,7 +301,11 @@ describe('កិច្ចសន្យា markup និងការបិទប�
         expect(h.element('secureKeyFingerprint').textContent).not.toBe('');
         Object.assign(h.ctx.document, { documentElement: h.element('documentRoot'), querySelectorAll: () => [] });
         vm.runInContext(source.slice(source.indexOf('function closeModal(id)'), source.indexOf('function setupModalFocusTrap()')), h.ctx);
+        h.element('licenseInvitationReference').value = 'synthetic-reference';
+        h.element('licenseInvitationQueue').append({ textContent: 'synthetic-request' });
         h.ctx.closeModal('secureKeySetupModal');
+        expect(h.element('licenseInvitationReference').value).toBe('');
+        expect(h.element('licenseInvitationQueue').children).toEqual([]);
         for (const name of ['secureKeySetupKey', 'secureKeyEnrollmentInput']) expect(h.element(name).value).toBe('');
         for (const name of ['secureKeyFingerprint', 'secureKeySetupStatus', 'secureKeySetupId']) expect(h.element(name).textContent).toBe('');
         expect(h.element('secureKeyApproveBtn').disabled).toBe(true);

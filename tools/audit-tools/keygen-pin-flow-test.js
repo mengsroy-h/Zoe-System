@@ -34,6 +34,7 @@ function build(savedPin, savedSigningKey) {
             const classes = {};
             els[id] = {
                 id, value: '', textContent: '', style: {},
+                childNodes: [], replaceChildren(...nodes) { this.childNodes = nodes; this.textContent = nodes.map(node => typeof node === 'string' ? node : node.textContent || '').join(''); },
                 classList: {
                     add: (c) => { classes[c] = true; },
                     remove: (c) => { delete classes[c]; },
@@ -71,6 +72,16 @@ function build(savedPin, savedSigningKey) {
     return { ctx, els, getEl };
 }
 
+{
+    const cleanup = build();
+    const row = { textContent: 'សំណើសាកល្បង' };
+    const queue = cleanup.getEl('licenseInvitationQueue');
+    queue.replaceChildren(row);
+    cleanup.getEl('licenseInvitationReference').value = 'synthetic-reference';
+    ok('មុនសម្អាត៖ ជួរសំណើមានធាតុសាកល្បង', queue.childNodes.length === 1 && queue.childNodes[0] === row);
+    cleanup.ctx.clearSecureKeySetup();
+    ok('សម្អាតការអញ្ជើញ៖ ដកធាតុ និងលេខយោង', queue.childNodes.length === 0 && queue.textContent === '' && cleanup.getEl('licenseInvitationReference').value === '');
+}
 console.log('-- checkPinAndOpenConfig មិនត្រូវទទួលមរតក callback ចាស់ --');
 let h = build(null);
 h.ctx.requestPinBeforeConfig(h.ctx.persistSigningKeyForSession, 'ចងចាំ Signing Key');

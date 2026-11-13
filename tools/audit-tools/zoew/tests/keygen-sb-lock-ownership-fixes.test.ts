@@ -30,6 +30,7 @@ async function scenario(action, stage) {
     if (!els.has(id)) {
       const classes = new Set(['sbAdminPanel', 'sbAdminLogoutBtn'].includes(id) ? ['hidden'] : []);
       els.set(id, {value: '', textContent: '', innerHTML: '', disabled: false,
+        childNodes: [], replaceChildren(...nodes) { this.childNodes = nodes; this.innerHTML = ''; this.textContent = nodes.map(node => typeof node === 'string' ? node : node.textContent || '').join(''); },
         classList: {add: c => classes.add(c), remove: c => classes.delete(c), contains: c => classes.has(c)}});
     }
     return els.get(id);
@@ -57,6 +58,15 @@ async function scenario(action, stage) {
     var appLocalStore = {}, appSessionStore = {}, SIGNING_KEY_SESSION_STORAGE_KEY = 'fixture';
     var signingPrivateKeyJwk = null, signingKeySessionKey = null, signingKeyLastUseAt = 0;
     var isGeneratingKey = false, generateKeyOwner = null, lookupSetupGeneration = 0, lastGeneratedSetupLink = '';`, ctx);
+  const invitationRow = {textContent: 'សំណើសាកល្បង'};
+  const invitationQueue = el('licenseInvitationQueue');
+  invitationQueue.replaceChildren(invitationRow);
+  el('licenseInvitationReference').value = 'synthetic-reference';
+  assert.deepEqual(invitationQueue.childNodes, [invitationRow]);
+  ctx.clearSecureKeySetup();
+  assert.equal(invitationQueue.childNodes.length, 0);
+  assert.equal(invitationQueue.textContent, '');
+  assert.equal(el('licenseInvitationReference').value, '');
   el('sbAdminUrlInput').value = 'https://fixture.supabase.co';
   el('sbAdminKeyInput').value = 'sb_publishable_fixture';
   el('sbAdminEmailInput').value = 'fixture@example.test';

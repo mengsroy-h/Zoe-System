@@ -122,6 +122,15 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### ZoeKeyGen [2.24.45] — 2026-11-13 · ផ្ទៀង cache មុនប្ដូរ marker
+
+**ZoeKeyGen** (`zoekeygen-v155` ➜ `zoekeygen-v156`)។ ZoeW រក្សាកំណែដដែល។
+
+- ជម្រើស 4 រង់ចាំ snapshot ពី listener លើ Key ជាក់លាក់ មុន transaction ហើយរក្សា listener រហូតអានលទ្ធផល REST ចប់។ គ្មាន row សិទ្ធិអានបាត់ ឬផុតពេលរង់ចាំ ➜ មិនយក REST ចាស់មកបំពេញ updater ទេ។
+- ផ្ទៀងវគ្គ សោ ម៉ោង និងតម្លៃដើមក្នុង updater ដដែល។ ផ្ទៀង `committed` និង snapshot របស់ transaction រួចអាន marker ពី Server ដាច់ដោយឡែក មុនបង្ហាញជោគជ័យ។ Marker ដែលមានរួចក៏ត្រូវផ្ទៀង REST។ ដោះ listener ក្នុង `finally`; timeout មិនធានាថា write ដែលផ្ញើរួចត្រូវលុប ហើយមិនសាកផ្ញើម្ដងទៀតដោយស្វ័យប្រវត្តិ។
+- ផ្លូវដោះឧបករណ៍ legacy និង secure រក្សាដដែល។ Rules និងការកំណត់ authority មិនបានកែ។
+- **សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ review និង CI លើ commit ចុងក្រោយ មុនសុំអនុញ្ញាត merge/deploy។ ក្រោយផ្សាយ បើក ZoeKeyGen កំណែថ្មី ហើយអានស្ថានភាពពី Server មុនសម្រេចចុចជម្រើស 4 ឡើងវិញ។ ការផ្ទៀងផ្ទាត់នេះសាកតែក្នុងម៉ាស៊ីន មិនប៉ះ Firebase ពិត និងមិន deploy។
+
 ### 2026-11-13 · បរិបទ runtime របស់ License stage (Server)
 
 កែតែ Netlify Function មិនចូលសំបក frontend; កំណែ App/cache និងសេចក្ដីជូនដំណឹងទាំងពីរ App រក្សាដដែល។
@@ -2100,6 +2109,12 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-11-13 — cache SDK របស់ seller marker
+
+- `seatSellerRow()` អាន REST មិនបំពេញ cache របស់ Firebase SDK ទេ។ `runTransaction` ទទួល `null` ដំបូង ហើយ updater ដែលបដិសេធ `null` បញ្ចប់មុនទទួល row ពី Server។ `ZoeW/tests/license-seat-seller.test.ts` ឥឡូវបំបែក REST row ពី SDK cache និងបំពេញ cache តាម listener ប៉ុណ្ណោះ។
+- តេស្តលើ app មុនកែ៖ ៤ បរាជ័យ / ៣៩ ឆ្លង។ ក្រោយកែ និងបន្ថែមករណី៖ ៧៨ ឆ្លង។ វាស់ snapshot បាត់/យឺត សិទ្ធិអាន វគ្គ/សោ/ម៉ោងប្រែ row ដែលផ្លាស់ពីអ្នកសរសេរផ្សេង លទ្ធផល transaction ខុស REST readback listener cleanup និង write យឺតក្រោយ timeout។ ជា mock SDK មិនមែនភស្តុតាងពី Firebase ពិត ឬ emulator ទេ។
+- តេស្ត seat ចំនួន ៥ ឯកសារ៖ ១៥៣ ឆ្លង។ អ្នកយាម KeyGen session/PIN/biometric/notice/key list៖ ៥៥៤ ឆ្លង; typecheck, lint, syntax និង strip-comments ឆ្លង។ តេស្ត IndexedDB ចំនួន ៥ និង audit measure build មិនបានបញ្ចប់ ព្រោះ Chromium បើក socket មិនបានក្នុងម៉ាស៊ីននេះ។ ដូច្នេះ generated-tree version/doc guards, full CI និងឧបករណ៍ពិតនៅមិនទាន់ផ្ទៀង។
 
 ### 2026-11-13 — Netlify runtime context
 

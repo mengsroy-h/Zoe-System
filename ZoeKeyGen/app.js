@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.44';
+const APP_VERSION = '2.24.45';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -3057,6 +3057,51 @@ function seatLegacyExpiresAt(value) {
     return Number.isSafeInteger(expiresAt) && expiresAt > 0 ? expiresAt : null;
 }
 
+async function seatSellerMark(context, id, state) {
+    const markerClock = captureKeygenClock();
+    if (!markerClock) throw new Error('seat-clock');
+    const latest = await seatSellerRow(context, id);
+    const sdk = fb;
+    let watching = true;
+    let watchError = null;
+    let unsubscribe = () => {};
+    const current = () => watching && !watchError && context.current() && fb === sdk && signingPrivateKeyJwk === context.privateKey && keygenClockIsCurrent(markerClock);
+    if (!current()) throw new Error('seat-session-changed');
+    const target = sdk.ref(context.database, 'license_keys/ZOE/' + id);
+    let failWatch;
+    const failed = new Promise((_, reject) => { failWatch = (error) => { watchError = error; reject(error); }; });
+    try {
+        const ready = new Promise((resolve) => {
+            unsubscribe = sdk.onValue(target, (snapshot) => {
+                const value = snapshot.val();
+                if (!value || typeof value !== 'object' || Array.isArray(value) || (value.seatProtocol !== undefined && value.seatProtocol !== 1 && value.seatProtocol !== 2)) {
+                    failWatch(new Error('seat-row-invalid'));
+                    return;
+                }
+                resolve();
+            }, failWatch);
+        });
+        await withTimeout(Promise.race([ready, failed]), 15000, 'Seat marker read timed out');
+        if (!current()) throw new Error('seat-session-changed');
+        if (latest.seatProtocol !== 2) {
+            const result = await withTimeout(Promise.race([sdk.runTransaction(target, (value) => {
+                if (!current() || !value || typeof value !== 'object' || Array.isArray(value)) return;
+                if (value.seatProtocol === 2) return;
+                if (value.seatProtocol !== undefined && value.seatProtocol !== 1) return;
+                if ((value.maxDevices || 1) !== state.maxDevices || value.expiresAt !== latest.expiresAt || seatLegacyExpiresAt(value.expiresAt) !== state.licenseExpiresAt || !!value.revoked !== state.revoked) return;
+                return { ...value, seatProtocol: 2 };
+            }, { applyLocally: false }), failed]), 15000, 'Seat marker outcome unknown');
+            if (!current()) throw new Error('seat-session-changed');
+            if (!result || typeof result.committed !== 'boolean' || !result.snapshot || result.snapshot.val()?.seatProtocol !== 2) throw new Error('seat-marker-unverified');
+        }
+        const verified = await Promise.race([seatSellerRow(context, id), failed]);
+        if (!current() || verified.seatProtocol !== 2) throw new Error('seat-marker-unverified');
+    } finally {
+        watching = false;
+        unsubscribe();
+    }
+}
+
 function seatSellerEncode(bytes) {
     return btoa(Array.from(new Uint8Array(bytes), (byte) => String.fromCharCode(byte)).join('')).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
@@ -3185,21 +3230,7 @@ async function manageSecureSeats(id) {
             state = inspected.state;
             if (!context.current() || state.mode !== 'active') throw new Error('seat-cutover-unverified');
             if (!confirm('Server បានបញ្ជាក់សកម្ម។ ប្ដូរ Key នេះទៅប្រព័ន្ធសុវត្ថិភាពឥឡូវ? ឧបករណ៍ដែលមិនទាន់ចុះឈ្មោះនឹងចូលមិនបាន។ មិនអាចប្ដូរត្រឡប់បានទេ។')) return;
-            const markerClock = captureKeygenClock();
-            if (!markerClock) throw new Error('seat-clock');
-            const latest = await seatSellerRow(context, id);
-            if (!context.current() || !keygenClockIsCurrent(markerClock)) throw new Error('seat-session-changed');
-            if (latest.seatProtocol !== 2) {
-                if (!context.current() || signingPrivateKeyJwk !== context.privateKey) throw new Error('seat-session-changed');
-                await withTimeout(fb.runTransaction(fb.ref(context.database, 'license_keys/ZOE/' + id), (current) => {
-                    if (!context.current() || signingPrivateKeyJwk !== context.privateKey || !keygenClockIsCurrent(markerClock) || !current) return;
-                    if (current.seatProtocol === 2) return;
-                    if ((current.maxDevices || 1) !== state.maxDevices || current.expiresAt !== latest.expiresAt || seatLegacyExpiresAt(current.expiresAt) !== state.licenseExpiresAt || !!current.revoked !== state.revoked) return;
-                    return { ...current, seatProtocol: 2 };
-                }), 15000, 'Seat marker outcome unknown');
-                if (!context.current()) return;
-            }
-            if ((await seatSellerRow(context, id)).seatProtocol !== 2) throw new Error('seat-marker-unverified');
+            await seatSellerMark(context, id, state);
         } else return;
         if (!context.current()) return;
         const checked = await seatSellerInspect(context, id);

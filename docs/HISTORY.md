@@ -122,6 +122,14 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### 2026-11-13 · បរិបទ runtime របស់ License stage (Server)
+
+កែតែ Netlify Function មិនចូលសំបក frontend; កំណែ App/cache និងសេចក្ដីជូនដំណឹងទាំងពីរ App រក្សាដដែល។
+
+- Endpoint ផ្ទៀង `context.deploy.context` ដែល Netlify ផ្ដល់នៅ runtime ជំនួស build variable `CONTEXT`។ Stage flag និង URL origin រក្សាដដែល; គ្មាន production context បិទជានិច្ច។
+- អ្នកយាម `ZoeW/tests/license-seat-runtime-context.test.ts` ផ្ទុក wrapper ពិត ដាក់ mock តែ Blobs និងប្រើ GET មិនប៉ះទិន្នន័យ។ មុនកែ ៨ បរាជ័យ/៧ ឆ្លង; ក្រោយកែ ១៥ ឆ្លង។ មិនរត់តេស្ត concurrent release/cutover ឬ full suite ក្នុងការងារនេះ។
+- **សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ review និង CI លើ commit ចុងក្រោយ មុនសុំអនុញ្ញាត merge/deploy។ ការកែនេះមិនបើក stage មិនដាក់សោឯកជន និងមិនផ្លាស់ legacy; hosted verification នៅមិនទាន់ធ្វើ។
+
 ### ZoeW [2.50.197] · ZoeKeyGen [2.24.44] — 2026-11-13 · រៀបចំសោសាធារណៈ Receipt
 
 **ZoeW** (`zoew-v460` ➜ `zoew-v461`) និង **ZoeKeyGen** (`zoekeygen-v154` ➜ `zoekeygen-v155`)។
@@ -2092,6 +2100,11 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-11-13 — Netlify runtime context
+
+- Build `process.env.CONTEXT` មិនមែនជា runtime variable របស់ Netlify Functions ទេ។ ឯកសារផ្លូវការ៖ [Environment variables](https://docs.netlify.com/build/functions/environment-variables/#netlify-read-only-variables) និង [Deploy context](https://docs.netlify.com/build/functions/api/#deploy)។
+- `ZoeW/tests/license-seat-runtime-context.test.ts` វាស់ production GET ដោយគ្មាន `CONTEXT` និងការបដិសេធ preview/branch/dev/បរិបទបាត់ ទោះកំណត់ build `CONTEXT=production`; flag និង origin ខុសក៏បដិសេធ។ មុនកែ ៨ បរាជ័យ/៧ ឆ្លង ក្រោយកែ ១៥ ឆ្លង។ Mock store មិនអានឬសរសេរ Blobs ពិត; មិនផ្ទៀង live configuration ឬ concurrent release/cutover។
 
 ### 2026-11-12 — Audit fixes និង License enrollment stage
 
@@ -5337,6 +5350,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/ledger-unknown-no-retry.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ledger-writer-contract.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/license-clock-recovery.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/license-seat-runtime-context.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/list-paging.test.tsx` | — | ផ្នែក ៧ |
 | `ZoeW/tests/list-render-scope.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៦ · ផ្នែក ៧ |
 | `ZoeW/tests/listener-leak-coverage.test.ts` | ផ្នែក ២ | — |

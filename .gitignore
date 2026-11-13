@@ -32,6 +32,7 @@ tools/audit-tools/emu/real.rules.json
 tools/audit-tools/.tmp-poison-*
 tools/audit-tools/emu/.tmp-poison-*
 tools/audit-tools/zto-import/.tmp-poison-*
+tools/audit-tools/zoew/scripts/.tmp-poison-*
 
 # Windows ZTO Cookie Sync: npm lock មូលដ្ឋាន (dependency ត្រូវបាន pin ក្នុង package.json)
 tools/zto-cookie-sync-windows/package-lock.json
@@ -59,5 +60,6 @@ audit-tools/emu/real.rules.json
 audit-tools/.tmp-poison-*
 audit-tools/emu/.tmp-poison-*
 audit-tools/zto-import/.tmp-poison-*
+audit-tools/zoew/scripts/.tmp-poison-*
 audit-tools/zoew/*.tsbuildinfo
 audit-tools/zoew/test-results/

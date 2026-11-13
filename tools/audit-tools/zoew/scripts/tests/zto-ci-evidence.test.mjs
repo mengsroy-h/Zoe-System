@@ -1,6 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { selectTests, validateReport, requireSuccessfulRun } from '../zto-ci-evidence.mjs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { readFileSync } from 'node:fs';
+import { runInNewContext } from 'node:vm';
+import { selectTests, validateReport, requireSuccessfulRun, evidenceSourceRoot } from '../zto-ci-evidence.mjs';
 
 const files = ['../tools/audit-tools/zoew/tests/native/zto-cors.test.ts', '../tools/audit-tools/zoew/tests/zto-signed-sync.test.tsx'];
 function report() {
@@ -53,5 +57,39 @@ test('របាយការណ៍បៃតងមិនអាចលាក់ exit
     assert.doesNotThrow(() => requireSuccessfulRun({ status: 0, signal: null }));
     for (const result of [{ status: 1 }, { status: null, signal: 'SIGTERM' }, { status: 0, error: new Error('spawn') }]) {
         assert.throws(() => requireSuccessfulRun(result));
+    }
+});
+
+
+test('root វាស់ត្រូវប្រើប្រភព repo ពិត មិនយក tree វាស់ជាប្រភព Vitest', () => {
+    const script = pathToFileURL(path.resolve('synthetic/measure-root/tools/audit-tools/zoew/scripts/zto-ci-evidence.mjs'));
+    assert.equal(evidenceSourceRoot('synthetic/source', script), path.resolve('synthetic/source/ZoeW'));
+    assert.equal(evidenceSourceRoot('', script), path.resolve('synthetic/measure-root/ZoeW'));
+});
+
+
+test('CLI ពិតរក្សា exit 1 រហូតដល់ child និងរបាយការណ៍ត្រូវទាំងពីរ', () => {
+    const source = readFileSync(new URL('../zto-ci-evidence.mjs', import.meta.url), 'utf8');
+    const marker = "if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {";
+    assert.ok(source.includes(marker));
+    const body = source.slice(source.indexOf(marker) + marker.length).replace(/}\s*$/, '');
+    for (const [childStatus, validReport] of [[0, true], [1, true], [0, false]]) {
+        const writes = [];
+        const fakeProcess = { env: {}, execPath: 'synthetic-node', exitCode: 86 };
+        const data = report();
+        if (!validReport) data.success = false;
+        const context = { path, assert, JSON, process: fakeProcess, console: { log() {} }, evidenceSourceRoot: () => '/synthetic/source/ZoeW',
+            mkdirSync() {}, rmSync() {}, walk: () => files, selectTests, requireSuccessfulRun, validateReport,
+            spawnSync: () => ({ status: childStatus, signal: null }), readFileSync: () => JSON.stringify(data),
+            writeFileSync: (file) => writes.push(file) };
+        if (childStatus === 0 && validReport) {
+            runInNewContext(body, context);
+            assert.equal(fakeProcess.exitCode, 0);
+            assert.ok(writes.some(file => file.endsWith('/summary.json')));
+        } else {
+            assert.throws(() => runInNewContext(body, context));
+            assert.equal(fakeProcess.exitCode, 1);
+            assert.equal(writes.some(file => file.endsWith('/summary.json')), false);
+        }
     }
 });

@@ -320,7 +320,7 @@ console.log('\n=== ២ខ. CI មិនត្រូវរត់ checker ដែ�
 // រត់ ត្រូវរត់នៅមូលដ្ឋានដែរ** (គ្មាន emulator ➜ SKIP ស្អាត; CI ដាក់
 // `CRUD_FLOW_STRICT=1` ដែលធ្វើឲ្យ SKIP នោះក្លាយជាការធ្លាក់)។
 {
-    const wf = path.join(TOOLS, '..', '.github', 'workflows', 'audit.yml');
+    const wf = path.join(TOOLS, '../..', '.github', 'workflows', 'audit.yml');
     if (!fs.existsSync(wf)) {
         bad('រកឃើញ .github/workflows/audit.yml', 'គ្មានឯកសារ ➜ បញ្ជាក់មិនបានថា CI និងមូលដ្ឋានស៊ីគ្នា');
     } else {

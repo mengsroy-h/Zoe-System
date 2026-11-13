@@ -68,6 +68,7 @@ function fixture(dir, rel, opts) {
     const o = Object.assign({ ms: 0, code: 0, out: ['   ok    ' + rel], hang: false, browser: false, envProbe: false }, opts || {});
     const name = JSON.stringify(rel);
     const lines = [
+        rel.endsWith('.mjs') ? "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);" : '',
         "const fs = require('fs');",
         o.browser ? '// ' + BROWSER_MARK + ' — សញ្ញា lane browser (មិនបើក browser ពិតទេ)' : '',
         "const log = (w) => fs.appendFileSync(process.env.FX_LOG, w + ' ' + " + name + " + ' ' + Date.now() + ' ' + process.pid + '\\n');",
@@ -552,6 +553,22 @@ for (const part of suiteParts) {
         { rc: suiteRun.rc, ranges });
 }
 
+// ZTO evidence មាន Vitest workers ផ្ទាល់ខ្លួន; fixture នេះមិនរត់ App ឬ network ទេ។
+{
+    const evidenceCase = newCase([
+        ['tools/audit-tools/zoew/scripts/zto-ci-evidence.mjs', { ms: 900 }],
+        ['tools/audit-tools/supabase-money-multishop-test.js', { ms: 900 }]
+    ]);
+    const result = runHarness(evidenceCase,
+        'run "evidence" node tools/audit-tools/zoew/scripts/zto-ci-evidence.mjs\n'
+        + 'run "money" node tools/audit-tools/supabase-money-multishop-test.js',
+        { RUNALL_JOBS: '2', RUNALL_BROWSER_JOBS: '1' });
+    const ranges = intervals(result.events);
+    ok('⛔ ZTO evidence .mjs រត់ម្នាក់ឯង ទោះមាន checker ផ្សេងរង់ចាំ',
+        result.rc === 0 && ranges.length === 2 && ranges.every(x => ranges.every(other => other === x
+            || other.end <= x.start || other.start >= x.end)), { rc: result.rc, ranges });
+}
+
 // Money guardian មាន child pool ផ្ទាល់ខ្លួន៖ checker ធ្ងន់ផ្សេងមិនត្រូវចែក CPU ក្នុងពិដានរបស់វា។
 const guardianParts = [...runall.matchAll(/^run "money-guardian [^"]+" node tools\/audit-tools\/money-guardian-test\.js --part=(\d+\/\d+)$/gm)].map(match => match[1]);
 ok('⛔ ផ្នែក money-guardian ពិតមានគ្រប់ មិនស្ទួន និង denominator ដូចគ្នា', guardianParts.length >= 4
@@ -869,8 +886,11 @@ async function sectionSix() {
     for (const j of jobs) {
         if (!j.id) continue;
         let src = '';
-        try { src = fs.readFileSync(path.join(ROOT, 'tools/audit-tools', j.id + '.js'), 'utf8'); }
-        catch (e) { try { src = fs.readFileSync(path.join(ROOT, j.id + '.js'), 'utf8'); } catch (e2) { continue; } }
+        for (const relative of [j.id + '.js', j.id + '.mjs', j.id]) {
+            try { src = fs.readFileSync(path.join(ROOT, 'tools/audit-tools', relative), 'utf8'); break; } catch (e) {}
+            try { src = fs.readFileSync(path.join(ROOT, relative), 'utf8'); break; } catch (e) {}
+        }
+        if (!src) continue;
         const c = code(src);
         if (c === null) { wrong.push(j.id + ' ៖ parse មិនបាន ➜ វាស់ភស្តុតាងមិនបាន'); continue; }
         const poison = c.indexOf('.tmp-poison-') !== -1 && /\bunlinkSync\s*\(/.test(c);
@@ -879,6 +899,8 @@ async function sectionSix() {
         const isolatedPurge = j.id === F03.slice('tools/audit-tools/'.length, -3) && c.includes('controlledDeadlinePass(');
         const isolatedSuite = j.id === 'zoew-suite-test' && /\bcp\.spawn(?:Sync)?\s*\(/.test(c) && c.includes("'npm'")
             && c.includes("'--maxWorkers='");
+        const isolatedEvidence = j.id === 'zoew/scripts/zto-ci-evidence.mjs' && /\bspawnSync\s*\(\s*process\.execPath/.test(c)
+            && c.includes('node_modules/vitest/vitest.mjs') && c.includes("'--maxWorkers'");
         const isolatedGuardian = j.id === 'money-guardian-test' && /\bexecFile\s*\(\s*process\.execPath\b/.test(c)
             && c.includes('await runPool(tasks.map(');
         const isolatedModal = j.id === 'modal-keyboard-device-test' && browser && c.includes('requestAnimationFrame(tick)')
@@ -889,11 +911,12 @@ async function sectionSix() {
         if (poison && j.lane !== 'excl') wrong.push(j.id + ' ៖ សរសេរ/បោស .tmp-poison-* តែ lane=' + j.lane + ' (ត្រូវ excl)');
         if (isolatedPurge && j.lane !== 'excl') wrong.push(j.id + ' ៖ F03 វាស់ deadline តែ lane=' + j.lane + ' (ត្រូវ excl)');
         if (isolatedSuite && j.lane !== 'excl') wrong.push(j.id + ' ៖ Vitest workers ក្នុង npm child តែ lane=' + j.lane + ' (ត្រូវ excl)');
+        if (isolatedEvidence && j.lane !== 'excl') wrong.push(j.id + ' ៖ Vitest evidence workers ត្រូវ excl');
         if (isolatedGuardian && j.lane !== 'excl') wrong.push(j.id + ' ៖ mutation child pool តែ lane=' + j.lane + ' (ត្រូវ excl)');
         if (isolatedModal && j.lane !== 'excl') wrong.push(j.id + ' ៖ វាស់ស៊ុម live តែ lane=' + j.lane + ' (ត្រូវ excl)');
         if (emu && j.lane !== 'emu' && j.lane !== 'excl') wrong.push(j.id + ' ៖ ប្រើ emulator តែ lane=' + j.lane + ' (ត្រូវ emu)');
         if (!poison && !emu && !isolatedModal && browser && j.lane !== 'browser') wrong.push(j.id + ' ៖ បើក browser តែ lane=' + j.lane);
-        if (j.lane === 'excl' && !poison && !isolatedPurge && !isolatedSuite && !isolatedGuardian && !isolatedModal) unjustified.push(j.id + ' ៖ excl គ្មានភស្តុតាង .tmp-poison-* ឬ F03 deadline ឬ Vitest child ឬ mutation child pool ឬស៊ុម live');
+        if (j.lane === 'excl' && !poison && !isolatedPurge && !isolatedSuite && !isolatedEvidence && !isolatedGuardian && !isolatedModal) unjustified.push(j.id + ' ៖ excl គ្មានភស្តុតាង .tmp-poison-* ឬ F03 deadline ឬ Vitest child ឬ mutation child pool ឬស៊ុម live');
         if (j.lane === 'emu' && !emu) unjustified.push(j.id + ' ៖ emu គ្មានភស្តុតាង emulator');
         if (j.lane === 'browser' && !browser) unjustified.push(j.id + ' ៖ browser គ្មាន ' + BROWSER_MARK);
     }

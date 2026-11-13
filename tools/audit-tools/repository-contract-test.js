@@ -192,6 +192,7 @@ scenario('.gitignore ការពារសោ/ទិន្នន័យ ហើយ
             'tools/firebase-backup/backups/data.json', 'tools/firebase-backup/backup.log',
             'tools/audit-tools/emu/real.rules.json', 'tools/audit-tools/.tmp-poison-fixture.js',
             'tools/audit-tools/emu/.tmp-poison-fixture.js', 'tools/audit-tools/zto-import/.tmp-poison-fixture.js',
+            'tools/audit-tools/zoew/scripts/.tmp-poison-fixture.mjs',
             'tools/audit-tools/zoew/tsconfig.tsbuildinfo', 'tools/audit-tools/zoew/test-results/fixture.json', 'node_modules/fixture.js'];
         // git pull មិនផ្លាស់ទី secret/output ដែល ignore នៅផ្លូវចាស់ទេ។
         blocked.push(...blocked.filter(name => name.startsWith('tools/audit-tools/') || name.startsWith('tools/firebase-backup/'))

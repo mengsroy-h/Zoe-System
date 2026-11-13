@@ -700,7 +700,7 @@ if (PART && PART.n > 1) {
 // (រួមទាំង SIGKILL) **មិនអាចធ្វើឲ្យ repo ខូចបានទេ**។ សំណល់ដែលនៅសល់ជា
 // ឯកសារ `.tmp-poison-*` ដែលគ្មានគ្រោះថ្នាក់ ហើយត្រូវបោសចោលពេលចាប់ផ្តើម។
 const POISON_PREFIX = '.tmp-poison-';
-const POISON_DIRS = [TOOLS, path.join(TOOLS, 'emu'), path.join(TOOLS, 'zto-import')];
+const POISON_DIRS = [TOOLS, path.join(TOOLS, 'emu'), path.join(TOOLS, 'zto-import'), path.join(TOOLS, 'zoew/scripts')];
 
 function sweepPoisonLeftovers() {
     for (const dir of POISON_DIRS) {

@@ -288,7 +288,7 @@ function body(res) {
     // ⛔ នេះជា **សំណួរទី ៧ (ស្នាមភ្ជាប់)** ៖ Function ត្រូវបានចាក់សោ,
     // ឯកសារត្រូវបានសរសេរ — តែ **គ្មានឧបករណ៍ណាសួរថាទាំង ២ និយាយរឿងដដែលទេ**។
     {
-        const DOC_PATH = path.join(ROOT, 'ZoeW', 'ZTO-SETUP-KH.md');
+        const DOC_PATH = path.join(ROOT, 'docs', 'zoew', 'ZTO-SETUP-KH.md');
         let doc = '';
         try { doc = fs.readFileSync(DOC_PATH, 'utf8'); } catch (_) { doc = ''; }
         ok('ជាន់អប្បបរមា៖ អាន ZTO-SETUP-KH.md បាន និងមានតារាងកែសម្រួល',

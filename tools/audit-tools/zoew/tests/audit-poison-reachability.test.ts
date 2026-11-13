@@ -28,7 +28,8 @@ async function withCleanupFixture(child: boolean, check: (fixture: {
     const tools = path.join(root, 'tools/audit-tools');
     fs.mkdirSync(path.join(tools, 'emu'), { recursive: true });
     fs.mkdirSync(path.join(tools, 'zto-import'));
-    const parents = [tools, path.join(tools, 'emu'), path.join(tools, 'zto-import')]
+    fs.mkdirSync(path.join(tools, 'zoew/scripts'), { recursive: true });
+    const parents = [tools, path.join(tools, 'emu'), path.join(tools, 'zto-import'), path.join(tools, 'zoew/scripts')]
         .map(directory => path.join(directory, '.tmp-poison-parent-repository-contract-test.js'));
     for (const parent of parents) fs.writeFileSync(parent, 'console.log("parent checker started");');
     const context = vm.createContext({

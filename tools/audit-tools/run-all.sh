@@ -251,6 +251,7 @@ runall_fmt_ms() {  # <ms> ➜ «12.3s» · មិនមែនលេខ ➜ «—
 #             ហើយ fan out ខាងក្នុងរួចស្រាប់ (probe ស្របគ្នា · ការរត់ checker ពុលរួម emu/* លើ emulator ដដែល)
 #             registry-purge-atomic-sdk វាស់ deadline ១៥ វិ. លើ JVM ផ្ទាល់ ➜ មិនចែក CPU ជាមួយ checker ផ្សេង។
 #             zoew-suite បើក Vitest workers និង browser ក្នុង child scripts ➜ រត់ម្នាក់ឯង ដោយរក្សាពិដាន 240s/step និង 300s/checker។
+#             ZTO/native evidence បើក Vitest workers និងសរសេររបាយការណ៍ ➜ រត់ម្នាក់ឯងដូច zoew-suite។
 #             money-guardian មាន mutation child pool ផ្ទាល់ខ្លួន ➜ មិនចែក CPU ជាមួយ browser/Postgres ដោយរក្សា matrix និងពិដានដដែល។
 #             modal-keyboard-device ផ្នែក 3/4 និង 4/4 វាស់ស៊ុម live ➜ មិនចែក CPU; ផ្នែក geometry 1/4 និង 2/4 នៅ lane browser។
 #   emu     ៖ ម្តងមួយ ៖ RTDB emulator តែមួយ (127.0.0.1:9000)
@@ -259,7 +260,7 @@ runall_fmt_ms() {  # <ms> ➜ «12.3s» · មិនមែនលេខ ➜ «—
 #   any     ៖ ផ្សេងៗ (ពិដានរួម RUNALL_JOBS អនុវត្តលើគ្រប់ lane)
 runall_script_of() {
     local a
-    for a in "$@"; do case "$a" in tools/audit-tools/*.js|tools/zto-import/*.js) printf '%s' "$a"; return ;; esac; done
+    for a in "$@"; do case "$a" in tools/audit-tools/*.js|tools/audit-tools/*.mjs|tools/zto-import/*.js) printf '%s' "$a"; return ;; esac; done
 }
 RUNALL_OWNED_DIR=''
 runall_needs_rtdb() {
@@ -309,7 +310,7 @@ runall_timeout_for() {
 runall_lane() {
     local s; s="$(runall_script_of "$@")"
     case "$s" in
-        tools/audit-tools/checker-coverage.js|tools/audit-tools/exit-code-integrity.js|tools/audit-tools/emu/registry-purge-atomic-sdk-test.js|tools/audit-tools/zoew-suite-test.js|tools/audit-tools/money-guardian-test.js) printf excl ;;
+        tools/audit-tools/checker-coverage.js|tools/audit-tools/exit-code-integrity.js|tools/audit-tools/emu/registry-purge-atomic-sdk-test.js|tools/audit-tools/zoew-suite-test.js|tools/audit-tools/zoew/scripts/zto-ci-evidence.mjs|tools/audit-tools/money-guardian-test.js) printf excl ;;
         tools/audit-tools/modal-keyboard-device-test.js)
             local part='' a
             for a in "$@"; do case "$a" in --part*) part="$a"; break ;; esac; done
@@ -1201,6 +1202,7 @@ run "zoew-suite 2/5 (ZoeW React ៖ build · sw · smoke · native · rules)" no
 run "zoew-suite 3/5 (ZoeW React ៖ vitest 2/4)" node tools/audit-tools/zoew-suite-test.js --part=3/5
 run "zoew-suite 4/5 (ZoeW React ៖ vitest 3/4)" node tools/audit-tools/zoew-suite-test.js --part=4/5
 run "zoew-suite 5/5 (ZoeW React ៖ vitest 4/4)" node tools/audit-tools/zoew-suite-test.js --part=5/5
+run "ZTO/native evidence" node tools/audit-tools/zoew/scripts/zto-ci-evidence.mjs
 
 section "== ខ្សែសង្វាក់នាំចូល (zto-import) =="
 # ⚠️ វាធ្លាប់នៅ **ក្រៅ** ឯកសារនេះ ដោយហេតុផលថា «មិនមែនជាផ្នែករបស់ App»។

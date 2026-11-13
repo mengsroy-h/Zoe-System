@@ -272,7 +272,7 @@ async function diagBody(env) {
 // មូលហេតុទាំង ៤ · ពិដានចំនួន · និងវាល `?diag=1` ត្រូវអានចេញពី Function ពិត។
 console.log('\n== ៧. ឯកសារត្រូវនឹងកូដ (ZTO-SETUP-KH.md) ==');
 (function () {
-    const DOC_PATH = path.join(ROOT, 'ZoeW', 'ZTO-SETUP-KH.md');
+    const DOC_PATH = path.join(ROOT, 'docs', 'zoew', 'ZTO-SETUP-KH.md');
     let doc = '';
     try { doc = fs.readFileSync(DOC_PATH, 'utf8'); } catch (_) { doc = ''; }
     const khmerToLatin = (s) => s.replace(/[\u17E0-\u17E9]/g,

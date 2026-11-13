@@ -3331,7 +3331,7 @@ function firstBody(requests) {
 
     // ⛔ E8 ៖ តារាង «📋 វាលដែល ZoeW អាន» ក្នុង `ZTO-SETUP-KH.md` ដេរីវេពីកូដ ៖ រាល់ឈ្មោះវាលក្នុងបញ្ជីផ្លូវរបស់ Function ត្រូវមានក្នុងផ្នែកនោះ
     //    (វាលថ្មីក្នុងកូដ ➜ ឯកសារចាស់ ➜ ធ្លាក់)។
-    const setupDoc = readOr(path.join(ROOT, 'ZoeW', 'ZTO-SETUP-KH.md'));
+    const setupDoc = readOr(path.join(ROOT, 'docs', 'zoew', 'ZTO-SETUP-KH.md'));
     const fieldsAt = setupDoc.indexOf('### 📋 វាលដែល ZoeW អានពីជួរដេកបញ្ជី ZTO');
     const fieldsEnd = fieldsAt === -1 ? -1 : setupDoc.indexOf('\n### ', fieldsAt + 10);
     const fieldsDoc = fieldsAt === -1 ? '' : setupDoc.slice(fieldsAt, fieldsEnd === -1 ? undefined : fieldsEnd);
@@ -3791,7 +3791,7 @@ function firstBody(requests) {
             && rowsOf(arrOff.body).length === 5 && arrOff.body.otherScans === 1,
             { list: [rowsOf(arrList.body).length, arrList.body.otherScans], off: rowsOf(arrOff.body).length });
         arrivalRowsNow = MISMATCH_ARRIVAL;
-        const envDoc = readOr(path.join(ROOT, 'ZoeW', 'ZTO-SETUP-KH.md'));
+        const envDoc = readOr(path.join(ROOT, 'docs', 'zoew', 'ZTO-SETUP-KH.md'));
         const docDefaults = ['DEFAULT_LIST_SCAN_DESC', 'DEFAULT_LIST_SIGNED_SCAN_DESC'].map((name) => {
             const m = new RegExp('const ' + name + " = '([^']*)'").exec(FUNCTION_SRC);
             return m ? m[1] : '';

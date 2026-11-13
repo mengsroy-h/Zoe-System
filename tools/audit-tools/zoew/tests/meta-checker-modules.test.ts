@@ -192,3 +192,28 @@ describe('meta-checker៖ ចុះឈ្មោះ helper ដោយមិនរ�
         expect(result.fail).toBe(1);
     });
 });
+
+
+describe('CI និង run-all ប្រើ checker ដូចគ្នាក្រោយផ្លាស់ទី', () => {
+    const start = coverage.indexOf("{\n    const wf =");
+    const end = coverage.indexOf("\n{\n    const cases =", start);
+    const workflowRunsAll = runInNewContext(coverage.slice(coverage.indexOf('function workflowRunsAll('),
+        coverage.indexOf("console.log('\\n=== ២ខ.")) + '\nworkflowRunsAll;', {});
+    const check = (runner: string) => {
+        const failures: string[] = [];
+        const baseline = runner.search(/if \[ -n "\$BASE" \]/);
+        expect(start).toBeGreaterThan(0);
+        expect(end).toBeGreaterThan(start);
+        runInNewContext(coverage.slice(start, end), { fs, path, TOOLS: tools, workflowRunsAll,
+            runNames: runnableNames(baseline < 0 ? runner : runner.slice(0, baseline)),
+            ok: () => {}, bad: (label: string, detail: string) => failures.push(label + ' ' + detail) });
+        return failures;
+    };
+    it('រក workflow នៅ root ពិត ហើយគ្រប checker របស់ CI ទាំងអស់', () => {
+        expect(check(runall)).toEqual([]);
+    });
+    it('ដក ZTO evidence ពីការរត់ធម្មតា ត្រូវធ្លាក់ ទោះរក្សា CI ដដែល', () => {
+        const without = runall.split('\n').filter(line => !/^run .*node tools\/audit-tools\/zoew\/scripts\/zto-ci-evidence\.mjs/.test(line)).join('\n');
+        expect(check(without).some(message => message.includes('zoew/scripts/zto-ci-evidence'))).toBe(true);
+    });
+});

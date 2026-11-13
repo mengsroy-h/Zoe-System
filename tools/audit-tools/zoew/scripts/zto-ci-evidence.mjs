@@ -56,8 +56,13 @@ function walk(root, dir) {
     });
 }
 
+export function evidenceSourceRoot(repoRoot = process.env.ZOE_REPO_ROOT, scriptUrl = import.meta.url) {
+    return repoRoot ? path.resolve(repoRoot, 'ZoeW') : path.resolve(path.dirname(fileURLToPath(scriptUrl)), '../../../../ZoeW');
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-    const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../ZoeW');
+    process.exitCode = 1;
+    const root = evidenceSourceRoot();
     const output = path.join(root, 'test-results/zto-ci-evidence');
     mkdirSync(output, { recursive: true });
     // លុបភស្តុតាងចាស់មុនរត់ ដើម្បីមិនយករបាយការណ៍ពីការរត់មុន។
@@ -74,4 +79,5 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const summary = validateReport(JSON.parse(readFileSync(path.join(output, 'vitest.json'), 'utf8')), files, root);
     writeFileSync(path.join(output, 'summary.json'), JSON.stringify({ ...selection, ...summary }, null, 2) + '\n');
     console.log('ZTO/native:', JSON.stringify(summary));
+    process.exitCode = 0;
 }

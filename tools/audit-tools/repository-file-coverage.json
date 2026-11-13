@@ -458,6 +458,14 @@
       "evidence": "vite.config ដេរីវេ CORE_SHELL របស់ Service Worker ពី build ពិត ➜ offline-shell · sw-install-integrity វាស់ build នោះ; zoew-suite រត់ build ផលិតកម្ម + smoke + sw:check។",
       "limitation": "build វាស់ និង build ផលិតកម្មចែក config តែមួយ; ការ deploy Netlify ពិតមិនស្ថិតក្នុងការវាស់នេះ។"
     },
+    "zto-document-paths": {
+      "category": "behavior",
+      "guards": [
+        "tools/audit-tools/zoew-suite-test.js"
+      ],
+      "evidence": "Vitest រត់ zto-document-paths.test.ts ដើម្បីប្រតិបត្តិ path expression ពិតរបស់ checker ZTO ទាំងបី និងអានឯកសារ docs ពិត; tree ដែលបានជ្រើសមានមាតិកាផ្សេង ហើយឯកសារបាត់ត្រូវបរាជ័យ។",
+      "limitation": "វាស់តែទីតាំងអានឯកសារ និងការគោរព ROOT; មិនមែនលទ្ធផលពេញលេញរបស់ checker ដែលត្រូវការ audit build ឬ browser។"
+    },
     "zoew-self-verification": {
       "category": "behavior",
       "guards": [
@@ -3461,6 +3469,9 @@
     "tools/audit-tools/zoew/tests/zto-cookie-response-boundary.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "tools/audit-tools/zoew/tests/zto-document-paths.test.ts": {
+      "policy": "zto-document-paths"
+    },
     "tools/audit-tools/zoew/tests/zto-detail-identity.test.ts": {
       "policy": "zoew-self-verification"
     },
@@ -4972,12 +4983,12 @@
     "tools/audit-tools/zoew/scripts/zto-ci-evidence.mjs": {
       "policy": "zto-ci-evidence-integrity",
       "encoding": "lf-text",
-      "sha256": "a770e077d9156fb335296947c972c30aab9e9c15933cd77c793bc81e153b4b38"
+      "sha256": "67007d4cda0f2e5ea4dae3d1f411a124ff571f263daa259ef23a73c8a0f8abb7"
     },
     "tools/audit-tools/zoew/scripts/tests/zto-ci-evidence.test.mjs": {
       "policy": "zto-ci-evidence-integrity",
       "encoding": "lf-text",
-      "sha256": "5aba2c3576f06f50108da4ebcb1cb35756d789476d52d9f164c1d39e848e78dd"
+      "sha256": "2bc306d4baff38f012a9c4958eea8505ea0ce18a951ee31da44d1efcf89e8af0"
     },
     ".github/workflows/registration-auth.yml": {
       "policy": "registration-auth-reviewed-fixture",

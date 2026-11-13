@@ -7,6 +7,7 @@ const appRequire = createRequire(path.join(__dirname, '../../ZoeW/package.json')
 const ts = appRequire('typescript');
 const React = appRequire('react');
 const { renderToStaticMarkup } = appRequire('react-dom/server');
+process.exitCode = 1;
 let passed = 0, failed = 0;
 function check(condition, name) {
     if (condition) { passed++; console.log('ok ' + name); }
@@ -64,6 +65,27 @@ async function run() {
     const invitation = seller.getElementById('licenseInvitationTarget');
     check(!!invitation?.closest('details') && !visible(invitation), 'អ្នកលក់៖ ការអញ្ជើញជាជម្រើសបន្ថែមបិទជាលំនាំដើម');
     check(before(seller.getElementById('secureKeyApproveBtn'), invitation), 'អ្នកលក់៖ វិធីដោយដៃនៅមុនការអញ្ជើញ');
+    const css = ['app.css', 'react-root.css'].map(file => fs.readFileSync(path.join(ROOT, 'ZoeW/src/styles', file), 'utf8')).join('\n');
+    for (const busy of ['', 'invitationBusy', 'activationBusy', 'seatEnrollmentBusy']) {
+        const document = customer({ invitationCode: 'A'.repeat(24) + '.' + 'B'.repeat(16), ...(busy ? { [busy]: true } : {}) });
+        const style = document.createElement('style'); style.textContent = css; document.head.append(style);
+        const getStyle = node => document.defaultView.getComputedStyle(node);
+        const primary = document.getElementById('activationSubmitBtn');
+        const standard = getStyle(primary), standardGroup = getStyle(primary.parentElement);
+        const buttons = [...document.querySelectorAll('details button'), document.getElementById('activationLogoutBtn')];
+        check(buttons.length === 3, 'ការអញ្ជើញ/បោះបង់/ចាកចេញមានប៊ូតុងទាំងបី');
+        for (const button of buttons) {
+            const actual = getStyle(button), group = getStyle(button.parentElement);
+            check(group.display === 'flex' && group.flexDirection === 'column' && group.gap === standardGroup.gap && group.marginTop === standardGroup.marginTop,
+                busy + ' ' + button.textContent + '៖ ជួរឈរពេញទទឹង និងចន្លោះតាមប៊ូតុងស្តង់ដារ');
+            check(parseFloat(actual.minHeight) >= 46 && ['padding', 'fontSize', 'borderRadius', 'fontWeight', 'lineHeight', 'flex'].every(property => actual[property] === standard[property]),
+                busy + ' ' + button.textContent + '៖ ទំហំប៊ូតុងតាមស្តង់ដារ');
+        }
+        check(buttons[0].classList.contains('btn-confirm') && buttons.slice(1).every(button => button.classList.contains('btn-cancel')),
+            busy + '៖ ស្នើសុំជាប៊ូតុងចម្បង បោះបង់និងចាកចេញជាប៊ូតុងបន្ទាប់');
+        check(buttons[0].disabled === !!busy && (!busy || getStyle(buttons[0]).opacity === '0.6') && buttons.slice(1).every(button => !button.disabled),
+            busy + '៖ ពេលកំពុងធ្វើការ បិទស្នើសុំតែរក្សាបោះបង់និងចាកចេញ');
+    }
     console.log(`${passed} PASS, ${failed} FAIL`);
     process.exitCode = failed ? 1 : 0;
 }

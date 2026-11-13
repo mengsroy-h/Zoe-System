@@ -1,0 +1,285 @@
+// ⛔ ផលិតដោយ `node tools/audit-tools/money-reality-check.js --emit-core ZoeW/dist-audit/ZoeW/app.js tools/audit-tools/money-core.js`
+//    (`npm --prefix ZoeW run money:core`) ពីកូដលុយពិតរបស់ ZoeW React — កុំកែដោយដៃ។ `money-reality-test` ធ្លាក់ពេលវាចាស់ជាងកូដ។
+const APP_TIME_ZONE = 'Asia/Phnom_Penh';
+
+const APP_TIME_ZONE_OFFSET_MINUTES = 420;
+
+const SCAN_PROTOCOL_MAX_INTEGER = 9007199254740990;
+
+function ledgerNumber(value) {
+        const n = parseFloat(value);
+        return isFinite(n) ? n : 0;
+    }
+
+function statsMonthOf(dateKey) {
+        const key = String(dateKey === undefined || dateKey === null ? '' : dateKey);
+        return PICKUP_DATE_KEY_PATTERN.test(key) ? key.substring(0, 7) : '';
+    }
+
+function statsPositive(value) {
+        const n = ledgerNumber(value);
+        return n > 0 ? n : 0;
+    }
+
+function statsMoney(value) {
+        return Math.round(statsPositive(value) * 100) / 100;
+    }
+
+function statsCount(value) {
+        return Math.round(statsPositive(value));
+    }
+
+function countPickedUpCustomers(record) {
+        return record && record.pickedUpPhones ? Object.keys(record.pickedUpPhones).length : 0;
+    }
+
+function uncollectedBarcodeValue(entry) {
+        if (!entry || typeof entry !== 'object') return null;
+        return { cod: statsMoney(entry.cod), dod: statsMoney(entry.dod) };
+    }
+
+function uncollectedItemValue(item, skipKeys) {
+        const out = { cod: 0, dod: 0 };
+        if (!item || typeof item !== 'object') return out;
+        const add = (source) => {
+            const value = uncollectedBarcodeValue(source);
+            if (!value) return;
+            out.cod += value.cod;
+            out.dod += value.dod;
+        };
+        const entries = (item.barcodes && Array.isArray(item.barcodes)) ? scanConfirmedBarcodes(item) : null;
+        if (scanPendingSlot(item) === null) return out;
+        if (entries) {
+            entries.forEach((b) => { if (b && !b.isClosed && !b.isDeducted && !(skipKeys && skipKeys.has(barcodeRegistryKey(b.code)))) add(b); });
+            return out;
+        }
+        if (!item.isClosed && !item.isDeducted) add(item);
+        return out;
+    }
+
+function uncollectedValueByDate() {
+        const out = {};
+        const restoring = new Map();
+        (Array.isArray(deletedItems) ? deletedItems : []).forEach((source) => {
+            if (!source || typeof source !== 'object' || !source.restoreClaim || typeof source.id !== 'string') return;
+            restoring.set(source.id, new Set((Array.isArray(source.barcodes) ? source.barcodes : []).filter(Boolean).map((b) => barcodeRegistryKey(b.code))));
+        });
+        [scanHistory, deletedItems].forEach((list) => {
+            if (!Array.isArray(list)) return;
+            const history = list === scanHistory;
+            list.forEach((item) => {
+                if (!item || typeof item !== 'object') return;
+                const date = String(item.scanDate === undefined || item.scanDate === null ? '' : item.scanDate);
+                if (!PICKUP_DATE_KEY_PATTERN.test(date)) return;
+                const value = uncollectedItemValue(item, history && item.restoreClaimId ? restoring.get(item.restoreClaimId) : null);
+                if (!value.cod && !value.dod) return;
+                const bucket = out[date] || (out[date] = { cod: 0, dod: 0 });
+                bucket.cod += value.cod;
+                bucket.dod += value.dod;
+            });
+        });
+        return out;
+    }
+
+function collectedValueOf(ledgerCod, ledgerDod, uncollected) {
+        const open = (uncollected && typeof uncollected === 'object') ? uncollected : {};
+        const cod = Math.round(Math.max(0, statsMoney(ledgerCod) - statsMoney(open.cod)) * 100) / 100;
+        const dod = Math.round(Math.max(0, statsMoney(ledgerDod) - statsMoney(open.dod)) * 100) / 100;
+        return { cod: cod, dod: dod, total: Math.round((cod + dod) * 100) / 100 };
+    }
+
+function collectedSetFromRecord(record) {
+        const out = {};
+        if (!record || typeof record !== 'object') return out;
+        Object.keys(record).forEach((key) => {
+            const entry = record[key];
+            if (!entry || typeof entry !== 'object') return;
+            out[key] = { c: statsMoney(entry.c), d: statsMoney(entry.d) };
+        });
+        return out;
+    }
+
+function collectedTotalsOfDay(record) {
+        const set = collectedSetFromRecord(record);
+        const keys = Object.keys(set);
+        let cod = 0;
+        let dod = 0;
+        keys.forEach((key) => { cod += set[key].c; dod += set[key].d; });
+        cod = Math.round(cod * 100) / 100;
+        dod = Math.round(dod * 100) / 100;
+        return { cod: cod, dod: dod, total: Math.round((cod + dod) * 100) / 100, count: keys.length };
+    }
+
+function recalcItemMoneyFromBarcodes(target) {
+        target.cod = Math.round(target.barcodes.reduce((sum, b) => sum + (parseFloat(b.cod) || 0), 0) * 100) / 100;
+        target.dod = Math.round(target.barcodes.reduce((sum, b) => sum + (parseFloat(b.dod) || 0), 0) * 100) / 100;
+        target.price = Math.round((target.cod + target.dod) * 100) / 100;
+    }
+
+function barcodeRegistryKey(code) {
+        return canonicalBarcodeRegistryKey(code);
+    }
+
+function barcodeEntriesOf(value) {
+        if (Array.isArray(value)) {
+            const out = [];
+            value.forEach((b, i) => { if (b !== null && b !== undefined) out.push({ barcode: b, index: i }); });
+            return out;
+        }
+        if (value && typeof value === 'object') {
+            return Object.keys(value)
+                .filter((k) => /^\d+$/.test(k))
+                .sort((a, b) => Number(a) - Number(b))
+                .map((k) => ({ barcode: value[k], index: Number(k) }))
+                .filter((e) => e.barcode !== null && e.barcode !== undefined);
+        }
+        return [];
+    }
+
+function rawSnapshotToItemList(data, label) {
+        if (!data || typeof data !== 'object') return [];
+        const isRecord = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+        const records = Array.isArray(data)
+            ? data.filter(isRecord)
+            : Object.keys(data).filter((key) => isRecord(data[key])).map((key) => { const v = data[key]; if (!v.id) v.id = key; return v; });
+        const total = Array.isArray(data) ? data.filter((item) => item !== null && item !== undefined).length : Object.keys(data).length;
+        if (records.length !== total && window.ZoeErrors) {
+            ZoeErrors.capture(new Error('Skipped non-object records in snapshot'), { zone: 'data', context: 'rawSnapshotToItemList ' + (label || ''), skipped: total - records.length });
+        }
+        const list = records.filter((item) => barcodeEntriesOf(item.barcodes).some((entry) => entry.barcode && typeof entry.barcode === 'object'));
+        if (list.length !== records.length && window.ZoeErrors) {
+            ZoeErrors.capture(new Error('Skipped records without barcodes in snapshot'), { zone: 'data', context: 'rawSnapshotToItemList ' + (label || ''), skipped: records.length - list.length });
+        }
+        return list;
+    }
+
+function pickupBarcodeKey(code) {
+        const raw = String(code === undefined || code === null ? '' : code).trim();
+        return raw ? barcodeRegistryKey(raw) : '';
+    }
+
+function collectedMarkValueOf(barcode) {
+        return { c: statsMoney(barcode && barcode.cod), d: statsMoney(barcode && barcode.dod) };
+    }
+
+function appZoneParts(ms) {
+        const at = typeof ms === 'number' ? ms : Number(ms);
+        try {
+            const parts = {};
+            const memo = appZoneParts;
+            if (!memo.zoneFormat || memo.zoneFormat.ctor !== Intl.DateTimeFormat) {
+                memo.zoneFormat = {
+                    ctor: Intl.DateTimeFormat,
+                    fmt: new Intl.DateTimeFormat('en-GB', {
+                        timeZone: APP_TIME_ZONE, hour12: false,
+                        year: 'numeric', month: '2-digit', day: '2-digit',
+                        hour: '2-digit', minute: '2-digit', second: '2-digit'
+                    })
+                };
+            }
+            memo.zoneFormat.fmt.formatToParts(at).forEach((p) => { if (p.type !== 'literal') parts[p.type] = p.value; });
+            if (parts.year && parts.month && parts.day) {
+                if (parts.hour === '24') parts.hour = '00';
+                return parts;
+            }
+        } catch (e) {}
+        const shifted = new Date(at + APP_TIME_ZONE_OFFSET_MINUTES * 60000);
+        return {
+            year: String(shifted.getUTCFullYear()),
+            month: String(shifted.getUTCMonth() + 1).padStart(2, '0'),
+            day: String(shifted.getUTCDate()).padStart(2, '0'),
+            hour: String(shifted.getUTCHours()).padStart(2, '0'),
+            minute: String(shifted.getUTCMinutes()).padStart(2, '0'),
+            second: String(shifted.getUTCSeconds()).padStart(2, '0')
+        };
+    }
+
+function getZoneDateKey(ms, dayOffset) {
+        const parts = appZoneParts(ms);
+        const base = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day));
+        const shifted = new Date(base + (dayOffset || 0) * 86400000);
+        return shifted.getUTCFullYear() + '-'
+            + String(shifted.getUTCMonth() + 1).padStart(2, '0') + '-'
+            + String(shifted.getUTCDate()).padStart(2, '0');
+    }
+
+function canonicalBarcodeRegistryKey(code) {
+        const normalized = String(code || '').trim().toUpperCase();
+        return normalized.replace(/[%.#$\[\]\/\x00-\x1F\x7F]/g, (character) => '%' + character.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
+    }
+
+function scanProtocolText(value, maximum) {
+        return typeof value === 'string' && value.length > 0 && value.length <= maximum;
+    }
+
+function scanProtocolInteger(value, minimum = 0) {
+        return Number.isSafeInteger(value) && Number(value) >= minimum && Number(value) <= SCAN_PROTOCOL_MAX_INTEGER;
+    }
+
+function scanProtocolMoney(value) {
+        return typeof value === 'number' && Number.isFinite(value) && value >= 0
+            && Math.round(value * 100) / 100 === value && scanProtocolInteger(Math.round(value * 100));
+    }
+
+function scanOperationValid(value) {
+        if (!value || typeof value !== 'object' || Array.isArray(value) || value.v !== 2
+            || !/^scan_[a-f0-9]{32}$/.test(value.id) || !scanProtocolText(value.actorUid, 2048)
+            || !scanProtocolText(value.scope, 2048) || !scanProtocolText(value.code, 256)
+            || !scanProtocolText(value.registryKey, 768) || value.registryKey !== canonicalBarcodeRegistryKey(value.code) || !scanProtocolInteger(value.birth, 1)
+            || !/^\d{4}-\d{2}-\d{2}$/.test(value.scanDate) || value.month !== value.scanDate.slice(0, 7)
+            || !scanProtocolMoney(value.cod) || !scanProtocolMoney(value.dod) || value.count !== 1
+            || value.monthToken !== 'op_m' + value.id.slice(5)
+            || !['admitted', 'prepared', 'committed', 'cancelled'].includes(value.phase)) return false;
+        const fields = ['v', 'id', 'actorUid', 'scope', 'code', 'registryKey', 'birth', 'scanDate', 'month', 'cod', 'dod', 'count', 'monthToken', 'phase'];
+        if (['targetId', 'payloadHash', 'phone', 'locker', 'closedAt'].some(key => value[key] !== undefined) || value.phase === 'prepared' || value.phase === 'committed') {
+            if (!scanProtocolText(value.targetId, 128) || !/^[a-zA-Z0-9_-]+$/.test(value.targetId)
+                || typeof value.payloadHash !== 'string' || !/^[a-f0-9]{64}$/.test(value.payloadHash)
+                || !scanProtocolText(value.phone, 2048) || !scanProtocolText(value.locker, 2048) || !scanProtocolInteger(value.closedAt)
+                || value.phase === 'admitted') return false;
+            fields.push('targetId', 'payloadHash', 'phone', 'locker', 'closedAt');
+        }
+        return Object.keys(value).every(key => fields.includes(key));
+    }
+
+function scanRegistryOwner(operation) {
+        return { v: 2, intent: operation.id, actorUid: operation.actorUid, birth: operation.birth };
+    }
+
+function scanRegistryOwned(value, operation) {
+        const expected = scanRegistryOwner(operation);
+        return !!value && typeof value === 'object' && !Array.isArray(value)
+            && Object.keys(value).length === Object.keys(expected).length
+            && Object.keys(expected).every(key => value[key] === expected[key]);
+    }
+
+function scanPendingSlot(row) {
+        const marker = row?.scanPending;
+        if (marker === undefined || marker === null) return undefined;
+        if (!marker || typeof marker !== 'object' || Array.isArray(marker) || Object.keys(marker).length !== 6
+            || !/^scan_[a-f0-9]{32}$/.test(marker.intent) || !scanProtocolText(marker.actorUid, 2048)
+            || !scanProtocolText(marker.code, 256) || !scanProtocolInteger(marker.birth, 1)
+            || typeof marker.payloadHash !== 'string' || !/^[a-f0-9]{64}$/.test(marker.payloadHash)
+            || typeof marker.slot !== 'string' || !/^(0|[1-9][0-9]{0,8})$/.test(marker.slot)) return null;
+        const barcode = row?.barcodes?.[marker.slot];
+        return barcode?.code === marker.code && barcode?.createdAt === marker.birth && barcode?.scanIntent === marker.intent ? marker.slot : null;
+    }
+
+function scanConfirmedBarcodes(row) {
+        const slot = scanPendingSlot(row);
+        if (slot === null) return null;
+        return Object.entries(row?.barcodes || {}).filter(([key]) => key !== slot).map(([, barcode]) => barcode);
+    }
+
+function scanPendingMatches(row, operation) {
+        const marker = row?.scanPending;
+        if (!scanOperationValid(operation) || !operation.targetId || scanPendingSlot(row) === undefined || scanPendingSlot(row) === null
+            || marker.intent !== operation.id || marker.actorUid !== operation.actorUid
+            || marker.code !== operation.code || marker.birth !== operation.birth || marker.payloadHash !== operation.payloadHash
+            || typeof marker.slot !== 'string' || !/^(0|[1-9][0-9]{0,8})$/.test(marker.slot)) return false;
+        const barcode = row?.barcodes?.[marker.slot];
+        return !!barcode && barcode.code === operation.code && barcode.createdAt === operation.birth
+            && barcode.cod === operation.cod && barcode.dod === operation.dod && row.scanDate === operation.scanDate
+            && row.phone === operation.phone && barcode.locker === operation.locker
+            && (operation.closedAt === 0 ? barcode.isClosed === false && !barcode.closedAt
+                : barcode.isClosed === true && barcode.closedAt === operation.closedAt);
+    }

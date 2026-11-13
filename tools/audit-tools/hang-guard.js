@@ -1,0 +1,273 @@
+// ⛔⛔ **checker ដែលព្យួរ មិនមែនជាការធ្លាក់ទេ — វាជាការបាត់ CI ទាំងមូល។**
+//
+// 🔴 កំហុសពិត វាស់បាន ២ ដងលើ GitHub Actions៖
+//
+//   | run | បន្ទាត់ចុងក្រោយ | បន្ទាប់ |
+//   |---|---|---|
+//   | `main` a465af9 (2026-08-26) | `offline-shell … PASS (19)` @ 13:53:14 | cancel @ 14:18:04 |
+//   | PR #96 (2026-08-27)         | `offline-shell … PASS (19)` @ 01:56:07 | cancel @ 02:19:24 |
+//
+// ទាំង ២ ដងឈប់ត្រង់កន្លែងតែមួយ — `sw-install-integrity-test.js` — ហើយ
+// GitHub សម្លាប់ job នៅនាទីទី ៣០ ដោយបន្សល់ log ដែល **គ្មានឈ្មោះ checker
+// ដែលខូចសោះ**។ អ្នកអភិវឌ្ឍន៍ឃើញត្រឹម «The operation was canceled»។
+//
+// មូលហេតុឫសគល់ (បង្កើតឡើងវិញបានសម្រេច)៖ ជុំទី ១ របស់តេស្តនោះមានសំណាញ់
+// `setTimeout(res, 8000)` ➜ វាចាកចេញខណៈ SW នៅ `'installing'` ➜ ជុំទី ២ ហៅ
+// `await navigator.serviceWorker.ready` ដែល **គ្មានពិដាន** ➜ រង់ចាំ SW ដែល
+// នឹងមិនដែល activate។ `page.evaluate()` របស់ Playwright ក៏គ្មាន timeout ដែរ
+// ➜ ការរង់ចាំមិនចេះចប់។ វាបៃតង ~៩១% នៃពេល ➜ ជា **ការប្រណាំង** ដែល
+// បរិស្ថានលឿនមិនដែលបង្ហាញ។
+//
+// ⛔ ការកែតែឯកសារនោះមិនគ្រប់គ្រាន់ទេ — checker ៣១ បើក browser ហើយរាល់
+// `await` ដែលគ្មានពិដានជាកន្លែងដែលថ្នាក់នេះនឹងវិលមកវិញ។ ដូច្នេះឯកសារនេះ
+// ចាក់សោ **ព្រំដែនតាមរចនាសម្ព័ន្ធ** ជំនួសការទុកចិត្តលើការប្រុងប្រយ័ត្ន។
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+const { execFileSync } = require('child_process');
+
+const ROOT = process.env.HANGGUARD_APP_DIR || path.join(__dirname, '../..');
+const TOOLS = path.join(ROOT, 'tools/audit-tools');
+
+let pass = 0, fail = 0;
+function ok(label, cond, detail) {
+    if (cond) { pass++; console.log('   ok    ' + label); }
+    else { fail++; console.log('  FAIL   ' + label + (detail !== undefined ? '\n         ' + (typeof detail === 'string' ? detail : JSON.stringify(detail)) : '')); }
+}
+
+const NOT_CHECKERS = new Set(['run-all.sh', 'trimws.js', 'strip-comments.js']);
+let files = [];
+try {
+    files = fs.readdirSync(TOOLS).filter((f) => f.endsWith('.js') && !NOT_CHECKERS.has(f)).sort();
+} catch (e) { files = []; }
+// ⛔ checker `emu/*` (ផ្នែក emulator របស់ run-all · browser + server ពិត) ក៏ត្រូវស្កេនរកការរង់ចាំគ្មានពិដានដែរ ៖ ជំនាន់មុនអានតែ
+// `readdirSync(TOOLS)` ➜ checker emu មិនដែលត្រូវបានវាស់ (ឈ្មោះក្នុងរបាយការណ៍ ៖ `emu/<x>.js`)។
+let emuFiles = [];
+try {
+    emuFiles = fs.readdirSync(path.join(TOOLS, 'emu')).filter((f) => f.endsWith('.js') && !f.startsWith('.tmp-poison-')).sort().map((f) => 'emu/' + f);
+} catch (e) { emuFiles = []; }
+files = files.concat(emuFiles);
+const srcOf = new Map();
+for (const f of files) {
+    try { srcOf.set(f, fs.readFileSync(path.join(TOOLS, f), 'utf8')); } catch (e) {}
+}
+
+// ═══ ១. ជាន់អប្បបរមា — ឯកសារនេះត្រូវពិតជាបានឃើញ checker ═══
+// បើគ្មានជាន់នេះ ការអះអាង «គ្មានលំនាំអាក្រក់» ខាងក្រោម **ពិតដោយស្វ័យប្រវត្តិ
+// លើថតទទេ** ➜ បៃតងក្លែងក្លាយ (មេរៀន `checker-coverage.js`)។
+const browserCheckers = [...srcOf.entries()].filter(([, s]) => /chromium\.launch\(/.test(s));
+ok('ជាន់អប្បបរមា៖ ឃើញ checker ដែលបើក browser >= 25 (ឃើញ ' + browserCheckers.length + ')',
+    browserCheckers.length >= 25);
+
+// ═══ ២. `run-all.sh` ត្រូវដាក់ពិដានពេលវេលាលើ checker គ្រប់មួយ ═══
+let runall = '';
+try { runall = fs.readFileSync(path.join(TOOLS, 'run-all.sh'), 'utf8'); } catch (e) {}
+ok('`run-all.sh` រុំរាល់ checker ក្នុង `timeout`',
+    /timeout -k \d+ "\$CHECKER_TIMEOUT"/.test(runall),
+    'រកមិនឃើញការហៅ timeout ក្នុង run()');
+ok('`run-all.sh` រាយការណ៍ការផុតកំណត់ជា FAIL ដែលមានឈ្មោះ (exit 124/137)',
+    /rc" -eq 124/.test(runall) && /ព្យួរ/.test(runall),
+    'ការផុតកំណត់ត្រូវបែកចេញពី FAIL ធម្មតា ដើម្បីឲ្យអ្នកអានដឹងថាវាព្យួរ');
+// ⛔ បញ្ជី checker emu ដេរីវេពី `run-all.sh` ៖ ឈ្មោះនីមួយៗដែលវារត់ ត្រូវមានប្រភពដែលឯកសារនេះបានស្កេន (ប្តូរឈ្មោះ · ផ្លាស់ទី ➜ ធ្លាក់)។
+const runallEmu = new Set();
+for (const m of runall.replace(/^\s*#.*$/gm, '').matchAll(/node\s+tools\/audit-tools\/(emu\/[A-Za-z0-9._-]+\.js)(?=\s|$)/g)) runallEmu.add(m[1]);
+const unscannedEmu = [...runallEmu].filter((f) => !srcOf.has(f));
+ok('ជាន់អប្បបរមា ៖ checker emu/ ដែល run-all រត់ >= 1 (ឃើញ ' + runallEmu.size + ' · ស្កេន emu/ ' + emuFiles.length + ')',
+    runallEmu.size >= 1 && emuFiles.length >= 1);
+ok('រាល់ checker emu/ ដែល run-all រត់ ត្រូវបានស្កេនរកការរង់ចាំគ្មានពិដាន', unscannedEmu.length === 0, unscannedEmu.join(', '));
+
+// checker-coverage ត្រូវ probe checker ជាង ១០០។ បើរត់ `execFileSync` ជាជួរ
+// checker browser នីមួយៗអាចចំណាយរាប់វិនាទី ➜ meta-checker ខ្លួនឯងលើសពិដាន
+// ៣០០ វិនាទី ទោះ checker ទាំងអស់ត្រឹមត្រូវ។ នេះកើតឡើងពិតក្នុង baseline
+// 2.30.9 (2026-09-08)។ ចាក់សោថាវាប្រើ bounded parallelism មិនមែនជួរតែមួយ។
+const coverageSrc = srcOf.get('checker-coverage.js') || '';
+const emptyProbeAt = coverageSrc.indexOf('=== ៤.');
+const emptyProbeEnd = coverageSrc.indexOf('=== ៥.', emptyProbeAt + 1);
+const emptyProbeSrc = emptyProbeAt >= 0 && emptyProbeEnd > emptyProbeAt
+    ? coverageSrc.slice(emptyProbeAt, emptyProbeEnd)
+    : '';
+ok('`checker-coverage` probe ថតទទេដោយ bounded parallelism (មិនព្យួរ CI > 300s)',
+    /EMPTY_PROBE_CONCURRENCY/.test(emptyProbeSrc)
+        && /Promise\.all\s*\(/.test(emptyProbeSrc)
+        && /execFile\s*\(/.test(emptyProbeSrc)
+        && !/execFileSync\s*\(/.test(emptyProbeSrc),
+    'ផ្នែក probe ថតទទេនៅតែរត់ checker ជាជួរ');
+
+// ═══ ３. គ្មាន `navigator.serviceWorker.ready` ដែល await ដោយគ្មានពិដាន ═══
+// នេះជា **ការព្យួរពិត** ដែលធ្វើឲ្យ CI ដួល ២ ដង។
+const bareReady = [];
+for (const [f, s] of srcOf) {
+    if (/await navigator\.serviceWorker\.ready\s*;/.test(s)) bareReady.push(f);
+    if (/await [A-Za-z.]*\.evaluate\(\s*\(\)\s*=>\s*navigator\.serviceWorker\.ready(?!\s*,)/.test(s)) bareReady.push(f + ' (evaluate)');
+}
+ok('គ្មាន `serviceWorker.ready` ដែលរង់ចាំដោយគ្មានពិដាន',
+    bareReady.length === 0, bareReady.join(', '));
+
+// ═══ ４. `server.close(cb)` ដែល await ត្រូវបង្ខំបិទ socket keep-alive ═══
+// Node ហៅ callback តែពេលគ្រប់ការតភ្ជាប់បិទអស់។ Chromium រក្សា keep-alive
+// ➜ ការរង់ចាំនោះអាចមិនចេះចប់ ដូចថ្នាក់ទី ３ ដដែល។
+const unclosed = [];
+for (const [f, s] of srcOf) {
+    if (!/await new Promise\(\s*\(\s*r\s*\)\s*=>\s*\{?[^}]*server\.close\(/.test(s)) continue;
+    if (!/closeAllConnections/.test(s)) unclosed.push(f);
+}
+ok('រាល់ `await server.close()` មាន `closeAllConnections()` ជាមួយ',
+    unclosed.length === 0, unclosed.join(', '));
+
+// ═══ ５. ⛔ ការវាស់ **ឥរិយាបថ** — checker ដែលព្យួរ ត្រូវក្លាយជា FAIL ═══
+// grep អាចត្រូវបញ្ឆោតដោយ comment ឬឈ្មោះ។ ការរត់ម៉ាស៊ីនរត់ពិតលើ script ដែល
+// ព្យួរដោយចេតនា មិនអាចត្រូវបញ្ឆោតបានទេ។
+// ⛔ ម៉ាស៊ីនរត់រស់ចន្លោះ `#@runner-begin` / `#@runner-end` (lane ស្របគ្នា ៖ `run` ចុះបញ្ជី ·
+// `runall_drain` រត់) ➜ ស្រង់ប្លុកទាំងមូល។ tree ចាស់ (`run()` រត់ភ្លាម) ➜ ស្រង់តែ `run()` ដូចមុន
+// ➜ ឯកសារនេះនៅវាស់ baseline បាន។ ⛔ រត់ជាមួយ checker **បៃតង** ១ ទៀតស្របគ្នា ៖ ការព្យួរមួយ
+// មិនត្រូវលេបលទ្ធផលរបស់ checker ដទៃ ហើយ **env ត្រូវស្អាត** (RUNALL_STATE ទទេ) ➜ harness
+// មិនសរសេរចូល state ពិតរបស់ run-all ដែលកំពុងហៅឯកសារនេះ។
+let behaviour = { ran: false, out: '', ms: 0 };
+const blockAt = runall.search(/^#@runner-begin$/m);
+const blockEnd = runall.search(/^#@runner-end$/m);
+let body = '';
+if (blockAt !== -1 && blockEnd > blockAt) body = runall.slice(blockAt, blockEnd) + '\n';
+else if (/^run\(\) \{/m.test(runall)) {
+    const runFn = runall.slice(runall.search(/^run\(\) \{/m));
+    body = runFn.slice(0, runFn.indexOf('\n}\n') + 3);
+}
+if (body) {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-hang-'));
+    const hangJs = path.join(tmp, 'hangy.js');
+    const greenJs = path.join(tmp, 'green.js');
+    const harness = path.join(tmp, 'harness.sh');
+    fs.writeFileSync(hangJs, "console.log('   ok    ចាប់ផ្តើម');\nsetInterval(() => {}, 1 << 30);\n");
+    fs.writeFileSync(greenJs, "console.log('   ok    បៃតង');\nprocess.exitCode = 0;\n");
+    fs.writeFileSync(harness,
+        'pass=0; fail=0; skip=0; partial=0\n' +
+        // ⛔ បង្ខំពិដានតូចត្រង់នេះ — កុំទទួលតម្លៃពីបរិស្ថាន បើមិនដូច្នេះ
+        // ការវាស់នេះរង់ចាំ ៣០០ វិនាទីពិត ហើយធ្លាក់ដោយហេតុផលមិនពាក់ព័ន្ធ។
+        'CHECKER_TIMEOUT=5\n' +
+        'if command -v timeout >/dev/null 2>&1; then HAS_TIMEOUT=1; else HAS_TIMEOUT=0; fi\n' +
+        body +
+        '\nrun "សាកល្បង" node ' + JSON.stringify(hangJs) +
+        '\nrun "បៃតង" node ' + JSON.stringify(greenJs) +
+        '\nif declare -F runall_drain >/dev/null; then runall_drain; fi' +
+        '\nif declare -F runall_cleanup_owned >/dev/null; then runall_cleanup_owned; fi' +
+        '\necho "FAILCOUNT=$fail PASSCOUNT=$pass"\n');
+    const env = Object.assign({}, process.env, { RUNALL_JOBS: '2', RUNALL_STATE: '' });
+    delete env.RUNALL_ONLY; delete env.RUNALL_RESUME; delete env.RUNALL_SHARD; delete env.RUNALL_TREE_HASH;
+    const t0 = Date.now();
+    try {
+        behaviour.out = execFileSync('bash', [harness], { encoding: 'utf8', timeout: 60000, env });
+        behaviour.ran = true;
+    } catch (e) { behaviour.out = String((e && e.stdout) || e); }
+    behaviour.ms = Date.now() - t0;
+    try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) {}
+}
+ok('⛔ ឥរិយាបថ៖ checker ដែលព្យួរ ➜ FAIL ដែលមានឈ្មោះ (មិនមែនការព្យួរ)',
+    behaviour.ran && /សាកល្បង[^\n]*FAIL[^\n]*ព្យួរ/.test(behaviour.out) && /FAILCOUNT=1 /.test(behaviour.out),
+    behaviour.out.trim().slice(0, 300));
+ok('⛔ ឥរិយាបថ៖ ការព្យួរមិនលេបលទ្ធផលរបស់ checker ដទៃ (បៃតង ➜ PASS)',
+    behaviour.ran && /បៃតង[^\n]*PASS/.test(behaviour.out) && /PASSCOUNT=1\b/.test(behaviour.out),
+    behaviour.out.trim().slice(0, 300));
+ok('⛔ ឥរិយាបថ៖ ការផុតកំណត់ត្រូវគោរព `CHECKER_TIMEOUT` (ចប់ក្នុង < 60s)',
+    behaviour.ran && behaviour.ms < 60000, 'ms=' + behaviour.ms);
+
+// ⛔ `exit-code-integrity` ជា meta-checker ធំជាងគេ ៖ វាពុល និងរត់ checker កូនជាង ១០០ ➜ ការរត់ជាជួរ (`execFileSync`)
+// ចំណាយ ២៨០–៣៦៧ វិ. ➜ លើសពិដាន ៣០០ វិ. របស់ `run-all.sh` ➜ «FAIL (ព្យួរ)» ខណៈគ្មាន checker ណាខូច (វាស់បាន 2.42.8)។
+// ហើយជំនាន់នោះរាប់កូនដែល **ផុតថវិកា** ថាជា «ការធ្លាក់ឡើងដល់ exit code» ➜ checker ដែលព្យួរពេលអះអាងធ្លាក់ ត្រូវរាយបៃតង។
+// ការវាស់ ៖ រត់ `exit-code-integrity.js` របស់ tree នេះលើ fixture ៤០ checker ដែលមួយ **ព្យួរ** និង ៨ **យឺត ២ វិ.** ពេលពុល។
+// (ក) កូនដែលព្យួរ ត្រូវលេចជា FAIL ដែលមានឈ្មោះ · (ខ) ពេលសរុបត្រូវតិចជាងផលបូកជាជួរ (≥ ២០ វិ.) ដោយរឹម ២ ដង។
+const eciPath = path.join(TOOLS, 'exit-code-integrity.js');
+if (process.env.EXITCODE_CHILD) {
+    ok('⛔ EXITCODE_CHILD ៖ រំលង fixture របស់ exit-code-integrity (របៀបនេះមិនដែលបៃតង)', false);
+} else if (!fs.existsSync(eciPath)) {
+    ok('រកឃើញ `exit-code-integrity.js` សម្រាប់ fixture', false, eciPath);
+} else {
+    const fx = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-eci-fixture-'));
+    const fxTools = path.join(fx, 'tools/audit-tools');
+    fs.mkdirSync(fxTools, { recursive: true });
+    const names = [];
+    for (let i = 1; i <= 40; i++) {
+        const name = 'c' + String(i).padStart(2, '0');
+        names.push(name);
+        const onFail = name === 'c01' ? 'setInterval(() => {}, 1 << 30);'
+            : i <= 9 ? 'setTimeout(() => process.exit(1), 2000);'
+            : 'process.exit(1);';
+        fs.writeFileSync(path.join(fxTools, name + '.js'),
+            'let pass = 0, fail = 0;\n'
+            + 'function ok(label, cond, detail) { if (cond) pass++; else fail++; }\n'
+            + "ok('fixture', true);\n"
+            + 'if (fail) { ' + onFail + ' } else { process.exit(0); }\n');
+    }
+    fs.writeFileSync(path.join(fxTools, 'run-all.sh'),
+        'for t in ' + names.join(' ') + '; do\n    run "$t" node "tools/audit-tools/$t.js"\ndone\n');
+    const env = Object.assign({}, process.env, {
+        EXITCODE_APP_DIR: fx, EXITCODE_TIMEOUT_MS: '4000', EXITCODE_CONCURRENCY: '4'
+    });
+    delete env.EXITCODE_CHILD;
+    let out = '', ran = false;
+    const t0 = Date.now();
+    try {
+        out = execFileSync(process.execPath, [eciPath], { env, encoding: 'utf8', timeout: 90000, stdio: ['ignore', 'pipe', 'pipe'] });
+        ran = true;
+    } catch (e) {
+        out = String((e && e.stdout) || '') + String((e && e.stderr) || '');
+        ran = e && typeof e.status === 'number';
+    }
+    const ms = Date.now() - t0;
+    try { fs.rmSync(fx, { recursive: true, force: true }); } catch (e) {}
+    ok('⛔ ឥរិយាបថ ៖ `exit-code-integrity` រត់ fixture ចប់ (មិនព្យួរ)', ran, out.trim().slice(-300));
+    const lines = out.split('\n');
+    const hangNamed = lines.some((l, i) => /^\s*FAIL\b/.test(l) && i + 1 < lines.length
+        && /c01\.js/.test(lines[i + 1]) && !/^\s*\(/.test(lines[i + 1]));
+    ok('⛔ ឥរិយាបថ ៖ កូនដែលព្យួរពេលពុល ➜ FAIL ដែលមានឈ្មោះ (timeout ≠ ការធ្លាក់ត្រឹមត្រូវ)',
+        hangNamed, lines.filter((l) => /FAIL|c01/.test(l)).join(' | ').slice(0, 300));
+    ok('⛔ ឥរិយាបថ ៖ ការពុលរត់ស្របគ្នា (ចប់ < ១៤ វិ. ; ជាជួរ ≥ ២០ វិ.)', ran && ms < 14000, 'ms=' + ms);
+
+    // ⛔ ថវិកាកូនពុល = deadline ពិតរបស់ job (`RUNALL_JOB_TIMEOUT` + `RUNALL_JOB_STARTED_MS` ពី `runall_exec`) មិនមែនលេខថេរ ៖
+    //    🔴 CI1156 ៖ ថវិកាថេរ ៦០ វិ. សម្លាប់កូនដែលយឺតតែកំពុងដើរ (ក្រហមក្លែង) ហើយមិនទាក់ទងនឹងពិដាន job ដែលវារត់ក្នុងនោះទេ។
+    //    fixture ៖ job ៣០ វិ. (deadline = ៣០ − ២០ វិ. រឹម) គ្មាន `EXITCODE_TIMEOUT_MS` ➜ កូនព្យួរត្រូវឈ្មោះមុនពិដាន job ·
+    //    កូនយឺត ៧ វិ. ទទួលសាលក្រមពិត (មិនមែន unverified)។ tree មុនកែ ៖ ថវិកា ៦០ វិ. ➜ meta-checker លើសពិដាន job (៣០ វិ.)។
+    const fx2 = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-eci-deadline-'));
+    const fx2Tools = path.join(fx2, 'tools/audit-tools');
+    fs.mkdirSync(fx2Tools, { recursive: true });
+    const names2 = [];
+    for (let i = 1; i <= 40; i++) {
+        const name = 'd' + String(i).padStart(2, '0');
+        names2.push(name);
+        const onFail = name === 'd01' ? 'setInterval(() => {}, 1 << 30);'
+            : name === 'd02' ? 'setTimeout(() => process.exit(1), 7000);'
+            : 'process.exit(1);';
+        fs.writeFileSync(path.join(fx2Tools, name + '.js'),
+            'let pass = 0, fail = 0;\n'
+            + 'function ok(label, cond, detail) { if (cond) pass++; else fail++; }\n'
+            + "ok('fixture', true);\n"
+            + 'if (fail) { ' + onFail + ' } else { process.exit(0); }\n');
+    }
+    fs.writeFileSync(path.join(fx2Tools, 'run-all.sh'),
+        'for t in ' + names2.join(' ') + '; do\n    run "$t" node "tools/audit-tools/$t.js"\ndone\n');
+    const env2 = Object.assign({}, process.env, {
+        EXITCODE_APP_DIR: fx2, EXITCODE_CONCURRENCY: '4', RUNALL_JOB_TIMEOUT: '30', RUNALL_JOB_STARTED_MS: String(Date.now())
+    });
+    delete env2.EXITCODE_CHILD; delete env2.EXITCODE_TIMEOUT_MS;
+    let out2 = '', ran2 = false;
+    const t2 = Date.now();
+    try {
+        out2 = execFileSync(process.execPath, [eciPath], { env: env2, encoding: 'utf8', timeout: 90000, stdio: ['ignore', 'pipe', 'pipe'] });
+        ran2 = true;
+    } catch (e) {
+        out2 = String((e && e.stdout) || '') + String((e && e.stderr) || '');
+        ran2 = e && typeof e.status === 'number';
+    }
+    const ms2 = Date.now() - t2;
+    try { fs.rmSync(fx2, { recursive: true, force: true }); } catch (e) {}
+    const unverifiedLine = (() => {
+        const lines2 = out2.split('\n');
+        const at = lines2.findIndex((l) => /^\s*FAIL\b/.test(l) && /signal|ផុតថវិកា|unverified|ស្លាប់ដោយ signal/.test(l));
+        return at === -1 ? '' : lines2[at + 1] || '';
+    })();
+    ok('⛔ ថវិកាពុល ៖ deadline របស់ job (៣០ វិ.) ➜ meta-checker ចប់មុនពិដាន job ហើយកូនព្យួរមានឈ្មោះ (មិនមែនថវិកាថេរ ៦០ វិ.)',
+        ran2 && ms2 < 25000 && /d01\.js/.test(unverifiedLine), { ms: ms2, unverifiedLine: unverifiedLine.slice(0, 300) });
+    ok('⛔ ថវិកាពុល ៖ កូនយឺត (៧ វិ.) ដែលចប់មុន deadline ទទួលសាលក្រមពិត មិនត្រូវសម្លាប់ជា unverified',
+        ran2 && !/d02\.js/.test(unverifiedLine), unverifiedLine.slice(0, 300));
+}
+
+console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')' : '✅ ជោគជ័យ ' + pass));
+process.exit(fail ? 1 : 0);

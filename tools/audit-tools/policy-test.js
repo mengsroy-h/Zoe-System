@@ -1,0 +1,329 @@
+// Policy harness: slices the REAL shipped code blocks out of ZoeW/app.js and
+// runs them against fake parcels, and asserts the លុប / ដក invariants.
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const { modulePrograms } = require('./audit-module-ast');
+
+const ROOT = process.env.POLICY_APP_DIR ? path.resolve(process.env.POLICY_APP_DIR) : path.join(__dirname, '../..');
+
+function slice(src, startMarker, endMarker, label) {
+    const a = src.indexOf(startMarker);
+    if (a === -1) throw new Error('start marker not found: ' + label);
+    const b = src.indexOf(endMarker, a);
+    if (b === -1) throw new Error('end marker not found: ' + label);
+    return src.slice(a, b + endMarker.length);
+}
+
+const functionIndexes = new Map();
+function fnBody(src, name) {
+    let functions = functionIndexes.get(src);
+    if (!functions) {
+        functions = new Map();
+        const programs = modulePrograms(src, path.join(ROOT, 'ZoeW', 'app.js'), { ecmaVersion: 'latest', sourceType: 'script' });
+        const visit = (node) => {
+            if (!node || typeof node !== 'object') return;
+            if (node.type === 'FunctionDeclaration' && node.id) {
+                const matches = functions.get(node.id.name) || [];
+                matches.push({ start: node.start, end: node.end });
+                functions.set(node.id.name, matches);
+            }
+            for (const value of Object.values(node)) {
+                if (Array.isArray(value)) value.forEach(visit);
+                else if (value && typeof value === 'object') visit(value);
+            }
+        };
+        programs.forEach(visit);
+        functionIndexes.set(src, functions);
+    }
+    const matches = functions.get(name) || [];
+    if (matches.length !== 1) throw new Error('expected one function ' + name + ', found ' + matches.length);
+    return src.slice(matches[0].start, matches[0].end);
+}
+
+function buildRunner(appFile) {
+    const src = fs.readFileSync(appFile, 'utf8').replace(/\r\n?/g, '\n');
+
+    // --- real block 1: claimAndCleanupItem's trash construction + revenue calls ---
+    const claimBlock = slice(src,
+        '            let trashItem;\n',
+        '                    trashItem.isFromDeletion = true;\n                    trashItem.trashReason = \'pickup\';\n                    trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isFromDeletion: true }));\n                }\n            }',
+        'claim');
+
+    // --- real block 2: executeRestoreItem's revenue + marker block ---
+    const restoreBlock = slice(src,
+        '            const appliedRevenueDeltas = [];\n            const revenueScanDate = itemToRestore.scanDate || getFormattedDate();',
+        "\n                });\n            }",
+        'restore');
+
+    // --- real block 3: removeSingleBarcode's deduct-once guard (ដក ដោយដៃ) ---
+    const removeSource = fnBody(src, 'removeSingleBarcode');
+    const keyedRemove = removeSource.includes('deductCleanupRevenue(itemId, itemToTrash, revenue)');
+    let removeBlock, removeResult;
+    if (keyedRemove) {
+        const first = removeSource.indexOf('            const removedBc = { ...claimedBarcode');
+        const last = removeSource.indexOf('            const itemToTrash = stripHistoryOnlyMarkers(');
+        const event = /const revenue = \{ scanDate: revenueScanDate, cod: itemToTrash.cod, dod: itemToTrash.dod, count: 1 \};/.exec(removeSource);
+        const guard = /if \(([^\n]+)\) \{\s*const revenue = \{ scanDate: revenueScanDate/.exec(removeSource);
+        if (first < 0 || last <= first || !event || !guard) throw new Error('keyed remove deduction block not found');
+        const flip = /current\.barcodes = current\.barcodes\.map\(\(b\) => \(b && codes\.has\(b\.code\) \? \{ \.\.\.b, isDeducted: true \} : b\)\);/.exec(src);
+        if (!flip) throw new Error('keyed remove flag flip not found');
+        removeBlock = removeSource.slice(first, last) + `
+            let deductionApplied = null;
+            const itemToTrash = { id: 'policy_remove', deletedAt: NOW, cod: removedBc.cod, dod: removedBc.dod, barcodes: [removedBc] };
+            if (${guard[1]}) {
+                ${event[0]}
+                const amounts = cleanupEventAmounts(revenue);
+                const decision = ledgerEventDecision(true, 'deduct', null, itemToTrash.id, itemToTrash.deletedAt, null);
+                deductionApplied = addRevenueToDailyAndMonthlyRecord(revenue.scanDate, decision.sign * amounts.cod, decision.sign * amounts.dod, decision.sign * amounts.count);
+                const codes = new Set([removedBc.code]); const current = itemToTrash;
+                ${flip[0]}
+            }
+        `;
+        removeResult = 'itemToTrash.barcodes[0]';
+    } else {
+    const removeStarts = ['            let deductionApplied = null;', '            const removedBc = { ...claimedBarcode']
+        .map((marker) => removeSource.indexOf(marker));
+    const removeEnd = removeSource.indexOf('            const itemToTrash = stripHistoryOnlyMarkers(');
+    if (removeStarts.some((at) => at < 0) || removeEnd <= Math.max(...removeStarts)) {
+        throw new Error('remove deduction block not found');
+    }
+    removeBlock = removeSource.slice(Math.min(...removeStarts), removeEnd);
+
+        removeResult = 'removedBc';
+    }
+
+    // ⛔ helper ពិតត្រូវស្រង់ចេញពី `app.js` — មិនចម្លងដោយដៃ (តេស្តលើកូដចម្លង
+    // វាស់អ្វីផ្សេង)។ `claimAndCleanupItem` និង `removeSingleBarcode` ហៅវា
+    // តាំងពីកំណែ 2.30.2 ដែលរួបរួមរូបមន្តលុយទៅកន្លែងតែមួយ។
+    const moneyHelper = fnBody(src, 'recalcItemMoneyFromBarcodes');
+
+    // ⛔ ចាប់ពីកំណែ 2.37.2 ការដកលុយឈរ **ក្រោយ** ការសរសេរធុងសំរាម (journal នៃ
+    //    ការសម្អាត) ➜ វាលែងនៅក្នុងប្លុកដែលស្រង់។ ⛔ ការហៅត្រូវ **ស្រង់ចេញពី
+    //    កូដពិត** មិនមែនចម្លងដោយដៃ — សញ្ញា និងលំដាប់អាគុយម៉ង់គឺជាអ្វីដែល
+    //    តេស្តនេះការពារ។ លើ tree ចាស់ (`revenueApplied` ក្នុងប្លុក) ផ្លូវចាស់នៅដដែល។
+    const pendingStyle = src.indexOf('            if (!revenuePending) {') !== -1;
+    // ⛔ ចាប់ពី [2.50.49] ការដកជាព្រឹត្តិការណ៍មានសោ ៖ `revenue` (ចំនួនវិជ្ជមាន) ➜ `deductCleanupRevenue()` ➜ សញ្ញាពី
+    //    `ledgerEventDecision()` ➜ tail ស្រង់បន្ទាត់ `revenue` · `cleanupEventAmounts()` · សញ្ញា **ពីកូដពិត** (tree ចាស់ ➜ ការហៅចាស់)។
+    const keyedStyle = src.indexOf('const deduction = await deductCleanupRevenue(id, trashItem, revenue);') !== -1;
+    const revenueLine = /const revenue = \{ scanDate: revenueScanDate, cod: revenueCod, dod: revenueDod, count: revenueCount \};/.exec(src);
+    if (keyedStyle && !revenueLine) throw new Error('cleanup revenue event not found');
+    const keyedHelpers = keyedStyle
+        ? ['ledgerNumber', 'ledgerOpRingOf', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerEventToken',
+            'ledgerEventDecision', 'cleanupEventAmounts', 'cleanupScanDateOf'].map((n) => fnBody(src, n)).join('\n') + '\n'
+        : '';
+    const ledgerCall = keyedStyle ? null : /addRevenueToDailyAndMonthlyRecord\(revenueScanDate,[^;]*?\)/.exec(src);
+    if (pendingStyle && !keyedStyle && !ledgerCall) throw new Error('cleanup ledger call not found');
+    // ⛔ ចាប់ពីកំណែ 2.50.14 (MONEY-3) ធុងសំរាម `returned` សរសេរ `isDeducted: false` ហើយទង់ប្តូរជា `true` តែក្រោយ ledger
+    //    ដកចុះពិត (`markCleanupTrashDeducted()`) ➜ tail ក៏អនុវត្តបន្ទាត់ flip **ដែលស្រង់ពីកូដពិត** ក្រោយការដក ·
+    //    tree ចាស់ (គ្មាន `markCleanupTrashDeducted`) ➜ គ្មាន flip ដូចដើម។
+    const flipStyle = src.indexOf('function markCleanupTrashDeducted(') !== -1;
+    const flipLine = /current\.barcodes = current\.barcodes\.map\(\(b\) => \(b && codes\.has\(b\.code\) \? \{ \.\.\.b, isDeducted: true \} : b\)\);/.exec(src);
+    if (flipStyle && !flipLine) throw new Error('cleanup flip not found');
+    const flipHelpers = flipStyle
+        ? fnBody(src, 'barcodeEntriesOf') + '\n' + fnBody(src, 'cleanupTrashCodes') + '\n'
+        : '';
+    const flipTail = flipStyle
+        ? '            if (revenueApplied && Array.isArray(trashItem.barcodes)) { const codes = cleanupTrashCodes(trashItem); const current = trashItem; ' + flipLine[0] + ' }\n'
+        : '';
+    const keyedCall = keyedStyle
+        ? '{ ' + revenueLine[0] + ' const amounts = cleanupEventAmounts(revenue);'
+          + " const decision = ledgerEventDecision(true, 'deduct', null, trashItem.id, trashItem.deletedAt, null);"
+          + ' revenueApplied = addRevenueToDailyAndMonthlyRecord(revenue.scanDate, decision.sign * amounts.cod, decision.sign * amounts.dod, decision.sign * amounts.count); }'
+        : null;
+    const claimLedgerTail = pendingStyle
+        ? '            let revenueApplied = null;\n'
+          + '            if (revenuePending) ' + (keyedStyle ? keyedCall : 'revenueApplied = ' + ledgerCall[0] + ';') + '\n'
+          + flipTail
+          + '            return { trashItem, revenueDeducted: !!revenueApplied };'
+        : '            return { trashItem, revenueDeducted: !!revenueApplied };';
+
+
+    // ⛔ ការ claim ពាក់កណ្តាលមាន id ធុងសំរាមកំណត់ (`cleanupPartialTrashId()` ៖ item + barcode ដែល claim) ➜ ស្រង់ helper ពិត · tree ចាស់ប្រើ `generateUniqueId()`
+    const partialIdHelpers = src.indexOf('function cleanupPartialTrashId(') !== -1
+        ? ['parseTimestampFromId', 'cleanupPartialTrashId'].concat(keyedStyle ? [] : ['ledgerEventToken']).concat(flipStyle ? [] : ['barcodeEntriesOf'])
+            .map((n) => fnBody(src, n)).join('\n') + '\n'
+        : '';
+    const prelude = moneyHelper + flipHelpers + keyedHelpers + partialIdHelpers + `
+        var NOW = 1000000;
+        function getServerNow() { return NOW; }
+        function getFormattedDate() { return '2026-08-19'; }
+        var idSeq = 0;
+        function generateUniqueId() { return 'id_gen_' + (++idSeq); }
+        var revenueLog = [];
+        function addRevenueToDailyAndMonthlyRecord(d, cod, dod, count) {
+            revenueLog.push({ d, cod, dod, count });
+            const before = { cod: stats.cod, dod: stats.dod, count: stats.count };
+            stats.cod = Math.round((stats.cod + cod) * 100) / 100;
+            stats.dod = Math.round((stats.dod + dod) * 100) / 100;
+            stats.count += count;
+            if (stats.cod < 0) stats.cod = 0;
+            if (stats.dod < 0) stats.dod = 0;
+            if (stats.count < 0) stats.count = 0;
+            const applied = {
+                cod: Math.round((stats.cod - before.cod) * 100) / 100,
+                dod: Math.round((stats.dod - before.dod) * 100) / 100,
+                count: stats.count - before.count
+            };
+            return { scanDate: d, daily: applied, monthly: applied, dailyServer: Promise.resolve(applied), monthlyServer: Promise.resolve(applied) };
+        }
+        function revertRevenueLedgerDelta(applied) {
+            if (!applied || !applied.daily) return null;
+            addRevenueToDailyAndMonthlyRecord(applied.scanDate, -applied.daily.cod, -applied.daily.dod, -applied.daily.count);
+            return applied;
+        }
+        var stats = { cod: 0, dod: 0, count: 0 };
+    `;
+
+    const script = new vm.Script(prelude + `
+        function runClaim(claimedWhole, claimedPartial, reason, id) {
+${claimBlock}
+${claimLedgerTail}
+        }
+        function runRemoveBarcode(claimedParent, claimedBarcode) {
+${removeBlock}
+            return { removedBc: ${removeResult}, deductionApplied: !!deductionApplied, deductedCod: deductionApplied ? -deductionApplied.daily.cod : 0, deductedDod: deductionApplied ? -deductionApplied.daily.dod : 0 };
+        }
+        function runRestore(itemToRestore) {
+            delete itemToRestore.deletedAt;
+            delete itemToRestore.isFromDeletion;
+${restoreBlock}
+            appliedRevenueDeltas.forEach((delta) => {
+                addRevenueToDailyAndMonthlyRecord(delta.scanDate, delta.cod, delta.dod, delta.count);
+            });
+            return { itemToRestore, appliedRevenueDeltas };
+        }
+    `);
+    const ctx = vm.createContext({ console });
+    script.runInContext(ctx);
+    return ctx;
+}
+
+const bc = (code, cod, dod, closed) => ({
+    code, cod, dod, locker: 'N/A', time: 't', isClosed: !!closed,
+    isDeducted: false, isFromDeletion: false, createdAt: 1
+});
+const parcel = (barcodes, extra) => Object.assign({
+    id: 'id_1', phone: '012345678', scanDate: '2026-08-19',
+    barcodes, count: barcodes.length,
+    cod: barcodes.reduce((s, b) => s + b.cod, 0),
+    dod: barcodes.reduce((s, b) => s + b.dod, 0),
+    isClosed: barcodes.every(b => b.isClosed), isCalled: true,
+    callMark: 'មិនទទួល', callMarkTime: 500
+}, extra || {});
+
+let failures = 0;
+function check(label, actual, expected) {
+    const ok = JSON.stringify(actual) === JSON.stringify(expected);
+    if (!ok) failures++;
+    console.log(`   ${ok ? 'ok  ' : 'FAIL'}  ${label}: ${JSON.stringify(actual)}${ok ? '' : '  expected ' + JSON.stringify(expected)}`);
+}
+
+for (const app of ['ZoeW']) {
+    console.log(`\n================= ${app} =================`);
+    const appFile = path.join(ROOT, app, 'app.js');
+    const ctx = buildRunner(appFile);
+    const appSrc = fs.readFileSync(appFile, 'utf8').replace(/\r\n?/g, '\n');
+
+    // ---------- លុប (Delete): 2-hour auto-cleanup of a closed parcel ----------
+    console.log('\n-- លុប: បិទ ➜ លុបស្វ័យប្រវត្តិ ២ម៉ោង ➜ ស្តារ ➜ លុប ➜ ស្តារ --');
+    ctx.stats.cod = 100; ctx.stats.dod = 50; ctx.stats.count = 3;
+    const closedParcel = parcel([bc('A', 60, 30, true), bc('B', 40, 20, true)]);
+    let r = ctx.runClaim(closedParcel, null, 'close', 'id_1');
+    check('ស្ថិតិក្រោយលុប (មិនប្រែប្រួល)', ctx.stats, { cod: 100, dod: 50, count: 3 });
+    check('marker ក្នុងធុងសំរាម (item)', r.trashItem.isFromDeletion, true);
+    check('marker ក្នុងធុងសំរាម (barcode)', r.trashItem.barcodes.map(b => b.isFromDeletion), [true, true]);
+    check('isDeducted នៅ false (លុយមិនត្រូវដក)', r.trashItem.barcodes.map(b => b.isDeducted), [false, false]);
+    check('ចងចាំស្ថានភាព បិទ/ខល', [r.trashItem.isClosed, r.trashItem.isCalled, r.trashItem.callMark], [true, true, 'មិនទទួល']);
+
+    let back = ctx.runRestore(r.trashItem);
+    check('ស្ថិតិក្រោយស្តារ (មិនបូកថែម)', ctx.stats, { cod: 100, dod: 50, count: 3 });
+    check('marker ត្រូវសម្អាតពេលរស់វិញ', back.itemToRestore.barcodes.map(b => b.isFromDeletion), [false, false]);
+    check('ស្ថានភាព បិទ/ខល នៅដដែល', [back.itemToRestore.isClosed, back.itemToRestore.isCalled, back.itemToRestore.callMark], [true, true, 'មិនទទួល']);
+    check('នាឡិកា ២ ម៉ោងរបស់ barcode ត្រូវចាប់ផ្តើមឡើងវិញពេលស្តារ (បើអត់ ➜ លោតចូលធុងសំរាមវិញភ្លាម)',
+        back.itemToRestore.barcodes.map(b => b.closedAt), [1000000, 1000000]);
+
+    r = ctx.runClaim(back.itemToRestore, null, 'close', 'id_1');
+    check('លុបម្ដងទៀត (មិនដកទៀត)', ctx.stats, { cod: 100, dod: 50, count: 3 });
+    back = ctx.runRestore(r.trashItem);
+    check('ស្តារម្ដងទៀត (មិនបូកទៀត)', ctx.stats, { cod: 100, dod: 50, count: 3 });
+
+    // ---------- ដក (Remove): 8-day abandon of a fully-open parcel ----------
+    console.log('\n-- ដក: មិនបិទ ៨ថ្ងៃ ➜ return សាខាកណ្ដាល ➜ ស្តារ ➜ ដក --');
+    ctx.stats.cod = 100; ctx.stats.dod = 50; ctx.stats.count = 3;
+    const openParcel = parcel([bc('C', 25, 5, false), bc('D', 15, 5, false)]);
+    r = ctx.runClaim(openParcel, null, 'abandon', 'id_2');
+    check('ស្ថិតិក្រោយដក (ដកលុយ+ចំនួន)', ctx.stats, { cod: 60, dod: 40, count: 1 });
+    check('marker ក្នុងធុងសំរាម (item)', r.trashItem.isFromDeletion, false);
+    check('marker ក្នុងធុងសំរាម (barcode)', r.trashItem.barcodes.map(b => b.isFromDeletion), [false, false]);
+    check('isDeducted = true', r.trashItem.barcodes.map(b => b.isDeducted), [true, true]);
+
+    back = ctx.runRestore(r.trashItem);
+    check('ស្ថិតិក្រោយស្តារ (បូកត្រឡប់ពេញ)', ctx.stats, { cod: 100, dod: 50, count: 3 });
+    check('isDeducted ត្រូវ reset', back.itemToRestore.barcodes.map(b => b.isDeducted), [false, false]);
+    check('marker ត្រូវសម្អាត', back.itemToRestore.barcodes.map(b => b.isFromDeletion), [false, false]);
+    check('barcode ដែលមិនទាន់យក មិនត្រូវមានត្រា closedAt', back.itemToRestore.barcodes.map(b => b.closedAt), [undefined, undefined]);
+
+    r = ctx.runClaim(back.itemToRestore, null, 'abandon', 'id_2');
+    check('ដកម្ដងទៀត (ដកម្ដងទៀត)', ctx.stats, { cod: 60, dod: 40, count: 1 });
+    back = ctx.runRestore(r.trashItem);
+    check('ស្តារម្ដងទៀត (បូកម្ដងទៀត)', ctx.stats, { cod: 100, dod: 50, count: 3 });
+
+    // ---------- ដក: partial claim (some barcodes still closed) ----------
+    console.log('\n-- ដក: partial (barcode ខ្លះបិទរួច barcode ខ្លះនៅ) --');
+    ctx.stats.cod = 100; ctx.stats.dod = 50; ctx.stats.count = 3;
+    const mixed = parcel([bc('E', 10, 2, true), bc('F', 30, 8, false)]);
+    const staleOpen = mixed.barcodes.filter(b => !b.isClosed);
+    r = ctx.runClaim(null, Object.assign({}, mixed, { barcodes: staleOpen }), 'abandon', 'id_3');
+    check('ដកតែ barcode ដែលនៅសល់', ctx.stats, { cod: 70, dod: 42, count: 2 });
+    check('marker barcode ដែលដក', r.trashItem.barcodes.map(b => [b.code, b.isFromDeletion, b.isDeducted]), [['F', false, true]]);
+    back = ctx.runRestore(r.trashItem);
+    check('ស្តារត្រឡប់វិញពេញ', ctx.stats, { cod: 100, dod: 50, count: 3 });
+
+    // ---------- ⛔ ប៊ូតុងលុបដោយដៃ ៖ មិនត្រូវប៉ះលុយសោះ (រចនាសម្ព័ន្ធ) ----------
+    console.log('\n-- ⛔ លុបដោយដៃ / លុបទាំងអស់ ៖ គ្មានការសរសេរលុយក្នុង function ទាំងមូល --');
+    const REVENUE_SINKS = [
+        'applyLedgerBucketDelta', 'commitRevenueBucketDelta', 'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'ledgerMemoryCompensationClaimed', 'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual', 'addRevenueToDailyAndMonthlyRecord',
+        'appendRestoreRevenueIncrements',
+        'zoew_daily_revenue_cod_dod',
+        'zoew_monthly_revenue_cod_dod'
+    ];
+    // ⛔ អ្នកដក/បូកលុយនៃ cleanup · ledger event ដេរីវេពីកូដ ship (បញ្ជីសរសេរដៃមិនដឹង helper ថ្មី ➜ Delete ហៅវាផ្ទាល់នៅតែបៃតង)
+    const derivedSinks = [...new Set([...appSrc.matchAll(/function (\w+)\(/g)].map((m) => m[1])
+        .filter((n) => /^(?:deduct|undo)\w*(?:Revenue|Ledger)\w*$|^commit\w*(?:Revenue|Ledger)\w*$|^runLedgerTransaction$|^settleCleanupDeduction$/.test(n)))];
+    check('ជាន់អប្បបរមា៖ ដេរីវេអ្នកសរសេរលុយ cleanup (deductCleanupRevenue · commitLedgerEventStep · runLedgerTransaction)',
+        ['deductCleanupRevenue', 'commitLedgerEventStep', 'runLedgerTransaction'].every((n) => derivedSinks.indexOf(n) !== -1), true);
+    derivedSinks.forEach((n) => { if (REVENUE_SINKS.indexOf(n) === -1) REVENUE_SINKS.push(n); });
+    {
+        const body = fnBody(appSrc, 'deleteSingleItem');
+        const journal = /noteCleanupJournalEntry\(\{[^}]*reason:\s*'delete'[^}]*\}\)/.exec(body);
+        check('⛔ លុបដោយដៃ ៖ journal ការរំខានមាន `revenue: null` (ការស្តារមិនដកលុយសម្រាប់ Delete)',
+            !!journal && /\brevenue:\s*null\b/.test(journal[0]), true);
+    }
+    ['deleteSingleItem', 'buildClearHistoryTrashItem'].forEach((name) => {
+        const body = fnBody(appSrc, name);
+        check(`ជាន់អប្បបរមា៖ តួ ${name} >= 200 តួអក្សរ`, body.length >= 200, true);
+        check(`ស្រង់ត្រូវកន្លែង៖ ${name} សរសេរ trashReason 'delete'`, /trashReason\s*=\s*'delete'/.test(body), true);
+        REVENUE_SINKS.forEach((sink) => {
+            check(`⛔ ${name} មិនប៉ះ ${sink}`, body.indexOf(sink) === -1, true);
+        });
+    });
+
+    // ---------- ⛔ ដក barcode ដោយដៃ ៖ ដកលុយ ១ ដងគត់ ----------
+    console.log('\n-- ⛔ ដក barcode ដោយដៃ (removeSingleBarcode) ៖ ដកលុយ ១ ដងគត់ --');
+    ctx.stats.cod = 100; ctx.stats.dod = 50; ctx.stats.count = 3;
+    const removeParent = parcel([bc('I', 12, 8, false), bc('J', 5, 5, false)]);
+    let rm = ctx.runRemoveBarcode(removeParent, removeParent.barcodes[0]);
+    check('ដកលើកទី ១ ➜ ដកលុយពីស្ថិតិ', ctx.stats, { cod: 88, dod: 42, count: 2 });
+    check('deductionApplied = true', rm.deductionApplied, true);
+    check('barcode ដែលដក ➜ isDeducted true · isFromDeletion false',
+        [rm.removedBc.isDeducted, rm.removedBc.isFromDeletion], [true, false]);
+
+    rm = ctx.runRemoveBarcode(removeParent, rm.removedBc);
+    check('⛔ ដក barcode ដដែលម្តងទៀត ➜ លុយមិនប្រែ (ច្រកទ្វារ isDeducted)', ctx.stats, { cod: 88, dod: 42, count: 2 });
+    check('deductionApplied = false', rm.deductionApplied, false);
+
+}
+
+console.log('\n' + (failures === 0 ? '✅ ការធ្វើតេស្តទាំងអស់ជោគជ័យ' : `❌ បរាជ័យ ${failures}`));
+process.exit(failures === 0 ? 0 : 1);

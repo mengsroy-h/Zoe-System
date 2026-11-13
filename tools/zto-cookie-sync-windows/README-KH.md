@@ -87,7 +87,7 @@ Netlify Blobs ដោយផ្ទាល់។ ទុកវាបានជា **�
 តែពេលអានចេញពី Blobs មិនបាន។ បើអ្នកមានតម្លៃចាស់ក្នុងនោះរួច **កុំលុបវាចេញ**។
 
 បង្កើត `ZTO_PROXY_KEY` លើ Windows៖ ⛔ **ពាក្យបញ្ជា PowerShell រស់នៅ
-[`../../ZoeW/ZTO-SETUP-KH.md`](../../ZoeW/ZTO-SETUP-KH.md) តែមួយកន្លែង** —
+[`../../docs/zoew/ZTO-SETUP-KH.md`](../../docs/zoew/ZTO-SETUP-KH.md) តែមួយកន្លែង** —
 សូមចម្លងពីទីនោះ រួចដាក់ output ចូល Netlify។
 
 តម្លៃ `ZTO_PROXY_KEY` ដដែលនេះត្រូវដាក់ក្នុង ZoeW នៅ

@@ -1,0 +1,148 @@
+const { modulePrograms } = require('./audit-module-ast');
+let acorn;
+try {
+    acorn = require('acorn');
+} catch (e) {
+    console.error('ត្រូវការ acorn — រត់ `npm i acorn` ជាមុនសិន (ឬកំណត់ NODE_PATH ទៅកន្លែងដែលបានដំឡើង)។');
+    process.exit(2);
+}
+const fs = require('fs');
+const path = require('path');
+
+const root = process.env.VERSION_APP_DIR || path.resolve(__dirname, '../..');
+const APPS = ['ZoeW', 'ZoeKeyGen'];
+const SEMVER = /^\d+\.\d+\.\d+$/;
+const RENDER_FN = 'renderAppVersionLabels';
+
+let failures = 0;
+function check(label, actual, expected) {
+    const ok = JSON.stringify(actual) === JSON.stringify(expected);
+    if (!ok) failures++;
+    console.log(`   ${ok ? 'ok  ' : 'FAIL'}  ${label}: ${JSON.stringify(actual)}${ok ? '' : '  expected ' + JSON.stringify(expected)}`);
+}
+
+function walk(node, cb) {
+    if (!node || typeof node.type !== 'string') return;
+    cb(node);
+    for (const key of Object.keys(node)) {
+        const value = node[key];
+        if (Array.isArray(value)) value.forEach((child) => walk(child, cb));
+        else if (value && typeof value.type === 'string') walk(value, cb);
+    }
+}
+
+const appSources = {};
+try {
+    for (const app of APPS) appSources[app] = require('./react-view').readAppCode(root, app);
+} catch (e) { console.log('FAIL — ' + e.message); process.exit(1); }
+
+const declared = {};
+const renderBody = {};
+const called = {};
+
+for (const app of APPS) {
+    const src = appSources[app];
+    const programs = modulePrograms(src, path.join(root, app, 'app.js'), { ecmaVersion: 2022, sourceType: 'script' });
+    programs.forEach(ast => walk(ast, (node) => {
+        if (node.type === 'VariableDeclarator' && node.id.name === 'APP_VERSION') {
+            declared[app] = node.init && node.init.type === 'Literal' ? node.init.value : null;
+        }
+        if (node.type === 'FunctionDeclaration' && node.id && node.id.name === RENDER_FN) {
+            renderBody[app] = src.slice(node.start, node.end).split('\n').map((l) => l.trim()).join('\n');
+        }
+        if (node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.callee.name === RENDER_FN) {
+            called[app] = (called[app] || 0) + 1;
+        }
+    }));
+}
+
+console.log('\n-- APP_VERSION: ' + APPS.map(app => require('./react-view').appCodeLabel(root, app)).join(' · ') + ' --');
+for (const app of APPS) {
+    check(`${app} ប្រកាស APP_VERSION ជា semver`, SEMVER.test(String(declared[app])), true);
+}
+// ⛔ **កំណែជារបស់ App នីមួយៗ (កំណែ 2.19.4)។** មុននេះ ZoeW និង ZoeKeyGen
+// ត្រូវបង្ខំឲ្យមានកំណែដូចគ្នា ➜ ជុំដែលកែតែ App មួយ នៅតែបង្ខំឲ្យ App មួយទៀត
+// ឡើងកំណែ + ឡើង `CACHE_VERSION` ➜ **អ្នកប្រើទាំងអស់របស់ App នោះទាញសំបក
+// ទាំងមូលឡើងវិញដោយឥតប្រយោជន៍** ហើយ Netlify redeploy ដោយគ្មានការប្រែពិត។
+// ឥឡូវអ្វីដែលត្រូវអះអាងគឺ **ភាពស៊ីគ្នាខាងក្នុង App នីមួយៗ** ៖
+// `app.js` ↔ `manifest.json` ↔ `index.html`។
+APPS.forEach((a) => console.log(`   កំណែ ${a}: ${declared[a]}`));
+
+console.log('\n-- manifest.json ត្រូវនឹង APP_VERSION **របស់ App ដដែល** --');
+for (const app of APPS) {
+    const manifest = JSON.parse(fs.readFileSync(path.join(root, app, 'manifest.json'), 'utf8'));
+    check(`${app}/manifest.json version`, manifest.version, declared[app]);
+}
+
+console.log(`\n-- ${RENDER_FN}() មានក្នុងគ្រប់ App និងត្រូវបានហៅ --`);
+for (const app of APPS) {
+    check(`${app} ប្រកាស ${RENDER_FN}()`, typeof renderBody[app] === 'string', true);
+    check(`${app} ហៅ ${RENDER_FN}() យ៉ាងតិចម្ដង`, (called[app] || 0) >= 1, true);
+    check(`${app} render យក APP_VERSION មិនមែនអក្សរដិត`, String(renderBody[app]).includes('APP_VERSION'), true);
+}
+// ⛔ ZoeW ជា React ៖ `renderAppVersionLabels()` សរសេរ `viewState.appVersionLabel` ហើយ JSX (`LoginModal.tsx` ·
+//    `SideDrawer.tsx`) គូរវាទៅធាតុ `data-app-version` ➜ byte-identical ជាមួយ ZoeKeyGen (vanilla ៖ `textContent`) មិនអាច
+//    ទៅរួច។ អ្វីដែលត្រូវស៊ីគ្នាគឺ **អត្ថបទដែលអ្នកប្រើអាន** ៖ រត់ function ពិតនៃ App នីមួយៗ (APP_VERSION sentinel) រួច
+//    អានអត្ថបទពីធាតុ `data-app-version` ដែលគូររួច (React ៖ JSX ពិត · vanilla ៖ DOM ក្លែង)
+function renderedVersionLabels(app) {
+    const vm = require('vm');
+    const src = appSources[app];
+    const els = [{ textContent: '' }];
+    const ctx = { queueMicrotask, document: { querySelectorAll: () => els, getElementById: () => null } };
+    vm.createContext(ctx);
+    if (/\bfunction createStore\(/.test(src)) vm.runInContext(require('./react-view').reactRuntime(src, { context: ctx }), ctx);
+    const fn = require('./react-view').sliceFunction(src, RENDER_FN);
+    if (!fn) return [];
+    vm.runInContext("const APP_VERSION = '9.8.7';\n" + fn + '\n' + RENDER_FN + '();', ctx);
+    if (!/\bfunction createStore\(/.test(src)) return els.map((e) => e.textContent);
+    const { renderFromContext } = require('./react-view');
+    return ['src/app/components/modals/LoginModal.tsx:LoginModal', 'src/app/components/SideDrawer.tsx:SideDrawer'].map((spec) => {
+        const [rel, name] = spec.split(':');
+        const m = /data-app-version[^>]*>([^<]*)</.exec(renderFromContext(root, ctx, rel, name));
+        return m ? m[1] : null;
+    });
+}
+const labels = Object.fromEntries(APPS.map((a) => [a, renderedVersionLabels(a)]));
+check(`${RENDER_FN}() ៖ គ្រប់កន្លែងបង្ហាញកំណែ ដែលគូររួច មានអត្ថបទដូចគ្នាទាំង ២ App`,
+    new Set([].concat(...APPS.map((a) => labels[a]))).size === 1 && labels.ZoeW.length >= 2 && labels.ZoeW[0].includes('9.8.7'), true);
+
+// កន្លែងបង្ហាញកំណែត្រូវមានតែក្នុងកន្តុំដែលរាយខាងក្រោមប៉ុណ្ណោះ។ ការបន្ថែមកន្លែងថ្មី
+// ដោយចៃដន្យ (ឧ. ក្នុងតារាង ឬ modal ផ្សេង) ធ្វើឲ្យអ្នកប្រើឃើញកំណែច្រើនកន្លែងមិនស៊ីគ្នា។
+const VERSION_SLOTS = {
+    ZoeW: [
+        { label: 'ប្រអប់ login', open: '<div id="loginModal"', close: '</div>' },
+        { label: 'របា Slide (ការកំណត់)', open: '<aside class="side-drawer"', close: '</aside>' }
+    ],
+    ZoeKeyGen: [
+        { label: 'ប្រអប់ login', open: '<div id="loginModal"', close: '</div>' }
+    ]
+};
+
+console.log('\n-- កន្លែងបង្ហាញកំណែ --');
+for (const app of APPS) {
+    const html = fs.readFileSync(path.join(root, app, 'index.html'), 'utf8');
+    const lines = html.split('\n');
+    const slots = VERSION_SLOTS[app];
+    const at = lines.map((l, i) => (l.includes('data-app-version') ? i : -1)).filter((i) => i !== -1);
+    check(`${app} មានកន្លែងបង្ហាញកំណែ ${slots.length} ប៉ុណ្ណោះ`, at.length, slots.length);
+    const covered = new Set();
+    slots.forEach((slot) => {
+        const start = lines.findIndex((l) => l.includes(slot.open));
+        // ⛔ ធាតុបិទ = បន្ទាត់ `slot.close` ដែលមាន **indent ដូចបន្ទាត់បើក** (markup របស់ React ក្នុង `#root` មាន indent
+        //    តាមជម្រៅ ➜ ការប្រៀបធៀបនឹងជួរឈរ ០ រកមិនឃើញ)
+        const indent = start === -1 ? '' : lines[start].match(/^\s*/)[0];
+        const closes = lines.findIndex((l, i) => i > start && l.trimEnd() === indent + slot.close);
+        const hit = at.find((i) => start !== -1 && i > start && i < closes);
+        check(`${app} បង្ហាញកំណែក្នុង ${slot.label}`, hit !== undefined, true);
+        if (hit !== undefined) covered.add(hit);
+    });
+    check(`${app} គ្មានកន្លែងបង្ហាញកំណែក្រៅកន្តុំដែលរំពឹងទុក`, at.filter((i) => !covered.has(i)).length, 0);
+}
+
+console.log('');
+if (failures) {
+    console.log(`❌ ធ្លាក់ ${failures} — កំណែមិនស៊ីគ្នា។ manifest.json ត្រូវតាម APP_VERSION របស់ App ដដែល និងប្រភពដែលបានរាយខាងលើ។`);
+    process.exit(1);
+}
+console.log('✅ កំណែ App ស៊ីគ្នាទាំង ២ (កូដដែលវាស់ ↔ manifest.json ↔ index.html)');
+process.exitCode = 0;

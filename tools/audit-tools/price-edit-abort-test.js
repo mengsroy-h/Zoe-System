@@ -1,0 +1,427 @@
+// ⛔⛔ ថ្នាក់កំហុសលុយ៖ **transaction ដែល *បោះបង់* (`committed: false`) ➜ ការ
+// បញ្ច្រាសមិនរត់** ➜ ចំណូលប្រែ ខណៈតម្លៃកញ្ចប់មិនប្រែ។
+//
+// `saveEditedBarcodePrice()` បូកលុយចូលសតិ **និង server** ជាមុន រួចរត់
+// transaction លើកញ្ចប់។ ការគ្រប់គ្រងលទ្ធផលសរសេរជា៖
+//
+//     }).then((result) => {
+//         if (!result || !result.committed) {
+//             throw new Error('Barcode price transaction was not committed');
+//         }
+//         …
+//     }, () => { …បញ្ច្រាសលុយ… })
+//       .catch((postErr) => { console.error(…); });   ⟵ លេបស្ងាត់
+//
+// ⛔ `throw` ខាងក្នុង handler **ជោគជ័យ** មិនទៅដល់ handler **បរាជ័យ** ទេ —
+// វាទៅដល់ `.catch()` ដែលគ្រាន់តែកត់ត្រា។ ដូច្នេះការបោះបង់ ➜ **លុយនៅដដែល**។
+//
+// **វាស់បានលើ `origin/main` (2026-09-03)** — កែ COD ពី $10 ទៅ $25 ខណៈ
+// transaction បោះបង់ (ឧបករណ៍ផ្សេងកំពុង «លុបទាំងអស់» ➜ `clearClaim`,
+// ឬ RTDB អស់ចំនួនព្យាយាមក្រោមការប្រកួតប្រជែង)៖
+//
+//   | រង្វាស់ | មុនកែ |
+//   |---|---|
+//   | ចំណូលក្នុងសតិ | **+$15** |
+//   | ចំណូលនៅ server | **+$15** |
+//   | តម្លៃ barcode នៅ server | **$10 (មិនប្រែ)** |
+//   | Toast ដល់អ្នកប្រើ | **គ្មានសោះ** |
+//
+// ➜ លុយឡើង ខណៈកញ្ចប់មិនប្រែ ហើយអ្នកប្រើមិនដឹងអ្វីទាំងអស់។
+//
+// ⛔ **មូលហេតុដែល checker ១២៤ បៃតងទាំងអស់** ៖ `ui-flow-test.js` សាកករណី
+// «កញ្ចប់រលាយ» (`currentItem === null` ➜ transaction **commit**) និងករណី
+// «បដិសេធ» (promise **reject**) — តែ **គ្មានឯកសារណាដាក់ transaction ក្នុង
+// របៀប *បោះបង់* សោះ**។ «commit ដោយគ្មានការផ្លាស់ប្តូរ» និង «បោះបង់» ជា
+// លទ្ធផល ២ ផ្សេងគ្នារបស់ RTDB — សំណួរទី ៩ ក្នុងទម្រង់ថ្មី។
+//
+// ច្បាប់ដែលឯកសារនេះចាក់សោ (ទាំង ២ ខាង)៖
+//   ១. បោះបង់ ➜ លុយត្រូវត្រឡប់ដើម (សតិ **និង** server) + Toast ប្រាប់ការពិត។
+//   ២. ⛔ ទិសផ្ទុយ ៖ commit ធម្មតា ➜ លុយប្រែ **១ ដងគត់** និងតម្លៃចុះពិត។
+//   ៣. កញ្ចប់រលាយ (commit តែគ្មានការផ្លាស់ប្តូរ) ➜ លុយត្រឡប់ដើម។
+//   ៤. បដិសេធ (permission_denied) ➜ លុយត្រឡប់ដើម។
+//   ៥. ⛔ ការ **ព្យួរ** ≠ ការបរាជ័យ ៖ RTDB ចាក់ជួរការសរសេរ ➜ លុយ **មិនត្រូវ
+//      បញ្ច្រាស** ហើយការ commit យឺតត្រូវបញ្ចប់ការងារ (មេរៀន 2.25.6)។
+'use strict';
+
+const path = require('path');
+const vm = require('vm');
+const { reactRuntime, moduleRuntime, memoryStorage } = require('./react-view.js');
+
+const ROOT = process.env.PRICEABORT_APP_DIR ? path.resolve(process.env.PRICEABORT_APP_DIR) : path.join(__dirname, '../..');
+
+let pass = 0, fail = 0;
+function ok(label, cond, detail) {
+    if (cond) { pass++; console.log('   ok    ' + label); }
+    else { fail++; console.log('  FAIL   ' + label + (detail !== undefined ? '\n         ' + (typeof detail === 'string' ? detail : JSON.stringify(detail)) : '')); }
+}
+
+let SRC = '';
+try {
+    SRC = require('./react-view').readAppCode(ROOT, 'ZoeW');
+} catch (e) {
+    console.log('  FAIL   មិនអាចវាស់ tree ដែលបានជ្រើស ➜ ' + e.message);
+    console.log('\n❌ ធ្លាក់ — មិនអាចអានកូដសម្រាប់ checker ពី tree ដែលបានជ្រើស');
+    process.exit(1);
+}
+
+function sliceFn(name) {
+    const at = SRC.search(new RegExp('(?:async\\s+)?function\\s+' + name + '\\s*\\('));
+    if (at === -1) return null;
+    let depth = 0;
+    const start = SRC.indexOf('{', SRC.indexOf(')', at));
+    for (let k = start; k < SRC.length; k++) {
+        if (SRC[k] === '{') depth++;
+        else if (SRC[k] === '}') { depth--; if (!depth) return SRC.slice(at, k + 1); }
+    }
+    return null;
+}
+
+const NEEDED = [
+    'elapsedSince', 'withTimeout', 'dbOp', 'dbOpStalled', 'armLateCommit', 'notifyIfSlow',
+    'getFormattedDate', 'appZoneParts', 'getZoneDateKey',
+    'ledgerNumber', 'ledgerAppliedDelta', 'ledgerDeltaWithClamp', 'revertLedgerRecordInMemory',
+    'recalcItemMoneyFromBarcodes', 'applyLedgerBucketDelta', 'commitRevenueBucketDelta',
+    'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'ledgerMemoryCompensationClaimed', 'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual',
+    'addRevenueToDailyAndMonthlyRecord', 'runLedgerTransaction', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerLatestMonths', 'ledgerMonthTrimmed', 'captureLedgerSession', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'alignMonthlyLedgerToDaily',
+    'ledgerTokenSeen', 'ledgerRecordTokens', 'ledgerTotalsOf', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged', 'ledgerDeltaIntent', 'ledgerDeltaCompanion', 'ledgerCompanionState',
+    'normalizeBarcodesOf', 'ensureBarcodeArrayForItem', 'barcodeEntriesOf', 'sanitizeInput', 'formatScanStamp',
+    'openViewListModal', 'closeModal', 'openModalHelper', 'viewListModalShowing',
+    'saveEditedBarcodePrice', 'itemHasRestoreMarkers', 'readRestoreServerNode', 'monthlyRootMutation',
+    'statsMoney', 'statsPositive', 'barcodeRegistryKey', 'pickupBarcodeKey', 'collectedSetFromRecord',
+    'collectedMarkValueOf', 'collectedDayHoldingKey', 'syncCollectedValueForBarcode',
+    'reconcileCollectedHistory', 'reconcileCollectedPriceState', 'collectedMarksFor', 'collectedDayOfStamp',
+    'markCollectedRevenue', 'commitCollectedMarks', 'collectedRetentionCutoffKey', 'armLateWrite'
+];
+const missing = NEEDED.filter((n) => !sliceFn(n));
+ok('ជាន់អប្បបរមា៖ រកឃើញ function ដែលចាំបាច់ទាំង ' + NEEDED.length,
+    missing.length === 0, missing.join(', '));
+if (missing.indexOf('saveEditedBarcodePrice') !== -1) {
+    console.log('\n❌ ធ្លាក់ ' + fail + ' — គ្មាន saveEditedBarcodePrice ➜ វាស់អ្វីមិនបានទេ');
+    process.exit(1);
+}
+
+const DATE_KEY = new Date().toISOString().slice(0, 10);
+const HISTORY_ROOT = 'zoew_scan_history_cod_dod';
+
+function makeCtx(mode) {
+    const els = {};
+    const mkEl = (id) => ({
+        id: id, value: '', innerText: '', innerHTML: '', className: '',
+        style: {}, hidden: false, disabled: false,
+        appendChild() {}, querySelector() { return null; }, querySelectorAll() { return []; },
+        classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
+        getAttribute() { return null; }, setAttribute() {}, focus() {}, blur() {}
+    });
+    ['editBcCodInput', 'editBcDodInput', 'editBcPcText', 'barcodeListContainer',
+        'listModalPhoneText', 'viewListModal', 'editBarcodePriceModal', 'phoneSuggestBox']
+        .forEach((id) => { els[id] = mkEl(id); });
+
+    const serverLedger = {};
+    const serverHistory = {};
+    const pending = [];
+
+    const ctx = {
+        console, Math, JSON, parseFloat, parseInt, isNaN, isFinite, Date, Object, Array,
+        String, Number, Promise, Set, Map, WeakMap, Intl, queueMicrotask, performance: require('node:perf_hooks').performance,
+        setTimeout: (fn, ms) => setTimeout(fn, ms >= 10000 ? 0 : ms),
+        clearTimeout,
+        document: {
+            getElementById: (id) => els[id] || null,
+            querySelectorAll: () => [],
+            createElement: () => mkEl('x'),
+            body: { style: {}, classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } } }
+        },
+        db: { app: { options: { databaseURL: 'https://price-abort-fixture.invalid' } } }, auth: { currentUser: { uid: 'fixture-user' } }, crypto: require('node:crypto').webcrypto, authGeneration: 0, serverTimeOffsetMs: 0, exchangeRateRiel: 4100,
+        dailyRevenueData: {}, monthlyRevenueData: {}, dailyCollectedData: {},
+        dbRefDailyCollected: { path: 'zoew_daily_collected_cod_dod' },
+        dbRefDailyRevenue: { path: 'zoew_daily_revenue_cod_dod' },
+        dbRefMonthlyRevenue: { path: 'zoew_monthly_revenue_cod_dod' },
+        activeParentItemId: 'id_1', activeEditingBarcode: 'BC1',
+        scanHistory: [], isModalOpen: false, pendingBarcode: '',
+        editingItemId: null, markingItemId: null,
+        toasts: [], lateResolvers: [], __writes: [],
+        showToast(m) { ctx.toasts.push(String(m)); },
+        refreshCurrentHistoryView() {}, clearLookupStatus() {}, safeFocusScanner() {},
+        originLabel() { return { icon: '', name: '', short: '', full: '' }; }, itemOriginOf() { return ''; },
+        resumeScanVideo() {}, hidePhoneSuggestions() {}, showAppChrome() {},
+        __serverLedger: serverLedger, __serverHistory: serverHistory, __pending: pending
+    };
+
+    ctx.fb = {
+        ref: (_db, p) => ({ path: p === undefined ? '' : String(p) }),
+        increment: (n) => ({ __inc: n }),
+        runTransaction: (r, fn) => {
+            const p = String(r.path);
+            ctx.__writes.push(p);
+            if (p.indexOf(HISTORY_ROOT) !== 0) {
+                const cur = serverLedger[p] === undefined ? null : serverLedger[p];
+                const next = fn(cur === null ? null : JSON.parse(JSON.stringify(cur)));
+                if (next === undefined) return Promise.resolve({ committed: false, snapshot: { val: () => serverLedger[p] || null } });
+                serverLedger[p] = next;
+                return Promise.resolve({ committed: true, snapshot: { val: () => serverLedger[p] } });
+            }
+            const id = p.split('/')[1];
+            const runUpdater = () => {
+                const cur = serverHistory[id] === undefined ? null : serverHistory[id];
+                const next = fn(cur === null ? null : JSON.parse(JSON.stringify(cur)));
+                if (next === undefined) return { committed: false, snapshot: { val: () => serverHistory[id] || null } };
+                if (next === null) { delete serverHistory[id]; return { committed: true, snapshot: { val: () => null } }; }
+                serverHistory[id] = next;
+                return { committed: true, snapshot: { val: () => serverHistory[id] } };
+            };
+            const currentPhase = serverHistory[id]?.pricePending?.phase;
+            const proposed = fn(serverHistory[id] ? JSON.parse(JSON.stringify(serverHistory[id])) : null);
+            const writesHistory = currentPhase === 'admitted' && proposed?.pricePending?.phase === 'history';
+            if (mode === 'abort' && writesHistory) {
+                fn(serverHistory[id] ? JSON.parse(JSON.stringify(serverHistory[id])) : null);
+                return Promise.resolve({ committed: false, snapshot: { val: () => serverHistory[id] || null } });
+            }
+            if (mode === 'reject' && writesHistory) return Promise.reject(new Error('permission_denied'));
+            if (mode === 'stall' && writesHistory) {
+                return new Promise((resolve) => { pending.push(() => resolve(runUpdater())); });
+            }
+            return Promise.resolve(runUpdater());
+        },
+        update: (r, patch) => {
+            const keys = Object.keys(patch || {});
+            const commit = keys.some((k) => k.endsWith('/pricePending/phase') && patch[k] === 'history');
+            const apply = () => {
+                for (const key of keys) {
+                    const full = [String(r.path || ''), key].filter(Boolean).join('/').split('/');
+                    const value = patch[key];
+                    const leaf = full.pop();
+                    let target;
+                    if (full[0] === HISTORY_ROOT) {
+                        target = serverHistory;
+                        for (const part of full.slice(1)) { if (!target[part]) target[part] = {}; target = target[part]; }
+                    } else if (full[0] === 'zoew_daily_revenue_cod_dod') {
+                        const day = 'zoew_daily_revenue_cod_dod/' + full[1];
+                        target = serverLedger[day] = serverLedger[day] || {};
+                    } else if (full[0] === 'zoew_monthly_revenue_cod_dod') {
+                        serverLedger.zoew_monthly_revenue_cod_dod = serverLedger.zoew_monthly_revenue_cod_dod || {};
+                        target = serverLedger.zoew_monthly_revenue_cod_dod[full[1]] = serverLedger.zoew_monthly_revenue_cod_dod[full[1]] || {};
+                    } else continue;
+                    target[leaf] = value && typeof value === 'object' && '__inc' in value
+                        ? Math.round(((parseFloat(target[leaf]) || 0) + value.__inc) * 100) / 100 : value;
+                }
+                for (const [day, record] of Object.entries(serverLedger)) {
+                    if (day.startsWith('zoew_daily_revenue_cod_dod/')) ctx.dailyRevenueData[day.split('/')[1]] = JSON.parse(JSON.stringify(record));
+                }
+                if (serverLedger.zoew_monthly_revenue_cod_dod) ctx.monthlyRevenueData = JSON.parse(JSON.stringify(serverLedger.zoew_monthly_revenue_cod_dod));
+            };
+            if (!commit) { apply(); return Promise.resolve(); }
+            const id = keys[0].split('/')[1];
+            if (serverHistory[id]?.pricePending?.phase !== 'admitted') return Promise.reject(Object.assign(new Error('permission_denied'), { code: 'PERMISSION_DENIED' }));
+            ctx.__writes.push('commit:' + id);
+            if (mode === 'abort' || mode === 'reject') return Promise.reject(Object.assign(new Error('permission_denied'), { code: 'PERMISSION_DENIED' }));
+            if (mode === 'stall') return new Promise((resolve) => { pending.push(() => { apply(); resolve(); }); });
+            apply();
+            return Promise.resolve();
+        },
+        get: ref => {
+            let value = ref.path.startsWith(HISTORY_ROOT + '/') ? serverHistory[ref.path.split('/')[1]] || null : serverLedger[ref.path] ?? null;
+            if (ref.path.startsWith('zoew_monthly_revenue_cod_dod/')) value = serverLedger.zoew_monthly_revenue_cod_dod?.[ref.path.split('/')[1]] ?? null;
+            return Promise.resolve({ exists: () => value !== null, val: () => value === null ? null : JSON.parse(JSON.stringify(value)) });
+        }
+    };
+    ctx.localStorage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://price-abort-fixture.invalid' }) });
+    ctx.window = ctx;
+    vm.createContext(ctx);
+    // ⛔ ថេរដែល function ដែលស្រង់ចូលយោង — ត្រូវអានចេញពី `app.js` ពិត
+    // មិនមែនចាក់លេខក្នុង checker (បើមិនដូច្នេះ ការប្តូរពិដានក្នុងកូដ ship
+    // នឹងមិនឆ្លុះក្នុងតេស្ត ➜ ចាក់សោការសន្មតចាស់)។
+    const DB_OP_TIMEOUT = /const DB_OP_TIMEOUT_MS = (\d+);/.exec(SRC);
+    const COLLECTED_DAYS = /const DAILY_COLLECTED_KEEP_DAYS = (\d+);/.exec(SRC);
+    // ⛔ ស្រទាប់ React (វាលបញ្ចូល · ប្រអប់ · ឃ្លាំង) — កូដពិតពីទិដ្ឋភាពដដែល (`react-view.js`)
+    vm.runInContext(reactRuntime(SRC, { exclude: NEEDED }), ctx);
+    // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
+    vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', ctx);
+    // ⛔ ការអាន server ក្នុង sandbox ឆ្លង `fb.get` (គ្មាន REST) · ជួររង់ចាំ monthly mutation ពិត (`monthlyRootMutation`)
+    vm.runInContext('var txRestUrl = function () { return null; }; var txReadServerValue = function () { return Promise.reject(new Error("rest unused")); }; var monthlyQueues = new WeakMap();', ctx);
+    vm.runInContext('const DB_OP_TIMEOUT_MS = ' + (DB_OP_TIMEOUT ? DB_OP_TIMEOUT[1] : '15000') + ';\n'
+        + 'const DAILY_COLLECTED_KEEP_DAYS = ' + (COLLECTED_DAYS ? COLLECTED_DAYS[1] : '7') + ';\n'
+        + 'const PICKUP_DATE_KEY_PATTERN = /^\\d{4}-\\d{2}-\\d{2}$/;\n'
+        + ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'LEDGER_OP_RING_MAX', 'TRASH_WRITE_SLOW_NOTICE_MS'].map(name => {
+            const declaration = new RegExp('const ' + name + ' = [^;]+;').exec(SRC);
+            return declaration ? declaration[0] : '';
+        }).join('\n') + '\n'
+        + NEEDED.filter((n) => sliceFn(n)).map(sliceFn).join('\n'), ctx);
+    const operation = moduleRuntime(ROOT, SRC, ['src/core/shop-scope.ts', 'src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts', 'src/services/row-operation-lock.ts', 'src/services/price-operation.ts']);
+    vm.runInContext(operation.code, ctx);
+    // getServerNow មាន anchor monotonic ឯកជន; ស្រង់ module ពិតរបស់វា
+    // មិនមែន function ដាច់ដោយឡែកពី state របស់វាទេ។
+    vm.runInContext(moduleRuntime(ROOT, SRC, [
+        { path: 'src/core/clock.ts', expose: ['getServerNow'] }
+    ]).code, ctx);
+    ctx.__els = els;
+    return ctx;
+}
+
+function seedItem() {
+    return {
+        id: 'id_1', phone: '012345678', scanDate: DATE_KEY,
+        cod: 10, dod: 0, price: 10, count: 1, barcode: 'BC1', isClosed: false, isCalled: false,
+        createdAt: 1,
+        barcodes: [{ code: 'BC1', cod: 10, dod: 0, locker: 'N/A', time: 't', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: 1 }]
+    };
+}
+
+function setup(mode) {
+    const ctx = makeCtx(mode);
+    ctx.scanHistory = [seedItem()];
+    ctx.__serverHistory.id_1 = seedItem();
+    ctx.__els.editBcCodInput.value = '25';
+    ctx.__els.editBcDodInput.value = '0';
+    return ctx;
+}
+
+const settle = () => new Promise((resolve) => setTimeout(resolve, 25));
+
+function memoryCod(ctx) {
+    const rec = ctx.dailyRevenueData[DATE_KEY];
+    return rec ? Math.round((parseFloat(rec.codDollar) || 0) * 100) / 100 : 0;
+}
+function serverCod(ctx) {
+    const rec = ctx.__serverLedger['zoew_daily_revenue_cod_dod/' + DATE_KEY];
+    return rec ? Math.round((parseFloat(rec.codDollar) || 0) * 100) / 100 : 0;
+}
+function serverBarcodeCod(ctx) {
+    const it = ctx.__serverHistory.id_1;
+    return it && it.barcodes ? it.barcodes[0].cod : null;
+}
+function toastText(ctx) { return ctx.toasts.join(' | '); }
+
+(async () => {
+    // ═══ ១. ⛔ បោះបង់ ➜ លុយត្រូវត្រឡប់ដើម ═════════════════════════════
+    console.log('\n=== ១. transaction បោះបង់ (committed:false) ➜ លុយមិនត្រូវប្រែ ===');
+    {
+        const ctx = setup('abort');
+        ctx.saveEditedBarcodePrice();
+        await settle(); await settle();
+        ok('សតិ ៖ ចំណូលមិនប្រែ (' + memoryCod(ctx) + ')', memoryCod(ctx) === 0, { memory: memoryCod(ctx) });
+        ok('server ៖ ចំណូលមិនប្រែ (' + serverCod(ctx) + ')', serverCod(ctx) === 0, { server: serverCod(ctx) });
+        ok('តម្លៃ barcode នៅ server មិនប្រែ ($' + serverBarcodeCod(ctx) + ')', serverBarcodeCod(ctx) === 10);
+        // ⛔ អះអាង **សាលក្រម** មិនមែន *ពាក្យ* ៖ សារបរាជ័យផ្ទុកពាក្យ «ជោគជ័យ»
+        // ខាងក្នុង «មិនបានជោគជ័យ» ➜ ការស្កេនពាក្យទទេជាការធ្លាក់ក្លែងក្លាយ។
+        ok('អ្នកប្រើទទួលសារប្រាប់ថាមិនជោគជ័យ',
+            /មិនបានជោគជ័យ|មិនបានរក្សាទុក|មិនត្រូវបានកែ|លែងមាន/.test(toastText(ctx)), toastText(ctx));
+        ok('⛔ មិនអះអាងថាជោគជ័យ', toastText(ctx).indexOf('បានកែប្រែទឹកប្រាក់តាមកញ្ចប់ជោគជ័យ') === -1, toastText(ctx));
+    }
+
+    // ═══ ២. ⛔ ទិសផ្ទុយ ៖ commit ធម្មតា ═══════════════════════════════
+    console.log('\n=== ២. ទិសផ្ទុយ ៖ commit ធម្មតា ➜ លុយប្រែ ១ ដងគត់ ===');
+    {
+        const ctx = setup('commit');
+        ctx.saveEditedBarcodePrice();
+        await settle(); await settle();
+        ok('សតិ ៖ ចំណូល +$15', memoryCod(ctx) === 15, { memory: memoryCod(ctx) });
+        ok('server ៖ ចំណូល +$15', serverCod(ctx) === 15, { server: serverCod(ctx) });
+        ok('តម្លៃ barcode នៅ server ក្លាយជា $25', serverBarcodeCod(ctx) === 25, { cod: serverBarcodeCod(ctx) });
+        ok('Toast ជោគជ័យ', toastText(ctx).indexOf('ជោគជ័យ') !== -1, toastText(ctx));
+    }
+
+    // ═══ ៣. កញ្ចប់រលាយ (commit តែគ្មានការផ្លាស់ប្តូរ) ═════════════════
+    console.log('\n=== ៣. កញ្ចប់រលាយពី server ➜ លុយត្រឡប់ដើម ===');
+    {
+        const ctx = setup('commit');
+        delete ctx.__serverHistory.id_1;
+        ctx.saveEditedBarcodePrice();
+        await settle(); await settle();
+        ok('សតិ ៖ ចំណូលមិនប្រែ', memoryCod(ctx) === 0, { memory: memoryCod(ctx) });
+        ok('server ៖ ចំណូលមិនប្រែ', serverCod(ctx) === 0, { server: serverCod(ctx) });
+        ok('⛔ កញ្ចប់មិនរស់ឡើងវិញ', !ctx.__serverHistory.id_1);
+        ok('Toast ប្រាប់ថាកញ្ចប់លែងមាន', /លែងមាន|មិនទាន់មានភស្តុតាងបញ្ចប់/.test(toastText(ctx)), toastText(ctx));
+    }
+
+    // ═══ ៤. បដិសេធ (permission_denied) ═══════════════════════════════
+    console.log('\n=== ៤. server បដិសេធ ➜ លុយត្រឡប់ដើម ===');
+    {
+        const ctx = setup('reject');
+        ctx.saveEditedBarcodePrice();
+        await settle(); await settle();
+        ok('សតិ ៖ ចំណូលមិនប្រែ', memoryCod(ctx) === 0, { memory: memoryCod(ctx) });
+        ok('server ៖ ចំណូលមិនប្រែ', serverCod(ctx) === 0, { server: serverCod(ctx) });
+        ok('តម្លៃក្នុងសតិត្រឡប់ទៅ $10', ctx.scanHistory[0].barcodes[0].cod === 10,
+            { cod: ctx.scanHistory[0].barcodes[0].cod });
+        ok('Toast ប្រាប់ថាបរាជ័យ', /មិនបានជោគជ័យ|មិនបានរក្សាទុក/.test(toastText(ctx)), toastText(ctx));
+    }
+
+    // ═══ ៥. ⛔ ការព្យួរ ≠ ការបរាជ័យ ═══════════════════════════════════
+    console.log('\n=== ៥. បណ្តាញព្យួរ ➜ មិនប៉ាន់ស្មាន · commit យឺតបញ្ចប់ការងារ (A526 ៖ ប្រាក់ចូលជាមួយ commit) ===');
+    {
+        const ctx = setup('stall');
+        ctx.saveEditedBarcodePrice();
+        await settle(); await settle(); await settle();
+        ok('ខណៈព្យួរ ៖ លុយមិនទាន់ចូល ហើយមិនមានការបញ្ច្រាស (commit atomic មិនទាន់ចុះ · សតិ $' + memoryCod(ctx) + ')',
+            memoryCod(ctx) === 0 && serverCod(ctx) === 0, { memory: memoryCod(ctx), server: serverCod(ctx) });
+        // ⛔ អះអាង **ការអះអាងថាការផ្លាស់ប្តូរត្រូវបានដកវិញ** មិនមែនវត្តមាន
+        // ពាក្យ «ត្រឡប់មកវិញ» (សារព្យួរនិយាយអំពី *បណ្តាញ* ត្រឡប់មកវិញ)។
+        ok('⛔ ខណៈព្យួរ ៖ មិនអះអាងថាទិន្នន័យត្រូវបានត្រឡប់មកវិញ',
+            toastText(ctx).indexOf('ទិន្នន័យត្រូវបានត្រឡប់មកវិញ') === -1, toastText(ctx));
+        ok('អ្នកប្រើត្រូវបានប្រាប់ថាបណ្តាញឆ្លើយមិនចេញ',
+            /ឆ្លើយមិនចេញ|រង់ចាំ|កំពុង/.test(toastText(ctx)), toastText(ctx));
+        ctx.__pending.forEach((release) => release());
+        await settle(); await settle();
+        ok('commit យឺត ➜ តម្លៃចុះពិត ($' + serverBarcodeCod(ctx) + ')', serverBarcodeCod(ctx) === 25,
+            { cod: serverBarcodeCod(ctx) });
+        ok('commit យឺត ៖ លុយនៅ +$15 ១ ដងគត់', memoryCod(ctx) === 15 && serverCod(ctx) === 15,
+            { memory: memoryCod(ctx), server: serverCod(ctx) });
+    }
+
+    console.log('\n=== ៦. ទិន្នន័យចាស់លើសសេននៅ HOLD មុន effects · តម្លៃសេនធម្មតាកែបាន ===');
+    const legacyCases = [
+        { label: 'តម្លៃដដែល 0.005 ទាំង COD និង DOD', server: [0.005, 0.005], next: [0.005, 0.005], expected: [0.01, 0.01] },
+        { label: 'បន្ថយ COD និងបង្កើន DOD ពីតម្លៃចាស់', server: [0.015, 0.005], next: [0.005, 2.005], expected: [0.01, 2.01] },
+        { label: 'ទិដ្ឋភាពចាស់ ត្រូវកែតាមសាលក្រម server', local: [0.015, 0.025], server: [0.005, 0.015], next: [0.015, 0.005], expected: [0.02, 0.01] },
+        { label: 'ទិសផ្ទុយ តម្លៃសេនធម្មតា', server: [0.01, 0.02], next: [2.01, 3.02], expected: [2.01, 3.02] }
+    ];
+    for (const entry of legacyCases) {
+        const ctx = setup('commit');
+        const local = entry.local || entry.server;
+        const records = [[ctx.scanHistory[0], local], [ctx.__serverHistory.id_1, entry.server]];
+        for (const [record, values] of records) {
+            record.barcodes[0].cod = values[0];
+            record.barcodes[0].dod = values[1];
+            record.cod = Math.round(values[0] * 100) / 100;
+            record.dod = Math.round(values[1] * 100) / 100;
+            record.price = Math.round((record.cod + record.dod) * 100) / 100;
+        }
+        const ledger = { codDollar: Math.round(entry.server[0] * 100) / 100,
+            dodDollar: Math.round(entry.server[1] * 100) / 100, totalCount: 1 };
+        const month = DATE_KEY.slice(0, 7);
+        ctx.dailyRevenueData[DATE_KEY] = { ...ledger };
+        ctx.monthlyRevenueData[month] = { ...ledger };
+        ctx.__serverLedger['zoew_daily_revenue_cod_dod/' + DATE_KEY] = { ...ledger };
+        ctx.__serverLedger.zoew_monthly_revenue_cod_dod = { [month]: { ...ledger } };
+        ctx.__els.editBcCodInput.value = String(entry.next[0]);
+        ctx.__els.editBcDodInput.value = String(entry.next[1]);
+        const before = JSON.stringify({ history: ctx.__serverHistory, ledger: ctx.__serverLedger });
+        const precisionHold = local.some((value) => Math.round(value * 100) / 100 !== value);
+        await ctx.saveEditedBarcodePrice();
+        await settle(); await settle();
+        if (precisionHold) {
+            ok(entry.label + ' ៖ គ្មាន admission ឬការសរសេរ', ctx.__writes.length === 0, ctx.__writes);
+            ok(entry.label + ' ៖ ប្រវត្តិ និង ledger មិនប្រែ', JSON.stringify({ history: ctx.__serverHistory, ledger: ctx.__serverLedger }) === before);
+            ok(entry.label + ' ៖ ប្រាប់ថាតម្លៃបង្ហាញលើសសេន និងមិនអះអាងជោគជ័យ', /កំពុងបង្ហាញមានខ្ទង់លើសសេន/.test(toastText(ctx)) && !/ជោគជ័យ/.test(toastText(ctx)), toastText(ctx));
+            continue;
+        }
+        const daily = ctx.__serverLedger['zoew_daily_revenue_cod_dod/' + DATE_KEY];
+        const monthly = ctx.__serverLedger.zoew_monthly_revenue_cod_dod[month];
+        const barcode = ctx.__serverHistory.id_1.barcodes[0];
+        const match = (record) => record && record.codDollar === entry.expected[0]
+            && record.dodDollar === entry.expected[1];
+        ok(entry.label + ' ៖ ledger ថ្ងៃជា COD/DOD ពិត', match(daily), { actual: daily, expected: entry.expected });
+        ok(entry.label + ' ៖ ledger ខែជា COD/DOD ពិត', match(monthly), { actual: monthly, expected: entry.expected });
+        ok(entry.label + ' ៖ barcode និងសតិត្រូវនឹង ledger',
+            barcode.cod === entry.expected[0] && barcode.dod === entry.expected[1]
+            && match(ctx.dailyRevenueData[DATE_KEY]), { barcode, memory: ctx.dailyRevenueData[DATE_KEY] });
+        ok(entry.label + ' ៖ មានសាលក្រមជោគជ័យក្រោយ commit',
+            ctx.toasts.some((message) => message.startsWith('✅')), toastText(ctx));
+    }
+
+    console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail : '✅ គ្មានបញ្ហា') + ' — ok ' + pass);
+    process.exit(fail ? 1 : 0);
+})().catch((e) => {
+    console.log('  FAIL   តេស្តគាំង ➜ ' + (e && e.stack ? e.stack : e));
+    process.exit(1);
+});

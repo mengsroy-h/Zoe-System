@@ -3,17 +3,17 @@
 PWA អាជីវកម្មចម្បងរបស់ប្រព័ន្ធ Zoe។ ដំឡើងលើទូរស័ព្ទបាន ដំណើរការក្រៅបណ្តាញបាន
 ហើយប្រើ Firebase Realtime Database ឬ Supabase (ជ្រើសតាម Config របស់ឧបករណ៍) ជាប្រភពទិន្នន័យ។ កូដសរសេរលើ **React +
 TypeScript + Vite** — ការអភិវឌ្ឍ · build · ការវាស់ ស្ថិតក្នុង
-**[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)**។
+**[DEVELOPMENT.md](../docs/zoew/DEVELOPMENT.md)**។
 
 > 📖 ឯកសារនេះសរសេរតែ **កំណែ · មុខងារ · របៀបប្រើប្រាស់ · ប្រព័ន្ធសុវត្ថិភាព ·
 > អាជ្ញាប័ណ្ណ**។ ប្រវត្តិកំហុស និងហេតុផលនៃការសម្រេចនីមួយៗ ស្ថិតក្នុង
-> **[docs/HISTORY.md](../docs/HISTORY.md)**។
+> **[../docs/HISTORY.md](../docs/HISTORY.md)**។
 
 ---
 
 ## កំណែ
 
-កំណែបច្ចុប្បន្ន **`2.50.197`** — ជាកំណែ **របស់ ZoeW ផ្ទាល់** (ដាច់ពី ZoeKeyGen
+កំណែបច្ចុប្បន្ន **`2.50.198`** — ជាកំណែ **របស់ ZoeW ផ្ទាល់** (ដាច់ពី ZoeKeyGen
 តាំងពី 2.19.4) ហើយត្រូវស៊ីនឹង `version` ក្នុង `manifest.json` **របស់ ZoeW**។
 
 - បង្ហាញ **២ កន្លែង** ៖ ប្រអប់ចូលប្រព័ន្ធ និងខាងក្រោមរបា Slide។ ចុចលើលេខ
@@ -21,13 +21,13 @@ TypeScript + Vite** — ការអភិវឌ្ឍ · build · ការវ�
 - `CACHE_VERSION` របស់ Service Worker (`zoew-vN`) ជាកូនសោ cache ដាច់ដោយឡែក ដែលឡើង
   រាល់ពេលឯកសារ static ណាមួយប្រែ។ កំណែថ្មីមកដល់តាមផ្លូវនោះ — ពេល Service
   Worker ថ្មីចាប់យក របាជូនដំណឹងលេចឡើងឲ្យអ្នកប្រើ Refresh។
-- ប្រវត្តិការផ្លាស់ប្តូរពេញលេញ ៖ **[docs/HISTORY.md](../docs/HISTORY.md)**។
+- ប្រវត្តិការផ្លាស់ប្តូរពេញលេញ ៖ **[../docs/HISTORY.md](../docs/HISTORY.md)**។
 
 ---
 
 ## មុខងារ
 
-- **Sign ZTO**៖ ស្កេនរូប/Barcode ➜ ZoeW ផ្ទៀង និងចែកចាយបើចាំបាច់ ➜ វាយឈ្មោះ ➜ ចុច Sign ➜ រក្សារូប និងការងារចូលបញ្ជីរង់ចាំ។ ZoeW បញ្ជាក់សារ ZTO ដែលអនុញ្ញាតបន្តដោយស្វ័យប្រវត្តិ។ ការងារដែលរក្សាទុករួចដំណើរការខាងក្រោយ ហើយមើលបានក្នុងបញ្ជី ✍️។ បញ្ជីមានផ្នែក «រង់ចាំ» និង «សង្គ្រោះ» 🗂️; ការងារដែលផ្អាករក្សារូប និងសំណើដើមដោយមិនរត់ស្វ័យប្រវត្តិ។ [របៀបប្រើ](docs/ZTO-PALM.md)។
+- **Sign ZTO**៖ ស្កេនរូប/Barcode ➜ ZoeW ផ្ទៀង និងចែកចាយបើចាំបាច់ ➜ វាយឈ្មោះ ➜ ចុច Sign ➜ រក្សារូប និងការងារចូលបញ្ជីរង់ចាំ។ ZoeW បញ្ជាក់សារ ZTO ដែលអនុញ្ញាតបន្តដោយស្វ័យប្រវត្តិ។ ការងារដែលរក្សាទុករួចដំណើរការខាងក្រោយ ហើយមើលបានក្នុងបញ្ជី ✍️។ បញ្ជីមានផ្នែក «រង់ចាំ» និង «សង្គ្រោះ» 🗂️; ការងារដែលផ្អាករក្សារូប និងសំណើដើមដោយមិនរត់ស្វ័យប្រវត្តិ។ [របៀបប្រើ](../docs/zoew/ZTO-PALM.md)។
 
 ### ការស្កេន និងការបញ្ចូល
 
@@ -108,7 +108,7 @@ TypeScript + Vite** — ការអភិវឌ្ឍ · build · ការវ�
 «ត្រឡប់» (`returned`) បូកចំនួនដែលបានដកត្រឡប់មកវិញ។
 
 បើការស្តារបញ្ជីបានរក្សាទុករួច តែស្ថិតិយកនៅមិនទាន់ផ្ទៀង App បង្ហាញ ⏳ ហើយរក្សាការងាររង់ចាំ។ បើក App វិញលើឧបករណ៍ដើម និងគណនី/ហាងដើម ដោយរក្សាទិន្នន័យក្នុងឧបករណ៍; App បន្តតែពេលភស្តុតាង Server ត្រូវនឹងសំណើស្តារ និងកញ្ចប់បច្ចុប្បន្ន។ កុំស្តារស្ទួន ឬកែលេខទូរស័ព្ទដើម្បីបំបាត់សារ។
-កញ្ចប់/លេខទូរស័ព្ទដែលបានប្រែ ឬភស្តុតាងខ្វះអាចធ្វើឱ្យការងារនៅរង់ចាំ; Reset ថ្មីមិនបូកស្ថិតិចាស់ត្រឡប់។ ឧបករណ៍ថ្មីដែលគ្មានការងារដើមមិនអាចសន្មតលទ្ធផលជំនួសបានទេ។ លក្ខខណ្ឌអាប់ដេត client និង backend សម្រាប់អ្នកថែទាំ៖ [ការដាក់ប្រើ Restore](docs/DEVELOPMENT.md#ការដាក់ប្រើ-restore-និង-pickup-journal)។
+កញ្ចប់/លេខទូរស័ព្ទដែលបានប្រែ ឬភស្តុតាងខ្វះអាចធ្វើឱ្យការងារនៅរង់ចាំ; Reset ថ្មីមិនបូកស្ថិតិចាស់ត្រឡប់។ ឧបករណ៍ថ្មីដែលគ្មានការងារដើមមិនអាចសន្មតលទ្ធផលជំនួសបានទេ។ លក្ខខណ្ឌអាប់ដេត client និង backend សម្រាប់អ្នកថែទាំ៖ [ការដាក់ប្រើ Restore](../docs/zoew/DEVELOPMENT.md#ការដាក់ប្រើ-restore-និង-pickup-journal)។
 
 ### Export
 
@@ -162,11 +162,11 @@ TypeScript + Vite** — ការអភិវឌ្ឍ · build · ការវ�
 
 ### Sign និងការរក្សារូបដើម
 
-Sign ទាមទាររក្សាទុក encrypted job មុនផ្ញើ; បរាជ័យក្នុងការរក្សាទុកមិនមាន foreground fallback។ ការរង់ចាំ · «សង្គ្រោះ» · ការលុបស្វ័យប្រវត្តិក្រោយ ZTO បញ្ជាក់ Sign · «លុបអចិន្ត្រៃយ៍» និងពិដានជួរ ៖ [docs/ZTO-PALM.md](docs/ZTO-PALM.md) ផ្នែក «Sign ទៅ ZTO»។
+Sign ទាមទាររក្សាទុក encrypted job មុនផ្ញើ; បរាជ័យក្នុងការរក្សាទុកមិនមាន foreground fallback។ ការរង់ចាំ · «សង្គ្រោះ» · ការលុបស្វ័យប្រវត្តិក្រោយ ZTO បញ្ជាក់ Sign · «លុបអចិន្ត្រៃយ៍» និងពិដានជួរ ៖ [ZTO-PALM.md](../docs/zoew/ZTO-PALM.md) ផ្នែក «Sign ទៅ ZTO»។
 
 ដាក់ client និង server ដែលផ្គូផ្គងគ្នា ហើយ update ឧបករណ៍គ្រប់គ្រឿងរបស់សាខា ដោយមិន uninstall/Clear Data/ប្តូរ PIN ដើម្បីរក្សារូបដែលនៅសល់។
 
-សម្រាប់សំណើចាស់ដែលរារាំងសំណើថ្មី ម៉ឺនុយ (…) អាចបង្ហាញ «ចាប់ផ្ដើម Sign ថ្មី…»។ ផ្លូវនេះត្រូវផ្ទៀងអាយុសំណើ និងស្ថានភាព ZTO ថ្មី ហើយអ្នកបញ្ជាក់ហានិភ័យដោយដៃ។ វាកក់សំណើថ្មីតែប៉ុណ្ណោះ មិនផ្ញើរូប/Sign; ត្រូវពិនិត្យរូប និងឈ្មោះ រួចចុចបន្តដោយឡែក។ [លក្ខខណ្ឌ និងការរង់ចាំ](docs/ZTO-PALM.md)។
+សម្រាប់សំណើចាស់ដែលរារាំងសំណើថ្មី ម៉ឺនុយ (…) អាចបង្ហាញ «ចាប់ផ្ដើម Sign ថ្មី…»។ ផ្លូវនេះត្រូវផ្ទៀងអាយុសំណើ និងស្ថានភាព ZTO ថ្មី ហើយអ្នកបញ្ជាក់ហានិភ័យដោយដៃ។ វាកក់សំណើថ្មីតែប៉ុណ្ណោះ មិនផ្ញើរូប/Sign; ត្រូវពិនិត្យរូប និងឈ្មោះ រួចចុចបន្តដោយឡែក។ [លក្ខខណ្ឌ និងការរង់ចាំ](../docs/zoew/ZTO-PALM.md)។
 
 ### រក្សាទុករូបដើមពីជួរ Sign
 
@@ -178,7 +178,7 @@ Netlify site មួយ ដោយ **Base directory = `ZoeW`** (⛔ ប្រក�
 Build command **`npm run build`** · Publish directory **`dist`** · Functions
 directory **`netlify/functions`**។ `netlify.toml` ក្នុងថតនេះកំណត់ទាំងអស់នោះ
 រួចរាល់ហើយ — ជំហាន build និងការផ្ទៀងផ្ទាត់មុន deploy ស្ថិតក្នុង
-[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)។
+[DEVELOPMENT.md](../docs/zoew/DEVELOPMENT.md)។
 
 Firebase rules (`../firebase-database.rules.json`) ត្រូវ paste ចូល Firebase
 Console ➜ **Publish** ដោយដៃ។ ⛔ វាមិន deploy ស្វ័យប្រវត្តិទេ។
@@ -246,11 +246,11 @@ Console ➜ **Publish** ដោយដៃ។ ⛔ វាមិន deploy ស្វ�
 ⚙️ របា Slide ➜ **🔌 API ស្វែងរកអតិថិជនស្វ័យប្រវត្តិ** (សុំ PIN)។
 
 **ក. ប្រភព Google Sheet** (តាម Apps Script) — មើល
-[`../zto-import/README.md`](../zto-import/README.md)។
+[`../tools/zto-import/README.md`](../tools/zto-import/README.md)។
 
 **ខ. ប្រភព ZTO Cambodia** (តាម Netlify Function) — តម្លៃវាលក្នុងប្រអប់ ការកំណត់ខាង server (Cookie ·
-Login ZTO · API token ផ្លូវការ) និងការផ្ទៀងផ្ទាត់ដោយ `?diag=1` ៖ **[ZTO-SETUP-KH.md](ZTO-SETUP-KH.md)** ផ្នែក ១–៣។ ពេល Cookie ផុតកំណត់ ៖
-រត់ [`../tools/zto-cookie-sync-windows/`](../tools/zto-cookie-sync-windows/README-KH.md)
+Login ZTO · API token ផ្លូវការ) និងការផ្ទៀងផ្ទាត់ដោយ `?diag=1` ៖ **[ZTO-SETUP-KH.md](../docs/zoew/ZTO-SETUP-KH.md)** ផ្នែក ១–៣។ ពេល Cookie ផុតកំណត់ ៖
+រត់ [`../tools/zto-cookie-sync-windows/README-KH.md`](../tools/zto-cookie-sync-windows/README-KH.md)
 លើ Windows ➜ Cookie ថ្មីចូល **Netlify Blobs** ➜ ⛔ **មិនបាច់ redeploy**។
 
 **ឥរិយាបថដែលត្រូវដឹង** ៖
@@ -267,7 +267,7 @@ Login ZTO · API token ផ្លូវការ) និងការផ្ទៀ�
   ចេញពីអេក្រង់ចូល **ZTO Palm ដោយផ្ទាល់** ដោយមិនបាច់រកលេខក្នុងតារាង។ ប៊ូតុង
   **🔄 ពិនិត្យម្តងទៀត** ធ្វើឲ្យបញ្ជីស្រស់ភ្លាម។ **ការបិទក្នុង Argus នៅតែធ្វើ
   ដោយ Palm ដដែល**។ របៀប Cookie ត្រូវដាក់ `ZTO_FIELD_SIGNED` និង
-  `ZTO_SIGNED_VALUES` ក្នុង Netlify; របៀប Palm ផ្ទៀងប្រវត្តិស្កេនរបស់សាខា — មើល **[ZTO-SETUP-KH.md](ZTO-SETUP-KH.md)**។
+  `ZTO_SIGNED_VALUES` ក្នុង Netlify; របៀប Palm ផ្ទៀងប្រវត្តិស្កេនរបស់សាខា — មើល **[ZTO-SETUP-KH.md](../docs/zoew/ZTO-SETUP-KH.md)**។
 - **🔄 បិទតាម ZTO ស្វ័យប្រវត្តិ** (⚙️ របា Slide · **លំនាំដើមបើក**) ៖ ទិសផ្ទុយ
   នៃរបាខាងលើ — កញ្ចប់ណាដែល **ZTO បិទរួច** តែក្នុង ZoeW នៅបើក វានឹងបិទ «យក»
   ឲ្យដោយខ្លួនឯង ➜ ពេលការងារច្រើន មិនបាច់ខ្លាចភ្លេចចុចបិទ។ App សួរ ZTO
@@ -377,7 +377,7 @@ ZoeKeyGen តាមកៅអីក្នុង Key (ហាង Supabase ៖ ក�
 ⛔ **ការបញ្ចូលប៉ះលុយពិត** — កញ្ចប់នីមួយៗឆ្លងកាត់ការចាក់សោ barcode នៅ server
 រួចរក្សាទុកតាមផ្លូវដដែលនឹងការស្កេន ➜ **ស្ថិតិប្រាក់ឡើងតាម COD**។ ការទាញបញ្ជី
 ខ្លួនវា **មិនសរសេរអ្វីសោះ**។ ត្រូវបង្កើតគណនីតាមសាខាជាមុន —
-មើល [`ZTO-SETUP-KH.md`](ZTO-SETUP-KH.md) ផ្នែក ៤គ។ **ហាង Supabase** ៖ សាខាមកពីហាង (អ្នកលក់កំណត់ពេលបង្កើតហាង) ➜
+មើល [`ZTO-SETUP-KH.md`](../docs/zoew/ZTO-SETUP-KH.md) ផ្នែក ៤គ។ **ហាង Supabase** ៖ សាខាមកពីហាង (អ្នកលក់កំណត់ពេលបង្កើតហាង) ➜
 Netlify ត្រូវមាន env `SUPABASE_URL` · `SUPABASE_PUBLISHABLE_KEY`។
 
 ### ១០. របាយការណ៍អាជីវកម្មប្រចាំខែ
@@ -435,7 +435,7 @@ Netlify ត្រូវមាន env `SUPABASE_URL` · `SUPABASE_PUBLISHABLE_KEY
    `VAPID_SUBJECT` ស្រេចចិត្ត (`mailto:…` ឬ `https://…` · លំនាំដើម = URL របស់ site)។ ⛔ ប្តូរកូនសោ ➜ ទូរស័ព្ទ/កុំព្យូទ័រចុះឈ្មោះឡើងវិញ
    ដោយខ្លួនឯងពេលបើក App លើកក្រោយ · iPhone ដែលមិនអនុញ្ញាតឲ្យចុះឈ្មោះដោយគ្មានការចុច ➜ ស្ថានភាពប្តូរជា «បិទ» ➜ ចុច **🔔 បើកការជូនដំណឹង** ម្តងទៀត។
 2. App Android ៖ Firebase Console របស់ **License Project** ➜ Project settings ➜ **Service accounts** ➜ Generate new private
-   key ➜ ដាក់ JSON (ឬ base64 របស់វា) ក្នុង `FCM_SERVICE_ACCOUNT` (⛔ សម្ងាត់) · APK ៖ មើល [docs/ANDROID.md](docs/ANDROID.md)។
+   key ➜ ដាក់ JSON (ឬ base64 របស់វា) ក្នុង `FCM_SERVICE_ACCOUNT` (⛔ សម្ងាត់) · APK ៖ មើល [ANDROID.md](../docs/zoew/ANDROID.md)។
 3. Deploy ➜ Function `push` (ចុះឈ្មោះ · ដាស់ពី ZoeKeyGen) និង `push-cron` (រាល់ ៥ នាទី) រត់ដោយខ្លួនឯង · ទិន្នន័យ
    subscription រស់ក្នុង Netlify Blobs (`zoew-push`)។ គ្មាន env ➜ ផ្ទាំងប្រាប់ «Server មិនទាន់កំណត់» (អ្វីផ្សេងដើរធម្មតា)។
    ⛔ កែ/លុប/ដាក់ env ឡើងវិញ ➜ ត្រូវ **Deploy ម្តងទៀត** (Netlify ➜ Deploys ➜ Trigger deploy) ទើប Function ឃើញតម្លៃថ្មី។
@@ -458,7 +458,7 @@ Netlify ត្រូវមាន env `SUPABASE_URL` · `SUPABASE_PUBLISHABLE_KEY
 ### ១២. App Android
 
 ZoeW មានជា **App Android** ផងដែរ (កូដ · លុយ · Firebase ដូចគ្នានឹង web)។
-ការ build APK និងការកំណត់ ៖ [docs/ANDROID.md](docs/ANDROID.md)។
+ការ build APK និងការកំណត់ ៖ [ANDROID.md](../docs/zoew/ANDROID.md)។
 
 - **ដំឡើង** ៖ ផ្ញើឯកសារ APK ទៅទូរស័ព្ទ ➜ បើក ➜ អនុញ្ញាត «ដំឡើងពីប្រភពនេះ»។
   លេខកំណែក្នុង Settings ➜ Apps ➜ ZoeW ស្មើលេខកំណែរបស់ App។

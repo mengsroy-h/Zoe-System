@@ -1,0 +1,1374 @@
+// ថ្នាក់ ៖ **rules RTDB ដែល Postgres អនុវត្ត (`private.zoe_eval` លើ `firebase-database.rules.json` ដដែល) ឃ្លាតពី RTDB ពិត ➜ server
+// មួយទទួលអ្វីដែលមួយទៀតបដិសេធ ➜ fence ស្តារ/លុបទាំងអស់ · ledger អវិជ្ជមាន · registry ដំណើរការខុសលើ backend Supabase ដោយស្ងាត់។**
+//
+// ⛔ oracle = RTDB emulator ពិត (មិនមែនការសរសេរ verdict ដោយដៃ)។ ការអនុវត្ត ៣ ផ្នែក លើ backend ទាំង ២ **ក្នុងពេលតែមួយ** ៖
+//   ក. probe semantics ជាមួយ rules គំរូ ៖ `.validate` របស់ ancestor · descendant ដែលមិនប្រែ · null/ប្រភេទក្នុងការប្រៀប · `.write`
+//      មិនចុះជ្រៅ · ការលុប · array ➜ object
+//   ខ. ការសរសេរពិតរបស់ App (`revenue-fuzz-test` + `FUZZ_CAPTURE`) ជាមួយ rules ពិត ➜ verdict ដូចគ្នា **រាល់ការសរសេរ**
+//   គ. ការសរសេរដដែលដែលបំប្លែងដោយចៃដន្យ (ប្រភេទ · លេខអវិជ្ជមាន · វាលបាត់/បន្ថែម · token ស្តារ/clearClaim ខុស · trashReason ·
+//      lockerRevision · op) ➜ verdict ដូចគ្នា
+//   ➜ ចុងលំដាប់នីមួយៗ ៖ ទិន្នន័យពេញ (canonical) ដូចគ្នា។ ការបដិសេធត្រូវចាក់ជា owner លើ **ទាំង ២** ➜ ស្ថានភាពនៅស្មើ។
+// ⛔ ជាន់អប្បបរមា ៖ ការសរសេរ user ≥ ១៥០ · probe បំប្លែង ≥ ១០០ ដែល **ទាំង ២ បដិសេធ** ≥ ៣០ (ការវាស់មិនទទេ) · root ៩។
+//
+//   java -jar ~/.cache/firebase/emulators/firebase-database-emulator-*.jar --port 9000 --host 127.0.0.1
+//   npm ci --prefix supabase
+//   M=$(ZOE_MEASURE_ONLY=1 bash tools/audit-tools/run-all.sh | tail -1); (cd "$M" && node tools/audit-tools/emu/supabase-rules-parity-test.js)
+'use strict';
+process.exitCode = 1;
+
+const fs = require('fs');
+const assert = require('assert/strict');
+const os = require('os');
+const path = require('path');
+const http = require('http');
+const { execFile } = require('child_process');
+const { pathToFileURL } = require('url');
+const { emuNamespace } = require('./ns.js');
+const { createPgHarness } = require('../supabase-pg.js');
+
+const ROOT = process.env.SBPARITY_APP_DIR ? path.resolve(process.env.SBPARITY_APP_DIR) : path.join(__dirname, '../../..');
+const REPO = process.env.ZOE_REPO_ROOT ? path.resolve(process.env.ZOE_REPO_ROOT) : ROOT;
+// ⛔ STRICT តាម emulator (`CRUD_FLOW_STRICT` ដូច emu/* ដទៃ) មិនមែន `SUPABASE_STRICT` ៖ job `audit-suite` របស់ CI គ្មាន emulator តែមាន
+//    `SUPABASE_STRICT=1` ➜ checker នេះ SKIP ស្អាតនៅទីនោះ ហើយរត់ STRICT ក្នុង job `firebase-rules` (មាន emulator · `.github/workflows/audit.yml`)
+const STRICT = process.env.SBPARITY_STRICT === '1' || process.env.CRUD_FLOW_STRICT === '1';
+const RUNS = parseInt(process.env.SBPARITY_RUNS || '6', 10);
+const OPS = parseInt(process.env.SBPARITY_OPS || '40', 10);
+const SEED = parseInt(process.env.SBPARITY_SEED || '20261001', 10);
+const MIN_USER_WRITES = 150;
+const REQUIRED_ROOTS = ['zoew_scan_history_cod_dod', 'zoew_recently_deleted_cod_dod', '(root)', 'zoew_daily_revenue_cod_dod',
+    'zoew_monthly_revenue_cod_dod', 'zoew_daily_pickup_cod_dod', 'zoew_daily_collected_cod_dod', 'zoew_barcode_registry',
+    'zoew_restore_finalizations'];
+let AUTH = 'auth_variable_override=' + encodeURIComponent(JSON.stringify({ uid: 'admin-uid' }));
+const DEPS_DIRS = [process.env.SUPABASE_DEPS_DIR, path.join(ROOT, 'supabase', 'node_modules'), path.join(REPO, 'supabase', 'node_modules')].filter(Boolean);
+
+let pass = 0, fail = 0;
+const check = (c, label, detail) => {
+    if (c) { pass++; console.log('  ok    ' + label); } else { fail++; console.log('  FAIL  ' + label + (detail ? '\n        ' + String(detail).slice(0, 1400) : '')); }
+};
+
+function req(method, urlPath, body) {
+    return new Promise((resolve, reject) => {
+        const payload = body === undefined ? null : JSON.stringify(body);
+        const r = http.request({ host: '127.0.0.1', port: 9000, method, path: urlPath, timeout: 15000,
+            headers: Object.assign({ Authorization: 'Bearer owner' }, payload ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } : {}) },
+        (res) => { let d = ''; res.on('data', (c) => { d += c; }); res.on('end', () => resolve({ status: res.statusCode, body: d })); });
+        r.on('timeout', () => r.destroy(new Error('emulator timed out')));
+        r.on('error', reject);
+        if (payload) r.write(payload);
+        r.end();
+    });
+}
+const emuDenied = (r) => r.status >= 400 || /Permission denied/i.test(r.body);
+const rootOf = (p) => String(p || '').split('/').filter(Boolean)[0] || '(root)';
+const segs = (p) => String(p || '').split('/').filter(Boolean);
+const isInc = (v) => !!v && typeof v === 'object' && !Array.isArray(v) && (typeof v.__increment === 'number'
+    || (v['.sv'] && typeof v['.sv'] === 'object' && typeof v['.sv'].increment === 'number'));
+const incOf = (v) => (typeof v.__increment === 'number' ? v.__increment : v['.sv'].increment);
+const withServerValues = (v) => {
+    if (Array.isArray(v)) return v.map(withServerValues);
+    if (v && typeof v === 'object') {
+        if (typeof v.__increment === 'number') return { '.sv': { increment: v.__increment } };
+        const out = {};
+        for (const k of Object.keys(v)) out[k] = withServerValues(v[k]);
+        return out;
+    }
+    return v;
+};
+function canon(v) {
+    if (v === null || v === undefined) return null;
+    if (typeof v !== 'object') return v;
+    const out = {};
+    const keys = Array.isArray(v) ? v.map((_, i) => String(i)) : Object.keys(v);
+    for (const k of keys.sort()) {
+        const c = canon(v[k]);
+        if (c !== null) out[k] = c;
+    }
+    return Object.keys(out).length ? out : null;
+}
+const dataOf = (s) => { const c = JSON.parse(JSON.stringify(s || {})); delete c._dateKey; return c; };
+function rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+
+let H = null;
+let pg = null;
+let tenant = null;
+let member = null;
+let opN = 0;
+const opId = () => 'par' + process.pid + 'x' + (++opN).toString(36).padStart(12, '0');
+
+const ENGINE_MUTANTS = [
+    ['មិនរត់ .validate របស់ ancestor', "        if node ? 'v' then\n            if private.zoe_snap_exists(jsonb_build_object('$s', 1, 'p', to_jsonb(p_path[1:i])), p_ctx)",
+        "        if node ? 'v' and i = depth then\n            if private.zoe_snap_exists(jsonb_build_object('$s', 1, 'p', to_jsonb(p_path[1:i])), p_ctx)"],
+    ['null ក្នុងការប្រៀប <= ជា 0 (coercion)', "            return 'false'::jsonb;\n        end if;\n        if op = '+' and left_type = 'string'",
+        "            return to_jsonb(coalesce((left_value #>> '{}')::numeric, 0) <= coalesce((right_value #>> '{}')::numeric, 0));\n        end if;\n        if op = '+' and left_type = 'string'"],
+    ['.validate រត់លើកូនដែលមិនប្រែរបស់ ancestor', "        if i = depth and (node ? 'c' or node ? 'x') then",
+        "        if i >= 2 and (node ? 'c' or node ? 'x') then"]
+];
+
+async function pgSetupTenant(transform) {
+    if (pg) { try { await pg.end(); } catch (e) {} pg = null; }
+    const { c } = await H.freshDb('default-grants');
+    const migDir = path.join(ROOT, 'supabase', 'migrations');
+    let sql = fs.readdirSync(migDir).filter((f) => /^\d{14}_[a-z0-9_]+\.sql$/.test(f)).sort()
+        .map((f) => fs.readFileSync(path.join(migDir, f), 'utf8')).join('\n;\n');
+    if (transform) {
+        const at = sql.lastIndexOf(transform[1]);
+        if (at === -1) throw new Error('engine mutant anchor missing: ' + transform[0]);
+        const declarations = [...sql.slice(0, at).matchAll(/create(?: or replace)? function private\.[a-z_]+\(/g)];
+        const begin = declarations.at(-1).index;
+        const end = sql.indexOf('\n$$;', at) + 4;
+        if (sql.slice(begin, end).split(transform[1]).length !== 2) throw new Error('effective engine mutant anchor must appear once: ' + transform[0]);
+        sql = sql.slice(0, at) + transform[2] + sql.slice(at + transform[1].length);
+    }
+    if (transform) await c.query(sql);
+    else for (const file of fs.readdirSync(migDir).filter((f) => /^\d{14}_[a-z0-9_]+\.sql$/.test(f)).sort()) await c.query(fs.readFileSync(path.join(migDir, file), 'utf8'));
+    const t = await c.query("insert into public.tenants (name, branch_code, expires_at) values ('parity', '100001', now() + interval '30 days') returning id");
+    const uid = await H.makeAuthUser(c, 'parity@u.zoe.test');
+    await c.query("insert into public.tenant_members (user_id, tenant_id, username, role) values ($1, $2, 'parity', 'owner')", [uid, t.rows[0].id]);
+    pg = c;
+    tenant = t.rows[0].id;
+    member = { role: 'authenticated', sub: uid };
+    AUTH = 'auth_variable_override=' + encodeURIComponent(JSON.stringify({ uid }));
+}
+
+async function pgSetRules(rulesJson, compileRules, rulesSql) {
+    await pg.query(rulesSql(compileRules(rulesJson)));
+}
+
+function toPgOps(method, p, v) {
+    const base = segs(p);
+    if (method === 'PATCH') {
+        const ops = [];
+        for (const key of Object.keys(v || {})) {
+            const full = base.concat(segs(key));
+            if (full.length < 1 || (full.length === 1 && isInc(v[key]))) return null;
+            ops.push(isInc(v[key]) ? { k: 'inc', p: full, d: incOf(v[key]) } : { k: 'set', p: full, v: v[key] === undefined ? null : v[key] });
+        }
+        return ops;
+    }
+    if (base.length < 1 || (base.length === 1 && isInc(v))) return null;
+    if (isInc(v)) return [{ k: 'inc', p: base, d: incOf(v) }];
+    return [{ k: 'set', p: base, v: v === undefined ? null : v }];
+}
+
+async function pgUser(method, p, v) {
+    const ops = toPgOps(method, p, v);
+    if (!ops) return { unsupported: true };
+    if (!ops.length) return { ok: true };
+    const r = await H.as(pg, member, 'select public.zoe_write($1, $2::jsonb) as r', [opId(), JSON.stringify(ops)]);
+    if (r.error) return { denied: true, why: r.error.message + (r.error.detail ? ' @' + r.error.detail : '') };
+    return { ok: true };
+}
+
+async function pgOwnerOps(ops, replace) {
+    if (replace) {
+        const existing = await pg.query('select root, key from public.zoe_docs where tenant_id = $1 and value is not null', [tenant]);
+        await pgOwnerOps(existing.rows.map((row) => ({ k: 'set', p: [row.root, row.key], v: null })), false);
+    }
+    for (let i = 0; i < ops.length; i += 400) {
+        const chunk = ops.slice(i, i + 400);
+        const r = await H.as(pg, { role: 'service_role' }, 'select public.zoe_admin_write($1, $2, $3::jsonb, $4) as r',
+            [tenant, opId(), JSON.stringify(chunk), false]);
+        if (r.error) throw new Error('owner write on Postgres failed: ' + r.error.message + ' ' + JSON.stringify(chunk.map((o) => o.p)).slice(0, 600));
+    }
+}
+
+async function pgOwnerSnapshot(tree) {
+    const ops = [];
+    for (const root of Object.keys(tree || {})) {
+        const node = tree[root];
+        if (node === null || typeof node !== 'object') continue;
+        const keys = Array.isArray(node) ? node.map((_, i) => String(i)) : Object.keys(node);
+        for (const key of keys) if (node[key] !== null && node[key] !== undefined) ops.push({ k: 'set', p: [root, key], v: node[key] });
+    }
+    await pgOwnerOps(ops, true);
+}
+
+async function pgOwner(method, p, v) {
+    const base = segs(p);
+    if (method === 'SNAP' || (base.length === 0 && method !== 'PATCH')) return pgOwnerSnapshot(v);
+    if (base.length === 1 && method !== 'PATCH') {
+        const existing = await pg.query('select key from public.zoe_docs where tenant_id = $1 and root = $2 and value is not null', [tenant, base[0]]);
+        const next = new Map(existing.rows.map((r) => [r.key, null]));
+        if (v && typeof v === 'object') {
+            const keys = Array.isArray(v) ? v.map((_, i) => String(i)) : Object.keys(v);
+            for (const key of keys) next.set(key, v[key] === undefined ? null : v[key]);
+        }
+        const ops = [...next.entries()].map(([key, val]) => ({ k: 'set', p: [base[0], key], v: val }));
+        return ops.length ? pgOwnerOps(ops, false) : undefined;
+    }
+    const ops = toPgOps(method, p, v);
+    if (!ops) throw new Error('owner op unsupported on Postgres: ' + method + ' ' + p);
+    if (ops.length) await pgOwnerOps(ops, false);
+}
+
+async function pgTree() {
+    const rows = (await pg.query('select root, key, value from public.zoe_docs where tenant_id = $1 and value is not null', [tenant])).rows;
+    const tree = {};
+    for (const r of rows) (tree[r.root] = tree[r.root] || {})[r.key] = r.value;
+    return canon(tree);
+}
+
+function firstDiff(a, b, where) {
+    if (JSON.stringify(a) === JSON.stringify(b)) return null;
+    if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return where + ' ៖ emu=' + JSON.stringify(a) + ' pg=' + JSON.stringify(b);
+    for (const k of new Set(Object.keys(a).concat(Object.keys(b)))) {
+        const d = firstDiff(a[k], b[k], where + '/' + k);
+        if (d) return d;
+    }
+    return where;
+}
+
+function makeScenario(tag) {
+    const ns = 'ns=' + emuNamespace('sb-parity-' + tag);
+    const at = (p, asUser) => p + (p.includes('?') ? '&' : '?') + ns + (asUser ? '&' + AUTH : '');
+    return {
+        async loadRules(rules) {
+            const r = await req('PUT', at('/.settings/rules.json'), rules);
+            if (r.status !== 200) throw new Error('load rules មិនបាន ៖ ' + r.status + ' ' + r.body.slice(0, 120));
+        },
+        async owner(method, p, v) {
+            if (method === 'SNAP') return req('PUT', at('/.json'), dataOf(v));
+            return req(method === 'PATCH' ? 'PATCH' : 'PUT', at('/' + (p || '') + '.json'), withServerValues(v));
+        },
+        async user(method, p, v) {
+            return req(method === 'PATCH' ? 'PATCH' : 'PUT', at('/' + (p || '') + '.json', true), withServerValues(v));
+        },
+        async tree() {
+            const r = await req('GET', at('/.json'));
+            return canon(JSON.parse(r.body));
+        },
+        async drop() { await req('PUT', at('/.json'), null); }
+    };
+}
+
+const stats = { user: 0, denied: 0, mismatches: [], stateDiffs: [], unsupported: [], roots: new Set(), probes: 0, probesDeniedBoth: 0, probesAcceptedBoth: 0 };
+
+// ⛔ `probe` ៖ ការសរសេរក្លែង (mutation) ដែល rules ទាំង ២ បដិសេធ **មិនត្រូវ** អនុវត្តជា owner ទេ — មានតែការសរសេរពិតរបស់ App (fake ក្នុង fuzz
+//    ទទួលវា) ទេដែលត្រូវចម្លងជា owner ដើម្បីរក្សាស្ថានភាពឲ្យស្មើ fuzz។ បើអត់ mutant ដែល rules បដិសេធចូលទិន្នន័យ (វាស់បាន ៖ `op` ក្រោម root
+//    នៃ PATCH ច្រើនផ្លូវ ➜ `zoe_admin_write` បដិសេធផ្លូវ root ➜ checker គាំង «owner write on Postgres failed» ខណៈ rules ទាំង ២ និយាយដូចគ្នា)
+async function both(sc, who, method, p, v, label, probe) {
+    const timestamp = Date.now();
+    const normalizeReceipt = (value, at) => {
+        if (at[0] === 'zoew_write_receipts') {
+            if (at.at(-1) === 'uid' && value === 'admin-uid') return member.sub;
+            if (at.at(-1) === 'at' && value && value['.sv'] === 'timestamp') return timestamp;
+        }
+        if (!value || typeof value !== 'object') return value;
+        if (Array.isArray(value)) return value.map((item, i) => normalizeReceipt(item, at.concat(String(i))));
+        return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, normalizeReceipt(item, at.concat(key.split('/')))]));
+    };
+    v = normalizeReceipt(v, String(p || '').split('/').filter(Boolean));
+    if (who === 'owner') {
+        await sc.owner(method, p, v);
+        await pgOwner(method, p, v);
+        return;
+    }
+    const e = await sc.user(method, p, v);
+    const g = await pgUser(method, p, v);
+    if (g.unsupported) {
+        stats.unsupported.push(method + ' ' + (p || '/'));
+        if (!probe) await pgOwner(method, p, v);
+        else if (!emuDenied(e)) await pgOwnerSnapshot(await sc.tree());
+        return { emuDenied: emuDenied(e), pgDenied: null };
+    }
+    const ed = emuDenied(e);
+    const gd = !!g.denied;
+    if (ed !== gd) {
+        stats.mismatches.push({ label, method, path: p || '/', emu: ed ? 'deny ' + e.body.slice(0, 60).replace(/\s+/g, ' ') : 'allow', pg: gd ? 'deny ' + g.why : 'allow',
+            value: JSON.stringify(v).slice(0, 300) });
+        const t = await sc.tree();
+        await pgOwnerSnapshot(t);
+    } else if (ed && !probe) {
+        await sc.owner(method, p, v);
+        await pgOwner(method, p, v);
+    }
+    return { emuDenied: ed, pgDenied: gd };
+}
+
+async function compareState(sc, label) {
+    const a = await sc.tree();
+    const b = await pgTree();
+    const d = firstDiff(a, b, '');
+    if (d) {
+        stats.stateDiffs.push(label + ' ៖ ' + d);
+        await pgOwnerSnapshot(a);
+    }
+}
+
+// ⛔ verdict ត្រូវតាមគោលការណ៍ (មិនមែនគ្រាន់តែ RTDB = Postgres) ៖ `denied` ជាការរំពឹង · ការបដិសេធទុកទិន្នន័យទាំង ២ ដដែល
+function policyWriter(sc, tag, title, keptText) {
+    return async (method, location, value, denied, label) => {
+        const before = await sc.tree();
+        const result = await both(sc, 'user', method, location, value, tag + ' ' + label, true);
+        check(result && result.emuDenied === denied && result.pgDenied === denied,
+            title + ' ៖ ' + label + ' (RTDB + Postgres ' + (denied ? 'បដិសេធ' : 'ទទួល') + ')', JSON.stringify(result));
+        if (denied) {
+            check(JSON.stringify(await sc.tree()) === JSON.stringify(before) && JSON.stringify(await pgTree()) === JSON.stringify(before),
+                label + ' ៖ ' + keptText);
+        }
+        await compareState(sc, tag + ' ' + label);
+    };
+}
+
+async function pickupProtocolCases(realRules, compileRules, rulesSql, installedRules = false) {
+    console.log('\n── Pickup revision / Reset epoch ៖ mixed-version · deletion · stale replay (RTDB + Postgres) ──');
+    if (installedRules) check(JSON.stringify(canon((await pg.query('select private.zoe_rules() as r')).rows[0].r)) === JSON.stringify(canon(compileRules(realRules))),
+        'file-by-file migration installs exactly the current Firebase business rules');
+    else await pgSetRules(realRules, compileRules, rulesSql);
+    const sc = makeScenario('pickup-protocol');
+    await sc.loadRules(realRules);
+    const root = 'zoew_daily_pickup_cod_dod';
+    const day = '2026-10-29';
+    const location = root + '/' + day;
+    const empty = { packagesPickedUp: 0 };
+    const populated = { packagesPickedUp: 1, pickedUpBarcodes: { ZT1: '012345678' }, pickedUpPhones: { '012345678': 1 } };
+    const versioned = (revision, epoch, record = populated) => ({ ...record, pickupRevision: revision, pickupResetEpoch: epoch });
+    const write = policyWriter(sc, 'pickup-protocol', 'Pickup protocol', 'ទិន្នន័យ និង revision/epoch នៅដដែលទាំង backend ២');
+    const trial = async (label, before, value, deny, suffix = '', method = 'PUT') => {
+        await both(sc, 'owner', 'SNAP', '', before === null ? {} : { [root]: { [day]: before } });
+        await write(method, location + suffix, value, deny, label);
+        if (!deny && !suffix && method === 'PUT') {
+            const expected = canon(value === null ? {} : { [root]: { [day]: value } });
+            check(JSON.stringify(await sc.tree()) === JSON.stringify(expected) && JSON.stringify(await pgTree()) === JSON.stringify(expected),
+                label + ' ៖ DB ទាំង ២ ផ្ទុក record រំពឹងពិត');
+        }
+    };
+    await trial('legacy create remains compatible', null, populated, false);
+    await trial('legacy update remains compatible', populated, empty, false);
+    await trial('legacy delete remains compatible', populated, null, false);
+    await trial('new day starts revision1 epoch0', null, versioned(1, 0), false);
+    await trial('upgrade legacy record revision1 epoch0', populated, versioned(1, 0), false);
+    await trial('new Reset starts revision1 epoch1 empty', null, versioned(1, 1, empty), false);
+    await trial('legacy Reset upgrades revision1 epoch1 empty', populated, versioned(1, 1, empty), false);
+    await trial('new epoch1 cannot contain pickup keys', null, versioned(1, 1), true);
+    await trial('new revision cannot skip first generation', null, versioned(2, 0), true);
+    await trial('new epoch cannot skip first Reset', null, versioned(1, 2, empty), true);
+    await trial('same-value mutation advances revision', versioned(1, 0), versioned(2, 0), false);
+    await trial('ordinary removal preserves epoch', versioned(2, 0), versioned(3, 0, empty), false);
+    await trial('Reset increments revision and epoch', versioned(3, 0), versioned(4, 1, empty), false);
+    await trial('new close after Reset retains new epoch', versioned(4, 1, empty), versioned(5, 1), false);
+    await trial('second Reset increments both markers', versioned(5, 1), versioned(6, 2, empty), false);
+    await trial('stale same-value close cannot reuse revision', versioned(2, 0), versioned(2, 0), true);
+    await trial('stale recovery cannot delete foreign newer close', versioned(3, 0), versioned(3, 0, empty), true);
+    await trial('pre-Reset replay cannot adopt old epoch', versioned(4, 1, empty), versioned(5, 0), true);
+    await trial('revision cannot jump', versioned(4, 1), versioned(6, 1), true);
+    await trial('epoch cannot jump', versioned(4, 1), versioned(5, 3, empty), true);
+    await trial('Reset cannot retain pickup keys', versioned(4, 1), versioned(5, 2), true);
+    await trial('Reset cannot retain phone mirror', versioned(4, 1), versioned(5, 2, { ...empty, pickedUpPhones: { '012345678': 1 } }), true);
+    await trial('Reset requires zero packages', versioned(4, 1), versioned(5, 2, { packagesPickedUp: 1 }), true);
+    await trial('versioned day cannot be deleted', versioned(4, 1), null, true);
+    await trial('legacy full replacement cannot erase fence', versioned(4, 1), empty, true);
+    await trial('child revision delete cannot erase fence', versioned(4, 1), null, true, '/pickupRevision');
+    await trial('child epoch delete cannot erase fence', versioned(4, 1), null, true, '/pickupResetEpoch');
+    await trial('legacy child deletion must advance revision', versioned(4, 1), null, true, '/pickedUpBarcodes/ZT1');
+    await trial('legacy child update must advance revision', versioned(4, 1), 2, true, '/packagesPickedUp');
+    await trial('atomic child patch advances revision', versioned(4, 1), { pickupRevision: 5, packagesPickedUp: 0, pickedUpBarcodes: null, pickedUpPhones: null }, false, '', 'PATCH');
+    await trial('atomic child patch cannot drop epoch', versioned(4, 1), { pickupRevision: 5, pickupResetEpoch: null }, true, '', 'PATCH');
+    await trial('revision-only legacy metadata rejected', populated, { ...populated, pickupRevision: 1 }, true);
+    await trial('epoch-only legacy metadata rejected', populated, { ...populated, pickupResetEpoch: 0 }, true);
+    for (const [field, values] of [['pickupRevision', [0, -1, 1.5, '1', 9007199254740991]], ['pickupResetEpoch', [-1, 0.5, '0', 9007199254740991]]]) {
+        for (const value of values) await trial(field + ' rejects ' + JSON.stringify(value), null, { ...versioned(1, 0), [field]: value }, true);
+    }
+    await trial('highest safe allowed revision increments exactly', versioned(9007199254740989, 0), versioned(9007199254740990, 0), false);
+    await trial('exhausted revision refuses rounded increment', versioned(9007199254740990, 0), versioned(9007199254740991, 0), true);
+    await trial('highest safe Reset epoch increments exactly', versioned(4, 9007199254740989), versioned(5, 9007199254740990, empty), false);
+    await trial('exhausted Reset epoch refuses overflow', versioned(4, 9007199254740990), versioned(5, 9007199254740991, empty), true);
+    await trial('partial stored metadata is not legacy', { ...populated, pickupRevision: 4 }, versioned(1, 0), true);
+    await trial('malformed stored metadata cannot be deleted', { ...populated, pickupResetEpoch: '0' }, null, true);
+    await both(sc, 'owner', 'SNAP', '', { [root]: { [day]: versioned(4, 1) } });
+    await write('PUT', root, null, true, 'ancestor delete cannot erase a versioned day');
+    await both(sc, 'owner', 'SNAP', '', { [root]: { [day]: versioned(4, 1) } });
+    await write('PATCH', '', { [location]: null }, true, 'root atomic delete cannot erase a versioned day');
+    await both(sc, 'owner', 'SNAP', '', { [root]: { [day]: versioned(4, 1) } });
+    await write('PUT', root, { [day]: empty }, true, 'legacy ancestor replacement cannot erase a versioned day');
+    await both(sc, 'owner', 'SNAP', '', { [root]: { [day]: versioned(4, 1), '2026-10-28': populated } });
+    await write('PATCH', '', { [location]: empty, [root + '/2026-10-28/packagesPickedUp']: 0 }, true,
+        'mixed legacy/versioned root patch refuses atomically without partial mutation');
+    await both(sc, 'owner', 'SNAP', '', { [root]: { [day]: versioned(4, 1) } });
+    const next = versioned(5, 1, empty);
+    const extra = await H.connect('postgres', pg.database);
+    try {
+        const writes = await Promise.all([
+            sc.user('PUT', location, next), sc.user('PUT', location, next),
+            H.as(pg, member, 'select public.zoe_write($1, $2::jsonb) as r', [opId(), JSON.stringify([{ k: 'set', p: [root, day], v: next }])]),
+            H.as(extra, member, 'select public.zoe_write($1, $2::jsonb) as r', [opId(), JSON.stringify([{ k: 'set', p: [root, day], v: next }])])
+        ]);
+        check(writes.slice(0, 2).filter((r) => !emuDenied(r)).length === 1 && writes.slice(2).filter((r) => !r.error && r.rows[0].r.ok).length === 1,
+            'two stale writers with one captured revision commit only one transition on each backend', writes);
+        const expected = canon({ [root]: { [day]: next } });
+        check(JSON.stringify(await sc.tree()) === JSON.stringify(expected) && JSON.stringify(await pgTree()) === JSON.stringify(expected),
+            'concurrent write readback advances revision once and preserves Reset epoch');
+    } finally { await extra.end(); }
+    const otherTenant = (await pg.query("insert into public.tenants (name, branch_code, expires_at) values ('pickup-isolation', '100002', now() + interval '1 day') returning id")).rows[0].id;
+    const otherUid = await H.makeAuthUser(pg, 'pickup-isolation@u.zoe.test');
+    await pg.query("insert into public.tenant_members (user_id, tenant_id, username, role) values ($1, $2, 'pickup_isolation', 'owner')", [otherUid, otherTenant]);
+    const foreign = { role: 'authenticated', sub: otherUid, extra: { tenant_id: tenant } };
+    const hidden = await H.as(pg, foreign, 'select public.zoe_read($1, $2) as r', [root, day]);
+    check(hidden.rows && hidden.rows[0].r.docs.length === 0, 'Supabase foreign tenant cannot read pickup day even with forged tenant claim', hidden);
+    const foreignWrite = await H.as(pg, foreign, 'select public.zoe_write($1, $2::jsonb) as r', [opId(), JSON.stringify([{ k: 'set', p: [root, day], v: versioned(1, 0) }])]);
+    const ownDay = (await pg.query('select value from public.zoe_docs where tenant_id=$1 and root=$2 and key=$3', [tenant, root, day])).rows[0].value;
+    check(foreignWrite.rows && foreignWrite.rows[0].r.ok && JSON.stringify(canon(ownDay)) === JSON.stringify(canon(next)),
+        'Supabase foreign writer affects its own tenant only; captured day is unchanged', foreignWrite);
+    await compareState(sc, 'pickup concurrency and tenant isolation');
+    await sc.drop();
+}
+
+// ⛔ ត្រារបៀបធុងសំរាមតាមឧបករណ៍ (`zoew_settings/zto_trash_mode/{palm|cookie}/<សោ>`) ៖ Postgres ត្រូវបដិសេធរាងខុសដូច RTDB
+//    (សោ 8–32 តួ · លេខ > 0 · ≤ now + 600000 · កូនសោផ្សេង ➜ `$other`) ហើយទទួលការលុប (ដកត្រាខ្លួនឯង · prune ត្រាចាស់) ·
+//    ⛔ រាងចាស់ `palmAt`/`cookieAt` (Phase B ៖ គ្មាន compat មុន launch) ➜ បដិសេធគ្រប់តម្លៃ · palmAt ដែលនៅសល់ក្នុង DB មិនរារាំងត្រាថ្មី
+async function trashModeCases(realRules, compileRules, rulesSql) {
+    console.log('\n── ត្រារបៀបធុងសំរាមតាមឧបករណ៍ ៖ រាងត្រូវ/ខុស ស្មើគ្នាទាំង RTDB/Postgres ──');
+    await pgSetRules(realRules, compileRules, rulesSql);
+    const sc = makeScenario('trash-mode');
+    await sc.loadRules(realRules);
+    const base = 'zoew_settings/zto_trash_mode';
+    const now = Date.now();
+    const own = 'k7m2p9q4r8s3t6v1';
+    const other = 'otherdv1';
+    await both(sc, 'owner', 'SNAP', '', { zoew_settings: { zto_trash_mode: { palm: { [other]: now - 3600000 }, palmAt: now - 7200000 } } });
+    const write = policyWriter(sc, 'trash-mode', 'ត្រារបៀបធុងសំរាម', 'ការបដិសេធទុកត្រាទាំងអស់ដដែល');
+    await write('PUT', base + '/palm/' + own, now, false, 'សោខ្លួនឯង ១៦ តួ + ម៉ោង server');
+    await write('PATCH', base, { ['cookie/' + own]: now }, false, 'PATCH ពី markRef (cookie/<សោ>)');
+    await write('PUT', base + '/palm/' + 'a'.repeat(8), now, false, 'សោ ៨ តួ (ព្រំក្រោម)');
+    await write('PUT', base + '/palm/' + 'c'.repeat(32), now, false, 'សោ ៣២ តួ (ព្រំលើ)');
+    await write('PUT', base + '/palm/' + 'abcdefg', now, true, 'palm សោ ៧ តួ');
+    await write('PUT', base + '/palm/' + 'd'.repeat(33), now, true, 'palm សោ ៣៣ តួ');
+    await write('PUT', base + '/cookie/' + 'abcdefg', now, true, 'cookie សោ ៧ តួ');
+    await write('PUT', base + '/cookie/' + 'e'.repeat(33), now, true, 'cookie សោ ៣៣ តួ');
+    await write('PATCH', base, { ['palm/' + 'abcdefg']: now }, true, 'PATCH សោ ៧ តួ');
+    await write('PUT', base + '/palm/' + own, String(now), true, 'តម្លៃជាអត្ថបទ');
+    await write('PUT', base + '/palm/' + own, true, true, 'តម្លៃជា boolean');
+    await write('PUT', base + '/palm/' + own, { at: now }, true, 'តម្លៃជា object');
+    await write('PUT', base + '/palm/' + own, 0, true, 'ត្រា 0');
+    await write('PUT', base + '/palm/' + own, -5, true, 'ត្រាអវិជ្ជមាន');
+    await write('PUT', base + '/palm/' + own, now + 600000 + 3600000, true, 'ត្រាអនាគតលើស now + 600000');
+    await write('PUT', base + '/cookie/' + own, now + 600000 + 3600000, true, 'cookie ត្រាអនាគតលើស now + 600000');
+    await write('PUT', base + '/palmAt', now, true, '⛔ palmAt ចាស់ ➜ បដិសេធ');
+    await write('PUT', base + '/cookieAt', now, true, '⛔ cookieAt ចាស់ ➜ បដិសេធ');
+    await write('PATCH', base, { palmAt: now, ['palm/' + own]: now }, true, '⛔ PATCH palmAt ចាស់រួមជាមួយត្រាថ្មី ➜ បដិសេធទាំងមូល');
+    await write('PUT', base + '/palmAt', String(now), true, 'palmAt ជាអត្ថបទ');
+    await write('PUT', base + '/cookieAt', true, true, 'cookieAt ជា boolean');
+    await write('PUT', base + '/palmAt', { at: now }, true, 'palmAt ជា object');
+    await write('PUT', base + '/cookieAt', 0, true, 'cookieAt 0');
+    await write('PUT', base + '/palmAt', -5, true, 'palmAt អវិជ្ជមាន');
+    await write('PUT', base + '/palmAt', now + 600000 + 3600000, true, 'palmAt អនាគតលើស now + 600000');
+    await write('PATCH', base, { cookieAt: now + 600000 + 3600000, ['cookie/' + own]: now }, true, 'PATCH cookieAt អនាគតរួមជាមួយត្រាថ្មី');
+    await write('PUT', base + '/local/' + own, now, true, 'ប្រភេទមិនស្គាល់ (local)');
+    await write('PUT', base + '/palm', now, true, 'palm ជាលេខ (មិនមែន object)');
+    await write('PUT', base + '/palm/' + own, null, false, 'លុបត្រាខ្លួនឯង (ដកត្រា)');
+    await write('PUT', base + '/palm/' + other, null, false, 'លុបត្រារបស់ឧបករណ៍ផ្សេង (prune)');
+    await write('PUT', base + '/palmAt', null, false, 'លុប palmAt ចាស់ (prune)');
+    await write('PUT', base + '/cookieAt', null, false, 'លុប cookieAt ចាស់ (APK ចាស់ដកត្រារបស់វា)');
+    await sc.drop();
+}
+
+// ⛔ អាយុ root ភស្តុតាង ៖ ការលុបកំណត់ត្រាចាស់ជាង ៦០ ថ្ងៃ មានតែពេលគ្មានទិន្នន័យរស់ណាយោងវា (registry · scan_pending · ធុងសំរាម · history ·
+//    restore finalization) ➜ verdict ដូចគ្នាទាំង RTDB/Postgres ហើយការបដិសេធទុកកំណត់ត្រាដដែល
+async function evidenceRetentionCases(realRules, compileRules, rulesSql) {
+    console.log('\n── អាយុ root ភស្តុតាង (scan operation · registry release · trash consumption) ៖ លុបតែកំណត់ត្រាចាស់ដែលគ្មានអ្វីយោង ──');
+    await pgSetRules(realRules, compileRules, rulesSql);
+    const sc = makeScenario('evidence-retention');
+    await sc.loadRules(realRules);
+    const now = Date.now(), old = now - 61 * 86400000, young = now - 59 * 86400000;
+    const op = (id, phase, birth, key = 'ZTREG1') => ({ v: 2, id, actorUid: 'uid-old', phase, birth, registryKey: key, code: key });
+    const release = (id, deletedAt, trashId = 'trash_old', key = 'ZTREG1') => ({ v: 1, id, kind: 'scan', deletedAt, trashId, registryKey: key, releasedBy: 'uid-old' });
+    const consumption = (sourceId, deletedAt) => ({ v: 1, sourceId, generation: 1, kind: 'purge', actorUid: 'uid-old', scope: 's', deletedAt, rowBirth: 1 });
+    const write = policyWriter(sc, 'evidence-retention', 'អាយុភស្តុតាង', 'កំណត់ត្រា និងទិន្នន័យទាំងអស់នៅដដែលទាំង backend ២');
+    const scanId = 'scan_' + 'a'.repeat(32);
+    const trial = async (label, seed, location, deny) => {
+        await both(sc, 'owner', 'SNAP', '', seed);
+        await write('PUT', location, null, deny, label);
+    };
+    await trial('scan operation committed ចាស់ · registry មិនជារបស់វា ➜ លុបបាន', { zoew_scan_operations: { [scanId]: op(scanId, 'committed', old) } }, 'zoew_scan_operations/' + scanId, false);
+    await trial('scan operation cancelled ចាស់ ➜ លុបបាន', { zoew_scan_operations: { [scanId]: op(scanId, 'cancelled', old) } }, 'zoew_scan_operations/' + scanId, false);
+    await trial('scan operation committed ថ្មីជាង ៦០ ថ្ងៃ ➜ បដិសេធ', { zoew_scan_operations: { [scanId]: op(scanId, 'committed', young) } }, 'zoew_scan_operations/' + scanId, true);
+    await trial('scan operation prepared ចាស់ ➜ បដិសេធ', { zoew_scan_operations: { [scanId]: op(scanId, 'prepared', old) } }, 'zoew_scan_operations/' + scanId, true);
+    await trial('scan operation admitted ចាស់ ➜ បដិសេធ', { zoew_scan_operations: { [scanId]: op(scanId, 'admitted', old) } }, 'zoew_scan_operations/' + scanId, true);
+    await trial('scan operation ចាស់ ដែល registry នៅជារបស់វា ➜ បដិសេធ', { zoew_scan_operations: { [scanId]: op(scanId, 'committed', old) },
+        zoew_barcode_registry: { ZTREG1: { v: 2, intent: scanId, actorUid: 'uid-old', birth: old } } }, 'zoew_scan_operations/' + scanId, true);
+    await trial('scan operation ចាស់ ដែលមាន scan_pending ➜ បដិសេធ', { zoew_scan_operations: { [scanId]: op(scanId, 'cancelled', old) },
+        zoew_scan_pending: { [scanId]: 'uid-old' } }, 'zoew_scan_operations/' + scanId, true);
+    await trial('scan operation ចាស់ ដែល registry ជារបស់ការស្កេនផ្សេង ➜ លុបបាន', { zoew_scan_operations: { [scanId]: op(scanId, 'committed', old) },
+        zoew_barcode_registry: { ZTREG1: { v: 2, intent: 'scan_' + 'b'.repeat(32), actorUid: 'uid-new', birth: now } } }, 'zoew_scan_operations/' + scanId, false);
+    await trial('registry release ចាស់ · ធុងសំរាមលែងមាន ➜ លុបបាន', { zoew_registry_releases: { [scanId]: release(scanId, old) } }, 'zoew_registry_releases/' + scanId, false);
+    await trial('registry release ថ្មីជាង ៦០ ថ្ងៃ ➜ បដិសេធ', { zoew_registry_releases: { [scanId]: release(scanId, young) } }, 'zoew_registry_releases/' + scanId, true);
+    await trial('registry release ចាស់ ដែលធុងសំរាមនៅ ➜ បដិសេធ', { zoew_registry_releases: { [scanId]: release(scanId, old) },
+        zoew_recently_deleted_cod_dod: { trash_old: { id: 'trash_old', deletedAt: old } } }, 'zoew_registry_releases/' + scanId, true);
+    await trial('registry release ចាស់ ដែល registry នៅជារបស់ intent នោះ ➜ បដិសេធ', { zoew_registry_releases: { [scanId]: release(scanId, old) },
+        zoew_barcode_registry: { ZTREG1: { v: 2, intent: scanId, actorUid: 'uid-old', birth: old } } }, 'zoew_registry_releases/' + scanId, true);
+    await trial('trash consumption ចាស់ · ធុងសំរាម និង history លែងមាន ➜ លុបបាន', { zoew_trash_consumptions: { trash_old: consumption('trash_old', old) } }, 'zoew_trash_consumptions/trash_old', false);
+    await trial('trash consumption ថ្មីជាង ៦០ ថ្ងៃ ➜ បដិសេធ', { zoew_trash_consumptions: { trash_old: consumption('trash_old', young) } }, 'zoew_trash_consumptions/trash_old', true);
+    await trial('trash consumption ចាស់ ដែល history នៅ (restore) ➜ បដិសេធ', { zoew_trash_consumptions: { trash_old: consumption('trash_old', old) },
+        zoew_scan_history_cod_dod: { trash_old: { id: 'trash_old', phone: '012', barcodes: [{ code: 'ZT1' }] } } }, 'zoew_trash_consumptions/trash_old', true);
+    await trial('trash consumption ចាស់ ដែលធុងសំរាមនៅ ➜ បដិសេធ', { zoew_trash_consumptions: { trash_old: consumption('trash_old', old) },
+        zoew_recently_deleted_cod_dod: { trash_old: { id: 'trash_old', deletedAt: old } } }, 'zoew_trash_consumptions/trash_old', true);
+    await trial('trash consumption ចាស់ ដែលមាន restore finalization ➜ បដិសេធ', { zoew_trash_consumptions: { trash_old: consumption('trash_old', old) },
+        zoew_restore_finalizations: { trash_old: { targetId: 'trash_old' } } }, 'zoew_trash_consumptions/trash_old', true);
+    await both(sc, 'owner', 'SNAP', '', { zoew_scan_operations: { [scanId]: op(scanId, 'committed', old) }, zoew_registry_releases: { [scanId]: release(scanId, old) },
+        zoew_trash_consumptions: { trash_old: consumption('trash_old', old) } });
+    await write('PATCH', '', { ['zoew_scan_operations/' + scanId]: null, ['zoew_registry_releases/' + scanId]: null, ['zoew_trash_consumptions/trash_old']: null }, false,
+        'PATCH ច្រើនផ្លូវលុប root ភស្តុតាងទាំង ៣ ដែលចាស់ ➜ ទទួល');
+    await sc.drop();
+}
+
+function generationConsumption(source, kind, token, targetId) {
+    return { v: 1, sourceId: source.id, generation: source.trashGeneration ?? 0, kind, actorUid: member.sub, scope: 'audit-scope', deletedAt: source.deletedAt, rowBirth: source.createdAt ?? 0,
+        ...(kind === 'restore' ? { token, targetId } : {}) };
+}
+function slotPurgeVectors(uid) {
+    const T = 'zoew_recently_deleted_cod_dod', G = 'zoew_trash_consumptions', P = 'zoew_registry_releases', R = 'zoew_barcode_registry', O = 'zoew_scan_operations';
+    const SCOPE = 'https://f03-parity.example', copy = value => JSON.parse(JSON.stringify(value));
+    const hex = text => require('crypto').createHash('sha256').update(text).digest('hex').slice(0, 32);
+    const keyOf = code => code === 'ß' ? 'SS' : code.toUpperCase();
+    const row = (id, generation, slots, extra = {}) => {
+        const value = { id, count: slots.length, cod: slots.length, dod: 0, price: slots.length, phone: '0120000000', createdAt: 1700000000000,
+            deletedAt: 1790000000000, scanDate: '2026-10-01', trashReason: 'delete', isFromDeletion: true, time: '10:00:00 (2026-10-01)', barcodes: {}, ...extra };
+        if (generation !== null) value.trashGeneration = generation;
+        if (extra.noCreatedAt) { delete value.createdAt; delete value.noCreatedAt; }
+        slots.forEach((slot, index) => { value.barcodes[slot.slot] = { code: slot.code, cod: 1, dod: 0, isClosed: false,
+            ...(extra.noBirth ? {} : { createdAt: 1700000000000 + index }), ...(slot.scan ? { scanIntent: slot.scan } : {}) }; });
+        delete value.noBirth;
+        return value;
+    };
+    const packet = (source, options = {}) => {
+        const updates = {}, members = {}, keys = {};
+        const generation = Object.prototype.hasOwnProperty.call(source, 'trashGeneration') ? source.trashGeneration : 0;
+        const rowBirth = Object.prototype.hasOwnProperty.call(source, 'createdAt') ? source.createdAt : 0;
+        for (const [slot, barcode] of Object.entries(source.barcodes).filter(([slot]) => !(options.skipSlots || []).includes(slot))) {
+            const id = barcode.scanIntent || 'release_' + hex(source.id + ':' + generation + ':' + slot);
+            const receipt = { v: 2, generation, id, kind: barcode.scanIntent ? 'scan' : 'legacy', actorUid: barcode.scanIntent ? (options.scanActor || uid) : uid, releasedBy: uid,
+                scope: SCOPE, code: barcode.code, registryKey: keyOf(barcode.code), birth: Object.prototype.hasOwnProperty.call(barcode, 'createdAt') ? barcode.createdAt : 0,
+                trashId: source.id, slot, deletedAt: source.deletedAt, rowBirth, rowCount: options.rowCount ?? source.count };
+            members[slot] = { id }; keys[receipt.registryKey] = id;
+            if (!options.oldShape) updates[T + '/' + source.id + '/barcodes/' + slot] = null;
+            updates[R + '/' + receipt.registryKey] = null;
+            updates[P + '/' + id] = receipt;
+        }
+        if (options.oldShape) updates[T + '/' + source.id] = null;
+        else for (const key of Object.keys(source)) if (key !== 'barcodes' && !(options.keepFields || []).includes(key)) updates[T + '/' + source.id + '/' + key] = null;
+        const consumption = { v: 1, sourceId: source.id, generation, kind: 'purge', actorUid: uid, scope: SCOPE, deletedAt: source.deletedAt, rowBirth };
+        const order = Object.keys(members).sort((a, b) => Number(a) - Number(b));
+        order.forEach((slot, index) => { members[slot].o = index; if (index) members[slot].p = order[index - 1]; if (index < order.length - 1) members[slot].n = order[index + 1]; });
+        if (!options.oldShape || options.withMaps) Object.assign(consumption, { first: order[0], members, keys });
+        updates[G + '/' + source.id] = consumption;
+        return updates;
+    };
+    const seedOf = source => ({ [T]: { [source.id]: source }, [R]: Object.fromEntries(Object.values(source.barcodes).map(barcode => [keyOf(barcode.code), true])) });
+    const two = [{ slot: '0', code: 'F03CODE0' }, { slot: '1', code: 'F03CODE1' }];
+    const three = [{ slot: '0', code: 'C0' }, { slot: '1', code: 'C1' }, { slot: '2', code: 'C2' }];
+    const extra = (source, slot = '2') => { source.barcodes[slot] = { code: 'F03EXTRA', cod: 1, dod: 0, isClosed: false, createdAt: 1700000000002 }; return source; };
+    const vectors = [];
+    const add = (id, allowed, build) => vectors.push({ id, allowed, build });
+    const simple = (id, allowed, make) => add(id, allowed, () => { const { seed, updates } = make(); return { seed, steps: [{ updates, allowed }] }; });
+    simple('pos-1', true, () => { const r = row('p1', 1, [two[0]]); return { seed: seedOf(r), updates: packet(r) }; });
+    simple('pos-2', true, () => { const r = row('p2', 1, two); return { seed: seedOf(r), updates: packet(r) }; });
+    simple('pos-noncontiguous', true, () => { const r = row('pnc', 1, [{ slot: '0', code: 'A0' }, { slot: '7', code: 'A7' }, { slot: '15', code: 'A15' }]); return { seed: seedOf(r), updates: packet(r) }; });
+    simple('pos-legacy-zero-fallbacks', true, () => { const r = row('plz', null, two, { noCreatedAt: true, noBirth: true }); return { seed: seedOf(r), updates: packet(r) }; });
+    simple('pos-origins-and-flags', true, () => { const r = row('pof', 1, two, { origins: { F03CODE0: 'VN' }, restoreBlocked: true, trashMode: 'cookie', locker: 'A1' }); return { seed: seedOf(r), updates: packet(r) }; });
+    simple('pos-prior-restore-G', true, () => { const r = row('ppr', 2, two), seed = seedOf(r);
+        seed[G] = { ppr: { v: 1, sourceId: 'ppr', generation: 1, kind: 'restore', actorUid: uid, scope: SCOPE, deletedAt: 1, rowBirth: 1, token: 't', targetId: 'x1' } }; return { seed, updates: packet(r) }; });
+    simple('pos-prior-purge-G-with-certificate', true, () => { const r = row('ppm', 2, two), seed = seedOf(r), old = 'release_' + hex('old0');
+        seed[G] = { ppm: { v: 1, sourceId: 'ppm', generation: 1, kind: 'purge', actorUid: uid, scope: SCOPE, deletedAt: 1, rowBirth: 1, first: '0', members: { 0: { o: 0, id: old } }, keys: { OLD0: old } } };
+        return { seed, updates: packet(r) }; });
+    simple('pos-scan-kind-member', true, () => { const intent = 'scan_' + hex('scan-member');
+        const r = row('psk', 1, [{ slot: '0', code: 'SCANCODE', scan: intent }, { slot: '1', code: 'F03CODE1' }]), seed = seedOf(r);
+        seed[R].SCANCODE = { v: 2, intent, actorUid: 'other-actor', birth: 1700000000000 };
+        seed[O] = { [intent]: { v: 2, id: intent, actorUid: 'other-actor', scope: SCOPE, code: 'SCANCODE', registryKey: 'SCANCODE', birth: 1700000000000, phase: 'committed' } };
+        return { seed, updates: packet(r, { scanActor: 'other-actor' }) }; });
+    simple('pos-group-two-rows', true, () => { const a = row('ga', 1, two), b = row('gb', 1, [{ slot: '0', code: 'GB0' }]), seed = seedOf(a); seed[T].gb = b; seed[R].GB0 = true;
+        return { seed, updates: { ...packet(a), ...packet(b) } }; });
+    simple('pos-3-chain', true, () => { const r = row('c3', 1, three); return { seed: seedOf(r), updates: packet(r) }; });
+    simple('pos-24-members', true, () => { const r = row('p24', 1, Array.from({ length: 24 }, (_, i) => ({ slot: String(i), code: 'F03M' + String(i).padStart(4, '0') }))); return { seed: seedOf(r), updates: packet(r) }; });
+    simple('neg-old-shape', false, () => { const r = row('no', 1, two); return { seed: seedOf(r), updates: packet(r, { oldShape: true }) }; });
+    simple('neg-old-shape-with-certificate', false, () => { const r = row('nom', 1, two); return { seed: seedOf(r), updates: packet(r, { oldShape: true, withMaps: true }) }; });
+    simple('neg-count-mirror-old-shape', false, () => { const r = row('cmo', 1, two), updates = packet(r, { oldShape: true }); return { seed: seedOf(extra(r)), updates }; });
+    simple('neg-count-mirror-slot-shape', false, () => { const r = row('cmn', 1, two), updates = packet(r); return { seed: seedOf(extra(r)), updates }; });
+    simple('neg-count-mirror-extra-slot-deleted-no-receipt', false, () => { const r = row('cmd', 1, two), updates = packet(r); updates[T + '/cmd/barcodes/2'] = null; return { seed: seedOf(extra(r)), updates }; });
+    simple('neg-count-mirror-every-member-receipted', false, () => { const r = row('cme', 1, three); r.count = 2; return { seed: seedOf(r), updates: packet(r, { rowCount: 2 }) }; });
+    simple('neg-count-larger-than-members', false, () => { const r = row('clm', 1, two); r.count = 3; return { seed: seedOf(r), updates: packet(r, { rowCount: 3 }) }; });
+    simple('neg-collision-slot-shape', false, () => { const r = row('col', 1, [{ slot: '0', code: 'ß' }, { slot: '1', code: 'SS' }]); return { seed: seedOf(r), updates: packet(r) }; });
+    simple('neg-collision-old-shape', false, () => { const r = row('colo', 1, [{ slot: '0', code: 'ß' }, { slot: '1', code: 'SS' }]); return { seed: seedOf(r), updates: packet(r, { oldShape: true }) }; });
+    simple('neg-partial-member-omitted', false, () => { const r = row('pm', 1, two); return { seed: seedOf(r), updates: packet(r, { skipSlots: ['1'] }) }; });
+    simple('neg-container-delete', false, () => { const r = row('bc', 1, two), updates = packet(r);
+        for (const key of Object.keys(updates)) if (key.startsWith(T + '/bc/barcodes/')) delete updates[key]; updates[T + '/bc/barcodes'] = null; return { seed: seedOf(r), updates }; });
+    simple('neg-field-missed', false, () => { const r = row('mf', 1, two); return { seed: seedOf(r), updates: packet(r, { keepFields: ['phone'] }) }; });
+    simple('neg-no-consumption', false, () => { const r = row('ng', 1, two), updates = packet(r); delete updates[G + '/ng']; return { seed: seedOf(r), updates }; });
+    simple('neg-restore-kind-with-receipts', false, () => { const r = row('gk', 1, two), updates = packet(r), g = updates[G + '/gk'];
+        delete g.members; delete g.keys; delete g.first; Object.assign(g, { kind: 'restore', token: 't', targetId: 'x1' }); return { seed: seedOf(r), updates }; });
+    simple('neg-borrowed-old-receipt', false, () => { const r = row('br', 2, two), updates = packet(r), g = updates[G + '/br'];
+        const oldId = 'release_' + hex('old-incarnation'), old = copy(updates[P + '/' + g.members['1'].id]); old.generation = 1; old.id = oldId;
+        const seed = seedOf(r); seed[P] = { [oldId]: old }; seed[G] = { br: { v: 1, sourceId: 'br', generation: 1, kind: 'purge', actorUid: uid, scope: SCOPE, deletedAt: 1, rowBirth: 1 } };
+        delete updates[P + '/' + g.members['1'].id]; g.members['1'].id = oldId; g.keys[old.registryKey] = oldId; return { seed, updates }; });
+    simple('neg-swapped-pointers', false, () => { const r = row('sw', 1, two), updates = packet(r), m = updates[G + '/sw'].members; [m['0'].id, m['1'].id] = [m['1'].id, m['0'].id]; return { seed: seedOf(r), updates }; });
+    simple('neg-keys-map-wrong', false, () => { const r = row('kw', 1, two), updates = packet(r), k = updates[G + '/kw'].keys; [k.F03CODE0, k.F03CODE1] = [k.F03CODE1, k.F03CODE0]; return { seed: seedOf(r), updates }; });
+    simple('neg-keys-map-missing', false, () => { const r = row('km', 1, two), updates = packet(r); delete updates[G + '/km'].keys; return { seed: seedOf(r), updates }; });
+    simple('neg-members-map-missing', false, () => { const r = row('mm', 1, two), updates = packet(r); delete updates[G + '/mm'].members; return { seed: seedOf(r), updates }; });
+    simple('neg-extra-receipt', false, () => { const r = row('xr', 1, two), updates = packet(r), more = copy(updates[P + '/' + updates[G + '/xr'].members['1'].id]);
+        more.id = 'release_' + hex('extra'); updates[P + '/' + more.id] = more; return { seed: seedOf(r), updates }; });
+    simple('neg-shared-receipt-two-slots', false, () => { const r = row('ss2', 1, two), updates = packet(r), g = updates[G + '/ss2'], shared = g.members['1'].id;
+        delete updates[P + '/' + g.members['0'].id]; g.members['0'].id = shared; delete g.keys.F03CODE0; return { seed: seedOf(r), updates }; });
+    simple('neg-cross-row-shared-receipt', false, () => { const a = row('xa', 1, [{ slot: '0', code: 'XA0' }]), b = row('xb', 1, [{ slot: '0', code: 'XA0' }]), seed = seedOf(a); seed[T].xb = b;
+        const pa = packet(a), pb = packet(b), rb = pb[G + '/xb'].members['0'].id; delete pa[P + '/' + pa[G + '/xa'].members['0'].id]; delete pa[R + '/XA0'];
+        pa[G + '/xa'].members['0'].id = rb; pa[G + '/xa'].keys = { XA0: rb }; return { seed, updates: { ...pa, ...pb } }; });
+    simple('neg-restoreClaim-present', false, () => { const r = row('rc', 1, two, { restoreClaim: { token: 't', targetId: 'x', claimedAt: 1 } }); return { seed: seedOf(r), updates: packet(r) }; });
+    simple('neg-other-actor', false, () => { const r = row('ou', 1, two), updates = packet(r); updates[G + '/ou'].actorUid = 'someone-else'; return { seed: seedOf(r), updates }; });
+    simple('neg-wrong-generation', false, () => { const r = row('wg', 2, two), updates = packet(r); updates[G + '/wg'].generation = 1;
+        for (const key of Object.keys(updates)) if (key.startsWith(P + '/')) updates[key].generation = 1; return { seed: seedOf(r), updates }; });
+    simple('neg-group-one-malformed', false, () => { const a = row('gc', 1, two), b = row('gd', 1, [{ slot: '0', code: 'GD0' }]), pb = packet(b);
+        b.barcodes['1'] = { code: 'GDX', cod: 1, dod: 0, isClosed: false, createdAt: 1 }; const seed = seedOf(a); seed[T].gd = b; seed[R].GD0 = true; seed[R].GDX = true;
+        return { seed, updates: { ...packet(a), ...pb } }; });
+    simple('neg-scan-pending', false, () => { const r = row('sp', 1, two), seed = seedOf(r); seed[T].sp.scanPending = { x: 1 }; return { seed, updates: packet(r) }; });
+    simple('neg-cert-missing-link-n', false, () => { const r = row('cml', 1, three), updates = packet(r); delete updates[G + '/cml'].members['0'].n; return { seed: seedOf(r), updates }; });
+    simple('neg-cert-missing-link-p', false, () => { const r = row('cmp', 1, three), updates = packet(r); delete updates[G + '/cmp'].members['2'].p; return { seed: seedOf(r), updates }; });
+    simple('neg-cert-wrong-ordinal', false, () => { const r = row('cwo', 1, three), updates = packet(r); updates[G + '/cwo'].members['2'].o = 3; return { seed: seedOf(r), updates }; });
+    simple('neg-cert-duplicate-ordinal', false, () => { const r = row('cdo', 1, three), updates = packet(r), m = updates[G + '/cdo'].members; m['2'].o = 1; m['2'].p = '0'; delete m['1'].n; return { seed: seedOf(r), updates }; });
+    simple('neg-cert-two-anchors', false, () => { const r = row('cta', 1, two), updates = packet(r), m = updates[G + '/cta'].members; m['1'] = { o: 0, id: m['1'].id }; delete m['0'].n; return { seed: seedOf(r), updates }; });
+    simple('neg-cert-first-wrong', false, () => { const r = row('cfw', 1, three), updates = packet(r); updates[G + '/cfw'].first = '1'; return { seed: seedOf(r), updates }; });
+    simple('neg-cert-first-missing', false, () => { const r = row('cfm', 1, three), updates = packet(r); delete updates[G + '/cfm'].first; return { seed: seedOf(r), updates }; });
+    simple('neg-cert-string-ordinal', false, () => { const r = row('cso', 1, two), updates = packet(r); updates[G + '/cso'].members['1'].o = '1'; return { seed: seedOf(r), updates }; });
+    simple('neg-cert-link-outside-source', false, () => { const r = row('clo', 1, two), updates = packet(r), m = updates[G + '/clo'].members;
+        m['0'].n = '9'; m['9'] = { o: 1, id: m['1'].id, p: '0' }; m['1'].p = '9'; m['1'].o = 2; return { seed: seedOf(r), updates }; });
+    simple('neg-stale-equal-consumption', false, () => { const r = row('sec', 1, two), seed = seedOf(r), updates = packet(r), g = updates[G + '/sec'];
+        seed[G] = { sec: { v: 1, sourceId: 'sec', generation: 1, kind: 'purge', actorUid: g.actorUid, scope: g.scope, deletedAt: g.deletedAt, rowBirth: g.rowBirth } }; return { seed, updates }; });
+    simple('neg-legacy-count-zero', false, () => { const r = row('lc0', null, two, { noCreatedAt: true, noBirth: true }); r.count = 0; return { seed: seedOf(r), updates: packet(r, { rowCount: 0 }) }; });
+    simple('neg-legacy-count-absent', false, () => { const r = row('lca', null, two, { noCreatedAt: true, noBirth: true }); delete r.count; return { seed: seedOf(r), updates: packet(r, { rowCount: 0 }) }; });
+    simple('ord-edit-isDeducted', true, () => { const r = row('ed', 1, two); return { seed: seedOf(r), updates: { [T + '/ed/barcodes/0/isDeducted']: true } }; });
+    simple('ord-edit-restoreBlocked', true, () => { const r = row('eb', 1, two); return { seed: seedOf(r), updates: { [T + '/eb/restoreBlocked']: true } }; });
+    simple('ord-create-row', true, () => ({ seed: {}, updates: { [T + '/cr']: row('cr', 1, two) } }));
+    simple('ord-drop-member-row-stays', true, () => { const r = row('dm', 1, two); return { seed: seedOf(r), updates: { [T + '/dm/barcodes/1']: null } }; });
+    simple('ord-field-delete-row-stays', true, () => { const r = row('md', 1, two); return { seed: seedOf(r), updates: { [T + '/md/locker']: null } }; });
+    simple('ord-trashGeneration-change-refused', false, () => { const r = row('tg', 1, two); return { seed: seedOf(r), updates: { [T + '/tg/trashGeneration']: 5 } }; });
+    simple('neg-barcodeless-row-fields-no-consumption', false, () => { const r = row('bl', 1, []); delete r.barcodes; const updates = {};
+        for (const key of Object.keys(r)) updates[T + '/bl/' + key] = null; return { seed: { [T]: { bl: r } }, updates }; });
+    add('neg-replay-after-apply', false, () => { const r = row('rr', 1, two), updates = packet(r); return { seed: seedOf(r), steps: [{ updates, allowed: true }, { updates, allowed: false }] }; });
+    add('pos-second-incarnation', true, () => { const r = row('rs', 1, two), first = packet(r), next = row('rs', 2, [{ slot: '0', code: 'G2CODE0' }, { slot: '1', code: 'G2CODE1' }]);
+        return { seed: seedOf(r), steps: [{ updates: first, allowed: true }, { owner: { [T + '/rs']: next, [R + '/G2CODE0']: true, [R + '/G2CODE1']: true } }, { updates: packet(next), allowed: true }] }; });
+    add('neg-identical-consumption-rewrite-new-incarnation', false, () => { const r = row('ri', 1, two), first = packet(r), next = row('ri', 2, [{ slot: '0', code: 'G2CODE0' }, { slot: '1', code: 'G2CODE1' }]);
+        const second = packet(next); for (const key of Object.keys(second)) if (key.startsWith(P + '/')) second[key].generation = 1;
+        second[G + '/ri'] = { ...first[G + '/ri'], first: second[G + '/ri'].first, members: second[G + '/ri'].members, keys: second[G + '/ri'].keys };
+        return { seed: seedOf(r), steps: [{ updates: first, allowed: true }, { owner: { [T + '/ri']: next, [R + '/G2CODE0']: true, [R + '/G2CODE1']: true } }, { updates: second, allowed: false }] }; });
+    return vectors;
+}
+
+function assertRestoreGuardCaseCoverage(vectors) {
+    const required = ["atomic-finalization-delete-and-guarded-pickup", "atomic-history-reopen-and-guarded-pickup", "atomic-history-birth-change-and-guarded-pickup", "atomic-identical-guard-carry-after-finalization-delete", "race-history-reopened-before-write", "race-history-phone-changed-before-write", "race-history-birth-changed-before-write", "race-finalization-token-changed-before-write", "race-finalization-removed-before-write", "race-consumption-replaced-before-write", "race-reset-after-proof-before-write", "unchanged-guard-carry-after-history-change", "unchanged-guard-carry-after-finalization-change", "unchanged-guard-carry-after-consumption-change", "ordinary-legacy-pickup-write", "ordinary-versioned-pickup-write", "ordinary-write-can-drop-prior-guard", "ordinary-finalization-delete-compatibility", "ordinary-history-reopen-compatibility", "ordinary-history-birth-change-compatibility", "valid-serial-restore-guard", "valid-raw-phone-punctuation-explicit-counter", "valid-khmer-no-number-counter", "valid-empty-raw-phone-counter"];
+    const ids = new Set(vectors.map(vector => vector.id));
+    assert(vectors.length >= 142 && ids.size === vectors.length, 'ជាន់ restoreGuard vectors មិនគ្រប់ ឬ id ស្ទួន');
+    for (const id of required) assert(ids.has(id), 'restoreGuard critical case បាត់៖ ' + id);
+    for (const vector of vectors) {
+        const writes = vector.build().steps.filter(step => !step.owner);
+        assert(writes.length && writes.every(step => typeof step.allowed === 'boolean' && typeof step.path === 'string' && ['PUT', 'PATCH'].includes(step.method)), 'restoreGuard case គ្មាន user write ពិត៖ ' + vector.id);
+        if (vector.group === 'valid-guard') assert(writes.some(step => step.allowed && step.value && Object.prototype.hasOwnProperty.call(step.value, 'restoreGuard')), 'restoreGuard positive គ្មាន guard៖ ' + vector.id);
+    }
+    return true;
+}
+
+async function restorePickupGuardCases(rulesJson, compileRules, rulesSql, label) {
+    const { restorePickupGuardCases: vectorsOf } = require('../restore-pickup-guard-cases.cjs');
+    await pgSetRules(rulesJson, compileRules, rulesSql);
+    const vectors = vectorsOf({ uid: member.sub });
+    check(assertRestoreGuardCaseCoverage(vectors), 'restoreGuard ' + label + '៖ vector ' + vectors.length + ' និង critical cases គ្រប់');
+    const sc = makeScenario('restore-guard-' + label);
+    await sc.loadRules(rulesJson);
+    for (const vector of vectors) {
+        const { seed, steps } = vector.build();
+        await both(sc, 'owner', 'SNAP', '', seed);
+        const write = policyWriter(sc, 'restore-guard-' + label, 'restoreGuard ' + label, 'ការបដិសេធទុក server ទាំងមូលដដែល');
+        for (const step of steps) {
+            if (step.owner) { for (const [location, value] of Object.entries(step.owner)) await both(sc, 'owner', 'PUT', location, value); continue; }
+            await write(step.method, step.path, step.value, !step.allowed, vector.id);
+        }
+        await sc.drop();
+    }
+}
+
+async function slotPurgeCases(rulesJson, compileRules, rulesSql, label) {
+    console.log('\n── F03 purge តាម slot (' + label + ') ៖ receipt គ្រប់ slot · certificate ចំនួន · verdict ដូចគ្នា RTDB/Postgres ──');
+    await pgSetRules(rulesJson, compileRules, rulesSql);
+    const vectors = slotPurgeVectors(member.sub);
+    check(vectors.length >= 60 && new Set(vectors.map(vector => vector.id)).size === vectors.length
+        && vectors.some(vector => vector.allowed) && vectors.some(vector => !vector.allowed), 'F03 slot matrix ' + label + ' ៖ vector ' + vectors.length + ' មិនស្ទួន មានទាំងទទួល/បដិសេធ');
+    // ⛔ namespace តែមួយ (rules ផ្ទុកម្តង) ៖ namespace ថ្មីក្នុងមួយ vector ផ្ទុក rules ~270 KB ច្រើនជាង ៦០ ដង ➜ emulator ព្យួរត្រង់ `PUT /.settings/rules.json`
+    //    (វាស់ ៖ 600 s គ្មានចម្លើយ) · ទិន្នន័យត្រូវ `drop()` រវាង vector ហើយ SNAP ជំនួស root ទាំងមូល ➜ vector មិនឃើញគ្នា
+    const sc = makeScenario('slot-matrix-' + label);
+    await sc.loadRules(rulesJson);
+    for (const vector of vectors) {
+        const { seed, steps } = vector.build();
+        await both(sc, 'owner', 'SNAP', '', seed);
+        const write = policyWriter(sc, 'slot-purge-' + label, 'F03 slot purge ' + label, 'ការបដិសេធគ្មាន effect ទាំង RTDB/Postgres');
+        for (const step of steps) {
+            if (step.owner) { for (const [location, value] of Object.entries(step.owner)) await both(sc, 'owner', 'PUT', location, value); continue; }
+            await write('PATCH', '', step.updates, !step.allowed, vector.id);
+        }
+        await sc.drop();
+    }
+}
+
+function slotPurgePacket(source) {
+    const updates = {}, members = {}, keys = {}, receipts = [];
+    source.barcodes.forEach((barcode, slot) => {
+        const id = 'release_' + require('crypto').randomBytes(16).toString('hex');
+        receipts.push(id);
+        updates['zoew_recently_deleted_cod_dod/' + source.id + '/barcodes/' + slot] = null;
+        updates['zoew_barcode_registry/' + barcode.code] = null;
+        updates['zoew_registry_releases/' + id] = { v: 2, generation: source.trashGeneration ?? 0, id, kind: 'legacy', actorUid: member.sub, releasedBy: member.sub, scope: 'audit-scope', code: barcode.code, registryKey: barcode.code,
+            birth: barcode.createdAt ?? 0, trashId: source.id, slot: String(slot), deletedAt: source.deletedAt, rowBirth: source.createdAt ?? 0, rowCount: source.count };
+        members[String(slot)] = { o: slot, id, ...(slot ? { p: String(slot - 1) } : {}), ...(slot < source.barcodes.length - 1 ? { n: String(slot + 1) } : {}) };
+        keys[barcode.code] = id;
+    });
+    for (const field of Object.keys(source)) if (field !== 'barcodes') updates['zoew_recently_deleted_cod_dod/' + source.id + '/' + field] = null;
+    updates['zoew_trash_consumptions/' + source.id] = { ...generationConsumption(source, 'purge'), first: '0', members, keys };
+    return updates;
+}
+function legacyPurgePacket(source) {
+    const updates = { ['zoew_recently_deleted_cod_dod/' + source.id]: null,
+        ['zoew_trash_consumptions/' + source.id]: generationConsumption(source, 'purge') };
+    source.barcodes.forEach((barcode, slot) => {
+        const id = 'release_' + require('crypto').randomBytes(16).toString('hex');
+        updates['zoew_barcode_registry/' + barcode.code] = null;
+        updates['zoew_registry_releases/' + id] = { v: 2, generation: source.trashGeneration ?? 0, id, kind: 'legacy', actorUid: member.sub, releasedBy: member.sub, scope: 'audit-scope', code: barcode.code, registryKey: barcode.code,
+            birth: barcode.createdAt ?? 0, trashId: source.id, slot: String(slot), deletedAt: source.deletedAt, rowBirth: source.createdAt ?? 0, rowCount: source.count };
+    });
+    return updates;
+}
+
+async function trashPolicyCases(realRules, compileRules, rulesSql) {
+    console.log('\n── គោលការណ៍ធុងសំរាម ៖ verdict ត្រូវតាមគោលការណ៍ និងស្មើគ្នាទាំង RTDB/Postgres ──');
+    await pgSetRules(realRules, compileRules, rulesSql);
+    const sc = makeScenario('trash-policy');
+    await sc.loadRules(realRules);
+    const trash = 'zoew_recently_deleted_cod_dod';
+    const history = 'zoew_scan_history_cod_dod';
+    const finals = 'zoew_restore_finalizations';
+    const at = Date.now();
+    const claim = { token: 'policy-token', targetId: 'policy_target', claimedAt: at };
+    const item = (extra = {}) => Object.assign({ id: 'policy_source', phone: '012000000', scanDate: '2026-01-01',
+        createdAt: at - 10000, deletedAt: at - 1000, cod: 3, dod: 1, count: 1, price: 4,
+        trashReason: 'remove', isFromDeletion: false, isClosed: false,
+        barcodes: [{ code: 'POLICY_PARCEL', cod: 3, dod: 1, isClosed: false, isDeducted: true }] }, extra);
+    const seed = async (source, live) => {
+        const tree = { [trash]: source ? { policy_source: source } : {},
+            [history]: live ? { policy_target: live } : {},
+            zoew_daily_revenue_cod_dod: { '2026-01-01': { codDollar: 0, dodDollar: 0, totalCount: 0 } } };
+        await both(sc, 'owner', 'SNAP', '', tree);
+    };
+    const write = policyWriter(sc, 'trash-policy', 'គោលការណ៍ធុងសំរាម', 'ការបដិសេធរក្សា barcode និងប្រាក់គ្រប់ផ្លូវដដែល');
+    await seed(null);
+    await write('PUT', trash + '/policy_source', item({ trashMode: 'palm', restoreBlocked: true }), false, 'បង្កើត Palm ដែលបិទស្ដារ');
+    await seed(item({ trashMode: 'palm', restoreBlocked: true }));
+    await write('PUT', trash + '/policy_source/restoreClaim', claim, true, 'Palm មិនអាច claim ស្ដារ');
+    await write('PUT', trash + '/policy_source/restoreBlocked', null, true, 'មិនអាចលុប restoreBlocked');
+    await write('PUT', trash + '/policy_source/restoreBlocked', false, true, 'មិនអាចបិទ restoreBlocked');
+    await write('PUT', trash + '/policy_source/trashMode', null, true, 'មិនអាចលុប mode Palm');
+    await write('PUT', trash + '/policy_source/trashMode', 'cookie', true, 'មិនអាចប្ដូរ Palm ទៅ Cookie');
+    await write('PUT', trash + '/policy_source', null, true, 'client ចាស់ purge គ្មាន consumption ត្រូវបដិសេធ');
+    await write('PATCH', '', legacyPurgePacket(item({ trashMode: 'palm', restoreBlocked: true })), true, 'client ចាស់ purge ទាំងជួរ ទោះមាន receipts/consumption ត្រូវបដិសេធ');
+    await write('PATCH', '', slotPurgePacket(item({ trashMode: 'palm', restoreBlocked: true })), false, 'Palm purge តាម slot ជាមួយ release receipts និង consumption');
+    await seed(null);
+    await write('PUT', trash + '/policy_source', item({ trashMode: 'palm' }), true, 'Palm ត្រូវមាន restoreBlocked');
+    await write('PUT', trash + '/policy_source', item({ trashMode: 'unknown' }), true, 'mode មិនស្គាល់ត្រូវបដិសេធ');
+    await write('PUT', trash + '/policy_source', item({ restoreBlocked: 'true' }), true, 'flag ត្រូវជា boolean');
+    for (const mode of ['cookie', 'local']) {
+        await seed(null);
+        await write('PUT', trash + '/policy_source', item({ trashMode: mode }), false, mode + ' មិនទាន់ Sign បង្កើតបាន');
+        await write('PUT', trash + '/policy_source/restoreClaim', claim, false, mode + ' មិនទាន់ Sign អនុញ្ញាត claim');
+        await write('PUT', trash + '/policy_source/restoreClaim', null, false, mode + ' អនុញ្ញាត release claim');
+    }
+    const signed = item({ trashMode: 'cookie', restoreBlocked: true });
+    signed.barcodes[0].ztoSignedAt = at;
+    await seed(null);
+    await write('PUT', trash + '/policy_source', signed, false, 'Cookie Sign ពិត បង្កើតជាមួយ flag');
+    await write('PUT', trash + '/policy_source/restoreClaim', claim, true, 'Cookie Sign ពិត មិនអាច claim');
+    await write('PUT', trash + '/policy_source/barcodes/0/ztoSignedExact', true, false, 'trash ទទួល ztoSignedExact boolean');
+    await write('PUT', trash + '/policy_source/barcodes/0/ztoSignedExact', 'true', true, 'trash បដិសេធ ztoSignedExact string');
+    await write('PUT', history + '/exact_stamp', { id: 'exact_stamp', barcodes: [{ code: 'EXACT_PARCEL', ztoSignedAt: at, ztoSignedExact: true }] }, false, 'history ទទួល ztoSignedExact boolean');
+    await write('PUT', history + '/exact_stamp/barcodes/0/ztoSignedExact', 1, true, 'history បដិសេធ ztoSignedExact number');
+
+    const legacySigned = item();
+    legacySigned.barcodes[0].ztoSignedAt = at;
+    await seed(null);
+    await write('PUT', trash + '/policy_source', legacySigned, true, '⛔ ធាតុគ្មាន trashMode ដែល Sign រួច ដោយគ្មាន flag ➜ បដិសេធ (Phase B ៖ គ្មាន compat មុន launch)');
+    await write('PUT', trash + '/policy_source', Object.assign({}, legacySigned, { isClosed: true }), true, '⛔ សរសេរធាតុដដែលឡើងវិញ (ត្រា Sign ដោយគ្មាន flag) ➜ បដិសេធ');
+    const legacyRestamp = JSON.parse(JSON.stringify(legacySigned));
+    legacyRestamp.barcodes[0].ztoSignedAt = at + 5;
+    await write('PUT', trash + '/policy_source', legacyRestamp, true, '⛔ ត្រា Sign ថ្មីលើធាតុគ្មាន trashMode ដោយគ្មាន flag ➜ បដិសេធ');
+    const modernSigned = item({ trashMode: 'cookie' });
+    modernSigned.barcodes[0].ztoSignedAt = at;
+    await seed(null);
+    await write('PUT', trash + '/policy_source', modernSigned, true, 'App ថ្មី (មាន trashMode) ត្រូវដាក់ restoreBlocked ជាមួយត្រា Sign');
+    await seed(item());
+    await write('PUT', trash + '/policy_source/barcodes/0/ztoSignedAt', at, true, '⛔ ត្រា Sign លើធាតុគ្មាន trashMode ដោយគ្មាន flag ➜ បដិសេធ');
+    await write('PATCH', trash + '/policy_source', { 'barcodes/0/ztoSignedAt': at, restoreBlocked: true }, false, 'ធាតុគ្មាន trashMode ៖ ត្រា Sign និង flag សរសេររួមបាន');
+    await seed(item({ trashMode: 'cookie' }));
+    await write('PUT', trash + '/policy_source/barcodes/0/ztoSignedAt', at, true, 'Sign stamp លើធាតុ App ថ្មី (មាន trashMode) ត្រូវភ្ជាប់ restoreBlocked');
+    await write('PATCH', trash + '/policy_source', { 'barcodes/0/ztoSignedAt': at, restoreBlocked: true }, false, 'Sign stamp និង flag សរសេររួមបាន');
+    await write('PUT', trash + '/policy_source/restoreBlocked', null, true, 'Cookie Sign មិនអាចលុប flag');
+    await seed(item({ restoreClaim: claim }));
+    await write('PATCH', trash + '/policy_source', { 'barcodes/0/ztoSignedAt': at, restoreBlocked: true }, false, 'stamp កើតក្រោយ claim អាចរក្សា claim ចាស់');
+    await write('PUT', trash + '/policy_source/restoreClaim', Object.assign({}, claim, { token: 'other-token' }), true, 'blocked មិនអាចផ្លាស់ token');
+    await write('PUT', trash + '/policy_source/restoreClaim', Object.assign({}, claim, { targetId: 'other_target' }), true, 'blocked មិនអាចផ្លាស់ target');
+    await write('PUT', trash + '/policy_source/restoreClaim', Object.assign({}, claim, { claimedAt: at + 1 }), true, 'blocked មិនអាចបន្ត lease');
+    await write('PUT', trash + '/policy_source/restoreClaim', claim, false, 'claim ដដែលអាចរក្សាសម្រាប់ recovery');
+    const restored = { id: 'policy_target', phone: '012000000', scanDate: '2026-01-01', cod: 3, dod: 1, count: 1,
+        barcodes: [{ code: 'POLICY_PARCEL', cod: 3, dod: 1, isClosed: false, isDeducted: false }] };
+    const prepared = Object.assign({}, restored, { restoreClaimId: 'policy_source', restoreClaimToken: claim.token });
+    await seed(item({ trashMode: 'palm', restoreBlocked: true, restoreClaim: claim }));
+    await write('PUT', history + '/policy_target', prepared, true, 'blocked source មិនអាច prepare history');
+    await seed(item({ trashMode: 'cookie', restoreBlocked: true, restoreClaim: claim }), prepared);
+    await write('PATCH', '', { [trash + '/policy_source']: null, [history + '/policy_target']: restored,
+        [finals + '/policy_source']: { token: claim.token, targetId: claim.targetId, finalizedAt: at },
+        'zoew_trash_consumptions/policy_source': generationConsumption(item(), 'restore', claim.token, claim.targetId),
+        'zoew_daily_revenue_cod_dod/2026-01-01': { codDollar: 3, dodDollar: 1, totalCount: 1 } }, true,
+    'blocked source មិនអាច finalize ឬបូកលុយ');
+    await write('PUT', trash + '/policy_source/restoreClaim', null, true, 'blocked មិនអាច release claim ខណៈ history នៅ prepare');
+    await seed(item({ trashMode: 'cookie', restoreBlocked: true, restoreClaim: claim }));
+    await write('PUT', trash + '/policy_source/restoreClaim', null, false, 'blocked អនុញ្ញាត release claim បន្ទាប់ពីគ្មាន prepared history');
+    await write('PATCH', '', slotPurgePacket(item({ trashMode: 'cookie', restoreBlocked: true })), false, 'blocked ដែល release រួចអាច purge តាម slot ជាមួយ receipts/consumption');
+    await seed(item({ restoreClaim: claim }), prepared);
+    await write('PATCH', '', { [trash + '/policy_source']: null, [history + '/policy_target']: restored,
+        [finals + '/policy_source']: { token: claim.token, targetId: claim.targetId, finalizedAt: at },
+        'zoew_trash_consumptions/policy_source': generationConsumption(item(), 'restore', claim.token, claim.targetId),
+        'zoew_daily_revenue_cod_dod/2026-01-01': { codDollar: 3, dodDollar: 1, totalCount: 1 } }, false,
+    'legacy មិនទាន់ Sign finalize និងបូកលុយម្តងបាន');
+    const emptied = Object.assign({}, prepared, { cod: 0, dod: 0, count: 0 });
+    delete emptied.barcodes;
+    const dropTarget = { [trash + '/policy_source']: null, [history + '/policy_target']: null,
+        [finals + '/policy_source']: { token: claim.token, targetId: claim.targetId, finalizedAt: at },
+        'zoew_trash_consumptions/policy_source': generationConsumption(item(), 'restore', claim.token, claim.targetId),
+        'zoew_daily_revenue_cod_dod/2026-01-01': { codDollar: 3, dodDollar: 1, totalCount: 1 } };
+    await seed(item({ restoreClaim: claim }), emptied);
+    await write('PATCH', '', dropTarget, false, 'A413 ៖ ជួរ prepare ដែលបាត់ barcode ទាំងអស់ចេញក្នុង finalize តែមួយ (បូកលុយម្តង)');
+    await seed(item({ restoreClaim: claim }), prepared);
+    await write('PATCH', '', dropTarget, true, '⛔ A413 ៖ finalize មិនអាចលុបជួរដែលនៅមាន barcode');
+
+    const addedCodes = JSON.stringify(['POLICY_PARCEL']);
+    const neighbor = { code: 'NEIGHBOR', cod: 7, dod: 2, isClosed: true, isDeducted: false, closedAt: at - 5000 };
+    const retained = { ...restored, barcodes: [neighbor], barcode: neighbor.code, cod: 7, dod: 2, price: 9, count: 1,
+        isClosed: true, closedAt: neighbor.closedAt };
+    const merged = { ...prepared, restoreAddedCodes: addedCodes, barcodes: [neighbor, restored.barcodes[0]],
+        barcode: neighbor.code, cod: 10, dod: 3, price: 13, count: 2, isClosed: false };
+    await seed(item({ restoreClaim: claim }), retained);
+    await write('PUT', history + '/policy_target', merged, false, 'prepare រក្សាបញ្ជី code ដែលទើបបញ្ចូល');
+    await write('PUT', history + '/policy_target', merged, false, 'retry ដដែលរក្សា provenance ដដែល');
+    await write('PUT', history + '/policy_target/restoreAddedCodes', JSON.stringify(['NEIGHBOR']), true, 'មិនអាចផ្លាស់ provenance ក្នុង claim');
+    await write('PUT', history + '/policy_target/restoreAddedCodes', null, true, 'មិនអាចលុប provenance ខណៈនៅ prepare');
+    await seed(item({ restoreClaim: claim }), prepared);
+    await write('PUT', history + '/policy_target/restoreAddedCodes', addedCodes, true, 'legacy prepared មិនអាចបង្កើត provenance ដោយស្មាន');
+    await seed(item({ restoreClaim: claim }), retained);
+    await write('PUT', history + '/policy_target/restoreAddedCodes', addedCodes, true, 'provenance ត្រូវមាន claim ទាំងពីរ');
+    await write('PUT', history + '/policy_target', { ...merged, restoreAddedCodes: ['POLICY_PARCEL'] }, true, 'provenance ត្រូវជា string');
+    await write('PUT', history + '/policy_target', { ...merged, restoreAddedCodes: 'x'.repeat(262145) }, true, 'provenance ត្រូវមានទំហំកំណត់');
+    const rotatedClaim = { ...claim, token: 'policy-rotated-token' };
+    await seed(item({ restoreClaim: rotatedClaim }), merged);
+    await write('PUT', history + '/policy_target', { ...merged, restoreClaimToken: rotatedClaim.token }, false, 'claim ថ្មីនៃ source ដដែលរក្សា provenance ចាស់');
+    await write('PUT', history + '/policy_target/restoreAddedCodes', '[]', true, 'ប្ដូរ token មិនអាចលុប provenance ចាស់');
+
+    const expiredClaim = { ...claim, claimedAt: Date.now() - 180000 };
+    await seed(item({ restoreClaim: expiredClaim }), merged);
+    await write('PUT', history + '/policy_target', retained, true, 'unsigned expired prepare មិនអាចសម្អាត markers មុនដោះស្រាយ claim');
+    await write('PUT', trash + '/policy_source/restoreClaim', null, true, 'unsigned expired prepare មិនអាច release claim មុនដោះស្រាយ history');
+    await write('PUT', trash + '/policy_source/restoreClaim', { ...expiredClaim, targetId: 'other_target' }, true, 'prepared source មិនអាចប្ដូរ target ទៅកន្លែងផ្សេង');
+    await write('PUT', trash + '/policy_source/restoreClaim', { ...rotatedClaim, claimedAt: Date.now() }, false, 'expired source អាចផ្ទេរ token ដោយរក្សា prepared target');
+    await write('PUT', history + '/policy_target', retained, true, 'token ថ្មីមិនអាចទម្លាក់ prepared markers ចាស់');
+    await write('PUT', history + '/policy_target', { ...merged, restoreClaimToken: rotatedClaim.token }, false, 'ម្ចាស់ថ្មីអាចបន្ត prepared target ជាមួយ provenance ដដែល');
+    await seed(item(), merged);
+    await write('PUT', history + '/policy_target', retained, false, 'legacy source គ្មាន claim អាចសម្អាត markers ចាស់');
+
+    for (const lease of [at, at - 180000]) {
+        const frozenClaim = { ...claim, claimedAt: lease };
+        const frozen = item({ trashMode: 'cookie', restoreBlocked: true, restoreClaim: frozenClaim });
+        await seed(frozen, merged);
+        await write('PUT', trash + '/policy_source/restoreClaim', null, true, 'blocked prepare ទុក claim ទោះ lease ផុត');
+        await write('PATCH', history + '/policy_target', { restoreClaimId: null, restoreClaimToken: null }, true, 'cancellation ត្រូវដក provenance និង markers រួមគ្នា');
+        await write('PUT', history + '/policy_target', { ...retained, restoreAddedCodes: addedCodes }, true, 'cancellation មិនអាចទុក provenance កំព្រា');
+        const beforeCancel = await sc.tree();
+        await write('PUT', history + '/policy_target', retained, false, 'terminal cancellation រក្សា neighbor ហើយដក prepared codes');
+        const cancelled = await sc.tree();
+        const expected = { ...beforeCancel, [history]: { policy_target: retained } };
+        check(JSON.stringify(canon(expected)) === JSON.stringify(cancelled)
+            && JSON.stringify(cancelled) === JSON.stringify(await pgTree()),
+        'cancellation មិនប៉ះ ledger ឬ source claim ហើយរក្សា neighbor ទាំងមូល');
+        await write('PUT', trash + '/policy_source/restoreClaim', null, false, 'release claim បានតែក្រោយ cancellation');
+        await seed({ ...frozen, restoreClaim: { ...frozenClaim, token: 'wrong-owner' } }, merged);
+        await write('PUT', history + '/policy_target', retained, false, 'token នៃ takeover ដែលមិនបានចុះ (target + provenance ត្រូវ) នៅ cancel បាន');
+        await seed({ ...frozen, restoreClaim: { ...frozenClaim, targetId: 'wrong_target' } }, merged);
+        await write('PUT', history + '/policy_target', retained, true, 'cancellation ត្រូវ target ត្រឹមត្រូវ');
+        // គ្មាន provenance (ទិន្នន័យខុសទម្រង់ · គ្មាន compat មុន launch) ៖ គ្មានការសរសេរណាអាចដក markers ឬច្បាប់ចម្លងស្តារ — ទាំងជួរ H តែឯង
+        // ទាំង PATCH root ដែលដោះ claim T ក្នុងការសរសេរដដែល ➜ backend ទាំង ២ បដិសេធ (ឃ្លា rules នៃផ្លូវ Admin ចាស់ដកចេញ)។
+        const heldRelease = (row, extra) => Object.assign({ [trash + '/policy_source/restoreClaim']: null, [history + '/policy_target']: row }, extra || {});
+        const noMarkers = ({ restoreClaimId, restoreClaimToken, restoreAddedCodes, ...rest }) => rest;
+        await seed(frozen, prepared);
+        await write('PUT', history + '/policy_target', { ...prepared, cod: 4 }, true, 'គ្មាន provenance ៖ ការសរសេរដែលរក្សា markers នៅតែបដិសេធ');
+        await write('PUT', history + '/policy_target', restored, true, 'គ្មាន provenance ៖ ដក markers ក្នុងជួរតែឯង (claim T នៅ) បដិសេធ');
+        await seed(frozen, prepared);
+        await write('PUT', history + '/policy_target', null, true, 'គ្មាន provenance ៖ លុបជួរតែឯង (claim T នៅ) បដិសេធ');
+        await seed(frozen, prepared);
+        await write('PUT', trash + '/policy_source/restoreClaim', null, true, 'គ្មាន provenance ៖ release claim មុនសម្អាតជួរ បដិសេធ');
+        await write('PATCH', '', heldRelease({ ...restored, restoreClaimId: 'policy_source' }), true, 'គ្មាន provenance ៖ ការសរសេរ atomic ដកតែ token ទុក restoreClaimId បដិសេធ');
+        await write('PATCH', '', heldRelease({ ...restored, restoreClaimToken: claim.token }), true, 'គ្មាន provenance ៖ ការសរសេរ atomic ដកតែ restoreClaimId ទុក token បដិសេធ');
+        await write('PATCH', '', heldRelease(restored, { [trash + '/policy_source/restoreBlocked']: false }), true, 'គ្មាន provenance ៖ ការសរសេរ atomic ដែលបិទ restoreBlocked បដិសេធ');
+        await write('PATCH', '', heldRelease(restored), true, 'គ្មាន provenance ៖ PATCH root (ជួរគ្មាន markers + release claim) បដិសេធ');
+        await write('PATCH', '', heldRelease(null), true, 'គ្មាន provenance ៖ លុបជួរ + release claim ក្នុងការសរសេរតែមួយ បដិសេធ');
+        await seed({ ...frozen, restoreClaim: { ...frozenClaim, token: 'wrong-owner' } }, prepared);
+        await write('PATCH', '', heldRelease(restored), true, 'គ្មាន provenance ៖ token H ខុសពី T ក៏បដិសេធ');
+        const unprovenMerged = { ...prepared, barcodes: [neighbor, { ...restored.barcodes[0], restoredAt: at - 500 }], barcode: neighbor.code,
+            cod: 10, dod: 3, price: 13, count: 2, isClosed: false };
+        await seed(frozen, unprovenMerged);
+        await write('PUT', history + '/policy_target', noMarkers(unprovenMerged), true, 'គ្មាន provenance + neighbor ៖ ដក markers ទុក barcode ទាំងអស់ បដិសេធ');
+        await seed(frozen, unprovenMerged);
+        await write('PUT', history + '/policy_target', retained, true, 'គ្មាន provenance + neighbor ៖ ដកច្បាប់ចម្លងស្តារក្នុងជួរតែឯង បដិសេធ');
+        await write('PATCH', '', heldRelease(retained), true, 'គ្មាន provenance + neighbor ៖ PATCH root រក្សា neighbor ដកច្បាប់ចម្លងស្តារ បដិសេធ');
+        await seed({ ...frozen, restoreClaim: { ...frozenClaim, targetId: 'wrong_target' } }, prepared);
+        await write('PATCH', '', heldRelease(restored), true, 'គ្មាន provenance ៖ claim ដែលចង្អុលជួរផ្សេង បដិសេធ');
+        await seed({ ...frozen, restoreBlocked: false, trashMode: 'cookie' }, prepared);
+        await write('PATCH', '', heldRelease(restored), true, 'គ្មាន provenance ៖ source មិនទាន់ freeze បដិសេធ (🔄 បញ្ចប់ធម្មតា)');
+    }
+    await seed(item({ trashMode: 'cookie', restoreBlocked: true, restoreClaim: claim }), { ...prepared, restoreAddedCodes: addedCodes });
+    await write('PUT', history + '/policy_target', null, false, 'cancel row ដែលមានតែ prepared codes អាចលុប row');
+    await seed(item({ restoreClaim: claim }), { ...prepared, restoreAddedCodes: addedCodes });
+    await write('PATCH', '', { [trash + '/policy_source']: null, [history + '/policy_target']: restored,
+        [finals + '/policy_source']: { token: claim.token, targetId: claim.targetId, finalizedAt: at },
+        'zoew_trash_consumptions/policy_source': generationConsumption(item(), 'restore', claim.token, claim.targetId),
+        'zoew_daily_revenue_cod_dod/2026-01-01': { codDollar: 3, dodDollar: 1, totalCount: 1 } }, false,
+    'finalize ធម្មតាដក provenance និងបូក ledger តែម្តង');
+    await sc.drop();
+}
+
+// ⛔ ព្រំដែនការដាក់ចេញ (App ចាស់ 2.50.135 ↔ ធុងសំរាមរបស់ App ថ្មី) ៖ រាងការសរសេរដែល App ចាស់ផ្ញើពិត (`executeRestoreItem` ·
+//    `claimDeletedItemForRestore` · `applyClaimedRestoreToHistory` · `finalizeClaimedRestore` · `applyZtoFinalMarks` ក្នុង
+//    `git show origin/main:ZoeW/src/features/restore.ts` · `zto-final-marks.ts`) ធៀបនឹង rules ពិត លើ backend ទាំង ២ ៖
+//    ក. ស្តារទៅជួរថ្មី ៖ App ចាស់ចម្លងធាតុធុងសំរាមទាំងមូល (គ្មានការដក `trashMode`) ➜ `$other` របស់ history បដិសេធ (ព្រំដែនទទួលស្គាល់ ៖
+//       ការស្តារបរាជ័យដោយសុវត្ថិភាព · ធុងសំរាម និងលុយនៅដដែល) · control ៖ ជួរដដែលគ្មាន `trashMode` ទទួល ➜ មូលហេតុគឺ `trashMode` តែមួយ
+//    ខ. App ចាស់ claim/prepare បាន តែ finalize គ្មាន generation consumption ត្រូវបដិសេធ៖ upgrade client និង rules ជាមួយគ្នា។
+//    គ. ត្រា Sign របស់ App ចាស់ (transaction លើធាតុទាំងមូល · គ្មាន `restoreBlocked`) ៖ ធាតុ App ថ្មី (`cookie` · `local`) និង
+//       ធាតុគ្មាន `trashMode` បដិសេធ (Phase B ៖ គ្មាន compat មុន launch)
+async function oldAppTrashCases(realRules, compileRules, rulesSql) {
+    console.log('\n── App ចាស់ (2.50.135) ↔ ធុងសំរាម App ថ្មី ៖ ព្រំដែនការដាក់ចេញ ស្មើគ្នាទាំង RTDB/Postgres ──');
+    await pgSetRules(realRules, compileRules, rulesSql);
+    const sc = makeScenario('old-app');
+    await sc.loadRules(realRules);
+    const trash = 'zoew_recently_deleted_cod_dod';
+    const history = 'zoew_scan_history_cod_dod';
+    const finals = 'zoew_restore_finalizations';
+    const daily = 'zoew_daily_revenue_cod_dod/2026-01-01';
+    const monthly = 'zoew_monthly_revenue_cod_dod/2026-01';
+    const at = Date.now();
+    const deletedAt = at - 1000;
+    const token = 'restore_oldapp_token';
+    const source = (extra = {}) => Object.assign({ id: 'oldapp_source', phone: '012000000', scanDate: '2026-01-01', time: '08:00:00 (2026-01-01)',
+        createdAt: at - 10000, deletedAt, cod: 3, dod: 1, count: 1, price: 4, trashReason: 'remove', isFromDeletion: false, isClosed: false,
+        isCalled: false, trashMode: 'local',
+        barcodes: [{ code: 'OLDAPP_PARCEL', cod: 3, dod: 1, locker: 'A1', createdAt: at - 10000, isClosed: false, isDeducted: true, isFromDeletion: false }] }, extra);
+    const neighbor = { code: 'OLDAPP_NEIGHBOR', cod: 7, dod: 2, locker: 'A2', createdAt: at - 5000, isClosed: false, isDeducted: false, isFromDeletion: false };
+    const openRow = { id: 'oldapp_target', phone: '012000000', scanDate: '2026-01-01', time: '09:00:00 (2026-01-01)', createdAt: at - 5000,
+        cod: 7, dod: 2, count: 1, price: 9, isClosed: false, isCalled: false, barcode: neighbor.code, barcodes: [neighbor] };
+    const ledger = { codDollar: 7, dodDollar: 2, totalCount: 1, ded: { oldapp_source: { at: deletedAt, cod: 3, dod: 1, count: 1 } } };
+    const seed = async (src, live) => {
+        await both(sc, 'owner', 'SNAP', '', { [trash]: src ? { oldapp_source: src } : {}, [history]: live ? { [live.id]: live } : {},
+            zoew_daily_revenue_cod_dod: { '2026-01-01': ledger }, zoew_monthly_revenue_cod_dod: { '2026-01': { codDollar: 7, dodDollar: 2, totalCount: 1 } } });
+    };
+    const claimed = (targetId) => source({ restoreClaim: { token, claimedAt: at, targetId } });
+    const oldItemToRestore = () => {
+        const item = JSON.parse(JSON.stringify(claimed('unused')));
+        for (const k of ['deletedAt', 'isFromDeletion', 'trashReason', 'restoreClaim', 'restoreClaimId', 'restoreClaimToken']) delete item[k];
+        item.createdAt = at;
+        item.barcodes.forEach((b) => {
+            b.isDeducted = false;
+            b.isFromDeletion = false;
+            delete b.ztoReturnedAt; delete b.ztoMisplacedAt; delete b.ztoSentOutAt; delete b.closedAt;
+            b.restoredAt = at;
+        });
+        return item;
+    };
+    const write = policyWriter(sc, 'old-app', 'App ចាស់ ↔ ធុងសំរាម App ថ្មី', 'ការបដិសេធទុកធុងសំរាម claim និងលុបដដែល');
+
+    await seed(source());
+    await write('PUT', trash + '/oldapp_source', claimed('oldapp_source'), false, 'ក. App ចាស់ claim ធាតុ local មិនទាន់ Sign (transaction ធាតុទាំងមូល · trashMode នៅ) ទទួល');
+    const freshRow = Object.assign(oldItemToRestore(), { id: 'oldapp_source', restoreClaimId: 'oldapp_source', restoreClaimToken: token });
+    await write('PUT', history + '/oldapp_source', freshRow, true, 'ក. App ចាស់ស្តារទៅជួរថ្មី ៖ ចម្លងធាតុទាំងមូល (trashMode \'local\' នៅ) បដិសេធ (ព្រំដែនទទួលស្គាល់)');
+    const { trashMode, ...withoutMode } = freshRow;
+    check(trashMode === 'local', 'ក. រាងជួរ App ចាស់ពិតជាមាន trashMode (cloneRestoreItem មិនដក)');
+    await write('PUT', history + '/oldapp_source', withoutMode, false, 'ក. control ៖ ជួរដដែលគ្មាន trashMode ទទួល ➜ ការបដិសេធមកពី trashMode តែមួយ');
+
+    await seed(source(), openRow);
+    await write('PUT', trash + '/oldapp_source', claimed('oldapp_target'), false, 'ខ. App ចាស់ claim ទៅជួរបើកដែលមានស្រាប់ ទទួល');
+    const merged = JSON.parse(JSON.stringify(openRow));
+    merged.barcodes.push(...oldItemToRestore().barcodes.map((b) => ({ ...b })));
+    merged.count = merged.barcodes.length;
+    merged.cod = 10; merged.dod = 3; merged.price = 13; merged.isClosed = false;
+    Object.assign(merged, { restoreClaimId: 'oldapp_source', restoreClaimToken: token });
+    await write('PUT', history + '/oldapp_target', merged, false, 'ខ. App ចាស់ prepare បញ្ចូលតែ barcode ទៅជួរបើក ទទួល');
+    const oldFinalize = {
+        [finals + '/oldapp_source']: { token, targetId: 'oldapp_target', finalizedAt: at },
+        [trash + '/oldapp_source']: null,
+        [history + '/oldapp_target/restoreClaimId']: null,
+        [history + '/oldapp_target/restoreClaimToken']: null,
+        [daily + '/codDollar']: { __increment: 3 }, [daily + '/dodDollar']: { __increment: 1 }, [daily + '/totalCount']: { __increment: 1 },
+        [monthly + '/codDollar']: { __increment: 3 }, [monthly + '/dodDollar']: { __increment: 1 }, [monthly + '/totalCount']: { __increment: 1 },
+        [daily + '/ded/oldapp_source']: { at: deletedAt, cod: 3, dod: 1, count: 1, back: true }
+    };
+    await write('PATCH', '', oldFinalize, true, 'App ចាស់ finalize គ្មាន generation consumption បដិសេធ៖ ត្រូវ upgrade ជាមួយគ្នា');
+    await write('PATCH', '', { ...oldFinalize, 'zoew_trash_consumptions/oldapp_source': generationConsumption(source(), 'restore', token, 'oldapp_target') }, false, 'control៖ client ថ្មី consume generation ហើយ finalize បាន');
+    const after = await sc.tree();
+    const row = after && after[history] && after[history].oldapp_target;
+    check(!(after[trash] && after[trash].oldapp_source) && row && Object.keys(row.barcodes || {}).length === 2 && !row.restoreClaimId && !row.restoreClaimToken
+        && after.zoew_daily_revenue_cod_dod['2026-01-01'].codDollar === 10 && after.zoew_daily_revenue_cod_dod['2026-01-01'].ded.oldapp_source.back === true
+        && JSON.stringify(after) === JSON.stringify(await pgTree()),
+    'ខ. ក្រោយ finalize ៖ ធុងសំរាមទទេ · ជួរមាន barcode ២ គ្មាន markers · លុបបូកវិញម្តង (RTDB = Postgres)', JSON.stringify(row));
+
+    const pickup = (mode) => {
+        const closedAt = at - 4000;
+        const item = source({ trashReason: 'pickup', isFromDeletion: true, isClosed: true, closedAt,
+            barcodes: [{ code: 'OLDAPP_PARCEL', cod: 3, dod: 1, locker: 'A1', createdAt: at - 10000, isClosed: true, closedAt, isDeducted: false, isFromDeletion: true }] });
+        if (mode) item.trashMode = mode; else delete item.trashMode;
+        return item;
+    };
+    const stamped = (item) => { const next = JSON.parse(JSON.stringify(item)); next.barcodes[0].ztoSignedAt = at; return next; };
+    for (const mode of ['cookie', 'local']) {
+        await seed(pickup(mode));
+        await write('PUT', trash + '/oldapp_source', stamped(pickup(mode)), true, 'គ. App ចាស់ត្រា Sign (transaction ធាតុទាំងមូល · គ្មាន restoreBlocked) លើធាតុ App ថ្មី (' + mode + ') បដិសេធ');
+    }
+    await seed(pickup(null));
+    await write('PUT', trash + '/oldapp_source', stamped(pickup(null)), true, '⛔ គ. ត្រា Sign (transaction ធាតុទាំងមូល · គ្មាន restoreBlocked) លើធាតុគ្មាន trashMode ➜ បដិសេធ');
+    await sc.drop();
+}
+
+async function monthlyDeductionCases(realRules, compileRules, rulesSql) {
+    console.log('\n── បង្កាន់ដៃដកប្រាក់ប្រចាំខែ និងប្រចាំថ្ងៃ ──');
+    await pgSetRules(realRules, compileRules, rulesSql);
+    const sc = makeScenario('monthly-deduction');
+    await sc.loadRules(realRules);
+    await both(sc, 'owner', 'SNAP', '', {});
+    const write = policyWriter(sc, 'monthly-deduction', 'បង្កាន់ដៃ', 'ការបដិសេធរក្សាប្រាក់ និងបង្កាន់ដៃដដែល');
+    const receipt = { at: Date.now(), cod: 2.25, dod: 0, count: 1 };
+    const base = { codDollar: 0, dodDollar: 3.5, totalCount: 0 };
+    for (const bucket of ['zoew_daily_revenue_cod_dod/2026-01-01', 'zoew_monthly_revenue_cod_dod/2026-01']) {
+        await write('PUT', bucket, base, false, 'App ចាស់គ្មានបង្កាន់ដៃ ទទួល');
+        await write('PUT', bucket, { ...base, ded: { receipt: receipt } }, false, 'ប្រាក់ និងបង្កាន់ដៃក្នុងការសរសេរតែមួយ ទទួល');
+        await write('PATCH', bucket, { codDollar: 2.25, 'ded/receipt/back': true }, false, 'ស្ដារប្រាក់ និង back ក្នុងការសរសេរតែមួយ ទទួល');
+        await write('PUT', bucket + '/ded/zero', { at: receipt.at, cod: 0, dod: 0, count: 0, undo: true }, false, 'ដកសូន្យ និង undo ទទួល');
+        await write('PUT', bucket + '/ded/' + 'a'.repeat(64), receipt, false, 'លេខសម្គាល់ប្រវែង 64 ទទួល');
+        await write('PUT', bucket + '/ded/' + 'a'.repeat(65), receipt, true, 'លេខសម្គាល់លើស 64 បដិសេធ');
+        for (const field of ['at', 'cod', 'dod', 'count']) {
+            const missing = { ...receipt };
+            delete missing[field];
+            await write('PUT', bucket + '/ded/bad', missing, true, 'ខ្វះ ' + field + ' បដិសេធ');
+            for (const value of [-1, '1', false, {}]) {
+                await write('PUT', bucket + '/ded/bad', { ...receipt, [field]: value }, true, field + ' ខុសប្រភេទ/អវិជ្ជមាន បដិសេធ');
+            }
+        }
+        await write('PUT', bucket + '/ded/bad', { ...receipt, at: 0 }, true, 'at សូន្យ បដិសេធ');
+        for (const field of ['back', 'undo']) {
+            for (const value of [false, 1, 'true']) await write('PUT', bucket + '/ded/bad', { ...receipt, [field]: value }, true, field + ' មិនមែន true បដិសេធ');
+        }
+        await write('PUT', bucket + '/ded/bad', { ...receipt, extra: 1 }, true, 'វាលបន្ថែម បដិសេធ');
+        await write('PUT', bucket + '/ded', 1, true, 'ded មិនមែន object បដិសេធ');
+        await write('PATCH', bucket, { codDollar: -1, 'ded/receipt/back': true }, true, 'ស្ដារដែលធ្វើឱ្យប្រាក់អវិជ្ជមាន បដិសេធទាំងអស់');
+        await write('PUT', bucket + '/ded/zero', null, false, 'សម្អាតបង្កាន់ដៃចាស់ ទទួល');
+        await write('PUT', bucket, base, false, 'App ចាស់សរសេររាងគ្មាន ded ទទួល ត្រូវធ្វើបច្ចុប្បន្នភាពគ្រប់ឧបករណ៍');
+        await write('PUT', bucket, null, false, 'សម្អាត bucket ចាស់ ទទួល');
+    }
+    await sc.drop();
+}
+
+const PROBE_RULES = { rules: { '.read': true,
+    anc: { '$k': { '.write': 'auth != null', '.validate': "newData.hasChildren(['a','b'])", a: { '.validate': 'newData.isNumber()' }, b: { '.validate': 'newData.isNumber()' }, '$other': { '.validate': false } } },
+    desc: { '$k': { '.write': 'auth != null', x: { '.validate': 'newData.isNumber()' }, y: { '.validate': 'newData.isNumber()' } } },
+    cmp: { '$k': { '.write': 'auth != null', '.validate': "newData.child('v').val() <= 5" } },
+    cmp2: { '$k': { '.write': 'auth != null', '.validate': "newData.child('v').val() === null" } },
+    cmp3: { '$k': { '.write': 'auth != null', '.validate': "newData.child('v').val() !== 'x'" } },
+    cmp4: { '$k': { '.write': 'auth != null', '.validate': "newData.child('v').val() > -1" } },
+    cmp5: { '$k': { '.write': 'auth != null', '.validate': "newData.child('s').val() < 'm'" } },
+    len: { '$k': { '.write': 'auth != null', '.validate': "newData.child('s').isString() && newData.child('s').val().length >= 3 && newData.child('s').val().length <= 4" } },
+    mod: { '$k': { '.write': 'auth != null', '.validate': "newData.child('n').isNumber() && newData.child('n').val() % 1 === 0 && newData.child('n').val() >= 1" } },
+    arr: { '$k': { '.write': 'auth != null', '.validate': 'newData.hasChildren()', '$i': { '.validate': "newData.hasChildren(['c'])" } } },
+    wr: { '$k': { '.write': "newData.child('ok').val() === true", deep: { '.write': 'true' } } },
+    nul: { '$k': { '.write': 'auth != null', '.validate': "newData.child('a').exists() || !newData.exists()" } },
+    fence: { '$k': { '.write': "auth != null && (!data.exists() || root.child('keys').child($k).val() === newData.child('t').val() || newData.parent().parent().child('keys').child($k).val() === newData.child('t').val())" } },
+    keys: { '$k': { '.write': 'auth != null', '.validate': 'newData.isString()' } },
+    par: { '$k': { '.write': 'auth != null', 'c': { '.validate': "newData.parent().child('d').exists()" } } },
+    err: { '$k': { '.write': "auth != null && (root.child('keys').child(newData.child('ref').val()).exists() || newData.child('ref').val() === null)" } },
+    uidGuard: { '$k': { '.write': 'auth != null && newData.val() === auth.uid' } },
+    // ដូច `zoew_write_receipts/$operation` ពិត ៖ បង្កើតបានតែ uid ខ្លួនឯង · លុបបានតែ receipt ខ្លួនឯងដែលចាស់ជាង ២ ថ្ងៃ (`NATIVE_RECEIPT_RETENTION_MS`)
+    rcpt: { '$k': { '.write': "auth != null && ((!data.exists() && newData.exists() && newData.child('uid').val() === auth.uid) || (data.exists() && !newData.exists() && data.child('uid').val() === auth.uid && data.child('at').val() < now - 172800000))" } }
+} };
+// [who · method · path · value · emulator verdict ដែលរំពឹង (true = denied)] — rules receipt ត្រូវបដិសេធ/ទទួលឲ្យត្រូវ មិនមែនគ្រាន់តែស្មើគ្នា
+const RECEIPT_STEPS = (uid, now) => [
+    ['owner', 'PUT', 'rcpt/old', { uid, at: now - 3 * 86400000, hash: 'h' }, null],
+    ['owner', 'PUT', 'rcpt/young', { uid, at: now - 1000, hash: 'h' }, null],
+    ['owner', 'PUT', 'rcpt/foreign', { uid: 'foreign-user', at: now - 3 * 86400000, hash: 'h' }, null],
+    ['user', 'PUT', 'rcpt/mine', { uid, at: now - 1000, hash: 'h' }, false],
+    ['user', 'PUT', 'rcpt/mine', { uid, at: now - 1000, hash: 'h2' }, true],
+    ['user', 'PUT', 'rcpt/stolen', { uid: 'foreign-user', at: now - 1000, hash: 'h' }, true],
+    ['user', 'PUT', 'rcpt/young', null, true],
+    ['user', 'PUT', 'rcpt/foreign', null, true],
+    ['user', 'PUT', 'rcpt/old', null, false]
+];
+const PROBE_STEPS = [
+    ['user', 'PUT', 'anc/k1', { a: 1, b: 2 }], ['user', 'PATCH', 'anc/k1', { a: 5 }], ['user', 'PUT', 'anc/k2/a', 1], ['user', 'PATCH', '', { 'anc/k3/a': 1 }],
+    ['user', 'PUT', 'anc/k1/z', 3], ['user', 'PUT', 'anc/k1/a', null], ['user', 'PATCH', 'anc/k1', { a: 7, b: 8 }],
+    ['owner', 'PUT', 'desc/k1', { x: 1, y: 'bad' }], ['user', 'PATCH', 'desc/k1', { x: 2 }], ['user', 'PUT', 'desc/k1', { x: 3, y: 'bad' }], ['user', 'PATCH', '', { 'desc/k1/x': 4 }],
+    ['user', 'PUT', 'desc/k1/y', 'still-bad'], ['user', 'PUT', 'desc/k2', { x: 1, extra: { deep: [1, 2] } }],
+    ['user', 'PUT', 'cmp/k1', { w: 1 }], ['user', 'PUT', 'cmp/k2', { v: 3 }], ['user', 'PUT', 'cmp/k3', { v: '3' }], ['user', 'PUT', 'cmp/k4', { v: true }], ['user', 'PUT', 'cmp/k5', { v: 5 }], ['user', 'PUT', 'cmp/k6', { v: 5.0001 }],
+    ['user', 'PUT', 'cmp2/k1', { w: 1 }], ['user', 'PUT', 'cmp2/k2', { v: 0 }], ['user', 'PUT', 'cmp3/k1', { w: 1 }], ['user', 'PUT', 'cmp3/k2', { v: 'x' }],
+    ['user', 'PUT', 'cmp4/k1', { w: 1 }], ['user', 'PUT', 'cmp4/k2', { v: -1 }], ['user', 'PUT', 'cmp4/k3', { v: -0.5 }],
+    ['user', 'PUT', 'cmp5/k1', { s: 'abc' }], ['user', 'PUT', 'cmp5/k2', { s: 'zz' }], ['user', 'PUT', 'cmp5/k3', { s: 'M' }], ['user', 'PUT', 'cmp5/k4', { s: 3 }],
+    ['user', 'PUT', 'len/k1', { s: 'ab' }], ['user', 'PUT', 'len/k2', { s: 'abcd' }], ['user', 'PUT', 'len/k3', { s: 'ក្រហម' }], ['user', 'PUT', 'len/k4', { s: '😀a' }], ['user', 'PUT', 'len/k5', { s: 12345 }],
+    ['user', 'PUT', 'mod/k1', { n: 3 }], ['user', 'PUT', 'mod/k2', { n: 2.5 }], ['user', 'PUT', 'mod/k3', { n: 0 }], ['user', 'PUT', 'mod/k4', { n: 9007199254740991 }],
+    ['user', 'PUT', 'arr/k1', [{ c: 1 }, { c: 2 }]], ['user', 'PUT', 'arr/k2', [{ c: 1 }, null, { c: 3 }]], ['user', 'PUT', 'arr/k3', [{ c: 1 }, {}]], ['user', 'PUT', 'arr/k4', [{ c: 1 }, { d: 1 }]],
+    ['user', 'PUT', 'arr/k5', []], ['user', 'PATCH', 'arr/k1', { '1': { c: 9 } }], ['user', 'PATCH', 'arr/k1', { '5': { d: 1 } }],
+    ['user', 'PUT', 'wr/k1/deep', 5], ['user', 'PUT', 'wr/k2', { deep: 5 }], ['user', 'PATCH', 'wr/k2', { deep: 6 }], ['user', 'PUT', 'wr/k3', { ok: true, deep: 1 }],
+    ['owner', 'PUT', 'nul/k1', { a: 1 }], ['user', 'PUT', 'nul/k1', null], ['owner', 'PUT', 'nul/k2', { a: 1, b: 2 }], ['user', 'PUT', 'nul/k2/a', null], ['user', 'PUT', 'nul/k2/b', null],
+    ['owner', 'PUT', 'nul/k3', { a: 1 }], ['user', 'PUT', 'nul/k3/a', null],
+    ['user', 'PUT', 'fence/f1', { t: 'x' }], ['user', 'PUT', 'fence/f1', { t: 'y' }], ['user', 'PATCH', '', { 'keys/f1': 'y', 'fence/f1': { t: 'y' } }],
+    ['user', 'PUT', 'fence/f1', { t: 'y', more: 1 }], ['user', 'PATCH', '', { 'keys/f1': 'z', 'fence/f1/t': 'z' }], ['user', 'PUT', 'fence/f1', { t: 'q' }],
+    ['user', 'PUT', 'par/p1', { c: 1 }], ['user', 'PUT', 'par/p1', { c: 1, d: 1 }], ['user', 'PUT', 'par/p1/c', 2], ['user', 'PUT', 'par/p1/d', null],
+    ['user', 'PUT', 'err/e1', { w: 1 }], ['user', 'PUT', 'err/e2', { ref: 'f1' }], ['user', 'PUT', 'err/e3', { ref: 'nope' }], ['user', 'PUT', 'err/e4', { ref: 5 }]
+];
+
+const MUTATORS = [
+    ['number ➜ string', (v) => (typeof v === 'number' ? String(v) : undefined)],
+    ['number ➜ អវិជ្ជមាន', (v) => (typeof v === 'number' ? -Math.abs(v) - 1 : undefined)],
+    ['boolean ➜ number', (v) => (typeof v === 'boolean' ? 1 : undefined)],
+    ['string ➜ number', (v) => (typeof v === 'string' ? 7 : undefined)],
+    ['leaf ➜ object', (v) => (typeof v !== 'object' || v === null ? { nested: v === null ? 1 : v } : undefined)],
+    ['leaf ➜ ទសភាគ', (v) => (typeof v === 'number' ? v + 0.5 : undefined)]
+];
+const FIELD_MUTATORS = [
+    ['វាលមិនស្គាល់', (o) => { o.zzUnknown = 1; }],
+    ['លុបវាល id', (o) => { if ('id' in o) { delete o.id; return true; } return false; }],
+    ['clearClaim ខ្វះ token', (o) => { o.clearClaim = { claimedAt: 1 }; }],
+    ['clearClaim ត្រឹមត្រូវ', (o) => { o.clearClaim = { token: 'tk' + Math.floor(o.cod || 1), claimedAt: 1790000000000 }; }],
+    ['restoreClaim ខុស', (o) => { o.restoreClaimId = 'nosuch'; o.restoreClaimToken = 'bad'; }],
+    ['restoreClaim (trash)', (o) => { o.restoreClaim = { token: 'x', claimedAt: Date.now(), targetId: String(o.id || 'x') }; }],
+    ['trashReason ខុស', (o) => { o.trashReason = 'lost'; }],
+    ['trashReason ត្រូវ', (o) => { o.trashReason = 'remove'; o.deletedAt = 1790000000000; }],
+    ['lockerRevision 0', (o) => { o.lockerRevision = 0; }],
+    ['lockerRevision 1.5', (o) => { o.lockerRevision = 1.5; }],
+    ['lockerRevision 3', (o) => { o.lockerRevision = 3; }],
+    ['op ខ្លី', (o) => { o.op = 'abc'; }],
+    ['op ត្រូវ', (o) => { o.op = 'op-12345678'; }],
+    ['token finalization ខុស', (o) => { o.token = 'wrong-token'; o.finalizedAt = 1; }],
+    ['targetId ផ្សេង', (o) => { o.targetId = 'other-target'; }],
+    ['barcodes/0 វាលហាម', (o) => { if (o.barcodes && o.barcodes[0]) { o.barcodes[0].hacker = true; return true; } return false; }],
+    ['barcodes/0 cod អវិជ្ជមាន', (o) => { if (o.barcodes && o.barcodes[0]) { o.barcodes[0].cod = -3; return true; } return false; }],
+    ['barcodes ជា string', (o) => { if ('barcodes' in o) { o.barcodes = 'x'; return true; } return false; }],
+    ['pickedUpBarcodes ទទេ string', (o) => { o.pickedUpBarcodes = { K1: '' }; }],
+    ['pickedUpPhones 0', (o) => { o.pickedUpPhones = { p1: 0 }; }]
+];
+
+function leaves(v, at, out) {
+    if (v === null || typeof v !== 'object') { out.push(at); return out; }
+    const keys = Array.isArray(v) ? v.map((_, i) => i) : Object.keys(v);
+    for (const k of keys) leaves(v[k], at.concat([k]), out);
+    return out;
+}
+function mutate(entry, rand) {
+    const v = JSON.parse(JSON.stringify(entry.v === undefined ? null : entry.v));
+    if (v && typeof v === 'object' && !isInc(v) && rand() < 0.55) {
+        const targets = [v];
+        if (entry.m === 'PATCH') for (const k of Object.keys(v)) if (v[k] && typeof v[k] === 'object' && !isInc(v[k])) targets.push(v[k]);
+        const obj = targets[Math.floor(rand() * targets.length)];
+        const [name, fn] = FIELD_MUTATORS[Math.floor(rand() * FIELD_MUTATORS.length)];
+        if (!Array.isArray(obj) && fn(obj) !== false) return { v, name };
+    }
+    if (v === null) return { v: { zzUnknown: 1 }, name: 'null ➜ object' };
+    if (isInc(v)) return { v: { __increment: -1e9 }, name: 'increment ធំអវិជ្ជមាន' };
+    const ls = leaves(v, [], []);
+    if (!ls.length) return null;
+    for (let tries = 0; tries < 8; tries++) {
+        const pth = ls[Math.floor(rand() * ls.length)];
+        const [name, fn] = MUTATORS[Math.floor(rand() * MUTATORS.length)];
+        let holder = { root: v };
+        let key = 'root';
+        for (const k of pth) { holder = holder[key]; key = k; }
+        if (holder && typeof holder === 'object' && isInc(holder)) continue;
+        const next = fn(holder[key]);
+        if (next === undefined) continue;
+        holder[key] = next;
+        return { v: holder.root !== undefined && pth.length === 0 ? next : v, name };
+    }
+    return null;
+}
+
+function capture() {
+    const file = path.join(os.tmpdir(), 'sb-parity-' + process.pid + '.json');
+    return new Promise((resolve) => {
+        execFile(process.execPath, [path.join(__dirname, '..', 'revenue-fuzz-test.js')], {
+            cwd: ROOT,
+            env: Object.assign({}, process.env, { FUZZ_APP_DIR: ROOT, FUZZ_CAPTURE: file, FUZZ_RUNS: String(RUNS), FUZZ_OPS: String(OPS), FUZZ_RUN0: '0' }),
+            encoding: 'utf8', timeout: 300000, maxBuffer: 8 * 1024 * 1024
+        }, (error, stdout, stderr) => {
+            let data = null;
+            try { data = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { data = null; }
+            try { fs.unlinkSync(file); } catch (e) {}
+            const detail = error ? JSON.stringify({ code: error.code, signal: error.signal, killed: error.killed,
+                message: String(error.message || '').slice(0, 600) }) : '';
+            const tail = [String(stdout || '').trim().split('\n').slice(-3).join(' | '), detail,
+                String(stderr || '').trim().slice(-2500)].filter(Boolean).join('\n');
+            resolve({ ok: !error, tail, data });
+        });
+    });
+}
+
+(async () => {
+    console.log('supabase-rules-parity — rules RTDB លើ Postgres (backend Supabase) ធៀបនឹង RTDB emulator ពិត\n');
+    const reach = await req('GET', '/.json?ns=' + emuNamespace('sb-parity-probe')).catch(() => null);
+    const rulesMod = path.join(ROOT, 'supabase', 'scripts', 'rtdb-rules.mjs');
+    H = createPgHarness({ depsDirs: DEPS_DIRS, shimDir: path.join(__dirname, '..', 'supabase-shim'),
+        wantMajor: parseInt((fs.readFileSync(path.join(ROOT, 'supabase', 'config.toml'), 'utf8').match(/^major_version\s*=\s*(\d+)\s*$/m) || [])[1] || '0', 10) });
+    const missing = !reach || reach.status >= 500 ? 'គ្មាន RTDB emulator នៅ 127.0.0.1:9000' : (H.unavailableReason() || (!fs.existsSync(rulesMod) ? 'គ្មាន supabase/scripts/rtdb-rules.mjs' : null));
+    if (missing) {
+        if (STRICT) {
+            console.log('  FAIL  ' + missing + ' — STRICT ➜ ការ SKIP រាប់ជាការធ្លាក់');
+            process.exit(1);
+        }
+        console.log('SKIP — ' + missing);
+        process.exitCode = 0;
+        return;
+    }
+    const { compileRules, rulesSql } = await import(pathToFileURL(rulesMod).href);
+    const realRules = JSON.parse(fs.readFileSync(path.join(ROOT, 'firebase-database.rules.json'), 'utf8'));
+    await H.start();
+    try {
+        await pgSetupTenant();
+        if (process.env.SBPARITY_POLICY_ONLY === '1') {
+            await trashPolicyCases(realRules, compileRules, rulesSql);
+            await oldAppTrashCases(realRules, compileRules, rulesSql);
+            await monthlyDeductionCases(realRules, compileRules, rulesSql);
+            await trashModeCases(realRules, compileRules, rulesSql);
+            console.log('SBPARITY_POLICY_ONLY=1 ៖ debug តែគោលការណ៍ធុងសំរាម · ' + pass + ' ok, ' + fail + ' FAIL · មិនមែនលទ្ធផល checker ពេញ');
+            process.exitCode = 1;
+            return;
+        }
+
+        console.log('── ក. probe semantics (rules គំរូ) ──');
+        await pgSetRules(PROBE_RULES, compileRules, rulesSql);
+        const sc = makeScenario('probe');
+        await sc.loadRules(PROBE_RULES);
+        await pgOwnerSnapshot({});
+        let probeDenied = 0, probeAllowed = 0;
+        const before = stats.mismatches.length;
+        PROBE_STEPS.push(['user', 'PUT', 'uidGuard/own', member.sub], ['user', 'PUT', 'uidGuard/foreign', 'foreign-user']);
+        for (let i = 0; i < PROBE_STEPS.length; i++) {
+            const [who, m, p, v] = PROBE_STEPS[i];
+            const r = await both(sc, who, m, p, v, 'probe#' + i);
+            if (r) { if (r.emuDenied) probeDenied++; else probeAllowed++; }
+            await compareState(sc, 'probe#' + i + ' ' + who + ' ' + m + ' ' + (p || '/'));
+        }
+        const receiptSteps = RECEIPT_STEPS(member.sub, Date.now());
+        const receiptWrong = [];
+        for (let i = 0; i < receiptSteps.length; i++) {
+            const [who, m, p, v, expectDenied] = receiptSteps[i];
+            const r = await both(sc, who, m, p, v, 'receipt#' + i);
+            if (expectDenied !== null && (!r || r.emuDenied !== expectDenied)) receiptWrong.push('receipt#' + i + ' ' + who + ' ' + m + ' ' + p + ' ➜ ' + JSON.stringify(r && r.emuDenied));
+            await compareState(sc, 'receipt#' + i + ' ' + who + ' ' + m + ' ' + p);
+        }
+        check(receiptWrong.length === 0, 'receipt rules ៖ បង្កើតតែ uid ខ្លួន · មិនសរសេរជាន់ · លុបបានតែ receipt ខ្លួនដែលចាស់ជាង ២ ថ្ងៃ (' + receiptSteps.length + ' ជំហាន · RTDB = Postgres)', receiptWrong.join('\n        '));
+        await sc.drop();
+        const probeMis = stats.mismatches.slice(before);
+        console.log('    probe ៖ ' + PROBE_STEPS.length + ' ជំហាន · RTDB បដិសេធ ' + probeDenied + ' · ទទួល ' + probeAllowed);
+        check(probeMis.length === 0, 'probe semantics ៖ verdict Postgres = RTDB គ្រប់ជំហាន (' + PROBE_STEPS.length + ')',
+            probeMis.slice(0, 8).map((d) => JSON.stringify(d)).join('\n        '));
+        check(probeDenied >= 20 && probeAllowed >= 20, 'probe មិនទទេ ៖ បដិសេធ ≥ ២០ និងទទួល ≥ ២០', 'deny=' + probeDenied + ' allow=' + probeAllowed);
+        check(stats.stateDiffs.length === 0, 'probe ៖ ទិន្នន័យចុងក្រោយ Postgres = RTDB (array/null/ការលុប)', stats.stateDiffs.join('\n        '));
+
+        for (const mutant of ENGINE_MUTANTS) {
+            await pgSetupTenant(mutant);
+            await pgSetRules(PROBE_RULES, compileRules, rulesSql);
+            const ms = makeScenario('mutant');
+            await ms.loadRules(PROBE_RULES);
+            const misStart = stats.mismatches.length;
+            const diffStart = stats.stateDiffs.length;
+            for (let i = 0; i < PROBE_STEPS.length; i++) {
+                const [who, m, p, v] = PROBE_STEPS[i];
+                await both(ms, who, m, p, v, 'mutant#' + i);
+                await compareState(ms, 'mutant#' + i);
+            }
+            await ms.drop();
+            const caught = (stats.mismatches.length - misStart) + (stats.stateDiffs.length - diffStart);
+            stats.mismatches.length = misStart;
+            stats.stateDiffs.length = diffStart;
+            check(caught > 0, 'ការវាស់រសើប ៖ engine Postgres ខូច «' + mutant[0] + '» ➜ probe ឃើញភាពខុសគ្នា (' + caught + ')');
+        }
+        await pgSetupTenant();
+        if (process.env.SBPARITY_PROBE_ONLY === '1') {
+            console.log('\nSBPARITY_PROBE_ONLY=1 ៖ រំលងផ្នែក ខ–គ (ការ debug តែប៉ុណ្ណោះ · មិនមែនភស្តុតាង)');
+            fail++;
+            return;
+        }
+        console.log('\n── ខ–គ. ការសរសេរពិតរបស់ App + ការបំប្លែង (rules ពិត) ──');
+        await pgSetRules(realRules, compileRules, rulesSql);
+        await trashPolicyCases(realRules, compileRules, rulesSql);
+        await oldAppTrashCases(realRules, compileRules, rulesSql);
+        await monthlyDeductionCases(realRules, compileRules, rulesSql);
+        await trashModeCases(realRules, compileRules, rulesSql);
+        await evidenceRetentionCases(realRules, compileRules, rulesSql);
+        await pickupProtocolCases(realRules, compileRules, rulesSql);
+        await restorePickupGuardCases(realRules, compileRules, rulesSql, 'source');
+        await slotPurgeCases(realRules, compileRules, rulesSql, 'source');
+        const artifactText = fs.readFileSync(path.join(ROOT, 'firebase-database.rules.min.json'), 'utf8');
+        check(rulesSql(compileRules(JSON.parse(artifactText))) === rulesSql(compileRules(realRules)), 'artifact publish compile ទៅ SQL ដូចប្រភព');
+        await slotPurgeCases(JSON.parse(artifactText), compileRules, rulesSql, 'artifact');
+        await restorePickupGuardCases(JSON.parse(artifactText), compileRules, rulesSql, 'artifact');
+        await pgSetRules(realRules, compileRules, rulesSql);
+        const cap = await capture();
+        check(cap.ok && Array.isArray(cap.data) && cap.data.length === RUNS, 'revenue-fuzz (App ពិត) capture ' + RUNS + ' លំដាប់', cap.tail);
+        if (!cap.ok || !Array.isArray(cap.data)) throw new Error('capture failed');
+        const rand = rng(SEED);
+        const mutNames = new Set();
+        const misBefore = stats.mismatches.length;
+        const diffBefore = stats.stateDiffs.length;
+        for (const run of cap.data) {
+            const s = makeScenario('real-' + run.run);
+            await s.loadRules(realRules);
+            await s.owner('SNAP', '', run.seed);
+            await pgOwnerSnapshot(dataOf(run.seed));
+            const live = await both(s, 'user', 'PUT', 'zoew_daily_revenue_cod_dod/2000-01-01/codDollar', -1, 'live');
+            if (!live || !live.emuDenied || !live.pgDenied) throw new Error('rules មិនរស់ ៖ ledger អវិជ្ជមានត្រូវទទួល');
+            for (let i = 0; i < run.log.length; i++) {
+                const entry = run.log[i];
+                if (!entry || entry.bad) throw new Error('capture ខូច ៖ ' + JSON.stringify(entry));
+                if (entry.owner) {
+                    await both(s, 'owner', entry.m, entry.p, entry.v);
+                    continue;
+                }
+                if (rand() < 0.6) {
+                    const mut = mutate(entry, rand);
+                    if (mut) {
+                        stats.probes++;
+                        mutNames.add(mut.name);
+                        const r = await both(s, 'user', entry.m, entry.p, mut.v, 'run' + run.run + '#' + i + ' ' + mut.name, true);
+                        if (r && r.emuDenied && r.pgDenied) stats.probesDeniedBoth++;
+                        if (r && !r.emuDenied && r.pgDenied === false) stats.probesAcceptedBoth++;
+                    }
+                }
+                stats.user++;
+                stats.roots.add(rootOf(entry.p));
+                const r = await both(s, 'user', entry.m, entry.p, entry.v, 'run' + run.run + '#' + i);
+                if (r && r.emuDenied) stats.denied++;
+            }
+            await compareState(s, 'run ' + run.run);
+            await s.drop();
+        }
+        const realMis = stats.mismatches.slice(misBefore);
+        console.log('    ការសរសេរ user ' + stats.user + ' (RTDB បដិសេធ ' + stats.denied + ') · probe បំប្លែង ' + stats.probes + ' (បដិសេធទាំង ២ ' + stats.probesDeniedBoth
+            + ' · ទទួលទាំង ២ ' + stats.probesAcceptedBoth + ') · ប្រភេទបំប្លែង ' + mutNames.size + ' · root ' + JSON.stringify([...stats.roots].sort()));
+        check(stats.unsupported.length === 0, 'ការសរសេររបស់ App ទាំងអស់បង្ហាញជា op Postgres បាន (path ≥ ១ ជាន់)', stats.unsupported.slice(0, 5).join(' · '));
+        check(stats.user >= MIN_USER_WRITES, 'ជាន់អប្បបរមា ៖ ការសរសេររបស់ App ≥ ' + MIN_USER_WRITES, 'user=' + stats.user);
+        const missingRoots = REQUIRED_ROOTS.filter((r) => !stats.roots.has(r));
+        check(missingRoots.length === 0, 'គ្រប root ដែលផ្លូវអាជីវកម្មសរសេរ (' + REQUIRED_ROOTS.length + ')', 'ខ្វះ ' + missingRoots.join(' · '));
+        check(stats.probes >= 100 && stats.probesDeniedBoth >= 30 && stats.probesAcceptedBoth >= 10,
+            'probe បំប្លែង ≥ ១០០ · បដិសេធទាំង ២ ≥ ៣០ · ទទួលទាំង ២ ≥ ១០ (ការវាស់មិនទទេទាំង ២ ទិស)',
+            'probes=' + stats.probes + ' deniedBoth=' + stats.probesDeniedBoth + ' acceptedBoth=' + stats.probesAcceptedBoth);
+        check(realMis.length === 0, '⛔ verdict Postgres = RTDB លើរាល់ការសរសេរពិត + បំប្លែង (' + (stats.user + stats.probes) + ')',
+            realMis.slice(0, 8).map((d) => JSON.stringify(d)).join('\n        '));
+        check(stats.stateDiffs.length === diffBefore, '⛔ ទិន្នន័យចុងលំដាប់នីមួយៗ Postgres = RTDB (' + cap.data.length + ' លំដាប់)',
+            stats.stateDiffs.slice(diffBefore).join('\n        '));
+    } finally {
+        try { if (pg) await pg.end(); } catch (e) {}
+        H.stop();
+    }
+    console.log('\n' + pass + ' ok, ' + fail + ' FAIL');
+    process.exitCode = fail ? 1 : 0;
+})().catch((e) => { console.log('  FAIL  ' + (e && e.stack || e)); if (H) H.stop(); process.exit(1); });

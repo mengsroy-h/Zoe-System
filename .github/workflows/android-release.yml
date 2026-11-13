@@ -4,7 +4,7 @@
 #    ផ្សេង ➜ អ្នកប្រើត្រូវលុប App ចាស់ ➜ បាត់ការចូលប្រព័ន្ធ · PIN · និង **កៅអី License** (Device ID ថ្មី)។
 #    ដូច្នេះ ៖ គ្មាន keystore ➜ **មិន build** (⛔ គ្មានការធ្លាក់ចុះទៅ debug key ដែលប្រែរាល់ការរត់)។
 #
-# Secret ៥ ដែលត្រូវកំណត់ក្នុង Settings ➜ Secrets and variables ➜ Actions (មើល ZoeW/docs/ANDROID.md) ៖
+# Secret ៥ ដែលត្រូវកំណត់ក្នុង Settings ➜ Secrets and variables ➜ Actions (មើល docs/zoew/ANDROID.md) ៖
 #   · ZOEW_KEYSTORE_BASE64   — ឯកសារ keystore (.jks) ជា base64
 #   · ZOEW_KEYSTORE_PASSWORD — ពាក្យសម្ងាត់ keystore
 #   · ZOEW_KEY_ALIAS         — ឈ្មោះ key
@@ -125,7 +125,7 @@ jobs:
         run: |
           GITHUB_OUTPUT=$(cygpath -u "$GITHUB_OUTPUT")
           if [ -z "$RELEASES_TOKEN" ]; then
-            echo "::error::secret ZOE_RELEASES_TOKEN គ្មាន ➜ Release ទៅ ${ZOE_RELEASES_REPO} មិនបាន ➜ ឧបករណ៍មិនឃើញកំណែថ្មី ➜ មិន build (មើល ZoeW/docs/ANDROID.md)"
+            echo "::error::secret ZOE_RELEASES_TOKEN គ្មាន ➜ Release ទៅ ${ZOE_RELEASES_REPO} មិនបាន ➜ ឧបករណ៍មិនឃើញកំណែថ្មី ➜ មិន build (មើល docs/zoew/ANDROID.md)"
             exit 1
           fi
           if GH_TOKEN="$RELEASES_TOKEN" gh release view "${{ steps.meta.outputs.tag }}" --repo "$ZOE_RELEASES_REPO" >/dev/null 2>&1; then
@@ -165,7 +165,7 @@ jobs:
             exit 0
           fi
           echo "ready=false" >> "$GITHUB_OUTPUT"
-          MSG="secret ZOEW_KEYSTORE_BASE64 · ZOEW_KEYSTORE_PASSWORD · ZOEW_KEY_ALIAS · ZOEW_KEY_PASSWORD មិនទាន់គ្រប់ ➜ មិន build (មើល ZoeW/docs/ANDROID.md)"
+          MSG="secret ZOEW_KEYSTORE_BASE64 · ZOEW_KEYSTORE_PASSWORD · ZOEW_KEY_ALIAS · ZOEW_KEY_PASSWORD មិនទាន់គ្រប់ ➜ មិន build (មើល docs/zoew/ANDROID.md)"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "::error::${MSG}"
             exit 1
@@ -230,7 +230,7 @@ jobs:
           GITHUB_STEP_SUMMARY=$(cygpath -u "$GITHUB_STEP_SUMMARY")
           powershell.exe -NoProfile -Command '& "$env:ANDROID_HOME\build-tools\35.0.0\apksigner.bat" verify -v --print-certs "ZoeW\android\app\build\outputs\apk\release\app-release.apk"; exit $LASTEXITCODE'  > apk-certs.txt || { cat apk-certs.txt; echo "::error::apksigner verify ធ្លាក់ ➜ មិនបង្កើត Release"; exit 1; }
           cat apk-certs.txt
-          if ! GOT=$(node ZoeW/scripts/apk-cert-check.mjs apk-certs.txt ZoeW/android/release-cert.sha256 2> apk-cert-why.txt); then
+          if ! GOT=$(node tools/audit-tools/zoew/scripts/apk-cert-check.mjs apk-certs.txt ZoeW/android/release-cert.sha256 2> apk-cert-why.txt); then
             echo "::error::$(cat apk-cert-why.txt) ➜ secret ចង្អុលទៅ keystore ផ្សេង ឬ APK មិនត្រឹមត្រូវ ➜ មិនបង្កើត Release"
             exit 1
           fi
@@ -275,7 +275,7 @@ jobs:
           ១. ទាញ **${OUT}** ខាងក្រោម ➜ បើកលើទូរស័ព្ទ Android ➜ អនុញ្ញាត «ដំឡើងពីប្រភពនេះ» ➜ ដំឡើង។
           ២. មាន ZoeW Android រួចហើយ ➜ ដំឡើងជាន់បានផ្ទាល់ (ទិន្នន័យ · PIN · Activation នៅដដែល)។
 
-          ⛔ បើទូរស័ព្ទរាយ «App not installed» ➜ App ចាស់ត្រូវ sign ដោយ keystore ផ្សេង (ឧ. build ពី Android Studio) ➜ មើល ZoeW/docs/ANDROID.md មុនលុប App ចាស់ (កៅអី License)។
+          ⛔ បើទូរស័ព្ទរាយ «App not installed» ➜ App ចាស់ត្រូវ sign ដោយ keystore ផ្សេង (ឧ. build ពី Android Studio) ➜ មើល docs/zoew/ANDROID.md មុនលុប App ចាស់ (កៅអី License)។
 
           - SHA-256 នៃ APK ៖ \`$(cut -d' ' -f1 "$OUT.sha256")\`
           - វិញ្ញាបនបត្រ sign ៖ \`${CERT}\`

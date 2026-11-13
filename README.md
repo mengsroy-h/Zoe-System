@@ -8,7 +8,7 @@ step; App ទាំង ២ deploy ជា Netlify site។ ទិន្នន័�
 
 | App | តួនាទី | កំណែ |
 |---|---|---|
-| **[ZoeW](ZoeW/README.md)** | App អាជីវកម្មចម្បង — ស្កេន បញ្ចូល គ្រប់គ្រងកញ្ចប់ និងនាំចូល Excel ទៅ Sheet (web/PWA និង App Android) | `2.50.197` |
+| **[ZoeW](ZoeW/README.md)** | App អាជីវកម្មចម្បង — ស្កេន បញ្ចូល គ្រប់គ្រងកញ្ចប់ និងនាំចូល Excel ទៅ Sheet (web/PWA និង App Android) | `2.50.198` |
 | **[ZoeKeyGen](ZoeKeyGen/README.md)** | ឧបករណ៍អ្នកលក់ — បង្កើត និងគ្រប់គ្រង Activation Key · បង្កើតហាង Supabase និងកូដអញ្ជើញ | `2.24.46` |
 
 > 📖 ឯកសារនេះសរសេរតែ **កំណែ · មុខងារ · របៀបប្រើប្រាស់ · ប្រព័ន្ធសុវត្ថិភាព ·
@@ -35,7 +35,7 @@ step; App ទាំង ២ deploy ជា Netlify site។ ទិន្នន័�
 **ពិនិត្យកំណែឲ្យស៊ីគ្នា**
 
 `version-check` និង `version-bump-scope` រត់លើ build វាស់របស់ React តាម
-[audit-tools/README.md](audit-tools/README.md)។ កុំហៅ checker ទាំងនេះផ្ទាល់លើ source tree។
+[tools/audit-tools/README.md](tools/audit-tools/README.md)។ កុំហៅ checker ទាំងនេះផ្ទាល់លើ source tree។
 
 ---
 
@@ -159,8 +159,8 @@ Rules · ការបិទ sign-up · គណនីបុគ្គលិក ប�
 
 បំពេញលេខទូរស័ព្ទ/COD/DOD ស្វ័យប្រវត្តិពេលស្កេន។ មានប្រភព ២ ៖
 
-- **Google Sheet** តាម Apps Script — មើល [`zto-import/`](zto-import/README.md)
-- **ZTO** តាម Netlify Function — មើល [`ZoeW/ZTO-SETUP-KH.md`](ZoeW/ZTO-SETUP-KH.md)
+- **Google Sheet** តាម Apps Script — មើល [`tools/zto-import/`](tools/zto-import/README.md)
+- **ZTO** តាម Netlify Function — មើល [`docs/zoew/ZTO-SETUP-KH.md`](docs/zoew/ZTO-SETUP-KH.md)
 
 ពេល ZTO បដិសេធ Cookie ៖ រត់
 [`tools/zto-cookie-sync-windows/`](tools/zto-cookie-sync-windows/README-KH.md)
@@ -188,7 +188,7 @@ npm run lint --prefix ZoeW
 ```
 
 ការជ្រើសតេស្តក្នុង session និង suite ពេញក្នុង Audit CI ទាំង ៤ ផ្នែក តាម **[Runbook](CLAUDE.md#-runbook)**។
-មើល **[audit-tools/README.md](audit-tools/README.md)** សម្រាប់របៀបរត់ checker មួយៗ ការរត់លើ tree ផ្សេង និងការដំឡើង Firebase emulator។
+មើល **[tools/audit-tools/README.md](tools/audit-tools/README.md)** សម្រាប់របៀបរត់ checker មួយៗ ការរត់លើ tree ផ្សេង និងការដំឡើង Firebase emulator។
 
 ---
 
@@ -199,13 +199,16 @@ npm run lint --prefix ZoeW
 | [docs/HISTORY.md](docs/HISTORY.md) | **ប្រវត្តិកំណែ (ផ្នែក ១) និងប្រវត្តិកំហុស + ហេតុផលនៃច្បាប់នីមួយៗ (ផ្នែក ២)** — សម័យ ZoeW React |
 | [docs/HISTORY-ARCHIVE.md](docs/HISTORY-ARCHIVE.md) | **បណ្ណសារប្រវត្តិសម័យ ZoeW vanilla** (អានបាន តែមិនបន្ថែម) |
 | [CLAUDE.md](CLAUDE.md) | ច្បាប់ស្ថាបត្យកម្មសម្រាប់អ្នកថែទាំ |
-| [audit-tools/](audit-tools/README.md) | របៀបរត់ checker និងតេស្ត |
-| [ZoeW/ZTO-SETUP-KH.md](ZoeW/ZTO-SETUP-KH.md) | របៀបកំណត់ ZTO Lookup |
-| [zto-import/](zto-import/README.md) | Apps Script ដែលទទួលការនាំចូល និងបម្រើ Lookup API |
+| [tools/audit-tools/](tools/audit-tools/README.md) | របៀបរត់ checker និងតេស្ត |
+| [ZoeW/README.md](ZoeW/README.md) | របៀបប្រើ ZoeW |
+| [docs/zoew/](docs/zoew/DEVELOPMENT.md) | ឯកសារស្ថាបត្យកម្ម · អភិវឌ្ឍ · Android របស់ ZoeW |
+| [ZoeKeyGen/README.md](ZoeKeyGen/README.md) | របៀបប្រើ ZoeKeyGen |
+| [docs/zoew/ZTO-SETUP-KH.md](docs/zoew/ZTO-SETUP-KH.md) | របៀបកំណត់ ZTO Lookup |
+| [tools/zto-import/](tools/zto-import/README.md) | Apps Script ដែលទទួលការនាំចូល និងបម្រើ Lookup API |
 | [tools/zto-cookie-sync-windows/](tools/zto-cookie-sync-windows/README-KH.md) | Windows helper សម្រាប់ប្តូរ Cookie ZTO |
 | [tools/money-check-windows/](tools/money-check-windows/README-KH.md) | Windows ៖ រត់ការវាស់លុយ ៩ លើ dump ពិតរបស់អ្នក |
 | [tools/firebase-provision/](tools/firebase-provision/README-KH.md) | Windows ៖ បង្កើតអតិថិជនថ្មីលើ Firebase ដោយពាក្យបញ្ជាតែមួយ · ដំឡើង Rules ទៅអតិថិជនទាំងអស់ |
-| [firebase-backup/](firebase-backup/README.md) | CLI បម្រុងទុកទិន្នន័យ Firebase និងហាងនីមួយៗក្នុង Supabase |
+| [tools/firebase-backup/](tools/firebase-backup/README.md) | CLI បម្រុងទុកទិន្នន័យ Firebase និងហាងនីមួយៗក្នុង Supabase |
 | [tools/supabase-migrate/](tools/supabase-migrate/README.md) | CLI ផ្ទេរទិន្នន័យហាងពី Firebase ចូល Supabase · ស្តារហាង Supabase ពី backup |
 
 ---

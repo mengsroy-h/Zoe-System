@@ -47,6 +47,8 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+      - name: ផ្ទៀងទីតាំងតេស្ត
+        run: node tools/audit-tools/test-placement-test.js
       - name: ផ្ទៀង Node
         run: node -e 'if (Number(process.versions.node.split(".")[0]) !== 24) process.exit(1)'
       - name: ត្រៀម browser និង emulator cache រួមសម្រាប់ Linux runners
@@ -80,18 +82,18 @@ jobs:
           mkdir -p /opt/pw-browsers/chromium-1194
           ln -sfn "$(dirname "$SRC")" /opt/pw-browsers/chromium-1194/chrome-linux
           test -x /opt/pw-browsers/chromium-1194/chrome-linux/chrome
-          # ZoeW React (`ZoeW/scripts/*.mjs` ៖ smoke · sw-check · native-check) ប្រើផ្លូវ `/opt/pw-browsers/chromium`
+          # ZoeW React (`tools/audit-tools/zoew/scripts/*.mjs` ៖ smoke · sw-check · native-check) ប្រើផ្លូវ `/opt/pw-browsers/chromium`
           ln -sfn /opt/pw-browsers/chromium-1194/chrome-linux/chrome /opt/pw-browsers/chromium
           test -x /opt/pw-browsers/chromium
 
       - name: ដំឡើង dependency របស់ ZoeW
         run: npm ci --prefix ZoeW --prefer-offline --no-audit --no-fund
       - name: ផ្ទៀងការទទួល និងបដិសេធរបាយការណ៍
-        run: node --test ZoeW/scripts/tests/zto-ci-evidence.test.mjs
+        run: node --test tools/audit-tools/zoew/scripts/tests/zto-ci-evidence.test.mjs
       - name: វាស់ ZTO/native ដោយមិនប៉ះសោ
         env:
           ZTO_EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: node ZoeW/scripts/zto-ci-evidence.mjs
+        run: node tools/audit-tools/zoew/scripts/zto-ci-evidence.mjs
       - name: រក្សាភស្តុតាង ZTO/native
         if: always()
         uses: actions/upload-artifact@v7
@@ -194,7 +196,7 @@ jobs:
           mkdir -p /opt/pw-browsers/chromium-1194
           ln -sfn "$(dirname "$SRC")" /opt/pw-browsers/chromium-1194/chrome-linux
           test -x /opt/pw-browsers/chromium-1194/chrome-linux/chrome
-          # ZoeW React (`ZoeW/scripts/*.mjs` ៖ smoke · sw-check · native-check) ប្រើផ្លូវ `/opt/pw-browsers/chromium`
+          # ZoeW React (`tools/audit-tools/zoew/scripts/*.mjs` ៖ smoke · sw-check · native-check) ប្រើផ្លូវ `/opt/pw-browsers/chromium`
           ln -sfn /opt/pw-browsers/chromium-1194/chrome-linux/chrome /opt/pw-browsers/chromium
           test -x /opt/pw-browsers/chromium
 
@@ -218,7 +220,7 @@ jobs:
         run: bash tools/actions-runners/prepare-audit-cache.sh database
 
       - name: ត្រៀម rules សម្រាប់ owned emulator scopes របស់ runner
-        run: cp firebase-database.rules.json audit-tools/emu/real.rules.json
+        run: cp firebase-database.rules.json tools/audit-tools/emu/real.rules.json
 
       - name: ផ្ទៀងទំហំ និង font Sign queue សាកល្បង
         if: matrix.shard == 1 && !(github.event_name == 'workflow_dispatch' && inputs.multishop_scale)
@@ -252,7 +254,7 @@ jobs:
             export RUNALL_SHARD='' RUNALL_ONLY='supabase-money-multishop-test'
             export SBMONEY_SHOPS='8' SBMONEY_DEVICES='3'
           fi
-          bash audit-tools/run-all.sh 2>&1 | tee "$AUDIT_LOG"
+          bash tools/audit-tools/run-all.sh 2>&1 | tee "$AUDIT_LOG"
 
       - name: រក្សា log របស់ audit គ្រប់ផ្នែក
         if: always() && steps.audit.outcome != 'skipped'

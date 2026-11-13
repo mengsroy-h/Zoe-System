@@ -4,13 +4,13 @@ on:
   pull_request:
     paths:
       - '.github/workflows/f03-native-diagnostic.yml'
-      - 'ZoeW/tests/f03-heap-diagnostic.test.ts'
-      - 'audit-tools/run-all.sh'
-      - 'audit-tools/owned-rtdb-command.js'
-      - 'audit-tools/emu/registry-purge-atomic-sdk-test.js'
-      - 'audit-tools/emu/ns.js'
-      - 'audit-tools/supabase-pg.js'
-      - 'audit-tools/supabase-fake-server.js'
+      - 'tools/audit-tools/zoew/tests/f03-heap-diagnostic.test.ts'
+      - 'tools/audit-tools/run-all.sh'
+      - 'tools/audit-tools/owned-rtdb-command.js'
+      - 'tools/audit-tools/emu/registry-purge-atomic-sdk-test.js'
+      - 'tools/audit-tools/emu/ns.js'
+      - 'tools/audit-tools/supabase-pg.js'
+      - 'tools/audit-tools/supabase-fake-server.js'
       - 'firebase-database.rules.json'
       - 'ZoeW/src/domain/registry-purge-proof.ts'
       - 'ZoeW/src/services/registry-purge.ts'
@@ -309,7 +309,7 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$F03_EXPECTED_HEAD"
           printf 'F03 capacity hypothesis only; checkout=%s; order=%s; heapMiB=%s; ordinary heap profile depends on verified runner environment\n' "$F03_EXPECTED_HEAD" "$F03_DIAGNOSTIC_ORDER" "$F03_DIAGNOSTIC_HEAP_MIB"
-          sha256sum audit-tools/emu/registry-purge-atomic-sdk-test.js firebase-database.rules.json
+          sha256sum tools/audit-tools/emu/registry-purge-atomic-sdk-test.js firebase-database.rules.json
           PORT=$(node "$F03_DIAG_DIR/owned-jvm.cjs" port "$F03_DIAG_DIR")
           JAR=$(realpath "${ZOE_RTDB_JAR:?RTDB JAR unavailable}")
           env -u JAVA_TOOL_OPTIONS -u JDK_JAVA_OPTIONS -u _JAVA_OPTIONS node "$F03_DIAG_DIR/owned-jvm.cjs" launch "$F03_DIAG_DIR" "$PORT" "$JAR" "$F03_DIAGNOSTIC_HEAP_MIB"
@@ -332,7 +332,7 @@ jobs:
           F03_TIMING_ORDER: ${{ matrix.order }}
         run: |
           set -euo pipefail
-          F03_PARITY_RESULT="$F03_DIAG_DIR/parity.json" timeout --signal=TERM --kill-after=5s 300s node audit-tools/emu/registry-purge-atomic-sdk-test.js
+          F03_PARITY_RESULT="$F03_DIAG_DIR/parity.json" timeout --signal=TERM --kill-after=5s 300s node tools/audit-tools/emu/registry-purge-atomic-sdk-test.js
       - name: បិទតែ owned JVM និងផ្ទៀង metrics
         if: always()
         run: |

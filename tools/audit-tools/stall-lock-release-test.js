@@ -1,0 +1,441 @@
+// ⛔ ថ្នាក់កំហុស៖ **សោការងារ (in-flight lock) ដែលឈរខាងក្រោយការសរសេរធុងសំរាម
+// ដែល *ព្យួរ* — ជាប់អស់កល្ប។**
+//
+// នេះជា **មេរៀន 2.23.1 / `write-stall-guard-test.js` ដែលវិលមកតាមទ្វារទី ៣**។
+// ឯកសារនោះវាស់សោ `deletedCleanupInFlight` (`runAutomaticDeletedCleanup`) និង
+// `staleRestoreMarkerSweeps` (`clearStaleRestoreMarkers`) — ទាំង ២ ឆ្លងកាត់
+// `dbOp()` ➜ សោដោះតាមពិដាន។ តែសោ **២ ផ្សេងទៀត** ឈរខាងក្រោយ
+// `await notifyIfSlow(retryAsync(() => saveSingleDeletedItemToFirebase(…)))`
+// ដែល **គ្មានពិដានដោយចេតនា** (ច្បាប់ «⛔ កុំដាក់ `dbOp()` លើការសរសេរធុងសំរាម»
+// — `catch` របស់វាបញ្ច្រាសលុយ ➜ ការសរសេរដែលចូជួរចុះក្រោយមកនឹងធ្វើឲ្យធាតុនៅ
+// ទាំង ២ កន្លែង)។ ដូច្នេះ **ការសរសេរត្រូវនៅគ្មានពិដានដដែល តែសោមិនត្រូវជាប់**។
+//
+// **វាស់បានលើ tree មុនកែ (stub `fb.update` ដែលព្យួរ · transaction ចុះលឿន —
+// ជាលំដាប់ពិត ៖ បណ្តាញដាច់ *ក្រោយ* transaction commit)**៖
+//   · `claimAndCleanupItem()` ➜ `cleanupInFlight` ជាប់ id **អស់កល្ប** ➜
+//     ⛔ ច្បាប់ **២ ម៉ោង** និង **៧ ថ្ងៃ** លែងអនុវត្តលើកញ្ចប់នោះទាល់តែសោះ ➜
+//     កញ្ចប់ដែលលើស ៧ ថ្ងៃ **មិនចូលធុងសំរាម** ➜ **លុយមិនត្រូវដក** ➜ ចំណូលប៉ោង
+//     (តំបន់លុយពិត — `revenue-fuzz` មើលមិនឃើញ ព្រោះវាមិនចាក់របៀបព្យួរ)
+//   · `confirmScannedRemoval()` ➜ `scanRemoveInFlight` ជាប់ **អស់កល្ប** ➜
+//     ⛔ **របៀបស្កេនដកងាប់ទាំងស្រុង** ៖ រាល់ការស្កេនបន្ទាប់ត្រូវបដិសេធដោយ
+//     «⏳ ការដក (…) កំពុងដំណើរការ — សូមកុំស្កេនស្ទួន។» រហូតដល់ reload
+//
+// ច្បាប់ដែលឯកសារនេះចាក់សោ៖
+//   ១. សោទាំង ២ ត្រូវ **ដោះក្នុងពេលកំណត់** ទោះការសរសេរធុងសំរាមព្យួរ។
+//   ២. ⛔ ការដោះសោ **មិនត្រូវបោះបង់ការងារ** — ការសរសេរដែលចុះយឺតត្រូវបញ្ចប់
+//      ការងារក្រោយ commit (ធាតុនៅក្នុងធុងសំរាម · លុយត្រូវបានដក)។
+//   ៣. ⛔ ការសរសេរនៅតែ **គ្មាន `dbOp()`** ដដែល (បើដាក់ ➜ `catch` បញ្ច្រាសលុយ
+//      ➜ ធាតុនៅទាំង ២ កន្លែងពេលការសរសេរចុះយឺត)។
+//   ៤. ⛔ **ទិសផ្ទុយត្រូវរក្សា** ៖ បណ្តាញធម្មតា ➜ សោដោះដដែល · ការងារពេញលេញ ·
+//      គ្មានការព្យាយាមស្ទួន។
+//   ៥. ក្រោយសោដោះ ជុំបន្ទាប់ត្រូវ **ព្យាយាមម្តងទៀតបាន** (ការសម្អាតមិនងាប់)។
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const { moduleRuntime, memoryStorage } = require('./react-view');
+
+const ROOT = process.env.STALLLOCK_APP_DIR
+    ? path.resolve(process.env.STALLLOCK_APP_DIR)
+    : path.resolve(__dirname, '../..');
+const APP = path.join(ROOT, 'ZoeW', 'app.js');
+
+let pass = 0, fail = 0;
+function ok(label, cond, detail) {
+    if (cond) { console.log('   ok    ' + label); pass++; }
+    else { console.log('  FAIL   ' + label + (detail !== undefined ? '  got: ' + JSON.stringify(detail) : '')); fail++; }
+}
+
+function sliceBalanced(src, from) {
+    let depth = 0;
+    for (let i = from; i < src.length; i++) {
+        if (src[i] === '{') depth++;
+        else if (src[i] === '}') { depth--; if (!depth) return src.slice(from, i + 1); }
+    }
+    return null;
+}
+function extractFn(src, name) {
+    const re = new RegExp('\\n(\\s*)(async\\s+)?function ' + name + '\\s*\\(');
+    const m = re.exec(src);
+    if (!m) return null;
+    const head = src.indexOf('function ' + name, m.index);
+    const brace = src.indexOf('{', src.indexOf('(', head));
+    const body = sliceBalanced(src, brace);
+    if (!body) return null;
+    return (m[2] ? 'async ' : '') + src.slice(head, brace) + body;
+}
+function extractConst(src, name) {
+    const re = new RegExp('\\n\\s*const ' + name + ' = ([^;]+);');
+    const m = re.exec(src);
+    return m ? 'const ' + name + ' = ' + m[1] + ';' : null;
+}
+
+const src = fs.existsSync(APP) ? fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, '\n') : '';
+
+// ── ១. ជាន់អប្បបរមា ៖ ថតទទេ / ការស្រង់ដែលធ្លាក់ មិនត្រូវបៃតង ────────────────
+console.log('== ១. ជាន់អប្បបរមា ==');
+ok('អាន ZoeW/app.js បាន (>= ១០០ KB)', src.length > 100000, src.length);
+
+const NEEDED = ['stripHistoryOnlyMarkers', 'claimAndCleanupItem', 'confirmScannedRemoval', 'removeSingleBarcode',
+    'saveSingleDeletedItemToFirebase', 'withTimeout', 'dbOp', 'dbOpStalled',
+    'armLateCommit', 'notifyIfSlow', 'retryAsync', 'clearScannedRemovalInFlight'];
+const missing = NEEDED.filter((n) => !extractFn(src, n));
+ok('រកឃើញ function ដែលត្រូវវាស់ ' + NEEDED.length, missing.length === 0, { missing: missing });
+
+const NEEDED_CONSTS = ['DB_OP_TIMEOUT_MS', 'LOCK_STALL_RELEASE_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'ABANDON_AGE_MS', 'TWO_HOURS_MS', 'COLLECTED_SETTLE_HOLD_MS'];
+const cmissing = NEEDED_CONSTS.filter((n) => !extractConst(src, n));
+ok('រកឃើញថេរដែលត្រូវវាស់ ' + NEEDED_CONSTS.length, cmissing.length === 0, { missing: cmissing });
+
+// ⛔ កុំបញ្ឈប់ checker ពេលរកឈ្មោះមិនឃើញ — stub ជំនួស ដើម្បីឲ្យការអះអាង
+// ឥរិយាបថខាងក្រោមនៅតែរត់ (មេរៀន `checker-coverage.js` ផ្នែក ៣)។
+const STUBS = {
+    notifyIfSlow: 'function notifyIfSlow(p) { return p; }',
+    armLateCommit: 'function armLateCommit() { return false; }'
+};
+function fnSource(name) { return extractFn(src, name) || STUBS[name] || ('function ' + name + '() {}'); }
+function constSource(name) { return extractConst(src, name) || ('const ' + name + ' = 0;'); }
+
+// ⛔ ការវាស់ត្រូវធៀបនឹង **ពិដានពិត** មិនមែនលេខថេរ ៖ សោត្រូវដោះក្នុងរង្វង់
+// ជុំវិញ `DB_OP_TIMEOUT_MS` ដែលអានចេញពីកូដពិត។
+const DB_TIMEOUT = Number((extractConst(src, 'DB_OP_TIMEOUT_MS') || '= 15000').replace(/\D+/g, '')) || 15000;
+// នាឡិកាមាត្រដ្ឋាន ៖ `setTimeout` ក្នុង sandbox ត្រូវបែងចែកដោយ `TIME_SCALE`
+// ➜ ពិដាន ១៥ វិ. ក្លាយជា ៣០០ ms ➜ checker លឿន ៥០ ដង **ខណៈកូដពិតមិនប្រែ**
+// (លំនាំដដែលនឹង `late-commit-test.js`)។ ⛔ រាល់ការពន្យារត្រូវ scale **ដូចគ្នា**
+// បើមិនដូច្នេះសមាមាត្ររវាងពិដានឃ្លាតគ្នា ➜ ការវាស់ក្លាយជាការសំណាង។
+const TIME_SCALE = 50;
+const scaled = (ms) => Math.max(1, Math.round(ms / TIME_SCALE));
+const WAIT_AFTER_TIMEOUT = scaled(DB_TIMEOUT + 3000);
+const SETTLE_MS = 60;
+
+// ── ២. Sandbox ដែលរត់កូដ ship ពិត ─────────────────────────────────────────
+function buildWorld(mode) {
+    const log = { updates: 0, txs: 0, toasts: [], captures: [] };
+    const recorder = { capture: (e, d) => log.captures.push({ message: String(e && e.message || e), details: d }) };
+    const ctx = { ztoState: { ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 }, ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 } }, ZTO_TRASH_MODE_ACTIVE_MS: 7 * 24 * 60 * 60 * 1000, 
+        console: { log: () => {}, error: () => {}, warn: () => {} },
+        Promise, JSON, Object, Array, Number, String, Boolean, Math, Set, Map, Date,
+        setTimeout: (fn, ms, ...a) => setTimeout(fn, scaled(ms || 0), ...a),
+        clearTimeout, isNaN, parseFloat, parseInt, isFinite,
+        navigator: { onLine: true },
+        ZoeErrors: recorder,
+        window: { ZoeErrors: recorder },
+        __log: log
+    };
+    ctx.authGeneration = 0;
+    vm.createContext(ctx);
+
+    // ទំនុកចិត្តបែបសាកល្បងនេះរក្សានាឡិកាអាជីវកម្មថេររបស់ fixture ដើម។
+    const preamble = `
+let sessionExpiryCheck = 'live', serverTimeOffsetMs = 0, serverClockTrusted = true;
+let db = {}, fb = null;
+let dbRefDeleted = { p: 'del' }, dbRefHistory = { p: 'hist' };
+let dbRefDailyRevenue = { p: 'rev' }, dbRefMonthlyRevenue = { p: 'mrev' };
+let scanHistory = [], deletedItems = [], dailyCollectedData = {};
+const appLocalStore = __storage;
+let dailyRevenueData = {}, monthlyRevenueData = {};
+let scanRemoveInFlight = null, pendingScannedRemoval = null;
+const cleanupInFlight = new Set(); const liveTrashClaims = new Set(); const trashClaimPage = Math.random().toString(36).slice(2); const cleanupOperationOwners = new Map();
+let __ledgerCod = 0, __ledgerCount = 0;
+function getServerNow() { return Date.now(); }
+function probeDatabaseLiveness() { return Promise.resolve(null); }
+function elapsedSince(m) { if (!m) return Infinity; const d = Date.now() - m; return d < 0 ? Infinity : d; }
+function showToast(m) { __log.toasts.push(String(m)); }
+function refreshCurrentHistoryView() {}
+function updateRecentPhonesList() {}
+function generateUniqueId() { return 'gen' + (Math.random() * 1e9 | 0); }
+function getFormattedDate() { return '2026-09-08'; }
+function parseTimestampFromId() { return 0; }
+function normalizeBarcodesOf(i) { if (i && !Array.isArray(i.barcodes)) i.barcodes = []; return i; }
+
+function itemHasRestoreMarkers() { return false; }
+function ensureBarcodeArrayForItem(i) { if (i && !Array.isArray(i.barcodes)) i.barcodes = []; return i; }
+function barcodeAbandonIsRipe(b, p, n) { return !b.isClosed && (n - p) > ABANDON_AGE_MS; }
+function barcodeCloseIsRipe(b, n) { return !!(b && b.isClosed && typeof b.closedAt === 'number' && (n - b.closedAt) > TWO_HOURS_MS); }
+function recalcItemMoneyFromBarcodes(t) {
+    t.cod = Math.round(t.barcodes.reduce((s, b) => s + (parseFloat(b.cod) || 0), 0) * 100) / 100;
+    t.dod = Math.round(t.barcodes.reduce((s, b) => s + (parseFloat(b.dod) || 0), 0) * 100) / 100;
+    t.price = Math.round((t.cod + t.dod) * 100) / 100;
+}
+function addRevenueToDailyAndMonthlyRecord(d, cod, dod, count) {
+    __ledgerCod = Math.round((__ledgerCod + (parseFloat(cod) || 0)) * 100) / 100;
+    __ledgerCount += (parseFloat(count) || 0);
+    return { scanDate: d, daily: { cod: cod, dod: dod, count: count }, monthly: { cod: cod, dod: dod, count: count },
+        dailyServer: Promise.resolve({ cod: cod, dod: dod, count: count }),
+        monthlyServer: Promise.resolve({ cod: cod, dod: dod, count: count }) };
+}
+function revertRevenueLedgerDelta(a) {
+    if (!a) return null;
+    __ledgerCod = Math.round((__ledgerCod - (parseFloat(a.daily.cod) || 0)) * 100) / 100;
+    __ledgerCount -= (parseFloat(a.daily.count) || 0);
+    return a;
+}
+function correctRevenueLedgerToActual() { return Promise.resolve({ ok: true }); }
+function restoreClaimedItemToScanHistory() { return Promise.resolve({ snapshot: { val: () => null } }); }
+function viewListModalShowing() { return false; }
+function closeModal() {}
+function openViewListModal() {}
+function refreshRemoveScanBanner() {}
+function safeFocusScanner() {}
+function confirm() { return true; }
+`;
+    const FNS = ['stripHistoryOnlyMarkers', 'withTimeout', 'dbOp', 'dbOpStalled', 'armLateCommit', 'armLateWrite', 'notifyIfSlow',
+        'getZtoTrashMode', 'ztoTrashModeOf', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'sameShop', 'lookupApiIsZto', 'lookupApiIsPalm', 'stampTrashPolicy', 'barcodeZtoSigned',
+        'ledgerNumber', 'ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'applyLedgerBucketDelta', 'ledgerOpRingOf', 'ledgerOpRing',
+        'ledgerOpWitness', 'ledgerTagged', 'runLedgerTransaction',
+        'retryAsync', 'settleLockWithin', 'clearScannedRemovalInFlight', 'cloneRestoreItem', 'barcodeEntriesOf', 'prepareCleanupClaim', 'cleanupLockManager', 'beginCleanupOperation', 'releaseCleanupOperation', 'markCleanupJournalLive', 'releaseCleanupJournalLive', 'holdCleanupJournalLive',
+        'shopScope', 'liveShopScope', 'safeStoreGet', 'safeStoreSet', 'safeStoreRemove', 'readCleanupJournal', 'writeCleanupJournal', 'cleanupJournalScope', 'cleanupJournalScopeMismatch', 'noteCleanupJournalEntry', 'markCleanupJournalStage', 'clearCleanupJournalEntry',
+        'pickupBarcodeKey', 'barcodeRegistryKey', 'collectedMarksFor', 'collectedDayHoldingKey', 'collectedDayOfStamp', 'markCollectedRevenue',
+        'saveSingleDeletedItemToFirebase', 'claimCleanupTrashSlot', 'trashClaimPolicy', 'newTrashClaimToken', 'trashClaimAge', 'trashClaimHeldByOther', 'ownLeftoverTrashClaim', 'trashClaimOwned', 'stripTrashClaim', 'itemHasLiveTrashClaim', 'trashClaimRecords', 'writeTrashClaimRecords', 'noteTrashClaim', 'forgetTrashClaim', 'pendingTrashClaims', 'trashClaimOwner', 'trashClaimOwnerIsCurrent', 'claimTrashBarcodes', 'releaseTrashClaims', 'beginTrashClaim', 'releaseLeftoverTrashClaims', 'trashSlotSharesClaim', 'cleanupPartialTrashId', 'cleanupTrashCodes', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMonthTrimmed', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'readRestoreServerNode', 'txRestUrl', 'txReadServerValue', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'cleanupJournalClaimMatches', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'collectedSettleHolds', 'collectedSettleHeld', 'claimAndCleanupItem', 'removeSingleBarcode',
+        'confirmScannedRemoval'];
+    const code = preamble
+        + NEEDED_CONSTS.map(constSource).join('\n') + '\n'
+        + (extractConst(src, 'LEDGER_OP_RING_MAX') || 'const LEDGER_OP_RING_MAX = 12;') + '\n'
+        + ['CLEANUP_LIVE_LOCK_PREFIX', 'cleanupJournalLive', 'cleanupResumeBarrier', 'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX', 'CLEANUP_STAGE_SLOT', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_UNDO', 'CLEANUP_STAGE_COLLECTED', 'CLEANUP_LEDGER_KEYED', 'CLEANUP_LEDGER_RETRY_MAX', 'CLEANUP_NO_PRIOR'].map(constSource).join('\n') + '\n'
+        + FNS.map(fnSource).join('\n')
+        + `
+globalThis.__setFb = (i) => { fb = i; };
+globalThis.__cleanupLock = () => Array.from(cleanupInFlight);
+globalThis.__removeLock = () => !!scanRemoveInFlight;
+globalThis.__seedHistory = (h) => { scanHistory = h; };
+globalThis.__setPending = (p) => { pendingScannedRemoval = p; };
+globalThis.__trash = () => deletedItems.map((i) => i.id);
+globalThis.__ledger = () => { const k = __ledgerKeyed(); return { cod: Math.round((__ledgerCod + k.cod) * 100) / 100, count: __ledgerCount + k.count }; };
+globalThis.__claim = claimAndCleanupItem;
+globalThis.__confirmRemove = confirmScannedRemoval;
+`;
+    const protocol = moduleRuntime(ROOT, src, [{ path: 'src/core/session-verification.ts', expose: ['sessionVerificationRequired'] }, { path: 'src/core/clock.ts', expose: ['captureClockOperation', 'serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'getServerClockBounds'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations', 'clearRestoreFinalization'] }]);
+    ctx.__storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://fixture-stall-lock-release-test.invalid' }) });
+    ctx.auth = { currentUser: { uid: 'fixture-user' } };
+    ctx.dataState = { pickupPendingVersion: 0 };
+    ctx.pickupPendingVersion = 0;
+    ctx.isInitializingFirebase = false;
+    ctx.cleanupResumeInFlight = false;
+    ctx.navigator = { onLine: true };
+    vm.runInContext(protocol.code + '\n' + protocol.withoutBindings(code), ctx);
+
+    let CURRENT = null;
+    const later = [];
+    // ⛔ [2.50.49] ការដកនៃការសម្អាត ៧ ថ្ងៃ = transaction មានសោលើ record ថ្ងៃ/ខែ ➜ ledger ពិតរស់ក្នុង LEDGER (ដាច់ពី item)
+    //    ហើយ `__ledger()` = ការដកតាមផ្លូវមានសោ + ផ្លូវ stub (ដកដោយដៃ)។
+    const LEDGER = {
+        'zoew_daily_revenue_cod_dod/2026-09-01': { codDollar: 100, dodDollar: 100, totalCount: 10 },
+        mrev: { '2026-09': { codDollar: 100, dodDollar: 100, totalCount: 10 } }
+    };
+    const TRASH = {};
+    const PICKUP = {};
+    const ledgerKeyOf = (ref) => (ref && ref.p === 'mrev' ? 'mrev'
+        : (ref && typeof ref.path === 'string' && ref.path.indexOf('zoew_daily_revenue_cod_dod/') === 0 ? ref.path : null));
+    ctx.__ledgerKeyed = () => {
+        const day = LEDGER['zoew_daily_revenue_cod_dod/2026-09-01'] || {};
+        return { cod: Math.round(((day.codDollar || 0) - 100) * 100) / 100, count: (day.totalCount || 0) - 10 };
+    };
+    ctx.__setFb({
+        ref: (_d, p) => ({ path: p || '' }),
+        increment: (n) => n,
+        // `hang` ➜ ការសរសេរធុងសំរាមមិនដោះ មិនបដិសេធ (RTDB ក្រៅបណ្តាញពិត)
+        update: () => {
+            log.updates++;
+            if (mode === 'hang') return new Promise((resolve) => later.push(resolve));
+            return Promise.resolve();
+        },
+        // ⛔ transaction ចុះ **លឿន** ➜ នេះជាលំដាប់ដែលបង្កើតកំហុស ៖ បណ្តាញ
+        // ដាច់ *ក្រោយ* transaction commit មិនមែនមុនទេ។
+        runTransaction: (ref, updater) => {
+            log.txs++;
+            if (typeof ref.path === 'string' && ref.path.startsWith('zoew_daily_pickup_cod_dod/')) {
+                const current = PICKUP[ref.path] ? JSON.parse(JSON.stringify(PICKUP[ref.path])) : null;
+                const next = updater(current);
+                if (next !== undefined) PICKUP[ref.path] = JSON.parse(JSON.stringify(next));
+                return Promise.resolve({ committed: next !== undefined, snapshot: { val: () => PICKUP[ref.path] || null } });
+            }
+            // ⛔ ការសរសេរធុងសំរាមរបស់ការសម្អាត = transaction create-if-absent លើ `trash/<id>` ➜ ទ្វារសរសេរធុងសំរាមដូច `update` (ព្យួរពេល `hang`)
+            if (ref && typeof ref.path === 'string' && ref.path.indexOf('zoew_recently_deleted_cod_dod/') === 0) {
+                log.updates++;
+                const settle = () => {
+                    const cur = TRASH[ref.path] ? JSON.parse(JSON.stringify(TRASH[ref.path])) : null;
+                    const next = updater(cur);
+                    if (next === undefined) return { committed: false, snapshot: { val: () => cur } };
+                    TRASH[ref.path] = JSON.parse(JSON.stringify(next));
+                    return { committed: true, snapshot: { val: () => next } };
+                };
+                if (mode === 'hang') return new Promise((resolve) => later.push(() => resolve(settle())));
+                return Promise.resolve(settle());
+            }
+            const ledgerKey = ledgerKeyOf(ref);
+            if (ledgerKey) {
+                const cur = LEDGER[ledgerKey] ? JSON.parse(JSON.stringify(LEDGER[ledgerKey])) : null;
+                let next;
+                try { next = updater(cur); } catch (e) { next = undefined; }
+                if (next === undefined) return Promise.resolve({ committed: false, snapshot: { val: () => cur } });
+                LEDGER[ledgerKey] = JSON.parse(JSON.stringify(next));
+                return Promise.resolve({ committed: true, snapshot: { val: () => next } });
+            }
+            let out;
+            try { out = updater(CURRENT ? JSON.parse(JSON.stringify(CURRENT)) : null); } catch (e) { log.captures.push({ message: String(e.stack || e), details: { context: 'updater' } }); return Promise.reject(e); }
+            if (out !== undefined) CURRENT = out;
+            return Promise.resolve({ committed: out !== undefined, snapshot: { val: () => out === undefined ? CURRENT : out } });
+        },
+        get: (ref) => {
+            const prefix = 'zoew_monthly_revenue_cod_dod/';
+            const value = ref.path.startsWith(prefix) ? LEDGER.mrev[ref.path.slice(prefix.length)]
+                : ref.path === 'zoew_scan_history_cod_dod' ? CURRENT && { [CURRENT.id]: CURRENT }
+                    : ref.path.startsWith('zoew_scan_history_cod_dod/') ? CURRENT
+                        : (LEDGER[ref.path] || TRASH[ref.path] || PICKUP[ref.path]);
+            const snapshot = value == null ? null : JSON.parse(JSON.stringify(value));
+            return Promise.resolve({ exists: () => snapshot !== null, val: () => snapshot });
+        }
+    });
+    return {
+        ctx, log,
+        setCurrent: (v) => { CURRENT = v ? JSON.parse(JSON.stringify(v)) : null; },
+        current: () => CURRENT,
+        releaseLateWrites: () => { later.splice(0).forEach((r) => r()); }
+    };
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+(async () => {
+    {
+        const w = buildWorld('ok');
+        const marker = { token: 'price_' + 'a'.repeat(32), actorUid: 'fixture-user', code: 'BC1', slot: '0', birth: 1,
+            rowBirth: 1, scanDate: '2026-09-01', priorCod: 1, priorDod: 0, wantCod: 2, wantDod: 0, phase: 'settled', outcome: 'committed' };
+        const original = { id: 'projection-fixture', pricePending: marker, cod: 2 };
+        const projected = w.ctx.stripHistoryOnlyMarkers({ ...original });
+        ok('projection ពិតដកតែ valid settled price marker ដោយមិនកែ history ដើម', !projected.pricePending && original.pricePending === marker && projected.cod === 2);
+        for (const bad of [{ ...marker, phase: 'admitted', outcome: undefined }, { ...marker, token: 'malformed' }]) {
+            const row = { pricePending: bad };
+            ok('projection ពិតរក្សា pending/malformed marker', w.ctx.stripHistoryOnlyMarkers(row).pricePending === bad);
+        }
+    }
+    // ── ២. `claimAndCleanupItem` ៖ សោត្រូវដោះ ទោះការសរសេរធុងសំរាមព្យួរ ──────
+    console.log('\n== ២. សោសម្អាតស្វ័យប្រវត្តិ (២ ម៉ោង / ៧ ថ្ងៃ) ក្រោមការសរសេរដែលព្យួរ ==');
+    {
+        const w = buildWorld('hang');
+        const old = Date.now() - 30 * 24 * 3600 * 1000;
+        w.setCurrent({ id: 'itm1', createdAt: old, scanDate: '2026-09-01',
+            barcodes: [{ code: 'BC1', cod: 3.25, dod: 0, isClosed: false }] });
+        w.ctx.__claim('itm1', 'abandon');
+        await sleep(SETTLE_MS);
+        ok('ជាន់អប្បបរមា ៖ transaction បានចេញដំណើរពិត', w.log.txs >= 1, w.log.txs);
+        ok('ជាន់អប្បបរមា ៖ ការសរសេរធុងសំរាមបានចេញដំណើរពិត', w.log.updates >= 1, w.log.updates);
+        ok('សោត្រូវកាន់ខណៈការសរសេរនៅព្យួរ', w.ctx.__cleanupLock().length === 1, w.ctx.__cleanupLock());
+        // ⛔ ចាប់ពីកំណែ 2.37.2 ការដកលុយឈរ **ក្រោយ** ការសរសេរធុងសំរាម (journal នៃ
+        //    ការសម្អាត) ➜ ខណៈការសរសេរព្យួរ ledger ត្រូវ **មិនទាន់ប្រែ**។ លើ tree
+        //    ចាស់ លំដាប់ផ្ទុយ ➜ ការរំពឹងទុកដេរីវេពី **កូដពិត** មិនមែនលេខថេរ។
+        const ledgerAfterTrashWrite = src.indexOf('revenuePending') !== -1;
+        ok(ledgerAfterTrashWrite
+            ? '⛔ ការសរសេរធុងសំរាមព្យួរ ➜ លុយ **មិនទាន់ដក** (ការដកឈរក្រោយការសរសេរ)'
+            : 'ជាន់អប្បបរមា ៖ លុយត្រូវបានដកក្នុងសតិរួច',
+            w.ctx.__ledger().cod === (ledgerAfterTrashWrite ? 0 : -3.25), w.ctx.__ledger());
+
+        await sleep(WAIT_AFTER_TIMEOUT);
+        ok('⛔ សោ `cleanupInFlight` ត្រូវដោះក្នុងពេលកំណត់ (ច្បាប់ ២ម៉ោង/៧ថ្ងៃ មិនងាប់)',
+            w.ctx.__cleanupLock().length === 0, w.ctx.__cleanupLock());
+
+        // ជុំបន្ទាប់ត្រូវព្យាយាមម្តងទៀតបាន — ហើយ **មិនត្រូវដកលុយស្ទួន**
+        const txBefore = w.log.txs;
+        const ledgerBefore = w.ctx.__ledger();
+        w.ctx.__claim('itm1', 'abandon');
+        await sleep(SETTLE_MS);
+        ok('⛔ ជុំបន្ទាប់ត្រូវព្យាយាមម្តងទៀតបាន', w.log.txs > txBefore, { before: txBefore, after: w.log.txs });
+        ok('⛔ ការព្យាយាមម្តងទៀត **មិនត្រូវដកលុយស្ទួន** (idempotent)',
+            w.ctx.__ledger().cod === ledgerBefore.cod && w.ctx.__ledger().count === ledgerBefore.count,
+            { before: ledgerBefore, after: w.ctx.__ledger() });
+
+        // ការសរសេរដែលចុះយឺត ➜ ការងារក្រោយ commit ត្រូវបញ្ចប់ (មិនត្រូវបញ្ច្រាស)
+        w.releaseLateWrites();
+        await sleep(SETTLE_MS);
+        ok('⛔ ការសរសេរដែលចុះយឺត ➜ ធាតុនៅក្នុងធុងសំរាម (មិនត្រូវបញ្ច្រាស)',
+            w.ctx.__trash().length >= 1, w.ctx.__trash());
+        ok('⛔ ការសរសេរដែលចុះយឺត ➜ លុយនៅតែត្រូវដក (គ្មានការបញ្ច្រាសខុស)',
+            w.ctx.__ledger().cod === -3.25, w.ctx.__ledger());
+    }
+
+    {
+        const w = buildWorld('ok');
+        w.setCurrent({ id: 'clock_hold', createdAt: Date.now() - 30 * 24 * 3600 * 1000, scanDate: '2026-09-01',
+            barcodes: [{ code: 'CLOCK1', cod: 4, dod: 0, isClosed: false }] });
+        vm.runInContext('serverClockTrusted = false;', w.ctx);
+        await w.ctx.__claim('clock_hold', 'abandon');
+        ok('នាឡិកាមិនទុកចិត្ត៖ គ្មាន trash ឬប្រាក់', w.log.updates === 0 && w.ctx.__ledger().cod === 0);
+        vm.runInContext('serverClockTrusted = true;', w.ctx);
+        await w.ctx.__claim('clock_hold', 'abandon');
+        await sleep(SETTLE_MS);
+        ok('នាឡិកាត្រឡប់៖ trash និងប្រាក់តែម្តង', w.ctx.__trash().length === 1 && w.ctx.__ledger().cod === -4);
+        ok('នាឡិកាត្រឡប់៖ គ្មានកំហុសលាក់', w.log.captures.length === 0, w.log.captures);
+    }
+
+    // ── ៣. `confirmScannedRemoval` ៖ សោស្កេនដកត្រូវដោះ ─────────────────────
+    console.log('\n== ៣. សោរបៀបស្កេនដក ក្រោមការសរសេរដែលព្យួរ ==');
+    {
+        const w = buildWorld('hang');
+        const item = { id: 'itm2', scanDate: '2026-09-01',
+            barcodes: [{ code: 'BC2', cod: 2, dod: 0, isClosed: false }, { code: 'BC3', cod: 5, dod: 0, isClosed: false }] };
+        w.setCurrent(item);
+        w.ctx.__seedHistory([JSON.parse(JSON.stringify(item))]);
+        w.ctx.__setPending({ itemId: 'itm2', barcodeCode: 'BC2' });
+        w.ctx.__confirmRemove();
+        await sleep(SETTLE_MS);
+        ok('ជាន់អប្បបរមា ៖ ការសរសេរធុងសំរាមបានចេញដំណើរពិត', w.log.updates >= 1, w.log.updates);
+        ok('សោត្រូវកាន់ខណៈការសរសេរនៅព្យួរ', w.ctx.__removeLock() === true);
+        ok('⛔ trash មិនទាន់ ACK ➜ មិនទាន់កាត់លុយ ឬចំនួន barcode', w.ctx.__ledger().cod === 0 && w.ctx.__ledger().count === 0, w.ctx.__ledger());
+
+        await sleep(WAIT_AFTER_TIMEOUT);
+        ok('⛔ សោ `scanRemoveInFlight` ត្រូវដោះក្នុងពេលកំណត់ (របៀបស្កេនដកមិនងាប់)',
+            w.ctx.__removeLock() === false);
+
+        w.releaseLateWrites();
+        await sleep(SETTLE_MS);
+        ok('⛔ ការសរសេរដែលចុះយឺត ➜ Barcode ដែលដកនៅក្នុងធុងសំរាម',
+            w.ctx.__trash().length === 1, w.ctx.__trash());
+        ok('⛔ ការសរសេរដែលចុះយឺត ➜ លុយនៅតែត្រូវដក', w.ctx.__ledger().cod === -2, w.ctx.__ledger());
+    }
+
+    // ── ៤. ទិសផ្ទុយ ៖ បណ្តាញធម្មតា ➜ លទ្ធផលដដែលបេះបិទ ─────────────────────
+    console.log('\n== ៤. ទិសផ្ទុយ ៖ បណ្តាញធម្មតា ==');
+    {
+        const w = buildWorld('ok');
+        const old = Date.now() - 30 * 24 * 3600 * 1000;
+        w.setCurrent({ id: 'itm3', createdAt: old, scanDate: '2026-09-01',
+            barcodes: [{ code: 'BC9', cod: 1.5, dod: 0.5, isClosed: false }] });
+        w.ctx.__claim('itm3', 'abandon');
+        await sleep(SETTLE_MS);
+        ok('សោត្រូវដោះក្រោយចប់', w.ctx.__cleanupLock().length === 0, w.ctx.__cleanupLock());
+        ok('ធាតុត្រូវចូលធុងសំរាម', w.ctx.__trash().length === 1, w.ctx.__trash());
+        ok('លុយត្រូវដកត្រឹមត្រូវ (COD ១.៥)', w.ctx.__ledger().cod === -1.5, w.ctx.__ledger());
+        ok('⛔ គ្មានសារបរាជ័យលើបណ្តាញធម្មតា',
+            !w.log.toasts.some((t) => /បញ្ហាធ្ងន់ធ្ងរ|មិនបានជោគជ័យ/.test(t)), w.log.toasts);
+        ok('⛔ គ្មានការ capture កំហុសលើបណ្តាញធម្មតា', w.log.captures.length === 0, w.log.captures);
+    }
+    {
+        const w = buildWorld('ok');
+        const item = { id: 'itm4', scanDate: '2026-09-01',
+            barcodes: [{ code: 'BX1', cod: 4, dod: 0, isClosed: false }, { code: 'BX2', cod: 6, dod: 0, isClosed: false }] };
+        w.setCurrent(item);
+        w.ctx.__seedHistory([JSON.parse(JSON.stringify(item))]);
+        w.ctx.__setPending({ itemId: 'itm4', barcodeCode: 'BX1' });
+        await w.ctx.__confirmRemove();
+        await sleep(SETTLE_MS);
+        ok('⛔ ស្កេនដក ៖ គ្មាន dependency/runtime error ដែលលាក់', w.log.captures.length === 0, w.log.captures);
+        ok('ស្កេនដក ៖ សោត្រូវដោះក្រោយចប់', w.ctx.__removeLock() === false);
+        ok('ស្កេនដក ៖ ធាតុត្រូវចូលធុងសំរាម', w.ctx.__trash().length === 1, w.ctx.__trash());
+        ok('ស្កេនដក ៖ លុយត្រូវដកត្រឹមតែ Barcode នោះ', w.ctx.__ledger().cod === -4, w.ctx.__ledger());
+    }
+
+    // ── ៥. ច្បាប់រចនាសម្ព័ន្ធ ៖ ការសរសេរធុងសំរាមត្រូវនៅគ្មាន `dbOp()` ──────────
+    console.log('\n== ៥. ការសរសេរធុងសំរាមត្រូវនៅគ្មានពិដាន (ច្បាប់បញ្ច្រាសលុយ) ==');
+    {
+        const bodies = ['claimAndCleanupItem', 'removeSingleBarcode']
+            .map((n) => ({ name: n, body: extractFn(src, n) || '' }));
+        bodies.forEach(({ name, body }) => {
+            // ⛔ ទ្វារសរសេរធុងសំរាម ៖ `saveSingleDeletedItemToFirebase()` ឬ slot create-if-absent `claimCleanupTrashSlot()` (ការសម្អាត) ➜ ច្បាប់ដដែលលើទាំង ២
+            ok(name + ' ៖ ⛔ គ្មាន `dbOp(` លើការសរសេរធុងសំរាម',
+                !/dbOp\(\s*(?:retryAsync|notifyIfSlow|saveSingleDeletedItemToFirebase|claimCleanupTrashSlot)/.test(body));
+            ok(name + ' ៖ ជាន់អប្បបរមា — ការសរសេរធុងសំរាមមានពិត',
+                /(?:saveSingleDeletedItemToFirebase|claimCleanupTrashSlot)\s*\(/.test(body), body.length);
+        });
+    }
+
+    console.log('\n' + pass + ' ok, ' + fail + ' FAIL');
+    process.exit(fail ? 1 : 0);
+})();

@@ -1,0 +1,1418 @@
+// អ្នកយាមស្នាមភ្ជាប់របស់ manifest, template និង config ដែល ship ពិត។
+// សេវា Google/បណ្ដាញមិនត្រូវបានហៅ៖ វាស់កិច្ចសន្យាក្នុង repo តែប៉ុណ្ណោះ។
+'use strict';
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+const vm = require('vm');
+const cp = require('child_process');
+const { createRequire } = require('module');
+const acorn = require('acorn');
+const ROOT = path.resolve(process.env.REPOCONTRACT_APP_DIR || path.join(__dirname, '../..'));
+let pass = 0, fail = 0;
+function check(label, condition, detail) {
+    if (condition) { pass++; console.log('  ok    ' + label); }
+    else { fail++; console.log('  FAIL  ' + label + (detail ? '\n        ' + detail : '')); }
+}
+function scenario(label, action) {
+    try { action(); } catch (error) { check(label, false, error.message); }
+}
+function read(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function json(rel) { return JSON.parse(read(rel)); }
+function plain(value) { return JSON.parse(JSON.stringify(value)); }
+function same(a, b) {
+    if (a && b && typeof a === 'object' && typeof b === 'object') {
+        const aa = Object.keys(a).sort(), bb = Object.keys(b).sort();
+        return JSON.stringify(aa) === JSON.stringify(bb) && aa.every((k) => same(a[k], b[k]));
+    }
+    return a === b;
+}
+function nodes(source) {
+    const found = [];
+    (function visit(node) {
+        if (!node || typeof node !== 'object') return;
+        if (node.type) found.push(node);
+        for (const value of Object.values(node)) {
+            if (Array.isArray(value)) value.forEach(visit);
+            else if (value && typeof value === 'object') visit(value);
+        }
+    })(acorn.parse(source, { ecmaVersion: 2022 }));
+    return found;
+}
+
+scenario('Apps Script manifest អានបាន', () => {
+    const manifest = json('tools/zto-import/appsscript.json');
+    const uses = new Set();
+    for (const rel of ['tools/zto-import/Code.gs', 'tools/zto-import/Watch.gs']) {
+        for (const node of nodes(read(rel))) {
+            if (node.type === 'MemberExpression' && node.object.type === 'Identifier') uses.add(node.object.name);
+        }
+    }
+    const services = {
+        SpreadsheetApp: 'spreadsheets', DriveApp: 'drive', Drive: 'drive',
+        ScriptApp: 'script.scriptapp', MailApp: 'script.send_mail'
+    };
+    const required = [...new Set(Object.keys(services).filter((name) => uses.has(name))
+        .map((name) => 'https://www.googleapis.com/auth/' + services[name]))];
+    check('Apps Script ៖ មានការប្រើសេវាពិតជាមូលដ្ឋាននៃ scopes', required.length >= 4);
+    check('Apps Script ៖ scopes គ្របសេវាក្នុង Code.gs និង Watch.gs ដោយគ្មានសិទ្ធិលើស',
+        Array.isArray(manifest.oauthScopes) && same([...manifest.oauthScopes].sort(), required.sort()));
+    check('Apps Script ៖ កំណត់ V8 និងម៉ោងកម្ពុជា',
+        manifest.runtimeVersion === 'V8' && manifest.timeZone === 'Asia/Phnom_Penh');
+    const drive = (manifest.dependencies && manifest.dependencies.enabledAdvancedServices || [])
+        .filter((service) => service.userSymbol === 'Drive');
+    check('Apps Script ៖ Drive.Files.insert ប្រើ Drive API v2',
+        uses.has('Drive') && drive.length === 1 && drive[0].serviceId === 'drive' && drive[0].version === 'v2');
+    check('Apps Script ៖ webapp អនុវត្តជាម្ចាស់ deployment និងទទួល request របស់ App',
+        manifest.webapp && manifest.webapp.executeAs === 'USER_DEPLOYING'
+        && manifest.webapp.access === 'ANYONE_ANONYMOUS');
+    check('Apps Script ៖ មានកំណត់ត្រា exception', manifest.exceptionLogging === 'STACKDRIVER');
+});
+
+scenario('CSV template ឆ្លង importer និង reader ពិត', () => {
+    const XLSX = require(path.join(ROOT, 'ZoeW/vendor/xlsx.full.min.js'));
+    const wb = XLSX.read(read('tools/zto-import/google-sheets-api/customer-template.csv'), { type: 'string', raw: true });
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: '' });
+    const importer = vm.createContext({});
+    vm.runInContext(read('tools/zto-import/Code.gs'), importer, { timeout: 3000 });
+    check('CSV ៖ មាន header និងជួរឧទាហរណ៍ដែលមាន ៤ column',
+        rows.length >= 2 && rows.every((row) => row.length === 4));
+    check('CSV ៖ header ត្រូវនឹងលំដាប់ barcode/dod/cod/phone ដែល reader ប្រើ',
+        same(plain(importer.detectMapping_(rows[0])), { barcode: 0, dod: 1, cod: 2, phone: 3 }));
+    const records = plain(importer.normalizeRecords_(rows.slice(1))).records;
+    check('CSV ៖ គ្មាន barcode ទទេ/ស្ទួន និងតម្លៃលុយមិនអវិជ្ជមាន', records.length === rows.length - 1
+        && rows.slice(1).every((r) => typeof r[0] === 'string' && r[0].trim()
+            && [r[1], r[2]].every((v) => String(v).trim() !== '' && Number.isFinite(Number(v)) && Number(v) >= 0)));
+    check('CSV ៖ គំរូរក្សាលេខសូន្យនាំមុខទូរស័ព្ទ',
+        records.some((r) => /^0\d{7,10}$/.test(r.phone))
+        && records.every((r, i) => r.phone === rows[i + 1][3]));
+    const api = vm.createContext({
+        PropertiesService: { getScriptProperties: () => ({ getProperty: () => 'fixture-key' }) },
+        SpreadsheetApp: { getActiveSpreadsheet: () => ({ getSheetByName: () => ({
+            getLastRow: () => rows.length,
+            getRange: () => ({ getValues: () => rows.slice(1) })
+        }) }) },
+        CacheService: { getScriptCache: () => ({ get: () => null, put() {}, remove() {} }) },
+        Utilities: { newBlob: (value) => ({ getBytes: () => Array.from(Buffer.from(value)) }) },
+        ContentService: { MimeType: { JSON: 'application/json' },
+            createTextOutput: (value) => ({ value, setMimeType() { return this; } }) }
+    });
+    vm.runInContext(read('tools/zto-import/google-sheets-api/Code.gs'), api, { timeout: 3000 });
+    const result = JSON.parse(api.doGet({ parameter: { key: 'fixture-key', list: '1' } }).value);
+    check('CSV ៖ API អាន template ហើយប្រគល់តម្លៃដូច importer', same(result.rows, records));
+});
+
+scenario('Firebase example config អានដោយ validator ពិត', () => {
+    const config = json('tools/firebase-backup/config.example.json');
+    const moduleFile = path.join(ROOT, 'tools/firebase-backup/backup.js');
+    const source = read('tools/firebase-backup/backup.js');
+    const context = vm.createContext({ module: { exports: {} }, require: createRequire(moduleFile),
+        process, console, Buffer, URL, __dirname: path.dirname(moduleFile), config });
+    vm.runInContext(source, context, { timeout: 3000 });
+    const backup = context.module.exports;
+    backup.validateBusinesses(config, path.join(os.tmpdir(), 'zoe-example-validation'));
+    check('Backup example ៖ business entries ឆ្លង validator ពិត', config.businesses.length >= 2);
+    check('Backup example ៖ network defaults ត្រូវនឹងកូដពិត',
+        same(plain(backup.networkOptions(config)), plain(backup.networkOptions({}))));
+    for (const key of ['keepCount', 'lockStaleMs']) {
+        const calls = nodes(source).filter((node) => node.type === 'CallExpression'
+            && node.arguments.length === 5 && node.arguments[1].value === key);
+        check('Backup example ៖ ' + key + ' មាន validator ជាក់លាក់ក្នុង main', calls.length === 1);
+        if (calls.length === 1) {
+            // យក call ពិតតាម key; ការប្តូរឈ្មោះ helper/config មិនបំបាក់ checker។
+            const call = calls[0], input = call.arguments[0];
+            const expression = source.slice(call.start, input.start) + '__contractConfig'
+                + source.slice(input.end, call.end);
+            context.__contractConfig = config;
+            const actual = vm.runInContext(expression, context, { timeout: 3000 });
+            context.__contractConfig = {};
+            const fallback = vm.runInContext(expression, context, { timeout: 3000 });
+            check('Backup example ៖ ' + key + ' ត្រូវនឹង default ពិត', actual === fallback);
+        }
+    }
+    const firebaseTargets = config.businesses.filter((b) => b.type !== 'supabase');
+    const supabaseTargets = config.businesses.filter((b) => b.type === 'supabase');
+    check('Backup example ៖ សោទុកក្នុង secrets/ និងគ្មាន private key/secret key ក្នុង config',
+        config.backupDir === './backups'
+        && firebaseTargets.length >= 2 && firebaseTargets.every((b) => /^\.\/secrets\/[^/\\]+\.json$/.test(b.serviceAccountPath))
+        && supabaseTargets.every((b) => /^\.\/secrets\/[^/\\]+\.key$/.test(b.secretKeyPath) && !('secretKey' in b))
+        && !/PRIVATE KEY|private_key|client_secret|access_token|sb_secret_|service_role/.test(JSON.stringify(config)));
+    check('Backup example ៖ មាន target Supabase (url ឆ្លង normalizeSupabaseUrl ពិត)', supabaseTargets.length >= 1
+        && supabaseTargets.every((b) => { try { return !!require(path.join(ROOT, 'tools/firebase-backup/supabase.js')).normalizeSupabaseUrl(b.url); } catch (e) { return false; } }));
+});
+
+scenario('npm lock ត្រូវនឹង package និង dependency graph', () => {
+    const pkg = json('ZoeW/package.json'), lock = json('ZoeW/package-lock.json');
+    const packages = lock.packages || {}, root = packages[''] || {};
+    check('npm lock ៖ version 3 និងឈ្មោះ package ត្រឹមត្រូវ',
+        lock.lockfileVersion === 3 && lock.name === pkg.name && root.name === pkg.name);
+    for (const key of ['dependencies', 'devDependencies', 'optionalDependencies', 'engines']) {
+        check('npm lock ៖ ' + key + ' ស៊ីគ្នានឹង package.json', same(root[key] || {}, pkg[key] || {}));
+    }
+    const entries = Object.entries(packages).filter(([name]) => name !== '');
+    check('npm lock ៖ មាន dependency graph ពិត', entries.length > 0);
+    const invalid = [], absent = [];
+    for (const [name, item] of entries) {
+        let url;
+        try { url = new URL(item.resolved); } catch (_) {}
+        const hash = /^sha512-([A-Za-z0-9+/]+={0,2})$/.exec(item.integrity || '');
+        if (!name.startsWith('node_modules/') || name.includes('..') || item.link
+            || !url || url.protocol !== 'https:' || url.hostname !== 'registry.npmjs.org'
+            || url.username || url.password || !hash || Buffer.from(hash[1], 'base64').length !== 64
+            || !/^\d+\.\d+\.\d+(?:[-+].+)?$/.test(item.version || '')) invalid.push(name);
+    }
+    function resolve(name, dependency) {
+        let at = name;
+        while (at) {
+            const candidate = at + '/node_modules/' + dependency;
+            if (packages[candidate]) return packages[candidate];
+            const next = at.lastIndexOf('/node_modules/');
+            at = next < 0 ? '' : at.slice(0, next);
+        }
+        return packages['node_modules/' + dependency];
+    }
+    for (const [name, item] of Object.entries(packages)) {
+        for (const dependency of Object.keys(item.dependencies || {})) {
+            if (!resolve(name, dependency) && !(item.optionalDependencies || {})[dependency]) absent.push(name + ' → ' + dependency);
+        }
+    }
+    check('npm lock ៖ រាល់ tarball មាន registry HTTPS និង SHA-512 ពេញ', !invalid.length, invalid.join(' · '));
+    check('npm lock ៖ រាល់ dependency មាន entry ដែល resolve បាន', !absent.length, absent.join(' · '));
+    check('npm lock ៖ direct dependencies ប្រើកំណែ pin ដែល package ស្នើ',
+        Object.entries(pkg.dependencies || {}).every(([name, version]) =>
+            packages['node_modules/' + name] && packages['node_modules/' + name].version === version));
+});
+
+scenario('.gitignore ការពារសោ/ទិន្នន័យ ហើយអនុញ្ញាត config គំរូ', () => {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-ignore-contract-'));
+    try {
+        cp.execFileSync('git', ['init', '--quiet', temp], { stdio: 'pipe', timeout: 10000 });
+        fs.writeFileSync(path.join(temp, '.gitignore'), read('.gitignore'));
+        const blocked = ['tools/firebase-backup/config.json', 'tools/firebase-backup/secrets/key.json',
+            'tools/firebase-backup/backups/data.json', 'tools/firebase-backup/backup.log',
+            'tools/audit-tools/emu/real.rules.json', 'tools/audit-tools/.tmp-poison-fixture.js',
+            'tools/audit-tools/emu/.tmp-poison-fixture.js', 'tools/audit-tools/zto-import/.tmp-poison-fixture.js',
+            'tools/audit-tools/zoew/scripts/.tmp-poison-fixture.mjs',
+            'tools/audit-tools/zoew/tsconfig.tsbuildinfo', 'tools/audit-tools/zoew/test-results/fixture.json', 'node_modules/fixture.js'];
+        // git pull មិនផ្លាស់ទី secret/output ដែល ignore នៅផ្លូវចាស់ទេ។
+        blocked.push(...blocked.filter(name => name.startsWith('tools/audit-tools/') || name.startsWith('tools/firebase-backup/'))
+            .map(name => name.slice('tools/'.length)));
+        const allowed = ['tools/firebase-backup/config.example.json', 'ZoeW/package-lock.json',
+            'tools/audit-tools/new-guard.js', 'tools/zto-import/appsscript.json'];
+        const answer = cp.spawnSync('git', ['-C', temp, 'check-ignore', '--no-index', '--stdin'], {
+            input: blocked.concat(allowed).join('\n') + '\n', encoding: 'utf8', timeout: 10000
+        });
+        const ignored = new Set((answer.stdout || '').trim().split(/\r?\n/));
+        check('.gitignore ៖ sample សោ និង output ត្រូវបានរំលង',
+            answer.status === 0 && blocked.every((name) => ignored.has(name)));
+        check('.gitignore ៖ source/config គំរូ និង checker ថ្មីមិនត្រូវលាក់', allowed.every((name) => !ignored.has(name)));
+    } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+});
+
+scenario('.gitattributes ៖ checkout លើ Windows (core.autocrlf=true) បានបៃតដូច Linux · .cmd/.bat រក្សា CRLF', () => {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-eol-contract-'));
+    const git = (args, cwd) => cp.execFileSync('git', args, { cwd: cwd || temp, stdio: 'pipe', timeout: 15000, encoding: 'utf8' });
+    try {
+        const src = path.join(temp, 'src');
+        const win = path.join(temp, 'win');
+        fs.mkdirSync(src);
+        git(['init', '--quiet', src]);
+        git(['config', 'core.autocrlf', 'false'], src);
+        fs.writeFileSync(path.join(src, '.gitattributes'), read('.gitattributes'));
+        fs.mkdirSync(path.join(src, 'res'));
+        fs.writeFileSync(path.join(src, 'res', 'splash_icon.xml'), '<?xml version="1.0"?>\n<vector>\n</vector>\n');
+        fs.writeFileSync(path.join(src, 'icon.svg'), '<svg>\n<path d="M0 0"/>\n</svg>\n');
+        fs.writeFileSync(path.join(src, 'tool.cmd'), '@echo off\r\necho ok\r\n');
+        fs.writeFileSync(path.join(src, 'gradlew.bat'), '@rem x\r\nexit /b 0\r\n');
+        git(['add', '-A'], src);
+        git(['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '--quiet', '-m', 'x'], src);
+        git(['-c', 'core.autocrlf=true', 'clone', '--quiet', src, win]);
+        const bytes = (rel) => fs.readFileSync(path.join(win, rel), 'latin1');
+        check('.gitattributes ៖ Windows checkout ៖ XML/SVG នៅ LF (android-check ប្រៀបបៃតដូច Linux)',
+            !bytes('res/splash_icon.xml').includes('\r') && !bytes('icon.svg').includes('\r'));
+        check('.gitattributes ៖ Windows checkout ៖ .cmd/.bat នៅ CRLF ដដែល',
+            /\r\n/.test(bytes('tool.cmd')) && /\r\n/.test(bytes('gradlew.bat')));
+        const crlf = [];
+        const walk = (dir) => {
+            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+                if (['.git', 'node_modules', 'dist', 'dist-audit', 'build'].includes(entry.name)) continue;
+                const full = path.join(dir, entry.name);
+                if (entry.isDirectory()) walk(full);
+                else if (entry.isFile() && fs.statSync(full).size < 2000000) {
+                    const buf = fs.readFileSync(full);
+                    if (!buf.includes(0) && buf.includes('\r\n')) crlf.push(path.relative(ROOT, full).split(path.sep).join('/'));
+                }
+            }
+        };
+        walk(ROOT);
+        const attrs = crlf.length ? git(['check-attr', 'text', '--'].concat(crlf), src) : '';
+        const converted = crlf.filter((rel) => !new RegExp('^' + rel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ': text: unset$', 'm').test(attrs));
+        check('.gitattributes ៖ ឯកសារ CRLF ពិតក្នុង repo (' + crlf.length + ') ទាំងអស់ជា -text (មិនប្តូរ EOL)', crlf.length >= 1 && converted.length === 0,
+            converted.join(' · '));
+    } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+});
+
+scenario('ឧបករណ៍សម្អាតរក្សាតម្លៃកូដពិត', () => {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-clean-contract-'));
+    const options = { encoding: 'utf8', timeout: 10000, env: { ...process.env,
+        NODE_PATH: [path.dirname(path.dirname(require.resolve('acorn/package.json'))), process.env.NODE_PATH]
+            .filter(Boolean).join(path.delimiter) } };
+    try {
+        const file = path.join(temp, 'sample.js');
+        const original = 'const value = `រក្សា  \nចន្លោះ`;  \nmodule.exports = value;  \n';
+        fs.writeFileSync(file, original);
+        let result = cp.spawnSync(process.execPath, [path.join(ROOT, 'tools/audit-tools/trimws.js'), file],
+            options);
+        check('trimws ៖ មិនបាត់ចន្លោះក្នុង template literal',
+            result.status === 0 && fs.readFileSync(file, 'utf8') === original);
+        fs.writeFileSync(file, 'module.exports = "មានចន្លោះ  ";  \n');
+        result = cp.spawnSync(process.execPath, [path.join(ROOT, 'tools/audit-tools/trimws.js'), file],
+            options);
+        check('trimws ៖ សម្អាតតែ whitespace ក្រៅ string',
+            result.status === 0 && fs.readFileSync(file, 'utf8') === 'module.exports = "មានចន្លោះ  ";\n');
+        fs.writeFileSync(file, '// សម្គាល់\nmodule.exports = "/* មិនមែន comment */"; // ចុង\n');
+        result = cp.spawnSync(process.execPath, [path.join(ROOT, 'tools/audit-tools/strip-comments.js'), file],
+            options);
+        const cleaned = fs.readFileSync(file, 'utf8');
+        check('strip-comments ៖ លុប comment ហើយរក្សា string ដដែល',
+            result.status === 0 && !cleaned.includes('សម្គាល់') && !cleaned.includes('ចុង')
+            && cleaned.includes('"/* មិនមែន comment */"'));
+        // ZoeW React (`ts-comments.js`) ៖ TSX ពិត — directive `///` នៅដដែល · string/template រក្សា · `{/* */}` ក្នុង JSX ចេញ
+        const tsx = path.join(temp, 'sample.tsx');
+        fs.writeFileSync(tsx, '/// <reference lib="dom" />\n// សម្គាល់ TSX\nconst s: string = "// មិនមែន comment";\n'
+            + 'const t = `/* រក្សា */`;\nexport const C = () => <div>{/* JSX សម្គាល់ */}<span>{s}{t}</span></div>;\n');
+        result = cp.spawnSync(process.execPath, [path.join(ROOT, 'tools/audit-tools/strip-comments.js'), tsx], options);
+        const tsxOut = fs.readFileSync(tsx, 'utf8');
+        check('strip-comments (TSX) ៖ លុប comment · រក្សា directive/string/template',
+            result.status === 0 && !tsxOut.includes('សម្គាល់') && tsxOut.includes('/// <reference lib="dom" />')
+            && tsxOut.includes('"// មិនមែន comment"') && tsxOut.includes('`/* រក្សា */`') && !tsxOut.includes('{}'),
+            { status: result.status, out: tsxOut });
+        // ⛔ ទិសផ្ទុយ ៖ comment ដែលផ្ទុកបន្ទាត់ថ្មីក្រោយ `return` ជា ASI ➜ ការលុបវាប្តូរកូដ ➜ ត្រូវបោះបង់ មិនប៉ះឯកសារ
+        const asi = path.join(temp, 'asi.ts');
+        const asiSrc = 'export function f(x: number) {\n    return /*\n    */ x;\n}\n';
+        fs.writeFileSync(asi, asiSrc);
+        result = cp.spawnSync(process.execPath, [path.join(ROOT, 'tools/audit-tools/strip-comments.js'), asi], options);
+        check('strip-comments (TS) ៖ ការលុបដែលប្តូរ compile ➜ បោះបង់ (exit ≠ 0) ហើយឯកសារនៅដដែល',
+            result.status !== 0 && fs.readFileSync(asi, 'utf8') === asiSrc, { status: result.status });
+        // Gradle ៖ slashy regex ដែលផ្ទុក `'` · URL `//` ក្នុង string · comment ក្រោយកូដ · block comment ➜ string/regex នៅដដែល
+        const gradle = path.join(temp, 'build.gradle');
+        fs.writeFileSync(gradle, '// សម្គាល់ Gradle\ndef m = (src =~ /V\\s*=\\s*\'(\\d+)\'/)\ndef u = "https://x.example/a" // ចុង\n'
+            + '/* ប្លុក */\ndef n = 10 / 2\ndef r = (u =~ /https:\\/\\//)\n');
+        result = cp.spawnSync(process.execPath, [path.join(ROOT, 'tools/audit-tools/strip-comments.js'), gradle], options);
+        const gradleOut = fs.readFileSync(gradle, 'utf8');
+        check('strip-comments (Gradle) ៖ លុប comment · រក្សា slashy regex · URL ក្នុង string · ការចែក',
+            result.status === 0 && !/សម្គាល់|ចុង|ប្លុក/.test(gradleOut) && gradleOut.includes("=~ /V\\s*=\\s*'(\\d+)'/)")
+            && gradleOut.includes('"https://x.example/a"') && gradleOut.includes('10 / 2')
+            && gradleOut.includes('=~ /https:\\/\\//)'), { status: result.status, out: gradleOut });
+        const props = path.join(temp, 'gradle.properties');
+        fs.writeFileSync(props, '# សម្គាល់\na=1 \\\n  # តម្លៃបន្ត\nb=2\n');
+        result = cp.spawnSync(process.execPath, [path.join(ROOT, 'tools/audit-tools/strip-comments.js'), props], options);
+        const propsOut = fs.readFileSync(props, 'utf8');
+        check('strip-comments (gradle.properties) ៖ លុប comment · ⛔ ជួរបន្ត (continuation) ដែលចាប់ផ្តើមដោយ # ជាតម្លៃ មិនមែន comment',
+            result.status === 0 && !propsOut.includes('សម្គាល់') && propsOut.includes('# តម្លៃបន្ត') && propsOut.includes('b=2'), { out: propsOut });
+        const generated = path.join(temp, 'capacitor.build.gradle');
+        const generatedSrc = '// DO NOT EDIT THIS FILE! IT IS GENERATED EACH TIME "capacitor update" IS RUN\nandroid {}\n';
+        fs.writeFileSync(generated, generatedSrc);
+        result = cp.spawnSync(process.execPath, [path.join(ROOT, 'tools/audit-tools/strip-comments.js'), generated], options);
+        check('strip-comments (Gradle) ៖ ឯកសារដែល Capacitor សាងឡើងវិញ (header «DO NOT EDIT») មិនប៉ះ',
+            result.status === 0 && fs.readFileSync(generated, 'utf8') === generatedSrc);
+        const android = path.join(temp, 'android');
+        const cordova = path.join(android, 'capacitor-cordova-android-plugins');
+        const custom = path.join(android, 'app', 'capacitor-cordova-android-plugins');
+        fs.mkdirSync(cordova, { recursive: true });
+        fs.mkdirSync(custom, { recursive: true });
+        fs.writeFileSync(path.join(android, 'build.gradle'), '// សម្គាល់របស់គម្រោង\n');
+        fs.writeFileSync(path.join(cordova, 'build.gradle'), '// SUB-PROJECT DEPENDENCIES START\n');
+        fs.writeFileSync(path.join(custom, 'build.gradle'), '// សម្គាល់របស់គម្រោង\n');
+        const gradleFiles = require('./ts-comments').gradleShippedFiles(temp);
+        check('Gradle ៖ មិនលុប marker ក្នុងថត Cordova ដែល cap sync បង្កើត',
+            !gradleFiles.includes(path.join(cordova, 'build.gradle')));
+        check('Gradle ៖ នៅតែវាស់ឯកសាររបស់គម្រោងក្រោយ cap sync',
+            gradleFiles.includes(path.join(android, 'build.gradle')));
+        check('Gradle ៖ មិនរំលងថតឈ្មោះដូចគ្នាក្រៅ root ដែល Capacitor បង្កើត',
+            gradleFiles.includes(path.join(custom, 'build.gradle')));
+    } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+});
+
+scenario('comment checker វាស់ root ដែលបានស្នើ និងមិនលាក់ parse error', () => {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-comment-root-'));
+    try {
+        for (const app of ['ZoeW', 'ZoeKeyGen']) {
+            fs.mkdirSync(path.join(temp, app));
+            for (let i = 0; i < 3; i++) fs.writeFileSync(path.join(temp, app, 'fixture-' + i + '.js'), 'const value = 1;\n');
+        }
+        const run = () => cp.spawnSync(process.execPath, [path.join(__dirname, 'comments.js')], {
+            cwd: ROOT, encoding: 'utf8', timeout: 10000,
+            env: { ...process.env, COMMENTS_APP_DIR: temp }
+        });
+        let result = run();
+        check('comments ៖ root ផ្សេងពី cwd ដែលស្អាតត្រូវឆ្លង', result.status === 0, result.stdout + result.stderr);
+        const file = path.join(temp, 'ZoeW', 'fixture-0.js');
+        fs.writeFileSync(file, '// សម្គាល់ដែលត្រូវចាប់\nconst value = 1;\n');
+        result = run();
+        check('comments ៖ ចាប់ comment ក្នុង root ដែលបានស្នើ', result.status === 1 && /comments=1/.test(result.stdout));
+        fs.writeFileSync(file, 'const value = 1;\n');
+        fs.writeFileSync(path.join(temp, 'ZoeW', 'components.js'), 'const value = ;\n');
+        result = run();
+        check('comments ៖ parse error ត្រូវធ្លាក់', result.status === 1 && /PARSE ERROR/.test(result.stdout));
+    } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+});
+
+scenario('comment scanner រកឃើញម៉ូឌុល Netlify ទាំងអស់ និងសម្អាតដោយផ្លូវពិត', () => {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-comment-modules-'));
+    try {
+        const app = path.join(temp, 'ZoeW');
+        fs.mkdirSync(path.join(app, 'src'), { recursive: true });
+        fs.mkdirSync(path.join(app, 'public'));
+        fs.writeFileSync(path.join(app, 'src/main.tsx'), 'export const main = 1;\n');
+        for (let i = 0; i < 50; i++) fs.writeFileSync(path.join(app, 'src', 'fixture-' + i + '.ts'), 'export const value = 1;\n');
+        const entries = ['public/plain.js', 'public/module.mjs', 'public/common.cjs',
+            'netlify/functions/entry.mjs', 'netlify/functions/legacy.cjs',
+            'netlify/functions/_shared/core.cjs', 'netlify/functions/_shared/deep/helper.mjs'];
+        for (const rel of entries) {
+            const file = path.join(app, rel);
+            fs.mkdirSync(path.dirname(file), { recursive: true });
+            fs.writeFileSync(file, rel.endsWith('.cjs') ? 'module.exports = "// រក្សា";\n' : 'export const value = "// រក្សា";\n');
+        }
+        for (const rel of ['src/config.json', 'netlify/functions/config.json', 'netlify/functions/_shared/data.json']) {
+            fs.writeFileSync(path.join(app, rel), '{"note":"// មិនមែន comment កូដ"}\n');
+        }
+        fs.writeFileSync(path.join(app, 'netlify.toml'), '[build]\n  publish = "dist"\n\n[[headers]]\n  for = "/*"\n  [headers.values]\n    X-Note = "a#b"\n');
+        const scanned = require('./ts-comments').reactShippedFiles(app).map((file) => path.relative(app, file).split(path.sep).join('/'));
+        check('React scanner ៖ entry និង helpers ក្នុងថតជ្រៅ (.mjs/.cjs) គ្រប់គ្នា',
+            entries.filter((rel) => rel.startsWith('netlify/')).every((rel) => scanned.includes(rel)), scanned.join(' · '));
+        const expected = ['src/main.tsx', ...Array.from({ length: 50 }, (_, i) => 'src/fixture-' + i + '.ts'),
+            ...entries.filter((rel) => rel.startsWith('netlify/'))];
+        check('React scanner ៖ inventory ត្រូវគ្នាទាំងមូល និងមិនយក JSON ចូល',
+            same(scanned.slice().sort(), expected.sort()), scanned.join(' · '));
+        const options = { cwd: ROOT, encoding: 'utf8', timeout: 10000,
+            env: { ...process.env, COMMENTS_APP_DIR: temp, STRIP_APP_DIR: temp } };
+        const runComments = () => cp.spawnSync(process.execPath, [path.join(__dirname, 'comments.js')], options);
+        const clean = runComments();
+        check('comments ៖ root React សាកល្បងស្អាតត្រូវឆ្លង', clean.status === 0, clean.stdout + clean.stderr);
+        for (const rel of entries) {
+            const file = path.join(app, rel);
+            const original = fs.readFileSync(file, 'utf8');
+            fs.writeFileSync(file, '// សម្គាល់ដែលត្រូវចាប់\n' + original);
+            const dirty = runComments();
+            check('comments ៖ ចាប់ comment ក្នុង ' + rel,
+                dirty.status === 1 && dirty.stdout.includes('ZoeW/' + rel + ': comments=1'), dirty.stdout + dirty.stderr);
+            const stripped = cp.spawnSync(process.execPath, [path.join(__dirname, 'strip-comments.js')], options);
+            check('strip-comments ៖ ស្វែងរក និងសម្អាត ' + rel + ' ដោយស្វ័យប្រវត្តិ',
+                stripped.status === 0 && fs.readFileSync(file, 'utf8') === original, stripped.stdout + stripped.stderr);
+            fs.writeFileSync(file, original);
+        }
+        const toml = path.join(app, 'netlify.toml');
+        const tomlOriginal = fs.readFileSync(toml, 'utf8');
+        fs.writeFileSync(toml, '# សម្គាល់ដែលត្រូវចាប់\n' + tomlOriginal.replace('publish = "dist"', 'publish = "dist" # ក្រោយតម្លៃ'));
+        const dirtyToml = runComments();
+        check('comments ៖ ចាប់ comment TOML ក្នុង netlify.toml (ជួរពេញ + ក្រោយតម្លៃ) · `#` ក្នុង string មិនរាប់',
+            dirtyToml.status === 1 && dirtyToml.stdout.includes('ZoeW/netlify.toml: toml-comments=2'), dirtyToml.stdout + dirtyToml.stderr);
+        const strippedToml = cp.spawnSync(process.execPath, [path.join(__dirname, 'strip-comments.js')], options);
+        check('strip-comments ៖ សម្អាត netlify.toml ដោយស្វ័យប្រវត្តិ (token ក្រៅ comment ដដែល)',
+            strippedToml.status === 0 && fs.readFileSync(toml, 'utf8') === tomlOriginal, strippedToml.stdout + strippedToml.stderr);
+        fs.rmSync(toml);
+        const missingToml = runComments();
+        check('comments ៖ ZoeW React គ្មាន netlify.toml ➜ ធ្លាក់ (ការអះអាងអវត្តមានលើឯកសារដែលបាត់)',
+            missingToml.status === 1 && /TOML/.test(missingToml.stdout), missingToml.stdout + missingToml.stderr);
+    } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+});
+
+scenario('Netlify config scanner រាប់ entry .js/.mjs/.cjs និងមិនរាប់ថត helper', () => {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-netlify-modules-'));
+    try {
+        const fnDir = path.join(temp, 'ZoeW/netlify/functions');
+        fs.mkdirSync(fnDir, { recursive: true });
+        const source = read('tools/audit-tools/netlify-config-scope-test.js');
+        const start = source.indexOf("    const fnDir = path.join(ROOT, app, 'netlify', 'functions');");
+        const end = source.indexOf('    // គ.', start);
+        check('Netlify scanner ៖ ស្រង់ផ្លូវវាស់ Function ពិតបាន', start >= 0 && end > start);
+        const run = (src) => {
+            const verdicts = [];
+            vm.runInNewContext('let derived = 0;\n' + source.slice(start, end), {
+                fs, path, ROOT: temp, app: 'ZoeW', src,
+                ok: (label, condition) => verdicts.push({ label, condition })
+            });
+            return verdicts;
+        };
+        for (const ext of ['js', 'mjs', 'cjs']) {
+            const file = path.join(fnDir, 'entry.' + ext);
+            fs.writeFileSync(file, 'export default () => new Response();\n');
+            const missing = run('');
+            const configured = run('functions = "netlify/functions"');
+            check('Netlify scanner ៖ .' + ext + ' បង្ខំ functions config ដែលមានពិត',
+                missing.length === 1 && missing[0].condition === false
+                && configured.length === 2 && configured.every((item) => item.condition));
+            fs.rmSync(file);
+        }
+        fs.writeFileSync(path.join(fnDir, 'config.json'), '{}\n');
+        const jsonOnly = run('');
+        check('Netlify scanner ៖ JSON មួយឯងមិនមែនជា deployed entry', jsonOnly.length === 1 && jsonOnly[0].condition === true);
+        fs.mkdirSync(path.join(fnDir, 'helper.mjs'));
+        fs.mkdirSync(path.join(fnDir, '_shared'));
+        fs.writeFileSync(path.join(fnDir, '_shared/core.cjs'), 'module.exports = {};\n');
+        const helpers = run('');
+        check('Netlify scanner ៖ ថតនិង helpers មិនមែនជា deployed entry', helpers.length === 1 && helpers[0].condition === true);
+    } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+});
+
+scenario('CORS scanner ប្រើ selector ពិតលើ entry និង helpers ដោយមិនយក client ឬ data', () => {
+    const source = read('tools/audit-tools/security-guard-test.js');
+    const start = source.indexOf('    const fnFiles = ');
+    const end = source.indexOf('    const deadC =', start);
+    check('CORS scanner ៖ ស្រង់ selector និង consumer ពិតបាន', start >= 0 && end > start);
+    if (start < 0 || end <= start) throw new Error('CORS selector/consumer មិនមាន');
+    const included = [
+        'ZoeW/netlify/functions/plain.js',
+        'ZoeW/netlify/functions/zto-order-detail.mjs',
+        'ZoeW/netlify/functions/legacy.cjs',
+        'ZoeW/netlify/functions/_shared/zto-order-detail-core.cjs',
+        'ZoeW/netlify/functions/_shared/deep/helper.mjs',
+        'ZoeW/netlify/lib/push-core.mjs',
+        'ZoeW/netlify/lib/plain.js',
+        'ZoeW/netlify/lib/_shared/helper.cjs',
+        'supabase/functions/register/index.ts',
+        'supabase/functions/_shared/http.ts'
+    ];
+    const excluded = [
+        'tools/audit-tools/zoew/tests/zto-cors.test.ts',
+        'tools/audit-tools/zoew/tests/fixtures/server.cjs',
+        'ZoeW/netlify/functions/settings.json',
+        'ZoeW/netlify/functions/_shared/settings.json',
+        'ZoeW/netlify/functions/source.js.map',
+        'ZoeW/netlify/functions/source.cjs.bak',
+        'ZoeW/netlify/functions-old/source.cjs',
+        'fakeZoeW/netlify/functions/source.js',
+        'ZoeW/netlify/lib/settings.json',
+        'supabase/functions/register/config.json',
+        'supabase/tests/http.ts',
+        'ZoeW/src/services/client.ts',
+        'ZoeW/public/client.js',
+        'ZoeW/public/client.mjs'
+    ];
+    const scanned = [], bodies = [], verdicts = [];
+    vm.runInNewContext(source.slice(start, end), {
+        TEXT: new Map([...included, ...excluded].map((name) => [name, 'fixture:' + name])),
+        corsProblems: (name, text) => { scanned.push(name); bodies.push(text); return []; },
+        ok: (condition) => verdicts.push(condition)
+    });
+    check('CORS scanner ៖ ជាន់អប្បបរមា និងការផ្ទៀងដើមនៅតែបៃតងក្នុង fixture ស្អាត',
+        verdicts.length >= 2 && verdicts.every((condition) => condition === true), JSON.stringify(verdicts));
+    check('CORS scanner ៖ consumer ទទួលអត្ថបទពី TEXT របស់ឯកសារដែលបានជ្រើសត្រឹមត្រូវ',
+        scanned.length > 0 && bodies.every((text, i) => text === 'fixture:' + scanned[i]));
+    check('CORS scanner ៖ consumer ពិតទទួល JS/MJS/CJS ក្នុង Netlify និង TS ក្នុង Supabase គ្រប់គ្នា',
+        included.every((name) => scanned.includes(name)), scanned.join(' · '));
+    check('CORS scanner ៖ consumer ពិតមិនទទួល tests, JSON ឬ client',
+        excluded.every((name) => !scanned.includes(name)), scanned.join(' · '));
+    check('CORS scanner ៖ inventory ត្រូវគ្នាម្តងគត់ទាំងមូល',
+        same(scanned.slice().sort(), included.slice().sort()), scanned.join(' · '));
+});
+
+scenario('comments រំលងតែទិដ្ឋភាព React ដែលបង្កើតក្នុង root វាស់', () => {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-comment-measure-'));
+    try {
+        const app = path.join(temp, 'ZoeW');
+        const measure = path.join(app, 'dist-audit/measure-root');
+        const measuredApp = path.join(measure, 'ZoeW');
+        fs.mkdirSync(path.join(app, 'src'), { recursive: true });
+        fs.mkdirSync(path.join(app, 'public'));
+        fs.mkdirSync(measuredApp, { recursive: true });
+        fs.writeFileSync(path.join(app, 'src/main.tsx'), 'export const main = 1;\n');
+        fs.writeFileSync(path.join(app, 'netlify.toml'), '[build]\n  publish = "dist"\n');
+        for (let i = 0; i < 50; i++) fs.writeFileSync(path.join(app, 'src', 'fixture-' + i + '.ts'), 'export const value = 1;\n');
+        const manifest = path.join(measuredApp, 'audit-source-files.json');
+        fs.writeFileSync(manifest, JSON.stringify(['src/main.tsx']));
+        fs.writeFileSync(path.join(measuredApp, 'components.js'), 'const value = ;\n');
+        fs.writeFileSync(path.join(measuredApp, 'react-render.cjs'), '// មកពី esbuild សម្រាប់ checker\nmodule.exports = {};\n');
+        const run = (root) => cp.spawnSync(process.execPath, [path.join(__dirname, 'comments.js')], {
+            cwd: ROOT, encoding: 'utf8', timeout: 10000,
+            env: { ...process.env, COMMENTS_APP_DIR: root }
+        });
+        let result = run(measure);
+        check('comments ៖ root វាស់មាន source និង manifest ➜ ទិដ្ឋភាព React មិនមែនជា shipped source',
+            result.status === 0, result.stdout + result.stderr);
+        const other = path.join(measuredApp, 'other.cjs');
+        fs.writeFileSync(other, '// សម្គាល់ក្នុង CJS ផ្សេង\nmodule.exports = {};\n');
+        result = run(measure);
+        check('comments ៖ .cjs ផ្សេងក្នុង root វាស់នៅតែត្រូវស្កេន',
+            result.status === 1 && result.stdout.includes('ZoeW/other.cjs: comments=1'), result.stdout + result.stderr);
+        fs.rmSync(other);
+        fs.writeFileSync(manifest, JSON.stringify(['src/main.tsx', 'public/react-render.cjs']));
+        result = run(measure);
+        check('comments ៖ manifest កាន់ public/react-render.cjs ➜ មិនរំលងឈ្មោះដូច renderer',
+            result.status === 1 && result.stdout.includes('ZoeW/react-render.cjs: comments=1'), result.stdout + result.stderr);
+        fs.writeFileSync(path.join(app, 'public/react-render.cjs'), '// សម្គាល់ដែល ship\nmodule.exports = {};\n');
+        result = run(temp);
+        check('comments ៖ public/react-render.cjs ក្នុង source ពិតនៅតែត្រូវស្កេន',
+            result.status === 1 && result.stdout.includes('ZoeW/public/react-render.cjs: comments=1'), result.stdout + result.stderr);
+        fs.writeFileSync(manifest, JSON.stringify(['src/main.tsx']));
+        fs.rmSync(path.join(app, 'src'), { recursive: true });
+        result = run(measure);
+        check('comments ៖ manifest មួយឯងគ្មាន source ពិតមិនអាចរំលងបាន', result.status === 1);
+        fs.writeFileSync(path.join(app, 'react-render.cjs'), '// សម្គាល់ក្រៅ root វាស់\nmodule.exports = {};\n');
+        for (let i = 0; i < 6; i++) fs.writeFileSync(path.join(app, 'fixture-' + i + '.js'), 'const value = 1;\n');
+        result = run(temp);
+        check('comments ៖ react-render.cjs ក្រៅ root វាស់នៅតែត្រូវស្កេន',
+            result.status === 1 && result.stdout.includes('ZoeW/react-render.cjs: comments=1'), result.stdout + result.stderr);
+    } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+});
+
+// XML Android ដែលគម្រោងថែទាំ (`android/app/src/main` ៖ `AndroidManifest.xml` · `res/**/*.xml`) ៖ មានតែ comment template របស់
+// Capacitor (អត្ថបទដដែល · ឯកសារដដែល · ផ្ទៀងជាមួយ template ដែលដំឡើង) · comment របស់គម្រោង ➜ comments.js ធ្លាក់ · strip-comments សម្អាត
+function tarGzFixture(entries) {
+    const blocks = [];
+    for (const [name, body] of Object.entries(entries)) {
+        const data = Buffer.from(body, 'utf8');
+        const header = Buffer.alloc(512);
+        header.write(name, 0, 100, 'utf8');
+        header.write('0000644\0', 100, 8);
+        header.write('0000000\0', 108, 8);
+        header.write('0000000\0', 116, 8);
+        header.write(data.length.toString(8).padStart(11, '0') + '\0', 124, 12);
+        header.write('00000000000\0', 136, 12);
+        header.write('        ', 148, 8);
+        header.write('0', 156, 1);
+        header.write('ustar\0', 257, 6);
+        header.write('00', 263, 2);
+        let sum = 0;
+        for (const byte of header) sum += byte;
+        header.write(sum.toString(8).padStart(6, '0') + '\0 ', 148, 8);
+        blocks.push(header, data, Buffer.alloc((512 - (data.length % 512)) % 512));
+    }
+    blocks.push(Buffer.alloc(1024));
+    return require('zlib').gzipSync(Buffer.concat(blocks));
+}
+
+scenario('comments ៖ XML Android ដែល ship មានតែ comment template របស់ Capacitor', () => {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-comment-android-xml-'));
+    try {
+        const app = path.join(temp, 'ZoeW');
+        const main = path.join(app, 'android/app/src/main');
+        fs.mkdirSync(path.join(app, 'src'), { recursive: true });
+        fs.mkdirSync(path.join(app, 'public'));
+        fs.writeFileSync(path.join(app, 'src/main.tsx'), 'export const main = 1;\n');
+        for (let i = 0; i < 50; i++) fs.writeFileSync(path.join(app, 'src', 'fixture-' + i + '.ts'), 'export const value = 1;\n');
+        fs.writeFileSync(path.join(app, 'netlify.toml'), '[build]\n  publish = "dist"\n');
+        for (const rel of ['android/build.gradle', 'android/variables.gradle', 'android/app/build.gradle']) {
+            fs.mkdirSync(path.dirname(path.join(app, rel)), { recursive: true });
+            fs.writeFileSync(path.join(app, rel), 'ext {}\n');
+        }
+        const files = {
+            'AndroidManifest.xml': '<?xml version="1.0" encoding="utf-8"?>\n<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n'
+                + '    <application android:allowBackup="false" />\n\n    <!-- Permissions -->\n\n'
+                + '    <uses-permission android:name="android.permission.INTERNET" />\n</manifest>\n',
+            'res/values/styles.xml': '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n\n    <!-- Base application theme. -->\n'
+                + '    <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">\n        <!-- Customize your theme here. -->\n'
+                + '        <item name="colorPrimary">@color/colorPrimary</item>\n    </style>\n</resources>\n',
+            'res/values/strings.xml': '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n'
+                + '    <string name="note"><![CDATA[<!-- មិនមែន comment -->]]></string>\n</resources>\n',
+            'res/xml/data_extraction_rules.xml': '<?xml version="1.0" encoding="utf-8"?>\n<data-extraction-rules>\n'
+                + '    <cloud-backup>\n        <exclude domain="root" path="." />\n    </cloud-backup>\n</data-extraction-rules>\n'
+        };
+        for (const [rel, body] of Object.entries(files)) {
+            fs.mkdirSync(path.dirname(path.join(main, rel)), { recursive: true });
+            fs.writeFileSync(path.join(main, rel), body);
+        }
+        const generated = { 'assets/public/browserconfig.xml': '<!-- ចម្លងពី web ដោយ cap sync -->\n<browserconfig />\n' };
+        for (const [rel, body] of Object.entries(generated)) {
+            fs.mkdirSync(path.dirname(path.join(main, rel)), { recursive: true });
+            fs.writeFileSync(path.join(main, rel), body);
+        }
+        const cordova = path.join(app, 'android/capacitor-cordova-android-plugins/src/main/AndroidManifest.xml');
+        fs.mkdirSync(path.dirname(cordova), { recursive: true });
+        fs.writeFileSync(cordova, '<?xml version=\'1.0\' encoding=\'utf-8\'?>\n<!-- cap sync -->\n<manifest />\n');
+        const options = { cwd: ROOT, encoding: 'utf8', timeout: 20000,
+            env: { ...process.env, COMMENTS_APP_DIR: temp, STRIP_APP_DIR: temp } };
+        const runComments = () => cp.spawnSync(process.execPath, [path.join(__dirname, 'comments.js')], options);
+        const runStrip = (...args) => cp.spawnSync(process.execPath, [path.join(__dirname, 'strip-comments.js'), ...args], options);
+        const target = (rel) => path.join(main, rel);
+        let result = runComments();
+        check('comments ៖ XML Android ដែលមានតែ comment template (អត្ថបទ · ឯកសារដដែល) និង `<!--` ក្នុង CDATA ត្រូវឆ្លង',
+            result.status === 0, result.stdout + result.stderr);
+        check('comments ៖ រាប់ XML Android ដែលគម្រោងថែទាំ (manifest · res/**) ទាំង ៤ ឯកសារ · មិនរាប់ assets/public និងថត Cordova',
+            /ZoeW Android XML ៖ ស្កេន 4 ឯកសារ/.test(result.stdout), result.stdout);
+        const dataRules = target('res/xml/data_extraction_rules.xml');
+        const manifest = target('AndroidManifest.xml');
+        const styles = target('res/values/styles.xml');
+        const strings = target('res/values/strings.xml');
+        fs.writeFileSync(dataRules, files['res/xml/data_extraction_rules.xml'].replace('\n<data-extraction-rules>',
+            '\n<!--\n    សម្គាល់ហេតុផលរបស់គម្រោង\n-->\n<data-extraction-rules>'));
+        fs.writeFileSync(manifest, files['AndroidManifest.xml']
+            .replace('<application android:allowBackup="false" />', '<application android:allowBackup="false" /> <!-- ចុងជួរ -->')
+            .replace('    <uses-permission', '    <!-- សម្គាល់របស់គម្រោង -->\n    <uses-permission'));
+        fs.writeFileSync(styles, files['res/values/styles.xml']
+            .replace('    <!-- Base application theme. -->\n', '    <!-- Base application theme. -->\n    <!-- Base application theme. -->\n')
+            .replace('        <!-- Customize your theme here. -->\n', '        <!-- Customize your theme here. -->\n        <!-- Customize your theme here -->\n'));
+        fs.writeFileSync(strings, files['res/values/strings.xml'].replace('<resources>\n', '<resources>\n    <!-- Permissions -->\n'));
+        result = runComments();
+        const dirtyOut = result.stdout + result.stderr;
+        check('comments ៖ ចាប់ comment របស់គម្រោងក្នុង res/xml (ឯកសារមិនមែន template)',
+            result.status === 1 && result.stdout.includes('ZoeW/android/app/src/main/res/xml/data_extraction_rules.xml: xml-comments=1'), dirtyOut);
+        check('comments ៖ manifest ៖ រាប់តែ comment របស់គម្រោង (template «Permissions» មិនរាប់)',
+            result.stdout.includes('ZoeW/android/app/src/main/AndroidManifest.xml: xml-comments=2'), dirtyOut);
+        check('comments ៖ comment template ស្ទួន និងអត្ថបទ template ដែលកែ ➜ រាប់ (ត្រូវដូច template បេះបិទ ទាំងអត្ថបទ ទាំងចំនួន)',
+            result.stdout.includes('ZoeW/android/app/src/main/res/values/styles.xml: xml-comments=2'), dirtyOut);
+        check('comments ៖ អត្ថបទ template ក្នុងឯកសារខុស (Permissions ក្នុង strings.xml) ➜ រាប់ · `<!--` ក្នុង CDATA មិនរាប់',
+            result.stdout.includes('ZoeW/android/app/src/main/res/values/strings.xml: xml-comments=1'), dirtyOut);
+        result = runStrip('--check');
+        check('strip-comments --check ៖ រាយ XML Android ដែលមាន comment ហើយ exit ≠ 0 ដោយមិនកែ',
+            result.status === 1 && /data_extraction_rules\.xml/.test(result.stdout) && /សម្គាល់ហេតុផល/.test(fs.readFileSync(dataRules, 'utf8')),
+            result.stdout + result.stderr);
+        result = runStrip();
+        check('strip-comments ៖ លុប comment ក្រៅ template ក្នុង XML Android ហើយ markup និង comment template ដដែលមួយ byte',
+            result.status === 0 && ['res/xml/data_extraction_rules.xml', 'AndroidManifest.xml', 'res/values/styles.xml', 'res/values/strings.xml']
+                .every((rel) => fs.readFileSync(target(rel), 'utf8') === files[rel]), result.stdout + result.stderr);
+        check('strip-comments ៖ មិនប៉ះ assets/public និងថត Cordova ដែល cap sync បង្កើត',
+            fs.readFileSync(target('assets/public/browserconfig.xml'), 'utf8') === generated['assets/public/browserconfig.xml']
+            && fs.readFileSync(cordova, 'utf8').includes('<!-- cap sync -->'));
+        result = runComments();
+        check('comments ៖ ក្រោយ strip-comments XML Android ស្អាតត្រូវឆ្លង', result.status === 0, result.stdout + result.stderr);
+        const unterminated = files['res/xml/data_extraction_rules.xml'].replace('</data-extraction-rules>', '<!-- មិនបិទ\n</data-extraction-rules>');
+        fs.writeFileSync(dataRules, unterminated);
+        result = runStrip();
+        check('strip-comments ៖ `<!--` ដែលមិនបិទក្នុង XML Android ➜ FAIL ហើយឯកសារដដែលមួយ byte (មិនកាត់ markup ដល់ចុងឯកសារ)',
+            result.status === 1 && /data_extraction_rules\.xml/.test(result.stdout) && /FAIL/.test(result.stdout)
+            && fs.readFileSync(dataRules, 'utf8') === unterminated, result.stdout + result.stderr);
+        result = runComments();
+        check('comments ៖ `<!--` ដែលមិនបិទក្នុង XML Android ➜ រាប់ជា comment (ធ្លាក់)',
+            result.status === 1 && result.stdout.includes('res/xml/data_extraction_rules.xml: xml-comments=1'), result.stdout + result.stderr);
+        fs.writeFileSync(dataRules, files['res/xml/data_extraction_rules.xml']);
+        const templateAt = path.join(app, 'node_modules/@capacitor/cli/assets/android-template.tar.gz');
+        fs.mkdirSync(path.dirname(templateAt), { recursive: true });
+        fs.writeFileSync(templateAt, tarGzFixture({
+            'app/src/main/AndroidManifest.xml': files['AndroidManifest.xml'],
+            'app/src/main/res/values/styles.xml': files['res/values/styles.xml'].replace('        <!-- Customize your theme here. -->\n', '')
+        }));
+        result = runComments();
+        check('comments ៖ template ដែល tree ដំឡើង (node_modules ផ្ទាល់) លែងមាន comment allowlist ➜ ធ្លាក់ត្រឹមធាតុនោះ (មិនអនុញ្ញាតដោយស្ងាត់)',
+            result.status === 1 && /Customize your theme here/.test(result.stdout)
+            && !/Permissions|Base application theme/.test(result.stdout.slice(result.stdout.indexOf('វិសាលភាព'))), result.stdout + result.stderr);
+        fs.writeFileSync(templateAt, 'មិនមែន gzip\n');
+        result = runComments();
+        check('comments ៖ template របស់ Capacitor អានមិនបាន ➜ ធ្លាក់ (មិនរំលង)',
+            result.status === 1 && /template/.test(result.stdout), result.stdout + result.stderr);
+        fs.rmSync(path.join(app, 'node_modules'), { recursive: true });
+        fs.writeFileSync(manifest, files['AndroidManifest.xml'].replace('    <!-- Permissions -->\n', ''));
+        result = runComments();
+        check('comments ៖ allowlist ដែលឯកសារលែងប្រើ (dead entry) ➜ ធ្លាក់',
+            result.status === 1 && /Permissions/.test(result.stdout), result.stdout + result.stderr);
+        fs.rmSync(manifest);
+        result = runComments();
+        check('comments ៖ ថត Android គ្មាន AndroidManifest.xml ➜ ធ្លាក់ (ជាន់អប្បបរមា)',
+            result.status === 1 && /AndroidManifest\.xml/.test(result.stdout), result.stdout + result.stderr);
+    } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+});
+
+function auditWorkflowJobs(workflow) {
+    const sections = workflow.split(/^jobs:[ \t]*(?:#[^\r\n]*)?\r?$/m);
+    if (sections.length !== 2) return { jobs: [], valid: false };
+    const section = sections[1].split(/^(?=[A-Za-z0-9_-]+:)/m)[0];
+    const jobs = []; let valid = true, current = null;
+    for (const line of section.match(/[^\n]*\n|[^\n]+$/g) || []) {
+        if (/^[ \t]*(?:#[^\r\n]*)?\r?\n?$/.test(line)) { if (current) current.text += line; continue; }
+        const header = /^  ([A-Za-z0-9_-]+):[ \t]*(?:#[^\r\n]*)?\r?\n?$/.exec(line);
+        if (header) { current = { name: header[1], text: line }; jobs.push(current); continue; }
+        if (!current || !/^ {4,}\S/.test(line)) valid = false;
+        if (current) current.text += line;
+    }
+    const names = jobs.map(job => job.name);
+    return { jobs, valid: valid && names.filter(name => name === 'audit-shard').length === 1 && new Set(names).size === names.length };
+}
+
+function auditShardRuntimeContract(workflow, image, apk) {
+    const { jobs, valid } = auditWorkflowJobs(workflow);
+    // `ci-config` ជា preflight ស្រាល (ubuntu-latest · គ្មាន checkout/dependency/Chromium)
+    // ➜ មិនត្រូវរំពឹង cache/runtime/Chromium ដូច audit shard ទេ។
+    const contracts = jobs.filter(({ name }) => name !== 'ci-config').map(({ name, text }) => {
+        const shard = name === 'audit-shard';
+        const steps = text.match(/^      -[^\n]*(?:\n(?!      -)[^\n]*)*/gm) || [];
+        const privileged = steps.filter((step) => /\bsudo\b|--with-deps/.test(step));
+        const setupRuntime = steps.filter((step) => /uses: actions\/setup-(node|java)@/.test(step));
+        const nodeStep = setupRuntime.find((step) => step.includes('setup-node@')) || '';
+        const installs = steps.flatMap(step => step.split('\n').filter(line => /\bnpm (?:ci|install)\b/.test(line)));
+        const installLocks = steps.flatMap(step => [...step.matchAll(/npm ci --prefix (\S+)/g)].map(match => match[1] + '/package-lock.json'));
+        const block = (nodeStep.match(/cache-dependency-path: \|\n((?:            [^\n]+\n?)+)/) || ['', ''])[1];
+        const scalar = (nodeStep.match(/^          cache-dependency-path: ([^|\n]+)$/m) || ['', ''])[1];
+        const cacheLocks = (block || scalar).trim().split(/\s+/).filter(Boolean);
+        return {
+            cache: nodeStep.includes("if: vars.ZOE_RUNNER_MODE == 'github'") && /^          cache: npm$/m.test(nodeStep)
+                && installLocks.length >= (shard ? 3 : 1) && same(installLocks.slice().sort(), cacheLocks.slice().sort())
+                && cacheLocks.every((file) => fs.existsSync(path.join(ROOT, file))),
+            offline: installLocks.length >= (shard ? 3 : 1) && installs.length > 0 && installs.every(line => line.includes('--prefer-offline')),
+            runtime: setupRuntime.length === 2 && setupRuntime.every((step) => step.includes("if: vars.ZOE_RUNNER_MODE == 'github'"))
+                && image.includes('FROM node:24-') && image.includes('openjdk-21-jdk-headless')
+                && (!shard || steps.some((step) => step.includes("if: vars.ZOE_RUNNER_MODE != 'github'")
+                    && step.includes('java -version') && step.includes('process.versions.node') && step.includes('$GITHUB_ENV'))),
+            chromium: image.includes('install-deps chromium') && privileged.length === 1
+                && privileged.every((step) => step.includes("if: vars.ZOE_RUNNER_MODE == 'github'"))
+                && steps.some((step) => step.includes("if: vars.ZOE_RUNNER_MODE != 'github'")
+                    && step.includes('prepare-audit-cache.sh chromium') && !/\bsudo\b|--with-deps/.test(step))
+        };
+    });
+    return Object.fromEntries(['cache', 'offline', 'runtime', 'chromium'].map(key => [key,
+        valid && contracts.length > 0 && contracts.every(contract => contract[key])
+        && (key !== 'offline' || /npm ci --prefix ZoeW --prefer-offline/.test(apk))]));
+}
+
+scenario('runner ៖ Linux audit និង Windows APK មាន mode ទាំងពីរ', () => {
+    const audit = read('.github/workflows/audit.yml');
+    const apk = read('.github/workflows/android-release.yml');
+    const apkSteps = apk.match(/^      -[^\n]*(?:\n(?!      -)[^\n]*)*/gm) || [];
+    const firstRun = apkSteps.find((step) => /^        run:/m.test(step));
+    check('APK កំណត់ Git Bash មុន run step ផ្សេង ដោយ PowerShell របស់ Windows',
+        !!firstRun && /^        shell: powershell$/m.test(firstRun)
+        && firstRun.includes("Get-Command git -ErrorAction Stop")
+        && firstRun.includes("Join-Path $gitRoot 'bin'")
+        && firstRun.includes("Join-Path $gitBin 'bash.exe'")
+        && firstRun.includes('Test-Path -LiteralPath $gitBash -PathType Leaf')
+        && firstRun.includes('& $gitBash --version')
+        && /\$gitBin \| Out-File -FilePath \$env:GITHUB_PATH -Encoding utf8 -Append/.test(firstRun));
+    const bootstrapScript = ((firstRun || '').match(/^        run: \|\r?\n([\s\S]*)$/m) || [])[1] || '';
+    const bootstrapMessage = ((firstRun || '').match(/^          ZOE_GIT_BASH_MISSING_MESSAGE: '([^'\r\n]*)'$/m) || [])[1] || '';
+    check('Windows PowerShell អាន inline script បានដោយគ្មាន BOM និងសារខ្មែរនៅក្នុង env',
+        bootstrapScript.trim().length > 0 && !/[^\x00-\x7f]/.test(bootstrapScript)
+        && bootstrapMessage.includes('{0}') && /[\u1780-\u17ff]/.test(bootstrapMessage)
+        && bootstrapScript.includes('throw ($env:ZOE_GIT_BASH_MISSING_MESSAGE -f $gitBash)'));
+    const shellCheck = read('.github/workflows/android-shell-check.yml');
+    check('Windows shell CI វាស់ bootstrap ពិត ដោយគ្មាន secrets ឬ Release',
+        /contents:\s*read/.test(shellCheck) && /shell:\s*powershell/.test(shellCheck)
+        && shellCheck.includes('github.event.pull_request.head.repo.full_name == github.repository')
+        && shellCheck.includes('.github\\workflows\\android-release.yml')
+        && shellCheck.includes('Management.Automation.Language.Parser]::ParseInput')
+        && shellCheck.includes('legacy-encoding-mutation-survived')
+        && shellCheck.includes('missing-Git-Bash-must-fail-with-path')
+        && !/secrets\.|gh\s+release\s+create|assembleRelease/.test(shellCheck));
+    const compose = read('tools/actions-runners/compose.yml');
+    const image = read('tools/actions-runners/Dockerfile');
+    const labels = (source, mode) => {
+        const match = source.match(/runs-on:\s*\$\{\{\s*(.*?)\s*\}\}/);
+        if (!match) return null;
+        return vm.runInNewContext(match[1], { vars: { ZOE_RUNNER_MODE: mode }, fromJSON: JSON.parse });
+    };
+    // matrix ថាមវន្ត៖ public GitHub (CPU ៤) ៥ shard · GitHub ឯកជន/self-hosted (CPU ២) ៤ shard · scale តែផ្នែក 1។
+    // ⛔ ការអានត្រូវវាយតម្លៃ expression ពិត (មិនមែន regex លើលេខថេរ) ដើម្បីកុំឲ្យ matrix ខុស N ក្លាយជាបៃតងស្ងាត់។
+    const matrixMatch = /^\s*include: \$\{\{\s*(.*)\s*\}\}\s*$/m.exec(audit);
+    const matrixFor = (mode, isPrivate, event = 'pull_request', scale = false) => {
+        if (!matrixMatch) return null;
+        try {
+            return vm.runInNewContext(matrixMatch[1], {
+                vars: { ZOE_RUNNER_MODE: mode },
+                github: { event_name: event, event: { repository: { private: isPrivate } } },
+                inputs: { multishop_scale: scale }, fromJSON: JSON.parse
+            });
+        } catch (e) { return null; }
+    };
+    const matrixJson = (n) => JSON.stringify(Array.from({ length: n }, (_, i) => ({ shard: i + 1, n })));
+    const matrix = {
+        public: matrixFor('github', false), private: matrixFor('github', true),
+        self: matrixFor('self-hosted', true), unset: matrixFor('', false),
+        scalePublic: matrixFor('github', false, 'workflow_dispatch', true),
+        scaleSelf: matrixFor('self-hosted', true, 'workflow_dispatch', true)
+    };
+    check('audit ជ្រើស Linux pool ឬ GitHub និងបែងចែក shard ៥ (public) / ៤ (ឯកជន · self-hosted)',
+        same(labels(audit, 'self-hosted'), ['self-hosted', 'Linux', 'X64', 'wsl-zoe-audit'])
+        && same(labels(audit, 'github'), ['ubuntu-latest'])
+        && same(labels(audit, ''), ['self-hosted', 'Linux', 'X64', 'wsl-zoe-audit'])
+        && same(labels(audit, 'invalid'), ['self-hosted', 'Linux', 'X64', 'wsl-zoe-audit'])
+        && JSON.stringify(matrix.public) === matrixJson(5)
+        && JSON.stringify(matrix.private) === matrixJson(4)
+        && JSON.stringify(matrix.self) === matrixJson(4)
+        && JSON.stringify(matrix.unset) === matrixJson(4)
+        && JSON.stringify(matrix.scalePublic) === JSON.stringify([{ shard: 1, n: 5 }])
+        && JSON.stringify(matrix.scaleSelf) === JSON.stringify([{ shard: 1, n: 4 }])
+        && /max-parallel:\s*5\b/.test(audit)
+        && /RUNALL_SHARD:\s*\$\{\{\s*matrix\.shard\s*\}\}\/\$\{\{\s*matrix\.n\s*\}\}/.test(audit),
+        JSON.stringify(matrix));
+    const allowed = (source, mode, isPrivate, event = 'pull_request', sameRepo = true, ref = 'refs/heads/main') => {
+        const match = source.match(/^    if: (.+)$/m);
+        if (!match) return false;
+        return vm.runInNewContext(match[1], { vars: { ZOE_RUNNER_MODE: mode }, github: {
+            event_name: event, repository: 'owner/repo', ref,
+            event: { repository: { private: isPrivate },
+                pull_request: { draft: true, head: { repo: { full_name: sameRepo ? 'owner/repo' : 'fork/repo' } } } }
+        } }) === true;
+    };
+    check('GitHub mode រត់ Public/Private និង Draft; self-hosted នៅតែទាមទារ Private',
+        allowed(audit, 'github', false) && allowed(audit, 'github', true)
+        && allowed(audit, 'self-hosted', true) && !allowed(audit, 'self-hosted', false)
+        && !allowed(audit, '', false) && !allowed(audit, 'invalid', false)
+        && allowed(apk, 'github', false, 'workflow_dispatch')
+        && allowed(apk, 'self-hosted', true, 'workflow_dispatch')
+        && !allowed(apk, 'self-hosted', false, 'workflow_dispatch'));
+    // Public + mode ខុស ➜ job សំខាន់ skip ហើយ run អាចបៃតងដោយគ្មានភស្តុតាង។
+    // `ci-config` ត្រូវធ្លាក់ឮៗ និង jobs សំខាន់ត្រូវពឹងវា ដើម្បីកុំឲ្យការកំណត់ខុសក្លាយជាបៃតងស្ងាត់។
+    const gated = {
+        'audit.yml': ['zto-native-evidence', 'audit-shard'],
+        'android-release.yml': ['apk'],
+        'android-shell-check.yml': ['shell'],
+        'f03-native-diagnostic.yml': ['native-order']
+    };
+    const preflight = Object.entries(gated).map(([file, names]) => {
+        const jobs = auditWorkflowJobs(read('.github/workflows/' + file)).jobs;
+        return { file, jobs, names, job: jobs.find((entry) => entry.name === 'ci-config') };
+    });
+    check('public repo ➜ mode ខុសត្រូវក្រហម ៖ ci-config ធ្លាក់ឮៗ និង jobs សំខាន់ needs វា',
+        preflight.every(({ jobs, names, job }) => job
+            && /^    runs-on: ubuntu-latest$/m.test(job.text)
+            && job.text.includes('::error::') && job.text.includes('exit 1')
+            && names.every((name) => /^    needs: ci-config$/m.test(jobs.find((entry) => entry.name === name)?.text || ''))),
+        preflight.map(({ file, jobs, names, job }) => file + ': ' + (job ? 'ci-config' : 'missing')
+            + ' needs=' + names.map((name) => /^    needs: ci-config$/m.test(jobs.find((entry) => entry.name === name)?.text || '')).join(',')).join(' · '));
+    const runall = (audit.match(/^          RUNALL_JOBS: \$\{\{ (.*?) \}\}$/m) || [])[1];
+    const runallFor = (mode, isPrivate) => runall && vm.runInNewContext(runall, {
+        vars: { ZOE_RUNNER_MODE: mode }, github: { event: { repository: { private: isPrivate } } }
+    });
+    check('RUNALL_JOBS សមនឹង CPU ៖ GitHub ឯកជន 1 · GitHub public 2 · self-hosted 2',
+        runallFor('github', true) === '1' && runallFor('github', false) === '2'
+        && runallFor('self-hosted', true) === '2' && runallFor('', false) === '2',
+        [['github', true], ['github', false], ['self-hosted', true], ['', false]]
+            .map(([mode, isPrivate]) => mode + '/' + isPrivate + '=' + runallFor(mode, isPrivate)).join(' · '));
+    check('fork មិនរត់ audit · APK ស្វ័យប្រវត្តិ (push) នៅ main តែប៉ុណ្ណោះ · branch ផ្សេង ➜ តែ «Run workflow» ដោយដៃ (APK សាក)',
+        !allowed(audit, 'self-hosted', true, 'pull_request', false)
+        && !allowed(audit, 'github', false, 'pull_request', false)
+        && allowed(audit, 'github', false, 'push')
+        && allowed(apk, 'github', false, 'push')
+        && !allowed(apk, 'github', false, 'push', true, 'refs/heads/feature')
+        && !allowed(apk, 'github', false, 'pull_request', true, 'refs/heads/feature')
+        && allowed(apk, 'github', false, 'workflow_dispatch', true, 'refs/heads/feature')
+        && allowed(apk, 'self-hosted', true, 'workflow_dispatch', true, 'refs/heads/feature')
+        && !allowed(apk, 'self-hosted', false, 'workflow_dispatch', true, 'refs/heads/feature')
+        && /^  push:\n    branches: \[main\]$/m.test(apk) && !/^  pull_request/m.test(apk));
+    check('APK ជ្រើស Windows pool ឬ GitHub និងប្រើ Gradle/apksigner របស់ Windows',
+        same(labels(apk, 'self-hosted'), ['self-hosted', 'Windows', 'X64', 'windows-zoe-android'])
+        && same(labels(apk, 'github'), ['windows-latest'])
+        && same(labels(apk, ''), ['self-hosted', 'Windows', 'X64', 'windows-zoe-android'])
+        && apk.includes('gradlew.bat') && apk.includes('apksigner.bat')
+        && apk.indexOf('actions/setup-node@') < apk.indexOf('VERSION=$(node')
+        && apk.indexOf('android-actions/setup-android@') < apk.indexOf('gradlew.bat'));
+    check('Linux container មាន home ដាច់ពីគ្នា និងគ្មាន host port/socket',
+        [1, 2, 3, 4].every((n) => compose.includes('audit-' + n + '-home:/home/runner'))
+        && !/network_mode\s*:|\bports\s*:|docker\.sock|privileged\s*:\s*true/.test(compose));
+    const contract = auditShardRuntimeContract(audit, image, apk);
+    check('GitHub npm cache យោង lockfiles ដែល audit ដំឡើងពិតទាំងអស់', contract.cache);
+    check('Audit និង APK ប្រើ npm ci + prefer-offline ដោយរក្សា lockfile validation', contract.offline);
+    check('self-hosted ប្រើ Node/Java ក្នុង image; setup downloads សម្រាប់ GitHub តែប៉ុណ្ណោះ', contract.runtime);
+    check('Chromium ៖ system dependencies ក្នុង image ឬ GitHub step តែប៉ុណ្ណោះ', contract.chromium);
+    // job ផ្សេងមិនត្រូវបាំង shard ខូច ឬធ្វើឲ្យ shard ត្រឹមត្រូវធ្លាក់ទេ។
+    const shard = auditWorkflowJobs(audit).jobs.find(job => job.name === 'audit-shard')?.text || '';
+    const sibling = audit.replace(shard, '');
+    check('runtime contract ៖ sibling job មិនលាយ cache/runtime/Chromium របស់ shard',
+        Object.values(contract).every(Boolean));
+    check('runtime contract ៖ shard បាត់ ឬស្ទួន ត្រូវបដិសេធ',
+        Object.values(auditShardRuntimeContract(sibling, image, apk)).every(value => !value)
+        && Object.values(auditShardRuntimeContract(audit + '\n' + shard, image, apk)).every(value => !value));
+    check('runtime contract ៖ sibling job នៅក្រោយ shard មិនប៉ះលទ្ធផល',
+        same(contract, auditShardRuntimeContract(audit + '\n' + shard.replace('  audit-shard:', '  extra-audit:'), image, apk)));
+    const future = shard.replace('  audit-shard:', '  future-audit: # fixture');
+    check('runtime contract ៖ job ក្រោយមាន comment ក៏ត្រូវវាស់ gate',
+        !auditShardRuntimeContract(audit + '\n' + future.replace("      - name: ត្រៀម Chromium លើម៉ាស៊ីន GitHub\n        if: vars.ZOE_RUNNER_MODE == 'github'", "      - name: ត្រៀម Chromium លើម៉ាស៊ីន GitHub\n        if: always()"), image, apk).chromium);
+    for (const header of ['  "quoted-job":', '   malformed-job:', '  future-audit: { unexpected: true }']) {
+        check('runtime contract ៖ job header មិនស្គាល់ ត្រូវបដិសេធ ' + header,
+            Object.values(auditShardRuntimeContract(audit + '\n' + shard.replace('  audit-shard:', header), image, apk)).every(value => !value));
+    }
+    for (const [name, key, mutated] of [
+        ['cache lock', 'cache', sibling.replace('cache-dependency-path: ZoeW/package-lock.json', 'cache-dependency-path: supabase/package-lock.json')],
+        ['Node gate', 'runtime', sibling.replace("      - uses: actions/setup-node@v7\n        if: vars.ZOE_RUNNER_MODE == 'github'", "      - uses: actions/setup-node@v7\n        if: always()")],
+        ['Java gate', 'runtime', sibling.replace("      - uses: actions/setup-java@v6\n        if: vars.ZOE_RUNNER_MODE == 'github'", "      - uses: actions/setup-java@v6\n        if: always()")],
+        ['Chromium gate', 'chromium', sibling.replace("      - name: ត្រៀម Chromium លើម៉ាស៊ីន GitHub\n        if: vars.ZOE_RUNNER_MODE == 'github'", "      - name: ត្រៀម Chromium លើម៉ាស៊ីន GitHub\n        if: always()")],
+        ['offline ci', 'offline', sibling.replace('npm ci --prefix ZoeW --prefer-offline', 'npm ci --prefix ZoeW')],
+        ['offline install', 'offline', sibling.replace('npm install --prefer-offline', 'npm install')]
+    ]) {
+        check('runtime contract ៖ job បន្ថែមខូច ' + name + ' មិនត្រូវ shard បាំង',
+            mutated !== sibling && !auditShardRuntimeContract(mutated + shard, image, apk)[key]);
+    }
+    for (const [name, key, mutated] of [
+        ['cache lock', 'cache', shard.replace('            supabase/package-lock.json\n', '')],
+        ['Node gate', 'runtime', shard.replace("if: vars.ZOE_RUNNER_MODE == 'github'", "if: always()")],
+        ['Java gate', 'runtime', shard.replace("      - uses: actions/setup-java@v6\n        if: vars.ZOE_RUNNER_MODE == 'github'", "      - uses: actions/setup-java@v6\n        if: always()")],
+        ['Chromium gate', 'chromium', shard.replace("      - name: ត្រៀម Chromium លើម៉ាស៊ីន GitHub\n        if: vars.ZOE_RUNNER_MODE == 'github'", "      - name: ត្រៀម Chromium លើម៉ាស៊ីន GitHub\n        if: always()")],
+        ['offline install', 'offline', shard.replace('npm ci --prefix ZoeW --prefer-offline', 'npm ci --prefix ZoeW')]
+    ]) {
+        check('runtime contract ៖ shard ខូច ' + name + ' មិនត្រូវ sibling job បាំង',
+            mutated !== shard && !auditShardRuntimeContract(sibling + mutated, image, apk)[key]);
+    }
+});
+
+scenario('APK សាក ៖ branch ផ្សេងពី main ➜ Pre-release តែមួយក្នុងមួយ commit · main ➜ Release ផ្លូវការ (script ពិតរបស់ workflow)', () => {
+    const apk = read('.github/workflows/android-release.yml');
+    const stepRun = (name) => {
+        const step = (apk.match(/^      -[^\n]*(?:\n(?!      -)[^\n]*)*/gm) || []).find((st) => st.includes('- name: ' + name)) || '';
+        const body = (step.match(/^        run: \|\n([\s\S]*)$/m) || [])[1] || '';
+        return body.split('\n').map((line) => line.replace(/^          /, '')).join('\n');
+    };
+    const meta = stepRun('កំណែ និងស្លាក Release');
+    const release = stepRun('បង្កើត GitHub Release');
+    check('ស្រង់ step «កំណែ» និង «បង្កើត GitHub Release» ពី workflow ពិតបាន',
+        meta.includes('GITHUB_OUTPUT') && release.includes('gh release create'), meta.slice(0, 80) + ' | ' + release.slice(0, 80));
+    const bash = cp.spawnSync('bash', ['--version'], { encoding: 'utf8' });
+    if (bash.status !== 0) { check('bash មានសម្រាប់រត់ script ពិត', false, String(bash.error || bash.stderr)); return; }
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'apk-test-mode-'));
+    try {
+        const bin = path.join(temp, 'bin');
+        fs.mkdirSync(bin);
+        fs.writeFileSync(path.join(bin, 'cygpath'), '#!/bin/sh\nwhile [ "${1#-}" != "$1" ]; do shift; done\nprintf \'%s\\n\' "$1"\n', { mode: 0o755 });
+        fs.writeFileSync(path.join(bin, 'gh'), '#!/bin/sh\nif [ "$1 $2" = "release view" ]; then exit 1; fi\nif [ "$1 $2" = "release create" ]; then shift 2; { printf \'%s %s\\n\' --CALL-- "${GH_TOKEN:-}"; for a in "$@"; do printf \'%s\\n\' "$a"; done; } >> "$GH_LOG"; exit 0; fi\nexit 3\n', { mode: 0o755 });
+        const releasesRepo = (apk.match(/^\s+ZOE_RELEASES_REPO:\s*(\S+)\s*$/m) || [])[1] || '';
+        check('repo Release public (`ZOE_RELEASES_REPO`) ដាច់ពី repo source ➜ source ជា Private បាន', /^[\w.-]+\/[\w.-]+$/.test(releasesRepo) && releasesRepo !== 'mengsroy-h/Zoe-System', releasesRepo);
+        const run = (ref, refName, releasesToken = 'rel-token') => {
+            const work = fs.mkdtempSync(path.join(temp, 'w-'));
+            fs.mkdirSync(path.join(work, 'ZoeW', 'src', 'core'), { recursive: true });
+            fs.writeFileSync(path.join(work, 'ZoeW', 'src', 'core', 'version.ts'), "export const APP_VERSION = '9.8.7';\n");
+            const out = path.join(work, 'out.txt');
+            fs.writeFileSync(out, '');
+            const env = { ...process.env, PATH: bin + path.delimiter + process.env.PATH, GITHUB_REF: ref, GITHUB_SHA: 'abcdef1234567890',
+                GITHUB_OUTPUT: out, REF_NAME: refName, GH_LOG: path.join(work, 'gh.log'), GH_TOKEN: 'x', ZOE_RELEASES_REPO: releasesRepo, RELEASES_TOKEN: releasesToken };
+            const m = cp.spawnSync('bash', ['-eo', 'pipefail', '-c', meta], { cwd: work, env, encoding: 'utf8', timeout: 20000 });
+            const outputs = {};
+            fs.readFileSync(out, 'utf8').split('\n').filter(Boolean).forEach((line) => { const i = line.indexOf('='); outputs[line.slice(0, i)] = line.slice(i + 1); });
+            const filled = release.replace(/\$\{\{\s*steps\.meta\.outputs\.(\w+)\s*\}\}/g, (_, k) => outputs[k] || '')
+                .replace(/\$\{\{\s*github\.sha\s*\}\}/g, 'abcdef1234567890');
+            fs.writeFileSync(path.join(work, 'apk-cert.txt'), 'CERT\n');
+            if (outputs.file) {
+                fs.writeFileSync(path.join(work, outputs.file), 'apk');
+                fs.writeFileSync(path.join(work, outputs.file + '.sha256'), 'deadbeef  ' + outputs.file + '\n');
+            }
+            const r = cp.spawnSync('bash', ['-eo', 'pipefail', '-c', filled], { cwd: work, env, encoding: 'utf8', timeout: 20000 });
+            const log = fs.existsSync(env.GH_LOG) ? fs.readFileSync(env.GH_LOG, 'utf8') : '';
+            const calls = log.split(/^--CALL-- /m).filter(Boolean).map((block) => {
+                const lines = block.split('\n').filter(Boolean);
+                return { token: lines[0], args: lines.slice(1) };
+            });
+            const args = calls.length ? calls[0].args : [];
+            const notes = fs.existsSync(path.join(work, 'notes.md')) ? fs.readFileSync(path.join(work, 'notes.md'), 'utf8') : '';
+            return { meta: m, rel: r, outputs, args, calls, notes, pwned: fs.existsSync(path.join(work, 'pwned')) };
+        };
+        const test = run('refs/heads/feature', 'feature');
+        check('branch ផ្សេង ➜ test=true · ស្លាក/ឯកសារមាន «-test.<commit ៧ តួ>»',
+            test.meta.status === 0 && test.outputs.test === 'true' && test.outputs.tag === 'zoew-android-v9.8.7-test.abcdef1'
+            && test.outputs.file === 'ZoeW-9.8.7-test.abcdef1.apk' && test.outputs.exists === 'false',
+            JSON.stringify(test.outputs) + ' ' + test.meta.stderr);
+        check('branch ផ្សេង ➜ `gh release create` ជា --prerelease លើស្លាក test · កំណត់ចំណាំប្រាប់ «APK សាក» + branch',
+            test.rel.status === 0 && test.args[0] === 'zoew-android-v9.8.7-test.abcdef1' && test.args.includes('--prerelease')
+            && test.args.includes('ZoeW-9.8.7-test.abcdef1.apk') && /APK សាក/.test(test.notes) && test.notes.includes('`feature`')
+            && test.notes.includes('deadbeef'),
+            JSON.stringify(test.args) + ' ' + test.rel.stderr);
+        const main = run('refs/heads/main', 'main');
+        check('main ➜ Release ផ្លូវការ (គ្មាន --prerelease · ស្លាក/ឯកសារដូចដើម · គ្មានសារ «APK សាក»)',
+            main.meta.status === 0 && main.rel.status === 0 && main.outputs.test === 'false' && main.outputs.tag === 'zoew-android-v9.8.7'
+            && main.outputs.file === 'ZoeW-9.8.7.apk' && main.args[0] === 'zoew-android-v9.8.7' && !main.args.includes('--prerelease')
+            && !/APK សាក/.test(main.notes) && main.notes.includes('deadbeef'),
+            JSON.stringify(main.outputs) + ' ' + JSON.stringify(main.args) + ' ' + main.rel.stderr);
+        const evil = run('refs/heads/x', 'x$(touch pwned)`touch pwned`');
+        check('ឈ្មោះ branch ចូលតាម env (មិនរត់ជា shell)', evil.rel.status === 0 && !evil.pwned && evil.notes.includes('$(touch pwned)'),
+            evil.rel.stderr);
+        const mirror = main.calls[1] || { token: '', args: [] };
+        check('main ➜ Release ទី ២ ទៅ repo Release public ដោយ token ZOE_RELEASES_TOKEN (ស្លាក · APK · sha256 ដូចគ្នា · គ្មាន --prerelease)',
+            main.calls.length === 2 && main.calls[0].token === 'x' && mirror.token === 'rel-token' && mirror.args[0] === 'zoew-android-v9.8.7'
+            && mirror.args.includes('ZoeW-9.8.7.apk') && mirror.args.includes('ZoeW-9.8.7.apk.sha256') && mirror.args.includes('--repo') && mirror.args.includes(releasesRepo)
+            && !mirror.args.includes('--prerelease') && !main.calls[0].args.includes('--repo'),
+            JSON.stringify(main.calls));
+        check('branch ផ្សេង ➜ APK សាកចេញតែក្នុង repo source (មិនទៅ repo Release public)',
+            test.calls.length === 1 && !test.calls[0].args.includes('--repo') && !test.calls[0].args.includes(releasesRepo), JSON.stringify(test.calls));
+        const noToken = run('refs/heads/main', 'main', '');
+        check('⛔ main គ្មាន ZOE_RELEASES_TOKEN ➜ step ធ្លាក់ (ឧបករណ៍មិនត្រូវឃើញកំណែដែលទាញមិនបាន) · មិនហៅ repo Release',
+            noToken.rel.status !== 0 && noToken.calls.length === 1 && !noToken.calls[0].args.includes('--repo') && /ZOE_RELEASES_TOKEN/.test(noToken.rel.stdout + noToken.rel.stderr),
+            noToken.rel.status + ' ' + JSON.stringify(noToken.calls));
+        const tokenStep = (apk.match(/^      -[^\n]*(?:\n(?!      -)[^\n]*)*/gm) || []).find((st) => st.includes('- name: ពិនិត្យ token របស់ repo Release')) || '';
+        const mirrorStep = (apk.match(/^      -[^\n]*(?:\n(?!      -)[^\n]*)*/gm) || []).find((st) => st.includes('- name: ចម្លង Release ដែលមានរួចទៅ repo Release')) || '';
+        check('token ត្រូវពិនិត្យមុន build (main · exit 1 បើគ្មាន) · Release ដែលមានរួចតែមិនទាន់ចម្លង ➜ ចម្លងដោយ download + create --repo (គ្មាន build ម្តងទៀត)',
+            tokenStep.includes("if: steps.meta.outputs.test == 'false'") && /RELEASES_TOKEN: \$\{\{ secrets\.ZOE_RELEASES_TOKEN \}\}/.test(tokenStep) && /-z "\$RELEASES_TOKEN"[\s\S]*?exit 1/.test(tokenStep)
+            && /mirrored=(true|false)/.test(tokenStep) && apk.indexOf(tokenStep) < apk.indexOf('- name: ពិនិត្យ secret របស់ keystore')
+            && mirrorStep.includes("steps.meta.outputs.exists == 'true' && steps.releases.outputs.mirrored == 'false'") && /gh release download "\$TAG"/.test(mirrorStep)
+            && /gh release create "\$TAG" mirror\/\*[\s\S]*?--repo "\$ZOE_RELEASES_REPO"/.test(mirrorStep),
+            (tokenStep.slice(0, 60) + ' | ' + mirrorStep.slice(0, 60)).replace(/\n/g, ' '));
+        const webStep = (apk.match(/^      -[^\n]*(?:\n(?!      -)[^\n]*)*/gm) || []).find((st) => st.includes('- name: Build web')) || '';
+        check('APK សាក និង Release ពី main build web ដូចគ្នា (android:sync · គ្មានការកំណត់ផ្សេងតាម test)',
+            webStep.includes('npm run android:sync --prefix ZoeW') && !/outputs\.test|VITE_[A-Z_]+:/.test(webStep), webStep);
+        check('ឈ្មោះ branch មិនដែលចូល script តាម `${{ github.ref_name }}` ផ្ទាល់', !/run: \|[\s\S]*?\$\{\{\s*github\.(ref_name|head_ref)/.test(apk.replace(/REF_NAME: \$\{\{ github\.ref_name \}\}/g, '')));
+    } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+});
+
+scenario('runner៖ workers ខាងក្នុងសមនឹង CPU quota ដោយរក្សា shards តាម mode (៥ public · ៤ self-hosted)', () => {
+    const audit = read('.github/workflows/audit.yml');
+    const compose = read('tools/actions-runners/compose.yml');
+    const cpu = Number((compose.match(/cpus:\s*([\d.]+)/) || [])[1]);
+    const values = ['MONEYGUARD_JOBS', 'ZOEWSUITE_TEST_WORKERS'].map((name) => {
+        const match = audit.match(new RegExp('^\\s+' + name + ': \\$\\{\\{ (.*?) \\}\\}', 'm'));
+        return match ? ['self-hosted', '', 'invalid', 'github'].map((mode) =>
+            vm.runInNewContext(match[1], { vars: { ZOE_RUNNER_MODE: mode } })) : [];
+    });
+    check('self-hosted កំណត់ workers តាម CPU quota; GitHub រក្សា auto',
+        cpu >= 1 && values.every((result) => result.length === 4
+            && result.slice(0, 3).every((value) => Number(value) === cpu) && result[3] === 'auto'));
+});
+
+scenario('audit៖ scale តាមសំណើដោយដៃ មិនកាត់ការគ្រប CI ធម្មតា', () => {
+    const audit = read('.github/workflows/audit.yml');
+    const expression = (line) => (line || '').match(/\$\{\{\s*(.*?)\s*\}\}/)?.[1] || '';
+    const evaluate = (source, event, scale, mode = 'github', isPrivate = false) => source ? vm.runInNewContext(source, {
+        vars: { ZOE_RUNNER_MODE: mode },
+        github: { event_name: event, event: { repository: { private: isPrivate } } },
+        inputs: { multishop_scale: scale }, matrix: { shard: 1 }, fromJSON: JSON.parse, always: () => true
+    }) : undefined;
+    const include = expression(audit.split('\n').find((line) => /^\s+include:/.test(line)));
+    const mode = expression(audit.split('\n').find((line) => /^\s+ZOE_MULTISHOP_SCALE:/.test(line)));
+    const active = (event, scale, runnerMode, isPrivate) =>
+        (evaluate(include, event, scale, runnerMode, isPrivate) || []).map((entry) => entry.shard);
+    check('manual scale ជា boolean លំនាំដើម false', /multishop_scale:\s*\n(?:[^\n]*\n)*?\s+type: boolean\s*\n\s+default: false/.test(audit));
+    check('PR/push និង dispatch ធម្មតានៅមាន shard ៥ public / ៤ ឯកជន · self-hosted ទោះ context input មិនសមក៏ដោយ',
+        ['pull_request', 'push'].every((event) => [false, true].every((scale) => same(active(event, scale), [1, 2, 3, 4, 5])))
+        && same(active('workflow_dispatch', false), [1, 2, 3, 4, 5])
+        && same(active('pull_request', false, 'github', true), [1, 2, 3, 4])
+        && same(active('pull_request', false, 'self-hosted', true), [1, 2, 3, 4]));
+    check('manual scale តែប៉ុណ្ណោះជ្រើស shard១',
+        same(active('workflow_dispatch', true), [1])
+        && same(active('workflow_dispatch', true, 'self-hosted', true), [1]));
+    const steps = audit.match(/^      -[^\n]*(?:\n(?!      -)[^\n]*)*/gm) || [];
+    const step = steps.find((part) => /- name: run-all\.sh \(ផ្នែក/.test(part)) || '';
+    const block = (step.match(/^        run: \|\r?\n([\s\S]*)/m) || [])[1];
+    const script = block ? block.split('\n').map((line) => line.replace(/^          /, '')).join('\n')
+        : ((step.match(/^        run: (.+)$/m) || [])[1] || 'exit 91');
+    const invoke = (event, scale) => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-audit-scale-'));
+        try { return cp.spawnSync('bash', ['-e', '-o', 'pipefail', '-c',
+        'bash() { printf \'%s|%s|%s|%s\\n\' "$RUNALL_ONLY" "$RUNALL_SHARD" "$SBMONEY_SHOPS" "$SBMONEY_DEVICES"; }\n' + script], {
+        cwd: ROOT, encoding: 'utf8', timeout: 10000,
+        env: { ...process.env, RUNALL_ONLY: '', RUNALL_SHARD: '1/5', SBMONEY_SHOPS: '', SBMONEY_DEVICES: '',
+            AUDIT_LOG: path.join(dir, 'audit.log'),
+            ZOE_MULTISHOP_SCALE: String(evaluate(mode, event, scale) || false) }
+        }); } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+    };
+    const scaled = invoke('workflow_dispatch', true), regular = invoke('pull_request', false), ignored = invoke('push', true);
+    check('scale រត់ checker ពិត៨ហាង×៣devices ដោយគ្មាន shard filter', scaled.status === 0
+        && scaled.stdout.trim() === 'supabase-money-multishop-test||8|3', scaled.stdout + scaled.stderr);
+    check('CI ធម្មតាមិនប្ដូរ selection ឬទំហំ matrix លំនាំដើម', [regular, ignored].every((result) =>
+        result.status === 0 && result.stdout.trim() === '|1/5||'), regular.stdout + regular.stderr + ignored.stdout + ignored.stderr);
+    const group = audit.split('\n').find((line) => /^  group:/.test(line)) || '';
+    const modeGroup = expression(group.replace(/\$\{\{\s*github\.(workflow|ref)\s*\}\}/g, ''));
+    check('scale concurrency ដាច់ពី full CI ហើយរក្សា deadline/STRICT', evaluate(modeGroup, 'workflow_dispatch', true) !== evaluate(modeGroup, 'pull_request', false)
+        && /timeout-minutes: 60/.test(audit) && /SUPABASE_STRICT:\s*'1'/.test(step) && !/CHECKER_TIMEOUT:/.test(step));
+    const layoutSteps = steps.filter((part) => /queued-sign-photo-layout\.test\.ts/.test(part));
+    check('scale រំលង layout ខណៈ full CI ផ្ទៀង font ពិតដោយគ្មាន screenshot artifact', layoutSteps.length === 1
+        && /ZOEW_QUEUE_REAL_FONTS:\s*'1'/.test(layoutSteps[0])
+        && !/ZOEW_QUEUE_SCREENSHOT_DIR|zoew-queue-screenshots|name: sign-queue/.test(audit)
+        && layoutSteps.every((part) => {
+            const condition = (part.match(/^        if: (.+)$/m) || [])[1] || '';
+            return evaluate(condition, 'workflow_dispatch', true) === false
+                && evaluate(condition, 'pull_request', false) === true
+                && evaluate(condition, 'pull_request', true) === true;
+        }));
+});
+
+scenario('workers Vitest៖ zoew-suite ផ្ញើ CLI flag ពិត និងមិនប្ដូរ steps ផ្សេង', () => {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-suite-workers-'));
+    const app = path.join(temp, 'ZoeW');
+    try {
+        for (const dir of ['src', 'node_modules/vite', 'node_modules/typescript']) fs.mkdirSync(path.join(app, dir), { recursive: true });
+        fs.writeFileSync(path.join(app, 'src/main.tsx'), '');
+        fs.writeFileSync(path.join(app, 'package.json'), JSON.stringify(json('ZoeW/package.json')));
+        const bin = path.join(temp, 'bin'), callLog = path.join(temp, 'calls.jsonl');
+        fs.mkdirSync(bin);
+        fs.writeFileSync(path.join(bin, 'npm'), '#!' + process.execPath + '\n' + `
+const fs = require('fs');
+const args = process.argv.slice(2), mode = process.env.ZOE_SUITE_FIXTURE_MODE;
+fs.appendFileSync(process.env.ZOE_SUITE_FIXTURE_CALLS, JSON.stringify({ command: 'npm', args }) + '\\n');
+if (args[2] === 'test') {
+    const option = args.find(arg => arg.startsWith('--outputFile.json='));
+    if (option && mode !== 'missing') {
+        const skipped = mode === 'skipped' || mode === 'unfinished', empty = mode === 'empty';
+        const report = {
+            success: true, startTime: Date.now(), numTotalTests: empty ? 0 : 1,
+            numPassedTests: empty || skipped ? 0 : 1, numFailedTests: 0,
+            numPendingTests: skipped ? 1 : 0, numTodoTests: 0,
+            testResults: empty ? [] : [{ status: 'passed', assertionResults: [{ status: skipped ? 'skipped' : 'passed' }] }]
+        };
+        if (mode === 'stale') report.startTime = 1;
+        if (mode === 'unfinished') report.testResults[0].assertionResults[0].status = 'pending';
+        if (mode === 'wrong-count') report.numTotalTests = 2;
+        if (mode === 'failed') { report.success = false; report.numFailedTests = 1; }
+        fs.writeFileSync(option.slice('--outputFile.json='.length), mode === 'malformed' ? '{' : JSON.stringify(report));
+    }
+}
+`, { mode: 0o755 });
+        const invoke = (workers, reportMode = 'passed') => {
+            fs.writeFileSync(callLog, '');
+            const env = { ...process.env, ZOEWSUITE_APP_DIR: temp, PATH: bin + path.delimiter + process.env.PATH,
+                ZOE_SUITE_FIXTURE_MODE: reportMode, ZOE_SUITE_FIXTURE_CALLS: callLog };
+            delete env.ZOEWSUITE_TEST_WORKERS;
+            if (workers !== undefined) env.ZOEWSUITE_TEST_WORKERS = workers;
+            const result = cp.spawnSync(process.execPath, [path.join(ROOT, 'tools/audit-tools/zoew-suite-test.js')],
+                { env, encoding: 'utf8', timeout: 20000 });
+            const calls = fs.readFileSync(callLog, 'utf8').trim().split('\n').filter(Boolean).map(line => JSON.parse(line));
+            const reports = calls.flatMap(call => call.args.filter(arg => arg.startsWith('--outputFile.json='))
+                .map(arg => arg.slice('--outputFile.json='.length)));
+            return { calls, code: result.status, logs: result.stdout + result.stderr, reports,
+                error: result.error, signal: result.signal };
+        };
+        const expectedSteps = ['typecheck', 'lint', 'slot:check', 'purity:check', 'test', 'doc:check', 'android:check',
+            'build:only', 'notice:check', 'sw:check', 'smoke', 'native:check', 'rules:check'];
+        const capped = invoke('2'), automatic = invoke('auto'), missing = invoke(undefined);
+        const rawTestArgs = (result) => (result.calls.find((call) => call.command === 'npm' && call.args[2] === 'test') || { args: [] }).args;
+        const testArgs = (result) => {
+            const args = rawTestArgs(result).filter((arg) => !arg.startsWith('--reporter=') && !arg.startsWith('--outputFile.json='));
+            if (args[args.length - 1] === '--') args.pop();
+            return args;
+        };
+        check('Vitest ទទួល --maxWorkers=2 តែ test step', capped.code === 0 && !capped.error && !capped.signal
+            && same(capped.calls.map(call => call.args[2]), expectedSteps)
+            && same(testArgs(capped), ['run', '-s', 'test', '--', '--maxWorkers=2'])
+            && capped.calls.filter((call) => call.args[2] !== 'test').every((call) => call.args.length === 3));
+        check('auto/មិនកំណត់ ផ្ញើ worker budget ដែលបានគណនាច្បាស់ទៅ Vitest', automatic.code === 0 && missing.code === 0
+            && /^--maxWorkers=[1-8]$/.test(testArgs(automatic).at(-1))
+            && same(testArgs(automatic).slice(0, -1), ['run', '-s', 'test', '--'])
+            && same(testArgs(automatic), testArgs(missing)));
+        check('worker value ខុស មិនបៃតងដោយស្ងាត់ និងមិនបើក child', ['0', 'lots'].every(value => {
+            const result = invoke(value); return result.code === 1 && !result.error && !result.signal && result.calls.length === 0;
+        }));
+        for (const mode of ['missing', 'empty', 'malformed', 'wrong-count', 'failed', 'stale', 'unfinished']) {
+            const result = invoke('2', mode);
+            check('Vitest exit 0 + report ' + mode + ' មិនមែន PASS', result.code === 1 && !result.error && !result.signal && same(result.calls.map(call => call.args[2]), expectedSteps), result.logs);
+        }
+        const skipped = invoke('2', 'skipped');
+        check('Vitest រំលងទាំងអស់ រាយ SKIP ជំនួស PASS', /^SKIP /m.test(skipped.logs), skipped.logs);
+        check('Vitest report ថ្មីសម្រាប់រាល់ run និងសម្អាតក្រោយអាន', capped.reports.length === 1
+            && automatic.reports.length === 1 && capped.reports[0] !== automatic.reports[0]
+            && [...capped.reports, ...automatic.reports].every((file) => !fs.existsSync(file)));
+        check('Vitest ប្រើ reporter អានបាន និង default output សម្រាប់ diagnosis', rawTestArgs(capped).includes('--reporter=default')
+            && rawTestArgs(capped).includes('--reporter=json'));
+
+    } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+});
+
+scenario('runtime ក្នុង Linux image៖ កំណែខុសឬ Java បាត់ ត្រូវបដិសេធមុន download', () => {
+    const steps = read('.github/workflows/audit.yml').match(/^      -[^\n]*(?:\n(?!      -)[^\n]*)*/gm) || [];
+    const step = steps.find((item) => item.includes("if: vars.ZOE_RUNNER_MODE != 'github'") && item.includes('$GITHUB_ENV'));
+    check('runtime preflight មាន Bash script ពិតក្នុង workflow', !!step && /        run: \|/.test(step || ''));
+    if (!step) return;
+    const script = step.slice(step.indexOf('        run: |') + '        run: |'.length).trimStart()
+        .split('\n').map((line) => line.replace(/^          /, '')).join('\n');
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-image-runtime-'));
+    const bin = path.join(temp, 'bin'), envFile = path.join(temp, 'github-env');
+    fs.mkdirSync(bin);
+    try {
+        const write = (name, body) => {
+            const target = path.join(bin, name);
+            fs.writeFileSync(target, '#!' + process.execPath + '\n' + body + '\n');
+            fs.chmodSync(target, 0o755);
+        };
+        write('node', 'require("vm").runInNewContext(process.argv[3],{process:{versions:{node:process.env.ZOE_FIXTURE_NODE+".0.0"},exit:code=>process.exit(code)}});');
+        write('java', 'if(process.env.ZOE_FIXTURE_JAVA==="missing")process.exit(127);console.error("openjdk version \\\""+process.env.ZOE_FIXTURE_JAVA+".0.0\\\"");');
+        write('javac', 'console.log("javac "+process.env.ZOE_FIXTURE_JAVA+".0.0");');
+        const run = (node = '24', java = '21') => {
+            fs.writeFileSync(envFile, '');
+            return cp.spawnSync('bash', ['-e', '-o', 'pipefail', '-c', script], {
+                cwd: ROOT, encoding: 'utf8', timeout: 10000,
+                env: { ...process.env, PATH: bin + path.delimiter + process.env.PATH,
+                    GITHUB_ENV: envFile, ZOE_FIXTURE_NODE: node, ZOE_FIXTURE_JAVA: java }
+            });
+        };
+        const valid = run();
+        check('Node 24 + Java/Javac 21 ឆ្លង និង JAVA_HOME ផ្ដល់ឱ្យ step បន្ទាប់',
+            valid.status === 0 && fs.readFileSync(envFile, 'utf8').includes('JAVA_HOME=' + temp), valid.stdout + valid.stderr);
+        check('Node 22 ត្រូវបដិសេធ', run('22').status !== 0);
+        check('Java 17 ត្រូវបដិសេធ', run('24', '17').status !== 0);
+        check('Java រកមិនឃើញ ត្រូវបដិសេធ', run('24', 'missing').status !== 0);
+    } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+});
+
+function auditCacheWiring(audit, compose, preparation, runner, owner) {
+    const active = text => text.replace(/^\s*#.*$/gm, '');
+    const workflow = active(audit), shell = active(preparation), runall = active(runner);
+    const command = mode => new RegExp('^\\s*(?:run:\\s*)?bash tools/actions-runners/prepare-audit-cache\\.sh ' + mode + '(?:\\s+#.*)?\\s*$', 'm').exec(workflow);
+    const init = command('init'), chromium = command('chromium'), database = command('database');
+    const download = /^\s*PW_VERSION=/m.exec(workflow), execute = /^\s*bash tools\/audit-tools\/run-all\.sh(?: 2>&1 \| tee "\$AUDIT_LOG")?\s*$/m.exec(workflow);
+    const mode = name => { const start = shell.indexOf('\n  ' + name + ')'); const end = shell.indexOf('\n    ;;', start); return start >= 0 && end > start ? shell.slice(start, end) : ''; };
+    const locked = name => name === 'chromium'
+        ? /^\s*flock "\$CACHE\/\.chromium\.lock" npx --no-install playwright install chromium\s*$/m.test(mode(name))
+        : /^\s*flock 9\s*$/m.test(mode(name));
+    const walks = node => {
+        const result = []; const visit = value => { if (!value || typeof value !== 'object') return; if (value.type) result.push(value);
+            for (const part of Object.values(value)) { if (Array.isArray(part)) part.forEach(visit); else if (part && typeof part === 'object') visit(part); } }; visit(node); return result;
+    };
+    let preparedJar = false, consumedJar = false;
+    try {
+        for (const block of mode('database').matchAll(/node <<'NODE'\s*\n([\s\S]*?)\nNODE/g)) {
+            const tree = acorn.parse(block[1], { ecmaVersion: 'latest' });
+            preparedJar ||= tree.body.some(statement => {
+                const call = statement.expression;
+                return call?.type === 'CallExpression' && call.callee.type === 'MemberExpression' && call.callee.property.name === 'appendFileSync'
+                    && block[1].slice(call.arguments[0]?.start, call.arguments[0]?.end) === 'process.env.GITHUB_ENV'
+                    && walks(call.arguments[1]).some(node => node.type === 'Literal' && node.value === 'ZOE_RTDB_JAR=');
+            });
+        }
+        const tree = acorn.parse(owner, { ecmaVersion: 'latest' }), verify = tree.body.find(node => node.type === 'FunctionDeclaration'
+            && walks(node).some(part => part.type === 'VariableDeclarator' && part.init?.type === 'MemberExpression'
+                && part.init.object.name === 'env' && part.init.property.name === 'ZOE_RTDB_JAR'));
+        const input = verify && walks(verify).find(node => node.type === 'VariableDeclarator' && node.init?.type === 'MemberExpression'
+            && node.init.object.name === 'env' && node.init.property.name === 'ZOE_RTDB_JAR')?.id.name;
+        consumedJar = !!input && walks(verify).some(node => node.type === 'CallExpression' && node.callee.property?.name === 'realpathSync' && node.arguments[0]?.name === input);
+    } catch (_) { return false; }
+    return (compose.match(/audit-binaries:\/opt\/zoe-cache/g) || []).length === 4
+        && !!init && !!download && init.index < download.index && !!chromium && !!database && !!execute && database.index < execute.index
+        && locked('chromium') && locked('database') && preparedJar && consumedJar
+        && /^\s*RUNALL_COMMAND=\(node tools\/audit-tools\/owned-rtdb-command\.js --state "\$RUNALL_OWNED_DIR" -- "\$@"\)\s*$/m.test(runall)
+        && !/\bjava\s+-jar\b/.test(workflow);
+}
+
+scenario('audit cache ៖ ទាញម្ដង · ផ្ទៀង checksum · មិនលាយ workspace', () => {
+    const audit = read('.github/workflows/audit.yml');
+    const compose = read('tools/actions-runners/compose.yml');
+    const script = path.join(ROOT, 'tools/actions-runners/prepare-audit-cache.sh');
+    const preparation = read('tools/actions-runners/prepare-audit-cache.sh'), runner = read('tools/audit-tools/run-all.sh'), owner = read('tools/audit-tools/owned-rtdb-command.js');
+    check('runner ទាំង ៤ mount binary cache រួម និង workflow ត្រៀមមុនទាញ', auditCacheWiring(audit, compose, preparation, runner, owner));
+    const mutations = [
+        ['cache mount ខ្វះត្រូវបដិសេធ', audit, compose.replace('audit-binaries:/opt/zoe-cache', 'missing:/opt/zoe-cache'), preparation, runner, owner],
+        ['comment មិនជំនួស init command', audit.replace('run: bash tools/actions-runners/prepare-audit-cache.sh init', '# run: bash tools/actions-runners/prepare-audit-cache.sh init'), compose, preparation, runner, owner],
+        ['database preparation ខ្វះត្រូវបដិសេធ', audit.replace('run: bash tools/actions-runners/prepare-audit-cache.sh database', 'run: echo database'), compose, preparation, runner, owner],
+        ['database preparation ក្រោយ run-all មិនត្រឹមត្រូវ', audit.replace('run: bash tools/actions-runners/prepare-audit-cache.sh database', 'run: echo database') + '\nrun: bash tools/actions-runners/prepare-audit-cache.sh database\n', compose, preparation, runner, owner],
+        ['JAR export ខ្វះត្រូវបដិសេធ', audit, compose, preparation.replace('ZOE_RTDB_JAR=', 'OTHER_JAR='), runner, owner],
+        ['owned wrapper ខ្វះត្រូវបដិសេធ', audit, compose, preparation, runner.replace('node tools/audit-tools/owned-rtdb-command.js --state', 'node tools/audit-tools/other.js --state'), owner],
+        ['owner មិនប្រើ prepared JAR ត្រូវបដិសេធ', audit, compose, preparation, runner, owner.replace('env.ZOE_RTDB_JAR', 'env.OTHER_JAR')],
+        ['global JVM មិនជំនួស owned lifecycle', audit + '\nrun: java -jar existing.jar --port 9000\n', compose, preparation, runner, owner],
+        ['database download lock ខ្វះត្រូវបដិសេធ', audit, compose, preparation.replace(/flock 9/g, 'echo unlocked'), runner, owner],
+        ['chromium download lock ខ្វះត្រូវបដិសេធ', audit, compose, preparation.replace('flock "$CACHE/.chromium.lock" npx', 'npx'), runner, owner],
+        ['chromium lock ផ្សេងមិនជំនួស shared lock', audit, compose, preparation.replace('flock "$CACHE/.chromium.lock" npx', 'flock "$CACHE/foreign.lock" npx'), runner, owner]
+    ];
+    for (const [label, ...inputs] of mutations) check(label, !auditCacheWiring(...inputs));
+    check('មាន helper សម្រាប់វាស់ការទាញពិតជាមួយ fixture', fs.existsSync(script));
+    if (!fs.existsSync(script)) return;
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe shared cache '));
+    try {
+        const home = path.join(temp, 'home'), cache = path.join(temp, 'shared'), bin = path.join(temp, 'bin');
+        const moduleDir = path.join(temp, 'tools/firebase-provision/node_modules/firebase-tools');
+        const log = path.join(temp, 'downloads.jsonl'), envFile = path.join(temp, 'github-env');
+        for (const dir of [home, cache, bin, path.join(moduleDir, 'lib/emulator')]) fs.mkdirSync(dir, { recursive: true });
+        const payload = 'fixture emulator bytes', filename = 'firebase-database-emulator-v1.jar';
+        const checksum = require('crypto').createHash('sha256').update(payload).digest('hex');
+        fs.writeFileSync(path.join(moduleDir, 'lib/emulator/downloadableEmulatorInfo.json'), JSON.stringify({ database: {
+            version: '1', expectedSize: Buffer.byteLength(payload), expectedChecksumSHA256: checksum,
+            downloadPathRelativeToCacheDir: filename
+        } }));
+        fs.writeFileSync(path.join(temp, 'tools/firebase-provision/package-lock.json'), JSON.stringify({ packages: {
+            'node_modules/firebase-tools': { version: 'fixture' }
+        } }));
+        const executable = (file, source) => { fs.writeFileSync(file, '#!' + process.execPath + '\n' + source); fs.chmodSync(file, 0o755); };
+        executable(path.join(bin, 'npx'), 'const fs=require("fs"),path=require("path");'
+            + 'const log=process.env.CACHE_FIXTURE_LOG,p=path.join(process.env.PLAYWRIGHT_BROWSERS_PATH,"chromium-1");'
+            + 'fs.appendFileSync(log,JSON.stringify({event:"browser-start"})+"\\n");'
+            + 'setTimeout(()=>{if(process.env.CACHE_FIXTURE_FAIL)process.exit(17);'
+            + 'if(!fs.existsSync(path.join(p,"INSTALLATION_COMPLETE"))){fs.mkdirSync(p,{recursive:true});'
+            + 'fs.writeFileSync(path.join(p,"INSTALLATION_COMPLETE"),"");'
+            + 'fs.appendFileSync(log,JSON.stringify({event:"browser-download"})+"\\n");}'
+            + 'fs.appendFileSync(log,JSON.stringify({event:"browser-end"})+"\\n");},80);');
+        const cli = path.join(temp, 'tools/firebase-provision/node_modules/.bin/firebase');
+        fs.mkdirSync(path.dirname(cli), { recursive: true });
+        executable(cli, 'const fs=require("fs"),path=require("path");'
+            + 'fs.appendFileSync(process.env.CACHE_FIXTURE_LOG,JSON.stringify({event:"database-download"})+"\\n");'
+            + 'if(process.env.CACHE_FIXTURE_FAIL)process.exit(17);'
+            + 'fs.mkdirSync(process.env.FIREBASE_EMULATORS_PATH,{recursive:true});'
+            + 'fs.writeFileSync(path.join(process.env.FIREBASE_EMULATORS_PATH,' + JSON.stringify(filename) + '),'
+            + JSON.stringify(payload) + ');');
+        let env = { ...process.env, HOME: home, ZOE_AUDIT_CACHE: cache, GITHUB_ENV: envFile,
+            PATH: bin + path.delimiter + process.env.PATH, CACHE_FIXTURE_LOG: log };
+        delete env.PLAYWRIGHT_BROWSERS_PATH; delete env.FIREBASE_EMULATORS_PATH;
+        const run = (mode, extra = {}) => cp.spawnSync('bash', [script, mode], {
+            cwd: temp, encoding: 'utf8', timeout: 10000, env: { ...env, ...extra }
+        });
+        const unconfigured = run('init', { ZOE_AUDIT_CACHE: '' });
+        check('image ចាស់គ្មាន cache config ត្រូវឈប់មុន download និងប្រាប់វិធី update',
+            unconfigured.status === 1 && /audit-binaries/.test(unconfigured.stderr));
+        const complete = path.join(home, '.cache/ms-playwright/chromium-2');
+        fs.mkdirSync(complete, { recursive: true }); fs.writeFileSync(path.join(complete, 'INSTALLATION_COMPLETE'), '');
+        fs.mkdirSync(path.join(home, '.cache/ms-playwright/chromium-3'), { recursive: true });
+        let result = run('init');
+        check('init reuse browser ទាញរួច និងមិនយក browser ទាញមិនចប់', result.status === 0
+            && fs.existsSync(path.join(cache, 'ms-playwright/chromium-2/INSTALLATION_COMPLETE'))
+            && !fs.existsSync(path.join(cache, 'ms-playwright/chromium-3')), result.stdout + result.stderr);
+        if (result.status !== 0) return;
+        for (const line of fs.readFileSync(envFile, 'utf8').trim().split('\n')) {
+            const at = line.indexOf('='); env[line.slice(0, at)] = line.slice(at + 1);
+        }
+        const parallel = (mode) => cp.spawnSync(process.execPath, ['-e',
+            'const cp=require("child_process"),fs=require("fs"),s=JSON.parse(fs.readFileSync(0,"utf8"));'
+            + 'Promise.all(Array.from({length:4},()=>new Promise(resolve=>{'
+            + 'const p=cp.spawn("bash",[s.script,s.mode],{cwd:s.cwd,env:s.env,stdio:"ignore"});'
+            + 'p.on("error",()=>resolve(1));p.on("exit",code=>resolve(code));})))'
+            + '.then(codes=>process.exit(codes.every(c=>c===0)?0:1));'], {
+            input: JSON.stringify({ script, mode, cwd: temp, env }), encoding: 'utf8', timeout: 12000
+        });
+        const events = () => fs.existsSync(log) ? fs.readFileSync(log, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse) : [];
+        result = parallel('chromium');
+        let active = 0, peak = 0;
+        for (const e of events()) { if (e.event === 'browser-start') peak = Math.max(peak, ++active); if (e.event === 'browser-end') active--; }
+        check('Chromium ៖ runner ៤មិនទាញជាន់គ្នា ហើយ cache បាត់ទាញម្ដង', result.status === 0
+            && peak === 1 && active === 0 && events().filter(e => e.event === 'browser-download').length === 1);
+        const jar = path.join(env.FIREBASE_EMULATORS_PATH, filename);
+        fs.mkdirSync(path.dirname(jar), { recursive: true }); fs.writeFileSync(jar, 'ខូច');
+        result = parallel('database');
+        check('RTDB ៖ cache ខូចទាញជួសជុលម្ដងសម្រាប់ runner ៤', result.status === 0
+            && events().filter(e => e.event === 'database-download').length === 1
+            && fs.readFileSync(jar, 'utf8') === payload);
+        result = run('database');
+        check('RTDB ៖ cache ត្រូវ checksum មិនទាញម្ដងទៀត និងប្រើ JAR កំណែពិត', result.status === 0
+            && events().filter(e => e.event === 'database-download').length === 1
+            && fs.readFileSync(envFile, 'utf8').includes('ZOE_RTDB_JAR=' + jar));
+        fs.rmSync(jar);
+        const oldJar = path.join(home, '.cache/firebase/emulators', filename);
+        fs.mkdirSync(path.dirname(oldJar), { recursive: true }); fs.writeFileSync(oldJar, payload);
+        result = run('database');
+        check('RTDB ៖ reuse JAR ចាស់ដែល checksum ត្រូវ ដោយគ្មាន download', result.status === 0
+            && fs.readFileSync(jar, 'utf8') === payload
+            && events().filter(e => e.event === 'database-download').length === 1);
+        const otherJar = path.join(cache, 'firebase-legacy/other-runner', filename);
+        fs.mkdirSync(path.dirname(otherJar), { recursive: true }); fs.writeFileSync(otherJar, payload);
+        fs.rmSync(oldJar); fs.rmSync(jar);
+        result = run('database');
+        check('RTDB ៖ reuse JAR ដែល runner ផ្សេង seed ទុកក្នុង shared cache', result.status === 0
+            && fs.readFileSync(jar, 'utf8') === payload
+            && events().filter(e => e.event === 'database-download').length === 1);
+        fs.rmSync(otherJar); fs.writeFileSync(jar, payload.slice(0, -1) + 'x');
+        result = run('database', { CACHE_FIXTURE_FAIL: '1' });
+        check('RTDB ៖ checksum ខុសទោះទំហំដូចគ្នា និង download fail ត្រូវធ្លាក់', result.status === 17,
+            result.stdout + result.stderr);
+        check('Chromium ៖ install fail ត្រូវធ្លាក់', run('chromium', { CACHE_FIXTURE_FAIL: '1' }).status === 17);
+        fs.writeFileSync(oldJar, payload);
+        result = run('database', { ZOE_AUDIT_CACHE: '', FIREBASE_EMULATORS_PATH: '' });
+        check('GitHub mode ប្រើ home cache និង JAR ពិត ដោយមិនទាមទារ Docker volume', result.status === 0
+            && fs.readFileSync(envFile, 'utf8').includes('ZOE_RTDB_JAR=' + oldJar)
+            && events().filter(e => e.event === 'database-download').length === 2);
+    } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+});
+
+scenario('registration script ៖ ៤ runner · token លាក់ពី argv · បញ្ឈប់ពេលខុស', () => {
+    const script = path.join(ROOT, 'tools/actions-runners/register.sh');
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-runner-register-'));
+    const log = path.join(temp, 'calls.jsonl');
+    try {
+        const docker = path.join(temp, 'docker');
+        fs.writeFileSync(docker, '#!' + process.execPath + '\n'
+            + 'const fs=require("fs"),args=process.argv.slice(2);'
+            + 'if(args.includes("run")){const input=fs.readFileSync(0,"utf8");'
+            + 'fs.appendFileSync(process.env.ZOE_RUNNER_FIXTURE_LOG,JSON.stringify({args,input})+"\\n");'
+            + 'if(process.env.ZOE_RUNNER_FIXTURE_FAIL && args.includes(process.env.ZOE_RUNNER_FIXTURE_FAIL)) process.exit(17);}\n');
+        fs.chmodSync(docker, 0o755);
+        const run = (stopAt = '') => cp.spawnSync('bash', [script], {
+            cwd: ROOT, input: 'fixture-registration-token\n', encoding: 'utf8', timeout: 10000,
+            env: { ...process.env, PATH: temp + path.delimiter + process.env.PATH,
+                ZOE_RUNNER_FIXTURE_LOG: log, ZOE_RUNNER_FIXTURE_FAIL: stopAt }
+        });
+        const calls = () => fs.readFileSync(log, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l));
+        let result = run();
+        let recorded = fs.existsSync(log) ? calls() : [];
+        check('register ៖ លំដាប់ runner ៤ មិនស្ទួន ហើយ exit 0', result.status === 0
+            && same(recorded.map((c) => c.args.find((a) => /^audit-[1-4]$/.test(a))),
+                ['audit-1', 'audit-2', 'audit-3', 'audit-4']), result.stdout + result.stderr);
+        check('register ៖ token ឆ្លង stdin ប៉ុណ្ណោះ និងមិនលេចក្នុង output', recorded.length === 4
+            && recorded.every((c) => c.input === 'fixture-registration-token\n'
+                && !c.args.join(' ').includes('fixture-registration-token'))
+            && !(result.stdout + result.stderr).includes('fixture-registration-token'));
+        if (fs.existsSync(log)) fs.rmSync(log);
+        result = run('audit-2');
+        recorded = fs.existsSync(log) ? calls() : [];
+        check('register ៖ Docker ខុស ➜ exit ដើម និងមិន register runner បន្ទាប់',
+            result.status === 17 && recorded.length === 2, result.stdout + result.stderr);
+    } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+});
+
+console.log('\n' + pass + ' ok, ' + fail + ' FAIL');
+process.exit(fail ? 1 : 0);

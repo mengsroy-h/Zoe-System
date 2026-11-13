@@ -6,7 +6,7 @@
 
 > 📖 ឯកសារនេះសរសេរតែ **កំណែ · មុខងារ · របៀបប្រើប្រាស់ · ប្រព័ន្ធសុវត្ថិភាព ·
 > អាជ្ញាប័ណ្ណ**។ ប្រវត្តិកំហុស ស្ថិតក្នុង
-> **[docs/HISTORY.md](../docs/HISTORY.md)**។
+> **[../docs/HISTORY.md](../docs/HISTORY.md)**។
 
 ---
 
@@ -19,7 +19,7 @@
 - `CACHE_VERSION` ក្នុង `sw.js` (`zoekeygen-vN`) ជាកូនសោ cache ដាច់ដោយឡែក។
 - ⛔ ជុំកែដែលប៉ះតែ ZoeW **មិនត្រូវឡើងកំណែ App នេះទេ** — វានឹងបង្ខំអ្នកប្រើ
   ទាញសំបកទាំងមូលឡើងវិញដោយឥតប្រយោជន៍។
-- ប្រវត្តិការផ្លាស់ប្តូរពេញលេញ ៖ **[docs/HISTORY.md](../docs/HISTORY.md)**។
+- ប្រវត្តិការផ្លាស់ប្តូរពេញលេញ ៖ **[../docs/HISTORY.md](../docs/HISTORY.md)**។
 
 ---
 
@@ -111,7 +111,7 @@ ZoeW ទាញវាពេលបើក App · ពេលបើកផ្ទាំ�
 ### ១. Deploy
 
 Netlify site មួយ ដោយ **Base directory = `ZoeKeyGen`** · Build command **ទទេ** ·
-Publish directory **`.`** · Functions directory **`netlify/functions`** សម្រាប់ endpoint ម៉ោង · build environment **Node 24** តាម `netlify.toml`។ តំណសាក PR និងការផ្ទៀងម៉ោងតាម [មគ្គុទ្ទេសក៍ deploy preview](../ZoeW/docs/DEVELOPMENT.md#deploy-preview--ឧបករណ៍ពិត--ការថយក្រោយ)។
+Publish directory **`.`** · Functions directory **`netlify/functions`** សម្រាប់ endpoint ម៉ោង · build environment **Node 24** តាម `netlify.toml`។ តំណសាក PR និងការផ្ទៀងម៉ោងតាម [មគ្គុទ្ទេសក៍ deploy preview](../docs/zoew/DEVELOPMENT.md#deploy-preview--ឧបករណ៍ពិត--ការថយក្រោយ)។
 
 Firebase rules របស់ **License Project** (`ZoeKeyGen/firebase-database.rules.json`)
 ត្រូវ paste ចូល Firebase Console ➜ **Publish** ដោយដៃ។ ⛔ វាជា Project

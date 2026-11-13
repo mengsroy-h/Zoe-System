@@ -4,8 +4,8 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
-const supabase = require('../../firebase-backup/supabase.js');
-const crypt = require('../../firebase-backup/crypt.js');
+const supabase = require('../firebase-backup/supabase.js');
+const crypt = require('../firebase-backup/crypt.js');
 const { parseExpression } = require('../../supabase/scripts/rtdb-expression.cjs');
 
 const EXIT = { OK: 0, FAIL: 1, USAGE: 2 };

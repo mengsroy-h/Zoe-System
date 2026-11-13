@@ -1,0 +1,525 @@
+import { acceptServerClockOffset, resetServerClock } from '../../../../ZoeW/src/core/clock';
+import { webcrypto } from 'node:crypto';
+import { setTimeout as realSetTimeout, clearTimeout as realClearTimeout } from 'node:timers';
+/**
+ * ⛔ ZTO ៖ ការបញ្ចូលបញ្ជី **ស្របគ្នា** តាមខ្សែ «អតិថិជន + ថ្ងៃ» (សំណើម្ចាស់គម្រោង ៖ «ការទាញកញ្ចប់ពី ZTO យឺត ពេលចុច
+ * បញ្ចូលក៏យឺត»)។ ការវាស់ ៖ ជួរដេកមួយ = ~៤–៩ ដំណើរទៅមក Firebase តាមលំដាប់ ➜ ១០០ ជួរ ≈ ២–៣ នាទី។
+ *
+ * ១. ជួរដេកអតិថិជនផ្សេងគ្នា ➜ claim/រក្សាទុក **ស្របគ្នា** (≤ `ZTO_LIST_IMPORT_CONCURRENCY`) ➜ ផ្លូវសំខាន់ខ្លីជាង ~៣ ដង
+ *    (មុនកែ ៖ ម្តងមួយជួរ)។
+ * ២. ជួរដេកអតិថិជនដដែល ថ្ងៃដដែល ➜ **ខ្សែតែមួយ តាមលំដាប់** ➜ `addOrUpdateEntry()` បញ្ចូលគ្នាជាកញ្ចប់តែមួយ (barcode តាមលំដាប់
+ *    · `count` · លុយ ledger ត្រឹម · registry គ្រប់)។
+ * ៣. ការព្យួរដំបូង ➜ **គ្មានជួរថ្មីចាប់ផ្តើម** · ខ្សែដែលកំពុងរត់បញ្ចប់ជួររបស់វា (⏳ ≤ ចំនួនខ្សែ) · «មិនទាន់បញ្ចូល N» ·
+ *    ចំនួនបូកគ្នា = បញ្ជី · បញ្ជីនៅដដែល។
+ * ៤. ក្រៅបណ្តាញកណ្តាលការបញ្ចូល ➜ ឈប់ដូចគ្នា។
+ * ៥–៧. **អតិថិជនរាប់រយ** (សំណើម្ចាស់គម្រោង) ៖ បញ្ជី ១០០ ជួរ (ពិដានមួយដង) បញ្ចូលគ្រប់ និងត្រឹម · ៣០០ ជួរ ➜ ១០០ ក្នុងមួយចុច ·
+ *    អតិថិជនមួយមាន ២០ កញ្ចប់ក្នុងចំណោម ២០ អតិថិជន ➜ ខ្សែតែមួយ លំដាប់ត្រឹម · ហាងធំ (៥០០ កញ្ចប់ក្នុងប្រវត្តិរួច) ➜ បញ្ចូល ១០០ ថ្មីលឿនដដែល។
+ */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { refTo } from '../../../../ZoeW/src/app/refs';
+import { dataState, firebaseState, uiState, ztoState } from '../../../../ZoeW/src/core/state';
+import { viewState } from '../../../../ZoeW/src/core/view-state';
+import { appLocalStore } from '../../../../ZoeW/src/core/storage';
+import { dbListenerFailedPaths, dbListenerPendingPaths } from '../../../../ZoeW/src/core/text';
+import { barcodeRegistryKey } from '../../../../ZoeW/src/domain/registry';
+import { clearCustomerDataTableCache } from '../../../../ZoeW/src/features/customer-table';
+import { ZTO_LIST_IMPORT_CONCURRENCY, ZTO_LIST_IMPORT_MAX, importZtoListRows } from '../../../../ZoeW/src/features/zto-list-sync';
+import { clearZtoPickupStatusStore } from '../../../../ZoeW/src/features/zto-status';
+import { createScanEvidenceJournal } from '../../../../ZoeW/src/services/scan-evidence';
+import { pendingScanScope } from '../../../../ZoeW/src/services/scan-pending';
+
+const NOW = Date.UTC(2026, 9, 6, 3, 0, 0);
+const HISTORY = 'zoew_scan_history_cod_dod';
+const REGISTRY = 'zoew_barcode_registry/';
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+type Row = { barcode: string; phone: string; cod: number; dod: number; at: string; ztoClosed: null; skip: string; from: string };
+const lab = {
+    latMs: 10,
+    backendCalls: 0,
+    store: {} as Record<string, any>,
+    phoneOfKey: new Map<string, string>(),
+    inFlightClaims: 0,
+    inFlightByPhone: new Map<string, number>(),
+    maxClaimOverlap: 0,
+    maxClaimOverlapPerPhone: 0,
+    claims: 0,
+    historyWrites: 0,
+    hangCodes: new Set<string>(),
+    hangingHistoryWrites: new Set<string>(),
+    onHistoryWrite: null as null | ((n: number) => void),
+    lastQuestion: ''
+};
+
+function getPath(path: string) {
+    const parts = path.split('/').filter(Boolean);
+    let cur: any = lab.store;
+    for (const p of parts) {
+        if (!cur || typeof cur !== 'object' || !(p in cur)) return null;
+        cur = cur[p];
+    }
+    return cur === undefined ? null : JSON.parse(JSON.stringify(cur));
+}
+
+function setPath(path: string, value: any) {
+    const parts = path.split('/').filter(Boolean);
+    let cur: any = lab.store;
+    if (value === null || value === undefined) {
+        for (let i = 0; i < parts.length - 1; i++) {
+            if (!cur[parts[i]] || typeof cur[parts[i]] !== 'object') return;
+            cur = cur[parts[i]];
+        }
+        delete cur[parts[parts.length - 1]];
+        return;
+    }
+    for (let i = 0; i < parts.length - 1; i++) {
+        if (!cur[parts[i]] || typeof cur[parts[i]] !== 'object') cur[parts[i]] = {};
+        cur = cur[parts[i]];
+    }
+    cur[parts[parts.length - 1]] = JSON.parse(JSON.stringify(value));
+}
+
+const mentionsHangCode = (value: unknown) => {
+    if (!lab.hangCodes.size) return false;
+    const text = JSON.stringify(value) || '';
+    for (const code of lab.hangCodes) if (text.indexOf(code) !== -1) return true;
+    return false;
+};
+const hangForever = () => new Promise<never>(() => {});
+
+const backendWait = () => { lab.backendCalls++; return sleep(lab.latMs); };
+
+function makeFb() {
+    return {
+        getIdTokenResult: async () => ({ token: 't' }),
+        ref: (_db: unknown, path = '') => ({ path }),
+        get: async (ref: any) => {
+            await backendWait();
+            const v = getPath(ref.path);
+            return { val: () => v, exists: () => v !== null };
+        },
+        update: async (ref: any, payload: any) => {
+            if (ref.path === HISTORY && mentionsHangCode(payload)) return hangForever();
+            await backendWait();
+            for (const k of Object.keys(payload)) {
+                const path = [ref.path, k].filter(Boolean).join('/');
+                const value = payload[k];
+                setPath(path, typeof value?.['.sv']?.increment === 'number' ? (Number(getPath(path)) || 0) + value['.sv'].increment : value);
+            }
+            if (ref.path === HISTORY && lab.onHistoryWrite) lab.onHistoryWrite(++lab.historyWrites);
+            return true;
+        },
+        set: async (ref: any, value: any) => {
+            await backendWait();
+            setPath(ref.path, value);
+            return true;
+        },
+        runTransaction: async (ref: any, fn: any) => {
+            const claimKey = ref.path.startsWith(REGISTRY) ? ref.path.slice(REGISTRY.length) : '';
+            const phone = claimKey ? (lab.phoneOfKey.get(claimKey) || '?') : '';
+            if (claimKey) {
+                lab.claims++;
+                lab.inFlightClaims++;
+                lab.inFlightByPhone.set(phone, (lab.inFlightByPhone.get(phone) || 0) + 1);
+                lab.maxClaimOverlap = Math.max(lab.maxClaimOverlap, lab.inFlightClaims);
+                lab.maxClaimOverlapPerPhone = Math.max(lab.maxClaimOverlapPerPhone, lab.inFlightByPhone.get(phone) || 0);
+            }
+            try {
+                await backendWait();
+                const cur = getPath(ref.path);
+                const next = fn(cur);
+                if (next === undefined) return { committed: false, snapshot: { val: () => cur }, txOutcome: 'not-applied' };
+                if (ref.path.startsWith(HISTORY + '/') && mentionsHangCode(next)) {
+                    lab.hangingHistoryWrites.add(ref.path);
+                    return hangForever();
+                }
+                setPath(ref.path, next);
+                const v = getPath(ref.path);
+                if (ref.path.startsWith(HISTORY + '/') && lab.onHistoryWrite) lab.onHistoryWrite(++lab.historyWrites);
+                return { committed: true, snapshot: { val: () => v }, txOutcome: 'committed' };
+            } finally {
+                if (claimKey) {
+                    lab.inFlightClaims--;
+                    lab.inFlightByPhone.set(phone, (lab.inFlightByPhone.get(phone) || 1) - 1);
+                }
+            }
+        },
+        onValue: () => () => {},
+        off: () => {},
+        increment: (n: number) => ({ '.sv': { increment: n } })
+    };
+}
+
+function row(index: number, phone: string, minute: number): Row {
+    const barcode = 'ZTL' + String(100000 + index);
+    lab.phoneOfKey.set(barcodeRegistryKey(barcode), phone);
+    const hour = 9 + Math.floor(minute / 60);
+    const at = '2026-10-05 ' + String(hour).padStart(2, '0') + ':' + String(minute % 60).padStart(2, '0') + ':00';
+    return { barcode, phone, cod: 1 + index, dod: 0, at, ztoClosed: null, skip: '', from: 'cn' };
+}
+
+function distinctRows(n: number) {
+    const out: Row[] = [];
+    for (let i = 0; i < n; i++) out.push(row(i, '09' + String(10000000 + i), i));
+    return out;
+}
+
+function loadList(rows: Row[]) {
+    ztoState.ztoListSyncResult = { rows, signedRows: [], from: '2026-10-03', to: '2026-10-06', total: rows.length } as any;
+}
+
+function numberAfter(label: string) {
+    const match = viewState.ztoListSyncNote.match(new RegExp(label + ' (\\d+)'));
+    return match ? Number(match[1]) : 0;
+}
+
+function tally() {
+    return {
+        saved: numberAfter('✅ បញ្ចូល'),
+        pending: numberAfter('⏳ កំពុងរក្សាទុក'),
+        failed: numberAfter('⚠️ បរាជ័យ'),
+        notTried: numberAfter('⏸️ មិនទាន់បញ្ចូល')
+    };
+}
+
+function itemWithBarcode(code: string) {
+    return dataState.scanHistory.find((item: any) => Array.isArray(item.barcodes) && item.barcodes.some((b: any) => b.code === code));
+}
+
+beforeEach(() => {
+    vi.stubGlobal('crypto', webcrypto);
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+        if (new URL(String(url)).hostname !== 'example.invalid') throw new Error('Unexpected fixture HTTP');
+        return new Response(JSON.stringify({ found: false }), { status: 200 });
+    }));
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(NOW));
+    const clockStarted = performance.now();
+    vi.spyOn(Date, 'now').mockImplementation(() => Math.floor(NOW + performance.now() - clockStarted));
+    lab.store = {};
+    lab.phoneOfKey.clear();
+    lab.inFlightClaims = 0;
+    lab.inFlightByPhone.clear();
+    lab.maxClaimOverlap = 0;
+    lab.maxClaimOverlapPerPhone = 0;
+    lab.claims = 0;
+    lab.historyWrites = 0;
+    lab.hangCodes.clear();
+    lab.hangingHistoryWrites.clear();
+    lab.onHistoryWrite = null;
+    lab.latMs = 10;
+    lab.backendCalls = 0;
+    appLocalStore.clear();
+    appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true,
+        url: 'https://example.invalid/.netlify/functions/zto-order-detail?barcode={barcode}' }));
+    appLocalStore.setItem('zoew_zto_listsync_v1', '1');
+    clearCustomerDataTableCache();
+    clearZtoPickupStatusStore();
+    dbListenerPendingPaths.clear();
+    dbListenerFailedPaths.clear();
+    ztoState.ztoListSyncInFlight = false;
+    ztoState.ztoListSyncResult = null;
+    dataState.scanHistory = [];
+    dataState.deletedItems = [];
+    dataState.dailyRevenueData = {};
+    dataState.monthlyRevenueData = {};
+    dataState.dailyCollectedData = {};
+    dataState.dailyPickupData = {};
+    uiState.isModalOpen = false;
+    uiState.toasts = [];
+    viewState.ztoListSyncNote = '';
+    firebaseState.authGeneration++;
+    const options = { databaseURL: 'https://lanes-fixture.firebaseio.com' };
+    firebaseState.auth = { currentUser: { uid: 'lanes-user' }, app: { options } } as any;
+    firebaseState.db = { lanes: true, app: { options } } as any;
+    firebaseState.isInitializingFirebase = false;
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
+    firebaseState.isDatabaseConnected = true;
+    firebaseState.fb = makeFb() as any;
+    resetServerClock(); acceptServerClockOffset(1, null, false);
+    for (const [name, path] of [['dbRefHistory', HISTORY], ['dbRefDeleted', 'zoew_recently_deleted_cod_dod'],
+        ['dbRefDailyRevenue', 'zoew_daily_revenue_cod_dod'], ['dbRefMonthlyRevenue', 'zoew_monthly_revenue_cod_dod'],
+        ['dbRefDailyCollected', 'zoew_daily_collected_cod_dod'], ['dbRefDailyPickup', 'zoew_daily_pickup_cod_dod'],
+        ['dbRefRegistry', 'zoew_barcode_registry']] as const) {
+        (firebaseState as any)[name] = { path };
+    }
+    firebaseState.dbLivenessProbe = Promise.resolve(null) as any;
+    for (const name of ['ztoListSyncFrom', 'ztoListSyncTo'] as const) {
+        const input = document.createElement('input');
+        input.value = name === 'ztoListSyncFrom' ? '2026-10-03' : '2026-10-06';
+        refTo(name)(input);
+    }
+    lab.lastQuestion = '';
+    vi.stubGlobal('confirm', (question: string) => { lab.lastQuestion = String(question); return true; });
+    vi.stubGlobal('alert', () => undefined);
+    (window as any).ZoeErrors = { capture: () => {} };
+});
+
+afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    delete (window as any).ZoeErrors;
+    firebaseState.dbLivenessProbe = null as any;
+    refTo('ztoListSyncFrom')(null);
+    refTo('ztoListSyncTo')(null);
+    appLocalStore.clear();
+});
+
+describe('ZTO list import — lanes by customer + day', () => {
+    it('1. rows of different customers import in parallel (≤ ZTO_LIST_IMPORT_CONCURRENCY) and finish ~3× sooner', async () => {
+        const rows = distinctRows(16);
+        lab.latMs = 30;
+        loadList(rows);
+        const startedAt = performance.now();
+        await importZtoListRows();
+        const wallMs = performance.now() - startedAt;
+        expect(ZTO_LIST_IMPORT_CONCURRENCY).toBe(4);
+        expect(lab.maxClaimOverlap).toBeGreaterThanOrEqual(2);
+        expect(lab.maxClaimOverlap).toBeLessThanOrEqual(ZTO_LIST_IMPORT_CONCURRENCY);
+        expect(wallMs).toBeLessThan(lab.backendCalls * lab.latMs / 2.5);
+        console.log('V2_LANE_COST', JSON.stringify({ rows: rows.length, latency: lab.latMs, backendCalls: lab.backendCalls, wallMs }));
+        expect(tally()).toEqual({ saved: 16, pending: 0, failed: 0, notTried: 0 });
+        expect(dataState.scanHistory.length).toBe(16);
+        expect(Object.keys(lab.store.zoew_barcode_registry || {}).length).toBe(16);
+        expect(ztoState.ztoListSyncResult).toBeNull();
+    }, 20000);
+
+    it('2. rows of the same customer + day stay in one lane: merged into one item, barcodes in list order, money exact', async () => {
+        const a = [row(0, '0961111111', 0), row(1, '0961111111', 1), row(2, '0961111111', 2), row(3, '0961111111', 3)];
+        const b = [row(4, '0962222222', 4), row(5, '0962222222', 5)];
+        const others = [row(6, '0963333333', 6), row(7, '0964444444', 7), row(8, '0965555555', 8)];
+        const rows = [a[0], b[0], others[0], a[1], others[1], b[1], a[2], others[2], a[3]];
+        loadList(rows);
+        await importZtoListRows();
+        expect(lab.maxClaimOverlapPerPhone).toBe(1);
+        expect(lab.maxClaimOverlap).toBeGreaterThanOrEqual(2);
+        expect(tally()).toEqual({ saved: 9, pending: 0, failed: 0, notTried: 0 });
+        expect(dataState.scanHistory.length).toBe(5);
+        const itemA = itemWithBarcode(a[0].barcode) as any;
+        expect(itemA.barcodes.map((x: any) => x.code)).toEqual(a.map((r) => r.barcode));
+        expect(itemA.count).toBe(4);
+        expect(Number(itemA.cod)).toBe(a.reduce((sum, r) => sum + r.cod, 0));
+        const itemB = itemWithBarcode(b[0].barcode) as any;
+        expect(itemB.barcodes.map((x: any) => x.code)).toEqual(b.map((r) => r.barcode));
+        const ledgerDay = (lab.store.zoew_daily_revenue_cod_dod || {})['2026-10-05'] || {};
+        expect(Number(ledgerDay.codDollar)).toBe(rows.reduce((sum, r) => sum + r.cod, 0));
+        expect(Number(ledgerDay.dodDollar)).toBe(0);
+        expect(Number(ledgerDay.totalCount)).toBe(rows.length);
+        expect(Object.keys(lab.store.zoew_barcode_registry || {}).length).toBe(9);
+        const serverItems = Object.values(lab.store[HISTORY] || {}) as any[];
+        expect(serverItems.length).toBe(5);
+        expect(serverItems.filter((item) => item.phone === itemA.phone).length).toBe(1);
+    }, 20000);
+
+    it('3. the first hung save stops new rows; lanes in flight finish (⏳ ≤ lanes); counts add up; the list stays', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date(NOW));
+        resetServerClock(); acceptServerClockOffset(1, null, false);
+        const rows = distinctRows(12);
+        for (let i = 4; i < rows.length; i++) lab.hangCodes.add(rows[i].barcode);
+        loadList(rows);
+        const digests = new Set<Promise<ArrayBuffer>>();
+        const actualDigest = webcrypto.subtle.digest.bind(webcrypto.subtle);
+        vi.spyOn(webcrypto.subtle, 'digest').mockImplementation((...args) => {
+            const digest = actualDigest(...args);
+            digests.add(digest);
+            void digest.then(() => digests.delete(digest), () => digests.delete(digest));
+            return digest;
+        });
+        const importStartedAt = Date.now();
+        const run = importZtoListRows();
+        const ready = () => Object.values(lab.store.zoew_scan_operations || {}).filter((operation: any) => operation.phase === 'committed').length === 4
+            && lab.hangingHistoryWrites.size === ZTO_LIST_IMPORT_CONCURRENCY;
+        let deadline: ReturnType<typeof realSetTimeout>;
+        let preflightActive = true;
+        try {
+            await Promise.race([
+                (async () => {
+                    for (let elapsed = 0; elapsed < 5000 && preflightActive && !ready(); elapsed += 10) {
+                        await Promise.all([...digests]);
+                        if (!preflightActive) return;
+                        await vi.advanceTimersByTimeAsync(10);
+                    }
+                    expect(ready(), 'four genuine committed receipts and all hung history writes must precede the timeout jump').toBe(true);
+                })(),
+                new Promise<never>((_resolve, reject) => {
+                    deadline = realSetTimeout(() => reject(new Error('Import preflight did not reach real committed/hung checkpoints within 5s')), 5000);
+                })
+            ]);
+        } finally { preflightActive = false; realClearTimeout(deadline); }
+        await vi.advanceTimersByTimeAsync(40000 - (Date.now() - importStartedAt));
+        await run;
+        const counts = tally();
+        expect(counts.saved).toBe(4);
+        expect(counts.pending).toBeGreaterThanOrEqual(2);
+        expect(counts.pending).toBeLessThanOrEqual(ZTO_LIST_IMPORT_CONCURRENCY);
+        expect(counts.notTried).toBeGreaterThanOrEqual(1);
+        expect(counts.saved + counts.pending + counts.failed + counts.notTried).toBe(rows.length);
+        expect(lab.claims).toBe(rows.length - counts.notTried);
+        expect(viewState.ztoListSyncNote).toContain('បញ្ជីនៅដដែល');
+        expect(ztoState.ztoListSyncResult).not.toBeNull();
+        expect(ztoState.ztoListSyncInFlight).toBe(false);
+    }, 20000);
+
+    it('4. going offline mid-import stops new rows; counts add up; the list stays', async () => {
+        let online = true;
+        vi.spyOn(navigator, 'onLine', 'get').mockImplementation(() => online);
+        const rows = distinctRows(12);
+        lab.onHistoryWrite = (n) => { if (n === 2) online = false; };
+        loadList(rows);
+        await importZtoListRows();
+        const counts = tally();
+        expect(counts.notTried).toBeGreaterThanOrEqual(1);
+        expect(counts.saved).toBeGreaterThanOrEqual(1);
+        expect(counts.saved + counts.pending + counts.failed + counts.notTried).toBe(rows.length);
+        expect(lab.claims).toBe(rows.length - counts.notTried);
+        expect(ztoState.ztoListSyncResult).not.toBeNull();
+        expect(ztoState.ztoListSyncInFlight).toBe(false);
+    }, 20000);
+    it('5. hundreds of customers: a 100-row list (the per-click cap) imports fully and exactly; 300 rows ➜ 100 per click', async () => {
+        const rows = distinctRows(100);
+        loadList(rows);
+        const startedAt = performance.now();
+        await importZtoListRows();
+        const wallMs = performance.now() - startedAt;
+        expect(tally()).toEqual({ saved: 100, pending: 0, failed: 0, notTried: 0 });
+        expect(lab.maxClaimOverlap).toBeGreaterThanOrEqual(2);
+        expect(lab.maxClaimOverlap).toBeLessThanOrEqual(ZTO_LIST_IMPORT_CONCURRENCY);
+        expect(wallMs).toBeLessThan(lab.backendCalls * lab.latMs / 2.5);
+        console.log('V2_LANE_COST', JSON.stringify({ rows: rows.length, latency: lab.latMs, backendCalls: lab.backendCalls, wallMs }));
+        expect(dataState.scanHistory.length).toBe(100);
+        expect(Object.keys(lab.store[HISTORY] || {}).length).toBe(100);
+        expect(Object.keys(lab.store.zoew_barcode_registry || {}).length).toBe(100);
+        const ledgerDay = (lab.store.zoew_daily_revenue_cod_dod || {})['2026-10-05'] || {};
+        expect(Number(ledgerDay.codDollar)).toBe(rows.reduce((sum, r) => sum + r.cod, 0));
+        expect(Number(ledgerDay.totalCount)).toBe(100);
+        expect(ztoState.ztoListSyncResult).toBeNull();
+
+        const threeHundred = distinctRows(300);
+        loadList(threeHundred);
+        await importZtoListRows();
+        expect(lab.lastQuestion).toContain('បញ្ចូល ' + ZTO_LIST_IMPORT_MAX + ' កញ្ចប់ថ្មី');
+        expect(lab.lastQuestion).toContain('ពិដាន ' + ZTO_LIST_IMPORT_MAX);
+        expect(tally()).toEqual({ saved: ZTO_LIST_IMPORT_MAX, pending: 0, failed: 0, notTried: 0 });
+        expect(dataState.scanHistory.length).toBe(100 + ZTO_LIST_IMPORT_MAX);
+        expect(Object.keys(lab.store.zoew_barcode_registry || {}).length).toBe(100 + ZTO_LIST_IMPORT_MAX);
+        expect(Number(((lab.store.zoew_daily_revenue_cod_dod || {})['2026-10-05'] || {}).totalCount)).toBe(100 + ZTO_LIST_IMPORT_MAX);
+        expect(ztoState.ztoListSyncResult).toBeNull();
+        expect(viewState.ztoListSyncNote).toContain('សូមទាញបញ្ជីម្តងទៀត');
+    }, 30000);
+
+    it('6. one customer with 20 parcels among 20 customers × 4 (shuffled): one lane per customer, order kept, money exact', async () => {
+        let index = 0;
+        const bigRows: Row[] = [];
+        for (let i = 0; i < 20; i++) bigRows.push(row(index++, '0969999999', i));
+        const groups: Row[][] = [];
+        for (let c = 0; c < 20; c++) {
+            const phone = '09' + String(20000000 + c);
+            const group: Row[] = [];
+            for (let k = 0; k < 4; k++) group.push(row(index++, phone, 20 + k));
+            groups.push(group);
+        }
+        const sources = [bigRows].concat(groups);
+        const cursors = sources.map(() => 0);
+        const rows: Row[] = [];
+        while (rows.length < 100) {
+            for (let s = 0; s < sources.length; s++) {
+                if (cursors[s] < sources[s].length) rows.push(sources[s][cursors[s]++]);
+            }
+        }
+        loadList(rows);
+        await importZtoListRows();
+        expect(tally()).toEqual({ saved: 100, pending: 0, failed: 0, notTried: 0 });
+        expect(lab.maxClaimOverlapPerPhone).toBe(1);
+        expect(lab.maxClaimOverlap).toBeGreaterThanOrEqual(2);
+        expect(dataState.scanHistory.length).toBe(21);
+        expect(Object.keys(lab.store[HISTORY] || {}).length).toBe(21);
+        const bigItem = itemWithBarcode(bigRows[0].barcode) as any;
+        expect(bigItem.barcodes.map((x: any) => x.code)).toEqual(bigRows.map((r) => r.barcode));
+        expect(bigItem.count).toBe(20);
+        expect(Number(bigItem.cod)).toBe(bigRows.reduce((sum, r) => sum + r.cod, 0));
+        for (const group of groups) {
+            const item = itemWithBarcode(group[0].barcode) as any;
+            expect(item.barcodes.map((x: any) => x.code)).toEqual(group.map((r) => r.barcode));
+            expect(item.count).toBe(4);
+        }
+        const ledgerDay = (lab.store.zoew_daily_revenue_cod_dod || {})['2026-10-05'] || {};
+        expect(Number(ledgerDay.codDollar)).toBe(rows.reduce((sum, r) => sum + r.cod, 0));
+        expect(Number(ledgerDay.totalCount)).toBe(100);
+        expect(Object.keys(lab.store.zoew_barcode_registry || {}).length).toBe(100);
+    }, 30000);
+
+    it('7. a big shop (500 parcels already in history) still imports 100 new rows fully and within the same time bound', async () => {
+        const existing: any[] = [];
+        for (let i = 0; i < 500; i++) {
+            const code = 'OLD' + String(500000 + i);
+            const item = { id: 'old-' + i, phone: '09' + String(70000000 + i), scanDate: '2026-10-05', isClosed: false, createdAt: NOW - 7200000,
+                count: 1, cod: 1, dod: 0, barcodes: [{ code, isClosed: false, cod: 1, dod: 0, createdAt: NOW - 7200000 }] };
+            existing.push(item);
+            setPath(HISTORY + '/' + item.id, item);
+            setPath(REGISTRY + barcodeRegistryKey(code), true);
+        }
+        dataState.scanHistory = existing;
+        const rows = distinctRows(100);
+        loadList(rows);
+        const startedAt = performance.now();
+        await importZtoListRows();
+        const wallMs = performance.now() - startedAt;
+        expect(tally()).toEqual({ saved: 100, pending: 0, failed: 0, notTried: 0 });
+        expect(wallMs).toBeLessThan(lab.backendCalls * lab.latMs / 2.5);
+        console.log('V2_LANE_COST', JSON.stringify({ rows: rows.length, latency: lab.latMs, backendCalls: lab.backendCalls, wallMs }));
+        expect(dataState.scanHistory.length).toBe(600);
+        expect(Object.keys(lab.store[HISTORY] || {}).length).toBe(600);
+        expect(Object.keys(lab.store.zoew_barcode_registry || {}).length).toBe(600);
+        expect(Number(((lab.store.zoew_daily_revenue_cod_dod || {})['2026-10-05'] || {}).totalCount)).toBe(100);
+    }, 30000);
+});
+
+it('ការបញ្ចូលជួរយករួចស្របគ្នារាប់លទ្ធផលគ្រប់ មិនបាត់ពេលរង់ចាំ', async () => {
+    const rows = distinctRows(ZTO_LIST_IMPORT_CONCURRENCY);
+    for (const entry of rows) (entry as any).ztoClosed = true;
+    loadList(rows);
+    Object.assign(ztoState.ztoListSyncResult, { verifiedAt: NOW, verifiedServerAt: NOW });
+    const captured: any[] = [];
+    (window as any).ZoeErrors = { capture: (error: any, extra: any) => { captured.push(extra && extra.context); } };
+    uiState.toasts = [];
+    await importZtoListRows();
+    expect(captured.filter((context) => context === 'scan evidence pending'), 'ជួរ lane ផ្សេងដែលកំពុងរត់ មិនមែនភស្តុតាងដែលនៅជាប់').toEqual([]);
+    expect(uiState.toasts.filter((toast: any) => /បានរក្សាទុក និងផ្ទៀងប្រាក់រួច|មិនទាន់មានភស្តុតាងបញ្ចប់/.test(toast.msg))).toEqual([]);
+    expect(createScanEvidenceJournal(appLocalStore, 2).list(pendingScanScope())).toEqual([]);
+    expect(lab.maxClaimOverlap).toBeGreaterThanOrEqual(2);
+    expect(tally()).toEqual({ saved: rows.length, pending: 0, failed: 0, notTried: 0 });
+    const stored = Object.values(lab.store[HISTORY] || {}).flatMap((item: any) => item.barcodes);
+    expect(stored).toHaveLength(rows.length);
+    expect(stored.every((barcode: any) => barcode.isClosed === true)).toBe(true);
+    const ledger = lab.store.zoew_daily_revenue_cod_dod['2026-10-05'];
+    expect(ledger.codDollar).toBe(rows.reduce((sum, entry) => sum + entry.cod, 0));
+    expect(ledger.totalCount).toBe(rows.length);
+    expect(numberAfter('🔒 យករួច')).toBe(rows.length);
+    const pickup = (lab.store.zoew_daily_pickup_cod_dod || {})['2026-10-05'] || {};
+    expect(pickup.packagesPickedUp, 'lane ស្របគ្នាទាំងអស់ចូល «យករួច» ម្តង (CAS revision ប្រកួតគ្នា)').toBe(rows.length);
+    expect(Object.keys(pickup.pickedUpBarcodes || {}).sort()).toEqual(rows.map((entry) => barcodeRegistryKey(entry.barcode)).sort());
+}, 20000);
+
+it('import cannot reuse fallback birth captured before the pickup epoch read and clock resync', async () => {
+    const rows = distinctRows(1);
+    rows[0].at = ''; (rows[0] as any).ztoClosed = true;
+    loadList(rows);
+    Object.assign(ztoState.ztoListSyncResult, { verifiedAt: NOW, verifiedServerAt: NOW });
+    const get = firebaseState.fb.get;
+    let crossed = false;
+    firebaseState.fb.get = async ref => {
+        const result = await get(ref);
+        if (!crossed && ref.path.startsWith('zoew_daily_pickup_cod_dod/')) {
+            crossed = true;
+            resetServerClock(); acceptServerClockOffset(3600000, null, false);
+        }
+        return result;
+    };
+    await importZtoListRows();
+    expect(crossed).toBe(true);
+    expect(lab.claims).toBe(0);
+    expect(Object.values(lab.store[HISTORY] || {})).toHaveLength(0);
+    expect(createScanEvidenceJournal(appLocalStore, 2).list(pendingScanScope())).toHaveLength(0);
+});

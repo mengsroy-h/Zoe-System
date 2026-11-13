@@ -1,0 +1,978 @@
+# កំណត់ ZTO Lookup សម្រាប់ ZoeW
+
+**ជម្រើស ZTO Palm:** ផ្ទាំង «API ស្វែងរកអតិថិជនស្វ័យប្រវត្តិ» មាន **Login ZTO Palm**
+សម្រាប់ទាញលេខទូរស័ព្ទ និង COD/DOD ដោយគណនី Palm របស់អ្នក។ មិនត្រូវការ Argus Cookie
+សម្រាប់ផ្លូវ Palm ទេ តែត្រូវការ env `ZTO_PALM_SESSION_SECRET` · `ZTO_PALM_SIGN_KEY` · `ZTO_PALM_PASSWORD_KEY` នៅ Netlify។
+Login ម្តងលើទូរស័ព្ទមួយក្នុងសាខា ➜ Server ទុក session Palm របស់សាខានោះក្នុង Netlify Blobs ដូច Cookie ➜ ទូរស័ព្ទផ្សេងនៃសាខាដដែលចុច
+«ប្រើ Login ZTO របស់ហាង» ដោយមិនបាច់ពាក្យសម្ងាត់ · សាខានីមួយៗ Login គណនី Palm របស់ខ្លួន (សាខាច្រើនប្រើសោភ្ជាប់ដដែលក៏បាន)។
+របៀបកំណត់ server និងប្រើ៖ [ZTO-PALM.md](ZTO-PALM.md)។
+ក្នុងរបៀប Palm «បិទតាម ZTO ស្វ័យប្រវត្តិ» អានបញ្ជី «ចុះហត្ថលេខា» របស់គណនី Palm។ «ទាញបញ្ជីកញ្ចប់ពី ZTO» ផ្ទៀងស្កេនមកដល់របស់សាខា និងរក្សាប្រភព VN · CN · ផ្សេងៗ ដូច Cookie (មើល [ZTO-PALM.md](ZTO-PALM.md)); ការកំណត់ Argus ខាងក្រោមសម្រាប់ផ្លូវ Argus។
+
+ZoeW ស្កេន Barcode រួចទាញ **លេខទូរស័ព្ទ · COD · DOD** ពី ZTO តាម Netlify
+Function មួយ (`/.netlify/functions/zto-order-detail`)។ Cookie និង Token ស្ថិត
+**តែខាង server** ក្នុង Netlify — មិនចូលក្នុងកូដ static ឬ browser របស់អ្នកប្រើទេ។
+
+សម្រាប់ផ្លូវ Argus មានជម្រើស auth **២**៖
+
+| # | ផ្លូវ | ប្រើពេលណា |
+| --- | --- | --- |
+| ១ | **API ផ្លូវការ** — `ZTO_AUTHORIZATION` ឬ `ZTO_TOKEN` | ពេល ZTO ផ្តល់ API ឲ្យអ្នក (**ល្អបំផុត**) |
+| ២ | **Cookie** — Netlify Blobs (`site:zto-auth/cookie`) ឬ `ZTO_COOKIE` | ពេលនៅមិនទាន់មាន API — Windows helper (ណែនាំ) ឬ DevTools fallback |
+
+> ⚡ **ការប្តូរ Cookie មិនត្រូវការ redeploy ទេ** — helper សរសេរវាចូល
+> **Netlify Blobs** ដែល Function អានពេលមានសំណើ។ `ZTO_COOKIE` ជា
+> **ផ្លូវបម្រុង** ពេលអានចេញពី Blobs មិនបាន។
+
+---
+
+## ១. Environment Variables ក្នុង Netlify
+
+ចូល `Netlify → ZoeW site → Project configuration → Environment variables`។
+
+### បើប្រើ Windows Cookie helper — ដាក់តែ ២ Key
+
+ចុច **Add a variable** ហើយបង្កើត variable ២ ដាច់ដោយឡែក៖
+
+`setup.cmd` អាចរត់មុន ឬក្រោយការបង្កើត env ទាំងនេះ៖ វាត្រូវការតែ Site ID +
+PAT។ `ZTO_PROXY_KEY` គឺសម្រាប់ ZoeW ហៅ Function មិនមែនសម្រាប់ `setup.cmd` ទេ។
+
+| Key | Value | Secret | Scope | Context |
+| --- | --- | --- | --- | --- |
+| `ZTO_PROXY_KEY` | តម្លៃចៃដន្យ ៣២ bytes — សោរវាង ZoeW និង Function | ✅ | **Functions** | **Production** |
+| `ZTO_COOKIE` | **ស្រេចចិត្ត** — ផ្លូវបម្រុងពេល Blobs ដាច់ | ✅ | **Functions** | **Production** |
+
+⛔ **កុំលុប `ZTO_COOKIE` ដែលមានស្រាប់ចេញ** — Function ប្រើវាពេលអានចេញពី
+Blobs មិនបាន។ បើវាមិនទាន់មាន ក៏មិនចាំបាច់បង្កើតដែរ ៖ helper សរសេរចូល Blobs
+ដោយផ្ទាល់ ហើយ lookup ដើរភ្លាមក្រោយការសរសេរនោះ។
+
+បង្កើត `ZTO_PROXY_KEY` លើ Windows PowerShell៖
+
+```powershell
+$bytes = New-Object byte[] 32
+$rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+$rng.GetBytes($bytes)
+$rng.Dispose()
+[Convert]::ToBase64String($bytes)
+```
+
+⛔ កុំដាក់ `NETLIFY_AUTH_TOKEN`, `NETLIFY_ACCOUNT_ID`, `NETLIFY_SITE_ID` ឬ
+`ZTO_COOKIE_UPDATE_KEY` ក្នុង Netlify env។ Site ID និង PAT របស់ helper រស់តែ
+លើ Windows។ សម្រាប់ផ្លូវ Cookie ក៏មិនចាំបាច់បង្កើត `ZTO_API_URL` ឬ
+`ZTO_REQUEST_*` ដែរ។ បើមាន `ZTO_AUTHORIZATION`/`ZTO_TOKEN` ចាស់ សូមលុបវា
+ព្រោះវាមានអាទិភាពលើ Cookie។
+
+### បើប្រើ API ផ្លូវការ — `ZTO_PROXY_KEY` បូក **មួយ** ក្នុងចំណោមនេះ
+
+| Key | ប្រើសម្រាប់ |
+| --- | --- |
+| `ZTO_AUTHORIZATION` | តម្លៃពេញរបស់ header `Authorization` ពី ZTO (ឧ. `Bearer eyJ...`) |
+| `ZTO_TOKEN` + `ZTO_TOKEN_HEADER` | Token ដែល ZTO ដាក់ក្នុង header ផ្សេង (លំនាំដើម `X-Access-Token`) |
+| `ZTO_COOKIE` | ផ្លូវ fallback ប៉ុណ្ណោះ; Windows helper គឺជាផ្លូវណែនាំខាងលើ |
+
+លំដាប់អាទិភាព ៖ **`ZTO_AUTHORIZATION` ➜ `ZTO_TOKEN` ➜ `ZTO_COOKIE`**។
+
+សម្គាល់តម្លៃទាំងអស់នេះជា **Contains secret values**, scope **Functions** និង
+context **Production**។ កុំដាក់វាក្នុង `netlify.toml`, GitHub, chat ឬ
+screenshot។ ក្រោយ Save ត្រូវ **Trigger deploy** ម្តង។
+
+> ℹ️ **Netlify Base directory ត្រូវជា `ZoeW`** (ប្រកាន់អក្សរតូចធំ) ដើម្បីឲ្យ
+> វាឃើញ `netlify.toml` និង `netlify/functions/`។ Function ប្រើ dependency
+> `@netlify/aws-lambda-compat` និង `@netlify/blobs` ពី `package.json` របស់ ZoeW។
+
+---
+
+## ២. Windows — ប្តូរ Cookie ដោយមិនប្រើ DevTools (**ណែនាំ**)
+
+ឧបករណ៍ `tools/zto-cookie-sync-windows/` បើក Edge/Chrome profile ដាច់ដោយឡែក
+លើកុំព្យូទ័ររបស់អ្នក ហើយចាប់បន្ទាត់ `Cookie:` ពី **សំណើពិត** ទៅ
+`aargus-api.ztoglobal.com` ដែល ZTO ឆ្លើយដោយ **ជោគជ័យ**។ បន្ទាប់មកវាសរសេរ Cookie ចូល **Netlify Blobs**
+(store `site:zto-auth`, key `cookie` — បច្ច័យ `site:` ជាឈ្មោះខាងក្នុងរបស់
+`@netlify/blobs`) ➜ ⛔ **គ្មាន deploy ថ្មី**។
+
+វា **មិនប្រើ** `document.cookie`, `chrome.cookies` extension API ឬ Chromium
+ក្នុង Netlify Function ទេ។
+
+### Setup ម្តងដំបូង
+
+១. ត្រូវមាន **Windows 10/11 · Edge ឬ Chrome · Node.js 22.17.0+**។
+២. បង្កើត **Netlify Personal Access Token** នៅ
+   `User settings → Applications → Personal access tokens` ហើយយក ZoeW
+   **Site ID** ពី `Project configuration → General → Project details`។
+៣. Download/Clone repo រួចបើកថត `tools/zto-cookie-sync-windows/`។
+៤. Double-click **`setup.cmd`** ➜ បញ្ចូល Site ID និង PAT ក្នុង prompt លាក់អក្សរ។
+៥. ឃើញ `OK: setup is complete` គឺចប់។ ⛔ សារក្នុង cmd ជាភាសាអង់គ្លេស
+   ទាំងអស់ ព្រោះ `cmd.exe` បង្ហាញអក្សរខ្មែរបែកបាក់។
+
+### ពេល ZTO បដិសេធ Cookie
+
+១. Double-click **`sync-zto-cookie.cmd`** ➜ វាបើកទំព័រ
+   **`gate.ztoglobal.com`** (ទំព័រនោះរក្សា session ➜ ជាទូទៅមិនសុំ password)។
+២. ឧបករណ៍ **បើក Argus ក្នុង tab ថ្មីជំនួសអ្នក** (បើ ZTO សុំ សូម Login
+   ជាធម្មតា) រួច **ទុកទំព័រនោះចោល**។ បើវាបើកមិនកើត សូមចុច **កាតសាខា**
+   ដោយខ្លួនឯង។ បើទំព័រ gate បើកមិនកើត ឧបករណ៍បោះពុម្ព URL របស់
+   Argus លើអេក្រង់ ➜ វាយវាក្នុង address bar ដោយផ្ទាល់។
+៣. ឧបករណ៍បន្តដោយខ្លួនឯង ភ្លាមពេល ZTO ឆ្លើយការហៅ API ណាមួយដោយជោគជ័យ
+   (ជាទូទៅ Argus ហៅ API ភ្លាមក្រោយចូល)។ បើវានៅរង់ចាំ សូមចូល
+   **Scan Management ➜ Arrival Scan** ហើយវាយ ឬស្កេន Waybill មួយ។
+   ⛔ ការចាប់ឈរលើ Cookie របស់ **`aargus-api.ztoglobal.com`** ➜ ការចូល
+   ត្រឹមទំព័រ gate តែម្យ៉ាង **មិនទាន់គ្រប់គ្រាន់ទេ**។ បើអស់ម៉ោង ឧបករណ៍រាយ
+   ចំនួនការហៅ API ដែលវាឃើញ (សរុប · 2xx · មិនទាន់ Login)។
+៤. ឧបករណ៍បញ្ចូល `Set-Cookie` ថ្មី រួចបិទ browser ➜ សរសេរ Cookie ចូល
+   Netlify Blobs។ **មិនចាំបាច់ redeploy**។ បើ ZTO បដិសេធ session
+   (401/403 ឬទំព័រ Login) វា **មិនយក Cookie នោះទេ** — វានៅរង់ចាំ។
+
+**របៀបផ្សេងទៀត** (ត្រូវការ Site URL + `ZTO_PROXY_KEY` ក្នុង `setup.cmd`)៖
+
+| ពាក្យបញ្ជា | ធ្វើអ្វី |
+| --- | --- |
+| `sync-zto-cookie.cmd --check` | រាយ ទទួលយក/បដិសេធ/មិនទាន់វាស់ **ដោយមិនបើក browser** |
+| `sync-zto-cookie.cmd --auto` | បើ Cookie បាត់ ឬត្រូវបដិសេធ ទើបបើក browser; មិនទាន់វាស់មិនបើក |
+| `schedule-zto-cookie.cmd` | ដំឡើង Windows Task ឲ្យរត់ `--auto` រាល់ពេលចូល Windows |
+
+ក្រោយយក Cookie រួច helper **ផ្ទៀងផ្ទាត់ខ្លួនឯង** តាម `?diag=1` ដោយប្រៀបធៀប
+fingerprint ➜ `OK: stored cookie verified in the Function (source: blob, …)`។
+នេះបញ្ជាក់ការផ្ទុក Cookie ត្រូវគ្នា។ សូម Lookup ក្នុង ZoeW ដើម្បីឲ្យ ZTO
+ផ្ទៀងផ្ទាត់ការប្រើ Cookie ពី Netlify; អាយុ session ពិតសម្រេចដោយ ZTO។
+
+Cookie **បង្ហាញក្នុង console ដោយចេតនា** (ងាយស្រួល paste ចូល `ZTO_COOKIE`
+ជាផ្លូវបម្រុង) តែវាមិនសរសេរចូល file/config និងមិនចូល shell history ទេ។ ⛔ **PAT និង `ZTO_PROXY_KEY` មិនបង្ហាញសោះ។**
+PAT ត្រូវអ៊ិនគ្រីបដោយ **Windows DPAPI / CurrentUser** ក្នុង
+`%LOCALAPPDATA%` — មិនដាក់ក្នុង command line, repo, extension ឬ Netlify
+Function។ សេចក្តីណែនាំពេញ និងព្រំដែនសិទ្ធិរបស់ PAT៖
+[`tools/zto-cookie-sync-windows/README-KH.md`](../../tools/zto-cookie-sync-windows/README-KH.md)។
+
+> ⚠️ បើ ZTO SSO ផុតទាំងស្រុង អ្នកនៅតែត្រូវ Login ម្តងក្នុង browser profile
+> ពិសេស។ អ្វីដែលត្រូវដកចេញគឺ F12 · Copy/Paste · Netlify UI និង Trigger deploy
+> ដោយដៃ មិនមែនការផ្ទៀងផ្ទាត់អត្តសញ្ញាណរបស់ ZTO ទេ។
+
+---
+
+## ២ខ. ផ្លូវដោយដៃ (fallback)
+
+បើ Windows helper មានបញ្ហា៖
+
+១. បើក `https://argus.ztoglobal.com` ក្នុង browser រួចចូលប្រព័ន្ធ។
+២. `F12` ➜ **Network** ➜ បើក/ស្វែងរកកញ្ចប់មួយ។
+៣. ជ្រើសសំណើទៅ `aargus-api.ztoglobal.com/scan/get/order/detail` ➜
+   **Request Headers** ➜ ចម្លងតម្លៃពេញរបស់ `Cookie:`។
+៤. ដាក់ចូល `ZTO_COOKIE` ក្នុង Netlify ➜ Save ➜ **Trigger deploy**
+   (ផ្លូវ env នេះនៅតែត្រូវការ deploy — មានតែផ្លូវ Blobs ទេដែលមិនត្រូវការ)។
+
+---
+
+## ៣. បំពេញក្នុង ZoeW
+
+របា Slide ⚙️ ➜ **🔌 API ស្វែងរកអតិថិជនស្វ័យប្រវត្តិ**៖
+
+| វាល | តម្លៃ |
+| --- | --- |
+| URL API | `/.netlify/functions/zto-order-detail?barcode={barcode}` |
+| ឈ្មោះ Header | `X-Zoe-Proxy-Key` |
+| តម្លៃ Header | តម្លៃដូច `ZTO_PROXY_KEY` ក្នុង Netlify |
+| Field លេខទូរស័ព្ទ | `phone` |
+| Field COD | `cod` |
+| Field DOD | `dod` |
+
+ធីក **`Fast Mode សម្រាប់ ZTO Lookup`** ដើម្បីឲ្យ barcode ដែលរកឃើញរួចក្នុង
+១០ នាទី បំពេញ **ភ្លាមៗ ០ ms**។ វារក្សាតែក្នុងសតិ និងមានពិដាន ៣០០ barcode។
+
+⛔ **ប្រអប់ធីកនេះក៏ជាច្រកទ្វារនៃកុងតាក់ ZTO ទាំង ២ ដែរ** ៖ **🔄 បិទតាម ZTO ស្វ័យប្រវត្តិ** និង **📥 ទាញបញ្ជីកញ្ចប់ពី ZTO**
+លេចក្នុងរបា Slide **តែពេលវាត្រូវគូស**។ ដកគ្រីស ➜ កុងតាក់ទាំង ២ លាក់
+ហើយមុខងារទាំង ២ **ឈប់ដំណើរការ** (ការកំណត់ចាស់មិនត្រូវលុប ➜ គូសវិញ ➜
+វាត្រឡប់មកដដែល)។
+
+Manual fallback **១.៨ វិនាទី** នៅដដែល៖ ខណៈ lookup កំពុងដំណើរការ វាលលេខ
+ទូរស័ព្ទទទួល focus ឲ្យវាយដោយដៃបាន។ សំណើមិនត្រូវបោះបង់ទេ ហើយលទ្ធផលនឹងបំពេញ
+ពេលមកដល់ **ប្រសិនបើវាលនៅទទេ**។
+
+---
+
+## ៤. ពេល ZTO ផ្តល់ **API ផ្លូវការ**
+
+Function ត្រូវបានសរសេរឲ្យ **សម្របទៅនឹងទម្រង់ API ណាក៏បាន** ដោយ
+**មិនចាំបាច់កែកូដ** — គ្រប់យ៉ាងកំណត់តាម Environment Variables។
+
+| Key | Default | ន័យ |
+| --- | --- | --- |
+| `ZTO_API_URL` | `https://aargus-api.ztoglobal.com/scan/get/order/detail` | Endpoint ពិត (ត្រូវជា **https**) |
+| `ZTO_API_METHOD` | `POST` | `POST` ឬ `GET` |
+| `ZTO_REQUEST_BODY_JSON` | `{"billCode":"{barcode}","countryCode":"KH"}` | តួសំណើ (POST) — `{barcode}` ត្រូវជំនួសដោយលេខពិត |
+| `ZTO_REQUEST_QUERY_PARAM` | `billCode` | ឈ្មោះ query param (GET) |
+| `ZTO_REQUEST_HEADERS_JSON` | ទទេ | Header បន្ថែម ឧ. `{"X-App-Key":"...","X-Sign":"..."}` |
+| `ZTO_FIELD_PHONE` | បញ្ជីលំនាំដើម | ផ្លូវ field លេខទូរស័ព្ទ បំបែកដោយ `,` (ឧ. `consigneePhone`) |
+| `ZTO_FIELD_COD` | បញ្ជីលំនាំដើម | ផ្លូវ field COD |
+| `ZTO_FIELD_DOD` | បញ្ជីលំនាំដើម | ផ្លូវ field DOD |
+| `ZTO_FIELD_BARCODE` | បញ្ជីលំនាំដើម | ផ្លូវ field លេខបាកូដ |
+| `ZTO_FIELD_SIGNED` | **ទទេ** | ផ្លូវ field ស្ថានភាព «បិទរួច/សញ្ញាបញ្ជាក់» នៅ ZTO (ឧ. `billStatus`) — ⛔ ទទេ ➜ មុខងារ **ដេកលក់** |
+| `ZTO_SIGNED_VALUES` | **ទទេ** | តម្លៃដែលមានន័យថា «បិទរួច» បំបែកដោយ `,` (ឧ. `5`) — ត្រូវដាក់ **គូនឹង** `ZTO_FIELD_SIGNED` |
+| `ZTO_SEND_BROWSER_HEADERS` | ស្វ័យប្រវត្តិ | `false` = កុំផ្ញើ `Origin`/`Referer` របស់ Argus |
+
+### អ្វីដែល Function ធ្វើដោយខ្លួនឯង
+
+- **ស្គាល់ទម្រង់ចម្លើយច្រើនបែប** ៖ វារកទិន្នន័យក្នុង `data` · `result` ·
+  `data.data` · `result.data` · `body` · `rows` · ឬ **root ផ្ទាល់** ហើយបើ
+  មួយក្នុងចំណោមនោះជា **array** វាយកធាតុទី ១។
+- **ស្គាល់សញ្ញាជោគជ័យច្រើនបែប** ៖ `success:true` · `result:true` ·
+  `status:true` · `code` ជា `0` / `000000` / `200` / `success` / `ok` ·
+  ឬ **គ្មាន `code` សោះ**។
+- **ស្គាល់ឈ្មោះ field ច្រើនបែប** (មុនអ្នកកំណត់អ្វីទាល់តែសោះ)៖
+
+  | | ឈ្មោះដែលសាកតាមលំដាប់ |
+  | --- | --- |
+  | ទូរស័ព្ទ | `consigneePhone` · `consigneeMobile` · `consigneeTel` · `receiverPhone` · `receiverMobile` · `recipientPhone` · `recipientMobile` · `phone` · `mobile` |
+  | COD | `agentAmount` · `codAmount` · `collectionAmount` · `codFee` · `cod` |
+  | DOD | `fcAmount` · `arrivalServiceCharge` · `dodAmount` · `arrivalCharge` · `serviceCharge` · `dod` |
+  | Barcode | `billCode` · `waybillNo` · `waybillCode` · `mailNo` · `barcode` |
+
+  ឈ្មោះដែល **អ្នកកំណត់** តាម `ZTO_FIELD_*` ត្រូវសាក **មុន** បញ្ជីលំនាំដើម
+  ➜ ការកំណត់ខុសក៏មិនធ្វើឲ្យ lookup ស្លាប់ដែរ។
+- ⛔ **ពេលប្រើ Token/Authorization វា *មិន* ផ្ញើ `Origin`, `Referer` និង
+  `User-Language` របស់ Argus ទេ** — header ក្លែងបែបនោះអាចធ្វើឲ្យ WAF ឬ CORS
+  របស់ API ផ្លូវការបដិសេធសំណើ។ ការផ្ញើវាកើតតែពេលប្រើ **Cookie** ប៉ុណ្ណោះ
+  (ឬពេលអ្នកបង្ខំដោយ `ZTO_SEND_BROWSER_HEADERS=true`)។
+
+### ផ្ទៀងផ្ទាត់ការកំណត់ និងការរក្សាទុក — `?diag=1`
+
+បើក URL នេះក្នុង browser (ត្រូវការ header `X-Zoe-Proxy-Key`, ឬប្រើ `curl`)៖
+
+```bash
+curl -H "X-Zoe-Proxy-Key: <ZTO_PROXY_KEY>" \
+  "https://<site>.netlify.app/.netlify/functions/zto-order-detail?diag=1"
+```
+
+វាឆ្លើយ **ការកំណត់ពិតដែល Function កំពុងប្រើ** ដោយ **គ្មានតម្លៃសម្ងាត់សោះ**៖
+
+```json
+{
+  "ok": true, "code": "ZTO_DIAG",
+  "auth": "cookie",
+  "cookie": {
+    "source": "blob",
+    "fingerprint": "a1b2c3d4",
+    "ageMs": 12345,
+    "blobSyncAgeMs": 10800000,
+    "blobRenewAgeMs": null,
+    "storeReason": null,
+    "renewals": 0,
+    "life": [
+      { "syncAgeMs": 7200000, "aliveMs": 6900000, "rejectedAfterMs": null, "idleMs": null, "ended": false },
+      { "syncAgeMs": 90000000, "aliveMs": 39600000, "rejectedAfterMs": 50400000, "idleMs": 10800000, "ended": true }
+    ]
+  },
+  "endpoint": { "host": "...", "path": "...", "method": "POST" },
+  "requestHeaders": ["Accept", "Cookie", "..."],
+  "browserHeaders": true,
+  "fields": { "phone": [...], "cod": [...], "dod": [...], "barcode": [...] },
+  "timing": { "upstreamTimeoutMs": 6000, "budgetMs": 9000, "retries": 1, "cacheTtlMs": 60000 },
+  "upstreamTiming": {
+    "detail": { "count": 12, "timeouts": 0, "lastMs": 820, "avgMs": 910, "maxMs": 2400, "ageMs": 5000 },
+    "list": { "count": 3, "timeouts": 0, "lastMs": 4100, "avgMs": 3800, "maxMs": 4100, "ageMs": 60000 },
+    "signed": { "count": 1, "timeouts": 0, "lastMs": 2900, "avgMs": 2900, "maxMs": 2900, "ageMs": 60000 }
+  },
+  "cacheEntries": 0
+}
+```
+
+`upstreamTiming` ប្រាប់ **ពេលដែល ZTO ឆ្លើយ** (ms · ចាប់ពីផ្ញើសំណើរហូតដល់អានតួ JSON ចប់ · រាប់តាម container) ដាច់ពីគ្នាតាមប្រភេទ ៖
+`detail` (ស្កេន ➜ `/detail`) · `list` (បញ្ជីកញ្ចប់មកដល់) · `signed` (បញ្ជីចុះហត្ថលេខា) ៖ `count` ចំនួនហៅ · `lastMs` ចុងក្រោយ ·
+`avgMs` មធ្យម · `maxMs` យូរបំផុត · `timeouts` ចំនួនដែលលើសពិដាន `upstreamTimeoutMs` · `ageMs` អាយុនៃការហៅចុងក្រោយ។
+ទាញបញ្ជីយឺត ➜ បើក `?diag=1` **ភ្លាមក្រោយទាញ** ៖ `list.lastMs`/`signed.lastMs` ធំ = ZTO ឆ្លើយយឺត (មិនមែន App) · `timeouts` > 0 =
+ZTO មិនឆ្លើយក្នុងពិដាន ➜ Function ឆ្លើយ `ZTO_TIMEOUT`។ container ត្រជាក់ ➜ `count` 0 និង `null` ទាំងអស់ · មានតែលេខ (គ្មាន Cookie · URL · barcode)។
+
+⛔ `auth` ត្រូវជា **`authorization`** ឬ **`token`** ពេលប្រើ API ផ្លូវការ។
+បើវាឡើង `none` នោះមានន័យថា Function រកមិនឃើញ Cookie ឬ Token សោះ។
+`requestHeaders` ជា **ឈ្មោះ header ប៉ុណ្ណោះ** — តម្លៃមិនដែលចេញទេ។
+
+**ប្លុក `cookie` ជាឧបករណ៍ផ្ទៀងផ្ទាត់ផ្លូវ Blobs**៖
+
+| វាល | អត្ថន័យ |
+| --- | --- |
+| `source` | `blob` = អានពី Netlify Blobs (helper ដើរត្រឹមត្រូវ) · `env` = ធ្លាក់ចុះទៅ `ZTO_COOKIE` · `none` = គ្មានសោះ |
+| `fingerprint` | ៨ តួនៃ SHA-256 របស់ Cookie — ⛔ **មិនមែនតម្លៃ Cookie** ទេ; ប្រើដើម្បីមើលថាតម្លៃប្រែឬអត់ |
+| `ageMs` | ពេលតាំងពី cache ត្រូវបានអាន/ធ្វើឲ្យស្រស់; ប្រើសម្រាប់ cache ដែលមាន TTL ៦០ វិនាទី — ⛔ **មិនមែនអាយុ Cookie** |
+| `blobSyncAgeMs` | អាយុពិតរបស់ Cookie ក្នុង Blob ៖ ពេលតាំងពីឧបករណ៍ Sync សរសេរវា (metadata `syncedAt`) · `null` = Blob ត្រូវ Sync ដោយឧបករណ៍ដែលមិនដាក់ត្រា ឬ `source` មិនមែន `blob` ➜ Sync ម្តងទៀតដើម្បីវាស់ |
+| `blobRenewAgeMs` | ពេលតាំងពី Function បន្តអាយុ Cookie ចូល Blob ចុងក្រោយ (metadata `renewedAt`) · `null` = មិនទាន់បន្ត |
+| `storeReason` | មូលហេតុពេលអានចេញពី Blobs មិនបាន (`no-context` · `getstore` · `read:timeout` · `invalid` · `empty` …) |
+| `renewals` | ចំនួនការរក្សាទុក Cookie បន្តពី Argus ដែលបានបញ្ជាក់ជោគជ័យក្នុង instance នេះ |
+| `authRejectedAgeMs` | ZTO ទើបបដិសេធ Cookie នេះនៅប៉ុន្មាន ms មុន (`null` = មិនដែលបដិសេធ ឬការស្កេនក្រោយនោះជោគជ័យ) — ជាមូលដ្ឋានរបស់របៀប `--auto` |
+| `authAcceptedAgeMs` | ពេលតាំងពី ZTO ទទួលយក Cookie នេះ; auth fields ទាំង ២ ជា `null` មានន័យថាមិនទាន់វាស់ |
+| `life` | អាយុ Cookie តាមការ Sync នីមួយៗ (ថ្មីមុន · ៨ ចុងក្រោយ · Blob `cookie-life`) ៖ `syncAgeMs` ពេលតាំងពី Sync · `aliveMs` ZTO ទទួលចុងក្រោយនៅប៉ុន្មានក្រោយ Sync · `rejectedAfterMs` ZTO បដិសេធនៅប៉ុន្មានក្រោយ Sync · `idleMs` ចន្លោះពីការទទួលចុងក្រោយដល់ការបដិសេធ · `ended` = Cookie នោះស្លាប់ · `[]` = មិនទាន់វាស់ · `null` = អាន Blob មិនបាន។ Cookie ពី env ឬ Sync ដោយឧបករណ៍ដែលមិនដាក់ត្រា ➜ មិនវាស់ |
+
+⛔ **ក្រោយរត់ `sync-zto-cookie.cmd` ថ្មី ៖ `source` ត្រូវជា `blob`។** បើវានៅ
+`env` សូមមើល `storeReason` ➜ វាប្រាប់ថាធ្លាក់ត្រង់ណា។
+
+---
+
+## ៤ខ. បើកមុខងារ «របា ZTO មិនទាន់បិទ» (ស្រេចចិត្ត)
+
+របៀប Palm ផ្ទៀងការមកដល់ និងចុះហត្ថលេខាពីប្រវត្តិស្កេនរបស់សាខា ដោយប្រើ session Login។ ការកំណត់ field ក្នុង env ខាងក្រោមសម្រាប់របៀប Cookie។
+
+> **វាធ្វើអ្វី** ៖ កញ្ចប់ដែលអ្នកបិទ «យករួច» ក្នុង ZoeW តែ **ភ្លេចបិទក្នុង
+> Palm** នឹងលេចជារបាលឿងមួយបន្ទាត់ខាងលើតារាងប្រវត្តិ ៖ «*N កញ្ចប់បិទក្នុង
+> ZoeW តែ ZTO មិនទាន់បិទ*»។ ចុចលើវា ➜ ពិនិត្យម្តងទៀត។
+>
+> ⛔ **វាអានតែប៉ុណ្ណោះ** — វា **មិនបិទក្នុង Argus ជំនួសអ្នកទេ**។ ការបិទនៅ
+> តែធ្វើដោយ Palm ដដែល (ស្កេន ➜ ថតរូប ➜ upload)។
+>
+> ⛔ **តាមលំនាំដើមមុខងារនេះ *ដេកលក់*** ៖ បើមិនដាក់ env ២ ខាងក្រោម
+> នោះគ្មានអ្វីប្រែសោះ។ វាដេកលក់ព្រោះ **យើងមិនដឹងជាមុនថា ZTO ដាក់ស្ថានភាព
+> ក្នុង field ណា** — អ្នកត្រូវរកវាម្តង រួចដាក់វា។
+
+### ជំហានទី ១ — រកឈ្មោះ field ក្នុង Argus
+
+១. បើក **Argus** ក្នុង Edge/Chrome រួច **Login**។
+២. ចុច **F12** ➜ ផ្ទាំង **Network** ➜ បើក **Preserve log**។
+៣. ទៅ **Scan Management ➜ Arrival Scan** រួចវាយលេខ Waybill នៃកញ្ចប់ដែល
+   អ្នក **បិទរួចក្នុង Palm ហើយ** ➜ Enter។
+៤. ក្នុងបញ្ជី Network ចុចលើសំណើឈ្មោះ **`detail`**
+   (`.../scan/get/order/detail`) ➜ ផ្ទាំង **Response** ឬ **Preview**។
+៥. រកវាលដែលមានន័យថា «បានចុះហត្ថលេខា / បិទរួច»។ **កត់ទុក ២ យ៉ាង** ៖
+   **ឈ្មោះ field** និង **តម្លៃ** របស់វាសម្រាប់កញ្ចប់ **ដែលបិទរួច**។
+៦. ⛔ **ធ្វើដដែលនឹងកញ្ចប់ដែល *មិនទាន់* បិទ** ➜ តម្លៃត្រូវ **ខុសគ្នា**។
+   បើតម្លៃដូចគ្នាទាំង ២ នោះវាលនោះ **មិនមែន** វាលស្ថានភាពទេ ➜ រកវាលផ្សេង។
+៧. ⛔ **កញ្ចប់ដែលយកមកប្រៀបធៀបត្រូវជា *លំហូរដដែល*** — ពិនិត្យថា `orderType` ·
+   `businessType` និង `productCode` ដូចគ្នា។ លំហូរខុសគ្នាប្រើ **កូដ
+   ស្ថានភាពខុសគ្នា** ➜ ការប្រៀបធៀបឆ្លងលំហូរផ្តល់ចម្លើយខុស។
+
+> ### ⛔⛔ វាលដែល *ទទេពេលមិនទាន់បិទ* ប្រើមិនបានទេ
+>
+> នេះជាអន្ទាក់ធំបំផុតនៃជំហាននេះ។ វាល `sign*` (`signEmp` · `signEmpId` ·
+> `signSite` · `signSiteId`) មើលទៅដូចជាចម្លើយត្រឹមត្រូវ តែពួកវា **បំបែក
+> មុខងារ** ៖ ពេលកញ្ចប់មិនទាន់បិទ ពួកវាជា `""` ឬ `null` ➜ Function ឆ្លើយ
+> **`null` («វាស់មិនបាន»)** ⛔ មិនមែន `false` ➜ **របាមិនដែលលេចទាល់តែសោះ** —
+> ខណៈនោះជាករណី *តែមួយ* ដែលរបាត្រូវលេច។
+>
+> ⛔ **ម៉ោង** ក៏ប្រើមិនបានដែរ (`signEmpDate` · `signSiteDate`) ៖ តម្លៃបែប
+> `2026-09-10 10:16:01` មាន **ដកឃ្លា** ➜ បដិសេធជា `values:invalid` ហើយវា
+> **ប្រែរាល់កញ្ចប់** ➜ ផ្គូផ្គងតាមតម្លៃមិនបាន។
+>
+> **ច្បាប់ ៖ ជ្រើសវាលដែល *មានតម្លៃទាំង ២ ខាង* តែ *តម្លៃខុសគ្នា*។**
+> ជាទូទៅនោះជា **លេខស្ថានភាព** មិនមែនឈ្មោះ ឬម៉ោងទេ។
+
+### ឧទាហរណ៍តម្លៃពិត (Argus កម្ពុជា)
+
+លំហូរ Shopee VN➜KH (`orderType 2` · `businessType 50` · `productCode VNKH001`) ៖
+
+| វាល | មិនទាន់បិទ | បិទរួច | ប្រើបានទេ |
+|---|---|---|---|
+| **`billStatus`** | **`4`** | **`5`** | ⭐ **ប្រើវា** |
+| `orderStatus` | `3` | `99` | ✅ បាន — តែ `99` ជាកូដ «បញ្ចប់» ទូទៅ (អាចរួមការត្រឡប់វិញ) |
+| `signEmp` · `signEmpId` · `signSite` · `signSiteId` | `""` | មានតម្លៃ | ⛔ ទទេម្ខាង |
+| `signEmpDate` · `signSiteDate` | `null` | ម៉ោង | ⛔ ទទេម្ខាង **និង** មានដកឃ្លា |
+| `version` | `15` | `22` | ⛔ លេខកំណែជួរដេក ប្រែរាល់កញ្ចប់ |
+
+⛔ **លេខទាំងនេះជារបស់ *លំហូរនោះ*** — សូមវាស់ឡើងវិញលើគណនីរបស់អ្នកមុនទុកចិត្ត។
+ការវាស់ដដែលលើកញ្ចប់ក្នុងលំហូរផ្សេង (`orderType 4`) ដែល **គ្មានការស្កេនណាមួយ**
+បង្ហាញ `billStatus: 10` ➜ កូដស្ថានភាពមិនស៊ីគ្នាឆ្លងលំហូរ។
+
+> ⛔ **សរសេរឈ្មោះ field *រាបស្មើ* — កុំដាក់ `data.` នាំមុខ។** Function
+> **ស្រាយសំបកចេញរួចហើយ** ៖ វារកទិន្នន័យក្នុង `data` · `result` · `data.data` ·
+> `result.data` · `body` · `rows` ឬ root ដោយស្វ័យប្រវត្តិ រួចទើបអានឈ្មោះ field
+> ខាងក្នុងនោះ។ នេះជាហេតុផលដែលវាលដទៃទាំងអស់ក្នុងគម្រោងនេះរាបស្មើដែរ ៖
+> `consigneePhone` · `billCode` · `agentAmount` — គ្មាន `data.` សោះ។
+> ⛔ ការដាក់ `data.billStatus` អាចដើរដោយចៃដន្យ (root ជា candidate ចុងក្រោយ)
+> តែវា **ធ្លាក់ពេល ZTO ដាក់ទិន្នន័យក្រោម `result` ជំនួស** ➜ កុំប្រើ។
+
+### ជំហានទី ២ — ដាក់ក្នុង Netlify
+
+Netlify ➜ site **zoew** ➜ **Site configuration ➜ Environment variables** ➜
+**Add a variable** ៖
+
+| Key | តម្លៃដែលត្រូវដាក់ | ឧទាហរណ៍ |
+|---|---|---|
+| `ZTO_FIELD_SIGNED` | ឈ្មោះ field ពីជំហានទី ១ | `billStatus` |
+| `ZTO_SIGNED_VALUES` | តម្លៃដែលមានន័យថា «បិទរួច» | `5` |
+
+- ដាក់បាន **ច្រើនផ្លូវ** បំបែកដោយ `,` (ZTO ប្តូរឈ្មោះតាមកំណែ) ៖
+  `billStatus,orderStatus` — Function សាកតាមលំដាប់ រហូតដល់ឃើញតម្លៃ។
+  ⛔ វា **ឈប់ត្រឹមវាលទី ១ ដែលមានតម្លៃ** ➜ បើវាលទី ១ មានតម្លៃជានិច្ច នោះវាល
+  ទី ២ **មិនដែលត្រូវសាកទេ** ➜ ដាក់តែវាលដែលអ្នក **វាស់រួច** ថាប្រែពិត។
+- ដាក់បាន **ច្រើនតម្លៃ** ដែរ ៖ `5,6` (មិនប្រកាន់អក្សរតូចធំ) — មានប្រយោជន៍
+  ពេល ZTO ប្តូរកូដបន្ទាប់ពីរំសាយបញ្ជី។
+- ⛔ **ត្រូវដាក់គូគ្នា** ៖ ដាក់តែមួយ ➜ មុខងារនៅដេកលក់ ហើយ `?diag=1` នឹងប្រាប់
+  មូលហេតុ (`paths:missing` ឬ `values:missing`)។
+- ⛔ **ដាក់រួច ត្រូវ Trigger deploy ម្តង** (env ថ្មីមិនចូលជាធរមានដោយខ្លួនឯងទេ)។
+
+### ជំហានទី ៣ — ផ្ទៀងផ្ទាត់
+
+បើក ៖
+
+```
+https://<site>.netlify.app/.netlify/functions/zto-order-detail?diag=1
+```
+
+មើលក្នុង `fields` ៖
+
+| អ្វីដែលឃើញ | មានន័យថា |
+|---|---|
+| `"signedReason": null` និង `"signed": ["billStatus"]` | ✅ កំណត់ត្រឹមត្រូវ |
+| `"signedReason": "paths:missing"` | ដាក់តែ `ZTO_SIGNED_VALUES` ➜ ខ្វះ `ZTO_FIELD_SIGNED` |
+| `"signedReason": "values:missing"` | ដាក់តែ `ZTO_FIELD_SIGNED` ➜ ខ្វះ `ZTO_SIGNED_VALUES` |
+| `"signedReason": "paths:invalid"` | ផ្លូវ field មានតួអក្សរមិនត្រឹមត្រូវ ឬវែងពេក |
+| `"signedReason": "values:invalid"` | តម្លៃមានតួអក្សរមិនត្រឹមត្រូវ ឬច្រើនជាង ១៦ |
+| `"signed": []` និង `signedReason: null` | មិនទាន់ដាក់ env ➜ មុខងារដេកលក់ (ធម្មតា) |
+
+⛔ **តម្លៃដែលអ្នកដាក់ក្នុង `ZTO_SIGNED_VALUES` មិនបង្ហាញក្នុង `?diag=1` ទេ** —
+វារាយត្រឹម **ចំនួន** (`signedValues`) ដោយចេតនា។
+
+### ជំហានទី ៣ខ — សាកលេខ ២ ដែលដឹងចម្លើយរួច (លឿនជាងគេ)
+
+មុនទៅសាកលើកញ្ចប់ពិត សូមប្រើប៊ូតុង **🧪 សាកល្បង** ក្នុងប្រអប់ **API ស្វែងរក**
+ជាមួយ Waybill **២** ដែលអ្នកដឹងចម្លើយរួច ៖
+
+| Waybill | លទ្ធផលដែលត្រូវឃើញ |
+|---|---|
+| កញ្ចប់ដែល **បិទរួច** ក្នុង Palm | `"ztoClosed":true` |
+| កញ្ចប់ដែល **មិនទាន់បិទ** | `"ztoClosed":false` |
+
+⛔ បើទាំង ២ ឆ្លើយ `null` ➜ ឈ្មោះវាលខុស ➜ ត្រឡប់ទៅជំហានទី ១។
+⛔ បើទាំង ២ ឆ្លើយដូចគ្នា ➜ វាលនោះមិនប្រែតាមការបិទ ➜ រកវាលផ្សេង។
+
+### ជំហានទី ៤ — សាកលើកញ្ចប់ពិត
+
+១. ក្នុង ZoeW បិទ «យក» កញ្ចប់មួយ ដោយ **មិន** បិទវាក្នុង Palm។
+២. ក្នុងប៉ុន្មានវិនាទី របាលឿងត្រូវលេចខាងលើតារាងប្រវត្តិ។
+៣. បិទកញ្ចប់នោះក្នុង Palm ➜ ចុចលើរបា ➜ របាត្រូវបាត់ (ឬរាយចំនួនដែលនៅសល់)។
+
+### អ្វីដែលមុខងារនេះ **មិន** ធ្វើ
+
+- ⛔ **មិនសរសេរអ្វីទៅ ZTO** — គ្មាន API សរសេរ ហើយ Palm ទាមទាររូបភាពថែមទៀត។
+- ⛔ **មិនប៉ះលុយ · មិនប៉ះស្ថិតិយក · មិនប៉ះធុងសំរាម** — សាលក្រមរស់ក្នុង
+  `localStorage` របស់ឧបករណ៍នេះតែប៉ុណ្ណោះ ➜ **គ្មាន Firebase rules ត្រូវកែ**។
+- ⚠️ **តែ env ទាំង ២ នេះ ក៏បម្រើមុខងារបញ្ជី ZTO ដែរ** (ផ្នែក **៤គ**) ៖ វាជា
+  អ្វីដែលសម្រេចថាកញ្ចប់ចាស់ជាង ៨ ថ្ងៃ ត្រូវបញ្ចូលជា «យករួច» ឬត្រូវរំលង។
+- ⛔ **មិនហៅ ZTO ជាប់រហូត** — barcode នីមួយៗសួរ **១ ដង** ហើយសាលក្រមរក្សា ៣ ថ្ងៃ (Barcode ដែល ZTO នៅឆ្លើយ «មិនទាន់បិទ» សួរម្តងទៀតម្តងក្នុងមួយម៉ោង) ·
+  យ៉ាងច្រើន ១០ ក្នុងមួយជុំ · ចន្លោះ ២០ វិនាទី · ហើយវា **ឈប់ទាំងស្រុង**
+  ខណៈអ្នកកំពុងស្កេន · ក្រៅបណ្ដាញ · ឬលើ 2G/Data Saver។ (ការចុចលើរបាដោយ
+  អ្នកប្រើ **ឈ្នះ** ការសន្សំទាំងនោះ។)
+
+### បើចង់បិទមុខងារវិញ
+
+លុប env ទាំង ២ (ឬតែមួយ) ➜ Trigger deploy ➜ របាលែងលេចទៀត។ សាលក្រមចាស់ក្នុង
+ឧបករណ៍រលត់ដោយខ្លួនឯងក្នុង ៣ ថ្ងៃ ហើយ **ការចាកចេញលុបវាភ្លាម**។
+
+## ៤គ. បើកមុខងារ «ទាញបញ្ជីកញ្ចប់ពី ZTO» (ស្រេចចិត្ត · **មើលជាមុន ➜ រួចបញ្ចូល**)
+
+ZoeW អាចទាញ **បញ្ជីកញ្ចប់ដែល ZTO ស្កេន «អីវ៉ាន់មកដល់»** តាមជួរកាលបរិច្ឆេទ
+ដើម្បីឲ្យអ្នកមើលថាមានអ្វីខ្លះ រួច **បញ្ចូលក្រុម «ថ្មី» ចូល ZoeW ដោយចុចម្តង**
+(មើលផ្នែក «➕ បញ្ចូលកញ្ចប់ថ្មីចូល ZoeW» ខាងក្រោម)។
+
+> ⛔ **ការទាញបញ្ជី មិនបញ្ចូលអ្វីដោយស្វ័យប្រវត្តិទេ** — អ្នកមើលមុន រួច
+> សម្រេចដោយខ្លួនឯង។ **គ្មាន Firebase rules ត្រូវ Publish** ព្រោះការបញ្ចូល
+> ឆ្លងកាត់ផ្លូវដដែលនឹងការស្កេនដោយដៃ។
+>
+> ⛔ **តែពេលអ្នកចុច «➕ បញ្ចូលកញ្ចប់ថ្មី» វាប៉ះលុយពិត** ៖ ស្ថិតិប្រាក់
+> ឡើងតាម COD ដូចការស្កេនដោយដៃបេះបិទ។ ដូច្នេះផ្នែកនេះ **មិនមែន
+> «មើលជាមុនតែប៉ុណ្ណោះ»** ទេ។
+
+### ជំហានទី ១ — ចាក់សោការបង្កើតគណនី (⛔ **ធ្វើមុនគេ**)
+
+លេខសាខាមកពី **គណនីដែលចូលប្រព័ន្ធ** ➜ អ្នកណាបង្កើតគណនីបាន អ្នកនោះជ្រើស
+សាខាបាន។ ដូច្នេះការចាក់សោនេះជា **មូលដ្ឋានរបស់ជាន់ទាំងអស់**។
+
+Firebase Console ➜ **Authentication ➜ Settings ➜ User actions** ៖
+
+- ☐ ដកធីក **Enable create (sign-up)**
+- ☐ ដកធីក **Enable delete**
+- ☑️ ទុក **Email enumeration protection** ឲ្យនៅដដែល
+
+រួចចុច **Save**។
+
+✅ Project ដែលបង្កើតដោយ [`tools/firebase-provision/`](../../tools/firebase-provision/README-KH.md) ត្រូវបានចាក់សោរួច
+ហើយ **វាស់** ដោយការសាកចុះឈ្មោះពិត ➜ Project ចាស់ ៖ `node provision.js new --project-id <id> --branch <សាខា> --adopt`។
+
+> ⛔ **ហេតុអ្វីវាចាំបាច់** ៖ `apiKey` ចែកទៅគ្រប់ឧបករណ៍តាម Setup Link/QR ➜
+> បើ sign-up បើកចំហ អ្នកណាក៏បង្កើត `x@zoew<សាខា>.com` ដោយខ្លួនឯងបាន។
+>
+> ✅ **វាមិនធ្វើឲ្យអ្វីខូចទេ** ៖ App មិនដែលបង្កើត ឬលុបគណនីឡើយ (`login`
+> តែម្យ៉ាង) ហើយអ្នកនៅបង្កើតគណនីបានតាម Console ➜ Users ➜ **Add user**។
+
+### ជំហានទី ២ — env ក្នុង Netlify
+
+Site `zoew` ➜ **Site configuration ➜ Environment variables** ៖
+
+| Key | តម្លៃ | ចាំបាច់? |
+| --- | --- | --- |
+| `FIREBASE_PROJECT_IDS` | **Project ID** របស់អ្នក (ឧ. `zoew-v1`) | ⛔ **ចាំបាច់** — គ្មានវា ➜ មុខងារបញ្ជីបិទទាំងស្រុង |
+| `ZTO_LIST_URL` | `https://aargus-api.ztoglobal.com/scan/page/scan` | ស្រេចចិត្ត (លំនាំដើម) |
+| `ZTO_LIST_SCAN_TYPE` | `03` (អីវ៉ាន់មកដល់) | ស្រេចចិត្ត (លំនាំដើម) |
+| `ZTO_LIST_PAGE_SIZE` | `100` | ស្រេចចិត្ត (លំនាំដើម) |
+| `ZTO_LIST_MAX_PAGES` | `3` | ស្រេចចិត្ត — លំនាំដើម ៣ ទំព័រ · អាចកំណត់ពី ១ ដល់ ២០ |
+| `ZTO_LIST_SCAN_DESC` | `អីវ៉ាន់មកដល់\|到件\|arrived` | ស្រេចចិត្ត (លំនាំដើម ៣ ភាសា) — អត្ថបទច្រើនបំបែកដោយ `\|` · ដាក់ `off` ដើម្បីបិទជាន់ការពារនេះ |
+| `ZTO_LIST_SIGNED_SCAN_TYPE` | `05` (ចុះហត្ថលេខា) | ស្រេចចិត្ត (លំនាំដើម) — ដាក់ `off` ដើម្បីបិទការអានបញ្ជី «ចុះហត្ថលេខា» |
+| `ZTO_LIST_SIGNED_SCAN_DESC` | `ចុះហត្ថលេខា\|签收\|Signed` | ស្រេចចិត្ត (លំនាំដើម ៣ ភាសា) — អត្ថបទច្រើនបំបែកដោយ `\|` · ដាក់ `off` ដើម្បីពឹងលើកូដតែម្យ៉ាង |
+| `ZTO_LIST_RETURN_SCAN_TYPE` | `-710` (ត្រឡប់ការស្កេន) | ស្រេចចិត្ត (លំនាំដើម) — ដាក់ `off` ដើម្បីបិទការពិនិត្យកញ្ចប់ត្រឡប់ទៅវិញ |
+| `ZTO_LIST_SEND_SCAN_TYPE` | `02` (ផ្ញើចេញ) | ស្រេចចិត្ត (លំនាំដើម) — ពិនិត្យកញ្ចប់ដែលសាខាស្កេនបញ្ជូនចេញក្រោយមកដល់ ក្នុងរបៀប Cookie (ដកពីបញ្ជីដូចត្រឡប់ · ធុងសំរាម «បញ្ជូនចេញ» · ស្តារបានតែបើមិនមាន Sign ពិត) · ដាក់ `off` ដើម្បីបិទ |
+| `ZTO_LIST_PROBLEM_SCAN_TYPE` | `30` (ការចុះឈ្មោះបញ្ហា) | ស្រេចចិត្ត (លំនាំដើម) — ស្កេនបញ្ហាដែលមូលហេតុ «ទីតាំងមិនត្រឹមត្រូវ» មុនការបញ្ជូនចេញ ➜ ស្លាក «ខុសទីតាំង» · ដាក់ `off` ដើម្បីបិទ (បញ្ជូនចេញទាំងអស់ ➜ «ត្រឡប់») |
+| `ZTO_LIST_MISPLACED_REASONS` | `ទីតាំងមិនត្រឹមត្រូវ\|地址不详\|Incorrect location` | ស្រេចចិត្ត (លំនាំដើម ៣ ភាសា) — មូលហេតុស្កេនបញ្ហាដែលរាប់ជា «ខុសទីតាំង» · បំបែកដោយ `\|` · ដាក់ `off` ដើម្បីបិទ (បញ្ជូនចេញទាំងអស់ ➜ «ត្រឡប់») |
+| `ZTO_SITE_EMAIL_PREFIX` | `zoew` | ស្រេចចិត្ត — ប្តូរតែពេលប្តូរទម្រង់ email |
+
+**Project ID រកនៅឯណា** ៖ Firebase Console ➜ ⚙️ **Project settings** ➜ ជួរ
+**Project ID**។ ⛔ យក **Project ID** មិនមែន Project number និងមិនមែន API key។
+វា **មិនមែន secret** ទេ។
+
+**Project ច្រើន** ➜ បំបែកដោយ comma ៖ `zoew-v1,zoew-branch2` (ដកឃ្លាក៏បាន)។
+
+**ចងគម្រោងនីមួយៗទៅលេខសាខា** (ណែនាំ · ចាំបាច់ពេលប្រើផ្នែក ៤ឃ ជំហានទី ៣) ៖ `Project ID:លេខសាខា` ឧ. `zoew-v1:12345,zoew-branch2:67890` ·
+សាខាច្រើនក្នុងគម្រោងមួយ ➜ `zoew-v1:12345|12346`។ អ្នកប្រើអាចប្តូរ email គណនីខ្លួនឯងបាន ➜ Function ទទួលលេខសាខាពី email តែពេលវាស្ថិតក្នុងសាខាដែលចងសម្រាប់គម្រោងនោះ
+(ក្រៅនោះ ➜ `site:project-branch`)។ ការចងសាខាខុសទម្រង់បដិសេធតែគម្រោងនោះ; គម្រោងត្រឹមត្រូវផ្សេងនៅប្រើបាន។
+គ្មានគម្រោងត្រឹមត្រូវនៅសល់ ➜ `idtoken:project-unset`; token របស់គម្រោងដែលមិនមានក្នុងបញ្ជីអនុញ្ញាត ➜ `idtoken:aud`។
+គម្រោងដែលចងសាខាច្រើន ៖ ជុំ «បិទតាម ZTO» អានបញ្ជី «ចុះហត្ថលេខា» **គ្រប់សាខាដែលចង** (លេខ Barcode តែប៉ុណ្ណោះ) ➜ ការសម្អាត ៨ ថ្ងៃរង់ចាំបញ្ជីគ្រប់សាខា ·
+បញ្ជីកញ្ចប់មកដល់ (ផ្ទាំង «ទាញបញ្ជីពី ZTO») នៅតែសាខារបស់គណនី។
+
+⛔ `ZTO_LIST_SITE_CODE` មិនត្រូវបានអាន ➜ បើវានៅក្នុង Netlify សូមលុបវាចេញ។
+
+បើកែ env ណាមួយ ➜ **Deploys ➜ Trigger deploy ➜ Deploy site**។
+
+### ជំហានទី ៣ — បង្កើតគណនីតាមសាខា
+
+លេខសាខារស់ក្នុង **domain របស់ email** តាមទម្រង់ `…@zoew<លេខសាខា>.com` ៖
+លេខសាខាមានពី **១ ដល់ ៣២ ខ្ទង់**; មិនចាំបាច់មាន ៦ ខ្ទង់ទេ។
+
+| Email | សាខាដែល Function ដេរីវេ |
+| --- | --- |
+| `sok@zoew881859.com` | `881859` (៦ ខ្ទង់) |
+| `chan@zoew88185.com` | `88185` (៥ ខ្ទង់) |
+| `dara@zoew7700.com` | `7700` (៤ ខ្ទង់) |
+| `user@zoew.com` | គ្មាន ➜ **មុខងារបញ្ជីបិទ** (ការស្កេននៅដើរធម្មតា) |
+
+**បង្កើត** ៖ Firebase Console ➜ **Authentication ➜ Users ➜ Add user** ➜
+បំពេញ email តាមទម្រង់ខាងលើ បូកពាក្យសម្ងាត់ ➜ ប្រាប់បុគ្គលិក។ **ចប់** —
+⛔ គ្មានអ្វីត្រូវវាយក្នុងទូរស័ព្ទ និងគ្មានការប៉ះ Netlify ទេ។
+
+ឬ ៖ `node provision.js user --project <id> --branch <សាខា> --user sok` ក្នុង [`tools/firebase-provision/`](../../tools/firebase-provision/README-KH.md)
+➜ បង្កើត `sok@zoew<សាខា>.com` ជាមួយពាក្យសម្ងាត់ចៃដន្យ ហើយសាក Login ពិត។
+
+**លេខសាខារកនៅឯណា** ៖ Argus ➜ **Scan Management ➜ Arrival Scan** ➜ DevTools
+➜ **Network** ➜ ចុច «ស្វែងរក» ➜ សំណើ `scan/page/scan` ➜ **Payload** ➜ វាល
+`scanSiteCode`។
+
+**ប្តូរសាខារបស់បុគ្គលិក** ➜ កែ email ក្នុង Console (មិនមែនក្នុងទូរស័ព្ទ)។
+
+> ⛔ **domain ទាំងនោះមិនមែន domain ពិត** ➜ «ភ្លេចពាក្យសម្ងាត់» **ដើរមិនកើត**
+> ➜ អ្នកគ្រប់គ្រងពាក្យសម្ងាត់ដោយខ្លួនឯង។ ដោយហេតុនេះ ការផ្ទៀងផ្ទាត់
+> **មិនទាមទារ `email_verified`** ទេ — ព្រំដែនពិតគឺ **ការគ្រប់គ្រងការបង្កើត
+> គណនី** (ជំហានទី ១)។
+
+### ហាង Supabase ៖ សាខាមកពីហាង
+
+ហាងដែលចូលប្រើដោយ **កូដអញ្ជើញ** (Supabase · [`../../supabase/README.md`](../../supabase/README.md)) មិនប្រើ email តាមសាខាទេ ៖ លេខសាខាជារបស់ **ហាង**
+ដែលអ្នកលក់កំណត់ពេលបង្កើតហាងក្នុង ZoeKeyGen ➜ Function សួរ Supabase (`my_account`) ដោយ token របស់អ្នកប្រើ ហើយយក `branch_code` របស់ហាងនោះ។
+ជំហានទី ១ និងទី ៣ ខាងលើ **មិនអនុវត្ត** ចំពោះហាងទាំងនេះ។ Site `zoew` ➜ **Environment variables** ៖
+
+| Key | តម្លៃ | ចាំបាច់? |
+| --- | --- | --- |
+| `SUPABASE_URL` | `https://<project>.supabase.co` | ⛔ ចាំបាច់សម្រាប់ហាង Supabase |
+| `SUPABASE_PUBLISHABLE_KEY` | **Publishable key** (`sb_publishable_…`) — ⛔ មិនមែន Secret key | ⛔ ចាំបាច់សម្រាប់ហាង Supabase |
+
+### ព្រំដែនពេលបន្ថែមហាង និងឧបករណ៍
+
+- ក្នុង Function deployment មួយ `FIREBASE_PROJECT_IDS` ទទួលអតិបរមា **១០២៤ គម្រោង** និង **១៦ សាខាក្នុងគម្រោងនីមួយៗ**។
+  នេះជាពិដាន allowlist របស់ proxy; ហាង Supabase យក tenant ពី `my_account()` ហើយមិនប្រើពិដានគម្រោង Firebase នេះទេ។
+- ZTO proxy cache អត្តសញ្ញាណ Supabase តាម token អតិបរមា **៥ នាទី** ឬដល់ token ផុតសុពលភាព។
+  ការដកសិទ្ធិហាង/គណនីអាចរង់ចាំ cache នេះនៅ proxy; database ពិនិត្យសិទ្ធិហាងរាល់ request។
+- ការសាកច្រើនហាង និងព្រំដែននៃភស្តុតាងសមត្ថភាព ➜ [`tools/audit-tools/README.md`](../../tools/audit-tools/README.md)។
+  ចំនួន concurrency/cache ក្នុងកូដមិនមែនការធានាល្បឿន ឬចំនួនហាងដែលប្រើបានលើ server ជាក់ស្តែងទេ។
+
+### ជំហានទី ៤ — បើកមុខងារក្នុង ZoeW
+
+**១. គូស «Fast Mode សម្រាប់ ZTO Lookup»** — ⚙️ របា Slide ➜ **API ស្វែងរក
+អតិថិជន** ➜ គូស ➜ រក្សាទុក។ ⛔ បើមិនគូស កុងតាក់ **📥 ទាញបញ្ជីកញ្ចប់ពី ZTO**
+និង **🔄 បិទតាម ZTO ស្វ័យប្រវត្តិ** **មិនលេចក្នុងរបា Slide សោះ**។
+
+**២. ចុចកុងតាក់ 📥 ទាញបញ្ជីកញ្ចប់ពី ZTO** ➜ បើកភ្លាម។ **លំនាំដើមគឺបិទ**។
+
+ក្រោយបើក ប៊ូតុង **📥 បញ្ជី ZTO** លេចនៅក្បាលផ្ទាំង **📋 ប្រវត្តិ**។ ចុចវា ➜
+ជ្រើសជួរកាលបរិច្ឆេទ ➜ ចុច **📥 ទាញបញ្ជី**។
+
+### មូលហេតុពេលមុខងារបញ្ជីបិទ
+
+⛔ **ការវាយខុសមិនសម្លាប់ការស្កេនទេ** — វាបិទតែមុខងារបញ្ជី ៖
+
+| `reason` | មានន័យ | ដោះស្រាយនៅឯណា |
+| --- | --- | --- |
+| `idtoken:project-unset` | `FIREBASE_PROJECT_IDS` មិនទាន់ដាក់ | Netlify env ➜ ជំហានទី ២ |
+| `idtoken:aud` | token មកពី Project ដែលមិនក្នុងបញ្ជី | Netlify env ➜ ជំហានទី ២ |
+| `idtoken:certs` · `idtoken:expired` · `idtoken:future` · `idtoken:kid-unknown` · `idtoken:missing` | ផ្ទៀងផ្ទាត់មិនបានបណ្តោះអាសន្ន (certs Google · token ផុត · នាឡិកា · App យក token មិនបាន) — App ប្រាប់ «សាកម្ដងទៀត» | សាកម្តងទៀត · នៅតែមិនបាន ➜ ចាកចេញ ហើយចូលប្រព័ន្ធវិញ |
+| `idtoken:signature` · `idtoken:malformed` | token មិនមែនរបស់ Firebase ពិត | ⛔ សញ្ញានៃការក្លែង |
+| `site:no-account` | គណនីនោះគ្មានលេខសាខាក្នុង email | Console ➜ ជំហានទី ៣ |
+| `url:invalid` · `scan-type:invalid` | env របស់បញ្ជីខូច | Netlify env ➜ `?diag=1` |
+| `idtoken:supabase-unset` | ហាង Supabase តែ `SUPABASE_URL`/`SUPABASE_PUBLISHABLE_KEY` មិនទាន់ដាក់ | Netlify env ➜ «ហាង Supabase» ខាងលើ |
+| `idtoken:supabase-unreachable` | Function សួរ Supabase មិនបាន (បណ្តាញ/ផុតពិដាន) | សាកម្តងទៀត · ពិនិត្យ `SUPABASE_URL` |
+| `site:tenant-expired` · `site:tenant-revoked` | ហាងផុតកំណត់ ឬត្រូវបានបិទ | ZoeKeyGen ➜ 🏪 ហាង Supabase ➜ ពន្យារ/បើកវិញ |
+
+> ⛔ **លេខសាខាមកពីអត្តសញ្ញាណ មិនមែនពីឧបករណ៍** ៖ Cookie ZTO ផ្ទុកសិទ្ធិអាន
+> **ទូទាំងប្រទេស** ➜ លេខសាខាដែលធ្វើដំណើរជា parameter ជាព្រំដែនក្លែងក្លាយ
+> (អ្នកកាន់សោ proxy ប្តូរវាបាន ដោយមិនបាច់បើក App ផង)។ Function បោះចោល
+> `?site=` ហើយដេរីវេសាខាពី email ដែល **ហត្ថលេខារបស់ Google បញ្ជាក់**។
+
+### 📋 វាលដែល ZoeW អានពីជួរដេកបញ្ជី ZTO
+
+Function អានវាលទាំងនេះពីជួរដេកនីមួយៗ (`result[]` របស់ `/scan/page/scan`) — ឈ្មោះទីមួយជាឈ្មោះដែល Argus ផ្ញើ · ឈ្មោះបន្ទាប់ជាជម្រើសបម្រុង ៖
+
+| ZoeW ប្រើសម្រាប់ | វាល ZTO | ឧទាហរណ៍ពិត (Argus កម្ពុជា · តម្លៃផ្ទាល់ខ្លួនប្តូរជាក្លែង) |
+| --- | --- | --- |
+| **Barcode** | `scanBillCode` · `billCode` · `waybillNo` · `waybillCode` · `mailNo` · `barcode` | `77130500008803` |
+| **លេខទូរស័ព្ទ** | `consigneePhone` · `consigneeMobile` · `consigneeTel` · `receiverPhone` · `receiverMobile` · `recipientPhone` · `recipientMobile` · `phone` · `mobile` | ក្នុងស្រុក `+855-090000001` · ចិន `081000002` · Shopee `855880000003` ➜ ZoeW រក្សាទុក `090000001` · `081000002` · `0880000003` |
+| **COD** | `agentAmount` (មើល «💵 COD និង DOD មកពីណា») | Shopee `3.16` · ក្នុងស្រុក `185.0` · ចិន `0.0` |
+| **DOD** | `fcAmount` | ចិន (`ztda`) `2.5` · Shopee `0.0` |
+| **ថ្ងៃ និងម៉ោងស្កេន** (ថ្ងៃលុយ · អាយុកញ្ចប់) | `scanTime` · `scanDate` · `createTime` · `operateTime` | `2026-10-04 14:53:29` |
+| **ប្រភេទស្កេន** (កូដ) | `scanTypeCode` · `scanType` | `03` មកដល់ · `04` ការចែកចាយ · `05` ចុះហត្ថលេខា · `30` ការចុះឈ្មោះបញ្ហា · `-710` ស្កេនបង្វិល |
+| **ប្រភេទស្កេន** (អត្ថបទ) | `scanTypeDesc` · `scanTypeName` · `scanDesc` | `អីវ៉ាន់មកដល់` · `ចុះហត្ថលេខា` (ប្រែតាមភាសាគណនី ៖ `到件` · `签收` · `arrived` · `Signed`) |
+| **ឈ្មោះសាខា** | `scanSite` · `scanSiteName` | `Mer SorChrey` |
+| **ប្រភពកញ្ចប់** (ប្រអប់បញ្ជី · ប្រវត្តិ) | `recSite` · `customerCodeDesc` | ចិន `ZTO ឃ្លាំងក្វាងចូវអន្តរជាតិ` · Shopee `Shopee SHPE` · ក្នុងស្រុក ឈ្មោះសាខាដែលផ្ញើ |
+
+⛔ ជួរដេកបញ្ជី **គ្មាន** `billStatus` ➜ «ZTO បិទរួច» ក្នុងបញ្ជីមកពីស្កេន `05` «ចុះហត្ថលេខា» · ជួរដែលហួស ៧ ថ្ងៃ ហើយគ្មានស្កេន `05` ➜ ZoeW សួរ
+`/detail` ម្តងមួយកញ្ចប់ (`billStatus` · ផ្នែក **៤ខ** · យូរបំផុត ២០ កញ្ចប់ក្នុងមួយការទាញ)។
+⛔ barcode តែមួយមានជួរដេកច្រើន (`03` ➜ `04` ➜ `05` · ពេលខ្លះ `30`) ហើយ ZTO តម្រៀបតាមលំដាប់បង្កើត (ពីចាស់ទៅថ្មី) — ជាន់ការពារខាងក្រោមយកតែ `03` ជាកញ្ចប់។
+⛔ ឈ្មោះ · អាសយដ្ឋាន · ឈ្មោះបុគ្គលិក · `signMan` **មិន** ឆ្លងកាត់ Function ទៅ App ទេ។
+⛔ ZTO **គ្មានវាលប្រទេស** (`countryCode` ទទេគ្រប់ជួរដេក) ➜ ZoeW បង្ហាញកន្លែងដែល ZTO ទទួលកញ្ចប់ (`recSite`) ៖ កន្លែង ២ ដែលម្ចាស់គម្រោងកំណត់
+(`ZTO ឃ្លាំងក្វាងចូវអន្តរជាតិ` ➜ 🇨🇳 ចិន · `Shopee SHPE` ➜ 🇻🇳 វៀតណាម) · កន្លែងផ្សេង ➜ 📍 ឈ្មោះដូច ZTO សរសេរ (មិនទាយប្រទេស)។
+ចុច «➕ បញ្ចូល» ➜ ប្រភពរក្សាទុកក្នុងកញ្ចប់ (`origins` ក្នុងប្រវត្តិ · ត្រូវការ Firebase rules ថ្មី ➜ Publish) ហើយបង្ហាញក្នុងតារាងប្រវត្តិ ·
+កញ្ចប់ដែលស្កេនដោយដៃមិនមានប្រភព។
+
+### ⛔ ជាន់ការពារ ៖ យកតែ «អីវ៉ាន់មកដល់»
+
+`scanTypeCode: 03` ជាតម្រងដែល **ZTO** អនុវត្តខាងវា — យើងផ្ទៀងផ្ទាត់វាមិនបានទេ។
+ដូច្នេះ ZoeW ពិនិត្យ **ជួរដេកដែលត្រឡប់មក** ដោយ **២ វាលឯករាជ្យ** ៖
+
+| វាល | ប្រៀបធៀបនឹង | ហេតុអ្វី |
+| --- | --- | --- |
+| `scanTypeCode` | `ZTO_LIST_SCAN_TYPE` (លំនាំដើម **`03`**) | កូដ **ស្ថិរ** — មិនប្រែតាមភាសា |
+| `scanTypeDesc` | `ZTO_LIST_SCAN_DESC` (លំនាំដើម **`អីវ៉ាន់មកដល់`** · **`到件`** · **`arrived`**) | អត្ថបទដែលអ្នកប្រើអាន — ZTO បកប្រែតាមភាសាគណនី Argus |
+
+មួយណាមិនត្រូវគ្នា ➜ ជួរដេកនោះ **មិនចូលបញ្ជីទេ** ➜ ប្រអប់ប្រាប់ចំនួន «⏭️ ស្កេនប្រភេទផ្សេង N ជួរ មិនរាប់»។
+
+⛔ **ហេតុអ្វីវាចាំបាច់** ៖ barcode តែមួយលេចក្នុងបញ្ជី **ច្រើនដង** តាមវដ្តជីវិត
+របស់វា — `03` អីវ៉ាន់មកដល់ · `04` ការចែកចាយអីវ៉ាន់ · `05` ចុះហត្ថលេខា។
+បើគ្មានជាន់នេះ **កញ្ចប់ ១ ក្លាយជា ៣ ជួរដេក** ➜ លុយ ៣ ដង។
+
+⛔ **ជួរដេកដែលគ្មានវាលនោះសោះ ឬវាទទេ ត្រូវ *មិន* រំលង** — ច្បាប់ «មិនអាច
+ផ្ទៀងផ្ទាត់ ≠ ខុស» ៖ បើ ZTO ប្តូរឈ្មោះវាល ការរំលងទាំងអស់នឹងក្លាយជា
+**បញ្ជីទទេកុហក**។ បើថ្ងៃណាតម្លៃប្រែ ➜ ដាក់តម្លៃថ្មីក្នុង env ទាំងនោះ
+(ឬដាក់ `ZTO_LIST_SCAN_DESC` = `off` ដើម្បីបិទជាន់អត្ថបទ) — ⛔ **កុំសង្ស័យកូដជាមុន**។
+
+🌐 **ភាសា** ៖ ZTO បកប្រែ `scanTypeDesc` តាមភាសាដែលគណនី Argus ជ្រើស (Cookie តែមួយ ➜ Function ទទួលភាសាដូច browser ចុងក្រោយ) ៖
+
+| កូដ | ខ្មែរ | ចិន | អង់គ្លេស |
+| --- | --- | --- | --- |
+| `03` | អីវ៉ាន់មកដល់ | 到件 | arrived |
+| `05` | ចុះហត្ថលេខា | 签收 | Signed |
+
+លំនាំដើមទទួលទាំង ៣ ភាសារួចហើយ ➜ ប្តូរភាសា Argus មិនបាច់កែ env។ ដាក់ env ផ្ទាល់ខ្លួន ➜ ជំនួសលំនាំដើមទាំងមូល
+(ឧ. `អីវ៉ាន់មកដល់|到件|arrived|ភាសាថ្មី`) ⛔ Netlify មិនទទួលតម្លៃទទេ ➜ ប្រើ `off`។ ជួរកូដផ្សេង (ឧ. `-710` «Return scan») រំលងតាមកូដ មិនថាភាសាណា។
+
+👻 **តួអក្សរមើលមិនឃើញ** ៖ ZTO ដាក់ ZERO WIDTH SPACE (U+200B) ចន្លោះពាក្យខ្មែរ (ឧ. «ចុះ» + U+200B + «ហត្ថលេខា») ➜ ការប្រៀបធៀបរំលងតួអក្សរទម្រង់មើលមិនឃើញ
+(Unicode `Cf` ៖ U+200B · U+200C · U+200D · U+2060 · U+FEFF · U+00AD …) ទាំងក្នុងជួរដេក និងក្នុង env ➜ វាយ env ធម្មតាបាន។ អក្សរមើលឃើញខុស (អក្សរបាត់ · ដកឃ្លា) នៅតែផ្ទុយ។
+
+### 🔒 បញ្ជី «ចុះហត្ថលេខា» (ZTO Palm) ៖ កញ្ចប់ដែល ZTO បិទរួច
+
+ពេលទាញបញ្ជី Function សួរ ZTO **២ ព្រមគ្នា** ក្នុងការហៅតែមួយ ៖ ស្កេន `03` (មកដល់) និងស្កេន `05` (ចុះហត្ថលេខា —
+ស្កេនលើ ZTO Palm ពេលអតិថិជនយក) របស់សាខាដដែល ពីថ្ងៃចាប់ផ្តើមដល់ **ថ្ងៃនេះ** ➜ barcode ដែលមានស្កេន «ចុះហត្ថលេខា» = **ZTO បិទរួច**។
+
+| កញ្ចប់ | ZoeW ធ្វើអ្វី |
+| --- | --- |
+| 🆕 ថ្មី + ZTO ចុះហត្ថលេខារួច | ស្លាក 🔒 ➜ បញ្ចូលជា **«យករួច»** ➜ ចូលស្ថិតិ «យករួច» **ដូចចុចបិទដោយដៃ** · COD ចូលស្ថិតិលើថ្ងៃ ZTO ស្កេន · ចូលធុងសំរាម «យករួច»៖ Cookie ២ ម៉ោងក្រោយបិទលើ ZoeW; ZTO Login ក្រោយ Sign ពិត ២ ម៉ោង ➜ **លុយមិនដក** |
+| 🆕 ថ្មី + គ្មានស្កេនចុះហត្ថលេខា | បញ្ចូលជា «មិនទាន់យក» (ការស្កេនធម្មតា) |
+| ✅ មានក្នុង ZoeW ហើយនៅបើក + ZTO ចុះហត្ថលេខារួច | ស្លាក 🔒 ➜ ចុច «➕ បញ្ចូល» ➜ បិទ «យក» ក្នុង ZoeW (ពេលកុងតាក់ **🔄 បិទតាម ZTO ស្វ័យប្រវត្តិ** បើក) |
+| ✍️ ZTO ចុះហត្ថលេខាក្នុងចន្លោះ តែគ្មានស្កេនមកដល់ក្នុងចន្លោះ (មកដល់មុនថ្ងៃចាប់ផ្តើម) | បញ្ចូលជា **«យករួច»** ➜ ថ្ងៃ និងម៉ោង = ពេល ZTO ស្កេនចុះហត្ថលេខា (លុយ និងស្ថិតិចុះលើថ្ងៃនោះ) · មានក្នុង ZoeW រួច ➜ មិនបញ្ចូលស្ទួន (នៅបើក ➜ បិទ) · គ្មានលេខទូរស័ព្ទ ឬចាស់ជាងអាយុធុងសំរាម ➜ រំលង |
+
+ជួរនីមួយៗក្នុងប្រអប់បង្ហាញ **«📥 មកដល់ ៖ …»** (ម៉ោងស្កេនមកដល់ · ឬ «មុនថ្ងៃ …» សម្រាប់កញ្ចប់ដែលមកដល់មុនចន្លោះ) និង **«✍️ ZTO ចុះហត្ថលេខា (បិទ) ៖ …»**។
+
+⛔ **ភស្តុតាងត្រូវច្បាស់** ៖ `scanTypeCode` = `ZTO_LIST_SIGNED_SCAN_TYPE` ហើយ `scanTypeDesc` (បើមាន) ស្ថិតក្នុង `ZTO_LIST_SIGNED_SCAN_DESC` ➜
+កូដត្រូវ តែអត្ថបទផ្ទុយ · ឬគ្មានវាលទាំង ២ ➜ **មិនបិទ** («មិនអាចផ្ទៀងផ្ទាត់ ≠ បិទរួច»)។ ការអានបញ្ជីនេះមិនបាន ➜ បញ្ជីមកដល់នៅបង្ហាញធម្មតា ហើយប្រអប់ប្រាប់
+«⚠️ ទាញបញ្ជីចុះហត្ថលេខា ZTO មិនបាន» ➜ កញ្ចប់ថ្មីចូលជា «មិនទាន់យក» ហើយ «បិទតាម ZTO ស្វ័យប្រវត្តិ» ពិនិត្យបន្ត។
+
+ជួរដែលមានកូដ `ZTO_LIST_SIGNED_SCAN_TYPE` តែ `scanTypeDesc` មិនស្ថិតក្នុង `ZTO_LIST_SIGNED_SCAN_DESC` (ឧ. ភាសាថ្មីដែលលំនាំដើមមិនទាន់មាន) ➜ មិនមែនភស្តុតាង
+តែ **មិនបាត់ស្ងាត់** ៖ ប្រអប់បញ្ជីប្រាប់ «⚠️ ZTO ផ្ញើជួរ «ចុះហត្ថលេខា» N ជួរ ដែលអត្ថបទប្រភេទស្កេនខុសពីការកំណត់ Server — Function ទទួលពី ZTO «…» (U+…)
+≠ Server រំពឹង «…» (U+…)» (អត្ថបទដែល Function ទទួលពិត ≤ ៥ ប្រភេទ ជាមួយកូដតួអក្សរ ➜ តួអក្សរមើលមិនឃើញ ដូចជា U+200B ក៏ឃើញ) · **🩺 ពិនិត្យសុខភាពប្រព័ន្ធ**
+បង្ហាញ ⚠️ ដដែលលើជួរ ZTO · `?diag=1` ➜ `list.signedMismatch` (`observed` · `count` · `ageMs` · `texts` ៥ ចុងក្រោយ · `expected`)។ ⛔ មិនដែលមាន barcode ឬអត្ថបទជួរផ្សេង។
+វិធីដោះស្រាយ ៖ ប្រៀបអត្ថបទ/កូដតួអក្សរដែល Function ទទួល ជាមួយ `scanTypeDesc` នៃស្កេន «ចុះហត្ថលេខា» លើ Argus ក្នុង browser ➜ បើដូចគ្នា ៖ ដាក់អត្ថបទនោះក្នុង
+`ZTO_LIST_SIGNED_SCAN_DESC` ជាមួយអត្ថបទលំនាំដើម (ឧ. `ចុះហត្ថលេខា|签收|Signed|អត្ថបទថ្មី` · ឬ `off` ដើម្បីពឹងលើកូដតែម្យ៉ាង) ➜ Deploy ឡើងវិញ · បើខុសពី browser ៖ សំណើរបស់ Function ខុសពី browser (ភាសា/header) ➜ ពិនិត្យ
+`ZTO_ACCEPT_LANGUAGE` · `ZTO_REQUEST_HEADERS_JSON` តាម Request Headers របស់ Argus។ ពេលនៅមានជួរផ្ទុយ
+ការសម្អាត ៧ ថ្ងៃរង់ចាំ (យូរបំផុត ៣០ នាទី) ព្រោះភស្តុតាងមិនច្បាស់។
+
+**🔄 បិទតាម ZTO ស្វ័យប្រវត្តិ** អានបញ្ជី «ចុះហត្ថលេខា» ដដែល ពេលមានកញ្ចប់បើកក្នុង ZoeW ៖ រៀងរាល់ **២០ វិ.** ពេលកំពុងប្រើ (ប៉ះអេក្រង់ ឬស្កេនក្នុង ៥ នាទីចុងក្រោយ ·
+ទោះប្រអប់ស្កេនបើក) · **១ នាទី** ពេលបើកទុកចោល · **២ នាទី** ពេល App នៅខាងក្រោយ ➜ ស្កេនចុះហត្ថលេខាលើ ZTO Palm ➜ កញ្ចប់ដែលនៅបើក
+ក្នុង ZoeW ត្រូវបិទ «យក» ដោយខ្លួនឯង (មួយជុំ ១០ កញ្ចប់)។ ក្រៅបណ្តាញ · Data Saver · កំពុងរក (Lookup) ➜ រង់ចាំ · ZTO មិនឆ្លើយ ➜ ចន្លោះពេលកើនទ្វេ យូរបំផុត ១០ នាទី ·
+Server ទុកចម្លើយបញ្ជីនេះយូរបំផុត ១៥ វិ. (ឧបករណ៍ច្រើនក្នុងសាខាតែមួយចែកគ្នាបាន)។ បញ្ជីវែងលើស `ZTO_LIST_MAX_PAGES` (លំនាំដើម ៣ ទំព័រ) ➜ ZoeW អានវាម្តងទៀតតាមថ្ងៃ · ថ្ងៃមួយនៅតែលើស ➜ toast
+«⚠️ បញ្ជី «ចុះហត្ថលេខា» ZTO វែងពេក …» ហើយកញ្ចប់ខ្លះត្រូវពិនិត្យម្តងមួយ។ ពេលកុងតាក់នេះបើក កញ្ចប់ដែលហួស ៧ ថ្ងៃ **មិនទាន់ចូល «ត្រឡប់»** (មិនដកលុយ)
+រហូតដល់ ZoeW អានបញ្ជីនេះបានពេញលេញ ➜ កញ្ចប់ក្នុងបញ្ជីបិទ «យក» · ZTO មិនឆ្លើយ ➜ រង់ចាំយូរបំផុត ៣០ នាទី។ ឧបករណ៍ផ្សេងក្នុងហាងដដែលដែលមិនបើក ZTO
+ក៏រង់ចាំដូចគ្នា (ឧបករណ៍ ZTO ទុកសញ្ញាក្នុង database `zoew_settings/zto_signed_sweep` · គ្មានឧបករណ៍ ZTO អានក្នុង ១ ម៉ោងចុងក្រោយ ➜ មិនរង់ចាំ)។ វាប្រើ env ដដែលនឹងមុខងារបញ្ជី (`FIREBASE_PROJECT_IDS` ឬ `SUPABASE_URL` + `SUPABASE_PUBLISHABLE_KEY`)
+➜ server ដែលមិនទាន់កំណត់ ➜ ZoeW សួរ ZTO ម្តងមួយកញ្ចប់ (ផ្នែក **៤ខ**)។
+
+### អ្វីដែលប្រអប់បង្ហាញ
+
+ក្បាលប្រអប់បង្ហាញ **🏢 ឈ្មោះសាខា** (វាល `scanSite` របស់ ZTO) និងលេខសាខា។ បញ្ជីត្រូវបែងចែកជា **៥ ក្រុម** ៖
+
+| ក្រុម | មានន័យ |
+| --- | --- |
+| 🆕 **ថ្មី** | ZTO មាន តែ ZoeW មិនទាន់មាន |
+| ✅ **មានក្នុង ZoeW រួច** | Barcode នេះស្កេនចូលរួចហើយ (ប្រវត្តិ ឬធុងសំរាម) |
+| ↩️ **មានក្នុងបញ្ជី តែស្កេនត្រឡប់រួច** | សាខាស្កេន «ត្រឡប់ការស្កេន» (`-710`) ក្រោយកញ្ចប់មកដល់ ➜ រំលង មិនបញ្ចូល · នៅបើកក្នុង ZoeW ➜ 🗑️ ធុងសំរាម «ត្រឡប់» ភ្លាម (ដកលុយ និងចំនួនកញ្ចប់ · ពេល «បិទតាម ZTO ស្វ័យប្រវត្តិ» បើក · បិទ ➜ 📌) · ZTO ចុះហត្ថលេខារួច ➜ មិនចូលក្រុមនេះ (បញ្ចូលជា «យករួច» · ចូលចំណូល) |
+| ♻️ **ស្ទួនក្នុងបញ្ជី ZTO** | ZTO ស្កេន «មកដល់» លើលេខដដែលច្រើនដង ➜ រាប់តែម្តង |
+| ⏭️ **រំលង** | គ្មានលេខទូរស័ព្ទអតិថិជន (កញ្ចប់ឆ្លងកាត់ ឬកញ្ចប់ផ្ទាល់ខ្លួន) |
+
+⛔ **ពេលទិន្នន័យ ZoeW មិនទាន់មកដល់គ្រប់** ប្រអប់សរសេរ «ទិន្នន័យមិនទាន់មកដល់
+គ្រប់ ➜ វាស់មិនបាន» នៅលើក្រុម «ថ្មី» និង «មានក្នុង ZoeW រួច» — ព្រោះ ២ ក្រុម
+នោះដេរីវេពីប្រវត្តិ និងធុងសំរាម។ កុំជឿលេខទាំងនោះខណៈសញ្ញានេះលេច។
+
+### ➕ បញ្ចូលកញ្ចប់ថ្មីចូល ZoeW
+
+ក្រោយពិនិត្យបញ្ជីរួច ចុច **➕ បញ្ចូលកញ្ចប់ថ្មី** ➜ ប្រអប់បញ្ជាក់សួរចំនួន ➜ យល់ព្រម។
+
+⛔ **វាដើរដូចការស្កេនដោយដៃបេះបិទ** ៖ កញ្ចប់នីមួយៗឆ្លងកាត់ការចាក់សោ barcode
+នៅ server (ការពារការបញ្ចូលស្ទួនពីឧបករណ៍ ២) រួចរក្សាទុកតាមផ្លូវដដែលនឹងការ
+ស្កេន ➜ **ស្ថិតិប្រាក់ឡើងតាម COD ដូចការស្កេន**។
+
+| ច្បាប់ | អ្វីកើតឡើង |
+|---|---|
+| បញ្ចូលតែក្រុម **🆕 ថ្មី** | «មានក្នុង ZoeW រួច» · «ស្កេនត្រឡប់រួច» · «ស្ទួន» · «រំលង» ត្រូវទុកចោល |
+| **DOD មកពី `fcAmount`** | កញ្ចប់ `ztda` បាន DOD ពិត · Shopee បាន 0 — **ដូចគ្នានឹងការស្កេនបេះបិទ** (មើលតារាងខាងក្រោម) |
+| **កាលបរិច្ឆេទ និងម៉ោង = ថ្ងៃស្កេនរបស់ ZTO ទាំងស្រុង** | កញ្ចប់ចុះក្នុងប្រវត្តិនៅថ្ងៃដែល ZTO ស្កេន ហើយ **ស្ថិតិប្រាក់ក៏ចុះលើថ្ងៃនោះដែរ** ➜ របាយការណ៍ថ្ងៃ និងខែត្រូវនឹង Argus។ អតិថិជនម្នាក់ដែលមានកញ្ចប់ ២ ថ្ងៃ ZTO ផ្សេងគ្នា ➜ **ជួរដេក ២** |
+| **ថ្ងៃចាប់ផ្តើមរាប់ ៨ ថ្ងៃ ក៏ជាថ្ងៃស្កេន ZTO ដែរ** | កញ្ចប់ចាស់ត្រូវសម្រេចតាមស្ថានភាព ZTO និងព្រំដែនរក្សាទុក ដូចផ្នែក «កញ្ចប់ចាស់ជាង ៨ ថ្ងៃ» ខាងក្រោម; មិនប្រើម៉ោងបញ្ចូលដើម្បីចាប់ផ្តើមរាប់ថ្មីទេ |
+| **កញ្ចប់គ្មានម៉ោងស្កេនពី ZTO** | ប្រើម៉ោងបញ្ចូលជំនួស ➜ ប្រអប់បញ្ជាក់ប្រាប់ចំនួននោះ **មុន**អ្នកចុចយល់ព្រម |
+| ⛔ **តារាងមើលទៅទទេក្រោយបញ្ចូល ≠ កំហុស** | តារាងត្រងតាម **ថ្ងៃនេះ** ចំណែកកញ្ចប់ចុះលើថ្ងៃ ZTO ➜ សារបញ្ចប់រាយថ្ងៃទាំងនោះ ➜ **ប្ដូរតម្រងថ្ងៃ**។ ⛔ កុំចុច «➕ បញ្ចូល» ម្ដងទៀត |
+| **Locker ជា `N/A`** | កំណត់ទីតាំងក្រោយតាមរបៀបធម្មតា |
+| ពិដាន **១០០ កញ្ចប់** ក្នុងមួយដង | បញ្ជីវែងជាងនេះ ➜ បំបែកជួរកាលបរិច្ឆេទ |
+| ⛔ **ទិន្នន័យមិនទាន់មកដល់គ្រប់ ➜ បដិសេធទាំងស្រុង** | បើមិនដូច្នេះ កញ្ចប់ដែលមានរួច នឹងរាយជា «ថ្មី» ➜ **បញ្ចូលស្ទួន ➜ លុយស្ទួន** |
+| ⛔ **ក្រៅបណ្ដាញ ➜ បដិសេធ** | ការចាក់សោ barcode ត្រូវការ server |
+
+ចុងជុំ សារប្រាប់លទ្ធផលពិត ៖ «✅ បញ្ចូល N កញ្ចប់ · ♻️ ស្ទួន M · ⏳ កំពុងរក្សាទុក P · ⚠️ បរាជ័យ K»។
+
+### 💵 COD និង DOD មកពីណា
+
+| ZoeW | វាល ZTO | ឧទាហរណ៍ |
+| --- | --- | --- |
+| **COD** | `agentAmount` | Shopee ៖ `8.49` · `ztda` ៖ `0.0` |
+| **DOD** | `fcAmount` | Shopee ៖ `0.0` · `ztda` ៖ `2.5` |
+
+កញ្ចប់ **Shopee** ៖ អតិថិជនបង់តម្លៃទំនិញ (COD) ហើយថ្លៃដឹកបង់រួច ➜ DOD 0។
+កញ្ចប់ **`ztda`** (អតិថិជនទទួល) ៖ គ្មានប្រាក់ប្រមូលជំនួស (COD 0) ប៉ុន្តែ
+អតិថិជនបង់ **ថ្លៃដឹកពេលទទួល** ➜ នោះជា DOD។
+
+វាលទាំង ២ នេះអានដូចគ្នា **លើផ្លូវទាំង ២** ៖ ការទាញបញ្ជី និងការស្កេន
+មួយកញ្ចប់ម្តងៗ។ ⛔ មិនត្រូវយក **`freightFee`** ជំនួស `fcAmount` ទេ — វាជា
+ថ្លៃដឹក **សរុប** ➜ កញ្ចប់បង់មុនមានវាមិនមែន 0 ខណៈ `fcAmount` ជា 0 ➜ ការយកវា
+= គិតលុយអតិថិជនលើថ្លៃដឹកដែលអ្នកផ្ញើបង់រួច។
+
+⛔ បើថ្ងៃណា ZTO ប្តូរឈ្មោះវាល ➜ ដាក់ **`ZTO_FIELD_DOD`** = ឈ្មោះថ្មី ➜
+Trigger deploy។ ការកំណត់នោះឈ្នះជានិច្ច **គ្មានការកែកូដ**។
+
+### កញ្ចប់ចាស់ជាង ៨ ថ្ងៃ ៖ សម្រេចតាម **ស្ថានភាពនៅ ZTO**
+
+ZoeW លុបកញ្ចប់ដែលអតិថិជនមិនមកយកក្នុង **៨ ថ្ងៃ** ហើយ **ដកលុយវិញ**។ ដូច្នេះ
+ជួរដេកចាស់ជាងនោះមិនអាចបញ្ចូលដោយងងឹតងងុលបានទេ — វាសម្រេចតាមចម្លើយរបស់ ZTO ៖
+
+| ស្ថានភាពនៅ ZTO | ZoeW ធ្វើអ្វី |
+|---|---|
+| **បិទបញ្ជីរួច** (អតិថិជនយករួច) | បញ្ចូលជា **«យករួច»** ➜ COD ចូលស្ថិតិលើថ្ងៃ ZTO ➜ ចូលធុងសំរាមក្រោម «យករួច»៖ Cookie ២ ម៉ោងក្រោយបិទលើ ZoeW; ZTO Login ក្រោយ Sign ពិត ២ ម៉ោង ➜ **លុយមិនត្រូវដក** |
+| **មិនទាន់បិទបញ្ជី** | **រំលង** — បើបញ្ចូល វានឹងចូលធុងសំរាមជា «ត្រឡប់» ភ្លាម ហើយដកលុយវិញ |
+| **ពិនិត្យមិនបាន** | **រំលង** — «មិនអាចផ្ទៀងផ្ទាត់» មិនស្មើ «បិទរួច» |
+| **ចាស់ជាង ៣០ ថ្ងៃ** | **រំលងជានិច្ច** ទោះបិទរួច — ធុងសំរាមលុបកំណត់ត្រាចាស់រួច ➜ ពិនិត្យស្ទួនមិនបាន ➜ ការបញ្ចូលប្រថុយ **លុយបូកស្ទួន** |
+
+⛔ **វាត្រូវការ `ZTO_FIELD_SIGNED` និង `ZTO_SIGNED_VALUES`** (ផ្នែក **៤ខ**)។
+បើ env ទាំង ២ នោះមិនទាន់ដាក់ ➜ រាល់ជួរដេកចាស់ធ្លាក់ជា «ពិនិត្យមិនបាន» ➜
+**រំលងទាំងអស់**។ ជួរដេកចាស់ដែលមានក្នុងបញ្ជី «ចុះហត្ថលេខា» មិនបាច់សួរទៀត ➜ ជួរដេកចាស់ផ្សេងទៀត
+សួរ ZTO **៤ កញ្ចប់ព្រមគ្នា** (យ៉ាងច្រើន ២០ ក្នុងមួយដង) ➜ អ្នកឃើញ «⏳ កំពុងពិនិត្យស្ថានភាព ZTO» មួយភ្លែត — **យឺតបន្តិច គឺធម្មតា**។
+
+### ព្រំដែនដែលត្រូវដឹង
+- ⛔ **របៀប Cookie ទាញតាម `ZTO_LIST_MAX_PAGES`** — លំនាំដើម ៣ ទំព័រ (~៣០០ ជួរដេក) · អាចកំណត់ពី ១ ដល់ ២០។
+  ក្រោយទំព័រទី ១ ទំព័រដែលនៅសល់ទាញព្រមគ្នាតាមពិដាននេះ។ បញ្ជីវែងជាងពិដានបង្ហាញថាមិនគ្រប់; ត្រូវបំបែកជួរកាលបរិច្ឆេទឲ្យតូច។
+- ⛔ ជួរកាលបរិច្ឆេទយ៉ាងច្រើន **៣១ ថ្ងៃ**។
+- ⛔ **ឈ្មោះ និងអាសយដ្ឋានមិនចេញមក browser ទេ** — Function បញ្ចាំងជួរដេកឲ្យ
+  នៅសល់តែ `barcode · phone · cod · dod · at` បូកសាលក្រម «បិទរួច/មិនទាន់បិទ»
+  (⛔ **តម្លៃឆៅរបស់ field មិនចេញមកទេ**) · បញ្ជី «ចុះហត្ថលេខា» ចេញតែ barcode · ឈ្មោះសាខាចេញពី `scanSite`។
+
+### បើចង់បិទមុខងារវិញ
+
+បិទកុងតាក់ក្នុងរបា Slide ➜ ប៊ូតុងលែងលេចទៀត (គ្មានអ្វីត្រូវវាយឡើងវិញពេល
+បើកវិញទេ — សាខាមកពីគណនី)។ ដកគ្រីស **Fast Mode** ➜ កុងតាក់ខ្លួនវាក៏
+លាក់ដែរ ហើយ **មុខងារឈប់ទាំងស្រុង**។
+
+## ៤ឃ. ការពារ `/detail` ៖ សោតាមហាង · ចងគណនី · កំណត់សាខា (ណែនាំពេលមានហាងច្រើន)
+
+`/detail` (ការស្វែងរកតាម barcode) ឆ្លើយលេខទូរស័ព្ទ និង COD របស់អតិថិជន។ ពេលហាងច្រើនប្រើ site `zoew` តែមួយ ៖ សោតែមួយដែលលេចពីទូរស័ព្ទមួយ
+បើកការអានកញ្ចប់ ZTO គ្រប់សាខា។ ជំហានទាំង ៣ ខាងក្រោមបិទផ្លូវនោះម្តងមួយជាន់ — ធ្វើតាមលំដាប់ ហើយ **Trigger deploy** ក្រោយការកែ env នីមួយៗ។
+
+### ជំហានទី ១ — សោមួយក្នុងមួយហាង (`ZTO_PROXY_KEYS`)
+
+| Key | តម្លៃ | Secret |
+| --- | --- | --- |
+| `ZTO_PROXY_KEYS` | `ឈ្មោះ=សោ` ក្នុងមួយហាង បំបែកដោយ comma ឬបន្ទាត់ថ្មី (ឧ. `shop-pp1=…,shop-sr2=…`) | ✅ |
+
+- ឈ្មោះ ៖ អក្សរតូច `a-z` · លេខ · `-` (យ៉ាងច្រើន ៣២) មិនស្ទួន · សោ ៖ យ៉ាងតិច ១៦ តួ មិនស្ទួន — បង្កើតដោយពាក្យបញ្ជា PowerShell ក្នុងផ្នែក ១ ម្តងក្នុងមួយហាង។
+- `ZTO_PROXY_KEY` ចាស់នៅដំណើរការជាមួយ (ឈ្មោះ `default`) ➜ ប្តូរម្តងមួយហាង ៖ ទូរស័ព្ទនីមួយៗ ➜ ⚙️ API ស្វែងរកអតិថិជន ➜ តម្លៃ Header = សោហាងនោះ ➜
+  🩺 ពិនិត្យសុខភាពប្រព័ន្ធ ➜ ជួរ Lookup បង្ហាញ «សោហាង ឈ្មោះ»។ ពេលគ្មានទូរស័ព្ទណាបង្ហាញ `default` ទៀត ➜ លុប `ZTO_PROXY_KEY` ➜ Trigger deploy។
+- សោហាងមួយលេច ➜ លុបតែធាតុនោះ ➜ Trigger deploy ➜ ឲ្យសោថ្មីដល់ហាងនោះ (ហាងផ្សេងមិនប៉ះ)។
+- `?diag=1` ➜ `access.keyLabel` (ឈ្មោះសោដែលសំណើនេះប្រើ) · `keys` (ចំនួនសោត្រឹមត្រូវ) · `invalidKeys` (> ០ = ធាតុខុស ៖ គ្មានឈ្មោះ · ឈ្មោះខុស · សោខ្លី · ស្ទួន
+  ➜ ធាតុនោះមិនផ្តល់សិទ្ធិ)។ គ្មានសោត្រឹមត្រូវណាមួយ ➜ `ZTO_PROXY_NOT_CONFIGURED`។
+- ឧបករណ៍ Cookie Sync (`--check` · `--auto`) ប្រើសោណាមួយក្នុងបញ្ជីបាន (ផ្នែកក្រោយ `=`) ៖ ⛔ **មុនលុប `ZTO_PROXY_KEY`** រត់ `setup.cmd` / `setup-termux.sh`
+  ម្តងទៀតលើគ្រប់ម៉ាស៊ីន Sync (Enter = រក្សាតម្លៃផ្សេង) ជាមួយសោមួយក្នុង `ZTO_PROXY_KEYS` (ឧ. ឈ្មោះ `sync`) ➜ `sync-zto-cookie.cmd --check` ឆ្លើយ OK។
+  🩺 មើលមិនឃើញម៉ាស៊ីន Sync ទេ ➜ បើភ្លេច `--auto` ឈប់បន្តអាយុ Cookie ហើយប្រាប់ «the Function refused the proxy key»។
+
+### ជំហានទី ២ — ចងគណនី (`ZTO_DETAIL_IDENTITY`)
+
+ZoeW ផ្ញើ ID token របស់គណនីដែលកំពុងចូល (header `X-Zoe-Id-Token`) ទៅ Function ZTO តែប៉ុណ្ណោះ (មិនដែលទៅ API ស្វែងរកផ្សេង)។ Function ផ្ទៀងវាដូចបញ្ជី ZTO ៖
+ត្រូវការ `FIREBASE_PROJECT_IDS` (ហាង Firebase · ផ្នែក ៤គ ជំហានទី ២) និង/ឬ `SUPABASE_URL` + `SUPABASE_PUBLISHABLE_KEY` (ហាង Supabase)។
+
+| តម្លៃ | ឥរិយាបថ |
+| --- | --- |
+| `off` (លំនាំដើម · មិនកំណត់) | មិនពិនិត្យគណនី |
+| `optional` | ពិនិត្យពេលមាន token · មិនបដិសេធ · រាប់ក្នុង `?diag=1` |
+| `require` | គ្មាន/មិនត្រឹមត្រូវ ➜ 401 `ZTO_IDENTITY_REQUIRED` · ផ្ទៀងមិនបាន (Google/Supabase មិនឆ្លើយ) ➜ 503 `ZTO_IDENTITY_UNAVAILABLE` (App សាកម្តងទៀត) · Function កំណត់ខុស (`idtoken:project-unset` · `idtoken:supabase-unset`) ➜ 503 `ZTO_CONFIG_INVALID` |
+
+គណនី Supabase ដែលគ្មានហាង (`site:no-account`) ➜ បដិសេធដូច token មិនត្រឹមត្រូវ។ App ៖ token យកមិនទាន់ទាន់ពេល (refresh យឺត) · token ផុត · កូនសោ Google ថ្មី ➜
+«⚠️ ផ្ទៀងផ្ទាត់គណនីជាមួយ Server មិនបាន — សូមស្កេនម្ដងទៀត» · token ក្លែង/គណនីមិនត្រឹមត្រូវ ➜ «🔒 … សូមចាកចេញ ហើយចូលគណនីម្តងទៀត»។
+
+លំដាប់ ៖ ទូរស័ព្ទទាំងអស់ប្រើ ZoeW កំណែបច្ចុប្បន្ន ➜ `optional` ➜ ស្កេនធម្មតាមួយថ្ងៃ ➜ `?diag=1` ៖ `access.verified` កើន · `access.missing` និង `rejected` នៅ ០
+(លេខរាប់តាម container ➜ ពិនិត្យច្រើនដង) ➜ `require`។ តម្លៃខុស (ឧ. `requre`) ➜ `ZTO_CONFIG_INVALID` `detail-identity:invalid` (Function មិនបើកចំហស្ងាត់ៗ)។
+`?diag=1` ត្រូវការតែសោ (🩺 និងឧបករណ៍ Sync ដំណើរការដដែល)។
+
+### ជំហានទី ៣ — កំណត់សាខា (`ZTO_DETAIL_BRANCH_PATHS`)
+
+Function ឆ្លើយតែកញ្ចប់ដែលលេខសាខាក្នុងកំណត់ត្រា ZTO = លេខសាខារបស់គណនី (ហាង Firebase ៖ email `@zoew<លេខ>.com` ក្នុងសាខាដែលចងសម្រាប់គម្រោងនោះ ·
+ហាង Supabase ៖ `branch_code` ដែល server សរសេរ)។
+
+1. **ចងគម្រោង Firebase នីមួយៗទៅលេខសាខា** ៖ `FIREBASE_PROJECT_IDS` = `Project ID:លេខសាខា` (ផ្នែក ៤គ ជំហានទី ២) ⛔ ធ្វើមុន ៖ គម្រោងដែលមិនចង ➜
+   គណនីរបស់វាមិនឃើញព័ត៌មានកញ្ចប់ណាទាំងអស់ (`branch:project-unbound`) ព្រោះ email ជាសញ្ញាដែលអ្នកប្រើប្តូរខ្លួនឯងបាន។ `?diag=1` ➜ `access.branch.unboundProjects` ត្រូវ ០។
+2. Argus ➜ បើកព័ត៌មានកញ្ចប់ **ច្រើន** របស់សាខាអ្នក (DevTools ➜ Network ➜ `order/detail` ➜ Response) ➜ រកវាលដែលមានលេខសាខាដូចលេខក្នុង email
+   លើគ្រប់កញ្ចប់ (វិធីដូចផ្នែក ៤ខ ជំហានទី ១)។
+3. `ZTO_DETAIL_BRANCH_PATHS` = ឈ្មោះវាលនោះ (ផ្លូវចុច ឧ. `a.b` · ច្រើនបំបែកដោយ comma ➜ ត្រូវវាលណាមួយក៏គ្រប់ · `off` = បិទ) ➜ Trigger deploy។
+   ផ្លូវខុសទម្រង់ ➜ `ZTO_CONFIG_INVALID` `field:branch`។
+4. ⛔ ការកំណត់នេះមានប្រសិទ្ធភាពភ្លាមលើគ្រប់ទូរស័ព្ទដែលផ្ញើគណនី — ទាំង `optional` ទាំង `require` (គ្មានដំណាក់កាលមើលតែប៉ុណ្ណោះ)។ ក្រោយ deploy ភ្លាម ៖
+   ស្កេនកញ្ចប់សាខាខ្លួនឯងពីរបី ➜ `?diag=1` ➜ `access.branch` ៖ `matched` (ត្រូវ) ត្រូវកើន · `other` (សាខាផ្សេង/គម្រោងមិនចង) · `missing` (កំណត់ត្រាគ្មានវាលនោះ) ·
+   `seen` (លេខសាខាដែលឃើញ)។ កញ្ចប់សាខាខ្លួនឯងធ្លាក់ក្នុង `other`/`missing` ➜ ដាក់ `ZTO_DETAIL_BRANCH_PATHS` = `off` ➜ Trigger deploy ➜ រកវាលម្តងទៀត។
+
+កញ្ចប់សាខាផ្សេង ➜ Function ឆ្លើយ `found:false` `ZTO_OTHER_BRANCH` `branch:other` (គ្មានលេខទូរស័ព្ទ · COD) ➜ App បង្ហាញ «⚠️ កញ្ចប់នេះជារបស់សាខាផ្សេង»។
+កំណត់ត្រាគ្មានវាលសាខា (`branch:missing`) · គណនីគ្មានលេខសាខា (`branch:no-account-site`) · email ក្រៅសាខាដែលចង (`branch:project-mismatch`) · គម្រោងមិនចង
+(`branch:project-unbound`) ➜ ក៏គ្មានលេខទូរស័ព្ទ · COD ដែរ តែ App បង្ហាញ «⚙️ ផ្ទៀងសាខាកញ្ចប់នេះមិនបាន … — ជាប់ត្រង់ <មូលហេតុ>»។
+`off` (ឬ `ZTO_DETAIL_IDENTITY` = `off`) ➜ មិនកំណត់សាខា។
+
+## ៥. ល្បឿន និងស្ថេរភាព
+
+| Key | Default | ន័យ |
+| --- | --- | --- |
+| `ZTO_UPSTREAM_TIMEOUT_MS` | `6000` | ពិដានក្នុងមួយសំណើទៅ ZTO (2,000–20,000 ms)។ ចាប់ផ្តើមពីលំនាំដើម ហើយវាស់ពេលពិតមុនបង្កើន; ទុកគម្លាតសម្រាប់អាន Cookie និងឆ្លើយតប |
+| `ZTO_REQUEST_BUDGET_MS` | `9000` | ថវិកាពេលសរុបក្នុង Function (4,000–24,000 ms) ដើម្បីឆ្លើយឆាប់។ វាជាពិដានរបស់ App; ពិដាន hosting ត្រូវពិនិត្យតាមការកំណត់ deploy របស់អ្នក |
+| `ZTO_UPSTREAM_RETRIES` | `1` | ចំនួនព្យាយាមឡើងវិញពេលបណ្តាញដាច់/5xx (0–3) |
+| `ZTO_CACHE_TTL_MS` | `60000` | Cache លទ្ធផលខាង server (0 = បិទ; អតិបរមា ១០ នាទី) |
+| `ZTO_NOT_FOUND_CACHE_TTL_MS` | `15000` | Cache សាលក្រម «រកមិនឃើញ» (0 = បិទ)។ ខ្លីជាងខាងលើដោយចេតនា ➜ កញ្ចប់ដែល ZTO ទើបបញ្ចូល ត្រូវរកឃើញវិញឆាប់។ វាមិនអាចលើស `ZTO_CACHE_TTL_MS` ទេ |
+
+### ស្រេចចិត្ត ៖ header ដែល Function បង្ហាញខ្លួនទៅ ZTO
+
+Function ផ្ញើ header បែប browser ទៅ ZTO ជាមួយតម្លៃលំនាំដើមដែលដំណើរការ
+រួចហើយ។ ⛔ **កុំប្តូរពួកវាដោយគ្មានមូលហេតុ** — ប្តូរតែពេល ZTO បដិសេធសំណើ
+ដោយសារ header (ឧ. ចម្លើយ HTML ជំនួស JSON) ៖
+
+| Key | Default | ន័យ |
+| --- | --- | --- |
+| `ZTO_USER_AGENT` | User-Agent បែប Chrome | អក្សរ `User-Agent` (កាត់ត្រឹម ៣០០ តួ) |
+| `ZTO_BROWSER_ORIGIN` | `https://argus.ztoglobal.com` | `Origin`/`Referer` ដែលផ្ញើទៅ ZTO — ត្រូវជា URL `https://` |
+| `ZTO_ACCEPT_LANGUAGE` | `km` | `Accept-Language` (កាត់ត្រឹម ៦០ តួ) |
+
+
+### ⛔ គម្លាតរវាង `UPSTREAM_TIMEOUT` និង `REQUEST_BUDGET`
+
+Function អានទិន្នន័យ Cookie ពី Netlify Blobs **ក្នុងថវិកាដដែល** ជាមួយការហៅ
+ZTO។ បង្អួចដែលនៅសល់សម្រាប់ការអាននោះគឺ ៖
+
+```
+បង្អួចអាន Cookie = budget − 1200 (បម្រុង) − upstreamTimeout − ពេលកន្លងផុត
+```
+
+⛔ **កុំពឹងលើការចាក់សោស្វ័យប្រវត្តិ** ៖ Function តម្រូវឲ្យ
+`budget >= upstream + 1500` ដោយខ្លួនឯង — តែ **១,៥០០ នោះស្មើបម្រុងបូកបង្អួច
+អប្បបរមាគត់** ➜ ការទុកគម្លាតត្រឹមនោះធ្វើឲ្យបង្អួចចុះចតលើតម្លៃអប្បបរមា
+បេះបិទ ហើយពេលកន្លងផុតបន្តិចបន្តួចច្រានវាទៅសូន្យ។
+
+| upstream | budget | បង្អួចនៅដើមសំណើ | ក្រោយ ៥០ ms |
+|---|---|---|---|
+| `7500` | `9000` | ៣០០ ms | **០** ❌ |
+| **`6000`** | **`9000`** | **១,៨០០ ms** | **១,៧៥០ ms** ✅ |
+| `7000` | `9000` | ៨០០ ms | ៧៥០ ms — គម្លាតតូច |
+| `8000` | `9500` (កូដលើកពី `9000`) | ៣០០ ms | **០** ❌ |
+| `8000` | `12000` | ២,៨០០ ms | ២,៧៥០ ms ✅ |
+
+> **ការកំណត់ដំបូង៖ `upstream=6000` និង `budget=9000` ទុកគម្លាត ៣,០០០ ms។**
+> កូដអាចលើក budget ដើម្បីធានា `upstream + 1500`; អានតម្លៃដែលមានប្រសិទ្ធភាពក្នុង diag។
+
+ការបង្កើន budget ធ្វើឲ្យអ្នកប្រើរង់ចាំយូរ។ ត្រូវវាស់ cold request និង retry
+ពិត ព្រមទាំងទុកពេលឆ្លើយតបមុន client timeout និងពិដាន hosting។
+
+⚠️ **`?diag=1` ពិនិត្យបង្អួចនេះមិនបានទេ** — ផ្លូវ diag ប្រើពិដានពេញ ៣,០០០ ms
+ជានិច្ច ➜ `storeReason` នឹង **មិនដែល** រាយ `"budget"` ទោះការកំណត់តឹងប៉ុណ្ណាក៏
+ដោយ។ ការរត់ diag ក៏ធ្វើឲ្យ container **ក្តៅ ៦០ វិនាទី** ➜ ការស្កេនភ្លាមក្រោយ
+នោះមិនឆ្លុះបញ្ចាំងស្ថានភាពពិតទេ។ អ្វីដែល diag ប្រាប់បាន គឺ **តម្លៃដែលកំពុង
+ប្រើ** ៖ `"timing":{"upstreamTimeoutMs":…,"budgetMs":…}` ➜ យកលេខ ២ នោះមក
+ផ្ទៀងនឹងតារាងខាងលើ។
+
+### អ្វីដែលធ្វើឲ្យវាលឿន និងស្ថេរ
+
+- **Cache ខាង server ៦០ វិនាទី** ➜ ស្កេន barcode ដដែលម្តងទៀត (ឬឧបករណ៍ ២
+  គ្រឿងស្កេនកញ្ចប់ដដែល) ឆ្លើយ **ដោយមិនប៉ះ ZTO សោះ**។
+- **Single-flight** ➜ សំណើស្របគ្នាលើ barcode ដដែល **ចែក upstream call តែមួយ**។
+- **ទុកការភ្ជាប់ទៅ ZTO ៦០ វិនាទី** (Cookie និង Palm ដូចគ្នា) ៖ ZTO មិនប្រាប់រយៈទុកការភ្ជាប់ (`Keep-Alive`) ➜ Function
+  ទុកការភ្ជាប់ TCP + TLS ទំនេរ ៦០ វិនាទី ➜ ស្កេនបន្ទាប់ក្នុង ៦០ វិនាទីប្រើការភ្ជាប់ដដែល (មិនភ្ជាប់ថ្មីម្តងៗ) · ការភ្ជាប់ដែល ZTO
+  បិទរួច ➜ សាកម្តងទៀតភ្លាមមួយដងលើការភ្ជាប់ថ្មី · 🩺 ជួរ ZTO បង្ហាញស្កេនលើការភ្ជាប់ថ្មី/បើករួច (`?diag=1` `upstreamTiming.scans`)។
+- **ព្យាយាមឡើងវិញដោយស្វ័យប្រវត្តិ** លើការដាច់បណ្តាញ និង HTTP 5xx — ក្នុង
+  ថវិកាពេលកំណត់ ដើម្បីឲ្យ Function អាចឆ្លើយកំហុសជា JSON ពេល upstream បរាជ័យ។
+- **ពិដានខាង client ៖ ១៣ វិនាទី** (ស្កេន) និង **១១ វិនាទី** (ប៊ូតុងសាកល្បង)។
+  ជាមួយ server budget ៩ វិនាទី គម្លាតគឺ ៤ វិនាទីសម្រាប់ស្កេន និង ២ វិនាទី
+  សម្រាប់ប៊ូតុងសាកល្បង។ បើបង្កើន budget ត្រូវពិនិត្យពិដានទាំងពីរ និងពេលបណ្ដាញជាមួយគ្នា។
+- **Barcode ដែល ZTO មិនស្គាល់ ឆ្លើយ HTTP 200 `found:false`** មិនមែនកំហុសទេ
+  ➜ វា **មិនកេះ cooldown ៣០ វិនាទី** ➜ ស្កេនកញ្ចប់បន្ទាប់បានភ្លាម។
+- **ការបន្តអាយុ Cookie មិនទប់ការឆ្លើយតបទេ** ៖ ពេល ZTO ផ្ញើ `Set-Cookie`
+  ថ្មី Function សរសេរវាចូល Blobs ក្នុងពិដានខ្លី ហើយ **រំលងពេលថវិកាជិតអស់**
+  — ការសរសេរបន្ទាប់ធ្វើវាជំនួស។
+- **ថវិកាពេលគ្របដណ្តប់ handler ទាំងមូល** ៖ ការអាន និងសរសេរ Cookie store
+  រាប់ចូលថវិកាដែរ ➜ Function ឆ្លើយ **ក្នុង** `ZTO_REQUEST_BUDGET_MS` ជានិច្ច
+  ហើយ store ដែលយឺតលែងធ្វើឲ្យការស្កេនធ្លាក់ជា `ZTO_TIMEOUT`។
+- **401 ដោយ Cookie ចាស់ក្នុង cache ត្រូវជួសជុលដោយខ្លួនឯង** ៖ ក្រោយអ្នករត់
+  `sync-zto-cookie.cmd` instance ដែលនៅកាន់ Cookie ចាស់ អាន Blobs ឡើងវិញ
+  **១ ដង** ហើយសាកម្តងទៀត **តែពេល Cookie ប្រែពិត**។ ⛔ បើ Cookie មិនប្រែ ៖
+  401 ភ្លាម គ្មានការហៅ ZTO ស្ទួន។
+
+---
+
+## ៦. សារកំហុស និងអ្វីត្រូវធ្វើ
+
+| `code` | អ្វីអ្នកឃើញក្នុង ZoeW | ត្រូវធ្វើអ្វី |
+| --- | --- | --- |
+| `ZTO_AUTH_EXPIRED` | 🔒 ZTO បដិសេធ Cookie | Login Argus និង Lookup ជោគជ័យ រួចរត់ `sync-zto-cookie.cmd` (ផ្នែក ២) ឬពិនិត្យ Token |
+| `ZTO_AUTH_NOT_CONFIGURED` | 🔒 Netlify មិនទាន់មាន Cookie ឬ Token | រត់ `sync-zto-cookie.cmd` ឬដាក់ `ZTO_COOKIE`/`ZTO_AUTHORIZATION` |
+| `ZTO_CONFIG_INVALID` | ⚙️ Config ZTO មិនត្រឹមត្រូវ | មើលវាល `reason` (ឧ. `api-url:not-https`, `body:invalid-json`) |
+| `ZTO_PROXY_NOT_CONFIGURED` | ⚙️ Config ZTO មិនត្រឹមត្រូវ | ភ្លេចដាក់ `ZTO_PROXY_KEY` · `reason` `proxy-keys:invalid` ➜ គ្រប់ធាតុក្នុង `ZTO_PROXY_KEYS` ខុស (ផ្នែក ៤ឃ ជំហានទី ១) |
+| `ZTO_IDENTITY_REQUIRED` | 🔒 … សូមចាកចេញ ហើយចូលគណនីម្តងទៀត (ឬ ⚠️ ផ្ទៀងផ្ទាត់គណនីមិនបាន — ពេល token យឺត/ផុត) | `ZTO_DETAIL_IDENTITY` = `require` ➜ ផ្នែក ៤ឃ ជំហានទី ២ |
+| `ZTO_IDENTITY_UNAVAILABLE` | ⚠️ ផ្ទៀងផ្ទាត់គណនីជាមួយ Server មិនបាន | Google certs/Supabase មិនឆ្លើយ — ស្កេនម្តងទៀត |
+| `ZTO_OTHER_BRANCH` | ⚠️ កញ្ចប់នេះជារបស់សាខាផ្សេង · ⚙️ ផ្ទៀងសាខាកញ្ចប់នេះមិនបាន | `reason` ➜ ផ្នែក ៤ឃ ជំហានទី ៣ |
+| `ZTO_NOT_FOUND` | ⚠️ ZTO មិនឃើញទិន្នន័យ | Barcode នោះមិនមានក្នុង ZTO ពិត — វាយដោយដៃ |
+| `ZTO_RATE_LIMITED` | 🚦 ZTO កំណត់ល្បឿន | រង់ចាំបន្តិច; បន្ថយល្បឿនស្កេន |
+| `ZTO_TIMEOUT` | ⏱️ ZTO ឆ្លើយតបយឺតពេក | បណ្តាញ ឬ ZTO យឺត — ស្កេនម្តងទៀត |
+| `ZTO_UPSTREAM_UNAVAILABLE` | 📡 ZTO ឆ្លើយមិនចេញ | ZTO មិនឆ្លើយ — ស្កេនម្តងទៀត |
+| `ZTO_UPSTREAM_REJECTED` | ⚠️ មិនអាចភ្ជាប់ ZTO បាន | សារពិតរបស់ ZTO នៅក្នុងវាល `error` |
+| `ZTO_INVALID_RESPONSE` | ⚠️ មិនអាចភ្ជាប់ ZTO បាន | ZTO ឆ្លើយមិនមែន JSON; ពិនិត្យស្ថានភាព និងសាក Lookup ម្ដងទៀត |
+| `ZTO_LIST_NOT_CONFIGURED` | ⚠️ មុខងារបញ្ជីមិនទាន់កំណត់ | `site:*` ➜ គណនីនោះគ្មានលេខសាខាក្នុងអ៊ីមែល (ផ្នែក ៤គ ជំហានទី ៣); `idtoken:*` ➜ មើលតារាងមូលហេតុក្នុងផ្នែក ៤គ; ផ្សេងទៀត ➜ មើលវាល `reason` |
+| `ZTO_LIST_RANGE_INVALID` | ⚠️ ជួរកាលបរិច្ឆេទមិនត្រឹមត្រូវ | ថ្ងៃបញ្ចប់ត្រូវនៅក្រោយថ្ងៃចាប់ផ្តើម និងមិនលើស ៣១ ថ្ងៃ |
+| `ZTO_LIST_PAGE_INVALID` | ⚠️ ទាញបញ្ជីមិនបាន | ទំព័រលើស `ZTO_LIST_MAX_PAGES` — បំបែកជួរកាលបរិច្ឆេទ |
+
+---
+
+## ៧. អ្វីដែល Function បញ្ជូនទៅ browser
+
+**តែប៉ុណ្ណេះ**៖
+
+```json
+{ "success": true, "found": true, "barcode": "...", "phone": "...", "cod": 0, "dod": 0, "cached": false }
+```
+
+ចម្លើយរបស់ **ផ្លូវបញ្ជី** (`?list=1`) ៖
+
+```json
+{ "success": true, "list": true, "page": 1, "pages": 2, "total": 115,
+  "rows": [ { "barcode": "...", "phone": "...", "cod": 0, "dod": 0, "at": "2026-09-10 09:10:16" } ],
+  "cached": false }
+```
+
+⛔ Cookie, Token, ឈ្មោះអតិថិជន និងអាសយដ្ឋាន **មិនដែលចេញទៅ browser ទេ**។
+វាល `reason` របស់សារកំហុសត្រូវច្រោះទាំង ២ ខាង (server និង client) មុនចូល DOM។

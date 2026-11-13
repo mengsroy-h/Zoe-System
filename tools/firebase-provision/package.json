@@ -10,7 +10,7 @@
   },
   "scripts": {
     "doctor": "node provision.js doctor",
-    "test": "node ../../audit-tools/firebase-provision-test.js"
+    "test": "node ../../tools/audit-tools/firebase-provision-test.js"
   },
   "dependencies": {
     "firebase-tools": "15.32.1",

@@ -21,12 +21,12 @@ jobs:
           package-manager-cache: false
       - run: npm ci --prefix supabase --ignore-scripts
       - name: ផ្ទៀង preflight របស់ project ថ្មី
-        run: node --test audit-tools/tests/registration-onboarding.test.mjs
+        run: node --test tools/audit-tools/tests/registration-onboarding.test.mjs
       - name: ត្រៀម GoTrue ដែល pin ដោយ digest
         shell: bash
         run: |
           set -euo pipefail
-          image=$(node -p "require('./audit-tools/registration-auth-pins.json').auth.image")
+          image=$(node -p "require('./tools/audit-tools/registration-auth-pins.json').auth.image")
           fixture="$RUNNER_TEMP/zoe-auth-fixture"
           mkdir -p "$fixture"
           name="zoe-auth-extract-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
@@ -40,4 +40,4 @@ jobs:
         env:
           ZOE_AUTH_FIXTURE_DIR: ${{ runner.temp }}/zoe-auth-fixture
           ZOE_AUTH_REPORT: ${{ runner.temp }}/registration-auth-results.json
-        run: node audit-tools/registration-auth-integration.cjs
+        run: node tools/audit-tools/registration-auth-integration.cjs

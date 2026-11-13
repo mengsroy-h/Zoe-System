@@ -94,6 +94,7 @@ async function expectQueueCompleted() {
 const bodies = (stage: string) => requests.filter((b) => b.stage === stage);
 const closes = () => vi.mocked(applyBarcodeCloseChange).mock.calls.map((c) => c[1]);
 beforeEach(async () => {
+    vi.mocked(replaceSignJob).mockReset();
     resetZtoFinalMarks(); ztoPickupStatus.clear(); resetZtoTrashMode();
     cleanupInFlight.clear(); dbListenerFailedPaths.clear(); dbListenerPendingPaths.clear();
     serverClock.resetServerClock();

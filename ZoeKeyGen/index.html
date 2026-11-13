@@ -477,6 +477,21 @@ const firebaseConfig = {
         <label>៣ · ប្រៀបធៀបស្នាមសោជាមួយអេក្រង់ឧបករណ៍ផ្ទាល់</label>
         <div id="secureKeyFingerprint" class="key-output"></div>
         <button id="secureKeyApproveBtn" class="btn-primary w-full" data-act="approveSecureKeyEnrollment" disabled>✅ ស្នាមសោត្រូវគ្នា · អនុម័តឧបករណ៍</button>
+        <details>
+            <summary>ជម្រើសបន្ថែម · ការអញ្ជើញអតិថិជន</summary>
+            <p>ប្រើតែពេលសេវាអញ្ជើញបានបើក។ វិធីដោយដៃនៅខាងលើអាចប្រើដដែល។</p>
+        <label for="licenseInvitationTarget">កម្មវិធីអតិថិជន</label>
+        <select id="licenseInvitationTarget"><option value="pwa">PWA</option><option value="apk">APK</option></select>
+        <label for="licenseInvitationHours">សុពលភាពអញ្ជើញ · ម៉ោង (អតិបរមា 24)</label>
+        <input id="licenseInvitationHours" type="number" min="1" max="24" value="24">
+        <button class="btn-primary w-full" data-act="createLicenseInvitation">បង្កើតការអញ្ជើញ</button>
+        <input id="licenseInvitationReference" readonly>
+        <button class="btn-secondary" data-act="copyLicenseInvitation" data-args='[false]'>ចម្លងកូដ</button>
+        <button class="btn-secondary" data-act="copyLicenseInvitation" data-args='[true]'>ចម្លងតំណ PWA</button>
+        <p>APK៖ បិទភ្ជាប់កូដក្នុងកម្មវិធីដែលបានដំឡើង។ ផ្ទៀងលេខជាមួយអតិថិជនផ្ទាល់ មុនអនុម័ត។</p>
+        <button class="btn-secondary w-full" data-act="refreshLicenseInvitations">ពិនិត្យសំណើអតិថិជន</button>
+        <div id="licenseInvitationQueue"></div>
+        </details>
         <div class="modal-btns mt-12">
             <button class="btn-secondary" data-act="refreshSecureKeySetup">🔄 ពិនិត្យ និងបន្ត</button>
             <button class="btn-cancel" data-act="closeModal" data-args='["secureKeySetupModal"]'>បិទ · បន្តពីតារាងបាន</button>

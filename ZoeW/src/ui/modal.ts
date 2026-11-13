@@ -1,3 +1,4 @@
+import { cancelLicenseInvitation } from '../features/license-invitations';
 import { viewState } from '../core/view-state';
 import { cancelZtoPalmSign } from '../features/zto-palm-sign';
 import { videoElement } from '../app/refs';
@@ -38,6 +39,7 @@ export function onScanVideoPause() {
 
 export function closeModal(modalId?) {
     if (modalId === 'activationModal' || !modalId) {
+        cancelLicenseInvitation();
         viewState.seatEnrollmentEpoch++;
         viewState.seatEnrollmentBusy = false;
     }

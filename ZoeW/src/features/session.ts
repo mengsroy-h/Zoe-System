@@ -1,3 +1,4 @@
+import { cancelLicenseInvitation, clearLicenseInvitationIntent } from './license-invitations';
 import { resetHealthCheck } from './health-check';
 import { blankElementById } from '../app/slot-resets';
 import { MODAL_IDS } from '../core/modals';
@@ -177,7 +178,10 @@ export function endSessionUi() {
     MODAL_IDS.forEach((id) => closeModal(id));
 }
 
-export function clearSensitiveModalFields() {
+export function clearSensitiveModalFields(preserveInvitationLink = false) {
+    cancelLicenseInvitation();
+    if (!preserveInvitationLink && firebaseState.auth?.currentUser) clearLicenseInvitationIntent();
+    viewState.invitationCode = '';
     sessionAuthTime = null;
     resetHealthCheck();
     closeModal('ztoPalmSignModal');
@@ -286,7 +290,7 @@ export function clearSensitiveModalFields() {
 
 export function showLoginModalWithPrefill() {
     viewState.loginMode = 'login';
-    clearSensitiveModalFields();
+    clearSensitiveModalFields(true);
     refreshLiveToasts();
     closeConfigQrScanner();
     MODAL_IDS.forEach((id) => {

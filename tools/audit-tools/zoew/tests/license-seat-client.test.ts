@@ -308,3 +308,21 @@ describe('អត្តសញ្ញាណឧបករណ៍ License', () => {
         expect(readFileSync('public/license-seat-client.js', 'utf8')).toBe(readFileSync('../ZoeKeyGen/license-seat-client.js', 'utf8'));
     });
 });
+
+
+describe('ការចុះហត្ថលេខាសំណើអញ្ជើញ', () => {
+    it('ចងសំណើទៅលេខអញ្ជើញ ប្រភេទ App និង identity ដើម', async () => {
+        const c = client(); const app = 'ZOE'; const keyId = 'ABCDEFGHIJKLMNOP'; const inviteId = keyId + '.0123456789ABCDEF';
+        await c.api.createIdentity(app, keyId);
+        const enrollment = await c.api.invitationEnrollmentRequest(app, keyId, inviteId, 'apk');
+        const payload = JSON.parse(Buffer.from(enrollment.payload, 'base64url').toString());
+        expect(payload).toMatchObject({ domain: 'zoe-license-enrollment-v1', app, keyId, inviteId, target: 'apk' });
+        const command = { domain: 'zoe-license-invitation-v1', audience: 'https://zoew.netlify.app', app, keyId, inviteId, action: 'submit', expiresAt: Date.now() + 45000, enrollment };
+        const signed = await c.api.signInvitationCommand(app, keyId, command);
+        const decoded = JSON.parse(Buffer.from(signed.payload, 'base64url').toString());
+        expect(decoded.publicKey).toEqual(payload.publicKey);
+        await expect(c.api.signCommand(app, keyId, command)).rejects.toThrow();
+        await expect(c.api.signInvitationCommand(app, keyId, { ...command, action: 'approve' })).rejects.toThrow();
+        await expect(c.api.invitationEnrollmentRequest(app, keyId, inviteId, 'browser')).rejects.toThrow();
+    });
+});

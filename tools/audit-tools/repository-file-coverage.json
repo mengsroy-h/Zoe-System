@@ -5209,6 +5209,27 @@
     },
     "tools/audit-tools/zoew/tests/relocated-checker-paths.test.ts": {
       "policy": "relocated-checker-paths"
+    },
+    "tools/audit-tools/license-invitation-default-ui-test.js": {
+      "policy": "guard-1"
+    },
+    "ZoeW/netlify/lib/license-invitations.mjs": {
+      "policy": "license-seat-protocol"
+    },
+    "ZoeW/netlify/functions/license-invitations.mjs": {
+      "policy": "license-seat-protocol"
+    },
+    "ZoeW/src/features/license-invitations.ts": {
+      "policy": "license-seat-protocol"
+    },
+    "tools/audit-tools/zoew/tests/license-invitations-server.test.ts": {
+      "policy": "license-seat-protocol"
+    },
+    "tools/audit-tools/zoew/tests/license-invitations-seller.test.ts": {
+      "policy": "license-seat-protocol"
+    },
+    "tools/audit-tools/zoew/tests/license-invitations.test.ts": {
+      "policy": "license-seat-protocol"
     }
   }
 }

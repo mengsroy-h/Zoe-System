@@ -111,3 +111,25 @@ describe.each(paths)('License នាឡិកា %s', file => {
     });
 
 });
+
+
+describe.each(paths)('ការពារការរក្សា Key ក្រោយបោះបង់ %s', file => {
+    it('មិនសរសេរ activation record បើម្ចាស់ប្ដូរពេល verify កំពុងរង់ចាំ', async () => {
+        const h = harness(file); h.route();
+        const original = h.store.get(RECORD);
+        let current = true;
+        h.ctx.crypto.subtle.verify = async () => { current = false; return true; };
+        const result = await h.api.activate(h.record.keyString, 'ZOE', () => current);
+        expect(result.valid).toBe(false);
+        expect(h.store.get(RECORD)).toBe(original);
+    });
+});
+
+
+describe.each(paths)('ការអញ្ជើញត្រូវការ protocol 2 %s', file => {
+    it('legacy seat មិនអាចផ្ដល់សិទ្ធិតាម invitation', async () => {
+        const h = harness(file); h.route(); const original = h.store.get(RECORD);
+        const result = await h.api.activate(h.record.keyString, 'ZOE', () => true, 2);
+        expect(result.valid).toBe(false); expect(h.store.get(RECORD)).toBe(original);
+    });
+});

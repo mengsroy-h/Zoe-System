@@ -15,6 +15,8 @@ import { withTimeout } from '../services/network';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { showLiveToast, showToast } from '../ui/toast';
 
+import { resumeLicenseInvitation, restoreLicenseInvitationIntent } from './license-invitations';
+
 export const LICENSE_APP_CODE = 'ZOE';
 
 export const LICENSE_RECHECK_INTERVAL_MS = 15 * 60 * 1000;
@@ -48,12 +50,14 @@ export async function ensureAppActivated() {
         closeModal('activationModal');
         return true;
     }
+    const hasInvitation = restoreLicenseInvitationIntent();
     const sessionIsCurrent = captureAuthDatabaseGuard();
     const status = await ZoeLicense.getStatus(LICENSE_APP_CODE);
     if (!sessionIsCurrent()) return false;
     pendingActivation = status.reason === 'clock-unverified' ? { isCurrent: sessionIsCurrent, user: firebaseState.auth && firebaseState.auth.currentUser, generation: firebaseState.authGeneration } : null;
     if (status.state === 'active') {
-        closeModal('activationModal');
+        if (hasInvitation) { viewState.seatEnrollmentOnly = true; openModalHelper('activationModal'); }
+        else closeModal('activationModal');
         return true;
     }
     clearSeatEnrollment();
@@ -63,6 +67,7 @@ export async function ensureAppActivated() {
         : (status.reason ? licenseFailureMessage(status.reason) : 'សូមបញ្ចូល Activation Key សម្រាប់ ZoeW ដើម្បីបន្ត។');
     openModalHelper('activationModal');
     focusField('activationKeyInput');
+    void resumeLicenseInvitation();
     return false;
 }
 

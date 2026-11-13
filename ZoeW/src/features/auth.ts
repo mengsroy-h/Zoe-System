@@ -1,3 +1,4 @@
+import { cancelLicenseInvitation, clearLicenseInvitationIntent } from './license-invitations';
 import { fieldChecked, fieldValue, setFieldValue } from '../app/refs';
 import { viewState } from '../core/view-state';
 import { dataState, firebaseState, uiState } from '../core/state';
@@ -228,6 +229,8 @@ export function updateAuthButton(isLoggedIn) {
 }
 
 export function logoutApp() {
+    cancelLicenseInvitation();
+    clearLicenseInvitationIntent();
     const logoutGeneration = ++firebaseState.authGeneration;
     firebaseState.authLoginOperation = null;
     viewState.loginBusy = false;

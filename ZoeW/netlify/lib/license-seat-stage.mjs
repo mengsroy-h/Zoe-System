@@ -183,3 +183,5 @@ export async function handleSeatStageRequest(request, service) {
     }
     return new Response(JSON.stringify(out.body), { status: out.status, headers });
 }
+
+export { publicKey, verifies, decode, validState, receiptSigner, enrollmentMatches, boundedBody };

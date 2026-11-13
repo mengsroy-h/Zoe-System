@@ -241,19 +241,20 @@
 
     const activationInFlight = new Map();
 
-    async function activate(keyString, appCode) {
+    async function activate(keyString, appCode, isOwnerCurrent, requiredSeatProtocol) {
         const startedAt = readClock();
         const owner = {};
         const identityOf = (record) => JSON.stringify(record && [record.keyString, record.id, record.a, record.iat, record.exp, record.activationId]);
         const snapshot = identityOf(loadLocalRecord(appCode));
         activationInFlight.set(appCode, owner);
-        const isCurrent = () => activationInFlight.get(appCode) === owner && identityOf(loadLocalRecord(appCode)) === snapshot;
+        const isCurrent = () => (typeof isOwnerCurrent !== 'function' || isOwnerCurrent() === true) && activationInFlight.get(appCode) === owner && identityOf(loadLocalRecord(appCode)) === snapshot;
         try {
             const result = await verifySignatureAndScope(keyString, appCode);
             if (!isCurrent()) return { valid: false, reason: 'verify-unavailable' };
             if (!result.valid) return result;
             const online = await checkOnline(appCode, result.payload.id, { priority: true, claimSeat: true });
             if (!isCurrent()) return { valid: false, reason: 'verify-unavailable' };
+            if (requiredSeatProtocol === 2 && online.protocol !== 2) return { valid: false, reason: 'device-unverified' };
             if (online.ok !== true) {
                 return { valid: false, reason: online.reason || 'network', payload: result.payload };
             }
@@ -291,6 +292,7 @@
                 onlineExp: ceiling,
                 seenMax: now
             };
+            if (!isCurrent()) return { valid: false, reason: 'verify-unavailable' };
             saveLocalRecord(appCode, record);
             return { valid: true, payload: result.payload };
         } finally {

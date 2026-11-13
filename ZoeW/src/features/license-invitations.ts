@@ -6,6 +6,7 @@ import { captureAuthDatabaseGuard } from './exchange-rate';
 import { isNativeAndroid, isNativeApp } from '../platform/native';
 import { openModalHelper } from '../ui/modal';
 import { proceedAfterLogin } from './license';
+import { fetchWithTimeout } from '../services/network';
 
 const ENDPOINT = 'https://zoew.netlify.app/.netlify/functions/license-invitations';
 const AUDIENCE = 'https://zoew.netlify.app';
@@ -105,17 +106,19 @@ function readPending(key: string): Pending | null {
 }
 
 async function post(body: unknown, signal: AbortSignal) {
-    const response = await fetch(ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal, credentials: 'omit', cache: 'no-store', redirect: 'error', referrerPolicy: 'no-referrer' });
-    if (!response.ok) {
-        if (response.status === 410 || response.status === 503) {
-            let failure;
-            try { failure = await response.json(); } catch { }
-            if (response.status === 410 && failure?.reason === 'invitation-unavailable') throw new Error('invitation-terminal');
-            if (response.status === 503 && failure?.reason === 'invitation-disabled') throw new Error('invitation-disabled');
+    const result = await fetchWithTimeout(ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal, credentials: 'omit', cache: 'no-store', redirect: 'error', referrerPolicy: 'no-referrer' }, 45000, 'invitation-unavailable', async response => {
+        if (!response.ok) {
+            if (response.status === 410 || response.status === 503) {
+                let failure;
+                try { failure = await response.json(); } catch { }
+                if (response.status === 410 && failure?.reason === 'invitation-unavailable') throw new Error('invitation-terminal');
+                if (response.status === 503 && failure?.reason === 'invitation-disabled') throw new Error('invitation-disabled');
+            }
+            throw new Error('invitation-unavailable');
         }
-        throw new Error('invitation-unavailable');
-    }
-    return response.json();
+        return response.json();
+    });
+    return result.body;
 }
 
 function trustedNow() {

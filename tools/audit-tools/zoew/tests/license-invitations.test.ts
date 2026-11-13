@@ -11,7 +11,7 @@ import { createElement } from 'react';
 import { ActivationModal } from '../../../../ZoeW/src/app/components/modals/ActivationModal';
 vi.mock('../../../../ZoeW/src/features/license', async importOriginal => ({ ...await importOriginal<any>(), proceedAfterLogin: vi.fn(async () => true) }));
 const native = vi.hoisted(() => ({ android: false, native: false }));
-vi.mock('../../../../ZoeW/src/platform/native', () => ({ isNativeAndroid: () => native.android, isNativeApp: () => native.native }));
+vi.mock('../../../../ZoeW/src/platform/native', async importOriginal => ({ ...await importOriginal<any>(), isNativeAndroid: () => native.android, isNativeApp: () => native.native }));
 const code = 'ABCDEFGHIJKLMNOP.0123456789ABCDEF';
 const enrollment = { payload: 'original-signed-payload', signature: 'original-signature', fingerprint: 'a'.repeat(64) };
 const requestId = createHash('sha256').update(JSON.stringify({ payload: enrollment.payload, signature: enrollment.signature })).digest('hex');
@@ -43,6 +43,24 @@ beforeEach(() => {
 });
 afterEach(() => { invitation.cancelLicenseInvitation(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 describe('ការអញ្ជើញឧបករណ៍អតិថិជន', () => {
+    it.each(['headers', 'body'])('បណ្ដាញ %s យឺតដល់ពិដានបញ្ចប់ការរង់ចាំ និង abort សំណើ', async phase => {
+        vi.useFakeTimers();
+        let signal: AbortSignal | undefined;
+        let settled = false;
+        vi.mocked(fetch).mockImplementation(async (_url, options) => {
+            signal = options?.signal as AbortSignal;
+            const pending = new Promise<never>(() => {});
+            return phase === 'headers' ? pending : { ok: true, json: () => pending } as any;
+        });
+        void invitation.submitLicenseInvitation().then(() => { settled = true; });
+        await vi.advanceTimersByTimeAsync(0);
+        expect(signal).toBeDefined();
+        expect(settled).toBe(false);
+        await vi.advanceTimersByTimeAsync(45000);
+        expect(signal?.aborted).toBe(true);
+        expect(settled).toBe(true);
+        expect(viewState.invitationBusy).toBe(false);
+    });
     it('បើកតំណមិនបង្កើតកូនសោ ឬភ្ជាប់បណ្ដាញ', () => {
         window.location.hash = '#license-invite=' + code;
         invitation.routeLicenseInvitation();

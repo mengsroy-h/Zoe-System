@@ -793,6 +793,13 @@ const SIZES = [
                             if (where) outside.push(key + ' ' + where);
                         }
                     }
+                    await page.evaluate(({ id, sel }) => {
+                        const field = Array.from(document.getElementById(id).querySelectorAll(sel))
+                            .find((el) => !el.disabled && el.checkVisibility({ visibilityProperty: true }));
+                        if (!field) throw new Error('រកមិនឃើញប្រអប់វាយដែលមើលឃើញ៖ ' + id);
+                        field.focus({ preventScroll: true });
+                        if (document.activeElement !== field) throw new Error('focus មិនចូលប្រអប់វាយ៖ ' + id);
+                    }, { id, sel: FIELD_SELECTOR });
                     await page.keyboard.press('Enter');
                     await settle(page, 200);
                     const after = await page.evaluate((m) => ({ open: openModalIds(), drawer: uiState.drawerOpen || uiState.notifyDrawerOpen, ran: window.__ran || 0, stays: openModalIds().includes(m) }), id);

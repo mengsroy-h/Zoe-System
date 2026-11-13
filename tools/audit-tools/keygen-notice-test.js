@@ -92,7 +92,9 @@ function build(options) {
     const getElementById = (id) => {
         if (!elements[id]) {
             const classes = new Set();
-            elements[id] = { id, value: '', textContent: '', innerHTML: '', disabled: false, style: {}, classList: {
+            elements[id] = { id, value: '', textContent: '', innerHTML: '', disabled: false,
+                childNodes: [], replaceChildren(...nodes) { this.childNodes = nodes; this.innerHTML = ''; this.textContent = nodes.map(node => typeof node === 'string' ? node : node.textContent || '').join(''); },
+                style: {}, classList: {
                 add: (name) => classes.add(name), remove: (name) => classes.delete(name), contains: (name) => classes.has(name),
                 toggle: (name, on) => { const enabled = on === undefined ? !classes.has(name) : !!on; if (enabled) classes.add(name); else classes.delete(name); return enabled; }
             } };
@@ -156,6 +158,16 @@ function fill(h, kind, title, body) {
 
 async function run() {
     if (missing.length) return;
+    {
+        const cleanup = build();
+        const row = { textContent: 'សំណើសាកល្បង' };
+        const queue = cleanup.el('licenseInvitationQueue');
+        queue.replaceChildren(row);
+        cleanup.el('licenseInvitationReference').value = 'synthetic-reference';
+        ok('មុនសម្អាត៖ ជួរសំណើមានធាតុសាកល្បង', queue.childNodes.length === 1 && queue.childNodes[0] === row);
+        cleanup.ctx.clearSecureKeySetup();
+        ok('សម្អាតការអញ្ជើញ៖ ដកធាតុ និងលេខយោង', queue.childNodes.length === 0 && queue.textContent === '' && cleanup.el('licenseInvitationReference').value === '');
+    }
     const probe = build();
     const C = probe.ctx;
     const kinds = Object.keys(C.NOTICE_KIND_LABELS);

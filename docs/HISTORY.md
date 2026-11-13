@@ -123,6 +123,13 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### ZoeW [2.50.200] · ZoeKeyGen [2.24.48] — 2026-11-13 · ផ្ទៀង CI ការអញ្ជើញ
+
+**ZoeW** (`zoew-v463` ➜ `zoew-v464`) និង **ZoeKeyGen** (`zoekeygen-v158` ➜ `zoekeygen-v159`)។ សំណើអញ្ជើញឆ្លង helper បណ្ដាញដែលមានពិដានពេលរហូតអានតួចប់; សារចម្លងបង្ហាញសញ្ញាជោគជ័យ ហើយវាលអញ្ជើញសម្អាតតាមបញ្ជីដដែលនឹងវាល Key។ កំណែ និង cache ឡើងតាមច្បាប់ ៨ ព្រោះមានកូដ ship ប្រែ។
+
+- ការកែ fixtures និងឧបករណ៍ CI រក្សា assertions/gates ដើម; ភស្តុតាង និងព្រំដែននៅផ្នែក ២។
+- **សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ ម្ចាស់ push commit បន្ថែមទៅ PR #413 ហើយផ្ទៀង CI ថ្មីលើ SHA នោះមុន merge។ គ្មាន rules/migration ឬការកំណត់ផលិតកម្មថ្មីក្នុងការកែនេះ។ ការអញ្ជើញនៅបិទជាលំនាំដើម; មិនបាន push, rerun, preview ឬ deploy ដោយស្វ័យប្រវត្តិ។
+
 ### ZoeW [2.50.199] · ZoeKeyGen [2.24.47] — 2026-11-13 · ការអញ្ជើញអាជ្ញាប័ណ្ណ និងសំណើរង់ចាំ
 
 **ZoeW** (`zoew-v462` ➜ `zoew-v463`) និង **ZoeKeyGen** (`zoekeygen-v157` ➜ `zoekeygen-v158`)។ ការងារលើ main `8527753` សម្រាប់ review និងសាកល្បង; មិន merge, deploy ផលិតកម្ម បើកមុខងារលើ Server ឬប៉ះទិន្នន័យពិត។
@@ -2142,6 +2149,16 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-11-13 — ប្រមូលមូលហេតុ CI ក្នុង PR #413
+
+- **ប្រភព**៖ [Audit 43445044200](https://github.com/mengsroy-h/Zoe-System/actions/runs/43445044200) លើ head `74eda82e8ac204af5f1565556719f19d785577a1` ចប់ដោយធ្លាក់ shards ទាំង ៥ និង ZTO/native; Registration Auth និង F03 ឆ្លង។ មិន rerun ឬប៉ះ remote។ Local `375dd864` រក្សាដាច់ដោយឡែក; ការកែសរុបចាប់ពី head ដើម។
+- **Fixtures**៖ DOM ក្លែងរបស់ KeyGen ខ្វះ `replaceChildren`; បន្ថែមវិធីដែលសម្អាត children ពិត និង assertion លើជួរអញ្ជើញ/លេខយោង។ VM របស់ connection, periodic និង boot ខ្វះ leaf dependencies ថ្មី; auth fixture ត្រូវ isolate invitation boundary ដើម្បីមិនបញ្ចូល action registry ពេញតាម mock មិនពេញ។
+- **បណ្ដាញ និង metadata**៖ invitation POST ប្រើ fetch ឆៅក្រៅ helper រួម។ តេស្តធម្មតា headers/body ដែលព្យួរធ្លាក់ ២ មុនកែ ហើយឆ្លងក្រោយ helper settle និង abort នៅពិដាន។ រក្សា status handling និង envelope ដើម។ សារចម្លងត្រូវមានសញ្ញា ✅; announcements ទុក update ថ្មីតែមួយ; កាតាឡុក audit បន្ថែមឧបករណ៍ UI ដែលខ្វះ។
+- **ការស្រង់ native**៖ esbuild ប្តូរ transport `client` ទៅ `client2` ដោយសារ function `client()` ថ្មី។ Compile-only បញ្ជាក់ថា matcher ចាស់រកមិនឃើញ; harness ថ្មីស្រង់ឈ្មោះ binding ក្នុង function ពិត ហើយរក្សាពិដាន exactly-one។ តេស្ត compile/transform ៣ ឆ្លង ដោយមិន execute bundle ឬ emulator។
+- **Keyboard fixture**៖ log បញ្ជាក់ `outside:[]`, `drawer:false`, `ran:0`, `stays:true`; Enter បើក logout confirmation ក្នុង activation modal ផ្ទាល់។ Fixture កំណត់ focus ទៅ field មើលឃើញមុន Enter ហើយរក្សា Tab containment និង assertion ចុងក្រោយដើម។ មិនកែ modal protection របស់ App។
+- **ការផ្ទៀង tree ចុងក្រោយ**៖ focused routine tests ៥៧ ឆ្លង (invitation/setup ១៧, notifications/push/compile-only ៣៩, DOM checker positive ១); default-off UI ២២ ឆ្លង។ Typecheck, lint, production build, doc check, Android source contract ១៣៥, slot ownership, purity ១៥, file coverage ១០, syntax និង whitespace ឆ្លង។ Hash integrity របស់ harness ធ្វើបច្ចុប្បន្នភាពក្រោយ review ឯករាជ្យ; គ្មាន gate ឬ assertion ដើមត្រូវដក។
+- **ព្រំដែន**៖ audit build ដល់ Chromium launch ហើយត្រូវបានទប់ដោយ sandbox socket permission; មិនអះអាងថា browser audit ឬ full doc-scope បានរត់។ មិនរត់ security/poison/mutation/native-emulator/full-CI ឬសាកឧបករណ៍ពិត; local pass និង compile-only មិនជំនួស CI ថ្មី។ Timeout test វាស់ពិដានរួម ៤៥ វិនាទី និង source abort មិនបំបែក timer របស់ helper ដោយឡែកទេ។
 
 ### 2026-11-13 — ស្តារ browser audit bridge និងផ្លូវ fixture
 

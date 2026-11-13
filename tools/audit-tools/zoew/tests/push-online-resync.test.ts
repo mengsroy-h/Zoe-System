@@ -66,7 +66,8 @@ it('bootApplication ពិតភ្ជាប់ `listenPushNetwork(scope)` ព�
     const stub = { onLoad: (fn: () => void) => fn(), onDispose: () => {}, listen: () => {} };
     const wired: unknown[] = [];
     const names = ['bootShell', 'startCoreServices', 'listenSetupLinkNavigation', 'startPeriodicTasks', 'setupConnectionRecovery',
-        'startScanEngine', 'startInteractions', 'startGlobalDismissals', 'sampleScrollHz', 'revealAppAfterBoot'];
+        'startScanEngine', 'startInteractions', 'startGlobalDismissals', 'sampleScrollHz', 'revealAppAfterBoot',
+        'routeLicenseInvitation', 'resumeLicenseInvitation', 'cancelLicenseInvitation'];
     const context: Record<string, unknown> = Object.fromEntries(names.map((name) => [name, () => {}]));
     context.exports = {};
     context.window = {};

@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.47';
+const APP_VERSION = '2.24.48';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -3147,9 +3147,7 @@ function clearSecureKeySetup() {
     secureKeySetup = null;
     const queue = document.getElementById('licenseInvitationQueue');
     if (queue) queue.replaceChildren();
-    const reference = document.getElementById('licenseInvitationReference');
-    if (reference) reference.value = '';
-    ['secureKeyEnrollmentInput', 'secureKeySetupKey'].forEach((id) => {
+    ['secureKeyEnrollmentInput', 'secureKeySetupKey', 'licenseInvitationReference'].forEach((id) => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
@@ -3287,7 +3285,7 @@ async function copyLicenseInvitation(link) {
     const ref = setup && setup.invitationReference;
     if (!ref || !secureKeySetupCurrent(setup) || (link && ref.target !== 'pwa')) return;
     const value = link ? 'https://zoew.netlify.app/#license-invite=' + ref.id : ref.id;
-    return copySensitiveText(value, () => secureKeySetupCurrent(setup) && setup.invitationReference === ref, () => showToast('បានចម្លង'));
+    return copySensitiveText(value, () => secureKeySetupCurrent(setup) && setup.invitationReference === ref, () => showToast('✅ បានចម្លង'));
 }
 
 async function actLicenseInvitation(setup, invite, action, request) {

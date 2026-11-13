@@ -27,7 +27,7 @@ const metadata = { url: 'https://api.example.com/search?barcode={barcode}', enab
 function producerHarness() {
     const elements: any = {};
     const writes: any[] = [];
-    const element = (id: string) => elements[id] ||= { value: '', checked: false, textContent: '', innerHTML: '', classList: { add() {}, remove() {} } };
+    const element = (id: string) => elements[id] ||= { value: '', checked: false, textContent: '', innerHTML: '', childNodes: [] as unknown[], replaceChildren(...nodes: unknown[]) { this.childNodes = nodes; }, classList: { add() {}, remove() {} } };
     const ctx: any = { crypto: webcrypto, TextEncoder, Uint8Array, Uint32Array, URL, btoa, atob,
         auth: { currentUser: { uid: 'seller' } }, authGeneration: 1, sensitiveSessionGeneration: 1, isSignedInUiActive: true,
         lookupSetupGeneration: 0, lastGeneratedSetupLink: '', secureKeySetup: null, SETUP_LINK_URL_KEY: 'base', appLocalStore: {},
@@ -94,8 +94,14 @@ describe('Setup Lookup ៖ កូដលក់ពិត ➜ កូដទទួល
         expect(h.element('setupLookupSecretInput').value).toBe('');
         expect(h.element('setupLinkQrContainer').textContent).toBe(url);
         expect(JSON.stringify(h.writes)).not.toMatch(/seller-private-header|keyEnc/);
+        const invitationRow = { textContent: 'សំណើសាកល្បង' };
+        h.element('licenseInvitationQueue').replaceChildren(invitationRow);
+        h.element('licenseInvitationReference').value = 'synthetic-reference';
+        expect(h.element('licenseInvitationQueue').childNodes).toEqual([invitationRow]);
         h.ctx.invalidateSensitiveSession();
         expect(h.element('setupLookupCodeOutput').textContent).toBe('');
+        expect(h.element('licenseInvitationQueue').childNodes).toEqual([]);
+        expect(h.element('licenseInvitationReference').value).toBe('');
     });
     it('អ្នកលក់ logout កណ្ដាល crypto ➜ Link/កូដ/QR មិនលេចក្រោយមក', async () => {
         const h = producerHarness();

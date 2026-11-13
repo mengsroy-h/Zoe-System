@@ -241,6 +241,7 @@ function makeDom() {
         const classes = new Set(spec.cls);
         const el = {
             id, tagName: spec.tag.toUpperCase(), value: spec.value || '', textContent: '', innerHTML: '', disabled: false,
+            childNodes: [], replaceChildren(...nodes) { this.childNodes = nodes; this.innerHTML = ''; this.textContent = nodes.map(node => typeof node === 'string' ? node : node.textContent || '').join(''); },
             classList: {
                 add: (c) => classes.add(c), remove: (c) => classes.delete(c), contains: (c) => classes.has(c),
                 toggle: (c, on) => { const want = on === undefined ? !classes.has(c) : !!on; if (want) classes.add(c); else classes.delete(c); return want; }
@@ -265,6 +266,23 @@ function makeDom() {
         el: element,
         texts: () => [...elements.values()].map((e) => ({ id: e.id, s: [e.value, e.textContent, e.innerHTML].join(' ') }))
     };
+}
+
+{
+    const dom = makeDom();
+    const queue = dom.el('licenseInvitationQueue');
+    const reference = dom.el('licenseInvitationReference');
+    ok('លក្ខខណ្ឌសម្អាត៖ មានជួរសំណើ និងលេខយោងក្នុង HTML', !!queue && !!reference);
+    if (queue && reference) {
+        const row = { textContent: 'សំណើសាកល្បង' };
+        queue.replaceChildren(row);
+        reference.value = 'synthetic-reference';
+        ok('មុនសម្អាត៖ ជួរសំណើមានធាតុសាកល្បង', queue.childNodes.length === 1 && queue.childNodes[0] === row);
+        const cleanup = vm.createContext({ document: dom.document });
+        vm.runInContext('var secureKeySetup = {};\n' + decls.get('clearSecureKeySetup').text, cleanup);
+        cleanup.clearSecureKeySetup();
+        ok('សម្អាតការអញ្ជើញ៖ ដកធាតុ និងលេខយោង', queue.childNodes.length === 0 && queue.textContent === '' && queue.innerHTML === '' && reference.value === '');
+    }
 }
 
 function buildKeygen(env) {

@@ -244,6 +244,8 @@ const SEAT_ENROLLMENT_DECL = (source.match(/(?:^|\n)[ \t]*(let seatEnrollmentOpe
             clearTimeout: (id) => timers.delete(id),
             document: { getElementById: element },
             licenseFailureMessage: (reason) => 'សិទ្ធិ៖' + reason,
+            restoreLicenseInvitationIntent: () => false,
+            resumeLicenseInvitation: () => Promise.resolve(),
             closeModal: (id) => effects.push('close:' + id),
             openModalHelper: (id) => effects.push('open:' + id),
             showToast: (message) => effects.push('toast:' + message),

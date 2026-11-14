@@ -3,7 +3,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, createHmac, randomBytes } from 'node:crypto';
 import Module, { createRequire } from 'node:module';
-import { execFileSync } from 'node:child_process';
 
 const require = createRequire(import.meta.url);
 const ROOT = path.resolve(__dirname, '../../../..');
@@ -14,6 +13,12 @@ let c: any, tenant: string, actor: any, other: any, serial = 0, exportDdlBefore:
 const baseline = new Map<string, any>();
 const definitions = () => c.query("select proname,prosrc,proacl::text,proconfig,prosecdef,provolatile,pg_get_userbyid(proowner) as owner from pg_proc where (pronamespace='private'::regnamespace and proname in ('zoe_apply_engine_v1','zoe_snap_val','zoe_eval')) or (pronamespace='public'::regnamespace and proname='zoe_admin_export')");
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
+// ចម្លង bytes ដើមពី cb8fc35d7c4cbe6bcc7208cda6f0d8f742ebcbf7:tools/firebase-backup/supabase.js។
+// Git blob a3ffa20d9b6c81ac9813777ac8bb046880122efd; CI shallow មិនត្រូវការប្រវត្តិ Git។
+const OLD_SUPABASE_CLI = {
+    path: 'tools/audit-tools/fixtures/supabase-backup-before-restore-guards.source',
+    sha256: 'e40e247f08afb75ff0ebec9ba17a4b62629287b31a9c6bafef8540e23e2bc208'
+};
 const TRASH = 'zoew_recently_deleted_cod_dod';
 const source = (id: string) => ({ id, phone: '012000000', createdAt: Date.now() - 10000, deletedAt: Date.now() - 1000,
     trashMode: 'cookie', trashReason: 'remove', isFromDeletion: false, isClosed: false, scanDate: '2026-11-14',
@@ -72,7 +77,8 @@ it('ordinary service export refuses unsealed sticky denial and no archive public
     expect((await c.query('select count(*)::int n from private.zoe_restore_attestations where tenant_id=$1', [tenant])).rows[0].n).toBe(1);
     const ordinary = await PG.as(c, { role: 'service_role' }, 'select public.zoe_admin_export($1) r', [tenant]);
     expect(ordinary.error?.code).toBe('55000'); expect(ordinary.error?.message).toBe('private-restore-state-requires-database-backup');
-    const oldCode = execFileSync('git', ['show', 'cb8fc35d7c4cbe6bcc7208cda6f0d8f742ebcbf7:tools/firebase-backup/supabase.js'], { cwd: ROOT, encoding: 'utf8' });
+    const oldCode = fs.readFileSync(path.join(ROOT, OLD_SUPABASE_CLI.path), 'utf8');
+    expect(hash(oldCode)).toBe(OLD_SUPABASE_CLI.sha256);
     const oldModule = new (Module as any)(ROOT + '/tools/firebase-backup/supabase.js');
     oldModule.filename = ROOT + '/tools/firebase-backup/supabase.js'; oldModule.paths = (Module as any)._nodeModulePaths(ROOT + '/tools/firebase-backup');
     oldModule._compile(oldCode, oldModule.filename);

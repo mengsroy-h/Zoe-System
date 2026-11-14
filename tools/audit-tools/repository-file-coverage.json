@@ -5525,6 +5525,10 @@
     },
     "tools/audit-tools/zoew/tests/zto-terminal-decision.pg.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/fixtures/supabase-backup-before-restore-guards.source": {
+      "policy": "zoew-self-verification",
+      "sha256": "e40e247f08afb75ff0ebec9ba17a4b62629287b31a9c6bafef8540e23e2bc208"
     }
   }
 }

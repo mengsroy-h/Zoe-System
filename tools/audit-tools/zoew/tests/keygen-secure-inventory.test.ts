@@ -31,6 +31,28 @@ async function harness() {
     return { ctx, state, publicKey, changeSession: () => { current = false; } };
 }
 
+function delegateInventory(h: Awaited<ReturnType<typeof harness>>) {
+    const current = h.ctx.seatSellerContext().current;
+    Object.assign(h.ctx, { captureSensitiveSession: () => ({}), adminOperationIsCurrent: current,
+        isSensitiveSessionCurrent: current, db: {}, signingPrivateKeyJwk: {} });
+    vm.runInContext(source.slice(source.indexOf('function seatSellerContext('), source.indexOf('async function seatSellerRow(')), h.ctx);
+    vm.runInContext(source.slice(source.indexOf('function secureKeySetupCurrent('), source.indexOf('function secureKeySetupMessage(')), h.ctx);
+    h.ctx.fixtureSetup = { id: keyId, context: h.ctx.seatSellerContext() };
+    vm.runInContext('secureKeySetup = fixtureSetup;', h.ctx);
+    vm.runInContext(source.slice(source.indexOf('const ACTION_ALLOWLIST ='), source.indexOf('function blockFormSubmit(')), h.ctx);
+    const registrations: Array<[string, EventListenerOrEventListenerObject]> = [];
+    const original = document.addEventListener.bind(document);
+    const spy = vi.spyOn(document, 'addEventListener').mockImplementation((type: string, listener: any, options?: any) => {
+        registrations.push([type, listener]);
+        original(type, listener, options);
+    });
+    h.ctx.setupActionDelegation();
+    return () => {
+        registrations.forEach(([type, listener]) => document.removeEventListener(type, listener));
+        spy.mockRestore();
+    };
+}
+
 beforeEach(() => { document.body.replaceChildren(); });
 
 describe('បញ្ជីឧបករណ៍សុវត្ថិភាពរបស់អ្នកលក់', () => {
@@ -135,6 +157,50 @@ describe('បញ្ជីឧបករណ៍សុវត្ថិភាពរប�
         ctx.renderKeyList();
         expect(document.querySelector('[data-action="secure-inventory"]')?.getAttribute('data-key-id')).toBe(keyId);
         expect(document.querySelector('[data-act="openSetupSeatInventory"]')).not.toBeNull();
+    });
+});
+
+describe('ចុចបញ្ជីឧបករណ៍តាម action delegation ពិត', () => {
+    it('ចុចបើក ពិនិត្យម្ដងទៀត និងបិទ តាមប៊ូតុងក្នុង HTML ពិត', async () => {
+        const h = await harness(), cleanup = delegateInventory(h);
+        try {
+            (document.querySelector('[data-act="openSetupSeatInventory"]') as HTMLButtonElement).click();
+            await vi.waitFor(() => expect(document.querySelector('.secure-seat-count')?.textContent).toContain('1/3'));
+            expect(h.ctx.seatSellerInspect).toHaveBeenCalledOnce();
+            (h.state as any).seats = {};
+            (document.getElementById('secureSeatInventoryRefresh') as HTMLButtonElement).click();
+            await vi.waitFor(() => expect(document.querySelector('.secure-seat-count')?.textContent).toContain('0/3'));
+            expect(h.ctx.seatSellerInspect).toHaveBeenCalledTimes(2);
+            (document.querySelector('#secureSeatInventoryModal [data-act="closeModal"]') as HTMLButtonElement).click();
+            expect(document.getElementById('secureSeatInventoryModal')?.classList.contains('active')).toBe(false);
+            expect(document.getElementById('secureSeatInventoryList')?.textContent).toBe('');
+        } finally { cleanup(); }
+    });
+    it('ចុចម្ដងទៀតពេលសម័យ ឬ Signing Key ផ្លាស់ប្ដូរ មិនអានបញ្ជី', async () => {
+        const h = await harness(), cleanup = delegateInventory(h);
+        try {
+            (document.querySelector('[data-act="openSetupSeatInventory"]') as HTMLButtonElement).click();
+            await vi.waitFor(() => expect(document.querySelector('.secure-seat-count')).not.toBeNull());
+            h.changeSession();
+            (document.getElementById('secureSeatInventoryRefresh') as HTMLButtonElement).click();
+            (document.querySelector('[data-act="openSetupSeatInventory"]') as HTMLButtonElement).click();
+            expect(h.ctx.seatSellerInspect).toHaveBeenCalledOnce();
+        } finally { cleanup(); }
+        const changedKey = await harness(), release = delegateInventory(changedKey);
+        try {
+            changedKey.ctx.signingPrivateKeyJwk = {};
+            (document.querySelector('[data-act="openSetupSeatInventory"]') as HTMLButtonElement).click();
+            expect(changedKey.ctx.seatSellerInspect).not.toHaveBeenCalled();
+        } finally { release(); }
+    });
+    it('រាល់ data-act ក្នុង HTML និង HTML បង្កើតមានក្នុង allowlist ពិត', async () => {
+        const h = await harness(), cleanup = delegateInventory(h);
+        try {
+            const allowed: string[] = JSON.parse(vm.runInContext('JSON.stringify(ACTION_ALLOWLIST)', h.ctx));
+            const actions = new Set([...html.matchAll(/data-act="([^"$]+)"/g), ...source.matchAll(/data-act="([^"$]+)"/g)].map(match => match[1]));
+            expect(actions.size).toBeGreaterThan(30);
+            expect([...actions].filter(action => !allowed.includes(action))).toEqual([]);
+        } finally { cleanup(); }
     });
 });
 

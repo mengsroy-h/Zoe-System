@@ -20,6 +20,8 @@ const ACTION_ALLOWLIST = [
     "doLogin",
     "generateLicenseKey",
     "refreshSecureKeySetup",
+    "openSetupSeatInventory",
+    "refreshSecureSeatInventory",
     "inspectSecureKeyEnrollment",
     "createLicenseInvitation",
     "refreshLicenseInvitations",

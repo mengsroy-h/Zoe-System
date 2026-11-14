@@ -5225,6 +5225,9 @@
     "tools/audit-tools/zoew/tests/license-invitations-server.test.ts": {
       "policy": "license-seat-protocol"
     },
+    "tools/audit-tools/zoew/tests/keygen-secure-inventory.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "tools/audit-tools/zoew/tests/license-invitations-seller.test.ts": {
       "policy": "license-seat-protocol"
     },

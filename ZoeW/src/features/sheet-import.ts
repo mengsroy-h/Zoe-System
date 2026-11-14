@@ -45,7 +45,7 @@ export const SHEET_IMPORT_UPSERT_UNMAPPED_TEXT = '⚠️ «បន្ថែមថ
 
 export const SHEET_IMPORT_PREPARE_PENDING_TEXT = 'កំពុងរកការផ្គូផ្គង Column របស់ឯកសារនេះ — សូមរង់ចាំបន្តិច';
 
-export const SHEET_IMPORT_UNKNOWN_TEXT = 'មិនទាន់ដឹងលទ្ធផលទេ — Sheet អាចបានទទួលរួច។ តារាងអតិថិជនក្នុងឧបករណ៍ត្រូវបានបោះចោល ហើយនឹងទាញថ្មី។ ចុចម្ដងទៀតបានដោយសុវត្ថិភាព (លទ្ធផលដដែល)។';
+export const SHEET_IMPORT_UNKNOWN_TEXT = 'មិនទាន់ដឹងលទ្ធផលទេ — Sheet អាចបានទទួលរួច។ តារាងអតិថិជនក្នុងឧបករណ៍ត្រូវបានបោះចោល ហើយនឹងទាញថ្មី។ រក្សាប្រតិបត្តិការដើម ហើយផ្ទៀងផ្ទាត់ Sheet មុនប្រតិបត្តិការថ្មី។';
 
 export async function deriveSheetImportKey(pin) {
     try {
@@ -249,6 +249,119 @@ export function editSheetImportConfig() {
     showSheetImportPart('siActionCard', false);
 }
 
+async function preparedSheetWrite_(kind, payload, env) {
+    var current = env.current || function () { return true; };
+    var responseCurrent = env.responseCurrent || current;
+    var fail = function (code, unknown = false) { return Object.assign(new Error(code), { outcomeUnknown: !!unknown }); };
+    var hash = async function (value) {
+        var bytes = await env.crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(value)));
+        return Array.from(new Uint8Array(bytes)).map(function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+    };
+    var dispatched = false;
+    var priorPending = false;
+    try {
+        if (!current()) throw fail('IMPORT_SESSION_CHANGED');
+        if (!env.storage) throw fail('IMPORT_CLIENT_STORAGE_HOLD');
+        var scopeHash = await hash({ scope: env.scope });
+        var inputHash = await hash({ kind: kind, source: payload });
+        if (!current()) throw fail('IMPORT_SESSION_CHANGED');
+        for (var pendingIndex = 0; pendingIndex < env.storage.length; pendingIndex++) {
+            var pendingKey = env.storage.key(pendingIndex);
+            if (!pendingKey || pendingKey.indexOf('zoe_sheet_pending_v1_') !== 0) continue;
+            var prior;
+            try { prior = JSON.parse(env.storage.getItem(pendingKey)); } catch (err) { throw fail('IMPORT_CLIENT_STORAGE_HOLD'); }
+            if (!prior || prior.v !== 1 || !prior.intent || ['pending', 'done'].indexOf(prior.state) < 0) throw fail('IMPORT_CLIENT_STORAGE_HOLD');
+            if (prior.state === 'pending' && prior.scopeHash === scopeHash && prior.kind === kind && (!prior.inputHash || prior.inputHash === inputHash)) priorPending = true;
+        }
+        var status = await env.rpc('status');
+        if (!current()) throw fail('IMPORT_SESSION_CHANGED');
+        if (!status || status.writeProtocol !== 1 || !/^[a-f0-9]{64}$/.test(status.writeScope)) throw fail('IMPORT_UPGRADE_REQUIRED');
+        var prefix = 'zoe_sheet_pending_v1_' + await hash({ scope: env.scope, writer: status.writeScope, kind: kind, source: payload }) + '_';
+        if (!current()) throw fail('IMPORT_SESSION_CHANGED');
+        var pending = [];
+        for (var i = 0; i < env.storage.length; i++) {
+            var key = env.storage.key(i);
+            if (!key || key.indexOf(prefix) !== 0) continue;
+            var raw = env.storage.getItem(key), saved;
+            try { saved = JSON.parse(raw); } catch (err) { throw fail('IMPORT_CLIENT_STORAGE_HOLD'); }
+            if (!saved || saved.v !== 1 || ['pending', 'done'].indexOf(saved.state) < 0 || saved.scopeHash !== scopeHash || saved.kind !== kind || saved.inputHash && saved.inputHash !== inputHash || !saved.intent || typeof saved.intent.id !== 'string' || key !== prefix + saved.intent.id) throw fail('IMPORT_CLIENT_STORAGE_HOLD');
+            pending.push({ key: key, raw: raw, saved: saved });
+        }
+        pending.sort(function (a, b) { return a.saved.intent.preparedAt - b.saved.intent.preparedAt || a.saved.intent.id.localeCompare(b.saved.intent.id); });
+        var entry = pending[0];
+        if (!entry) {
+            var prepared = await env.rpc('prepare', { kind: kind, payload: payload });
+            if (!current()) throw fail('IMPORT_SESSION_CHANGED');
+            if (!prepared || prepared.protocol !== 1 || !prepared.intent || prepared.intent.kind !== kind || !/^[0-9a-f-]{36}$/i.test(prepared.intent.id)) throw fail('IMPORT_PREPARE_UNREADABLE');
+            var created = { v: 1, state: 'pending', scopeHash: scopeHash, inputHash: inputHash, kind: kind, intent: prepared.intent };
+            entry = { key: prefix + prepared.intent.id, raw: JSON.stringify(created), saved: created };
+            env.storage.setItem(entry.key, entry.raw);
+            if (env.storage.getItem(entry.key) !== entry.raw) throw fail('IMPORT_CLIENT_STORAGE_HOLD');
+        }
+        if (!current()) throw fail('IMPORT_SESSION_CHANGED');
+        if (env.storage.getItem(entry.key) !== entry.raw) throw fail('IMPORT_CLIENT_STORAGE_HOLD');
+        dispatched = true;
+        var result = await env.rpc('execute', { kind: kind, payload: payload, intent: entry.saved.intent });
+        if (!responseCurrent()) throw fail('IMPORT_SESSION_CHANGED', true);
+        var receipt = result && result.importReceipt;
+        if (!receipt || receipt.v !== 1 || receipt.id !== entry.saved.intent.id || receipt.sourceHash !== entry.saved.intent.sourceHash || typeof receipt.revision !== 'string' || typeof receipt.current !== 'boolean' || result.importCurrent !== receipt.current) throw fail('IMPORT_REPLY_UNREADABLE', true);
+        if (!receipt.current) {
+            var fresh = await env.rpc('status');
+            if (!responseCurrent()) throw fail('IMPORT_SESSION_CHANGED', true);
+            result.currentStatus = fresh;
+        }
+        if (env.storage.getItem(entry.key) !== entry.raw) throw fail('IMPORT_CLIENT_STORAGE_HOLD', true);
+        entry.saved.state = 'done';
+        var completed = JSON.stringify(entry.saved);
+        env.storage.setItem(entry.key, completed);
+        if (env.storage.getItem(entry.key) !== completed) throw fail('IMPORT_CLIENT_STORAGE_HOLD', true);
+        return result;
+    } catch (err) {
+        if (dispatched || priorPending) err.outcomeUnknown = true;
+        var code = err && err.message ? err.message : String(err);
+        var text = /^(?:Error: )?ពាក្យសម្ងាត់មិនត្រឹមត្រូវ$/.test(code) ? 'ពាក្យសម្ងាត់មិនត្រឹមត្រូវ'
+            : !(err && err.outcomeUnknown) && code === 'ឧបករណ៍ក្រៅបណ្ដាញ — សូមភ្ជាប់អ៊ីនធឺណិតជាមុនសិន' ? 'ឧបករណ៍ក្រៅបណ្ដាញ — សូមភ្ជាប់អ៊ីនធឺណិតជាមុនសិន'
+            : /STORAGE/.test(code) ? 'មិនអាចរក្សាភស្តុតាងសង្គ្រោះក្នុងឧបករណ៍។ បានផ្អាកការសរសេរ; សូមរក្សាទិន្នន័យ និងពិនិត្យការផ្ទុក។'
+            : /STALE|SHEET_CHANGED|TARGET_CHANGED|SOURCE_CHANGED/.test(code) ? 'Sheet ឬឯកសារបានផ្លាស់ប្ដូរក្រោយការពិនិត្យ។ បានផ្អាកប្រតិបត្តិការដើម; សូមផ្ទៀងផ្ទាត់ទិន្នន័យមុនប្រតិបត្តិការថ្មី។'
+            : /UPGRADE|INTENT_REQUIRED/.test(code) ? 'Apps Script នាំចូលត្រូវធ្វើបច្ចុប្បន្នភាពជាមួយ App មុនប្រើ។ មិនបានសរសេរទិន្នន័យ។'
+            : 'លទ្ធផលប្រតិបត្តិការមុនមិនទាន់អាចផ្ទៀងផ្ទាត់បាន។ បានរក្សាភស្តុតាងដើម និងមិនសរសេរឡើងវិញ; សូមពិនិត្យ Sheet និងឯកសារដើម។';
+        throw Object.assign(new Error(text), { code: code, outcomeUnknown: !!(err && err.outcomeUnknown) });
+    }
+}
+
+async function forgetCompletedSheetWrites_(storage, scope, kind, cryptoApi, current) {
+    if (!storage) throw new Error('IMPORT_CLIENT_STORAGE_HOLD');
+    var bytes = await cryptoApi.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify({ scope: scope })));
+    var scopeHash = Array.from(new Uint8Array(bytes)).map(function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+    if (current && !current()) throw new Error('IMPORT_SESSION_CHANGED');
+    var remove = [];
+    for (var i = 0; i < storage.length; i++) {
+        var key = storage.key(i);
+        if (!key || key.indexOf('zoe_sheet_pending_v1_') !== 0) continue;
+        var raw = storage.getItem(key), saved;
+        try { saved = JSON.parse(raw); } catch (err) { throw new Error('IMPORT_CLIENT_STORAGE_HOLD'); }
+        if (saved && saved.v === 1 && saved.state === 'done' && saved.scopeHash === scopeHash && saved.kind === kind) remove.push({ key: key, raw: raw });
+    }
+    remove.forEach(function (entry) {
+        if (storage.getItem(entry.key) !== entry.raw) throw new Error('IMPORT_CLIENT_STORAGE_HOLD');
+        storage.removeItem(entry.key);
+        if (storage.getItem(entry.key) !== null) throw new Error('IMPORT_CLIENT_STORAGE_HOLD');
+    });
+}
+
+function sheetPendingScope_() { return shopScope() + '|' + (firebaseState.auth?.currentUser?.uid || '') + '|' + sheetImportState.sheetImportUrl; }
+
+function runPreparedAppWrite_(kind, payload, current, responseCurrent = current) {
+    const url = sheetImportState.sheetImportUrl, password = sheetImportState.sheetImportPassword;
+    const scope = sheetPendingScope_();
+    return preparedSheetWrite_(kind, payload, { storage: appLocalStore, crypto, scope, current, responseCurrent,
+        rpc: (step, body?) => {
+            if (step === 'status') return callSheetImportApi('status', {}, url, password);
+            if (step === 'prepare') return callSheetImportApi('prepareWrite', { request: { kind: body.kind, payload: body.payload, confirm: 'CLEAR' } }, url, password);
+            return body.kind === 'clear' ? callSheetImportApi('clear', { confirm: 'CLEAR', intent: body.intent }, url, password) : callSheetImportApi('import', { payload: { ...body.payload, intent: body.intent } }, url, password);
+        } });
+}
+
 export async function callSheetImportApi(action, extra, url?, password?) {
     const target = url || sheetImportState.sheetImportUrl;
     const secret = password === undefined ? sheetImportState.sheetImportPassword : password;
@@ -311,9 +424,10 @@ function captureSheetImportData() {
     const shop = shopScope();
     const authEpoch = firebaseState.authGeneration;
     const tableSession = lookupState.customerDataTableSessionGeneration;
+    const tableVersion = lookupState.customerDataTableFetchGeneration;
     return () => {
         if (shopScope() !== shop || firebaseState.authGeneration !== authEpoch) return null;
-        return lookupState.customerDataTableSessionGeneration === tableSession ? 'table' : 'shop';
+        return lookupState.customerDataTableSessionGeneration === tableSession && lookupState.customerDataTableFetchGeneration === tableVersion ? 'table' : 'shop';
     };
 }
 
@@ -437,7 +551,10 @@ let sheetFileGeneration = 0;
 
 export async function handleSheetImportFile(file) {
     if (!file) return;
-    const generation = ++sheetFileGeneration;
+    const incomingFileGeneration = ++sheetFileGeneration, incomingScope = sheetPendingScope_();
+    try { await forgetCompletedSheetWrites_(appLocalStore, incomingScope, 'import', crypto, () => incomingFileGeneration === sheetFileGeneration && incomingScope === sheetPendingScope_()); } catch (err) { if (incomingFileGeneration !== sheetFileGeneration || incomingScope !== sheetPendingScope_()) return; setSheetImportMsg('siFileMsg', 'មិនអាចពិនិត្យភស្តុតាងសង្គ្រោះក្នុងឧបករណ៍; បានផ្អាកការនាំចូល។', 'bad'); return; }
+    if (incomingFileGeneration !== sheetFileGeneration || incomingScope !== sheetPendingScope_()) return;
+    const generation = incomingFileGeneration;
     resetSheetImportFileSelection();
     setSheetImportMsg('siFileMsg', 'កំពុងអានឯកសារ...', 'warn');
     let buffer;
@@ -638,12 +755,19 @@ export async function runSheetImport() {
     viewState.siImportBtnText = 'កំពុងនាំចូល...';
     setSheetImportMsg('siActionMsg', '');
     try {
-        const result = await callSheetImportApi('import', {
-            payload: { rows: rows, mode: mode, mapping: mapping, signature: sheetImportState.sheetImportSignature }
-        });
+        const result = await runPreparedAppWrite_('import', { rows, mode, mapping, signature: sheetImportState.sheetImportSignature }, current, dataCurrent);
         const data = dataCurrent();
         if (!data) return;
-        if (data !== 'table' || !seedCustomerTableFromImport(rows, mode, result.rowsAfter, { added: result.added, keep: keep })) clearCustomerDataTableCache();
+        if (!result.importCurrent) {
+            clearCustomerDataTableCache();
+            scheduleCustomerTableSoonRefresh(true);
+            if (current()) {
+                setSheetImportMsg('siActionMsg', 'ប្រតិបត្តិការមុនបានបញ្ជាក់។ Sheet មានការកែថ្មីជាងនេះ; បានទាញទិន្នន័យបច្ចុប្បន្នឡើងវិញ។', 'warn');
+                if (result.currentStatus) setSheetImportFoot(sheetImportStatusText('', result.currentStatus.sheetName, result.currentStatus.rowCount));
+            }
+            return;
+        }
+        if (result.replayed || !result.importCurrent || data !== 'table' || !seedCustomerTableFromImport(rows, mode, result.rowsAfter, { added: result.added, keep: keep })) clearCustomerDataTableCache();
         scheduleCustomerTableSoonRefresh(true);
         showToast('✅ នាំចូលរួចរាល់ — ' + result.rowsAfter + ' ជួរដេកក្នុង Sheet');
         if (!current()) return;
@@ -686,10 +810,20 @@ export async function runSheetImportClear() {
     viewState.siClearBtnBusy = true;
     setSheetImportMsg('siClearMsg', '');
     try {
-        const result = await callSheetImportApi('clear', { confirm: 'CLEAR' });
+        await forgetCompletedSheetWrites_(appLocalStore, sheetPendingScope_(), 'clear', crypto, current);
+        const result = await runPreparedAppWrite_('clear', {}, current, dataCurrent);
         if (!dataCurrent()) return;
         clearCustomerDataTableCache();
         scheduleCustomerTableSoonRefresh(true);
+        if (!result.importCurrent) {
+            clearCustomerDataTableCache();
+            scheduleCustomerTableSoonRefresh(true);
+            if (current()) {
+                setSheetImportMsg('siClearMsg', 'ប្រតិបត្តិការមុនបានបញ្ជាក់។ Sheet មានការកែថ្មីជាងនេះ; បានទាញទិន្នន័យបច្ចុប្បន្នឡើងវិញ។', 'warn');
+                if (result.currentStatus) setSheetImportFoot(sheetImportStatusText('', result.currentStatus.sheetName, result.currentStatus.rowCount));
+            }
+            return;
+        }
         showToast('✅ សម្អាតរួចរាល់ — លុប ' + result.removed + ' ជួរដេក');
         if (!current()) return;
         setSheetImportMsg('siClearMsg', '✅ សម្អាតរួចរាល់ — លុប ' + result.removed + ' ជួរដេក', 'ok');

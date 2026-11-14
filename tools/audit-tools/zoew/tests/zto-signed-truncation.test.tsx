@@ -1,3 +1,4 @@
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 /**
  * ⛔ ZTO-E3 ៖ ពិដានបញ្ជី «ចុះហត្ថលេខា» (ZTO_LIST_CLIENT_MAX_PAGES ទំព័រ × ១០០)។
  *
@@ -84,6 +85,8 @@ beforeEach(() => {
     firebaseState.authGeneration++;
     firebaseState.auth = { currentUser: { uid: 'audit-user' } } as any;
     firebaseState.fb = { getIdTokenResult: async () => ({ token: 'audit-token' }) } as any;
+    configureFixtureBackend('zto-signed-truncation');
+    acceptFixtureSession();
 });
 
 afterEach(() => {

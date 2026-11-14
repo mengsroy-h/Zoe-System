@@ -5,6 +5,8 @@ import { armLateWrite, dbOp, dbOpStalled } from '../services/network';
 import { refreshCurrentHistoryView } from '../ui/history-refresh';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { showToast } from '../ui/toast';
+import { localAuthSessionCurrent, localLogoutIntent } from '../services/local-logout-intent';
+import { loginBackendScope } from './login-memory';
 
 export function openExchangeRateModal() {
     setFieldValue('exchangeRateInput', String(dataState.exchangeRateRiel));
@@ -16,7 +18,10 @@ export function captureAuthDatabaseGuard() {
     const database = firebaseState.db;
     const sessionAuth = firebaseState.auth;
     const user = firebaseState.auth && firebaseState.auth.currentUser;
-    return () => generation === firebaseState.authGeneration && database === firebaseState.db && sessionAuth === firebaseState.auth && user === (firebaseState.auth && firebaseState.auth.currentUser);
+    const scope = loginBackendScope();
+    const logoutCurrent = user?.uid ? localLogoutIntent.witness(scope, user.uid) : () => true;
+    return () => generation === firebaseState.authGeneration && database === firebaseState.db && sessionAuth === firebaseState.auth && user === (firebaseState.auth && firebaseState.auth.currentUser)
+        && (!user || localAuthSessionCurrent(sessionAuth, scope, user)) && logoutCurrent();
 }
 
 export async function saveExchangeRate() {

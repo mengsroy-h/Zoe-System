@@ -22,6 +22,7 @@ const SQL_LABELS = [["actual-root-not-subscribed","original-cas-applied-once","e
 const SOURCE = { files: {} };
 const fixtureControls = [];
 const results = [], records = [], errors = [], cleanupErrors = [], frames = new Set(), httpTasks = new Set(), sockets = new Set();
+const poolClients = new Set();
 let H, c, pool, fake, Window, bundleBytes, bundleHash, active, serial = 0, currentCase, appliedMigrationManifest, migrationRules;
 const ownedPgChildren = [], outboundViolations = [];
 function outside(reason, target) { outboundViolations.push({ reason, target: String(target) }); throw new Error(reason); }
@@ -86,6 +87,8 @@ async function build() {
     ({ Window } = await import(pathToFileURL(path.join(DEPS, 'happy-dom/lib/index.js')).href));
     const entry = [
         "export { createSupabaseSdk } from './ZoeW/src/services/supabase-sdk';",
+        "export { acceptLocalAuthSession } from './ZoeW/src/services/local-logout-intent';",
+        "export { loginBackendScope } from './ZoeW/src/features/login-memory';",
         "export { createSupabaseTransport } from './ZoeW/src/services/supabase-transport';",
         "export { withConnectionOwnership,captureConnectionOperation,connectionFlowSnapshot } from './ZoeW/src/services/connection-flow';",
         "export { appLocalStore,appSessionStore } from './ZoeW/src/core/storage';",
@@ -151,6 +154,7 @@ function activate(frame) {
     Object.assign(api.firebaseState, { db, fb: sdk, auth, authGeneration: (api.firebaseState.authGeneration || 0) + 1, firebaseConfig: app.options,
         isInitializingFirebase: false, firebaseSdkUnavailable: false, isDatabaseInitialized: true, isDatabaseConnected: true, dbListenersFailed: false,
         hasEverConnectedToDatabase: true, serverClockTrusted: true, serverTimeOffsetMs: 0, sessionExpiryCheck: 'live' });
+    if (!api.acceptLocalAuthSession(auth, api.loginBackendScope(app.options), auth.currentUser) || !sdk.resumeAcceptedSession(auth)) throw new Error('Synthetic SDK login was not locally accepted');
 }
 async function connect(frame, fixture, ready = true) {
     const { api } = frame;
@@ -223,6 +227,7 @@ async function bootstrap() {
     migrationRules.installedCanonicalEqual = isDeepStrictEqual((await c.query('select private.zoe_rules() as value')).rows[0].value, compiledRules);
     if (!migrationRules.installedCanonicalEqual) throw new Error('installed rules differ from current canonical compiler output');
     pool = new H.PG.Pool({ host: '127.0.0.1', port: c.connectionParameters.port, user: 'postgres', database: database.name, max: 4 });
+    trackPgPool(pool);
     fake = await require(path.join(ROOT, 'tools/audit-tools/supabase-fake-server.js')).startFakeSupabase({ pool });
     fake.setRpcHook(event => active?.hook?.(event));
     console.log('READY owned HTTP PostgreSQL ' + H.pgBin.version + ' migrations' + appliedMigrationManifest.count + '; two independent VM production-source evaluations');
@@ -286,7 +291,7 @@ function readMigrationManifest() {
 function loadNativeContract() {
     const file = path.join(ROOT, 'tools/audit-tools/emu/pickup-reset-applied-sdk-test.js'), source = fs.readFileSync(file, 'utf8');
     const sourceHash = crypto.createHash('sha256').update(source).digest('hex');
-    if (sourceHash !== '4278ac44652e01a03a0e9422e0125694510c6aa92f6c088699b12e06978d2489') throw new Error('native counterpart changed; independently review matched contract before accepting it');
+    if (sourceHash !== '66c0a50c2b512e90c8cafafaf0dd47b7d53ff8c2d0f071843abf0e997be8924a') throw new Error('native counterpart changed; independently review matched contract before accepting it');
     const nodes = [], env = {}, parse = require(path.join(DEPS, 'acorn')).parse;
     function walk(node) { if (!node || typeof node !== 'object') return; if (node.type) nodes.push(node);
         for (const value of Object.values(node)) { if (Array.isArray(value)) value.forEach(walk); else if (value?.type) walk(value); } }
@@ -622,10 +627,21 @@ async function runCase(index) {
     }
     if (cleanupErrors.length) throw new Error('failed cleanup; refuse next fixture');
 }
+function trackPgPool(ownerPool) {
+    ownerPool.on('connect', client => poolClients.add(client));
+    ownerPool.on('remove', client => poolClients.delete(client));
+    ownerPool.on('error', error => {
+        errors.push({ infrastructure: 'owned PostgreSQL pool error', code: String(error.code || ''), error: String(error.message || error) });
+        process.exitCode = 1;
+    });
+}
 async function cleanup() {
     if (active) { active.hook = null; for (const frame of active.allFrames) frame.releases.splice(0).forEach(release => release()); }
     for (const frame of [...frames]) try { await bounded(Promise.allSettled([...frame.tasks]), 'settle own SDK tasks before final cleanup'); await closeFrame(frame); } catch (error) { cleanupErrors.push(String(error)); }
-    for (const close of [() => fake?.close(), () => pool?.end(), () => c?.end(), () => H?.stop()]) try { await bounded(Promise.resolve(close()), 'owned runtime cleanup'); } catch (error) { cleanupErrors.push(String(error)); }
+    for (const close of [() => fake?.close(), async () => {
+        await pool?.end();
+        await until(() => poolClients.size === 0, 'owned PG pool connections drained');
+    }, () => c?.end(), () => H?.stop()]) try { await bounded(Promise.resolve(close()), 'owned runtime cleanup'); } catch (error) { cleanupErrors.push(String(error)); }
     try { await until(() => httpTasks.size === 0 && sockets.size === 0 && ownedPgChildren.every(child => child.exitCode !== null || child.signalCode !== null), 'all owned HTTP/PG gone'); } catch (error) { cleanupErrors.push(String(error)); }
 }
 (async () => {
@@ -652,7 +668,7 @@ async function cleanup() {
             layers: 'actual production SDK/transport/public service + owned loopback HTTP gateway + actual PostgreSQL17 canonical' + (appliedMigrationManifest?.count ?? 'unknown') + ' migrations; separately evaluated VM source contexts',
             limitations: 'HappyDOM/memory local+session stores/fake GoTrue setup/deterministic Web Locks; no actual native engine/device/browser lock/process-crash proof. Native-specific callback and receipt availability differences labelled in case records.',
             nativeEngine: 'UNRUN_BY_THIS_CHECKER', comparison: { comparableScenarios: 18, providerSpecificScenarios: ['native-strict-cas-cold'], identicalOutcomeClaim: false }, authPasswordOrRevocationMutation: false,
-            cleanup: { frames: frames.size, httpTasks: httpTasks.size, sockets: sockets.size, pgStopRequested: !!H, ownedPgChildren: ownedPgChildren.map(child => ({ pid: child.pid, exitCode: child.exitCode, signalCode: child.signalCode })) } };
+            cleanup: { frames: frames.size, httpTasks: httpTasks.size, sockets: sockets.size, poolClients: poolClients.size, pgStopRequested: !!H, ownedPgChildren: ownedPgChildren.map(child => ({ pid: child.pid, exitCode: child.exitCode, signalCode: child.signalCode })) } };
         fs.writeFileSync(RESULT, JSON.stringify(report, null, 2) + '\n');
         console.log(JSON.stringify({ status: report.status, full, cases: records.length, pass: report.pass, fail: report.fail, errors: errors.length, cleanupErrors: cleanupErrors.length,
             inputDrift: drift, driverHash: report.driverHash, nativeSourceHash: NATIVE.sourceHash, resultFile: RESULT })); process.exitCode = success ? 0 : 1;

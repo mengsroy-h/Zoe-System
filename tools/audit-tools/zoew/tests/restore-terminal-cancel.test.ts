@@ -1,14 +1,16 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 import * as pickup from '../../../../ZoeW/src/domain/pickup';
 import * as storageApi from '../../../../ZoeW/src/core/storage';
 import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState, ztoState } from '../../../../ZoeW/src/core/state';
 import { getServerNow } from '../../../../ZoeW/src/core/clock';
+import { appZoneParts } from '../../../../ZoeW/src/core/timezone';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../../../../ZoeW/src/core/text';
 import { clearStaleRestoreMarkers, runAutomaticDeletedCleanup } from '../../../../ZoeW/src/domain/cleanup';
 import { activeRestoreClaims, applyClaimedRestoreToHistory, cancelBlockedRestore, claimDeletedItemForRestore, executeRestoreItem, releaseStaleRestoreClaimForPurge, restoreCancellationInFlight, restoreInFlight, restoreLostCodesText, restoreRecoveryHolds, resumeBlockedRestoreCancellations, storedRestoreClaims, RESTORE_RECOVERY_REQUIRED_TEXT } from '../../../../ZoeW/src/features/restore';
 import { buildTrashRowModel, trashRestoreHalf } from '../../../../ZoeW/src/app/components/trash/model';
-import { resetZtoFinalMarks } from '../../../../ZoeW/src/features/zto-final-marks';
+import { noteZtoReturnedEvidence, resetZtoFinalMarks } from '../../../../ZoeW/src/features/zto-final-marks';
 import { applyBarcodeCloseChange } from '../../../../ZoeW/src/features/barcode-ops';
 import { toggleCloseStatus } from '../../../../ZoeW/src/features/entry-ops';
 import { RESTORE_IN_PROGRESS_CLOSE_TEXT } from '../../../../ZoeW/src/core/text';
@@ -61,6 +63,7 @@ function install() {
     firebaseState.db = db as any; firebaseState.fb = fb() as any;
     firebaseState.firebaseConfig = { databaseURL: 'https://cancel.firebaseio.com' } as any;
     firebaseState.auth = { currentUser: { uid: 'u1', getIdToken: async () => 'tok' } } as any;
+    acceptFixtureSession();
     firebaseState.isDatabaseInitialized = true; firebaseState.isDatabaseConnected = true; firebaseState.serverClockTrusted = true;
     firebaseState.hasEverConnectedToDatabase = true;
     firebaseState.dbRefHistory = ref(db, H) as any; firebaseState.dbRefDeleted = ref(db, T) as any;
@@ -96,8 +99,41 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllGlobals(); });
 
 describe('terminal ZTO proof during restore cancels without credit', () => {
-    it.each(['claim', 'prepare'])('cancels after %s ACK and persists the block for another device', async stage => {
-        const before = money(), neighbor = at(`${H}/neighbor`); let observed = false;
+    it.each(['remove', 'returned', 'returned-sent'])('Palm ត្រឡប់ថ្មីពេល retry prepare %s ៖ លុបតែការបន្ថែម និងមិនបូកប្រាក់', async reason => {
+        const neighbor = at(`${H}/neighbor`), before = money();
+        prepared(); delete store[T].source.restoreBlocked;
+        Object.assign(store[T].source, { trashMode: 'palm', trashReason: reason === 'remove' ? 'remove' : 'returned' });
+        if (reason === 'returned-sent') store[T].source.barcodes[0].ztoSentOutAt = getServerNow() - 2000;
+        dataState.deletedItems = [at(`${T}/source`)];
+        localStorage.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true,
+            url: window.location.origin + '/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}' }));
+        const p = appZoneParts(getServerNow());
+        const returnedAt = `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}:${p.second}`;
+        const read = cleanupServerRead(at);
+        vi.stubGlobal('fetch', vi.fn(async (url: any, options: any) => String(url).includes('/.netlify/functions/zto-order-detail')
+            ? new Response(JSON.stringify({ success: true, found: true, barcode: 'C', cached: false, verifiedForRestore: true,
+                ztoClosed: false, ztoReturnedAt: returnedAt })) : read(url, options)));
+        await restore();
+        expect(at(`${T}/source`).restoreBlocked).toBe(true);
+        expect(at(`${T}/source`).restoreClaim).toBeUndefined();
+        expect(at(`${T}/source`).barcodes[0].isDeducted).toBe(true);
+        expect(at(`${H}/neighbor`)).toEqual(neighbor);
+        expect(money()).toEqual(before); expect(at(F)).toBeNull();
+    });
+
+    it.each((['local', 'palm'] as const).flatMap(mode => (['claim', 'prepare'] as const).map(stage => ({ mode, stage }))))(
+        '$mode៖ Sign ក្រោយ $stage ACK លុបចោល restore ដោយមិនបូកប្រាក់ ហើយរក្សាបម្រាមសម្រាប់ឧបករណ៍ផ្សេង', async ({ mode, stage }) => {
+        const before = money(), neighbor = at(`${H}/neighbor`), consumptions = at('zoew_trash_consumptions'); let observed = false;
+        if (mode === 'palm') {
+            store[T].source.trashMode = 'palm';
+            dataState.deletedItems = [at(`${T}/source`)];
+            localStorage.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true,
+                url: window.location.origin + '/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}' }));
+            const read = cleanupServerRead(at);
+            vi.stubGlobal('fetch', vi.fn(async (url: any, options: any) => String(url).includes('/.netlify/functions/zto-order-detail')
+                ? new Response(JSON.stringify({ success: true, found: true, barcode: 'C', cached: false, verifiedForRestore: true,
+                    ztoClosed: observed })) : read(url, options)));
+        }
         hook = (path, value) => {
             if (observed) return;
             if (stage === 'claim' ? path === `${T}/source` && value?.restoreClaim : path === `${H}/neighbor` && value?.restoreClaimId) {
@@ -111,8 +147,10 @@ describe('terminal ZTO proof during restore cancels without credit', () => {
         expect(at(`${T}/source`).barcodes[0].isDeducted).toBe(true);
         expect(at(`${H}/neighbor`)).toEqual(neighbor); expect(money()).toEqual(before); expect(at(F)).toBeNull();
         expect(storedRestoreClaims().source).toBeUndefined();
+        expect(at('zoew_trash_consumptions')).toEqual(consumptions);
         ztoPickupStatus.clear(); activeRestoreClaims.clear(); await restore();
         expect(at(`${H}/neighbor`)).toEqual(neighbor); expect(money()).toEqual(before); expect(at(F)).toBeNull();
+        expect(at('zoew_trash_consumptions')).toEqual(consumptions);
     });
     it('preserves an overlapping preexisting code rather than guessing it was inserted', async () => {
         const old = { ...store[H].neighbor.barcodes[0], code: 'C', cod: 23, restoredAt: 5 };
@@ -450,5 +488,67 @@ describe('pickup protocol restore admission', () => {
         const failure = vi.spyOn(storageApi, 'safeStoreSet').mockReturnValue(false);
         try { await restore(); } finally { failure.mockRestore(); }
         expect(store).toEqual(before); expect(pickup.readPickupJournal()).toEqual([]);
+    });
+});
+
+describe('final restore write retry respects observed terminal evidence', () => {
+    it.each((['local', 'cookie', 'palm'] as const).flatMap(mode => (['signed', 'returned'] as const).map(kind => ({mode, kind}))))('$mode $kind observed after definite precommit failure cancels before retry', async ({mode, kind}) => {
+        const before = money(), neighbor = at(`${H}/neighbor`); let failed = false;
+        if (mode !== 'local') {
+            store[T].source.trashMode = mode; dataState.deletedItems = [at(`${T}/source`)];
+            localStorage.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' + (mode === 'palm' ? '&palm=1' : '') }));
+            const read = cleanupServerRead(at);
+            vi.stubGlobal('fetch', vi.fn(async (url:any, options:any) => String(url).includes('/.netlify/functions/zto-order-detail')
+                ? new Response(JSON.stringify({success:true,found:true,barcode:'C',cached:false,verifiedForRestore:true,ztoClosed:false})) : read(url,options)));
+        }
+        const api:any = firebaseState.fb, plain = api.update;
+        api.update = async (ref:any, patch:any) => {
+            if (!failed && patch[`${T}/source`] === null) {
+                failed = true;
+                setTimeout(() => { if (kind === 'signed') signed(); else noteZtoReturnedEvidence('C', getServerNow()); }, 50);
+                throw Object.assign(new Error('Controlled final update refused before any commit'),{code:'DISCONNECT',txOutcome:'not-applied'});
+            }
+            return plain(ref,patch);
+        };
+        await restore();
+        expect(failed).toBe(true);
+        expect(money(),'terminal observed before retry must never credit money').toEqual(before);
+        expect(at(`${T}/source`)?.restoreBlocked).toBe(true);
+        expect(at(`${T}/source`)?.restoreClaim).toBeUndefined();
+        expect(at(`${H}/neighbor`)).toEqual(neighbor);
+        expect(at(F)).toBeNull();
+    });
+});
+
+
+describe('final restore retry proof controls', () => {
+    it.each((['local', 'cookie', 'palm'] as const).flatMap(mode => (['not-applied', 'applied-lost-ack'] as const).map(outcome => ({ mode, outcome }))))('$mode $outcome retains one financial effect and exact recovery proof', async ({ mode, outcome }) => {
+        let attempts = 0;
+        if (mode !== 'local') {
+            store[T].source.trashMode = mode; dataState.deletedItems = [at(`${T}/source`)];
+            localStorage.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' + (mode === 'palm' ? '&palm=1' : '') }));
+            const read = cleanupServerRead(at);
+            vi.stubGlobal('fetch', vi.fn(async (url: any, options: any) => String(url).includes('/.netlify/functions/zto-order-detail')
+                ? new Response(JSON.stringify({ success: true, found: true, barcode: 'C', cached: false, verifiedForRestore: true, ztoClosed: false })) : read(url, options)));
+        }
+        const api: any = firebaseState.fb, plain = api.update;
+        api.update = async (ref: any, patch: any) => {
+            if (patch[`${T}/source`] === null && ++attempts === 1) {
+                if (outcome === 'applied-lost-ack') await plain(ref, patch);
+                throw Object.assign(new Error('Controlled final response loss'), { code: 'DISCONNECT', txOutcome: outcome === 'not-applied' ? 'not-applied' : 'unknown' });
+            }
+            return plain(ref, patch);
+        };
+        await restore();
+        expect(attempts).toBe(outcome === 'not-applied' ? 2 : 1);
+        expect(at(`${T}/source`)).toBeNull();
+        expect(at(`${H}/neighbor`).barcodes.map((b: any) => b.code)).toEqual(['D', 'C']);
+        expect(at(`${H}/neighbor`).count).toBe(2);
+        expect(at(D + '/' + DAY)).toMatchObject({ codDollar: 100, dodDollar: 0, totalCount: 10 });
+        expect(at(M + '/2026-10')).toMatchObject({ codDollar: 100, dodDollar: 0, totalCount: 10 });
+        expect(at('zoew_trash_consumptions/source')).toMatchObject({ kind: 'restore', sourceId: 'source' });
+        const settled = money(); await restore();
+        expect(money()).toEqual(settled);
+        expect(at(`${H}/neighbor`).barcodes.map((b: any) => b.code)).toEqual(['D', 'C']);
     });
 });

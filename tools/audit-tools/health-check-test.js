@@ -20,6 +20,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { reactRuntime, moduleRuntime } = require('./react-view.js');
+const { localAuthRuntime } = require('./local-auth-runtime.cjs');
 
 const ROOT = process.env.HEALTH_APP_DIR ? path.resolve(process.env.HEALTH_APP_DIR) : path.resolve(__dirname, '../..');
 const APP_JS = path.join(ROOT, 'ZoeW', 'app.js');
@@ -32,6 +33,7 @@ function ok(label, cond, detail) {
 
 let SRC = '';
 try { SRC = fs.readFileSync(APP_JS, 'utf8'); } catch (e) { SRC = ''; }
+const authRuntime = localAuthRuntime(ROOT, SRC);
 // ⛔ ពិដាន Lookup ដេរីវេពីកូដ ship ៖ តម្លៃសរសេរដៃក្នុងឧបករណ៍ធ្វើឲ្យការប្តូរពិដានក្នុង App (ឬការរសាត់ ZTO 20000 ↔ 13000) នៅតែបៃតង
 function srcNum(name) {
     const m = new RegExp('const ' + name + ' = ([0-9 *+]+);').exec(SRC);
@@ -170,13 +172,15 @@ function buildRuntime(over) {
         serverTimeOffsetMs: o.offset === undefined ? 0 : o.offset,
         appLocalStore: o.localStore === null ? null : (() => {
             const values = new Map([['zoew_firebase_config', storedBackendConfig(o)]]);
-            return { getItem: (k) => values.has(k) ? values.get(k) : null,
+            return { get length() { return values.size; }, key: (i) => [...values.keys()][i] ?? null,
+                getItem: (k) => values.has(k) ? values.get(k) : null,
                 setItem: (k, v) => { if (o.storageFull) throw new Error('quota'); values.set(k, v); },
                 removeItem: (k) => values.delete(k) };
         })(),
         appSessionStore: (() => {
             const values = new Map();
-            return { getItem: (k) => values.has(k) ? values.get(k) : null,
+            return { get length() { return values.size; }, key: (i) => [...values.keys()][i] ?? null,
+                getItem: (k) => values.has(k) ? values.get(k) : null,
                 setItem: (k, v) => values.set(k, v), removeItem: (k) => values.delete(k) };
         })(),
         customerDataTableRows: o.rows === undefined ? null : o.rows,
@@ -199,7 +203,7 @@ function buildRuntime(over) {
         getZoneDateKey: (ms) => new Date(ms + 7 * 3600000).toISOString().slice(0, 10),
         fb: o.account === undefined ? {} : { accountOf: () => o.account },
         db: {},
-        auth: { currentUser: { uid: 'health-fixture' }, _transport: { rpc: async () => [o.account] } },
+        auth: o.config === null ? null : { currentUser: { uid: 'health-fixture' }, _transport: { rpc: async () => [o.account] } },
         getLookupApiConfig: () => (o.cfg === undefined ? null : o.cfg),
         decryptLookupSecret: () => Promise.resolve(o.secretPlain === undefined ? SECRET : o.secretPlain),
         withTimeout: (p) => p,
@@ -229,14 +233,18 @@ function buildRuntime(over) {
         document: { getElementById: (id) => (id === 'healthCheckList' ? listEl : id === 'healthRecheckBtn' ? btnEl : id === 'healthCheckModal' ? modalEl : inputs[id] || null) }
     };
     ctx.globalThis = ctx;
+    ctx.firebaseConfig = JSON.parse(storedBackendConfig(o));
     vm.createContext(ctx);
+    vm.runInContext(authRuntime.code, ctx);
     vm.runInContext(moduleRuntime(ROOT, SRC, [{ path: 'src/core/clock.ts', expose: ['serverClockIsTrustworthy'] }]).code, ctx);
     // ⛔ ស្រទាប់ React (ឃ្លាំង `uiState`/`viewState` · `fieldValue` · ប្រអប់) — កូដពិតពីទិដ្ឋភាព (`react-view.js`)
     vm.runInContext(reactRuntime(SRC, { exclude: NEEDED, context: ctx }), ctx);
     const code = NEEDED.map((n) => src[n]).filter(Boolean).join('\n') + '\n' + constSrc
         + "\nconst HEALTH_ICONS = { ok: '\\u2705', warn: '\\u26a0\\ufe0f', bad: '\\u274c', info: '\\u2139\\ufe0f' };"
         + '\nglobalThis.api = { runHealthCheck, healthLookupRow, healthLicenseRow, healthClockRow, healthDatabaseRow, healthDatabaseLiveRow, healthStorageRow, healthCustomerTableRow, healthNetworkRow, healthServiceWorkerRow, healthSheetScriptRow, ztoDiagnosticsUrl, testLookupApiConfig, attemptAutoLookup };';
-    vm.runInContext(code, ctx);
+    vm.runInContext(authRuntime.withoutBindings(code), ctx);
+    if (ctx.firebaseConfig && ctx.appLocalStore) vm.runInContext(
+        'if (loginBackendScope() && !acceptLocalAuthSession(auth, loginBackendScope(), auth.currentUser)) throw new Error("Health fixture requires its declared SDK actor");', ctx);
     if (o.backend) vm.runInContext('viewState.backendKind = ' + JSON.stringify(o.backend) + ';', ctx);
     // ⛔ ជួរ (model) ➜ markup ដដែលនឹងអ្វីដែល `HealthCheckList` គូរ (class · រូប · ស្លាក · ព័ត៌មាន) ➜ ការអះអាងលើ
     //    អត្ថបទដែលអ្នកប្រើឃើញ នៅដដែល។ ខ្សែអក្សរ (App ចាស់) ឆ្លងកាត់ត្រង់ៗ។

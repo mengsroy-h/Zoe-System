@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState, ztoState } from '../../../../ZoeW/src/core/state';
@@ -141,6 +142,8 @@ function install(reason: 'abandon' | 'close', scheme: 'firebase' | 'supabase') {
         ? { supabaseUrl: 'https://abc.supabase.co', supabaseKey: 'sb_publishable_x' }
         : { databaseURL: FIREBASE_HOST }) as any;
     firebaseState.auth = { currentUser: { uid: 'u1', tenantId: 'synthetic-shop', getIdToken: async () => 'tok' } } as any;
+    localStorage.setItem('zoew_firebase_config', JSON.stringify(firebaseState.firebaseConfig));
+    acceptFixtureSession();
     firebaseState.isDatabaseInitialized = true;
     firebaseState.isDatabaseConnected = true;
     firebaseState.serverClockTrusted = true;

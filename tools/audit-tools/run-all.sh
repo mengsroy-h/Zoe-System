@@ -1223,6 +1223,7 @@ run "supabase-scan-rules (Postgres ពិត)" node tools/audit-tools/supabase-s
 run "supabase-functions" node tools/audit-tools/supabase-functions-test.js
 run "keygen-supabase-admin (Postgres ពិត)" node tools/audit-tools/keygen-supabase-admin-test.js
 run "supabase-data-tools (backup ហាង · CLI ផ្ទេរ · Postgres ពិត)" node tools/audit-tools/supabase-data-tools-test.js
+run "supabase-audit-archive (trusted audit backup · retarget · Postgres ពិត)" node tools/audit-tools/supabase-audit-archive-test.js
 run "supabase-docs-cache (IndexedDB ពិត · ថ្នេរ adapter)" node tools/audit-tools/supabase-docs-cache-test.js
 run "supabase-app-network-e2e (App ពិត · adapter · Postgres ពិត · បណ្តាញខូច)" node tools/audit-tools/supabase-app-network-e2e-test.js
 run "supabase-money-multishop (ហាងច្រើន × ឧបករណ៍ ៣ · App ពិត · Postgres ពិត · លុយស្របគ្នា)" node tools/audit-tools/supabase-money-multishop-test.js
@@ -1486,6 +1487,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     SUPABASE_FN_APP_DIR="$BASE" node tools/audit-tools/supabase-functions-test.js 2>&1 | tail -1 | sed 's/^/   supabase-fn:     /'
     KEYGEN_SBADMIN_APP_DIR="$BASE" node tools/audit-tools/keygen-supabase-admin-test.js 2>&1 | tail -1 | sed 's/^/   keygen-sbadmin:  /'
     SBDATA_APP_DIR="$BASE" node tools/audit-tools/supabase-data-tools-test.js 2>&1 | tail -1 | sed 's/^/   supabase-data:   /'
+    SBAUDITARCHIVE_APP_DIR="$BASE" node tools/audit-tools/supabase-audit-archive-test.js 2>&1 | tail -1 | sed 's/^/   sb-audit-archive:/'
     DOCSCACHE_APP_DIR="$BASE" node tools/audit-tools/supabase-docs-cache-test.js 2>&1 | tail -1 | sed 's/^/   sb-docs-cache:   /'
     SBNETE2E_APP_DIR="$BASE" node tools/audit-tools/supabase-app-network-e2e-test.js 2>&1 | tail -1 | sed 's/^/   sb-app-network:  /'
     SBMONEY_APP_DIR="$BASE" node tools/audit-tools/supabase-money-multishop-test.js 2>&1 | tail -1 | sed 's/^/   sb-money-multishop:/'

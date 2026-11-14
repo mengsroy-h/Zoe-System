@@ -1,3 +1,4 @@
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, securityState, uiState, ztoState } from '../../../../ZoeW/src/core/state';
 import { appLocalStore } from '../../../../ZoeW/src/core/storage';
@@ -67,6 +68,8 @@ beforeEach(() => {
     firebaseState.auth = { currentUser: { uid: 'sweep-prefetch-test' } } as any;
     firebaseState.db = { name: 'sweep-prefetch-test' } as any;
     firebaseState.fb = { getIdTokenResult: async () => ({ token: 'synthetic-token' }) } as any;
+    configureFixtureBackend('zto-sweep-prefetch');
+    acceptFixtureSession();
     securityState.lookupSecretKey = null;
     autoLookupInFlight.clear();
     online(true);

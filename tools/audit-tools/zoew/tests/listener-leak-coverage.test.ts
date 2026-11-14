@@ -8,6 +8,7 @@ import { initFirebase } from '../../../../ZoeW/src/services/firebase-init';
 import { setupAuthListener } from '../../../../ZoeW/src/features/auth';
 import { proceedAfterLogin } from '../../../../ZoeW/src/features/license';
 import { dbListenersBelongToSession, detachDatabaseListeners, initDatabaseListeners, resetDbListenerHealthState } from '../../../../ZoeW/src/services/db-listeners';
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 const source = fs.readFileSync('../tools/audit-tools/listener-leak-test.js', 'utf8');
 let fixture: any, checker: any;
 const fields = ['dbRefExchangeRate', 'dbRefDailyRevenue', 'dbRefMonthlyRevenue', 'dbRefDailyPickup', 'dbRefDailyCollected', 'dbRefHistory', 'dbRefDeleted'];
@@ -23,6 +24,8 @@ beforeEach(() => {
     const sdk = fixture.firebaseSDK;
     firebaseState.authGeneration++;
     Object.assign(firebaseState, { fb: sdk, db: sdk.getDatabase(), auth: sdk.getAuth(), isDatabaseInitialized: false, isDatabaseConnected: true });
+    configureFixtureBackend('listener-leak');
+    acceptFixtureSession();
     checker.REQUIRED_DATA_PATHS.forEach((path: string, i: number) => { (firebaseState as any)[fields[i]] = sdk.ref(firebaseState.db, path); });
     viewState.backendKind = 'firebase';
     resetDbListenerHealthState();

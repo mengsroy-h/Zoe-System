@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { keygenLogoutRuntime } = require('./keygen-logout-runtime.cjs');
 const { modulePrograms } = require('./audit-module-ast');
 const { infoListenerRecoveryContract } = require('./static-checker-contracts.cjs');
 const { auditAcorn, moduleRuntime, reactRuntime, renderedElement } = require('./react-view');
@@ -15,6 +16,7 @@ function ok(label, cond, detail) {
 }
 
 const SRC = fs.readFileSync(path.join(appRoot, 'ZoeW', 'app.js'), 'utf8');
+const authRuntime = require('./local-auth-runtime.cjs').localAuthRuntime(appRoot, SRC);
 const clockRuntime = moduleRuntime(appRoot, SRC, [{ path: 'src/core/clock.ts', expose: ['setServerClockRefresh', 'serverClockIsTrustworthy', 'acceptServerClockOffset', 'resetServerClock', 'getServerClockBounds', 'getServerNow', 'serverClockOffsetIsFromServer'] }]);
 
 // handler `visibilitychange` ហៅ `callee()` ក្នុងចម្ងាយ ៤០០ តួ។ ⛔ ZoeW (React) ចុះឈ្មោះតាមច្រកចេញ
@@ -305,7 +307,8 @@ function buildContext(backend = 'supabase') {
         dailyPickupData: {},
         exchangeRateRiel: 4100,
         exchangeRateObservedVersion: 0,
-        localStorage: { setItem: () => {}, getItem: () => null },
+        localStorage: require('./react-view').memoryStorage(),
+        sessionStorage: require('./react-view').memoryStorage(),
         generateUniqueId: () => 'id_1',
         parseTimestampFromId: () => 1,
         retryPendingActivation: () => { log.activationRetries = (log.activationRetries || 0) + 1; },
@@ -419,6 +422,9 @@ function buildContext(backend = 'supabase') {
     ]);
     vm.runInContext(pickupResetRecovery.code, ctx);
     vm.runInContext(moduleRuntime(appRoot, SRC, ['src/core/session-verification.ts', { path: 'src/ui/toast.ts', expose: ['releaseHeldToasts'] }]).code, ctx);
+    const declaredConfig = backend === 'supabase' ? { supabaseUrl: 'https://connection-fixture.supabase.co' } : { databaseURL: 'https://connection-fixture.invalid' };
+    ctx.db.app = { options: declaredConfig };
+    authRuntime.install(ctx, declaredConfig);
     return { ctx, log, clock, advance, listenerCallbacks, listenerHistory, statusDot, statusText, api: ctx.__api, probe: ctx.__probe,
         setConnHistory: ctx.__setConnHistory, connHistory: ctx.__connHistory,
         setInfoRefs: ctx.__setInfoRefs, infoProbe: ctx.__infoProbe,
@@ -1817,6 +1823,7 @@ testToastAdmissionFixture();
     ok('SDK init harness ៖ namespace មកពីថេរពិតរបស់ App', !!sliceConst('ZTO_SHOP_SWEEP_PATH') && !!sliceConst('ZTO_TRASH_MODE_PATH') && !!sliceConst('ZTO_SWEEP_LANE_PATH'));
 
     function runInit(changeConfigMidFlight, withExistingApp, omitSessionCleanup = false) {
+        const windowListeners = new Map();
         const store = { zoew_firebase_config: JSON.stringify({ apiKey: 'A', databaseURL: 'https://old.example' }) };
         const log = { inits: [], toasts: [], errors: [] };
         let releaseSdk = null;
@@ -1834,7 +1841,16 @@ testToastAdmissionFixture();
             __log: log,
             __store: store,
             __releaseSdk: (fn) => { releaseSdk = fn; },
-            __existingApp: !!withExistingApp
+            __existingApp: !!withExistingApp,
+            addEventListener(type, callback) {
+                if (!windowListeners.has(type)) windowListeners.set(type, new Set());
+                windowListeners.get(type).add(callback);
+            },
+            removeEventListener(type, callback) { windowListeners.get(type)?.delete(callback); },
+            dispatchEvent(event) {
+                for (const callback of Array.from(windowListeners.get(event.type) || [])) callback.call(ctx, event);
+                return true;
+            }
         };
         ctx.window = ctx;
         vm.createContext(ctx);
@@ -1998,7 +2014,7 @@ testToastAdmissionFixture();
                 ctx.window = ctx;
                 vm.createContext(ctx);
                 vm.runInContext([
-                    'const appLocalStore = localStorage;',
+                    'const appLocalStore = localStorage, appSessionStore = null;',
                     'let authUnsubscribe = () => { __log.oldAuthOff = true; }, authRecoveryTimeout = null, authGeneration = 0;',
                     'function safeStoreGet(s, k) { try { return s ? s.getItem(k) : null; } catch (e) { return null; } }',
                     'let firebaseConfig = null, fb = null, auth = null, db = null;',
@@ -2024,6 +2040,7 @@ testToastAdmissionFixture();
                     'function checkPinAndOpenConfig() {}',
                     'function renderConnectionStatus() {}',
                     'function showToast(m) {}',
+                    keygenLogoutRuntime(KGINIT),
                     (kgInitSrc || 'async function initFirebase() { return false; }')
                         .replace('firebaseConfig = JSON.parse(savedConfig);',
                             'firebaseConfig = JSON.parse(savedConfig); __log.inits.push(firebaseConfig.databaseURL);'),
@@ -2072,7 +2089,9 @@ testToastAdmissionFixture();
                 const ctx = {
                     console, Promise, Object, Array, Error,
                     document: { hidden: false, addEventListener() {}, removeEventListener() {} },
-                    appLocalStore: { getItem: () => "synthetic-config" },
+                    appLocalStore: { getItem: key => key === 'zoew_firebase_config' ? 'synthetic-config' : null },
+                    appSessionStore: { getItem: () => null },
+                    window: { addEventListener() {}, removeEventListener() {} },
                     safeStoreGet: (store, key) => store.getItem(key),
                     setTimeout: (fn, ms) => { const t = { fn, ms, dead: false }; timers.push(t); return t; },
                     clearTimeout: (t) => { if (t) t.dead = true; },
@@ -2080,12 +2099,13 @@ testToastAdmissionFixture();
                 };
                 vm.createContext(ctx);
                 vm.runInContext([
-                    'let auth = { currentUser: null }, authUnsubscribe = null, authRecoveryTimeout = null, authGeneration = 0, pendingRoleRecheck = false;',
+                    'let auth = { currentUser: null, app: { options: { databaseURL: \'https://connection-fixture.firebaseio.com\' } } }, authUnsubscribe = null, authRecoveryTimeout = null, authGeneration = 0, pendingRoleRecheck = false, keygenLoginOwner = null;',
                     'const fb = { onAuthStateChanged: (a, cb) => { __log.callbacks.push((user) => { a.currentUser = user; cb(user); }); return () => {}; } };',
                     'function attemptAuthStorageRecovery() { __log.recoveries++; }',
                     'function verifyAdminRoleThenProceed() { __log.proceeds++; }',
                     'function updateAuthButton() {}',
                     'function showLoginModalWithPrefill() {}',
+                    keygenLogoutRuntime(KGINIT),
                     kgSetupSrc || 'function setupAuthListener() {}',
                     'globalThis.__setup = () => setupAuthListener();'
                 ].join('\n'), ctx);
@@ -2141,6 +2161,8 @@ testToastAdmissionFixture();
         const signedOut = runInit(false);
         for (let i = 0; i < 8; i++) { await Promise.resolve(); signedOut.release(); }
         ok("Initialization signedOut ៖ គ្មានកំហុសដែល catch បាំង", signedOut.log.errors.length === 0, signedOut.log.errors);
+        authRuntime.install(signedOut.ctx, JSON.parse(signedOut.ctx.__store.zoew_firebase_config), false);
+        vm.runInContext(moduleRuntime(appRoot, SRC, [{ path: 'src/features/auth.ts', expose: ['initialAuthLogoutIntents'] }]).code, signedOut.ctx);
         vm.runInContext([
             'authUnsubscribe = null; authRecoveryTimeout = null; let autoLoginAttempted = false;',
             'function attemptAuthStorageRecovery() {}',

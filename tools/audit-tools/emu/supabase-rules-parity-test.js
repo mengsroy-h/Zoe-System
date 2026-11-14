@@ -126,7 +126,7 @@ async function pgSetupTenant(transform) {
     await c.query("insert into public.tenant_members (user_id, tenant_id, username, role) values ($1, $2, 'parity', 'owner')", [uid, t.rows[0].id]);
     pg = c;
     tenant = t.rows[0].id;
-    member = { role: 'authenticated', sub: uid };
+    member = await H.sessionClaims(c, { role: 'authenticated', sub: uid });
     AUTH = 'auth_variable_override=' + encodeURIComponent(JSON.stringify({ uid }));
 }
 
@@ -402,7 +402,7 @@ async function pickupProtocolCases(realRules, compileRules, rulesSql, installedR
     const otherTenant = (await pg.query("insert into public.tenants (name, branch_code, expires_at) values ('pickup-isolation', '100002', now() + interval '1 day') returning id")).rows[0].id;
     const otherUid = await H.makeAuthUser(pg, 'pickup-isolation@u.zoe.test');
     await pg.query("insert into public.tenant_members (user_id, tenant_id, username, role) values ($1, $2, 'pickup_isolation', 'owner')", [otherUid, otherTenant]);
-    const foreign = { role: 'authenticated', sub: otherUid, extra: { tenant_id: tenant } };
+    const foreign = await H.sessionClaims(pg, { role: 'authenticated', sub: otherUid, extra: { tenant_id: tenant } });
     const hidden = await H.as(pg, foreign, 'select public.zoe_read($1, $2) as r', [root, day]);
     check(hidden.rows && hidden.rows[0].r.docs.length === 0, 'Supabase foreign tenant cannot read pickup day even with forged tenant claim', hidden);
     const foreignWrite = await H.as(pg, foreign, 'select public.zoe_write($1, $2::jsonb) as r', [opId(), JSON.stringify([{ k: 'set', p: [root, day], v: versioned(1, 0) }])]);
@@ -765,10 +765,10 @@ async function trashPolicyCases(realRules, compileRules, rulesSql) {
     await write('PATCH', '', legacyPurgePacket(item({ trashMode: 'palm', restoreBlocked: true })), true, 'client ចាស់ purge ទាំងជួរ ទោះមាន receipts/consumption ត្រូវបដិសេធ');
     await write('PATCH', '', slotPurgePacket(item({ trashMode: 'palm', restoreBlocked: true })), false, 'Palm purge តាម slot ជាមួយ release receipts និង consumption');
     await seed(null);
-    await write('PUT', trash + '/policy_source', item({ trashMode: 'palm' }), true, 'Palm ត្រូវមាន restoreBlocked');
+    await write('PUT', trash + '/policy_source', item({ trashMode: 'palm', trashReason: 'pickup' }), true, 'Palm pickup cleanup ត្រូវមាន restoreBlocked');
     await write('PUT', trash + '/policy_source', item({ trashMode: 'unknown' }), true, 'mode មិនស្គាល់ត្រូវបដិសេធ');
     await write('PUT', trash + '/policy_source', item({ restoreBlocked: 'true' }), true, 'flag ត្រូវជា boolean');
-    for (const mode of ['cookie', 'local']) {
+    for (const mode of ['palm', 'cookie', 'local']) {
         await seed(null);
         await write('PUT', trash + '/policy_source', item({ trashMode: mode }), false, mode + ' មិនទាន់ Sign បង្កើតបាន');
         await write('PUT', trash + '/policy_source/restoreClaim', claim, false, mode + ' មិនទាន់ Sign អនុញ្ញាត claim');
@@ -812,6 +812,28 @@ async function trashPolicyCases(realRules, compileRules, rulesSql) {
     const restored = { id: 'policy_target', phone: '012000000', scanDate: '2026-01-01', cod: 3, dod: 1, count: 1,
         barcodes: [{ code: 'POLICY_PARCEL', cod: 3, dod: 1, isClosed: false, isDeducted: false }] };
     const prepared = Object.assign({}, restored, { restoreClaimId: 'policy_source', restoreClaimToken: claim.token });
+    const malformedPickup = item({ trashMode: 'palm', trashReason: 'pickup', isFromDeletion: true, restoreClaim: claim });
+    await seed(malformedPickup, prepared);
+    await write('PATCH', '', { [trash + '/policy_source']: null, [history + '/policy_target']: restored,
+        [finals + '/policy_source']: { token: claim.token, targetId: claim.targetId, finalizedAt: at },
+        'zoew_trash_consumptions/policy_source': generationConsumption(malformedPickup, 'restore', claim.token, claim.targetId),
+        'zoew_daily_revenue_cod_dod/2026-01-01': { codDollar: 3, dodDollar: 1, totalCount: 1 } }, true,
+    'Palm pickup ដែល owner ដាក់ដោយគ្មាន flag តែមាន claim/history រួច មិនអាច finalize ឬបូកលុយ');
+    await write('PUT', 'zoew_trash_consumptions/policy_source', generationConsumption(malformedPickup, 'restore', claim.token, claim.targetId), true,
+        'Palm pickup ដែលគ្មាន flag មិនអាច consume ផ្ទាល់');
+    for (const reason of ['delete', 'remove', 'returned']) {
+        const unsigned = item({ trashMode: 'palm', trashReason: reason, isFromDeletion: reason === 'delete' });
+        await seed(null);
+        await write('PUT', trash + '/policy_source', unsigned, false, 'Palm មិនទាន់ Sign បង្កើតធុងសំរាម ៖ ' + reason);
+        await write('PUT', trash + '/policy_source/restoreClaim', claim, false, 'Palm មិនទាន់ Sign claim ៖ ' + reason);
+        await write('PUT', history + '/policy_target', prepared, false, 'Palm មិនទាន់ Sign prepare ៖ ' + reason);
+        const packet = { [trash + '/policy_source']: null, [history + '/policy_target']: restored,
+            [finals + '/policy_source']: { token: claim.token, targetId: claim.targetId, finalizedAt: at },
+            'zoew_trash_consumptions/policy_source': generationConsumption(unsigned, 'restore', claim.token, claim.targetId),
+            'zoew_daily_revenue_cod_dod/2026-01-01': { codDollar: 3, dodDollar: 1, totalCount: 1 } };
+        await write('PATCH', '', packet, false, 'Palm មិនទាន់ Sign finalize និង consume ម្តង ៖ ' + reason);
+        await write('PATCH', '', packet, true, 'Palm replay ក្រោយ finalize ត្រូវបដិសេធ ៖ ' + reason);
+    }
     await seed(item({ trashMode: 'palm', restoreBlocked: true, restoreClaim: claim }));
     await write('PUT', history + '/policy_target', prepared, true, 'blocked source មិនអាច prepare history');
     await seed(item({ trashMode: 'cookie', restoreBlocked: true, restoreClaim: claim }), prepared);

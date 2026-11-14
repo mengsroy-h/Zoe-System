@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 /**
  * ⛔ ហាង Supabase «មិនទាន់ស្គាល់» (session ស្តារពី storage តែគណនីមិនទាន់មកដល់ ៖ គ្មាន cache គណនី · `my_account()` មិនទាន់ឆ្លើយ ឬក្រៅបណ្តាញ)។
  *    ការកំណត់ដែលចងហាង (ជុំ ៤) ➜ API ZTO មិនប្រើក្នុងចន្លោះនោះ ➜ ការរង់ចាំបញ្ជី «ចុះហត្ថលេខា» មុនការសម្អាត ៨ ថ្ងៃ (`ztoAbandonCleanupIsHeld`)
@@ -36,10 +37,14 @@ function openItem(id: string, code: string, ageMs: number) {
 function supabaseTenant(tenant: string) {
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ supabaseUrl: SB_URL, supabaseKey: 'sb_publishable_x' }));
     firebaseState.auth = { currentUser: { uid: 'u1' }, _account: tenant ? { tenant_id: tenant } : null } as any;
+    firebaseState.firebaseConfig = { supabaseUrl: SB_URL, supabaseKey: 'sb_publishable_x' };
+    acceptFixtureSession();
 }
 function firebaseShop(url: string) {
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: url, apiKey: 'k', projectId: 'p' }));
     firebaseState.auth = { currentUser: { uid: 'u1' } } as any;
+    firebaseState.firebaseConfig = { databaseURL: url, apiKey: 'k', projectId: 'p' };
+    acceptFixtureSession();
 }
 function abandoned(id: string) {
     return calls.includes('tx:zoew_scan_history_cod_dod/' + id);

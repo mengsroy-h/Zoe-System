@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 import * as serverClock from '../../../../ZoeW/src/core/clock';
 import { exportQueuedSignPhoto } from '../../../../ZoeW/src/features/queued-sign-photo';
 import { saveOriginalQueuedPhoto } from '../../../../ZoeW/src/platform/queued-photo-output';
@@ -110,6 +111,8 @@ beforeEach(async () => {
     key = await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']) as CryptoKey;
     securityState.lookupSecretKey = key;
     appLocalStore.clear(); appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://sign-shop.firebaseio.com' }));
+    firebaseState.firebaseConfig = { databaseURL: 'https://sign-shop.firebaseio.com' };
+    acceptFixtureSession();
     config = { enabled: true, url: window.location.origin + '/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}', headerName: 'X-Zoe-Proxy-Key', headerValueEnc: await encryptLookupSecret('synthetic-key'), palmTokenEnc: await encryptLookupSecret('session'), shop: 'https://sign-shop.firebaseio.com' };
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(config));
     dataState.deletedItems = [];

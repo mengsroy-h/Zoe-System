@@ -341,6 +341,14 @@ function applyOpsToDocs(getDoc, ops) {
 
 export function createSupabaseDatabase(transport, hooks, options?) {
     const opt = options || {};
+    const writeSessionWitness = () => {
+        if (typeof hooks.writeSessionWitness !== 'function') return () => true;
+        try {
+            const witness = hooks.writeSessionWitness();
+            return () => { try { return typeof witness === 'function' && witness() === true; } catch (error) { return false; } };
+        } catch (error) { return () => false; }
+    };
+    const writeSessionCurrent = () => writeSessionWitness()();
     const rpcTimeoutMs = opt.rpcTimeoutMs || SB_RPC_TIMEOUT_MS;
     const retrySteps = opt.retryStepsMs || SB_RETRY_STEPS_MS;
     const pollFallbackMs = opt.pollFallbackMs || SB_POLL_FALLBACK_MS;
@@ -667,7 +675,11 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         fireInfo();
     };
 
-    const rpc = async (fn, args, intent?, unjournaled?, writeTopic?) => {
+    const rpc = async (fn, args, intent?, unjournaled?, writeTopic?, ownerCurrent?) => {
+        const mutation = fn === 'zoe_write' || fn === 'zoe_purge_execute_v1' || fn === 'zoe_pickup_reset_execute_v1';
+        const sessionCurrent = mutation ? writeSessionWitness() : () => true;
+        const admitted = () => sessionCurrent() && (typeof ownerCurrent !== 'function' || ownerCurrent());
+        if (!admitted()) throw new SbNetworkError('local session closed', true);
         const epoch = sessionEpoch;
         const topic = fn === 'zoe_write' ? writeTopic : tenantTopic;
         const t0 = performance.now();
@@ -689,8 +701,10 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         }
         let data;
         try {
+            if (!admitted()) throw new SbNetworkError('local session closed', true);
             data = await transport.rpc(fn === 'zoe_write' ? 'zoe_write_v2' : fn,
                 fn === 'zoe_write' ? Object.assign({}, args, { p_expected_tenant: topic.slice(4) }) : args, rpcTimeoutMs);
+            if (!admitted()) throw new SbNetworkError('local session closed');
             if (fn === 'zoe_write' && (!data || typeof data !== 'object' || Array.isArray(data)
                 || data.ok !== true && data.conflict !== true)) throw new SbRpcError('write reply unreadable', 'bad_response', 0, '');
         } catch (e) {
@@ -714,7 +728,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             if (fn === 'zoe_write' && e instanceof SbRpcError && e.code === 'bad_response') throw new SbNetworkError('write reply unreadable');
             throw e;
         }
-        if (journalRow && (data.ok || data.conflict && (!journalRow.uncertain || journalRow.sentAfter > 0 && Number.isFinite(data.now)
+        if (journalRow && admitted() && (data.ok || data.conflict && (!journalRow.uncertain || journalRow.sentAfter > 0 && Number.isFinite(data.now)
             && data.now - journalRow.sentAfter >= 0 && data.now - journalRow.sentAfter <= SB_OP_REPLAY_SAFE_MS))) {
             writeJournal.remove(journalRow.scope, journalRow.topic, journalRow.opId);
         }
@@ -755,8 +769,11 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             sourceId: intent.sourceId, generation: first.generation, deletedAt: first.deletedAt, rowBirth: first.rowBirth, rowCount: first.rowCount };
     };
     const purgeRpc = async (row, readOnly) => {
+        const admitted = writeSessionWitness();
+        if (!admitted()) throw new SbNetworkError('local session closed', true);
         const epoch = sessionEpoch;
         const context = await purgeContext(row);
+        if (!admitted()) throw new SbNetworkError('local session closed', true);
         if (closed || !authed || epoch !== sessionEpoch || row.scope !== authScope || row.topic !== tenantTopic || row.topic !== 'zoe:' + serverTenant) {
             throw new SbRpcError('purge context changed', 'purge_context', 0, '');
         }
@@ -784,7 +801,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             if (!rowOps) throw new SbRpcError('purge context unverified', 'purge_context', 0, '');
             data = await rpc(readOnly ? 'zoe_purge_status_v1' : 'zoe_purge_execute_v1', {
                 p_expected_tenant: context.tenant, p_op_id: row.opId, p_ops: cloneCanonical(rowOps)
-            });
+            }, undefined, undefined, undefined, admitted);
             const proof = data?.purge;
             if (!data || data.ok !== true || !Number.isSafeInteger(data.seq) || data.seq < 0 || !Number.isFinite(data.now) || !(data.now > 0)
                 || !Array.isArray(data.docs) || !proof || Object.keys(proof).length !== Object.keys(context).length + 2
@@ -836,9 +853,10 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         delete apply.companion;
         return apply;
     };
-    const ledgerFollowUp = async (intent) => {
+    const ledgerFollowUp = async (intent, current) => {
+        if (!current()) return false;
         const updater: any = Object.assign((latest) => {
-            if (ledgerRules.witness(latest, null, intent) === 'applied') return;
+            if (!current() || ledgerRules.witness(latest, null, intent) === 'applied') return;
             return ledgerRules.update(latest, intent);
         }, { txOutcomeWitness: (server, prior) => ledgerRules.witness(server, prior, intent) });
         try {
@@ -847,12 +865,13 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         } catch (e) { hooks.onListenerError(e); return false; }
     };
     const recoverWrites = () => {
-        if (!writeJournal || !authed || !authScope || !tenantTopic) return Promise.resolve();
+        const admitted = writeSessionWitness();
+        if (!writeJournal || !authed || !authScope || !tenantTopic || !admitted()) return Promise.resolve();
         const context = authScope + '\n' + tenantTopic;
         if (recoveredContext === context && !companionRetryRequired) return Promise.resolve();
         if (recoveringWrites) return recoveringWrites;
         const scope = authScope; const topic = tenantTopic; const epoch = sessionEpoch;
-        const current = () => !closed && authed && scope === authScope && topic === tenantTopic && epoch === sessionEpoch;
+        const current = () => !closed && authed && scope === authScope && topic === tenantTopic && epoch === sessionEpoch && admitted();
         const followUps = [];
         const running = (async () => {
             recoveryBlocked = 0;
@@ -1002,7 +1021,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             try {
                 for (const followUp of followUps) {
                     if (!current()) return;
-                    const settled = await ledgerFollowUp(followUp.intent);
+                    const settled = await ledgerFollowUp(followUp.intent, current);
                     if (!current()) return;
                     if (settled) writeJournal.remove(scope, topic, followUp.opId);
                     else failed++;
@@ -1044,6 +1063,11 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     const waitForLink = () => new Promise<void>((resolve) => {
         if (closed || (online && (navigator.onLine as boolean) !== false)) { resolve(); return; }
         waiters.add(resolve);
+    });
+
+    const waitForWriteSession = () => new Promise<void>((resolve) => {
+        const wait = () => { if (closed || writeSessionCurrent()) resolve(); else waiters.add(wait); };
+        wait();
     });
 
     const cancelListenersWith = (error) => {
@@ -1440,6 +1464,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             for (;;) {
                 if (closed) { settleWrite(w); rejectDone(firebaseLikeError('disconnect', path)); return; }
                 await waitForLink();
+                await waitForWriteSession();
                 if (closed) continue;
                 if (authScope !== w.scope || tenantTopic !== w.topic) {
                     if (authed) {
@@ -1687,7 +1712,8 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         try { request = JSON.parse(JSON.stringify(raw)); } catch (error) { throw fail(); }
         const names = ['tenant', 'actorUid', 'context', 'attemptId', 'casText'];
         const split = typeof scope === 'string' ? scope.lastIndexOf('|') : -1;
-        const sessionCurrent = () => !closed && authed && scope === authScope && topic === tenantTopic && epoch === sessionEpoch;
+        const admitted = writeSessionWitness();
+        const sessionCurrent = () => !closed && authed && scope === authScope && topic === tenantTopic && epoch === sessionEpoch && admitted();
         const current = () => {
             try { return sessionCurrent() && (ownerCurrent === undefined || typeof ownerCurrent === 'function' && ownerCurrent()); }
             catch (error) { return false; }
@@ -1814,6 +1840,8 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             const txScope = authScope;
             const txTopic = tenantTopic;
             const txEpoch = sessionEpoch;
+            const admitted = writeSessionWitness();
+            const endedWrite = () => Object.assign(firebaseLikeError('permission_denied', path), { txOutcome: 'not-applied', noRetry: true });
             const gate: any = { seq: ++writeSeq, keys: opDocKeys({ p: path }), ops: [], overlay: false, scope: txScope, topic: txTopic };
             let release;
             gate.done = new Promise<void>((res) => { release = res; });
@@ -1853,6 +1881,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     };
                     let sendEpoch = sessionEpoch;
                     for (;;) {
+                        if (!admitted()) throw lost ? giveUp() : endedWrite();
                         if (closed) throw lost ? giveUp() : firebaseLikeError('disconnect', path);
                         if (authScope !== txScope || tenantTopic !== txTopic) {
                             if (authed && !lost && writeJournal && !advisory) {
@@ -1873,7 +1902,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                                 if (closed || sendEpoch !== sessionEpoch || authScope !== txScope || tenantTopic !== txTopic) continue;
                                 sentAfter = serverNowSeen;
                             }
-                            res = await rpc('zoe_write', { p_op_id: opId, p_ops: [op] }, updateFn.connectionIntent, advisory, txTopic);
+                            res = await rpc('zoe_write', { p_op_id: opId, p_ops: [op] }, updateFn.connectionIntent, advisory, txTopic, admitted);
                             break;
                         } catch (e) {
                             if (!(e instanceof SbNetworkError)) {
@@ -2083,6 +2112,13 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     db.isReady = () => ready;
     db.recoveryState = () => ({ blocked: recoveryBlocked, recovering: !!recoveringWrites || Array.from(companionRecoveries.values()).some(current => current()),
         pending: pending.filter(w => w.scope === authScope && w.topic === tenantTopic).length });
+    db.resumeAcceptedSession = () => {
+        if (closed || !writeSessionCurrent()) return false;
+        recoveredContext = null;
+        wakeWaiters();
+        if (authed && tenantTopic) requestSync();
+        return true;
+    };
     db.retryWriteRecovery = () => {
         recoveredContext = null;
         requestSync();
@@ -2094,7 +2130,8 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         const scope = authScope;
         const topic = tenantTopic;
         const epoch = sessionEpoch;
-        const current = () => !closed && scope === authScope && topic === tenantTopic && epoch === sessionEpoch;
+        const admitted = writeSessionWitness();
+        const current = () => !closed && scope === authScope && topic === tenantTopic && epoch === sessionEpoch && admitted();
         if (!current()) { out.failed = 1; return out; }
         let rows = [];
         try { rows = writeJournal.list(scope, topic); }

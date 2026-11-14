@@ -1,3 +1,4 @@
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 import { acceptServerClockOffset, resetServerClock } from '../../../../ZoeW/src/core/clock';
 /**
  * ⛔ ZTO-F1 (ការផ្ទៀងផ្ទាត់ឡើងវិញ) ៖ ប្រអប់បញ្ជី ZTO ពេល «ដល់ថ្ងៃ» < ថ្ងៃនេះ។ ទំព័រ ១ (`withSigned=1`) អានបញ្ជី «ចុះហត្ថលេខា» ពី `from` ដល់ **ថ្ងៃនេះ**
@@ -42,6 +43,8 @@ beforeEach(async () => {
     firebaseState.auth = { currentUser: { uid: 'u' } } as any;
     const token = fx.tokenForSite('777001');
     firebaseState.fb = { getIdTokenResult: async () => ({ token }) } as any;
+    configureFixtureBackend('zto-signed-past-range');
+    acceptFixtureSession();
     upstream.length = 0;
     vi.stubGlobal('fetch', vi.fn(async (u: any, init: any) => {
         const href = String(u);

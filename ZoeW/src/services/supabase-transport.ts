@@ -87,7 +87,7 @@ export function sbFetchWithTimeout(fetchImpl, url, init, timeoutMs) {
     });
     let started;
     try {
-        started = Promise.resolve(fetchImpl(url, controller ? Object.assign({}, init, { signal: controller.signal }) : init));
+        started = Promise.resolve(fetchImpl(url, Object.assign({}, init, { redirect: 'error' }, controller ? { signal: controller.signal } : {})));
     } catch (e) {
         started = Promise.reject(e);
     }
@@ -123,7 +123,7 @@ export function sbFetchWithCeiling(fetchImpl, input, init, timeoutMs) {
     });
     let started;
     try {
-        started = Promise.resolve(fetchImpl(input, controller ? Object.assign({}, init, { signal: controller.signal }) : init));
+        started = Promise.resolve(fetchImpl(input, Object.assign({}, init, { redirect: 'error' }, controller ? { signal: controller.signal } : {})));
     } catch (e) {
         started = Promise.reject(e);
     }

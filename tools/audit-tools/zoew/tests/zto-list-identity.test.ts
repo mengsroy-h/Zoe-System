@@ -13,12 +13,14 @@ import { viewState } from '../../../../ZoeW/src/core/view-state';
 import { appLocalStore } from '../../../../ZoeW/src/core/storage';
 import { clearCustomerDataTableCache } from '../../../../ZoeW/src/features/customer-table';
 import { runZtoListSyncPreview } from '../../../../ZoeW/src/features/zto-list-sync';
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 
 const NO_BRANCH = 'គ្មានលេខសាខា';
 const RETRY = 'សាកម្ដងទៀត';
 
 beforeEach(() => {
     appLocalStore.clear();
+    configureFixtureBackend('zto-list-identity');
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true,
         url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' }));
     appLocalStore.setItem('zoew_zto_listsync_v1', '1');
@@ -33,6 +35,7 @@ beforeEach(() => {
     firebaseState.authGeneration++;
     firebaseState.auth = { currentUser: { uid: 'audit-user' } } as any;
     firebaseState.fb = { getIdTokenResult: async () => ({ token: 'audit-token' }) } as any;
+    acceptFixtureSession();
     for (const name of ['ztoListSyncFrom', 'ztoListSyncTo'] as const) {
         const input = document.createElement('input');
         input.value = '2026-09-27';

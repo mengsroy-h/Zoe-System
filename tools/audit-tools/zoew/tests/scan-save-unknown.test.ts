@@ -6,6 +6,7 @@
 // nothing reverted, the save answers 'unknown' (the caller keeps the duplicate lock), Sentry money.
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { dataState, firebaseState, uiState, ztoState } from '../../../../ZoeW/src/core/state';
 import { getFormattedDate } from '../../../../ZoeW/src/core/timezone';
 import { addOrUpdateEntry as publicAddOrUpdateEntry, SCAN_SETTLE_READ_GAP_MS } from '../../../../ZoeW/src/features/scan-action';
@@ -145,6 +146,7 @@ beforeEach(() => {
         },
         onValue: () => () => {}, off: () => {}
     } as any;
+    acceptFixtureSession();
     vi.stubGlobal('fetch', vi.fn(async (input: any) => {
         if (lab.readFails) throw new TypeError('Failed to fetch');
         const path = decodeURIComponent(new URL(String(input)).pathname).replace(/^\//, '').replace(/\.json$/, '');
@@ -424,6 +426,8 @@ it('legacy v1 native reboot retains actionable pending evidence after a refused 
         const sdk = withTransactionOutcomeResolution(raw); sdk.getAuth(app); sdk.getDatabase(app);
         Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db, isDatabaseInitialized: true,
             isInitializingFirebase: false, firebaseSdkUnavailable: false, isDatabaseConnected: true, sessionExpiryCheck: 'live', authLoginOperation: null });
+        localStorage.setItem('zoew_firebase_config', JSON.stringify(app.options));
+        acceptFixtureSession();
         firebaseState.dbRefHistory = sdk.ref(db, H); firebaseState.dbRefDailyRevenue = sdk.ref(db, D); firebaseState.dbRefMonthlyRevenue = sdk.ref(db, M);
         return { sdk, db, app };
     };

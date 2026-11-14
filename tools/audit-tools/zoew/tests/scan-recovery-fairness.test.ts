@@ -18,6 +18,7 @@ import { createScanEvidenceJournal } from '../../../../ZoeW/src/services/scan-ev
 import { pendingScanScope, preparePendingScan } from '../../../../ZoeW/src/services/scan-pending';
 import { cancelScanOperation, claimScanOperation, resumePendingScanOperations, saveScanOperation } from '../../../../ZoeW/src/services/scan-operation';
 import { txResolvingPaths, withTransactionOutcomeResolution } from '../../../../ZoeW/src/services/tx-outcome';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 const H = 'zoew_scan_history_cod_dod';
 const D = 'zoew_daily_revenue_cod_dod';
@@ -71,9 +72,9 @@ function snapshot(ref: any, value: any) {
     return { ref, key: ref.key, val: () => copy(value), exists: () => value !== null && value !== undefined };
 }
 
-function makeNative() {
+function makeNative(uid = 'scan-owner') {
     const app = { options: { databaseURL: HOST } };
-    const auth = { app, currentUser: { uid: 'scan-owner', getIdToken: async () => 'test-token' } };
+    const auth = { app, currentUser: { uid, getIdToken: async () => 'test-token' } };
     const db = { app };
     const raw = {
         getAuth: () => auth,
@@ -138,6 +139,7 @@ function makeNative() {
     Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db, isDatabaseInitialized: true,
         isInitializingFirebase: false, firebaseSdkUnavailable: false, isDatabaseConnected: true,
         serverClockTrusted: true, sessionExpiryCheck: 'live', authLoginOperation: null, dbLivenessProbe: Promise.resolve(null) });
+    acceptFixtureSession();
     firebaseState.dbRefHistory = sdk.ref(db, H);
     firebaseState.dbRefDailyRevenue = sdk.ref(db, D);
     firebaseState.dbRefMonthlyRevenue = sdk.ref(db, M);
@@ -415,11 +417,11 @@ it('recovery releases stale-context bookkeeping across shops and logout without 
     const releases: Array<() => void> = [];
     const scopes: string[] = [];
     for (let index = 0; index < 3; index++) {
-        makeNative(); firebaseState.auth.currentUser.uid = 'shop-owner-' + index;
+        makeNative('shop-owner-' + index);
         const handle = await admitted('SCOPE_' + index);
         scopes.push(handle.record.scope);
         heldWrites.set(handle.record.id, new Promise<void>(resolve => releases.push(resolve)));
-        firebaseState.authGeneration++; makeNative(); firebaseState.auth.currentUser.uid = 'shop-owner-' + index;
+        firebaseState.authGeneration++; makeNative('shop-owner-' + index);
         vi.useFakeTimers();
         const pass = resumePendingScanOperations();
         await vi.waitFor(() => expect(writesStarted).toHaveLength(index + 1));

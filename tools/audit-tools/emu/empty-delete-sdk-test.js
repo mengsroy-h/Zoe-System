@@ -23,6 +23,8 @@ for (const url of ['ws://example.invalid:' + port, 'ws://127.0.0.1:' + (port + 1
 }
 websocket.Client = function (url, protocols, options) { return new originalClient(url, protocols, localSocketOptions(url, options)); };
 const { buildSync } = require(path.join(deps, 'esbuild'));
+const { initializeSdkSession } = require('./sdk-session-fixture.cjs');
+const { initializeSdkClock } = require('./sdk-clock-fixture.cjs');
 const { initializeApp, deleteApp } = require(path.join(deps, 'firebase/app'));
 const database = require(path.join(deps, 'firebase/database'));
 const { createMockUserToken } = require(path.join(deps, '@firebase/util'));
@@ -67,6 +69,10 @@ export { executeRestoreItem, executePermanentDelete } from './ZoeW/src/features/
 export { readCleanupJournal, resumeCleanupJournalEntry, cleanupJournalLive, cleanupInFlight } from './ZoeW/src/domain/cleanup';
 export { CLEANUP_JOURNAL_KEY } from './ZoeW/src/core/storage-keys';
 export { withTransactionOutcomeResolution } from './ZoeW/src/services/tx-outcome';
+export { acceptLocalAuthSession } from './ZoeW/src/services/local-logout-intent';
+export { loginBackendScope } from './ZoeW/src/features/login-memory';
+export { appLocalStore } from './ZoeW/src/core/storage';
+export { resetServerClock, acceptServerClockOffset } from './ZoeW/src/core/clock';
 export { liveShopScope } from './ZoeW/src/core/shop-scope';
 export { firebaseState, dataState, uiState, ztoState } from './ZoeW/src/core/state';`, resolveDir: ROOT }, bundle: true, platform: 'node', format: 'cjs', outfile: built, logLevel: 'error', define: { 'import.meta.env': '{}' } });
     const api = require(built);
@@ -101,6 +107,8 @@ export { firebaseState, dataState, uiState, ztoState } from './ZoeW/src/core/sta
             firebaseSdkUnavailable: false, isDatabaseConnected: true, hasEverConnectedToDatabase: true, serverClockTrusted: true, serverTimeOffsetMs: 0,
             sessionExpiryCheck: 'live', authLoginOperation: null });
         localStorage.setItem('zoew_firebase_config', JSON.stringify(app.options));
+        initializeSdkSession(api);
+        initializeSdkClock(api);
         Object.assign(api.dataState, { scanHistory: [], deletedItems: [], dailyRevenueData: {}, monthlyRevenueData: {}, dailyPickupData: {}, dailyCollectedData: {}, pickupResumeInFlight: false, cleanupResumeInFlight: false, deletedCleanupInFlight: false });
         api.uiState.toasts = []; api.cleanupJournalLive.clear(); api.cleanupInFlight.clear();
         api.ztoState.ztoStatusLoaded = true; api.ztoState.ztoTrashMode = { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0, stamps: {}, shop: api.liveShopScope() };

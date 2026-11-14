@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 vi.mock('../../../../ZoeW/src/services/crypto', async (original) => ({
     ...(await original<any>()), verifyStoredPin: async (pin) => pin === '482915', hashPin: async () => 'test-pin-hash',
     deriveLookupSecretKey: async () => ({ type: 'secret' }), rememberLookupSecretKey: async () => true
@@ -41,6 +42,7 @@ beforeEach(() => {
     localStorage.setItem('zoew_security_pin_hash', 'test-pin-hash');
     Object.assign(securityState, { isVerifyingPin: false, pinTargetAction: null, lookupSecretKey: null, appIsLocked: false });
     Object.assign(firebaseState, { db: {}, auth: { currentUser: { uid: 'owner' } }, fb: { set: vi.fn(), runTransaction: vi.fn() } });
+    configureFixtureBackend('edit-pin-gates'); acceptFixtureSession();
     firebaseState.authGeneration++;
     uiState.editingItemId = null; uiState.activeParentItemId = null; uiState.modalDisplay = {}; uiState.modalStack = [];
     dataState.exchangeRateRiel = 4100;

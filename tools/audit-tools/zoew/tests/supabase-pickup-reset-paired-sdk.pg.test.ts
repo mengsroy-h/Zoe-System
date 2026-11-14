@@ -46,6 +46,52 @@ it('paired Reset Web Locks fixture keeps ordinary writers exclusive and try-lock
     await expect(coordinator.api.request('unsupported', { mode: 'shared' }, () => true)).rejects.toThrow();
 });
 
+it('paired owned PG cleanup waits for physical pool client drain before stopping its server', async () => {
+    const source = fs.readFileSync(path.join(root, 'tools/audit-tools/supabase-pickup-reset-paired-sdk-test.cjs'), 'utf8');
+    const start = source.indexOf('async function cleanup() {'), end = source.indexOf('\n(async () => {', start);
+    expect(start).toBeGreaterThanOrEqual(0); expect(end).toBeGreaterThan(start);
+    let drainEntered!: (value: string) => void, pgStopped!: (value: string) => void, releaseClient!: () => void;
+    const drain = new Promise<string>(resolve => { drainEntered = resolve; });
+    const stopped = new Promise<string>(resolve => { pgStopped = resolve; });
+    const clientClosed = new Promise<void>(resolve => { releaseClient = resolve; });
+    const poolClients = new Set([{}]), events: string[] = [], cleanupErrors: string[] = [];
+    const context = { active: null, frames: new Set(), poolClients, cleanupErrors, httpTasks: new Set(), sockets: new Set(), ownedPgChildren: [],
+        fake: { close: async () => { events.push('http-close'); } },
+        pool: { end: async () => { events.push('pool-end-requested'); } },
+        c: { end: async () => { events.push('main-client-end'); } },
+        H: { stop: () => { events.push('pg-stop'); pgStopped('stopped'); } },
+        bounded: async (promise: Promise<unknown>) => promise,
+        until: async (predicate: () => boolean) => {
+            if (!predicate()) { drainEntered('drain'); await clientClosed; }
+            if (!predicate()) throw new Error('owned resource did not drain');
+        } };
+    const cleanup = runInNewContext(source.slice(start, end) + '\ncleanup', context);
+    const running = cleanup();
+    try {
+        expect(await Promise.race([drain, stopped])).toBe('drain');
+        expect(events).toEqual(['http-close', 'pool-end-requested']);
+    } finally { poolClients.clear(); releaseClient(); await running; }
+    expect(events).toEqual(['http-close', 'pool-end-requested', 'main-client-end', 'pg-stop']);
+    expect(cleanupErrors).toEqual([]);
+});
+
+it('paired owned PG pool reports unexpected errors as failures and tracks physical removal', () => {
+    const source = fs.readFileSync(path.join(root, 'tools/audit-tools/supabase-pickup-reset-paired-sdk-test.cjs'), 'utf8');
+    const start = source.indexOf('function trackPgPool('), end = source.indexOf('\nasync function cleanup()', start);
+    expect(start).toBeGreaterThanOrEqual(0); expect(end).toBeGreaterThan(start);
+    const poolClients = new Set(), errors: unknown[] = [], process = { exitCode: 0 };
+    const callbacks = new Map<string, (value: unknown) => void>();
+    const pool = { on: (event: string, callback: (value: unknown) => void) => callbacks.set(event, callback) };
+    const track = runInNewContext(source.slice(start, end) + '\ntrackPgPool', { poolClients, errors, process });
+    track(pool);
+    const client = {};
+    callbacks.get('connect')!(client); expect(poolClients.has(client)).toBe(true);
+    callbacks.get('remove')!(client); expect(poolClients.size).toBe(0);
+    callbacks.get('error')!(Object.assign(new Error('synthetic unexpected PG disconnect'), { code: '57P01' }));
+    expect(errors).toEqual([{ infrastructure: 'owned PostgreSQL pool error', code: '57P01', error: 'synthetic unexpected PG disconnect' }]);
+    expect(process.exitCode).toBe(1);
+});
+
 it('Supabase SDK ៖ paired Reset19 ប្រើ native seed ដូចគ្នា និង authoritative SQL outcomes', () => {
     const driver = path.join(root, 'tools/audit-tools/supabase-pickup-reset-paired-sdk-test.cjs');
     const native = path.join(root, 'tools/audit-tools/emu/pickup-reset-applied-sdk-test.js');
@@ -114,6 +160,7 @@ it('Supabase SDK ៖ paired Reset19 ប្រើ native seed ដូចគ្ន�
             zoew_scan_history_cod_dod: { retained: { id: 'retained', isClosed: true, count: 1, cod: 37, dod: 5 } }
         });
         expect(result.cleanup).toMatchObject({ frames: 0, httpTasks: 0, sockets: 0, pgStopRequested: true });
+        expect(result.cleanup.poolClients).toBe(0);
         expect(result.cleanup.ownedPgChildren.length).toBeGreaterThan(0);
         expect(result.cleanup.ownedPgChildren.every((row: { exitCode: number | null; signalCode: string | null }) => row.exitCode !== null || row.signalCode !== null)).toBe(true);
         for (const [file, expected] of Object.entries(result.sourceFiles)) expect(hash(file)).toBe(expected);

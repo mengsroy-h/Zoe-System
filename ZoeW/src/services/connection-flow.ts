@@ -2,6 +2,8 @@ import { firebaseState } from '../core/state';
 import { dbListenerPendingPaths } from '../core/text';
 import { createNativeWriteRecovery, nativeWriteRecoveryState } from './native-write-recovery';
 import { appLocalStore, safeStoreGet } from '../core/storage';
+import { localAuthSessionCurrent, localLogoutIntent } from './local-logout-intent';
+import { loginBackendScope } from '../features/login-memory';
 
 const connectionLeases = new Set<any>();
 let stopConnectionLeaseObserver: (() => void) | null = null;
@@ -10,10 +12,13 @@ export function captureConnectionOperation() {
     const leaseAuth = firebaseState.auth; const leaseDb = firebaseState.db; const sdk = firebaseState.fb;
     const epoch = firebaseState.authGeneration; const uid = leaseAuth && leaseAuth.currentUser && leaseAuth.currentUser.uid;
     const tenant = (leaseAuth && leaseAuth._account && leaseAuth._account.tenant_id) || '';
+    const scope = loginBackendScope();
+    const logoutCurrent = uid ? localLogoutIntent.witness(scope, uid) : () => true;
     const config = safeStoreGet(appLocalStore, 'zoew_firebase_config');
     const current = () => leaseAuth === firebaseState.auth && leaseDb === firebaseState.db && sdk === firebaseState.fb
         && epoch === firebaseState.authGeneration && uid === (leaseAuth && leaseAuth.currentUser && leaseAuth.currentUser.uid)
         && (tenant === '' || tenant === ((leaseAuth && leaseAuth._account && leaseAuth._account.tenant_id) || ''))
+        && (!uid || localAuthSessionCurrent(leaseAuth, scope, leaseAuth.currentUser)) && logoutCurrent()
         && config === safeStoreGet(appLocalStore, 'zoew_firebase_config');
     return {
         current,
@@ -46,7 +51,8 @@ export function connectionFlowSnapshot() {
     else if (!firebaseState.fb || !firebaseState.db) phase = 'unconfigured';
     else if (firebaseState.sessionExpiryCheck === 'expired') phase = 'expired';
     else if (firebaseState.authLoginOperation) phase = 'authenticating';
-    else if (!firebaseState.auth || !firebaseState.auth.currentUser) phase = 'signed-out';
+    else if (firebaseState.sessionExpiryCheck === 'signed-out' || !firebaseState.auth || !firebaseState.auth.currentUser
+        || !localAuthSessionCurrent(firebaseState.auth, loginBackendScope(), firebaseState.auth.currentUser)) phase = 'signed-out';
     else if (nativeWriteRecoveryState(firebaseState.db).blocked) phase = 'blocked';
     else if (nativeWriteRecoveryState(firebaseState.db).recovering || nativeWriteRecoveryState(firebaseState.db).deferred || nativeWriteRecoveryState(firebaseState.db).external) phase = 'recovering';
     else if (firebaseState.db && typeof firebaseState.db.recoveryState === 'function' && firebaseState.db.recoveryState().blocked) phase = 'blocked';
@@ -88,11 +94,14 @@ export function withConnectionOwnership(sdk) {
         const epoch = ownerScope && ownerScope.epoch;
         const tenant = scopeOf(ownerScope);
         const appEpoch = ownerAuth && ownerAuth === firebaseState.auth ? firebaseState.authGeneration : null;
+        const scope = appEpoch !== null ? loginBackendScope() : '';
+        const logoutCurrent = appEpoch !== null && uid ? localLogoutIntent.witness(scope, uid) : () => true;
         const config = appEpoch !== null ? safeStoreGet(appLocalStore, 'zoew_firebase_config') : null;
         return () => !ownerScope || (!ownerScope.closed && (!bound || (ownerScope.epoch === epoch && (tenant === '' || scopeOf(ownerScope) === tenant)
             && (ownerScope.auth && ownerScope.auth.currentUser && ownerScope.auth.currentUser.uid) === uid
             && (appEpoch === null || firebaseState.auth === ownerAuth && firebaseState.authGeneration === appEpoch
-                && config === safeStoreGet(appLocalStore, 'zoew_firebase_config')))));
+                && config === safeStoreGet(appLocalStore, 'zoew_firebase_config')
+                && (!uid || localAuthSessionCurrent(ownerAuth, scope, ownerAuth.currentUser)) && logoutCurrent()))));
     };
     const stop = (row) => {
         if (!row.active) return;

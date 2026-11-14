@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 /**
  * លេខទូរស័ព្ទ និង Barcode ក្លែង៖ Sign ពិតក្នុង App + close/pickup/collected ពិត។
  * App → encrypted durable queue → handler/journal/reservation/photo-proof ពិត; upstream ZTO និង storage ជា simulator។ `.validate` អានពី rules ពិត ហើយបដិសេធមុន commit;
@@ -170,6 +171,8 @@ beforeEach(async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.stubGlobal('crypto', webcrypto);
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://sign-shop.firebaseio.com' }));
+    firebaseState.firebaseConfig = { databaseURL: 'https://sign-shop.firebaseio.com' };
+    acceptFixtureSession();
     securityState.lookupSecretKey = await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']) as any;
     const session = await setupHandler();
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, url: window.location.origin + '/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}', headerName: 'X-Zoe-Proxy-Key', headerValueEnc: await encryptLookupSecret(KEY), palmTokenEnc: await encryptLookupSecret(session), shop: 'https://sign-shop.firebaseio.com' }));

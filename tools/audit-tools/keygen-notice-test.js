@@ -18,6 +18,8 @@ process.exitCode = 1;
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { keygenLogoutRuntime } = require('./keygen-logout-runtime.cjs');
+const { memoryStorage } = require('./react-view');
 
 const root = path.resolve(__dirname, '../..');
 const appRoot = process.env.KEYGEN_APP_DIR ? path.resolve(process.env.KEYGEN_APP_DIR) : root;
@@ -56,7 +58,7 @@ function realDecl(name) {
 
 const FN_NAMES = [...['getTrustedServerNow', 'captureKeygenClock', 'keygenClockIsCurrent'].filter(name => src.includes('function ' + name + '(')), 'noticeBucketPath', 'cleanNoticeText', 'buildNoticePayload', 'noticeErrorMessage', 'newNoticeId',
     'noticeIdsToTrim', 'noticeRowsOf', 'kickNoticePush', 'fetchWithTimeout', 'setNoticeSendBusy', 'refreshNoticeList', 'renderNoticeList',
-    'sendNotice', 'deleteNotice', 'escapeHtml', 'captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession', 'clearSecureKeySetup', ...(src.indexOf('function lookupSetupScrubUrl(') !== -1 ? ['lookupSetupScrubUrl', 'lookupSetupSecretName'] : []),
+    'sendNotice', 'deleteNotice', 'escapeHtml', 'safeStoreGet', 'captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession', 'clearSecureKeySetup', ...(src.indexOf('function lookupSetupScrubUrl(') !== -1 ? ['lookupSetupScrubUrl', 'lookupSetupSecretName'] : []),
     'closeModal', 'clearPinInputValues',
     ...(src.indexOf('function adminOperationIsCurrent(') !== -1 ? ['adminOwnerIsCurrent', 'adminOperationIsCurrent'] : [])];
 const DECL_NAMES = ['LICENSE_APP_CODE', 'NOTICE_TITLE_MAX', 'NOTICE_BODY_MAX', 'NOTICE_KEEP_MAX', 'NOTICE_KIND_LABELS', 'NOTICE_ID_ALPHABET', 'NOTICE_SEND_LABEL',
@@ -103,6 +105,10 @@ function build(options) {
     };
     const log = { alerts: [], toasts: [], confirms: [], updates: [], sets: [], gets: [], refreshes: 0, captures: 0, kicks: [] };
     const user = { uid: 'admin-1' };
+    const config = { databaseURL: 'https://notice-license-fixture.firebaseio.com', apiKey: 'synthetic-public-key' };
+    const appLocalStore = memoryStorage();
+    const appSessionStore = memoryStorage();
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(config));
     const sandbox = {
         console: { log() {}, error() {}, warn() {} },
         Promise, Error, JSON, String, Number, Object, Array, Uint8Array, Math, Date, isFinite, setTimeout, clearTimeout, AbortController,
@@ -117,7 +123,8 @@ function build(options) {
         waitForServerTimeSync: async () => true,
         retryAsync: (fn) => Promise.resolve().then(fn),
         withTimeout: opts.withTimeout || ((p) => p),
-        auth: { currentUser: user },
+        auth: { currentUser: user, app: { options: config } },
+        appLocalStore, appSessionStore,
         window: { ZoeLicense: { getTrustedServerNow: () => opts.now || 1760000000000, getServerTimeGeneration: () => 1 }, ZoeErrors: { capture() { log.captures++; } } },
         ZoeErrors: { capture() { log.captures++; } },
         fb: {
@@ -126,7 +133,7 @@ function build(options) {
             update: (ref, updates) => { log.updates.push({ path: ref.path, updates: JSON.parse(JSON.stringify(updates)) }); return opts.update ? opts.update(updates) : Promise.resolve(); },
             set: (ref, value) => { log.sets.push({ path: ref.path, value }); return opts.set ? opts.set(ref, value) : Promise.resolve(); }
         },
-        db: { name: 'license-db' },
+        db: { name: 'license-db', app: { options: config } },
         __log: log
     };
     const ctx = vm.createContext(sandbox);
@@ -145,7 +152,16 @@ function build(options) {
         function clearKeypairOutputs() {}
     `, ctx);
     vm.runInContext(declSources.map((x) => (x[1] || '').replace(/^const /, 'var ')).join('\n'), ctx);
+    vm.runInContext(keygenLogoutRuntime(src), ctx);
     vm.runInContext(fnSources.map((x) => x[1] || '').join('\n\n'), ctx);
+    vm.runInContext(`
+        if (typeof acceptedLogoutIntents !== 'undefined') {
+            const scope = keygenAuthScope();
+            acceptedLogoutIntents.set(auth, { user: auth.currentUser, scope,
+                config: safeStoreGet(appLocalStore, 'zoew_firebase_config'),
+                current: localLogoutIntent.witness(scope, auth.currentUser.uid) });
+        }
+    `, ctx);
     vm.runInContext('var __realRefresh = refreshNoticeList; refreshNoticeList = function () { __log.refreshes++; return __realRefresh(); };', ctx);
     return { ctx, log, el: getElementById };
 }

@@ -18,6 +18,7 @@ import { filterDataByDate, filterDataByCustomDate, getFilteredDataByDate } from 
 import { clearHistory, resetClearHistoryOperationState } from '../../../../ZoeW/src/features/clear-history';
 import { cleanupInFlight, cleanupJournalLive, runAutomaticCleanupRules } from '../../../../ZoeW/src/domain/cleanup';
 import { refTo } from '../../../../ZoeW/src/app/refs';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 // វាស់ module ម្ចាស់ និង setup ពិតរបស់ checker។ មិនមែន browser ឬ backend ពិត។
 const ROOT = path.resolve(process.env.BROWSER_SCENARIO_ROOT || '..');
@@ -71,6 +72,7 @@ async function bootSource(file: string, data: any, options?: any, owned = false)
     const app = sdk.initializeApp(config);
     Object.assign(firebaseState, { firebaseConfig: config, fb: sdk, db: sdk.getDatabase(app), auth: sdk.getAuth(app),
         isInitializingFirebase: false, isDatabaseInitialized: true, sessionExpiryCheck: 'unverified', sessionExpiryCheckInFlight: false });
+    acceptFixtureSession();
     for (const [field, value] of Object.entries({ dbRefHistory: 'zoew_scan_history_cod_dod', dbRefDeleted: 'zoew_recently_deleted_cod_dod',
         dbRefDailyRevenue: 'zoew_daily_revenue_cod_dod', dbRefMonthlyRevenue: 'zoew_monthly_revenue_cod_dod',
         dbRefDailyPickup: 'zoew_daily_pickup_cod_dod', dbRefDailyCollected: 'zoew_daily_collected_cod_dod',

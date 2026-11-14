@@ -47,6 +47,7 @@ function ok(label, cond, detail) {
 
 let SRC = '';
 try { SRC = fs.readFileSync(APP_JS, 'utf8'); } catch (e) { SRC = ''; }
+const authRuntime = require('./local-auth-runtime.cjs').localAuthRuntime(ROOT, SRC);
 // ⛔ ពិដាន Lookup ដេរីវេពីកូដ ship ៖ តម្លៃសរសេរដៃក្នុងឧបករណ៍ធ្វើឲ្យការប្តូរពិដានក្នុង App (ឬការរសាត់ ZTO 20000 ↔ 13000) នៅតែបៃតង
 function srcNum(name) {
     const m = new RegExp('const ' + name + ' = ([0-9 *+]+);').exec(SRC);
@@ -96,6 +97,7 @@ function buildRuntime(opts) {
     const filled = [];
     const statusEl = { className: 'lookup-status', textContent: '', hidden: true };
     const ctx = {
+        auth: { currentUser: { uid: 'lookup-burst-fixture' } }, db: {}, fb: {},
         console: { error: () => {}, log: () => {} },
         Object, Array, Promise, JSON, String, Number, Math, Date, Error, TypeError, Set, Map,
         parseFloat, isNaN, encodeURIComponent, setTimeout, clearTimeout,
@@ -163,7 +165,10 @@ function buildRuntime(opts) {
         }), o.netDelayMs === undefined ? 300 : o.netDelayMs));
     };
     vm.createContext(ctx);
-    vm.runInContext(reactRuntime(SRC, { context: ctx }), ctx);
+    const declaredConfig = { databaseURL: 'https://lookup-burst-fixture.firebaseio.com' };
+    authRuntime.prepare(ctx, declaredConfig);
+    vm.runInContext(authRuntime.withoutBindings(reactRuntime(SRC, { context: ctx })), ctx);
+    authRuntime.install(ctx, declaredConfig);
     const body = CONSTS.concat(NEEDED.concat(OPTIONAL).map((n) => src[n]).filter(Boolean)).join('\n');
     vm.runInContext(body, ctx);
     return ctx;

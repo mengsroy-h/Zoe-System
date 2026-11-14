@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { refTo } from '../../../../ZoeW/src/app/refs';
@@ -24,6 +25,9 @@ beforeEach(async () => {
     firebaseState.authGeneration++;
     firebaseState.auth = { currentUser: { uid: 'synthetic-user' } } as any;
     firebaseState.fb = { getIdTokenResult: async () => ({ token: 'synthetic-id-token' }) } as any;
+    firebaseState.firebaseConfig = { databaseURL: 'https://synthetic.firebaseio.com' };
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(firebaseState.firebaseConfig));
+    acceptFixtureSession();
     uiState.isModalOpen = true;
     scanState.pendingBarcode = CODE;
     viewState.lookupStatus = { kind: '', text: '' };

@@ -63,6 +63,8 @@ async function bundleAdapter() {
     fs.writeFileSync(entry, "export { createSupabaseSdk, loginEmailFor, SB_ACCOUNT_BLOCKED_TEXT } from " + JSON.stringify(path.join(SRC, 'supabase-sdk.ts')) + ";\n"
         + "export { createSupabaseTransport } from " + JSON.stringify(path.join(SRC, 'supabase-transport.ts')) + ";\n"
         + "export { exportVal, nameCompare } from " + JSON.stringify(path.join(SRC, 'supabase-rtdb.ts')) + ";\n"
+        + "export { acceptLocalAuthSession } from " + JSON.stringify(path.join(SRC, 'local-logout-intent.ts')) + ";\n"
+        + "export { appLocalStore } from " + JSON.stringify(path.join(SRC, '../core/storage.ts')) + ";\n"
         + "export { txDisconnectResolving } from " + JSON.stringify(path.join(SRC, 'tx-disconnect.ts')) + ";\n");
     try {
         const out = await esbuild.build({ entryPoints: [entry], bundle: true, platform: 'node', format: 'cjs', write: false, target: 'node20',
@@ -79,7 +81,7 @@ async function bundleAdapter() {
 
 function memStorage() {
     const m = new Map();
-    return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => { m.set(k, String(v)); }, removeItem: (k) => { m.delete(k); }, _map: m };
+    return { get length() { return m.size; }, key: (i) => [...m.keys()][i] ?? null, getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => { m.set(k, String(v)); }, removeItem: (k) => { m.delete(k); }, _map: m };
 }
 
 const PERMISSIVE = { rules: { '.read': true, '.write': true } };
@@ -251,6 +253,7 @@ async function scenario(api) {
     let client = null;
     const apps = [];
     try {
+        global.window = { localStorage: memStorage(), sessionStorage: memStorage(), addEventListener() {}, removeEventListener() {} };
         const mod = await bundleAdapter();
         check(typeof mod.createSupabaseSdk === 'function' && typeof mod.createSupabaseTransport === 'function', 'bundle adapter ពីប្រភព TS ពិត');
         await H.start();
@@ -283,7 +286,7 @@ async function scenario(api) {
             onListenerError: (e) => events.listenerErrors.push(String(e && e.message)),
             onAccountBlocked: (m) => events.blocked.push(m),
             onTxOutcomeUnknown: (p) => events.unknown.push(p.join('/')),
-            docsCache,
+            docsCache, writeJournal: null,
             dbOptions: Object.assign({ pollFallbackMs: 400, retryStepsMs: [100, 200, 400] }, dbOptions || {})
         });
         const config = { supabaseUrl: fake.url, supabaseKey: 'sb_publishable_' + 'x'.repeat(30), loginDomain: 'users.zoew.invalid' };
@@ -296,6 +299,8 @@ async function scenario(api) {
             let states = [];
             sdk.onAuthStateChanged(auth, (u) => states.push(u ? u.uid : null));
             const cred = await sdk.signInWithEmailAndPassword(auth, username, password);
+            mod.appLocalStore.setItem('zoew_firebase_config', JSON.stringify(config));
+            if (!mod.acceptLocalAuthSession(auth, 'sb:' + config.supabaseUrl, cred.user) || !sdk.resumeAcceptedSession(auth)) throw new Error('Synthetic SDK login was not locally accepted');
             return { sdk, app, auth, db, cred, states: () => states };
         };
 

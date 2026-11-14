@@ -8,12 +8,15 @@ import { connectionFlowSnapshot } from '../../../../ZoeW/src/services/connection
 import { DB_LIVENESS_PROBE_TIMEOUT_MS } from '../../../../ZoeW/src/services/connection';
 import { DB_OP_TIMEOUT_MS } from '../../../../ZoeW/src/services/network';
 import { firebaseState, uiState, dataState } from '../../../../ZoeW/src/core/state';
+import { appLocalStore } from '../../../../ZoeW/src/core/storage';
+import { acceptFixtureSession } from './helpers/accepted-session';
 const START = Date.UTC(2026, 9, 30, 9), SCOPE = 'synthetic-project|synthetic-user', TOPIC = 'zoe:synthetic-shop';
 const turn = async () => {
     for (let i = 0; i < 160; i++)
         await Promise.resolve();
 };
 let holdNextClock: boolean, clockEntered: boolean, releaseClock: () => void, clockGate: Promise<void>;
+let enterClock: () => void, clockEntry: Promise<void>;
 let separateUnsentGate: boolean, releaseUnsent: () => void, unsentGate: Promise<void>;
 let holdUnsentResponse: boolean;
 let holdLostResponse: boolean;
@@ -27,7 +30,7 @@ const journal = createLocalWriteJournal();
 function open() {
     const db: any = createSupabaseDatabase({ subscribe: () => () => { }, ping: async () => true, rpc: async (fn: string, args: any) => {
             if (fn === 'zoe_now') {
-                if (holdNextClock) { holdNextClock = false; clockEntered = true; await clockGate; }
+                if (holdNextClock) { holdNextClock = false; clockEntered = true; enterClock(); await clockGate; }
                 return serverNow;
             }
             if (fn === 'zoe_read')
@@ -69,13 +72,14 @@ function open() {
     databases.push(db);
     return db;
 }
-function attach(db: any) { firebaseState.authGeneration++; firebaseState.auth = { currentUser: { uid: 'synthetic-user' } } as any; firebaseState.db = db; firebaseState.fb = { __supabase: true, discardPendingWrites: (d: any) => d.discardPendingWrites(), retryWriteRecovery: (d: any) => d.retryWriteRecovery(), set: (r: any, v: any) => r._db.set(r, v) } as any; firebaseState.isInitializingFirebase = false; firebaseState.firebaseSdkUnavailable = false; firebaseState.sessionExpiryCheck = 'live'; firebaseState.authLoginOperation = null; firebaseState.isDatabaseInitialized = true; firebaseState.isDatabaseConnected = true; firebaseState.dbListenersFailed = false; }
+function attach(db: any) { const config = { supabaseUrl: 'https://abcdefghijklmnopqrst.supabase.co', supabaseKey: 'sb_publishable_synthetic' }; const app = { options: config }; firebaseState.firebaseConfig = config; appLocalStore.setItem('zoew_firebase_config', JSON.stringify(config)); firebaseState.authGeneration++; firebaseState.auth = { app, currentUser: { uid: 'synthetic-user' } } as any; firebaseState.db = db; firebaseState.fb = { __supabase: true, discardPendingWrites: (d: any) => d.discardPendingWrites(), retryWriteRecovery: (d: any) => d.retryWriteRecovery(), set: (r: any, v: any) => r._db.set(r, v) } as any; firebaseState.isInitializingFirebase = false; firebaseState.firebaseSdkUnavailable = false; firebaseState.sessionExpiryCheck = 'live'; firebaseState.authLoginOperation = null; firebaseState.isDatabaseInitialized = true; firebaseState.isDatabaseConnected = true; firebaseState.dbListenersFailed = false; acceptFixtureSession(); }
 beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(START);
     localStorage.clear();
     serverNow = START;
     holdNextClock = false; clockEntered = false; clockGate = new Promise(r => { releaseClock = r; });
+    clockEntry = new Promise(r => { enterClock = r; });
     loseFirst = true;
     applyLostFirst = false;
     holdLostResponse = false; holdUnsentResponse = false; separateUnsentGate = false; unsentGate = new Promise(r => { releaseUnsent = r; });
@@ -676,7 +680,7 @@ it.each([['within',SB_OP_REPLAY_SAFE_MS-1],['expired',SB_OP_REPLAY_SAFE_MS+1]] a
 it('C08 shared uncertainty មកកណ្តាល server-clock await ត្រូវពិនិត្យអាយុឡើងវិញមុន POST',async()=>{
  vi.stubGlobal('navigator',{onLine:true});rejectUncertain=false;const owner=open();await turn();owner.goOffline();
  const outcome=owner.set(owner.ref('zoew_settings/exchange_rate'),4300).then(()=> 'committed',(e:any)=>e);await turn();const [original]=journal.list(SCOPE,TOPIC);expect(original).toMatchObject({stage:'queued',awaitingRecovery:false});
- holdNextClock=true;owner.goOnline();await turn();expect(clockEntered).toBe(true);expect(writes).toEqual([]);
+ holdNextClock=true;pausePull=true;owner.goOnline();await clockEntry;expect(clockEntered).toBe(true);expect(writes).toEqual([]);pausePull=false;releasePull();await turn();
  const recoverer=open();await turn();expect(writes).toHaveLength(1);expect(journal.list(SCOPE,TOPIC)).toEqual([expect.objectContaining({opId:original.opId,stage:'sent',uncertain:true,sentAfter:START})]);recoverer.close('stop second recovery before its retry');
  serverNow=START+SB_OP_REPLAY_SAFE_MS+1;vi.setSystemTime(serverNow);const before=writes.length;releaseClock();await turn();await vi.advanceTimersByTimeAsync(10);await turn();
  expect(writes.slice(before),'shared uncertainty arriving during clock await must not pass an unchecked POST').toEqual([]);expect(await outcome).toMatchObject({txOutcome:'unknown'});expect(owner.recoveryState().blocked).toBeGreaterThan(0);expect(journal.list(SCOPE,TOPIC)).toEqual([expect.objectContaining({opId:original.opId,stage:'unresolved',uncertain:true,sentAfter:START})]);

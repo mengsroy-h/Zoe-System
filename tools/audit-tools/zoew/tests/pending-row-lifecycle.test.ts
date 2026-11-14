@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { DB_OP_TIMEOUT_MS } from '../../../../ZoeW/src/services/network';
 import { pendingHistoryPatches } from '../../../../ZoeW/src/core/clock';
 import { flushPendingHistoryPatches, queueHistoryPatchRetry } from '../../../../ZoeW/src/services/history-write';
@@ -92,6 +93,7 @@ beforeEach(() => {
         },
         onValue: () => () => {}, off: () => {}
     } as any;
+    acceptFixtureSession();
     vi.stubGlobal('fetch', vi.fn(async (inputUrl: any) => {
         if (lab.readFails) throw new TypeError('Failed to fetch');
         const path = decodeURIComponent(new URL(String(inputUrl)).pathname).replace(/^\//, '').replace(/\.json$/, '');

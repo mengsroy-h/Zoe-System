@@ -4,7 +4,7 @@ const path = require('path');
 const acorn = require('acorn');
 const { modulePrograms } = require('./audit-module-ast');
 const vm = require('vm');
-const { reactRuntime } = require('./react-view.js');
+const { reactRuntime, memoryStorage } = require('./react-view.js');
 
 const ROOT = path.resolve(process.env.TOAST_ACTION_APP_DIR || path.join(__dirname, '../..'));
 const APP_DIR = path.join(ROOT, 'ZoeW');
@@ -12,6 +12,7 @@ const APP_FILE = path.join(APP_DIR, 'app.js');
 const KEYGEN_FILE = path.join(ROOT, 'ZoeKeyGen', 'app.js');
 const APP = fs.existsSync(APP_FILE) ? fs.readFileSync(APP_FILE, 'utf8') : '';
 const KEYGEN = fs.existsSync(KEYGEN_FILE) ? fs.readFileSync(KEYGEN_FILE, 'utf8') : '';
+const authRuntime = require('./local-auth-runtime.cjs').localAuthRuntime(ROOT, APP);
 let pass = 0;
 let fail = 0;
 process.exitCode = 1;
@@ -113,7 +114,6 @@ ok('ZTO auto-fill មិនប្រើ success toast ខណៈកំពុង�
 const rateFn = sliceFn(APP, 'saveExchangeRate');
 const lockerSettingsFn = sliceFn(APP, 'saveLockerSettings');
 const lockerScanFn = sliceFn(APP, 'handleLockerScan');
-const oneCloseFn = sliceFn(APP, 'toggleIndividualBarcodeClose');
 const allCloseFn = sliceFn(APP, 'toggleCloseStatus');
 const markFn = sliceFn(APP, 'setCallMark');
 const phoneFn = sliceFn(APP, 'saveEditedPhone');
@@ -190,8 +190,8 @@ async function runRateSessionChecks() {
                     authGeneration: 7, auth: { currentUser: { uid: 'u1' } }, db: {}, dbRefExchangeRate: {},
                     exchangeRateRiel: 4100, exchangeRateObservedVersion: 0, exchangeRateSaveInFlight: false,
                     fb: { set: () => { writesReached++; return new Promise((resolve, reject) => { resolveWrite = resolve; rejectWrite = reject; }); } },
-                    appLocalStore: {},
-                    safeStoreSet: (_, key, value) => { effects.push('store:' + value); return true; },
+                    appLocalStore: memoryStorage(),
+                    safeStoreSet: (store, key, value) => { store.setItem(key, value); effects.push('store:' + value); return true; },
                     showToast: (message) => effects.push('toast:' + message),
                     refreshCurrentHistoryView: () => effects.push('render'), closeModal() {},
                     document: { getElementById: () => ({ value: '4200' }) },
@@ -200,7 +200,10 @@ async function runRateSessionChecks() {
                     queueMicrotask
                 });
                 // ⛔ ស្រទាប់ React (`fieldValue` · ប្រអប់) — កូដពិតពីទិដ្ឋភាពដដែល (`react-view.js`)
-                vm.runInContext(reactRuntime(APP, { exclude: names, context }), context);
+                const declaredConfig = { databaseURL: 'https://toast-rate-fixture.firebaseio.com' };
+                authRuntime.prepare(context, declaredConfig);
+                vm.runInContext(authRuntime.withoutBindings(reactRuntime(APP, { exclude: names, context })), context);
+                authRuntime.install(context, declaredConfig);
                 // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
                 vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', context);
                 vm.runInContext('const DB_OP_TIMEOUT_MS = 15000;\n' + functions, context);

@@ -6,6 +6,7 @@
  *    សម្រេចមិនបាន ➜ មិនប៉ះលុយ + ប្រាប់។ សោក៏ជាភស្តុតាងសម្រាប់ការស្តារ (បូកវិញតាមសោ) និងអ្នកបោសសម្អាតធុងសំរាម (flip ពេលគ្មាន journal)។
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { dataState, firebaseState, uiState } from '../../../../ZoeW/src/core/state';
 import { getServerNow } from '../../../../ZoeW/src/core/clock';
 import { CLEANUP_JOURNAL_KEY } from '../../../../ZoeW/src/core/storage-keys';
@@ -152,6 +153,8 @@ function seed(items: any[]) {
     firebaseState.fb = makeFb() as any;
     firebaseState.firebaseConfig = { databaseURL: HOST } as any;
     firebaseState.auth = { currentUser: { uid: 'u1', getIdToken: async () => 'tok' } } as any;
+    localStorage.setItem('zoew_firebase_config', JSON.stringify(firebaseState.firebaseConfig));
+    acceptFixtureSession();
     firebaseState.isDatabaseInitialized = true;
     firebaseState.isDatabaseConnected = true;
     firebaseState.sessionExpiryCheck = 'live'; firebaseState.serverClockTrusted = true;
@@ -186,6 +189,9 @@ function reloadPage() {
     lab.plan = {};
     lab.beforeTx = null;
     firebaseState.authGeneration++;
+    localStorage.setItem('zoew_firebase_config', JSON.stringify(firebaseState.firebaseConfig));
+    firebaseState.auth = { ...firebaseState.auth, currentUser: { ...firebaseState.auth.currentUser } };
+    acceptFixtureSession();
     cleanupInFlight.clear();
     for (const id of cleanupJournalLive.keys()) releaseCleanupJournalLive(id);
     dataState.cleanupResumeInFlight = false;

@@ -7,6 +7,7 @@ import { runTransactionResolved } from '../../../../ZoeW/src/services/tx-outcome
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../../../../ZoeW/src/core/text';
 import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { ABANDON_AGE_MS } from '../../../../ZoeW/src/features/session';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 const HISTORY = 'zoew_scan_history_cod_dod';
 const TRASH = 'zoew_recently_deleted_cod_dod';
@@ -139,6 +140,8 @@ function install() {
     firebaseState.sessionExpiryCheck = 'live';
     firebaseState.hasEverConnectedToDatabase = true;
     pointAt('A');
+    firebaseState.auth.app = firebaseState.db.app;
+    acceptFixtureSession();
     dataState.scanHistory = [clone(item)];
     dataState.deletedItems = [];
     dataState.dailyRevenueData = ledgerNode();

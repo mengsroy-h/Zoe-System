@@ -22,6 +22,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const acorn = require('acorn');
+const { keygenLogoutRuntime } = require('./keygen-logout-runtime.cjs');
 
 const ROOT = process.env.KEYGEN_SBADMIN_APP_DIR ? path.resolve(process.env.KEYGEN_SBADMIN_APP_DIR) : path.join(__dirname, '../..');
 const REPO = process.env.ZOE_REPO_ROOT ? path.resolve(process.env.ZOE_REPO_ROOT) : path.join(__dirname, '../..');
@@ -86,7 +87,7 @@ function sliceNested(source, name) {
 const decls = topLevel(src);
 const SB_FN_NAMES = [...decls.keys()].filter((n) => decls.get(n).kind === 'function' && /^sb[A-Z]|Sb[A-Z]/.test(n));
 const SB_VAR_NAMES = [...decls.keys()].filter((n) => decls.get(n).kind !== 'function' && /^(SB_|sb[A-Z])/.test(n));
-const HELPER_FNS = [...['keygenIdleStamp', 'keygenIdleElapsed', 'getTrustedServerNow', 'captureKeygenClock'].filter(n => decls.has(n)), 'fetchWithTimeout', 'elapsedSince', 'captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession', 'clearSecureKeySetup', ...(decls.has('lookupSetupScrubUrl') ? ['lookupSetupScrubUrl', 'lookupSetupSecretName'] : []), 'adminOwnerIsCurrent', 'safeStoreGet',
+const HELPER_FNS = [...['keygenIdleStamp', 'keygenIdleElapsed', 'getTrustedServerNow', 'captureKeygenClock'].filter(n => decls.has(n)), 'fetchWithTimeout', 'elapsedSince', 'captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession', 'clearSecureKeySetup', ...(decls.has('lookupSetupScrubUrl') ? ['lookupSetupScrubUrl', 'lookupSetupSecretName'] : []), 'adminOwnerIsCurrent', 'adminOperationIsCurrent', 'safeStoreGet',
     'safeStoreSet', 'escapeHtml', 'copySensitiveText', 'showLoginModalWithPrefill', 'makeQrCode', 'renderQrInto',
     'downloadQrPng', 'saveQrImage', 'seatMetaText'];
 const HELPER_VARS = ['SETUP_LINK_URL_KEY', 'QR_MAX_MODULES', 'lookupSetupGeneration', 'secureKeySetup'];
@@ -228,7 +229,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function memStorage() {
     const m = new Map();
-    return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => { m.set(k, String(v)); }, removeItem: (k) => { m.delete(k); }, _map: m };
+    return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => { m.set(k, String(v)); }, removeItem: (k) => { m.delete(k); }, get length() { return m.size; }, key: i => [...m.keys()][i] ?? null, _map: m };
 }
 
 function makeDom() {
@@ -293,6 +294,8 @@ function buildKeygen(env) {
     let responseGate = null;
     const store = memStorage();
     const user = { uid: 'keygen-admin' };
+    const config = { apiKey: 'fixture-public-key', projectId: 'keygen-sbadmin-fixture', databaseURL: 'https://keygen-sbadmin-fixture-default-rtdb.firebaseio.com' };
+    store.setItem('zoew_firebase_config', JSON.stringify(config));
     const sandbox = {
         console: { log() {}, warn() {}, error: (e) => log.errors.push(String(e && e.message || e)) },
         Promise, Error, JSON, String, Number, Object, Array, Math, Date, RegExp, Set, Map, isFinite, setTimeout, clearTimeout, AbortController, URL,
@@ -318,8 +321,8 @@ function buildKeygen(env) {
         ZoeLicense: { getTrustedServerNow: () => Date.now(), getServerTimeGeneration: () => 1 },
         document: dom.document,
         navigator: { clipboard: { writeText: (t) => { log.clipboard.push(String(t)); return Promise.resolve(); } }, onLine: true },
-        auth: { currentUser: user },
-        appLocalStore: store,
+        auth: { currentUser: user, app: { options: config } },
+        appLocalStore: store, appSessionStore: memStorage(),
         hasUncopiedKeypair: () => false,
         isPinFlowPending: () => false,
         refreshLiveToasts() {}, closeModal() {}, clearGeneratedKeyResult() {}, clearSigningKey() {}, openModalHelper() {}, refreshKgStatus() {}
@@ -338,7 +341,13 @@ function buildKeygen(env) {
         var lastGeneratedSetupLink = '';
     `, ctx);
     vm.runInContext(HELPER_VARS.concat(SB_VAR_NAMES).map((n) => decls.get(n).text).join('\n'), ctx);
+    vm.runInContext(keygenLogoutRuntime(src), ctx);
     vm.runInContext(HELPER_FNS.concat(SB_FN_NAMES).map((n) => decls.get(n).text).join('\n\n'), ctx);
+    // The License-project SDK actor is accepted before the independent Supabase-admin flow.
+    vm.runInContext(`{ const scope = keygenAuthScope();
+        acceptedLogoutIntents.set(auth, { user: auth.currentUser, scope,
+            config: safeStoreGet(appLocalStore, 'zoew_firebase_config'),
+            current: localLogoutIntent.witness(scope, auth.currentUser.uid) }); }`, ctx);
     return {
         ctx, log, dom, store, answers, user,
         gate() { gate = deferred(); return gate; },
@@ -594,7 +603,8 @@ async function behavior() {
         ok('ហាងគ្មានឧបករណ៍ ➜ គ្មានបន្ទាត់ឧបករណ៍ (មិនមែន «អានមិនបាន»)', ownerListHtml.indexOf('seat-device-line') === -1, ownerListHtml.slice(0, 400));
         console.log('   · ឧបករណ៍របស់ហាង (note_my_device ពិត ➜ member_devices)');
         const DEV_XSS = '<img src=x onerror=alert(2)> Pixel 8';
-        const noted = await H.as(c, { role: 'authenticated', sub: ownerUid }, 'select public.note_my_device($1, $2, $3) as ok', ['a1b2c3d4e5f60718', DEV_XSS, 'Android 15']);
+        const ownerSession = await H.sessionClaims(c, { role: 'authenticated', sub: ownerUid });
+        const noted = await H.as(c, ownerSession, 'select public.note_my_device($1, $2, $3) as ok', ['a1b2c3d4e5f60718', DEV_XSS, 'Android 15']);
         ok('សមាជិកកត់ឧបករណ៍ (RPC ពិត)', !!noted.rows && noted.rows[0].ok === true, noted.error);
         await C.sbAdminRefresh();
         const devHtml = el('sbTenantListBody').innerHTML;
@@ -1021,7 +1031,12 @@ async function behavior() {
         const removedRead = await memberRequest(removeUsers[2], 'zoe_read', { p_root: 'zoew_barcode_registry' });
         ok('session ដែលដក ➜ request បន្ទាប់ 401', removedRead.status === 401, removedRead);
         const removedWithoutSession = await H.as(c, { role: 'authenticated', sub: removeUsers[2].uid }, 'select public.zoe_read($1,null)', ['zoew_barcode_registry']);
-        ok('គ្មាន membership ➜ អានទិន្នន័យហាងមិនបាន ទោះគ្មាន session claim', removedWithoutSession.error?.message === 'forbidden', removedWithoutSession);
+        ok('គ្មាន session claim ➜ strict session gate បដិសេធ', removedWithoutSession.error?.code === 'PT401'
+            && removedWithoutSession.error?.message === 'session-revoked', removedWithoutSession);
+        // A valid owned SID reaches the membership guard instead of masking it with auth failure.
+        const removedSession = await H.sessionClaims(c, { role: 'authenticated', sub: removeUsers[2].uid });
+        const removedMemberRead = await H.as(c, removedSession, 'select public.zoe_read($1,null)', ['zoew_barcode_registry']);
+        ok('គ្មាន membership ➜ អានទិន្នន័យហាងមិនបាន ទោះមាន session claim ត្រឹមត្រូវ', removedMemberRead.error?.message === 'forbidden', removedMemberRead);
         const unaffected = await memberRequest(removeUsers[0], 'zoe_read', { p_root: 'zoew_barcode_registry' });
         ok('សមាជិកផ្សេងអានបានដដែល', unaffected.status === 200, unaffected);
         const removeRace = await Promise.all(removeUsers.slice(0, 2).map((user) => C.sbAdminRpc(C.sbAdminSession, 'admin_remove_member', argsRemove(user.username))));

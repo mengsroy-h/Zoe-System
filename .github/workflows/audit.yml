@@ -24,6 +24,27 @@ permissions:
   contents: read
 
 jobs:
+  firebase-audit-candidate:
+    name: Firebase audit candidate SDK
+    needs: ci-config
+    if: (vars.ZOE_RUNNER_MODE == 'github' || github.event.repository.private == true) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && !(github.event_name == 'workflow_dispatch' && inputs.multishop_scale)
+    runs-on: ${{ fromJSON(vars.ZOE_RUNNER_MODE == 'github' && '["ubuntu-latest"]' || '["self-hosted","Linux","X64","wsl-zoe-audit"]') }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          package-manager-cache: false
+          cache: npm
+          cache-dependency-path: tools/firebase-provision/business-audit-functions/package-lock.json
+      - name: Install candidate SDK dependencies
+        run: npm ci --prefix tools/firebase-provision/business-audit-functions --ignore-scripts --no-fund
+      - name: Check dependency vulnerabilities
+        run: npm audit --prefix tools/firebase-provision/business-audit-functions --omit=dev --audit-level=high
+      - name: Verify real Gen1 definitions and failure controls
+        run: node tools/audit-tools/firebase-business-audit-runtime-test.cjs
+
   # ភស្តុតាងដាច់ពី run-all៖ មិនជំនួសសោ ឬអ្នកយាម browser ក្នុង Audit ទេ។
   zto-native-evidence:
     name: ភស្តុតាង ZTO/native

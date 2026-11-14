@@ -19,6 +19,7 @@ import { databaseHealthLabel, healthLicenseRow } from '../../../../ZoeW/src/feat
 import { LoginModal } from '../../../../ZoeW/src/app/components/modals/LoginModal';
 import { fieldValue, setFieldValue } from '../../../../ZoeW/src/app/refs';
 import { byId, mount, step, unmount } from './native/react-harness';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 const GOOD = { supabaseUrl: 'https://abcd1234.supabase.co/', supabaseKey: 'sb_publishable_' + 'k'.repeat(24) };
 
@@ -80,7 +81,11 @@ function fakeSupabaseFb() {
         registerAccount: vi.fn(async (_app: any, body: any) => { calls.push(['register', body]); return fb.registerReply; }),
         resetPassword: vi.fn(async (_app: any, body: any) => { calls.push(['reset', body]); return fb.resetReply; }),
         setPersistence: vi.fn(async () => { calls.push(['persist']); }),
-        signInWithEmailAndPassword: vi.fn(async (_auth: any, email: string, password: string) => { calls.push(['signIn', email, password]); return { user: null }; }),
+        signInWithEmailAndPassword: vi.fn(async (auth: any, email: string, password: string) => {
+            calls.push(['signIn', email, password]);
+            auth.currentUser = { uid: 'registered-' + email };
+            return { user: auth.currentUser };
+        }),
         tenantScope: (auth: any) => (auth && auth._tenant) || ''
     };
     return { fb, calls };
@@ -95,6 +100,11 @@ describe('Modal ចូល/ចុះឈ្មោះ/ប្តូរពាក្�
     let alerts: string[];
     beforeEach(() => {
         alerts = [];
+        firebaseState.firebaseConfig = { supabaseUrl: GOOD.supabaseUrl.replace(/\/+$/, ''), supabaseKey: GOOD.supabaseKey };
+        localStorage.setItem('zoew_firebase_config', JSON.stringify(firebaseState.firebaseConfig));
+        firebaseState.isInitializingFirebase = false;
+        firebaseState.firebaseSdkUnavailable = false;
+        firebaseState.authLoginOperation = null;
         vi.stubGlobal('alert', (m: string) => { alerts.push(String(m)); });
         clearPendingInvite();
     });
@@ -117,7 +127,7 @@ describe('Modal ចូល/ចុះឈ្មោះ/ប្តូរពាក្�
     it('Supabase ៖ ចុះឈ្មោះ ➜ ផ្ញើ invite + username តូច ➜ ចូលប្រព័ន្ធដោយ username ដដែលភ្លាម', async () => {
         const { fb, calls } = fakeSupabaseFb();
         firebaseState.fb = fb;
-        firebaseState.auth = { app: { name: 'x' }, currentUser: null };
+        firebaseState.auth = { app: { name: 'x', options: firebaseState.firebaseConfig }, currentUser: null };
         mount(<LoginModal />);
         step(() => { viewState.backendKind = 'supabase'; });
         expect(byId('loginEmailInput').getAttribute('type')).toBe('text');
@@ -140,7 +150,7 @@ describe('Modal ចូល/ចុះឈ្មោះ/ប្តូរពាក្�
         const { fb, calls } = fakeSupabaseFb();
         fb.registerReply = { status: 403, body: { ok: false, code: 'invite-invalid' } };
         firebaseState.fb = fb;
-        firebaseState.auth = { app: {}, currentUser: null };
+        firebaseState.auth = { app: { options: firebaseState.firebaseConfig }, currentUser: null };
         mount(<LoginModal />);
         step(() => { viewState.backendKind = 'supabase'; openRegisterForm(); });
         setFieldValue('registerInviteInput', 'X');
@@ -166,7 +176,7 @@ describe('Modal ចូល/ចុះឈ្មោះ/ប្តូរពាក្�
         const hung = () => sbFetchWithTimeout(() => new Promise(() => {}), 'https://abcd1234.supabase.co/functions/v1/register', { method: 'POST' }, 5);
         fb.registerAccount.mockImplementationOnce(async () => { await hung(); });
         firebaseState.fb = fb;
-        firebaseState.auth = { app: {}, currentUser: null };
+        firebaseState.auth = { app: { options: firebaseState.firebaseConfig }, currentUser: null };
         mount(<LoginModal />);
         step(() => { viewState.backendKind = 'supabase'; openRegisterForm(); });
         rememberSetupInvite('abcd-efgh-jkmn-pqrs-tvwx');
@@ -196,7 +206,7 @@ describe('Modal ចូល/ចុះឈ្មោះ/ប្តូរពាក្�
         const { fb } = fakeSupabaseFb();
         fb.registerReply = { status: 502, body: { ok: false, code: 'registration-unknown' } };
         firebaseState.fb = fb;
-        firebaseState.auth = { app: {}, currentUser: null };
+        firebaseState.auth = { app: { options: firebaseState.firebaseConfig }, currentUser: null };
         mount(<LoginModal />);
         step(() => { viewState.backendKind = 'supabase'; openRegisterForm(); });
         setFieldValue('registerInviteInput', 'abcd-efgh-jkmn-pqrs-tvwx');
@@ -212,7 +222,7 @@ describe('Modal ចូល/ចុះឈ្មោះ/ប្តូរពាក្�
         const { fb, calls } = fakeSupabaseFb();
         fb.registerReply = { status: 409, body: { ok: false, code: 'username-taken' } };
         firebaseState.fb = fb;
-        firebaseState.auth = { app: {}, currentUser: null };
+        firebaseState.auth = { app: { options: firebaseState.firebaseConfig }, currentUser: null };
         mount(<LoginModal />);
         step(() => { viewState.backendKind = 'supabase'; openRegisterForm(); });
         setFieldValue('registerInviteInput', 'abcd-efgh-jkmn-pqrs-tvwx');
@@ -230,7 +240,7 @@ describe('Modal ចូល/ចុះឈ្មោះ/ប្តូរពាក្�
         const { fb, calls } = fakeSupabaseFb();
         fb.registerReply = { status: 403, body: { ok: false, code: 'invite-invalid' } };
         firebaseState.fb = fb;
-        firebaseState.auth = { app: {}, currentUser: null };
+        firebaseState.auth = { app: { options: firebaseState.firebaseConfig }, currentUser: null };
         mount(<LoginModal />);
         step(() => { viewState.backendKind = 'supabase'; openRegisterForm(); });
         setFieldValue('registerInviteInput', 'abcd-efgh-jkmn-pqrs-tvwx');
@@ -250,7 +260,7 @@ describe('Modal ចូល/ចុះឈ្មោះ/ប្តូរពាក្�
             await sbFetchWithTimeout(() => new Promise(() => {}), 'https://abcd1234.supabase.co/functions/v1/reset-password', { method: 'POST' }, 5);
         });
         firebaseState.fb = fb;
-        firebaseState.auth = { app: {}, currentUser: null };
+        firebaseState.auth = { app: { options: firebaseState.firebaseConfig }, currentUser: null };
         mount(<LoginModal />);
         step(() => { viewState.backendKind = 'supabase'; openResetPasswordForm(); });
         setFieldValue('resetUsernameInput', 'dara');
@@ -267,7 +277,7 @@ describe('Modal ចូល/ចុះឈ្មោះ/ប្តូរពាក្�
         const { fb, calls } = fakeSupabaseFb();
         fb.resetReply = { status: 502, body: { ok: false, code: 'password-reset-unknown' } };
         firebaseState.fb = fb;
-        firebaseState.auth = { app: {}, currentUser: null };
+        firebaseState.auth = { app: { options: firebaseState.firebaseConfig }, currentUser: null };
         mount(<LoginModal />);
         step(() => { viewState.backendKind = 'supabase'; openResetPasswordForm(); });
         setFieldValue('resetUsernameInput', 'dara');
@@ -285,7 +295,7 @@ describe('Modal ចូល/ចុះឈ្មោះ/ប្តូរពាក្�
     it('Supabase ៖ ប្តូរពាក្យសម្ងាត់ ➜ ផ្ញើ username + resetCode ➜ ត្រឡប់ទៅ Modal ចូល ជាមួយ username', async () => {
         const { fb, calls } = fakeSupabaseFb();
         firebaseState.fb = fb;
-        firebaseState.auth = { app: {}, currentUser: null };
+        firebaseState.auth = { app: { options: firebaseState.firebaseConfig }, currentUser: null };
         mount(<LoginModal />);
         step(() => { viewState.backendKind = 'supabase'; });
         setFieldValue('loginEmailInput', 'Dara');
@@ -328,6 +338,8 @@ describe('License · journal scope', () => {
         firebaseState.fb = { accountOf: () => account };
         const rpc = vi.fn(async () => [account]);
         firebaseState.auth = { currentUser: { uid: 'health-test' }, _transport: { rpc } };
+        firebaseState.firebaseConfig = { supabaseUrl: 'https://abcd.supabase.co', supabaseKey: 'sb_publishable_x' };
+        acceptFixtureSession();
         firebaseState.serverClockTrusted = true;
         firebaseState.serverTimeOffsetMs = 0;
         const good: any = await healthLicenseRow();

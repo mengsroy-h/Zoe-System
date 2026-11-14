@@ -7,9 +7,11 @@ import { autoCloseBarcodeFromZto } from '../../../../ZoeW/src/features/zto-statu
 import { claimAndCleanupItem, cleanupInFlight, runAutomaticDeletedCleanup, trashRetentionMs } from '../../../../ZoeW/src/domain/cleanup';
 import * as barcodeOps from '../../../../ZoeW/src/features/barcode-ops';
 import * as purge from '../../../../ZoeW/src/services/registry-purge';
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 
 beforeEach(() => {
     localStorage.clear(); resetServerClock();
+    configureFixtureBackend('scheduled-session-fixture');
     firebaseState.db = {} as any;
     firebaseState.auth = { currentUser: { uid: 'u' } } as any;
     firebaseState.serverClockTrusted = true;
@@ -17,6 +19,7 @@ beforeEach(() => {
     firebaseState.sessionExpiryCheck = 'unverified';
     firebaseState.dbRefDailyCollected = {} as any;
     firebaseState.fb = { update: vi.fn(async () => {}), ref: vi.fn(() => ({})), runTransaction: vi.fn(async () => ({ committed: false })) } as any;
+    acceptFixtureSession();
     dataState.dailyCollectedData = { '2020-01-01': { totalCount: 1 } };
     dataState.scanHistory = []; dataState.deletedItems = []; dataState.deletedCleanupInFlight = false;
     cleanupInFlight.clear(); dbListenerFailedPaths.clear(); dbListenerPendingPaths.clear();

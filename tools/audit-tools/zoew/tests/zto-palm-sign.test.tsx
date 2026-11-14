@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { barcodeSignIdentity } from '../../../../ZoeW/src/domain/barcode';
 import { createHash, webcrypto } from 'node:crypto';
 import { capturePalmSignPhoto } from '../../../../ZoeW/src/services/palm-sign-camera';
@@ -147,6 +148,8 @@ beforeEach(async () => {
     firebaseState.db = {};
     firebaseState.fb = { getIdTokenResult: async () => ({ token: 'synthetic-identity' }) };
     firebaseState.auth = { currentUser: { uid: 'audit-user' } };
+    firebaseState.firebaseConfig = { databaseURL: 'https://sign-shop.firebaseio.com' };
+    acceptFixtureSession();
     securityState.appIsLocked = false; securityState.appLockVeiled = false;
     securityState.lookupSecretKey = await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']) as any;
     config = { enabled: true, url: window.location.origin + '/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}',

@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { webcrypto } from 'node:crypto';
 import { createScanMemorySdk } from './helpers/scan-memory-sdk';
 /**
@@ -84,6 +85,8 @@ beforeEach(() => {
     firebaseState.auth = { currentUser: { uid: 'placeholder-owner' }, app: { options } } as any;
     firebaseState.isInitializingFirebase = false;
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
+    firebaseState.firebaseConfig = options;
+    acceptFixtureSession();
     firebaseState.fb = createScanMemorySdk().sdk as any;
     firebaseState.dbRefHistory = { path: 'zoew_scan_history_cod_dod' } as any;
     firebaseState.authGeneration++;

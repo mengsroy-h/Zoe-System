@@ -203,9 +203,14 @@ function extractFn(name) {
 }
 let summaryPrinted = false;
 // ⛔ React ៖ helper អាស្រ័យលើ `resolveNativeApiUrl()` (`platform/native.ts`) ➜ ចាក់កូដពិតរបស់វាផង (web ៖ គ្មាន Capacitor)
-const FN = extractFn('fetchWithTimeout') && require('./react-view.js').reactRuntime(src) + '\n'
+const authRuntime = require('./local-auth-runtime.cjs').localAuthRuntime(path.resolve(ROOT), src);
+const FN = extractFn('fetchWithTimeout') && authRuntime.withoutBindings(require('./react-view.js').reactRuntime(src)) + '\n' + authRuntime.code + '\n'
     + ['bridge', 'isNativeApp', 'nativeWebOrigin', 'resolveNativeApiUrl', 'nativeFunctionRequest', 'moveQueryToHeader']
-    .map((n) => extractFn(n) || '').join('\n') + '\n' + extractFn('fetchWithTimeout');
+    .map((n) => extractFn(n) || '').join('\n') + '\n' + extractFn('fetchWithTimeout')
+    + `\n firebaseConfig = { databaseURL: 'https://network-timeout-fixture.firebaseio.com' };
+        appLocalStore.setItem('zoew_firebase_config', JSON.stringify(firebaseConfig));
+        auth = { currentUser: { uid: 'network-timeout-fixture' } }; db = {}; fb = {};
+        if (!acceptLocalAuthSession(auth, loginBackendScope(), auth.currentUser)) throw Error('Network fixture requires accepted SDK actor');`;
 ok('ស្រង់ fetchWithTimeout ពិតចេញពី app.js បាន', !!FN);
 if (!FN) {
     // គ្មាន helper ➜ ផ្នែក browser គ្មានអ្វីត្រូវរត់។ ចាកចេញយ៉ាងស្អាតជំនួស
@@ -218,12 +223,11 @@ if (!FN) {
 // ម៉ាស៊ីនបម្រើដែលធ្វើត្រាប់តាមបណ្តាញឆ្កួត៖
 //   /hang       — មិនឆ្លើយអ្វីទាំងអស់
 //   /headers-only — ផ្ញើ header រួច **ឈប់** មិនផ្ញើ body និងមិនបិទ
-let openSockets = 0, abortedSockets = 0, hangHits = 0;
+let abortedSockets = 0, hangHits = 0;
 function serve() {
     return new Promise((res) => {
         const s = http.createServer((req, rsp) => {
             const p = req.url.split('?')[0];
-            openSockets++;
             req.on('aborted', () => { abortedSockets++; });
             rsp.on('close', () => {});
             if (p === '/hang') { hangHits++; return; }

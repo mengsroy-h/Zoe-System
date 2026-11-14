@@ -7,6 +7,8 @@ import { withTransactionOutcomeResolution } from '../../../../ZoeW/src/services/
 import { createLocalWriteJournal } from '../../../../ZoeW/src/services/write-journal';
 import { nativeWriteRecoveryState } from '../../../../ZoeW/src/services/native-write-recovery';
 import { createSupabaseDatabase } from '../../../../ZoeW/src/services/supabase-rtdb';
+import { appLocalStore } from '../../../../ZoeW/src/core/storage';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 const host = 'https://purge-proof.firebaseio.com';
 const ids = ['scan_' + 'a'.repeat(32), 'release_' + 'b'.repeat(32)];
@@ -72,6 +74,8 @@ for (const version of [1, 2]) for (const mode of ['receipt', 'absent', 'partial'
     const sdk = withTransactionOutcomeResolution(raw); sdk.getAuth(app); sdk.getDatabase(app);
     Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db, isDatabaseInitialized: true,
         isInitializingFirebase: false, firebaseSdkUnavailable: false, isDatabaseConnected: true, sessionExpiryCheck: 'live', serverClockTrusted: true, serverTimeOffsetMs: 0, authLoginOperation: null });
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(app.options));
+    acceptFixtureSession();
     try {
         const verdict = await sdk.set(sdk.ref(db, 'zoew_settings/exchange_rate'), 4200).then(() => 'sent', (error: any) => error.code);
         const proven = mode === 'receipt';
@@ -134,6 +138,8 @@ it('ការវាស់បញ្ច្រាស៖ នាឡិកាមិន
     const sdk = withTransactionOutcomeResolution(raw); sdk.getAuth(app); sdk.getDatabase(app);
     Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db, isDatabaseInitialized: true,
         isInitializingFirebase: false, firebaseSdkUnavailable: false, isDatabaseConnected: true, sessionExpiryCheck: 'live', serverClockTrusted: false, serverTimeOffsetMs: 0, authLoginOperation: null });
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(app.options));
+    acceptFixtureSession();
     try {
         let settled = false;
         const pending = sdk.set(sdk.ref(db, 'zoew_settings/exchange_rate'), 4200).then(() => 'sent', (error: any) => error.code).then(value => { settled = true; return value; });

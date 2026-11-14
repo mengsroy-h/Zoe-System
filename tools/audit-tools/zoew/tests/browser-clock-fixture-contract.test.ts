@@ -14,6 +14,8 @@ import * as license from '../../../../ZoeW/src/features/license';
 import { AppLockScreen } from '../../../../ZoeW/src/app/components/AppLockScreen';
 import { viewState } from '../../../../ZoeW/src/core/view-state';
 import { mount, unmount } from './native/react-harness';
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
+import { appLocalStore } from '../../../../ZoeW/src/core/storage';
 
 // កំណត់ផ្លូវនេះទៅ snapshot ដើម ដើម្បីវាស់ថា checker ចាប់ fixture ចាស់បានពិត។
 const root = path.resolve(process.env.BROWSER_FIXTURE_ROOT || '..');
@@ -54,6 +56,7 @@ beforeEach(() => {
     vi.spyOn(performance, 'now').mockImplementation(() => mono);
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
     resetServerClock();
+    configureFixtureBackend('browser-clock-contract');
     Object.assign(firebaseState, { db: {}, auth: null, isDatabaseConnected: false, hasEverConnectedToDatabase: false,
         infoListenersFailed: false, infoListenerRecoveryTimer: null, reconnectWatchdogTimer: null,
         sessionExpiryCheck: 'live', sessionExpiryCheckInFlight: false,
@@ -81,6 +84,8 @@ async function authFixture(file: string) {
     Object.assign(firebaseState, { fb: sdk, auth: sdk.getAuth(), db: sdk.getDatabase(),
         firebaseConfig: { databaseURL: 'https://auth-fixture.invalid' }, sessionExpiryCheck: 'pending',
         authGeneration: firebaseState.authGeneration + 1 });
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(firebaseState.firebaseConfig));
+    acceptFixtureSession();
     firebaseState.dbRefConnected = sdk.ref(firebaseState.db, '.info/connected');
     firebaseState.dbRefServerTimeOffset = sdk.ref(firebaseState.db, '.info/serverTimeOffset');
     expect(await api.syncServerTime()).toBe(true);
@@ -144,6 +149,7 @@ it.each(files)('%s៖ fixture ពិតផ្តល់ sample ក្រោយ sy
     expect(serverClockIsTrustworthy()).toBe(true);
     expect(getServerNow()).toBe(START);
     firebaseState.auth = { currentUser: { uid: 'fixture' } } as any;
+    acceptFixtureSession();
     firebaseState.sessionExpiryCheck = 'live';
     expect(sessionUserActionAllowed('triggerScanAction')).toBe(true);
     firebaseState.sessionExpiryCheck = 'unverified';
@@ -162,6 +168,7 @@ it.each(['missing', 'mutable', 'source', 'generation', 'observation', 'uncertain
     expect(attachInfoListeners()).toBe(true); await turn();
     expect(serverClockIsTrustworthy()).toBe(false);
     firebaseState.auth = { currentUser: { uid: 'fixture' } } as any;
+    acceptFixtureSession();
     firebaseState.sessionExpiryCheck = 'live';
     expect(sessionUserActionAllowed('triggerScanAction')).toBe(false);
 });

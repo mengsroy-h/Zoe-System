@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 /**
  * ✍️ ZTO Palm Sign ពីដើមដល់ចប់ ៖ App ពិត (`zto-palm-sign.ts`) ➜ Function ពិត (`zto-order-detail-core.cjs` ➜ `_shared/zto-palm-sign.js`) ➜ ZTO Palm ក្លែង។
  * សំណើម្ចាស់គម្រោង ៖ «ZTO Palm ពេលស្កេន ចែកចាយមិនផ្ទុករូបភាពទេនិងឈ្មោះទេ តែមានសារលោតបញ្ជាក់ បញ្ហាដូចពេល Sign ដែរ … ការ Sign ដំណើរការត្រឹមត្រូវ100%ហើយ»។
@@ -164,6 +165,8 @@ beforeEach(async () => {
     firebaseState.db = {};
     firebaseState.fb = { getIdTokenResult: async () => ({ token: 'synthetic-identity' }) };
     firebaseState.auth = { currentUser: { uid: 'audit-user' } };
+    firebaseState.firebaseConfig = { databaseURL: 'https://sign-shop.firebaseio.com' };
+    acceptFixtureSession();
     securityState.appIsLocked = false; securityState.appLockVeiled = false;
     securityState.lookupSecretKey = await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']) as any;
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, url: window.location.origin + '/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}',

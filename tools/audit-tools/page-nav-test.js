@@ -104,22 +104,26 @@ const FAKE_SDK = function (seed) {
     }
     function fireAll() { [...new Set(listeners.map((l) => l.path))].forEach(fire); }
     window.__fireAll = fireAll;
+    window.__getPath = getPath;
     window.__setPath = (p, v) => { setPath(p, v); fire(p); };
 
     const user = { uid: 'admin-uid', email: 'a@b.c', getIdToken: () => Promise.resolve('tok'), metadata: { lastSignInTime: new Date().toISOString() } };
+    const app = { name: 'fake', options: {} };
+    const auth = { currentUser: user, app };
+    const authListeners = new Set();
     window.firebaseSDK = {
-        initializeApp: () => ({ name: 'fake' }),
+        initializeApp: (options) => { app.options = options; return app; },
         getApps: () => [],
         deleteApp: () => Promise.resolve(),
-        getAuth: () => ({ currentUser: user }),
-        onAuthStateChanged: (a, cb) => { setTimeout(() => cb(user), 0); return () => {}; },
-        signInWithEmailAndPassword: () => Promise.resolve({ user }),
-        signOut: () => Promise.resolve(),
+        getAuth: () => auth,
+        onAuthStateChanged: (owner, cb) => { authListeners.add(cb); setTimeout(() => cb(owner.currentUser), 0); return () => authListeners.delete(cb); },
+        signInWithEmailAndPassword: (owner) => { owner.currentUser = user; user.metadata.lastSignInTime = new Date().toISOString(); authListeners.forEach(cb => setTimeout(() => cb(user), 0)); return Promise.resolve({ user }); },
+        signOut: (owner) => { owner.currentUser = null; authListeners.forEach(cb => setTimeout(() => cb(null), 0)); return Promise.resolve(); },
         setPersistence: () => Promise.resolve(),
         browserLocalPersistence: {}, browserSessionPersistence: {},
         getIdTokenResult: () => Promise.resolve({ authTime: new Date().toISOString(), claims: {} }),
-        getDatabase: () => ({ fake: true }),
-        ref: (d, p) => ({ path: p === undefined ? '' : String(p) }),
+        getDatabase: () => ({ fake: true, app }),
+        ref: (d, p) => ({ path: p === undefined ? '' : String(p), toString: () => d.app.options.databaseURL + '/' + (p === undefined ? '' : String(p)) }),
         onValue: (r, cb) => {
             listeners.push({ path: r.path, cb });
             setTimeout(() => { if (r.path === '.info/connected') cb({ val: () => true }); else cb(snapOf(r.path)); }, 0);
@@ -207,6 +211,15 @@ function seedData() {
     page.on('dialog', (d) => d.accept());
     await page.route('**', (route) => {
         const u = route.request().url();
+        const database = new URL('https://fake-default-rtdb.firebaseio.com');
+        const requested = new URL(u);
+        if (requested.origin === database.origin && requested.pathname.endsWith('.json') && route.request().method() === 'GET') {
+            const key = decodeURIComponent(requested.pathname.slice(1, -5));
+            return page.evaluate(key => window.__getPath(key), key).then(value => route.fulfill({
+                status: 200, contentType: 'application/json', body: JSON.stringify(value),
+                headers: { 'access-control-allow-origin': '*' }
+            }));
+        }
         if (u.indexOf('/license-verify.js') !== -1) {
             return route.fulfill({ status: 200, contentType: 'application/javascript', body: LICENSE_STUB });
         }
@@ -540,10 +553,10 @@ function seedData() {
     await page.evaluate(async () => {
         if (typeof window.setupActionDelegation === 'function' || typeof window.commitNow !== 'function') return;
         await new Promise((r) => setTimeout(r, 80));
-        const m = document.getElementById('loginModal');
-        if (m && getComputedStyle(m).display !== 'none' && typeof closeModal === 'function') closeModal('loginModal');
+        await window.performLogin('a@b.c', 'synthetic-page-nav-password', true, false);
         window.commitNow();
     });
+    await page.waitForFunction(() => window.sessionExpiryCheck === 'live' && window.isDatabaseInitialized && window.auth?.currentUser, null, { timeout: 15000 });
     const moreMenu = await page.evaluate(() => {
         const btn = document.querySelector('.header-more-btn');
         if (!btn) return '';

@@ -39,6 +39,7 @@ const { modulePrograms } = require('./audit-module-ast');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { localAuthRuntime } = require('./local-auth-runtime.cjs');
 const { webcrypto } = require('node:crypto');
 const { TextEncoder } = require('node:util');
 const { moduleRuntime, memoryStorage } = require('./react-view');
@@ -215,6 +216,7 @@ check(totalFbCalls >= 20, 'ជាន់អប្បបរមា ៖ រកឃើ
 // ── ២. ពិដានត្រូវសមហេតុផល ───────────────────────────────────────────────
 console.log('\n== ២. ពិដានស្ថិតក្នុងជួរសមហេតុផល ==');
 const zoewSrc = readApp('ZoeW') || '';
+const authRuntime = localAuthRuntime(ROOT, zoewSrc);
 const capMatch = zoewSrc.match(/const\s+DB_OP_TIMEOUT_MS\s*=\s*(\d+)\s*;/);
 check(!!capMatch, 'ZoeW ប្រកាស DB_OP_TIMEOUT_MS',
     capMatch ? undefined : 'រកមិនឃើញ ➜ គ្មានពិដានរួមសម្រាប់ការហៅ Firebase');
@@ -352,7 +354,9 @@ function runResetPickup(mode, opts) {
         if (!helper) return { missing: name };
         vm.runInContext(helper, ctx);
     }
-    vm.runInContext(resetRuntime.code, ctx);
+    authRuntime.prepare(ctx, config);
+    vm.runInContext(authRuntime.withoutBindings(resetRuntime.code) + '\n' + authRuntime.code, ctx);
+    authRuntime.seed(ctx, config);
     loadCommon(ctx, zoewSrc);
     vm.runInContext(sliceConst(zoewSrc, 'PICKUP_DATE_KEY_PATTERN')
         || 'const PICKUP_DATE_KEY_PATTERN=/^\\d{4}-\\d{2}-\\d{2}$/;', ctx);
@@ -578,7 +582,11 @@ function runAbandonCleanup(mode) {
     ctx.dataState = { pickupPendingVersion: 0 };
     ctx.pickupPendingVersion = 0;
     ctx.navigator = { onLine: true };
-    vm.runInContext(protocol.code + '\n' + protocol.withoutBindings(parts.join('\n\n')), ctx);
+    const authConfig = { databaseURL: 'https://fixture-db-stall-guard-test.invalid' };
+    ctx.appLocalStore = ctx.__storage;
+    authRuntime.prepare(ctx, authConfig);
+    vm.runInContext(authRuntime.withoutBindings(protocol.code + '\n' + protocol.withoutBindings(parts.join('\n\n'))) + '\n' + authRuntime.code, ctx);
+    authRuntime.seed(ctx, authConfig);
 
     // កញ្ចប់ហួស ៨ ថ្ងៃ ហើយ **មិនទាន់យក** ➜ ផ្លូវ `abandon` = ដកលុយ
     const item = {

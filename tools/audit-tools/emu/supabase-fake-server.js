@@ -85,10 +85,12 @@ async function startFakeSupabase(opts) {
         }
         return sessionId;
     };
-    const sessionAlive = async (sessionId) => {
+    const sessionAlive = async (sessionId, userId) => {
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(sessionId || '')) || !userId) return false;
         const c = await pool.connect();
         try {
-            return (await c.query('select 1 from auth.sessions where id = $1', [sessionId])).rows.length === 1;
+            return (await c.query(`select 1 from auth.sessions s where id = $1 and user_id = $2
+                and ((to_jsonb(s)->>'not_after') is null or (to_jsonb(s)->>'not_after')::timestamptz > statement_timestamp())`, [sessionId, userId])).rows.length === 1;
         } finally {
             c.release();
         }
@@ -98,7 +100,7 @@ async function startFakeSupabase(opts) {
         try {
             if (scope === 'global') await c.query('delete from auth.sessions where user_id = $1', [claims.sub]);
             else if (scope === 'others') await c.query('delete from auth.sessions where user_id = $1 and id <> $2', [claims.sub, claims.session_id]);
-            else await c.query('delete from auth.sessions where id = $1', [claims.session_id]);
+            else await c.query('delete from auth.sessions where id = $1 and user_id = $2', [claims.session_id, claims.sub]);
         } finally {
             c.release();
         }
@@ -281,7 +283,7 @@ async function startFakeSupabase(opts) {
                     }
                     if (grant === 'refresh_token') {
                         const rt = refreshTokens.get(body && body.refresh_token);
-                        if (!rt || !(await sessionAlive(rt.sessionId))) {
+                        if (!rt || !(await sessionAlive(rt.sessionId, rt.user.id))) {
                             if (rt) refreshTokens.delete(body.refresh_token);
                             return send(res, 400, { code: 'refresh_token_not_found', error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token: Refresh Token Not Found' }, { 'X-Supabase-Api-Version': '2024-01-01' });
                         }
@@ -299,7 +301,7 @@ async function startFakeSupabase(opts) {
                 if (u.pathname === '/auth/v1/user' && req.method === 'GET') {
                     const token = String(req.headers.authorization || '').slice(7);
                     const v = verifyJwt(token, secret, Math.floor(Date.now() / 1000));
-                    if (!v.ok) return send(res, 401, { code: 'bad_jwt', msg: 'invalid JWT' });
+                    if (!v.ok || !(await sessionAlive(v.claims.session_id, v.claims.sub))) return send(res, 401, { code: 'bad_jwt', msg: 'invalid JWT or session' });
                     return send(res, 200, { id: v.claims.sub, aud: 'authenticated', role: 'authenticated', email: v.claims.email });
                 }
                 const m = u.pathname.match(/^\/rest\/v1\/rpc\/([a-z_][a-z0-9_]*)$/);

@@ -1055,6 +1055,8 @@ function safeFailureMessage(code) {
     const android = isAndroidRuntime();
     const setupName = android ? 'setup-termux.sh' : 'setup.cmd';
     const messages = {
+        COOKIE_DISPLAY_MANUAL_ONLY: '--show-cookie is available only for a manual sync; remove automated/status/setup options.',
+        COOKIE_DISPLAY_INTERACTIVE_ONLY: '--show-cookie needs an interactive terminal for both input and output; redirection is disabled.',
         CAPTURE_TIMEOUT: 'Waited 10 minutes and saw no signed-in ZTO API answer. Open Argus from the gate page, then scan one Waybill.',
         BROWSER_CLOSED: 'The browser was closed before the cookie was captured. Please try again.',
         BROWSER_LAUNCH_FAILED: 'Could not start Edge/Chrome. Close any old ZTO Cookie Sync window, or install Edge/Chrome.',
@@ -1217,38 +1219,56 @@ async function reportVerification(cookieHeader) {
     console.log('      The cookie is written - try a scan in a minute.');
 }
 
-// ⛔ **សំណើអ្នកប្រើ (2026-09-02)** ៖ *«សូមអោយបង្ហាញ cookie ដែលយកបានពី argus
-// ក្នុង cmd ផង»*។ តម្លៃនេះជា session ZTO របស់អ្នកប្រើផ្ទាល់ ដែលគាត់កាន់ស្រាប់
-// ក្នុង browser ➜ ការបង្ហាញវាលើអេក្រង់របស់គាត់មិនបន្ថែមអ្នកកាន់ថ្មីទេ ហើយវា
-// ចាំបាច់ពេលត្រូវ paste ចូល `ZTO_COOKIE` ជាផ្លូវបម្រុង។
-// ⛔ **Netlify PAT និង ZTO_PROXY_KEY នៅតែហាមបង្ហាញដាច់ខាត** — `zto-cookie-sync-test.js`
-// ចាក់សោទាំង ២ ទិស ៖ Cookie ត្រូវបង្ហាញ · សោមិនត្រូវបង្ហាញ។
-function describeCapturedCookie(cookieHeader) {
-    const lines = [
+function capturedCookieDisplayOptions(args, interactive) {
+    args = args.map(arg => arg.toLowerCase());
+    const showCookie = args.includes('--show-cookie');
+    if (showCookie && ['--auto', '--check', '--auto-ready', '--verify-setup', '--help'].some(flag => args.includes(flag)))
+        throw codedError('COOKIE_DISPLAY_MANUAL_ONLY');
+    if (showCookie && !interactive) throw codedError('COOKIE_DISPLAY_INTERACTIVE_ONLY');
+    return { showCookie };
+}
+
+function cookieSyncUsage() {
+    return [
+        'Usage: sync-zto-cookie [--check | --auto | --auto-ready | --verify-setup]',
+        '       sync-zto-cookie --show-cookie',
+        '       sync-zto-cookie --help',
         '',
-        '--- Cookie captured from Argus (paste into ZTO_COOKIE if you ever need a fallback) ---',
+        'Normal sync captures and uploads the cookie without printing its value.',
+        '--show-cookie prints it only during a manual sync in an interactive terminal.',
+        'It cannot be combined with automated/status/setup modes or redirected output.'
+    ].join('\n');
+}
+
+function describeCapturedCookie(cookieHeader, options = {}) {
+    if (options.showCookie !== true) return 'Cookie value hidden.';
+    return [
+        '',
+        '--- Cookie captured from Argus (manual copy requested) ---',
         String(cookieHeader || ''),
         '--- end of cookie ---',
         ''
-    ];
-    return lines.join('\n');
+    ].join('\n');
 }
 
 async function main() {
-    if (process.argv.includes('--auto-ready')) {
+    const args = process.argv.slice(2).map(arg => arg.toLowerCase());
+    const display = capturedCookieDisplayOptions(args, process.stdin.isTTY === true && process.stdout.isTTY === true);
+    if (args.includes('--help')) { console.log(cookieSyncUsage()); return; }
+    if (args.includes('--auto-ready')) {
         const readiness = autoReadiness(await resolveVerification());
         console.log(describeAutoReadiness(readiness));
         if (!readiness.ready) process.exitCode = 1;
         return;
     }
 
-    if (process.argv.includes('--check')) {
+    if (args.includes('--check')) {
         console.log('Checking the health of the ZTO cookie...');
         console.log(describeHealth(await checkCookieHealth(await resolveVerification())));
         return;
     }
 
-    if (process.argv.includes('--auto')) {
+    if (args.includes('--auto')) {
         const health = await checkCookieHealth(await resolveVerification());
         console.log(describeHealth(health));
         if (!shouldRefreshInAuto(health)) {
@@ -1258,7 +1278,7 @@ async function main() {
         console.log('Getting a new cookie...');
     }
 
-    if (process.argv.includes('--verify-setup')) {
+    if (args.includes('--verify-setup')) {
         console.log('Checking the Netlify Site ID and token...');
         await verifyNetlifySetup();
         console.log(isAndroidRuntime()
@@ -1270,7 +1290,7 @@ async function main() {
     console.log('Capturing the cookie from a real request header - no DevTools, no extension...');
     let cookieHeader = await captureCookieHeader();
     console.log('OK: cookie captured.');
-    console.log(describeCapturedCookie(cookieHeader));
+    console.log(describeCapturedCookie(cookieHeader, display));
     // ⛔ ការរំលងគូត្រូវ **មើលឃើញ** — ការរំលងស្ងាត់ធ្វើឲ្យបញ្ហាថ្ងៃក្រោយ
     // វិនិច្ឆ័យមិនបាន។ បោះពុម្ព **ឈ្មោះ** ប៉ុណ្ណោះ មិនដែលបោះតម្លៃឡើយ។
     const skipped = droppedCookieNames();
@@ -1298,6 +1318,8 @@ if (require.main === module) {
 module.exports = {
     autoReadiness,
     describeCapturedCookie,
+    capturedCookieDisplayOptions,
+    cookieSyncUsage,
     diagnosticsCookie,
     describeHealth,
     droppedCookieNames,

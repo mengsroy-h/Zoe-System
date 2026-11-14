@@ -115,6 +115,20 @@ function responseValuesReachConsole(src) {
     return found;
 }
 
+async function capturedCookieFlow(args, stdinTTY = true, stdoutTTY = true) {
+    const output = [], calls = { capture: 0, upload: 0, verification: 0, health: 0, setup: 0 };
+    const exported = { exports: {} };
+    const context = { module: exported, exports: exported.exports, require, __dirname: TOOL_DIR, Buffer, URL, setTimeout, clearTimeout,
+        process: { argv: ['node', SOURCE_PATH, ...args], stdin: { isTTY: stdinTTY }, stdout: { isTTY: stdoutTTY }, env: {}, platform: 'linux' },
+        console: { log: (...values) => output.push(values.join(' ')), error: (...values) => output.push(values.join(' ')) },
+        __cookie: COOKIE, __calls: calls };
+    vm.createContext(context);
+    vm.runInContext(source + '\ncaptureCookieHeader=async()=>{__calls.capture++;return __cookie;};syncNetlifyCookie=async()=>{__calls.upload++;};reportVerification=async()=>{__calls.verification++;};resolveVerification=async()=>({});checkCookieHealth=async()=>{__calls.health++;return {status:"ok",healthy:false};};verifyNetlifySetup=async()=>{__calls.setup++;};globalThis.__main=main;', context, { filename: SOURCE_PATH });
+    let code = null;
+    try { await context.__main(); } catch (error) { code = error.code || 'UNEXPECTED'; }
+    return { echoed: output.join('\n').includes(COOKIE), calls, code, help: output.join('\n').includes('--show-cookie') };
+}
+
 const source = read(SOURCE_PATH);
 const setup = read(SETUP_PATH);
 const runner = read(RUN_PATH);
@@ -670,13 +684,41 @@ async function run() {
     }
     ok('⛔ តម្លៃសោ/token មិនត្រូវឡើងដល់ console (AST មិនមែនឈ្មោះ)',
         acorn && secretPrints.length === 0, secretPrints.join(', '));
-    // ⛔ ការបង្ហាញ Cookie ជា **សំណើអ្នកប្រើ** — ចាក់សោវាទុក ដើម្បីកុំឲ្យជុំ
-    // ក្រោយ «រឹង» វាវិញដោយផ្អែកលើច្បាប់ចាស់ «Cookie មិនត្រូវបង្ហាញ»។
-    ok('បង្ហាញ Cookie ដែលចាប់បានក្នុង cmd (សំណើអ្នកប្រើ)',
+    ok('Cookie formatter hides the value unless manual display is explicitly admitted',
         !!(api && typeof api.describeCapturedCookie === 'function')
-        && api.describeCapturedCookie(COOKIE).indexOf(COOKIE) !== -1
-        && /console\.log\(describeCapturedCookie\(/.test(source),
-        api && typeof api.describeCapturedCookie);
+        && !api.describeCapturedCookie(COOKIE).includes(COOKIE)
+        && api.describeCapturedCookie(COOKIE, { showCookie: true }).includes(COOKIE));
+    const displayCases = [
+        ['manual default', [], true, true, { echoed: false, capture: 1 }],
+        ['automated default', ['--auto'], false, false, { echoed: false, capture: 1 }],
+        ['manual explicit terminal opt-in', ['--show-cookie'], true, true, { echoed: true, capture: 1 }],
+        ...['--auto', '--check', '--auto-ready', '--verify-setup'].map(flag =>
+            ['reject display with ' + flag, [flag, '--show-cookie'], true, true, { code: 'COOKIE_DISPLAY_MANUAL_ONLY', capture: 0 }]),
+        ['reject redirected output', ['--show-cookie'], true, false, { code: 'COOKIE_DISPLAY_INTERACTIVE_ONLY', capture: 0 }],
+        ['reject unattended input', ['--show-cookie'], false, true, { code: 'COOKIE_DISPLAY_INTERACTIVE_ONLY', capture: 0 }],
+        ['help is read-only without setup', ['--help'], false, false, { help: true, capture: 0 }],
+        ['help cannot bypass manual display admission', ['--help', '--show-cookie'], true, true, { code: 'COOKIE_DISPLAY_MANUAL_ONLY', capture: 0 }],
+        ['Windows uppercase help stays read-only', ['--HELP'], false, false, { help: true, capture: 0 }],
+        ['Windows uppercase help cannot bypass manual display admission', ['--HELP', '--show-cookie'], true, true, { code: 'COOKIE_DISPLAY_MANUAL_ONLY', capture: 0 }],
+        ['mixed-case automated display stays denied', ['--AuTo', '--show-cookie'], true, true, { code: 'COOKIE_DISPLAY_MANUAL_ONLY', capture: 0 }],
+        ['mixed-case manual terminal opt-in', ['--ShOw-CoOkIe'], true, true, { echoed: true, capture: 1 }]
+    ];
+    for (const [label, args, stdinTTY, stdoutTTY, expected] of displayCases) {
+        const actual = await capturedCookieFlow(args, stdinTTY, stdoutTTY);
+        const matched = Object.entries(expected).every(([key, value]) => (key === 'capture' ? actual.calls.capture : actual[key]) === value);
+        ok('Cookie stdout policy: ' + label, matched && (expected.capture === 1
+            ? actual.calls.upload === 1 && actual.calls.verification === 1 && actual.code === null
+            : Object.values(actual.calls).every(value => value === 0)), JSON.stringify(actual));
+    }
+    ok('Cookie display errors use fixed messages without echoing arguments or credentials',
+        !!api && ['COOKIE_DISPLAY_MANUAL_ONLY', 'COOKIE_DISPLAY_INTERACTIVE_ONLY', COOKIE, TOKEN, PROXY_KEY].every(code => {
+            const message = api.safeFailureMessage(code);
+            return ![COOKIE, TOKEN, PROXY_KEY].some(secret => message.includes(secret));
+        }));
+    ok('Windows wrapper validates display before setup/capture and offers read-only help',
+        runner.includes('capturedCookieDisplayOptions(process.argv.slice(1)')
+        && runner.indexOf('capturedCookieDisplayOptions(') < runner.indexOf('node_modules')
+        && runner.includes('if /I "%~1"=="--help" goto help'));
     ok('⛔ configure.ps1 និង read-token.ps1 ជា ASCII (បង្ហាញក្នុង cmd បាន)',
         /^[\x00-\x7f]*$/.test(configure) && /^[\x00-\x7f]*$/.test(tokenReader)
         && configure.length > 2000,
@@ -1173,6 +1215,12 @@ async function run() {
     // ផ្លូវស្វ័យប្រវត្តិធ្លាក់ `ANDROID_ADB_NOT_CONNECTED` រាល់ដង។
     // ⚠️ `\b` រាប់ `-` ជាព្រំដែន ➜ `--auto\b` ត្រូវនឹង `--auto-ready` ដែរ។
     // ការវាស់ត្រូវចាក់សោ `--auto)` ជា **ករណីពេញ** មិនមែនបុព្វបទ។
+    ok('Termux wrapper validates display before ADB/setup and offers read-only help',
+        termuxRun.includes('capturedCookieDisplayOptions(process.argv.slice(1)')
+        && termuxRun.indexOf('capturedCookieDisplayOptions(') < termuxRun.indexOf('node_modules')
+        && termuxRun.includes('first_arg="${1:-}"')
+        && termuxRun.includes('if [ "${first_arg,,}" = "--help" ]; then exec node sync-zto-cookie.js "$@"; fi')
+        && termuxRun.includes('case "${arg,,}" in'));
     const noAdbCase = (/--check\|--verify-setup\|--auto-ready\)?[^\n]*needs_adb=0/.exec(termuxRun) || [''])[0];
     ok('⛔ `--auto` មិនស្ថិតក្នុងសំណុំ «មិនត្រូវការ ADB»',
         !!noAdbCase && !/--auto\)[^\n]*needs_adb=0/.test(termuxRun), noAdbCase);

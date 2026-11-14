@@ -84,6 +84,9 @@ const EXPECT_PUBLIC_EXEC = {
     zoe_admin_write: ['service_role'],
     zoe_admin_tenants: ['service_role'],
     zoe_admin_export: ['service_role'],
+    zoe_admin_audit_tenants: ['service_role'],
+    zoe_admin_audit_export: ['service_role'],
+    zoe_admin_audit_restore: ['service_role'],
     note_my_device: ['authenticated']
 };
 const EXPECT_PRIVATE_EXEC = {
@@ -115,6 +118,15 @@ const EXPECT_PRIVATE_EXEC = {
     zoe_docs_tombstone: [],
     zoe_daily_capture: [],
     zoe_daily_diff: [],
+    zoe_audit_fields_v1: [],
+    zoe_audit_entries_v1: [],
+    zoe_audit_members_v1: [],
+    zoe_audit_codes_v1: [],
+    zoe_audit_summary_v1: [],
+    zoe_audit_status_v1: [],
+    zoe_business_audit_capture_v1: [],
+    zoe_audit_export_row_v1: [],
+    zoe_audit_archive_summary_v1: [],
     zoe_apply: [],
     zoe_apply_engine_v1: [],
     zoe_purge_registry_key_v1: [],
@@ -153,7 +165,7 @@ const EXPECT_PRIVATE_EXEC = {
 const SPLINTER_EXCLUDED_SCHEMAS = ['_timescaledb_cache', '_timescaledb_catalog', '_timescaledb_config', '_timescaledb_internal', 'auth', 'cron', 'extensions',
     'graphql', 'graphql_public', 'information_schema', 'net', 'pgmq', 'pgroonga', 'pgsodium', 'pgsodium_masks', 'pgtle', 'pgbouncer', 'pg_catalog', 'realtime',
     'repack', 'storage', 'supabase_functions', 'supabase_migrations', 'tiger', 'topology', 'vault'];
-const EXPECT_AUTH_SELECT = ['member_devices', 'member_reset_codes', 'platform_admins', 'tenant_invites', 'tenant_members', 'tenants', 'zoe_docs', 'zoe_tenant_state'];
+const EXPECT_AUTH_SELECT = ['member_devices', 'member_reset_codes', 'platform_admins', 'tenant_invites', 'tenant_members', 'tenants', 'zoe_business_audit', 'zoe_docs', 'zoe_tenant_state'];
 const API_ROLES = ['anon', 'authenticated', 'service_role'];
 const TABLE_PRIVS = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'];
 const INVITE_RE = /^[0-9A-HJKMNP-TV-Z]{4}(-[0-9A-HJKMNP-TV-Z]{4}){4}$/;
@@ -253,6 +265,7 @@ async function suite(mode, sql, stopOnFail) {
         if (!cond && stopOnFail) throw STOP;
     };
     const { c } = await freshDb(mode);
+    if(mode==='default-grants')await c.query('alter default privileges for role postgres in schema public grant all on sequences to anon,authenticated,service_role;alter default privileges for role postgres in schema public grant execute on functions to public,anon,authenticated,service_role');
     const extra = [];
     let applied = false;
     try {
@@ -406,7 +419,7 @@ async function body(c, rec, extra, mode) {
     const plainId = await makeAuthUser(c, 'plain@u.zoe.test');
     const adminSession = (await one('insert into auth.sessions (id, user_id, created_at) values (gen_random_uuid(), $1, now()) returning id', [adminId]))[0].id;
     const ADMIN = { role: 'authenticated', sub: adminId, extra: { session_id: adminSession } };
-    const PLAIN = { role: 'authenticated', sub: plainId };
+    const PLAIN = await H.sessionClaims(c, { role: 'authenticated', sub: plainId });
     const ANON = { role: 'anon' };
     const SERVICE = { role: 'service_role' };
     const future = new Date(Date.now() + 30 * 86400000).toISOString();
@@ -645,8 +658,8 @@ async function body(c, rec, extra, mode) {
             await one('delete from auth.sessions where id = $1', [sid]);
         }
     };
-    const WA = { role: 'authenticated', sub: uA1 };
-    const WB = { role: 'authenticated', sub: uB1 };
+    const WA = await H.sessionClaims(c, { role: 'authenticated', sub: uA1 });
+    const WB = await H.sessionClaims(c, { role: 'authenticated', sub: uB1 });
     const seeTenants = async (who) => ((await as(c, who, 'select id from public.tenants order by id')).rows || []).map((r) => r.id);
     rec('សមាជិក A ឃើញតែ tenant A', JSON.stringify(await seeTenants(WA)) === JSON.stringify([A]));
     rec('សមាជិក B ឃើញតែ tenant B', JSON.stringify(await seeTenants(WB)) === JSON.stringify([B]));
@@ -655,7 +668,7 @@ async function body(c, rec, extra, mode) {
     rec('សមាជិក A មិនឃើញកូដអញ្ជើញ', ((await as(c, WA, 'select 1 from public.tenant_invites')).rows || [1]).length === 0);
     rec('សមាជិក A មិនឃើញកូដកំណត់ពាក្យសម្ងាត់', ((await as(c, WA, 'select 1 from public.member_reset_codes')).rows || [1]).length === 0);
     rec('សមាជិក A មិនឃើញបញ្ជី admin', ((await as(c, WA, 'select 1 from public.platform_admins')).rows || [1]).length === 0);
-    const accountWithoutSession = await as(c, WA, 'select * from public.my_account()');
+    const accountWithoutSession = await as(c, { ...WA, extra: {} }, 'select * from public.my_account()');
     rec('my_account គ្មាន session_id ➜ PT401 មិនឆ្លើយគណនី', raised(accountWithoutSession, 'session-revoked') && accountWithoutSession.error.code === 'PT401');
     const accA = (await accountAs(WA, 'select * from public.my_account()')).rows || [];
     rec('my_account() ៖ A · សាខា 881859 · active', accA.length === 1 && accA[0].tenant_id === A && accA[0].branch_code === '881859'
@@ -665,7 +678,7 @@ async function body(c, rec, extra, mode) {
     rec('អ្នកគ្មានសមាជិកភាព ៖ ឃើញ tenant ០ · my_account ទទេ', (await seeTenants(PLAIN)).length === 0
         && ((await accountAs(PLAIN, 'select * from public.my_account()')).rows || [1]).length === 0);
 
-    const FORGED = { role: 'authenticated', sub: uA1, extra: {
+    const FORGED = { ...WA, extra: { ...WA.extra,
         app_metadata: { tenant_id: B, branch_code: '770001', role: 'owner' },
         user_metadata: { tenant_id: B, branch_code: '770001' }, tenant_id: B, branch_code: '770001', is_admin: true } };
     rec('claim ក្លែង (app/user_metadata · tenant_id · branch_code របស់ B) ➜ នៅឃើញតែ A',
@@ -714,7 +727,7 @@ async function body(c, rec, extra, mode) {
     const seenSame = (await devRows()).find((d) => d.serial === SER_A);
     rec('note_my_device ៖ ព័ត៌មានដដែលក្នុង ១ ម៉ោង ➜ មិនសរសេរ (last_seen ដដែល)', !!seenBefore && !!seenSame
         && seenSame.last_seen === seenBefore.last_seen && /\.\d+/.test(seenBefore.last_seen), { seenBefore, seenSame });
-    await note({ role: 'authenticated', sub: uA2 }, SER_A.toUpperCase(), 'Samsung SM-A546E', 'Android 15');
+    await note(await H.sessionClaims(c, { role: 'authenticated', sub: uA2 }), SER_A.toUpperCase(), 'Samsung SM-A546E', 'Android 15');
     const seenNew = (await devRows()).filter((d) => d.tenant_id === A);
     rec('note_my_device ៖ serial អក្សរធំ = ឧបករណ៍ដដែល · គណនី/ប្រព័ន្ធថ្មី ➜ កែជួរដដែល (គ្មានជួរស្ទួន)',
         seenNew.length === 1 && seenNew[0].user_id === uA2 && seenNew[0].platform === 'Android 15', seenNew);
@@ -735,6 +748,10 @@ async function body(c, rec, extra, mode) {
     await c.query('update public.tenants set revoked = false where id = $1', [A]);
     rec('note_my_device ៖ ហាងបិទ ➜ shop-inactive', raised(devRevoked, 'shop-inactive'), devRevoked);
 
+    for(const who of [ANON,PLAIN,WA,SERVICE])rec('audit sequence ៖ API role មិនអាច nextval/setval/read',
+        denied(await as(c,who,"select nextval('public.zoe_business_audit_archive_seq_seq')"))
+        &&denied(await as(c,who,"select setval('public.zoe_business_audit_archive_seq_seq',1,false)"))
+        &&denied(await as(c,who,'select last_value from public.zoe_business_audit_archive_seq_seq')));
     const adminSees = (await as(c, ADMIN, 'select count(*)::int as n from public.tenants')).rows;
     rec('admin ឃើញ tenant ទាំងអស់', !!adminSees && adminSees[0].n >= 2, adminSees);
     for (const who of [ANON, PLAIN, WA, ADMIN]) {
@@ -748,6 +765,22 @@ async function body(c, rec, extra, mode) {
     rec('service_role ៖ zoe_admin_tenants · zoe_admin_export ហៅបាន (ផ្លូវ backup/ផ្ទេរទិន្នន័យ)',
         !!svcTenants.rows && Array.isArray(svcTenants.rows[0].r.tenants) && !!svcExport.rows && Array.isArray(svcExport.rows[0].r.rows),
         [svcTenants.error, svcExport.error]);
+    for (const who of [ANON, PLAIN, WA, ADMIN]) {
+        rec('audit archive ៖ app/anon មិនអាចរាយ ទាញ ឬ restore ទោះ platform admin',
+            denied(await as(c, who, 'select public.zoe_admin_audit_tenants(null, 10)'))
+            && denied(await as(c, who, 'select public.zoe_admin_audit_export($1)', [A]))
+            && denied(await as(c, who, 'select public.zoe_admin_audit_restore($1,$1,\'[]\'::jsonb)', [A])));
+    }
+    await c.query(`insert into public.zoe_business_audit(tenant_id,origin_tenant_id,operation_id,seq,actor_kind,origin,root,record_key,action,reason,previous_status,new_status,before_value,after_value,changed_fields,changed_fields_truncated,summary_unchanged)
+        select id,id,'rls_audit_fixture',1,'system','direct_sql','zoew_scan_history_cod_dod','rls_audit','create','record_created','{"exists":false,"location":"absent"}'::jsonb,'{"exists":true,"location":"history"}'::jsonb,'{"exists":false,"location":"absent"}'::jsonb,'{"exists":true,"location":"history"}'::jsonb,array['exists','location'],false,false from public.tenants where id in($1,$2)`, [A,B]);
+    const auditA=await as(c,WA,'select distinct tenant_id from public.zoe_business_audit'),auditB=await as(c,WB,'select distinct tenant_id from public.zoe_business_audit');
+    rec('audit archive ៖ RLS សាខា A/B ដាច់ដោយឡែក',auditA.rows?.length===1&&auditA.rows[0].tenant_id===A&&auditB.rows?.length===1&&auditB.rows[0].tenant_id===B,[auditA.error,auditB.error]);
+    const auditExport=await as(c,SERVICE,'select public.zoe_admin_audit_export($1) as r',[A]),auditTenants=await as(c,SERVICE,'select public.zoe_admin_audit_tenants(null, 10) as r'),auditRestore=await as(c,SERVICE,'select public.zoe_admin_audit_restore($1,$1,\'[]\'::jsonb) as r',[A]);
+    rec('audit archive ៖ service_role export/list/restore មានច្រកពិត',auditExport.rows?.[0]?.r.rows.length>=1&&auditTenants.rows?.[0]?.r.tenants.includes(A)&&auditRestore.rows?.[0]?.r.total===0,[auditExport.error,auditTenants.error,auditRestore.error]);
+    rec('audit archive ៖ app direct insert/update/delete/truncate ត្រូវបដិសេធ',
+        denied(await as(c,WA,'insert into public.zoe_business_audit(event_id) select event_id from public.zoe_business_audit limit 1'))
+        &&denied(await as(c,WA,"update public.zoe_business_audit set action='forged'"))
+        &&denied(await as(c,WA,'delete from public.zoe_business_audit'))&&denied(await as(c,WA,'truncate public.zoe_business_audit')));
     rec('zoe_admin_tenants មិនបញ្ចេញវាលសម្ងាត់ (hash កូដ · username · ពាក្យសម្ងាត់)', !!svcTenants.rows
         && svcTenants.rows[0].r.tenants.every((t) => JSON.stringify(Object.keys(t).sort()) === JSON.stringify(['branch_code', 'docs', 'expires_at', 'id', 'name', 'revoked', 'seq'])),
         svcTenants.rows && svcTenants.rows[0].r.tenants[0]);
@@ -933,6 +966,7 @@ async function body(c, rec, extra, mode) {
             await one("insert into auth.refresh_tokens (token, user_id, session_id, revoked, created_at) values (md5(random()::text), $1, $2, false, now())", [String(uid), sid]);
         }
     };
+    await c.query('delete from auth.sessions where id = any($1::uuid[])', [[WA.extra.session_id, WB.extra.session_id]]);
     await addSession(uA1, 2);
     await addSession(uB1, 1);
     rec('revoke_user_sessions ៖ anon ➜ permission denied', denied(await as(c, ANON, 'select public.revoke_user_sessions($1)', [uA1])));
@@ -953,6 +987,13 @@ async function body(c, rec, extra, mode) {
     const sessionWrite = await as(c, SA, 'select public.zoe_write($1, $2::jsonb) as r', ['session_live_op_0001', JSON.stringify([{ k: 'set', p: ['zoew_barcode_registry', 'SESS1'], v: true }])]);
     rec('session ដែលនៅរស់ ៖ zoe_read · zoe_pull · zoe_write ឆ្លង', codeOf(await readAs(SA)) === 'ok' && codeOf(await as(c, SA, 'select public.zoe_pull(0, 10)')) === 'ok'
         && !!sessionWrite.rows && sessionWrite.rows[0].r.ok === true, sessionWrite);
+    await c.query('alter table auth.sessions add column if not exists not_after timestamptz');
+    await c.query("update auth.sessions set not_after=statement_timestamp()-interval '1 second' where id=$1", [SA.extra.session_id]);
+    const expiredSession = [codeOf(await readAs(SA)), codeOf(await as(c, SA, 'select public.zoe_pull(0, 10)')),
+        codeOf(await as(c, SA, 'select public.zoe_write($1, $2::jsonb)', ['session_expired_op_001', '[]'])), codeOf(await as(c, SA, 'select 1 from public.zoe_docs limit 1'))];
+    rec('session not_after ផុតកំណត់ ៖ read · pull · write · RLS ត្រូវបដិសេធភ្លាម', expiredSession.every(code => code === 'PT401'), expiredSession);
+    await c.query("update auth.sessions set not_after=statement_timestamp()+interval '1 day' where id=$1", [SA.extra.session_id]);
+    rec('session not_after នៅអនាគត ៖ read បាន', codeOf(await readAs(SA)) === 'ok');
     const seqBeforeRevoke = await seqOf(A);
     const revokedLive = await as(c, SERVICE, 'select public.revoke_user_sessions($1) as n', [uA1]);
     rec('revoke_user_sessions ៖ ដក session ➜ seq ហាងឡើង ១ (realtime ប្រាប់ឧបករណ៍ឲ្យទាញភ្លាម)',
@@ -962,10 +1003,10 @@ async function body(c, rec, extra, mode) {
     rec('token ដែល session ត្រូវដក ៖ zoe_read · zoe_pull · zoe_write · SELECT zoe_docs ➜ PT401 (HTTP 401) ភ្លាម មិនរង់ចាំ token ផុតកំណត់',
         afterRevoke.every((x) => x === 'PT401'), afterRevoke);
     rec('session_id ខុសទម្រង់ ➜ PT401', codeOf(await readAs({ role: 'authenticated', sub: uA1, extra: { session_id: 'not-a-session' } })) === 'PT401');
-    rec('ការដក session របស់ A មិនប៉ះ B · claim គ្មាន session_id (service · fixture) មិនប៉ះ', codeOf(await readAs(SB)) === 'ok' && codeOf(await readAs(WA)) === 'ok');
+    rec('ការដក session របស់ A មិនប៉ះ B · authenticated គ្មាន session_id ត្រូវបដិសេធ', codeOf(await readAs(SB)) === 'ok'
+        && codeOf(await readAs({ ...WA, extra: {} })) === 'PT401');
     const borrowed = await as(c, { role: 'authenticated', sub: uA1, extra: { session_id: SB.extra.session_id } }, 'select public.zoe_pull(0, 10) as r');
-    rec('session_id តែបដិសេធ មិនផ្តល់សិទ្ធិ ៖ token A ដែលមាន session រស់របស់ B ➜ ហាងនៅតែ A (auth.uid())',
-        !!borrowed.rows && borrowed.rows[0].r.tenant === A, borrowed);
+    rec('token A ដែលមាន session រស់របស់ B ត្រូវបដិសេធ', codeOf(borrowed) === 'PT401', borrowed);
     const seqIdle = await seqOf(A);
     const revokedNone = await as(c, SERVICE, 'select public.revoke_user_sessions($1) as n', [uA1]);
     rec('revoke_user_sessions គ្មាន session ➜ seq មិនឡើង', !!revokedNone.rows && revokedNone.rows[0].n === 0 && (await seqOf(A)) === seqIdle, revokedNone);
@@ -1046,6 +1087,17 @@ const PURGE_EXEC_GRANT = 'grant execute on function private.zoe_purge_execute_v1
     + '    public.zoe_purge_execute_v1(uuid, text, jsonb), public.zoe_purge_status_v1(uuid, text, jsonb)\n    to authenticated;';
 const PICKUP_RESET_EXEC_GRANT = 'grant execute on function private.zoe_pickup_reset_execute_v1(uuid, text, jsonb, text), private.zoe_pickup_reset_status_v1(uuid, text, jsonb, text),\n'
     + '    public.zoe_pickup_reset_execute_v1(uuid, text, jsonb, text), public.zoe_pickup_reset_status_v1(uuid, text, jsonb, text)\n    to authenticated;';
+const DATA_SESSION_LOOKUP = `    if not exists (
+        select 1 from auth.sessions s
+        where s.id = v_sid::uuid and s.user_id = v_uid
+            and ((to_jsonb(s) ->> 'not_after') is null
+                or (to_jsonb(s) ->> 'not_after')::timestamptz > statement_timestamp())
+    ) then
+        raise exception 'session-revoked' using errcode = 'PT401';
+    end if;
+    return (
+        select m.tenant_id`;
+
 const MUTATIONS = [
     ['protocol ACL column-only grant', 'revoke all on private.registration_protocol from public, anon, authenticated, service_role;',
         'revoke all on private.registration_protocol from public, anon, authenticated, service_role; grant update (accepting) on private.registration_protocol to authenticated;'],
@@ -1091,7 +1143,9 @@ const MUTATIONS = [
         'grant execute on function private.zoe_write_v2(uuid, text, jsonb), public.zoe_write_v2(uuid, text, jsonb)\n    to authenticated, anon;'],
     ['public.zoe_write_v2 ជា SECURITY DEFINER', "language sql volatile security invoker set search_path = ''\nas $$\n    select private.zoe_write_v2(",
         "language sql volatile security definer set search_path = ''\nas $$\n    select private.zoe_write_v2("],
-    ['session ដែលដករួចនៅប្រើបាន', 'if not exists (select 1 from auth.sessions s where s.id = sid::uuid) then', 'if false then'],
+    ['session ដែលដករួចនៅប្រើបាន', DATA_SESSION_LOOKUP, DATA_SESSION_LOOKUP.replace('if not exists (', 'if false and not exists (')],
+    ['session របស់គណនីផ្សេងនៅប្រើបាន', DATA_SESSION_LOOKUP, DATA_SESSION_LOOKUP.replace(' and s.user_id = v_uid', '')],
+    ['session not_after ផុតកំណត់នៅប្រើបាន', DATA_SESSION_LOOKUP, DATA_SESSION_LOOKUP.replace("            and ((to_jsonb(s) ->> 'not_after') is null\n                or (to_jsonb(s) ->> 'not_after')::timestamptz > statement_timestamp())\n", '')],
     ['revoke_user_sessions មិនប្រាប់ឧបករណ៍ (seq មិនឡើង)', 'update public.zoe_tenant_state s set seq = s.seq + 1\n        where s.tenant_id in (select m.tenant_id from public.tenant_members m where m.user_id = p_user_id);', 'perform 1;'],
     ['បិទ RLS លើ tenant_members', 'alter table public.tenant_members enable row level security;', ''],
     ['policy tenants ➜ using (true)', "using (id = (select private.current_tenant_id()) or (select private.is_platform_admin()));", 'using (true);'],
@@ -1103,7 +1157,7 @@ const MUTATIONS = [
         'grant insert on public.tenants to authenticated;\ncreate function private.is_platform_admin()'],
     ['tenant_row_active មិនពិនិត្យ revoked', 'select not t.revoked and t.expires_at > now()', 'select t.expires_at > now()'],
     ['tenant_row_active មិនពិនិត្យថ្ងៃផុតកំណត់', 'select not t.revoked and t.expires_at > now()', 'select not t.revoked'],
-    ['current_tenant_id មិនពិនិត្យ tenant សកម្ម', '        where m.user_id = auth.uid() and private.tenant_row_active(t)\n    );', '        where m.user_id = auth.uid()\n    );'],
+    ['current_tenant_id មិនពិនិត្យ tenant សកម្ម', '        where m.user_id = v_uid and private.tenant_row_active(t)\n    );', '        where m.user_id = v_uid\n    );'],
     ['invite_row_usable មិនពិនិត្យ revoked', 'select not i.revoked and i.used_count', 'select i.used_count'],
     ['invite_row_usable មិនពិនិត្យ max_uses', 'and i.used_count < i.max_uses and', 'and'],
     ['invite_row_usable មិនពិនិត្យថ្ងៃផុតរបស់កូដ', 'and i.expires_at > now() and private.tenant_row_active(t)', 'and private.tenant_row_active(t)'],
@@ -1200,6 +1254,16 @@ const MUTATIONS = [
         "language sql volatile security definer set search_path = ''\nas $$\n    select private.zoe_write("],
     ['private.zoe_write អាចហៅដោយ anon', '    private.zoe_write(text, jsonb)\n    to authenticated;', '    private.zoe_write(text, jsonb)\n    to authenticated, anon;'],
     ['public.zoe_write អាចហៅដោយ anon (linter 0028)', '    public.zoe_write(text, jsonb)\n    to authenticated;', '    public.zoe_write(text, jsonb)\n    to authenticated, anon;'],
+    ['audit identity sequence រក្សា default grant ALL ដល់ API',
+        'revoke all on sequence public.zoe_business_audit_archive_seq_seq from public,anon,authenticated,service_role;', ''],
+    ['audit archive RPCs ឲ្យ authenticated ហៅបាន',
+        'grant execute on function public.zoe_admin_audit_tenants(uuid,integer),public.zoe_admin_audit_export(uuid,bigint,bigint,integer,integer),public.zoe_admin_audit_restore(uuid,uuid,jsonb) to service_role;',
+        'grant execute on function public.zoe_admin_audit_tenants(uuid,integer),public.zoe_admin_audit_export(uuid,bigint,bigint,integer,integer),public.zoe_admin_audit_restore(uuid,uuid,jsonb) to service_role,authenticated;'],
+    ['audit archive RLS ឆ្លងសាខា using true',
+        'create policy zoe_business_audit_read on public.zoe_business_audit for select to authenticated\n    using (tenant_id = (select private.current_tenant_id()));',
+        'create policy zoe_business_audit_read on public.zoe_business_audit for select to authenticated using (true);'],
+    ['audit archive helper ទទួល default PUBLIC execute',
+        'revoke all on function private.zoe_audit_archive_summary_v1(jsonb) from public,anon,authenticated,service_role;', ''],
     ['zoe_admin_export ឲ្យ authenticated ហៅបាន', 'grant execute on function public.zoe_admin_export(uuid, bigint, text, text, bigint, integer, integer) to service_role;',
         'grant execute on function public.zoe_admin_export(uuid, bigint, text, text, bigint, integer, integer) to service_role, authenticated;'],
     ['zoe_admin_tenants ឲ្យ anon ហៅបាន', 'grant execute on function public.zoe_admin_tenants(uuid, integer) to service_role;',

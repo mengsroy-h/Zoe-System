@@ -9,6 +9,7 @@ import { viewState } from '../../../../ZoeW/src/core/view-state';
 import { attemptAutoLookup, autoLookupFailureAt, autoLookupInFlight, autoLookupQueueRetries, lookupFastCache } from '../../../../ZoeW/src/features/auto-lookup';
 import { clearCustomerDataTableCache } from '../../../../ZoeW/src/features/customer-table';
 import { sealLookupHeader } from './helpers/sealed-lookup';
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 
 const CORE = process.env.ZTO_COOKIE_BINDING_SOURCE || path.resolve(__dirname, '../../../../ZoeW/netlify/functions/_shared/zto-order-detail-core.cjs');
 const core = createRequire(CORE)(CORE);
@@ -27,6 +28,7 @@ beforeEach(async () => {
     core.resetCachesForTests();
     core.setBlobsModuleForTests({ connectLambda() {}, getStore() { throw new Error('គ្មាន provider write ក្នុងតេស្តនេះ'); } });
     appLocalStore.clear();
+    configureFixtureBackend('zto-cookie-response-boundary');
     clearCustomerDataTableCache();
     autoLookupFailureAt.clear();
     autoLookupInFlight.clear();
@@ -35,6 +37,7 @@ beforeEach(async () => {
     firebaseState.authGeneration++;
     firebaseState.auth = { currentUser: { uid: 'synthetic-user' } } as any;
     firebaseState.fb = { getIdTokenResult: async () => ({ token: 'synthetic-id-token' }) } as any;
+    acceptFixtureSession();
     uiState.isModalOpen = true;
     scanState.pendingBarcode = CODE;
     viewState.lookupStatus = { kind: '', text: '' };

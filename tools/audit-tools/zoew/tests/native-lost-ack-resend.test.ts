@@ -10,6 +10,8 @@ import { withTransactionOutcomeResolution } from '../../../../ZoeW/src/services/
 import { nativeWriteRecoveryState } from '../../../../ZoeW/src/services/native-write-recovery';
 import { createLocalWriteJournal } from '../../../../ZoeW/src/services/write-journal';
 import { dbListenerPendingPaths } from '../../../../ZoeW/src/core/text';
+import { appLocalStore } from '../../../../ZoeW/src/core/storage';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 const host = 'https://shop.firebaseio.com';
 const records = () => Object.keys(localStorage).filter(k => k.startsWith('zoew_connection_writes_v1:')).map(k => JSON.parse(localStorage.getItem(k)!));
@@ -25,6 +27,8 @@ function lab(update: any) {
     const sdk = withTransactionOutcomeResolution(raw); sdk.getAuth(app); sdk.getDatabase(app);
     Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db, isDatabaseInitialized: true,
         isInitializingFirebase: false, firebaseSdkUnavailable: false, isDatabaseConnected: true, sessionExpiryCheck: 'live', authLoginOperation: null });
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(app.options));
+    acceptFixtureSession();
     resetServerClock(); acceptServerClockOffset(0, null, false);
     return { sdk, db };
 }

@@ -1,3 +1,4 @@
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 /**
  * ⛔ ល្បឿន និងស្ថេរភាពនៃ «បិទតាម ZTO ស្វ័យប្រវត្តិ» (របាយការណ៍ម្ចាស់គម្រោង ៖ «sync យឺត អត់ស្ថេរភាព» · ជម្រើស «ឆ្លាតវៃ»)។
  *
@@ -114,6 +115,8 @@ beforeEach(() => {
     firebaseState.authGeneration++;
     firebaseState.auth = { currentUser: { uid: 'u' } } as any;
     firebaseState.fb = { getIdTokenResult: async () => ({ token: 't' }) } as any;
+    configureFixtureBackend('zto-signed-cadence');
+    acceptFixtureSession();
 });
 
 afterEach(() => {

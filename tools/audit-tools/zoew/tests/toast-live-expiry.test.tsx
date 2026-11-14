@@ -10,16 +10,20 @@ import { viewState } from '../../../../ZoeW/src/core/view-state';
 import { dbListenerPendingPaths } from '../../../../ZoeW/src/core/text';
 import { renderConnectionStatus } from '../../../../ZoeW/src/services/connection';
 import { TOAST_LIFETIME_MS, TOAST_LIVE_LIMIT_MS, TOAST_STALLED_MS, showLiveToast } from '../../../../ZoeW/src/ui/toast';
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 
 const texts = () => uiState.toasts.map((t: any) => t.msg);
 let online = true;
 
 beforeEach(() => {
     vi.useFakeTimers();
+    configureFixtureBackend('toast-expiry-fixture');
     vi.spyOn(navigator, 'onLine', 'get').mockImplementation(() => online);
     online = true;
     uiState.toasts = [];
     firebaseState.auth = { currentUser: { uid: 'u' } } as any;
+    Object.assign(firebaseState, { fb: {}, db: {}, isDatabaseInitialized: true, isInitializingFirebase: false, authLoginOperation: null });
+    acceptFixtureSession();
     firebaseState.sessionExpiryCheck = 'live' as any;
     firebaseState.serverClockTrusted = true;
     firebaseState.firebaseSdkUnavailable = false;

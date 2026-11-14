@@ -340,9 +340,69 @@ function readInput(input, env) {
     } catch (e) {
         throw new Error('Input is not valid JSON: ' + file);
     }
-    if (supabase.isArchive(parsed)) return { file, kind: 'supabase-archive', data: parsed.data, manifest: parsed.manifest };
+    if (supabase.isArchive(parsed)) {
+        const audit = supabase.validateArchive(parsed);
+        rejectUnsupportedFirebaseAudit(parsed.data);
+        return { file, kind: 'supabase-archive', data: parsed.data, manifest: parsed.manifest, audit };
+    }
     if (isObject(parsed) && parsed.format === supabase.FORMAT) throw new Error('Unsupported archive version ' + JSON.stringify(parsed.version) + ' (expected ' + supabase.FORMAT_VERSION + ').');
-    return { file, kind: 'firebase-export', data: parsed, manifest: null };
+    rejectUnsupportedFirebaseAudit(parsed);
+    return { file, kind: 'firebase-export', data: parsed, manifest: null, audit: null };
+}
+
+function rejectUnsupportedFirebaseAudit(data) {
+    if (isObject(data) && ['zoew_business_audit_v1', 'zoew_business_audit_failures_v1'].some(root => hasOwn(data, root))) {
+        throw new Error('Firebase audit provenance is not supported by this importer. Preserve the original export and use an explicit supported audit conversion; --skip-invalid cannot drop audit history.');
+    }
+}
+
+function mappedAuditEvent(event, tenantId) {
+    return { ...event, tenant_id: tenantId };
+}
+
+function verifyAudit(audit, have, targetTenant) {
+    const existing = new Map(have.events.map(event => [event.event_id, event]));
+    const missing = [], different = [];
+    for (const event of audit.events) {
+        const found = existing.get(event.event_id);
+        if (!found) missing.push(event.event_id);
+        else if (stableJson(found) !== stableJson(mappedAuditEvent(event, targetTenant))) different.push(event.event_id);
+    }
+    return { equal: !missing.length && !different.length, missing, different };
+}
+
+function makeAuditBatches(events, maxOps, maxBytes) {
+    const batches = [];
+    let batch = [], bytes = 2;
+    for (const event of events) {
+        const size = jsonbTextBytes(event);
+        if (size + 2 > maxBytes) throw new Error('Audit event exceeds --batch-bytes; increase the limit before importing.');
+        if (batch.length && (batch.length >= Math.min(500, maxOps) || bytes + 2 + size > maxBytes)) {
+            batches.push(batch); batch = []; bytes = 2;
+        }
+        bytes += (batch.length ? 2 : 0) + size;
+        batch.push(event);
+    }
+    if (batch.length) batches.push(batch);
+    return batches;
+}
+
+async function restoreAudit(client, audit, have, targetTenant, options) {
+    const preflight = verifyAudit(audit, have, targetTenant);
+    if (preflight.different.length) throw new Error('Audit event ID conflicts with different historical content in the target. No document writes were started.');
+    supabase.assertAuditMergeBudget(have.events, audit.events);
+    const batches = makeAuditBatches(audit.events, options.batchOps, options.batchBytes);
+    let imported = 0, replayed = 0;
+    for (const events of batches) {
+        const result = await client.rpc('zoe_admin_audit_restore', { p_target_tenant: targetTenant, p_source_tenant: audit.tenant, p_events: events });
+        if (!isObject(result) || result.v !== 1 || result.tenant !== targetTenant || result.source_tenant !== audit.tenant
+            || !Number.isInteger(result.imported) || result.imported < 0 || !Number.isInteger(result.replayed) || result.replayed < 0
+            || result.total !== events.length || result.imported + result.replayed !== events.length) {
+            throw new Error('Audit restore did not confirm its complete event batch. Re-run the same archive to reconcile preserved event IDs.');
+        }
+        imported += result.imported; replayed += result.replayed;
+    }
+    return { imported, replayed };
 }
 
 function loadRules(file) {
@@ -479,6 +539,7 @@ async function run(argv, env) {
         return opts.help ? EXIT.OK : EXIT.USAGE;
     }
     const input = readInput(opts.input, env);
+    const auditOnly = !!input.audit && input.manifest.audit_only === true && input.audit.events.length > 0;
     const rules = loadRules(opts.rules ? path.resolve(opts.rules) : DEFAULT_RULES);
     if (input.kind === 'supabase-archive') {
         const t = input.manifest.tenant || {};
@@ -487,6 +548,8 @@ async function run(argv, env) {
     } else {
         say('Input  : ' + input.file + ' (Firebase export)');
     }
+    if (input.audit) say('Audit  : ' + input.audit.events.length + ' historical event(s), original IDs/actor/time/origin preserved'
+        + (auditOnly ? '; audit-only archive leaves document data unchanged.' : '.'));
 
     const problems = validateTree(input.data, rules);
     const byRoot = new Map();
@@ -506,7 +569,7 @@ async function run(argv, env) {
     say('  ' + 'total'.padEnd(34) + String(totalDocs).padStart(7) + ' records  ' + sizeText(totalBytes));
     const errorCount = printProblems(problems.problems);
     const kept = problems.docs.filter((d) => !d.invalid);
-    if (!kept.length) {
+    if (!kept.length && !auditOnly) {
         say((opts.apply ? 'REFUSED: ' : 'REFUSED (on --apply): ') + 'no record of the input passes the checks, so nothing would be imported and --replace would only delete. --skip-invalid leaves out bad records, never the whole input. Check that this is the right file.');
         return EXIT.FAIL;
     }
@@ -555,7 +618,7 @@ async function run(argv, env) {
         say('Note   : the archive comes from another tenant (' + input.manifest.tenant.id + ').');
     }
     const current = await supabase.exportTenant(client, meta.id);
-    const plan = diffTrees(want, current.data);
+    const plan = diffTrees(auditOnly ? current.data : want, current.data);
     const leftAsIs = plan.extra.filter(inputCopySkipped);
     const keptOwners = leftAsIs.some((d) => BARCODE_OWNER_ROOTS.includes(d.root));
     const keepsRegistry = (d) => keptOwners && d.root === REGISTRY_ROOT && !inputCopySkipped(d);
@@ -588,6 +651,11 @@ async function run(argv, env) {
             + '). Use --replace to overwrite them with the input.';
     }
     if (!opts.apply) {
+        if (input.audit) supabase.assertAuditMergeBudget(current.audit.events, input.audit.events);
+        if (input.audit && verifyAudit(input.audit, current.audit, meta.id).different.length) {
+            say('REFUSED (on --apply): audit event IDs conflict with different historical content in the target.');
+            return EXIT.FAIL;
+        }
         if (refusal) say('REFUSED (on --apply): ' + refusal);
         say('DRY-RUN: nothing was written. Add --apply to write.');
         return blocked || refusal ? EXIT.FAIL : EXIT.OK;
@@ -595,6 +663,11 @@ async function run(argv, env) {
     if (refusal) {
         say('REFUSED: ' + refusal);
         return EXIT.FAIL;
+    }
+
+    if (input.audit) {
+        const result = await restoreAudit(client, input.audit, current.audit, meta.id, opts);
+        say('Audit  : imported ' + result.imported + ', replayed ' + result.replayed + '; original archive provenance retained.');
     }
 
     const ops = plan.sets.map((d) => ({ k: 'set', p: [d.root, d.key], v: d.value }))
@@ -622,8 +695,8 @@ async function run(argv, env) {
     }
 
     const after = await supabase.exportTenant(client, meta.id);
-    const changes = current.seq < after.seq ? (await supabase.exportTenant(client, meta.id, { since: current.seq })).changes : [];
-    const expected = treeOf(kept.concat(leftAsIs.concat(registryKept).map((d) => ({ root: d.root, key: d.key, value: current.data[d.root][d.key] }))));
+    const changes = current.seq < after.seq ? (await supabase.exportTenant(client, meta.id, { since: current.seq, includeAudit: false })).changes : [];
+    const expected = auditOnly ? current.data : treeOf(kept.concat(leftAsIs.concat(registryKept).map((d) => ({ root: d.root, key: d.key, value: current.data[d.root][d.key] }))));
     const verdict = verifyTenant(expected, after.data);
     for (const r of verdict.roots) {
         say('Verify : ' + r.root.padEnd(34) + ' expected ' + String(r.expected).padStart(6) + '  found ' + String(r.found).padStart(6) + '  '
@@ -631,7 +704,9 @@ async function run(argv, env) {
     }
     const foreign = foreignWrites(current.seq, after.seq, results, changes);
     let code = EXIT.OK;
-    if (verdict.equal && !skippedDocs.size && !skippedRoots.size) {
+    if (verdict.equal && auditOnly) {
+        say('VERIFIED: audit-only archive restored; existing document data remains unchanged.');
+    } else if (verdict.equal && !skippedDocs.size && !skippedRoots.size) {
         say('VERIFIED: tenant ' + meta.id + ' equals the input (' + kept.length + ' record(s), seq ' + after.seq + ').');
     } else if (verdict.equal) {
         say('VERIFIED: tenant ' + meta.id + ' equals the input except the left-out records (' + kept.length + ' record(s) from the input, '
@@ -645,6 +720,13 @@ async function run(argv, env) {
     if (foreign > 0) {
         say('CHANGED BY OTHERS: ' + foreign + ' write(s) from other devices landed during the import. Close ZoeW on every device of this shop and run the import again.');
         code = EXIT.FAIL;
+    }
+    if (input.audit) {
+        const auditVerdict = verifyAudit(input.audit, after.audit, meta.id);
+        if (!auditVerdict.equal) {
+            say('AUDIT VERIFY FAILED: missing ' + auditVerdict.missing.length + ', different ' + auditVerdict.different.length + '. Re-run the same archive to reconcile original event IDs.');
+            code = EXIT.FAIL;
+        } else say('AUDIT VERIFIED: all ' + input.audit.events.length + ' original historical event(s) are preserved; unrelated target history remains.');
     }
     return code;
 }
@@ -672,9 +754,11 @@ module.exports = {
     foreignWrites,
     jsonbTextBytes,
     makeBatches,
+    makeAuditBatches,
     parseArgs,
     run,
     stableJson,
     validateTree,
-    verifyTenant
+    verifyTenant,
+    verifyAudit
 };

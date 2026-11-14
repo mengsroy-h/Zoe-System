@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { setImmediate } from 'node:timers';
+import { firebaseState } from '../../../../ZoeW/src/core/state';
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { createSupabaseSdk } from '../../../../ZoeW/src/services/supabase-sdk';
 import { SbRpcError } from '../../../../ZoeW/src/services/supabase-rtdb';
 import { createLocalWriteJournal } from '../../../../ZoeW/src/services/write-journal';
@@ -77,8 +79,12 @@ function fixture(order: 'pull-first' | 'account-first', options: { noSession?: b
     const sdk = createSupabaseSdk(() => transport, { docsCache: null, writeJournal: journal,
         onListenerError: vi.fn(), onAccountBlocked: vi.fn(), onSessionEnded: vi.fn(), onTenantChanged: vi.fn(),
         dbOptions: { pollFallbackMs: 600000, retryStepsMs: [10], rpcTimeoutMs: 5000 } });
-    const app = sdk.initializeApp({ supabaseUrl: URL, supabaseKey: 'sb_publishable_synthetic' });
+    const config = { supabaseUrl: URL, supabaseKey: 'sb_publishable_synthetic' };
+    localStorage.setItem('zoew_firebase_config', JSON.stringify(config));
+    const app = sdk.initializeApp(config);
     const auth = sdk.getAuth(app), db = sdk.getDatabase(app);
+    Object.assign(firebaseState, { firebaseConfig: config, fb: sdk, auth, db });
+    sdk.onAuthStateChanged(auth, user => { if (user) { acceptFixtureSession(); sdk.resumeAcceptedSession(auth); } });
     const row = { sdk, app, auth, db, journal, storage, account, pull, calls, events, state, original, replayOnly, get pulls() { return pulls; } };
     clients.push(row);
     return row;

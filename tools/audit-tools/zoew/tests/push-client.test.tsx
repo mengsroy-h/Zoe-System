@@ -63,6 +63,7 @@ import { NotifyDrawer } from '../../../../ZoeW/src/app/components/NotifyDrawer';
 import { AppNavbar } from '../../../../ZoeW/src/app/components/AppNavbar';
 import { DrawerBackdrop } from '../../../../ZoeW/src/app/components/DrawerBackdrop';
 import { mount, step, unmount } from './native/react-harness';
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 
 const LICENSE = 'ZOEKEY-payload.signature';
 const VAPID = 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4';
@@ -115,6 +116,10 @@ beforeEach(() => {
     order.length = 0;
     posts.length = 0;
     try { localStorage.clear(); } catch {}
+    configureFixtureBackend('push-client');
+    firebaseState.auth = { currentUser: { uid: 'push-client-user' } } as any;
+    firebaseState.fb = {}; firebaseState.db = {}; firebaseState.sessionExpiryCheck = 'live';
+    acceptFixtureSession();
     uiState.pushStatus = 'unknown';
     Object.assign(pushRuntime, { nativeListeners: false, nativeEnabling: false, nativeWanted: false, scheduleAttemptAt: 0, scheduleInFlight: false, nativePendingToken: '', webKeyChecked: false, offSends: new Set() });
     pushNativeBuild.fcm = true;
@@ -244,7 +249,7 @@ describe('⛔ web ៖ Server ប្តូរកូនសោ VAPID (លុប env
         };
     }
     function savedOn() {
-        appLocalStore.setItem(PUSH_STATE_KEY, JSON.stringify({ on: true, kind: 'web', syncedAt: Date.now() }));
+        appLocalStore.setItem(PUSH_STATE_KEY, JSON.stringify({ on: true, kind: 'web', syncedAt: Date.now(), shop: firebaseState.firebaseConfig.databaseURL }));
     }
 
     it('កូនសោ subscription ≠ កូនសោ server ➜ resyncPush() ជាវគ្គដំបូងក្នុងទំព័រ (ទោះ sync ក្នុង ២៤ ម៉ោង) ជាវ subscription ថ្មីដោយកូនសោថ្មី ➜ ផ្ញើ endpoint ថ្មី', async () => {
@@ -895,7 +900,10 @@ describe('⛔ ហាង Supabase ៖ អត្តសញ្ញាណ = គណន�
     // គ្មាន Key ដោយការរចនា (`ensureAppActivated()`) ➜ App ផ្ញើ session token របស់គណនីហាងជំនួស Key (server ផ្ទៀងតាម `my_account()`)
     const SB_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1MSJ9.sig';
     const signIn = (token: string | null = SB_TOKEN) => {
+        firebaseState.firebaseConfig = { supabaseUrl: 'https://push-client.supabase.co' };
+        appLocalStore.setItem('zoew_firebase_config', JSON.stringify(firebaseState.firebaseConfig));
         firebaseState.auth = token === null ? { currentUser: null } : { currentUser: { uid: 'u1', getIdToken: async () => { order.push('getIdToken'); return token; } } } as any;
+        if (token !== null) acceptFixtureSession();
     };
     beforeEach(() => {
         viewState.backendKind = 'supabase';
@@ -1213,17 +1221,21 @@ describe('⛔ Push ជារបស់ហាង (សំណើម្ចាស់�
         viewState.backendKind = 'supabase';
         setLicense(null);
         localStorage.setItem('zoew_firebase_config', JSON.stringify({ supabaseUrl: SB, supabaseKey: 'sb_publishable_x' }));
+        firebaseState.firebaseConfig = { supabaseUrl: SB, supabaseKey: 'sb_publishable_x' };
         firebaseState.fb = { tenantScope: (auth: any) => (auth && auth._account ? String(auth._account.tenant_id) : '') } as any;
         firebaseState.auth = (tenant
             ? { currentUser: { uid: 'u-' + tenant, getIdToken: async () => 'tok-' + tenant }, _account: { tenant_id: tenant } }
             : { currentUser: null, _account: null }) as any;
+        if (tenant) acceptFixtureSession();
     }
     function fbShop(url: string) {
         viewState.backendKind = 'firebase';
         setLicense(LICENSE);
         localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: url, apiKey: 'k', projectId: 'p' }));
+        firebaseState.firebaseConfig = { databaseURL: url, apiKey: 'k', projectId: 'p' };
         firebaseState.fb = {} as any;
         firebaseState.auth = { currentUser: { uid: 'u1' } } as any;
+        acceptFixtureSession();
     }
     function webSubscribed() {
         const sub = { endpoint: 'https://fcm.googleapis.com/fcm/send/abc', options: { applicationServerKey: b64urlToBytes(VAPID).buffer },

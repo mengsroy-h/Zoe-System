@@ -6,6 +6,7 @@ import { dataState, firebaseState, uiState } from '../../../../ZoeW/src/core/sta
 import { getFormattedDate } from '../../../../ZoeW/src/core/timezone';
 import { saveEditedBarcodePrice } from '../../../../ZoeW/src/features/barcode-ops';
 import { ledgerCompanionState } from '../../../../ZoeW/src/domain/ledger';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 const H = 'zoew_scan_history_cod_dod', D = 'zoew_daily_revenue_cod_dod', M = 'zoew_monthly_revenue_cod_dod';
 const HOST = 'https://m3-unknown.firebaseio.com';
@@ -78,6 +79,7 @@ beforeEach(() => {
         },
         onValue: () => () => {}, off: () => {}
     } as any;
+    acceptFixtureSession();
     vi.stubGlobal('fetch', vi.fn(async (inputUrl: any) => {
         if (lab.readFails) throw new TypeError('Failed to fetch');
         const path = decodeURIComponent(new URL(String(inputUrl)).pathname).replace(/^\//, '').replace(/\.json$/, '');

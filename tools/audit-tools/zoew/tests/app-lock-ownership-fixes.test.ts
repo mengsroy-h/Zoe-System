@@ -13,6 +13,7 @@ import { DocumentEffects } from '../../../../ZoeW/src/app/components/shell/Docum
 import { dismissModal } from '../../../../ZoeW/src/ui/modal-stack';
 import { modalBackdropTarget } from '../../../../ZoeW/src/app/lifecycle/layers';
 import { APP_LOCK_SESSION_KEY } from '../../../../ZoeW/src/core/storage-keys';
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 
 const cryptoCalls = vi.hoisted(() => ({ derive: vi.fn(), remember: vi.fn() }));
 vi.mock('../../../../ZoeW/src/services/crypto', async original => ({ ...await original<any>(),
@@ -29,11 +30,14 @@ function deferred<T>() { let resolve!: (v: T) => void; let reject!: (e: Error) =
 const turns = async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); };
 beforeEach(() => {
     appLocalStore.clear(); appSessionStore.clear();
+    configureFixtureBackend('app-lock-ownership-fixture');
     appLocalStore.setItem('zoew_security_pin_hash', 'pin:482915');
     Object.assign(securityState, { appIsLocked: false, appLockVeiled: false, appLockAwayNoted: false, appLockBusy: false, appLockExcuseAt: 0, lookupSecretKey: null });
     Object.assign(viewState, { appLockOpen: false, appLockMessage: '' });
     firebaseState.authGeneration++; firebaseState.auth = { currentUser: { uid: 'shop-a' } } as any;
     firebaseState.fb = { signOut: vi.fn(async () => { firebaseState.auth.currentUser = null; }) } as any;
+    firebaseState.db = {};
+    acceptFixtureSession();
     resetServerClock(); firebaseState.isDatabaseConnected = true;
     acceptServerClockOffset(0, { epochMs: Date.now(), wallMs: Date.now(), monotonicMs: performance.now() }, false);
     firebaseState.sessionExpiryCheck = 'live';

@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { auditAcorn, moduleRuntime } = require('../react-view');
+const { localAuthRuntime } = require('../local-auth-runtime.cjs');
 const http = require('http');
 const { isDeepStrictEqual } = require('util');
 const { emuNamespace } = require('./ns.js');
@@ -51,6 +52,7 @@ const optionalConst = (src, n, fallback) => { try { return extractConst(src, n);
 const extractConst = (src, n) => { const m = new RegExp('\\n\\s*const ' + n + ' = ([^;]+);').exec(src); if (!m) throw new Error('missing const ' + n); return `const ${n} = ${m[1]};`; };
 
 const src = fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, '\n');
+const authRuntime = localAuthRuntime(ROOT, src);
 let SANDBOX_SOURCE = '';
 let acorn = null;
 try { acorn = auditAcorn(); } catch (e) {}
@@ -328,8 +330,10 @@ function makeSandbox(store, now) {
         'globalThis.api = { ' + FNS.join(', ') + ' };'
     ].join('\n\n');
     const runtime = moduleRuntime(ROOT, src, [{ path: 'src/core/clock.ts', expose: ['serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'captureClockOperation', 'getServerClockBounds', 'acceptServerClockOffset', 'resetServerClock'] }, 'src/core/session-verification.ts', { path: 'src/services/scan-import-proof.ts', expose: ['createScanImportProofCache'] }, 'src/domain/scan-protocol.ts', { path: 'src/domain/registry-purge-proof.ts', expose: ['REGISTRY_RELEASES_ROOT', 'REGISTRY_PURGE_MAX_WRITES', 'boundedRegistryPurgeIntent', 'slotRegistryPurgeIntent', 'registryPurgeReceiptValid', 'registryPurgeReceiptMatches', 'registryPurgeIntent'] }, { path: 'src/services/registry-purge.ts', expose: ['purgeTrashWithRegistry'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
-    SANDBOX_SOURCE = runtime.code + '\n' + runtime.withoutBindings(assembled);
+    authRuntime.prepare(ctx, ctx.db.app.options);
+    SANDBOX_SOURCE = runtime.code + '\n' + authRuntime.withoutBindings(runtime.withoutBindings(assembled)) + '\n' + authRuntime.code;
     new vm.Script(SANDBOX_SOURCE).runInContext(ctx);
+    authRuntime.seed(ctx, ctx.db.app.options);
     ctx.acceptServerClockOffset(0, Object.freeze({ epochMs: now, wallMs: Date.now(), monotonicMs: performance.now(), uncertaintyMs: 0 }));
     ctx.sessionExpiryCheck = 'live';
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»

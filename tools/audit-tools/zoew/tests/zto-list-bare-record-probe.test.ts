@@ -10,6 +10,7 @@ import { createScanMemorySdk } from './helpers/scan-memory-sdk';
  */
 import { createRequire } from 'node:module';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { refTo } from '../../../../ZoeW/src/app/refs';
 import { dataState, firebaseState, securityState, uiState, ztoState } from '../../../../ZoeW/src/core/state';
 import { sealLookupHeader } from './helpers/sealed-lookup';
@@ -123,11 +124,13 @@ beforeEach(async () => {
     firebaseState.serverTimeOffsetMs = 0;
     firebaseState.authGeneration++;
     const options = { databaseURL: 'https://list-probe-fixture.firebaseio.com' };
+    firebaseState.firebaseConfig = options;
     firebaseState.auth = { currentUser: { uid: 'list-probe-user' }, app: { options } } as any;
     firebaseState.db = { listProbe: true, app: { options } } as any;
     firebaseState.isInitializingFirebase = false;
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
     firebaseState.fb = createScanMemorySdk('list-probe-token').sdk as any;
+    acceptFixtureSession();
     for (const name of ['ztoListSyncFrom', 'ztoListSyncTo'] as const) {
         const input = document.createElement('input');
         input.value = name === 'ztoListSyncFrom' ? '2026-09-26' : '2026-10-06';

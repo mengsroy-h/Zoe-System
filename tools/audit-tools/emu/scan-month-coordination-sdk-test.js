@@ -3,6 +3,7 @@ let failed = 0;const offOrigin=[];let commitGate=null;let collectedWrites=0;
 const fs = require('fs'), path = require('path'), os = require('os'), http = require('http'), assert = require('assert/strict');
 const { pathToFileURL } = require('url');
 const { initializeSdkClock } = require('./sdk-clock-fixture.cjs');
+const { initializeSdkSession } = require('./sdk-session-fixture.cjs');
 const ROOT = path.resolve(process.env.SCANSDK_APP_DIR || process.env.ZOE_REPO_ROOT || path.join(__dirname, '../../..'));
 const deps = path.join(ROOT, 'ZoeW/node_modules');
 const port = Number(process.env.SCANRULES_EMU_PORT || 9000);
@@ -86,6 +87,9 @@ export { resumePendingScanOperations } from './ZoeW/src/services/scan-operation'
 export { createScanEvidenceJournal } from './ZoeW/src/services/scan-evidence';
 export { pendingScanScope } from './ZoeW/src/services/scan-pending';
 export { acceptServerClockOffset, resetServerClock } from './ZoeW/src/core/clock';
+export { acceptLocalAuthSession } from './ZoeW/src/services/local-logout-intent';
+export { loginBackendScope } from './ZoeW/src/features/login-memory';
+export { appLocalStore } from './ZoeW/src/core/storage';
 export { withTransactionOutcomeResolution, txResolvingPaths } from './ZoeW/src/services/tx-outcome';
 export { initDatabaseListeners, anyDbListenerViewIsStale } from './ZoeW/src/services/db-listeners';
 export { dbListenerPendingPaths, dbListenerFailedPaths } from './ZoeW/src/core/text';
@@ -113,6 +117,7 @@ export { ztoState, firebaseState, dataState, uiState } from './ZoeW/src/core/sta
       runTransaction:async(ref,fn,options)=>{try{if(String(ref).includes('/zoew_daily_collected_cod_dod'))collectedWrites++;return await database.runTransaction(ref,fn,options);}catch(e){errors.push({kind:'transaction',path:String(ref),error:String(e)});throw e;}}
     };
     const sdk=api.withTransactionOutcomeResolution(raw);sdk.getAuth(app);sdk.getDatabase(app);Object.assign(api.firebaseState,{fb:sdk,db,auth,firebaseConfig:app.options,isDatabaseInitialized:true,isInitializingFirebase:false,firebaseSdkUnavailable:false,isDatabaseConnected:true,sessionExpiryCheck:'live',authLoginOperation:null});
+    initializeSdkSession(api);
     initializeSdkClock(api);
     api.dataState.scanHistory=[];api.dataState.deletedItems=[];api.dataState.dailyRevenueData={};api.dataState.monthlyRevenueData={};api.dataState.dailyPickupData={};api.dataState.dailyCollectedData={};
     for(const [key,root] of [['dbRefHistory',H],['dbRefDeleted','zoew_recently_deleted_cod_dod'],['dbRefDailyRevenue',D],['dbRefMonthlyRevenue',M],['dbRefRegistry',R],['dbRefDailyPickup','zoew_daily_pickup_cod_dod'],['dbRefDailyCollected','zoew_daily_collected_cod_dod']])api.firebaseState[key]=sdk.ref(db,root);

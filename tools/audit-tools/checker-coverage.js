@@ -100,13 +100,13 @@ function runnableNames(source, withExtensions = false) {
     const text = source.replace(/^\s*#.*$/gm, '');
     const names = new Set();
     for (const m of text.matchAll(/for t in ([\s\S]*?); do([\s\S]*?)\bdone\b/g)) {
-        const command = /^\s*run\s+"\$t"\s+node\s+"tools\/audit-tools\/\$t\.(m?js)"(?=\s|$)/m.exec(m[2]);
+        const command = /^\s*run\s+"\$t"\s+node\s+"tools\/audit-tools\/\$t\.([cm]?js)"(?=\s|$)/m.exec(m[2]);
         if (!command) continue;
         for (const name of m[1].split(/\s+/)) {
             if (/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(name)) names.add(name + (withExtensions ? '.' + command[1] : ''));
         }
     }
-    for (const m of text.matchAll(/^\s*(?:run\s+"[^"]*"\s+|(?:[A-Z0-9_]+="[^"]*"\s+)*)(?:runall_owned\s+)?node\s+tools\/audit-tools\/([A-Za-z0-9._/-]+)\.(m?js)(?=\s|$)/gm)) names.add(m[1] + (withExtensions ? '.' + m[2] : ''));
+    for (const m of text.matchAll(/^\s*(?:run\s+"[^"]*"\s+|(?:[A-Z0-9_]+="[^"]*"\s+)*)(?:runall_owned\s+)?node\s+tools\/audit-tools\/([A-Za-z0-9._/-]+)\.([cm]?js)(?=\s|$)/gm)) names.add(m[1] + (withExtensions ? '.' + m[2] : ''));
     return names;
 }
 const baselineAt = runall.search(/if \[ -n "\$BASE" \]/);
@@ -307,6 +307,78 @@ function workflowRunsAll(source) {
     return false;
 }
 
+function ciCheckerNames(source) {
+    const names = new Set(), lines = source.split(/\r?\n/);
+    for (let i = 0; i < lines.length; i++) {
+        const match = lines[i].match(/^(\s*)(-\s+)?run:\s*(.*?)\s*$/);
+        if (!match) continue;
+        let script = match[3];
+        if (/^[|>][+-]?(?:\s*#.*)?$/.test(script)) {
+            const indent = match[1].length + (match[2] || '').length, body = [];
+            for (let j = i + 1; j < lines.length; j++) {
+                if (!lines[j].trim()) { body.push(''); continue; }
+                if (lines[j].match(/^\s*/)[0].length <= indent) break;
+                body.push(lines[j].trim());
+            }
+            script = body.join(script[0] === '>' ? ' ' : '\n');
+        } else if (/^(['"])[\s\S]*\1$/.test(script)) script = script.slice(1, -1);
+        for (const command of script.split(/\r?\n/)) {
+            const call = command.match(/^\s*(?:[A-Z0-9_]+=(?:"[^"]*"|'[^']*'|[^\s]+)\s+)*node\s+(["']?)(?:\.\/)?tools\/audit-tools\/(?<file>[A-Za-z0-9._/-]+\.[cm]?js)\1(?=\s|$|[;&|])/);
+            if (call) names.add(call.groups.file);
+        }
+    }
+    return names;
+}
+
+// This supplemental job installs only the optional candidate package. Normal
+// Spark provisioning/run-all must not install Cloud Functions dependencies.
+// Keep the exception exact; all other CI-only .js/.mjs/.cjs checkers still fail.
+function firebaseAuditCandidateContract(source, pkg, lock) {
+    const markers = [...source.matchAll(/^  firebase-audit-candidate:[ \t]*$/gm)];
+    if (markers.length !== 1 || !/^jobs:[ \t]*$/m.test(source.slice(0, markers[0].index))) return false;
+    const remaining = source.slice(markers[0].index + markers[0][0].length);
+    const end = remaining.search(/^  [A-Za-z0-9_-]+:[ \t]*$/m);
+    const lines = (end < 0 ? remaining : remaining.slice(0, end)).split(/\r?\n/)
+        .filter(line => line.trim() && !/^\s*#/.test(line))
+        .map(line => /^    name: /.test(line) ? '    name: <label>'
+            : /^      - name: /.test(line) ? '      - name: <label>' : line.replace(/\s+$/, ''));
+    const expected = [
+        '    name: <label>',
+        '    needs: ci-config',
+        "    if: (vars.ZOE_RUNNER_MODE == 'github' || github.event.repository.private == true) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && !(github.event_name == 'workflow_dispatch' && inputs.multishop_scale)",
+        "    runs-on: ${{ fromJSON(vars.ZOE_RUNNER_MODE == 'github' && '[\"ubuntu-latest\"]' || '[\"self-hosted\",\"Linux\",\"X64\",\"wsl-zoe-audit\"]') }}",
+        '    timeout-minutes: 10',
+        '    steps:',
+        '      - uses: actions/checkout@v7',
+        '      - uses: actions/setup-node@v7',
+        '        with:',
+        "          node-version: '22'",
+        '          package-manager-cache: false',
+        '          cache: npm',
+        '          cache-dependency-path: tools/firebase-provision/business-audit-functions/package-lock.json',
+        '      - name: <label>',
+        '        run: npm ci --prefix tools/firebase-provision/business-audit-functions --ignore-scripts --no-fund',
+        '      - name: <label>',
+        '        run: npm audit --prefix tools/firebase-provision/business-audit-functions --omit=dev --audit-level=high',
+        '      - name: <label>',
+        '        run: node tools/audit-tools/firebase-business-audit-runtime-test.cjs'
+    ];
+    if (JSON.stringify(lines) !== JSON.stringify(expected)) return false;
+    if (!pkg || pkg.name !== 'zoe-business-audit-functions' || pkg.private !== true || pkg.main !== 'index.cjs' || pkg.engines?.node !== '22'
+        || !lock || lock.lockfileVersion !== 3 || lock.packages?.['']?.engines?.node !== '22') return false;
+    const versions = { 'firebase-admin': '14.5.1', 'firebase-functions': '7.4.0' };
+    if (Object.keys(pkg.dependencies || {}).length !== 2 || Object.keys(lock.packages[''].dependencies || {}).length !== 2) return false;
+    return Object.entries(versions).every(([name, version]) => pkg.dependencies[name] === version
+        && lock.packages[''].dependencies[name] === version && lock.packages['node_modules/' + name]?.version === version
+        && /^sha512-[A-Za-z0-9+/]+=*$/.test(lock.packages['node_modules/' + name]?.integrity || ''));
+}
+
+function ciUnscheduledCheckers(source, normalScripts, pkg, lock) {
+    const candidate = firebaseAuditCandidateContract(source, pkg, lock);
+    return [...ciCheckerNames(source)].filter(name => !normalScripts.has(name)
+        && !(name === 'firebase-business-audit-runtime-test.cjs' && candidate));
+}
+
 console.log('\n=== ២ខ. CI មិនត្រូវរត់ checker ដែល `run-all.sh` មិនរត់ ===');
 // ⛔ ថ្នាក់កំហុស៖ **checker ដែលរស់តែក្នុង CI**។ `run-all.sh` ជាការត្រួតពិនិត្យ
 // ដែលអ្នកអភិវឌ្ឍន៍រត់មុន push — បើ CI រត់អ្វីមួយបន្ថែម នោះការប្តូរដែលធ្វើឲ្យ
@@ -325,8 +397,7 @@ console.log('\n=== ២ខ. CI មិនត្រូវរត់ checker ដែ�
         bad('រកឃើញ .github/workflows/audit.yml', 'គ្មានឯកសារ ➜ បញ្ជាក់មិនបានថា CI និងមូលដ្ឋានស៊ីគ្នា');
     } else {
         const ciText = fs.readFileSync(wf, 'utf8');
-        const ciCheckers = new Set();
-        for (const m of ciText.matchAll(/node\s+tools\/audit-tools\/([A-Za-z0-9._\/-]+)\.m?js(?=\s|$)/g)) ciCheckers.add(m[1]);
+        const ciCheckers = ciCheckerNames(ciText);
         // ជាន់អប្បបរមា — CI ដែលមិនរត់អ្វីសោះ មិនត្រូវបៃតងស្ងាត់ៗ ៖ `bash tools/audit-tools/run-all.sh` (បញ្ជីពេញ · ផ្នែកនៃ matrix
         // ផ្ទៀងដោយ runall-runner-test) ឬ checker ផ្ទាល់ >= ៣
         const ciRunsAll = workflowRunsAll(ciText);
@@ -342,14 +413,21 @@ console.log('\n=== ២ខ. CI មិនត្រូវរត់ checker ដែ�
         // `for t in …; do` និងបន្ទាត់ `node tools/audit-tools/x.js` ដាច់ដោយឡែក។
         // ការអានតែទម្រង់ទី ២ ធ្វើឲ្យ checker ភាគច្រើន (ដែលហៅតាមរង្វិលជុំ)
         // ត្រូវរាយខុសថា «រត់តែក្នុង CI»។
-        const mainNames = runNames;
-        const ciOnly = [...ciCheckers].filter((name) => {
-            if (/run-all\.sh/.test(name)) return false;
-            return !mainNames.has(name);
-        });
+        let candidatePkg, candidateLock;
+        try {
+            const candidateRoot = path.join(TOOLS, '../firebase-provision/business-audit-functions');
+            candidatePkg = JSON.parse(fs.readFileSync(path.join(candidateRoot, 'package.json'), 'utf8'));
+            candidateLock = JSON.parse(fs.readFileSync(path.join(candidateRoot, 'package-lock.json'), 'utf8'));
+        } catch (_) {}
+        const mainNames = runnableNames(mainSection, true);
+        if (/^  firebase-audit-candidate:/m.test(ciText)) {
+            if (firebaseAuditCandidateContract(ciText, candidatePkg, candidateLock)) ok('Optional Firebase audit runtime CI job has the exact reviewed dependency/execution contract');
+            else bad('Optional Firebase audit runtime CI contract changed', 'Node22, pinned package/lock, ignored lifecycle scripts, vulnerability audit and exact checker command are required');
+        }
+        const ciOnly = ciUnscheduledCheckers(ciText, mainNames, candidatePkg, candidateLock);
         if (ciOnly.length) bad('⛔ checker ' + ciOnly.length + ' រត់តែក្នុង CI ➜ ការខូចមិនលេចនៅមូលដ្ឋាន',
             ciOnly.join(', '));
-        else ok('រាល់ checker ដែល CI រត់ ត្រូវបានហៅក្នុង run-all.sh ដែរ');
+        else ok('CI checkers មាន normal run-all registration ឬ exact optional Firebase candidate job contract');
     }
 }
 {

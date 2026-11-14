@@ -197,14 +197,15 @@ describe('meta-checker៖ ចុះឈ្មោះ helper ដោយមិនរ�
 describe('CI និង run-all ប្រើ checker ដូចគ្នាក្រោយផ្លាស់ទី', () => {
     const start = coverage.indexOf("{\n    const wf =");
     const end = coverage.indexOf("\n{\n    const cases =", start);
-    const workflowRunsAll = runInNewContext(coverage.slice(coverage.indexOf('function workflowRunsAll('),
-        coverage.indexOf("console.log('\\n=== ២ខ.")) + '\nworkflowRunsAll;', {});
+    const workflowRuntime = runInNewContext(coverage.slice(coverage.indexOf('function workflowRunsAll('),
+        coverage.indexOf("console.log('\\n=== ២ខ.")) + '\n({ workflowRunsAll, ciCheckerNames, firebaseAuditCandidateContract, ciUnscheduledCheckers });', {});
     const check = (runner: string) => {
         const failures: string[] = [];
         const baseline = runner.search(/if \[ -n "\$BASE" \]/);
         expect(start).toBeGreaterThan(0);
         expect(end).toBeGreaterThan(start);
-        runInNewContext(coverage.slice(start, end), { fs, path, TOOLS: tools, workflowRunsAll,
+        runInNewContext(coverage.slice(start, end), { fs, path, TOOLS: tools, ...workflowRuntime, runnableNames,
+            mainSection: baseline < 0 ? runner : runner.slice(0, baseline),
             runNames: runnableNames(baseline < 0 ? runner : runner.slice(0, baseline)),
             ok: () => {}, bad: (label: string, detail: string) => failures.push(label + ' ' + detail) });
         return failures;

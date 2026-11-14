@@ -6,23 +6,20 @@
   "main": "provision.js",
   "type": "commonjs",
   "engines": {
-    "node": ">=20"
+    "node": "^22.22.2 || ^24.15.0"
   },
   "scripts": {
     "doctor": "node provision.js doctor",
     "test": "node ../../tools/audit-tools/firebase-provision-test.js"
   },
   "dependencies": {
-    "firebase-tools": "15.32.1",
-    "braces": "file:vendor/braces"
+    "firebase-tools": "15.36.0"
   },
   "overrides": {
-    "basic-ftp": "6.2.3",
     "@opentelemetry/core": "2.8.0",
     "gaxios": {
       "uuid": "11.1.1"
     },
-    "braces": "$braces",
     "glob@>=9.0.0 <=14.0.1": "14.0.2",
     "minimatch@>=7.0.0 <11.0.1": "11.0.1"
   }

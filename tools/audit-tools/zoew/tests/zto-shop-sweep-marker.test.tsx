@@ -1,3 +1,4 @@
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 /**
  * ⛔ ZTO-M2 (លុយ) ៖ ការរង់ចាំបញ្ជី «ចុះហត្ថលេខា» មុនសម្អាត ៧ ថ្ងៃ ត្រូវជាច្បាប់ **ទូទាំងហាង** មិនមែនតែឧបករណ៍ដែលបើក ZTO។
  *
@@ -136,6 +137,8 @@ beforeEach(() => {
     firebaseState.isDatabaseConnected = true;
     firebaseState.auth = { currentUser: { uid: 'audit-user' } } as any;
     firebaseState.db = { name: 'audit-db' } as any;
+    configureFixtureBackend('zto-shop-sweep-marker');
+    acceptFixtureSession();
     ['dbRefDailyRevenue', 'dbRefMonthlyRevenue', 'dbRefDailyPickup', 'dbRefDailyCollected', 'dbRefHistory', 'dbRefDeleted', 'dbRefExchangeRate']
         .forEach((k) => { (firebaseState as any)[k] = null; });
     firebaseState.fb = {

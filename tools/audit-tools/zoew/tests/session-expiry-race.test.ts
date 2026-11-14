@@ -13,7 +13,7 @@ for (const reject of [false, true]) {
     firebaseState.auth = { currentUser: { uid: 'A' } } as any;
     firebaseState.fb = { signOut: () => promise } as any;
     firebaseState.firebaseConfig = { databaseURL: 'https://shop-A.firebaseio.com' };
-    forceExpireSession();
+    forceExpireSession(); await turn();
     firebaseState.auth = { currentUser: { uid: 'B' } } as any;
     firebaseState.firebaseConfig = { databaseURL: 'https://shop-B.firebaseio.com' };
     firebaseState.authGeneration++;

@@ -2,9 +2,12 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { reactRuntime } = require('./react-view');
+const { localAuthRuntime } = require('./local-auth-runtime.cjs');
 
 const ROOT = process.env.PERIODICGUARD_APP_DIR || path.join(__dirname, '../..');
 const source = fs.readFileSync(path.join(ROOT, 'ZoeW', 'app.js'), 'utf8');
+const authRuntime = localAuthRuntime(ROOT, source);
+const fixtureConfig = { databaseURL: 'https://periodic-fixture.invalid' };
 let pass = 0;
 let fail = 0;
 // ⛔ ការចេញដោយ **event loop ស្ងួត** (ឧ. `await` លើ promise ដែលគ្មានអ្នកដោះ)
@@ -74,7 +77,6 @@ const SEAT_ENROLLMENT_DECL = (source.match(/(?:^|\n)[ \t]*(let seatEnrollmentOpe
             isModalOpen: false,
             isDatabaseInitialized: true,
             withTimeout: (promise) => promise,
-            loginBackendScope: () => 'fixture',
             serverClockIsTrustworthy: () => true,
             serverTimeOffsetMs: 0,
             getServerNow: () => 0,
@@ -93,6 +95,7 @@ const SEAT_ENROLLMENT_DECL = (source.match(/(?:^|\n)[ \t]*(let seatEnrollmentOpe
             window: { ZoeErrors: { capture: () => { counts.captured++; } } },
             ZoeErrors: { capture: () => { counts.captured++; } }
         });
+        authRuntime.install(context, fixtureConfig);
         vm.runInContext('let sessionExpiryCheckInFlight = false; let licenseRecheckInFlight = false; let sessionExpiryCheck = "live"; let sessionAuthTime = { authTimeMs: 0 };\n'
             + PENDING_ACTIVATION_DECL + '\n' + sessionHelpers + '\n' + sessionFn + '\n' + licenseFn
             + '\nthis.sessionCheck = runSessionExpiryCheck; this.licenseCheck = runPeriodicLicenseCheck;', context);
@@ -133,7 +136,6 @@ const SEAT_ENROLLMENT_DECL = (source.match(/(?:^|\n)[ \t]*(let seatEnrollmentOpe
                 auth: { currentUser: { uid: 'u1' } },
                 db: {},
                 fb: {},
-                loginBackendScope: () => 'fixture',
                 serverClockIsTrustworthy: () => true,
                 serverTimeOffsetMs: 0,
                 getServerNow: () => 0,
@@ -160,7 +162,10 @@ const SEAT_ENROLLMENT_DECL = (source.match(/(?:^|\n)[ \t]*(let seatEnrollmentOpe
                 ZoeErrors: { capture: () => {} }
             });
             // ⛔ ZoeW ជា React ៖ ប៊ូតុង/វាល Activation ជា `viewState` · `fieldValue()` ➜ ស្រទាប់ React ពិតចូល sandbox
+            authRuntime.prepare(armCtx, fixtureConfig);
             vm.runInContext(reactRuntime(source, { context: armCtx }), armCtx);
+            vm.runInContext(authRuntime.code, armCtx);
+            authRuntime.seed(armCtx, fixtureConfig);
             // ⛔ ទង់ចាប់ផ្តើមជា `'pending'` — **តម្លៃដើមពិតរបស់ `app.js`**
             vm.runInContext('let sessionExpiryCheckInFlight = false; let isDatabaseInitialized = false;'
                 + ' let sessionExpiryCheck = "pending"; let listenersAuthGeneration = -1; let sessionAuthTime = { authTimeMs: 0 }; let sessionExpiryArm = null;\n'
@@ -256,7 +261,10 @@ const SEAT_ENROLLMENT_DECL = (source.match(/(?:^|\n)[ \t]*(let seatEnrollmentOpe
             window: { ZoeErrors: null },
             ZoeErrors: { capture: () => effects.push('error') }
         });
+        authRuntime.prepare(context, fixtureConfig);
         vm.runInContext(reactRuntime(source, { exclude: activationNames, context }), context);
+        vm.runInContext(authRuntime.code, context);
+        authRuntime.seed(context, fixtureConfig);
         vm.runInContext('let licenseRecheckInFlight = false;\n' + PENDING_ACTIVATION_DECL + '\n' + SEAT_ENROLLMENT_DECL + '\n' + activationFunctions, context);
         return { context, effects, reads, activations, timers, element };
     }

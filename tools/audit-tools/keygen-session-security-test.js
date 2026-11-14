@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { keygenLogoutRuntime } = require('./keygen-logout-runtime.cjs');
 process.exitCode = 1;
 
 const root = path.resolve(__dirname, '../..');
@@ -80,6 +81,7 @@ function build(options) {
         }
         return elements[id];
     };
+    const localValues = new Map();
     const storage = new Map();
     if (values.sessionRecord) storage.set('zoekeygen_signing_key_enc', values.sessionRecord);
     const log = { alerts: [], toasts: [], updates: 0 };
@@ -115,7 +117,9 @@ function build(options) {
             documentElement: getElementById('__documentElement'),
             querySelectorAll: (selector) => selector === '.modal.active' ? Object.values(elements).filter((el) => el.classList.contains('active')) : []
         },
+        localStorage: { get length() { return localValues.size; }, key: i => [...localValues.keys()][i] ?? null, getItem: key => localValues.get(key) ?? null, setItem: (key, value) => localValues.set(key, String(value)) },
         sessionStorage: {
+            get length() { return storage.size; }, key: i => [...storage.keys()][i] ?? null,
             getItem: (key) => storage.has(key) ? storage.get(key) : null,
             setItem: (key, value) => storage.set(key, value),
             removeItem: (key) => storage.delete(key)
@@ -146,8 +150,8 @@ function build(options) {
         },
         URL,
         db: { app: { options: { databaseURL: 'https://kg-probe.firebaseio.com' } } },
-        auth: { currentUser: user },
-        window: { ZoeLicense: license, ZoeErrors: { capture() {} } },
+        auth: { currentUser: user, app: { options: { databaseURL: 'https://kg-probe.firebaseio.com' } } },
+        window: { addEventListener() {}, removeEventListener() {}, ZoeLicense: license, ZoeErrors: { capture() {} } },
         ZoeErrors: { capture() { log.captures = (log.captures || 0) + 1; } },
         showToast: (message) => log.toasts.push(message),
         openModalHelper: (id) => getElementById(id).classList.add('active'),
@@ -192,6 +196,7 @@ function build(options) {
     // **getter ខ្លួនវាបោះ** ពេល browser បិទ site data)។
     vm.runInContext('var appLocalStore = typeof localStorage !== "undefined" ? localStorage : null;'
         + ' var appSessionStore = typeof sessionStorage !== "undefined" ? sessionStorage : null;', ctx);
+    vm.runInContext(keygenLogoutRuntime(src), ctx);
     vm.runInContext(realLicenseAppCodeDecl(src), ctx);
     vm.runInContext([realDecl('LICENSE_SEAT_SLOT_NAMES'), realDecl('LICENSE_SEAT_MAX')].join('\n'), ctx);
     // ⛔ ថេរ/function ថ្មីរបស់ផ្លូវ «ព្យួរ ➜ ⏳» ៖ អវត្តមាន (កូដមុនកែ) ➜ stub ដែលធ្វើឲ្យការអះអាងខាងក្រោម **ធ្លាក់ដោយមានឈ្មោះ** មិនមែនគាំង
@@ -300,6 +305,7 @@ function adminRetryFixture() {
     vm.runInContext(`
         var authUnsubscribe = null;
         var authRecoveryTimeout = null;
+        var keygenLoginOwner = null;
         var pendingRoleRecheck = false;
         var noticeListCache = [{ id: 'notice-a', title: 'ដំណឹងសាកល្បង' }];
         var isSendingNotice = false;
@@ -320,6 +326,9 @@ function adminRetryFixture() {
             const uid = kind === 'same-user' ? f.ctx.auth.currentUser.uid : 'admin-2';
             f.ctx.logoutApp(true);
             f.ctx.auth.currentUser = { uid };
+            const intent = vm.runInContext('localLogoutIntent', f.ctx);
+            const scope = f.ctx.keygenAuthScope();
+            if (!intent.acknowledge(scope, uid, intent.capture(scope))) throw new Error('Synthetic confirmed login could not acknowledge local logout');
             authListener(f.ctx.auth.currentUser);
         }
     };
@@ -753,7 +762,7 @@ async function run() {
             { rows: list.rows(), body: list.body() });
     }
     {
-        const body = (name) => { const m = src.match(new RegExp('\\nfunction ' + name + '\\([^)]*\\) \\{[\\s\\S]*?\\n\\}')); return m ? m[0] : ''; };
+        const body = (name) => { const m = src.match(new RegExp('\\n(?:async )?function ' + name + '\\([^)]*\\) \\{[\\s\\S]*?\\n\\}')); return m ? m[0] : ''; };
         ok('លក្ខខណ្ឌការក្លែង ៖ logoutApp() ពិតបង្កើន authGeneration', /authGeneration\+\+/.test(body('logoutApp')));
         ok('លក្ខខណ្ឌការក្លែង ៖ showLoginModalWithPrefill() ពិតហៅ invalidateSensitiveSession() + isSignedInUiActive = false',
             /invalidateSensitiveSession\(\)/.test(body('showLoginModalWithPrefill')) && /isSignedInUiActive = false/.test(body('showLoginModalWithPrefill')));
@@ -1575,9 +1584,9 @@ async function run() {
     lo.ctx.fb = { signOut: () => { lo.ctx.__signOuts++; return Promise.resolve(); } };
     vm.runInContext('var pendingRoleRecheck = false;', lo.ctx);
     vm.runInContext(slice(['logoutApp']), lo.ctx);
-    lo.ctx.logoutApp();
+    await lo.ctx.logoutApp();
     const manual = { confirms: lo.ctx.__confirms, signOuts: lo.ctx.__signOuts };
-    lo.ctx.logoutApp(true);
+    await lo.ctx.logoutApp(true);
     ok('logoutApp() ដោយដៃ ➜ confirm (Keypair មិនទាន់ចម្លង) · បដិសេធ ➜ មិនចាកចេញ · logoutApp(true) ➜ ចាកចេញដោយគ្មាន confirm',
         manual.confirms === 1 && manual.signOuts === 0 && lo.ctx.__confirms === 1 && lo.ctx.__signOuts === 1, { manual, confirms: lo.ctx.__confirms, signOuts: lo.ctx.__signOuts });
     // lockKeygenSession ៖ ដក Signing Key · Supabase Admin · ជំនាន់ session រសើប · toast លុះត្រាតែ silent

@@ -1,4 +1,6 @@
 'use strict';
+const { initializeSdkSession } = require('./sdk-session-fixture.cjs');
+const { initializeSdkClock } = require('./sdk-clock-fixture.cjs');
 
 const fs = require('fs'), path = require('path'), os = require('os'), http = require('http'), crypto = require('crypto');
 const { pathToFileURL } = require('url'), { isDeepStrictEqual: equal } = require('util');
@@ -170,6 +172,9 @@ async function bootstrap() {
         "export { noteDbListenerAlive } from './ZoeW/src/services/db-listeners';",
         "export { dbListenerPendingPaths,dbListenerFailedPaths } from './ZoeW/src/core/text';",
         "export { appLocalStore,appSessionStore } from './ZoeW/src/core/storage';",
+        "export { acceptLocalAuthSession } from './ZoeW/src/services/local-logout-intent';",
+        "export { loginBackendScope } from './ZoeW/src/features/login-memory';",
+        "export { resetServerClock,acceptServerClockOffset } from './ZoeW/src/core/clock';",
         "export { allStores } from './ZoeW/src/core/store';",
         "export { captureConnectionOperation } from './ZoeW/src/services/connection-flow';",
         "export { dropOldestToast } from './ZoeW/src/ui/toast';"
@@ -206,6 +211,8 @@ async function open(actorUid = UID) {
     Object.assign(api.firebaseState, { db, fb: sdk, auth, authGeneration: api.firebaseState.authGeneration + 1, firebaseConfig: app.options,
         isInitializingFirebase: false, isDatabaseInitialized: true, isDatabaseConnected: true, firebaseSdkUnavailable: false,
         dbListenersFailed: false, authLoginOperation: null, sessionExpiryCheck: 'live', serverClockTrusted: true, serverTimeOffsetMs: 0 });
+    initializeSdkSession(api);
+    initializeSdkClock(api);
     api.firebaseState.dbRefDailyPickup = sdk.ref(db, P);
     api.dbListenerPendingPaths.clear(); api.dbListenerPendingPaths.add('dailyPickup'); api.dbListenerFailedPaths.clear();
     api.dataState.dailyPickupData = {}; api.dataState.pickupResetInFlight = false;
@@ -504,6 +511,8 @@ async function connectIndependentContext(frame) {
     Object.assign(localApi.firebaseState, { db, fb: sdk, auth, authGeneration: localApi.firebaseState.authGeneration + 1, firebaseConfig: app.options,
         isInitializingFirebase: false, isDatabaseInitialized: true, isDatabaseConnected: true, firebaseSdkUnavailable: false,
         dbListenersFailed: false, authLoginOperation: null, sessionExpiryCheck: 'live', serverClockTrusted: true, serverTimeOffsetMs: 0 });
+    initializeSdkSession(localApi);
+    initializeSdkClock(localApi);
     localApi.firebaseState.dbRefDailyPickup = sdk.ref(db, P); localApi.dbListenerPendingPaths.clear(); localApi.dbListenerPendingPaths.add('dailyPickup');
     localApi.dbListenerFailedPaths.clear(); localApi.dataState.dailyPickupData = {}; localApi.dataState.pickupResetInFlight = false;
     localApi.uiState.toasts = []; localApi.uiState.currentFilterMode = 'all'; return frame;

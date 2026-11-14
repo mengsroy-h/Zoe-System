@@ -4,6 +4,7 @@ const path = require('path');
 const http = require('http');
 const vm = require('vm');
 const { moduleRuntime, memoryStorage } = require('../react-view');
+const { localAuthRuntime } = require('../local-auth-runtime.cjs');
 const acorn = require('acorn');
 const { isDeepStrictEqual } = require('util');
 const { emuNamespace } = require('./ns.js');
@@ -89,6 +90,7 @@ function adapter(pending, hooks = {}) {
     };
 }
 const SOURCE = fs.readFileSync(path.join(ROOT, 'ZoeW', 'app.js'), 'utf8');
+const authRuntime = localAuthRuntime(ROOT, SOURCE);
 const protocolRuntime = moduleRuntime(ROOT, SOURCE, [{ path: 'src/core/clock.ts', expose: ['getServerNow', 'serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'captureClockOperation', 'getServerClockBounds', 'acceptServerClockOffset', 'resetServerClock'] }, 'src/core/session-verification.ts', 'src/domain/scan-protocol.ts', { path: 'src/domain/registry-purge-proof.ts', expose: ['REGISTRY_RELEASES_ROOT', 'REGISTRY_PURGE_MAX_WRITES', 'registryPurgeReceiptValid', 'registryPurgeReceiptMatches', 'registryPurgeIntent'] }, { path: 'src/services/registry-purge.ts', expose: ['purgeTrashWithRegistry'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations'] }]);
 const declarations = modulePrograms(SOURCE, path.join(ROOT, 'ZoeW', 'app.js'), { ecmaVersion: 'latest' }).flatMap(program => program.body);
 const FNS = declarations.filter((node) => node.type === 'FunctionDeclaration');
@@ -147,7 +149,9 @@ function tab(suffix, hooks, fixedTime = false) {
         confirm: () => true, alert: (message) => toasts.push(message),
         appLocalStore: memoryStorage()
     });
-    vm.runInContext(protocolRuntime.code + '\n' + protocolRuntime.withoutBindings(CONSTANTS.join('\n') + '\n' + FNS.map((node) => SOURCE.slice(node.start, node.end)).join('\n')), context);
+    authRuntime.prepare(context, context.db.app.options);
+    vm.runInContext(protocolRuntime.code + '\n' + authRuntime.code + '\n' + authRuntime.withoutBindings(protocolRuntime.withoutBindings(CONSTANTS.join('\n') + '\n' + FNS.map((node) => SOURCE.slice(node.start, node.end)).join('\n'))), context);
+    authRuntime.seed(context, context.db.app.options);
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
     vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', context);
     Object.assign(context, {

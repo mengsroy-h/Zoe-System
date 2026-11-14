@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { localAuthRuntime } = require('./local-auth-runtime.cjs');
 const { moduleRuntime } = require('./react-view');
 const unexpectedErrors = [];
 const auditConsole = { ...console, error: (...args) => unexpectedErrors.push(args.map(String).join(' ')) };
@@ -191,6 +192,7 @@ function buildWorld(store, now) {
         releaseBarcodesInRegistry: (codes) => { world.releasedBarcodes.push(...(codes || [])); return Promise.resolve(); },
         scanHistory: [], deletedItems: []
     });
+    localAuthRuntime(ROOT, src).install(context, context.db.app.options);
     const fixtureSource = [
         extractConst(src, 'COLLECTED_SETTLE_HOLD_MS'), extractFn(src, 'elapsedSince'), extractConst(src, 'TWO_HOURS_MS'), extractConst(src, 'ABANDON_AGE_MS'), extractConst(src, 'RESTORE_CLAIM_LEASE_MS'), extractConst(src, 'RETURNED_TRASH_RETENTION_MS'), extractConst(src, 'TRASH_RETENTION_MS'),
         // ⛔ ពិដានការហៅ Firebase (db-stall-guard) ជាហេដ្ឋារចនាសម្ព័ន្ធរួម ➜ function ពិត

@@ -1,3 +1,4 @@
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { refTo, setFieldValue } from '../../../../ZoeW/src/app/refs';
 import { dataState, firebaseState, uiState, ztoState } from '../../../../ZoeW/src/core/state';
@@ -39,6 +40,13 @@ beforeEach(() => {
     uiState.isModalOpen = false;
     firebaseState.authGeneration++;
     firebaseState.auth = { currentUser: { uid: 'audit-user' } } as any;
+    const config = configureFixtureBackend('zto-session-race');
+    firebaseState.db = { app: { options: config } } as any;
+    firebaseState.serverClockTrusted = true;
+    firebaseState.serverTimeOffsetMs = 0;
+    firebaseState.sessionExpiryCheck = 'live';
+    firebaseState.isDatabaseConnected = true;
+    acceptFixtureSession();
     firebaseState.fb = { getIdTokenResult: async () => ({ token: 'audit-token' }) } as any;
     for (const name of ['ztoListSyncFrom', 'ztoListSyncTo'] as const) {
         const input = document.createElement('input');

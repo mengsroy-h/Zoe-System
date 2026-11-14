@@ -14,6 +14,7 @@ import { dbListenerPendingPaths } from '../../../../ZoeW/src/core/text';
 import { renderConnectionStatus } from '../../../../ZoeW/src/services/connection';
 import { connectionFlowSnapshot } from '../../../../ZoeW/src/services/connection-flow';
 import { showLiveToast } from '../../../../ZoeW/src/ui/toast';
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 
 const native = vi.hoisted(() => ({ state: { blocked: 0, recovering: false, deferred: false, external: 0, pending: 0 } }));
 vi.mock('../../../../ZoeW/src/services/native-write-recovery', async (importOriginal) => {
@@ -35,6 +36,7 @@ function setNet(o: { online?: boolean; db?: boolean }) {
 
 beforeEach(() => {
     vi.useFakeTimers();
+    configureFixtureBackend('network-toast-phase-fixture');
     vi.spyOn(navigator, 'onLine', 'get').mockImplementation(() => online);
     online = true;
     recovery = { blocked: 0, recovering: false, pending: 0 };
@@ -44,9 +46,10 @@ beforeEach(() => {
     Object.assign(firebaseState, {
         fb: {}, db: { recoveryState: () => recovery }, auth: { currentUser: { uid: 'u' } },
         isInitializingFirebase: false, firebaseSdkUnavailable: false, authLoginOperation: null,
-        sessionExpiryCheck: 'live', isDatabaseConnected: true, isDatabaseInitialized: true,
+        sessionExpiryCheck: 'live', serverClockTrusted: true, isDatabaseConnected: true, isDatabaseInitialized: true,
         dbListenersFailed: false, reconnectWatchdogAttempt: 99
     });
+    acceptFixtureSession();
     viewState.connectionStatus = null;
     viewState.backendKind = 'firebase';
     renderConnectionStatus();

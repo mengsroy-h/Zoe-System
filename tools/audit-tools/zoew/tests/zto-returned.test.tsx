@@ -1,3 +1,4 @@
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 import { acceptServerClockOffset, resetServerClock } from '../../../../ZoeW/src/core/clock';
 /**
  * ↩️ កញ្ចប់ត្រឡប់ទៅវិញ (សំណើម្ចាស់គម្រោង ៖ «ចង់ឲ្យកញ្ចប់ដែលត្រឡប់ទៅវិញត្រូវលាក់ ឬបង្ហាញសញ្ញាក្នុងបញ្ជី ទាំង Cookie និង palm»)។
@@ -49,6 +50,8 @@ beforeEach(async () => {
     firebaseState.auth = { currentUser: { uid: 'u' } } as any;
     const token = fx.tokenForSite('777001');
     firebaseState.fb = { getIdTokenResult: async () => ({ token }) } as any;
+    configureFixtureBackend('zto-returned');
+    acceptFixtureSession();
     upstream.length = 0;
     failType = '';
     vi.stubGlobal('fetch', vi.fn(async (u: any, init: any) => {

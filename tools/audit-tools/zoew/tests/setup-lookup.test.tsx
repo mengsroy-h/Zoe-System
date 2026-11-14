@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { runInNewContext } from 'node:vm';
@@ -16,6 +17,8 @@ import { deriveLookupSecretKey, decryptLookupSecret } from '../../../../ZoeW/src
 vi.mock('../../../../ZoeW/src/services/firebase-init', () => ({ initFirebase: vi.fn() }));
 vi.mock('../../../../ZoeW/src/features/customer-table', async (original) => ({ ...await original() as any, clearCustomerDataTableCache: vi.fn(), prefetchCustomerDataTableRowsIfConfigured: vi.fn() }));
 const source = readFileSync(resolve(__dirname, '../../../../ZoeKeyGen/app.js'), 'utf8');
+const require = createRequire(import.meta.url);
+const { keygenLogoutRuntime } = require('../../keygen-logout-runtime.cjs');
 const ast: any = parse(source, { ecmaVersion: 'latest' });
 const funcs = ast.body.filter((n: any) => n.type === 'FunctionDeclaration' && /^(lookupSetup|encryptSetupLookup)/.test(n.id.name));
 const seller = runInNewContext(funcs.map((n: any) => source.slice(n.start, n.end)).join('\n') + '\n({ encryptSetupLookup, lookupSetupCode })',
@@ -28,17 +31,22 @@ function producerHarness() {
     const elements: any = {};
     const writes: any[] = [];
     const element = (id: string) => elements[id] ||= { value: '', checked: false, textContent: '', innerHTML: '', childNodes: [] as unknown[], replaceChildren(...nodes: unknown[]) { this.childNodes = nodes; }, classList: { add() {}, remove() {} } };
+    const values = new Map<string, string>();
+    const sessionValues = new Map<string, string>();
+    const storage = (rows: Map<string, string>) => ({ get length() { return rows.size; }, key: (i: number) => [...rows.keys()][i] ?? null, getItem: (key: string) => rows.get(key) ?? null, setItem: (key: string, value: string) => rows.set(key, String(value)) });
+    const options = { databaseURL: 'https://seller-license.firebaseio.com' };
+    values.set('zoew_firebase_config', JSON.stringify(options));
     const ctx: any = { crypto: webcrypto, TextEncoder, Uint8Array, Uint32Array, URL, btoa, atob,
-        auth: { currentUser: { uid: 'seller' } }, authGeneration: 1, sensitiveSessionGeneration: 1, isSignedInUiActive: true,
-        lookupSetupGeneration: 0, lastGeneratedSetupLink: '', secureKeySetup: null, SETUP_LINK_URL_KEY: 'base', appLocalStore: {},
-        document: { getElementById: element }, safeStoreSet: (_store: any, key: string, value: string) => writes.push([key, value]),
+        auth: { currentUser: { uid: 'seller' }, app: { options } }, authGeneration: 1, sensitiveSessionGeneration: 1, isSignedInUiActive: true,
+        lookupSetupGeneration: 0, lastGeneratedSetupLink: '', secureKeySetup: null, SETUP_LINK_URL_KEY: 'base', appLocalStore: storage(values), appSessionStore: storage(sessionValues),
+        document: { getElementById: element }, safeStoreGet: (store: any, key: string) => store.getItem(key), safeStoreSet: (_store: any, key: string, value: string) => writes.push([key, value]),
         sbTenantCache: [], sbAdminSession: null, sbTenantReadFailed: false,
         sbAdminIsCurrent: (session: any) => !!session && session === ctx.sbAdminSession,
         getServerNow: () => Date.now(), switchKgTab: vi.fn(), showToast: vi.fn(),
         renderQrInto: (_el: any, link: string) => { element('setupLinkQrContainer').textContent = link; }, alert: vi.fn() };
-    const names = ['captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession', 'clearSecureKeySetup', 'generateLookupSetupLink', 'prepareSbLookupSetup', 'renderSbLookupTargets', 'sbTenantState', 'escapeHtml', 'sbAdminConfigProblem', 'sbAdminJwtRole'];
+    const names = ['captureSensitiveSession', 'isSensitiveSessionCurrent', 'adminOwnerIsCurrent', 'adminOperationIsCurrent', 'invalidateSensitiveSession', 'clearSecureKeySetup', 'generateLookupSetupLink', 'prepareSbLookupSetup', 'renderSbLookupTargets', 'sbTenantState', 'escapeHtml', 'sbAdminConfigProblem', 'sbAdminJwtRole'];
     const declared = ast.body.filter((n: any) => n.type === 'FunctionDeclaration' && (names.includes(n.id.name) || /^(lookupSetup|encryptSetupLookup)/.test(n.id.name)));
-    runInNewContext(declared.map((n: any) => source.slice(n.start, n.end)).join('\n'), ctx);
+    runInNewContext(keygenLogoutRuntime(source) + '\n' + declared.map((n: any) => source.slice(n.start, n.end)).join('\n'), ctx);
     element('setupLinkUrlInput').value = 'https://zoew.example/';
     element('setupLookupUrlInput').value = metadata.url;
     element('setupLookupHeaderInput').value = metadata.headerName;

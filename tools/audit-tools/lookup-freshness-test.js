@@ -29,6 +29,8 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { moduleRuntime, reactRuntime } = require('./react-view');
+const { localAuthRuntime } = require('./local-auth-runtime.cjs');
+const { createHash, randomUUID, webcrypto } = require('node:crypto');
 
 const ROOT = process.env.LOOKUPFRESH_APP_DIR ? path.resolve(process.env.LOOKUPFRESH_APP_DIR) : path.resolve(__dirname, '../..');
 const APP_JS = path.join(ROOT, 'ZoeW', 'app.js');
@@ -46,6 +48,7 @@ function readOr(file) {
 }
 
 const SRC = readOr(APP_JS);
+const lookupAuthRuntime = localAuthRuntime(ROOT, SRC);
 const HTML = readOr(INDEX_HTML);
 const GS = readOr(SHEET_API);
 
@@ -87,7 +90,8 @@ const FNS = [
     'prefetchCustomerDataTableRowsIfConfigured',
     'ztoIdToken', 'addZtoIdentityHeader', 'ztoAccountSignedIn', 'ztoIdentityRefusalIsTransient',
     'attemptAutoLookup', 'runSheetImport', 'captureSheetImportOperation', 'shopScope', 'safeStoreGet', 'lookupSecretLocked', 'lookupKeyedUrl', 'lookupUrlWithKey',
-    'captureSheetImportData', 'sheetImportWriterVersion'
+    'captureSheetImportData', 'sheetImportWriterVersion',
+    'preparedSheetWrite_', 'sheetPendingScope_', 'runPreparedAppWrite_'
 ];
 const src = {};
 FNS.forEach((n) => { src[n] = sliceFn(n); ok('រកឃើញ function ' + n + '()', !!src[n]); });
@@ -175,18 +179,26 @@ const CFG_URL = 'https://script.google.com/macros/s/AKfy/exec?code={barcode}&key
 
 function build(opts) {
     const o = opts || {};
+    const backendConfig = { databaseURL: 'https://lookup-freshness-fixture.firebaseio.com', apiKey: 'synthetic-public-key' };
+    const fixtureApp = { options: backendConfig };
     const clock = makeClock();
-    const net = { urls: [], lookups: 0 };
+    const net = { urls: [], lookups: 0, writerCalls: [] };
+    const digest = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+    let preparedWrite;
     const el = () => ({ value: '', textContent: '', innerHTML: '', disabled: false });
     const ctx = {
         console: { error: () => {}, log: () => {}, warn: () => {} },
         Object: Object, Array: Array, Promise: Promise, JSON: JSON, String: String,
         Number: Number, Math: Math, isNaN: isNaN, parseFloat: parseFloat, Infinity: Infinity,
         encodeURIComponent: encodeURIComponent, URL: URL, Set: Set, Map: Map, Error: Error,
+        TextEncoder, Uint8Array, crypto: webcrypto,
         Date: makeFakeDate(clock),
         setTimeout: clock.setTimeout, clearTimeout: clock.clearTimeout,
         navigator: { onLine: o.onLine === undefined ? true : o.onLine, connection: null },
-        auth: { currentUser: { uid: 'u1' } },
+        firebaseConfig: backendConfig,
+        auth: { app: fixtureApp, currentUser: { uid: 'u1' } },
+        db: { app: fixtureApp }, fb: {}, sessionExpiryCheck: 'live',
+        isDatabaseInitialized: true, isDatabaseConnected: true,
         isModalOpen: !!o.isModalOpen,
         pendingBarcode: null,
         lookupSecretKey: null,
@@ -207,8 +219,26 @@ function build(opts) {
         currentSheetImportMapping: () => ({ barcode: 0, dod: 1, cod: 2, phone: 3 }),
         sheetImportMappedRows: () => (o.importRows || []).map((r) => r.slice()),
         callSheetImportApi: (action, extra) => {
+            net.writerCalls.push(action);
+            if (action === 'status') return Promise.resolve({ writeProtocol: o.writerProtocol ?? 1,
+                writeScope: digest('synthetic-sheet-writer'), sheetName: 'Customers', rowCount: o.importResult?.rowsAfter || 0 });
+            if (action === 'prepareWrite') {
+                const request = extra?.request;
+                if (request?.kind !== 'import' || !Array.isArray(request.payload?.rows)) throw new Error('synthetic-invalid-prepare');
+                const payloadHash = digest(request.payload);
+                const intent = { v: 1, id: randomUUID(), kind: 'import', target: { sheetId: 'synthetic-sheet', sheetName: 'Customers', tabId: 123 },
+                    targetHash: digest('synthetic-sheet'), sourceHash: payloadHash, beforeHash: digest([]), baseRevision: 'initial', preparedAt: clock.now() };
+                preparedWrite = { intent, payloadHash };
+                return Promise.resolve({ protocol: 1, intent });
+            }
+            if (action !== 'import' || !preparedWrite) throw new Error('synthetic-unprepared-write');
+            const { intent, ...payload } = extra?.payload || {};
+            if (JSON.stringify(intent) !== JSON.stringify(preparedWrite.intent) || digest(payload) !== preparedWrite.payloadHash) throw new Error('synthetic-prepared-source-changed');
             net.import = { action: action, extra: extra };
-            return Promise.resolve(o.importResult || { added: 0, updated: 0, unchanged: 0, rowsAfter: 0, sheetName: 'Customers' });
+            return Promise.resolve({ ...(o.importResult || { added: 0, updated: 0, unchanged: 0, rowsAfter: 0, sheetName: 'Customers' }),
+                replayed: false, importCurrent: true,
+                importReceipt: { v: 1, id: o.corruptReceipt ? randomUUID() : intent.id, sourceHash: intent.sourceHash,
+                    baseRevision: intent.baseRevision, revision: randomUUID(), current: true } });
         },
         retryAsync: (fn) => fn(),
         fetchWithTimeout: (url) => {
@@ -222,6 +252,8 @@ function build(opts) {
         __net: net, __clock: clock
     };
     vm.createContext(ctx);
+    // Install physical stores before React captures its actual const storage bindings.
+    lookupAuthRuntime.prepare(ctx, backendConfig);
     // ⛔ ZoeW ជា React ៖ ឃ្លាំង · `fieldValue()` · `viewState` ជាស្រទាប់ React ពិត (stub របស់ sandbox ឈ្នះ)
     if (typeof ctx.queueMicrotask !== 'function') ctx.queueMicrotask = queueMicrotask;
     vm.runInContext(reactRuntime(SRC, { context: ctx }), ctx);
@@ -231,6 +263,8 @@ function build(opts) {
     // `fetchCustomerDataTableRows` ជាកូដពិត តែវាធំ ➜ យើងចាក់វាចុងក្រោយ
     const fetchSrc = sliceFn('fetchCustomerDataTableRows');
     if (fetchSrc) { try { vm.runInContext(fetchSrc, ctx); } catch (e) {} }
+    // Admit the declared SDK actor through the selected target's actual auth runtime, once at fixture bootstrap.
+    lookupAuthRuntime.install(ctx, backendConfig);
     return ctx;
 }
 
@@ -302,6 +336,21 @@ scenario('នាំចូល replace ➜ តារាងឆ្លើយភ្ល
     ok('ចំនួនជួរដេកត្រូវនឹង rowsAfter ➜ តារាងពេញលេញ', vm.runInContext('customerTableIsPartial === false', ctx));
     ok('គ្មានសំណើបណ្តាញណាមួយសម្រាប់ការបំពេញនោះ', ctx.__net.lookups === 0, ctx.__net);
     ok('តារាងចាត់ទុកជា **ស្រស់**', vm.runInContext('elapsedSince(customerDataTableFetchedAt) < CUSTOMER_TABLE_CACHE_MS', ctx));
+});
+
+scenario('អ្នកសរសេរចាស់គ្មាន write protocol ➜ មិននាំចូល ឬ seed cache', async () => {
+    const ctx = build({ importRows: FILE_ROWS, writerProtocol: 0 });
+    await vm.runInContext('runSheetImport()', ctx);
+    ok('អ្នកសរសេរចាស់ ➜ ពិនិត្យ status តែប៉ុណ្ណោះ មិន prepare/execute', JSON.stringify(ctx.__net.writerCalls) === JSON.stringify(['status']), ctx.__net);
+    ok('អ្នកសរសេរចាស់ ➜ គ្មានជួរនាំចូលក្នុង cache', vm.runInContext('findCustomerDataTableRow("BC-A")', ctx) === null);
+});
+
+scenario('receipt ខុសអត្តសញ្ញាណ ➜ មិន seed cache ជាជោគជ័យ', async () => {
+    const ctx = build({ importRows: FILE_ROWS, corruptReceipt: true,
+        importResult: { added: 2, updated: 0, unchanged: 0, rowsAfter: 2, sheetName: 'Customers' } });
+    await vm.runInContext('runSheetImport()', ctx);
+    ok('receipt ខុស ➜ តេស្តទៅដល់ prepare និង actual execute boundary', JSON.stringify(ctx.__net.writerCalls) === JSON.stringify(['status', 'prepareWrite', 'import']), ctx.__net);
+    ok('receipt ខុស ➜ cache មិនទុកជួរដែលមិនទាន់ផ្ទៀង', vm.runInContext('customerDataTableRows === null && findCustomerDataTableRow("BC-A") === null', ctx));
 });
 
 scenario('នាំចូល upsert ➜ merge លើតារាងចាស់', () => {

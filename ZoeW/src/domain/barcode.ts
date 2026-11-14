@@ -148,7 +148,7 @@ export function barcodeZtoSentOut(barcode) {
 }
 
 export function trashZtoFinalBlock(item) {
-    if (item?.trashMode === 'palm') return 'palm';
+    if (item?.trashMode === 'palm' && item?.trashReason === 'pickup') return 'palm';
     const barcodes = item && Array.isArray(item.barcodes) ? item.barcodes.filter(Boolean) : [];
     if (barcodes.some(barcodeZtoSigned)) return 'signed';
     if (item?.trashReason === 'returned' && barcodes.some((b) => barcodeZtoReturned(b) && !barcodeZtoMisplaced(b) && !barcodeZtoSentOut(b))) return 'returned';
@@ -156,13 +156,14 @@ export function trashZtoFinalBlock(item) {
 }
 
 export function trashEntryIsFinal(mode, items) {
-    return mode === 'palm' || (Array.isArray(items) ? items : [items]).some((item) => barcodeEntriesOf(item?.barcodes).some(({ barcode }) => barcodeZtoSigned(barcode)));
+    return (Array.isArray(items) ? items : [items]).some((item) => (item?.trashMode || mode) === 'palm' && item?.trashReason === 'pickup'
+        || item?.restoreBlocked === true || barcodeEntriesOf(item?.barcodes).some(({ barcode }) => barcodeZtoSigned(barcode)));
 }
 
 export function stampTrashPolicy(item, mode = 'local') {
     if (!item || typeof item !== 'object') return item;
     if (!item.trashMode) item.trashMode = mode;
-    if (item.trashMode === 'palm' || barcodeEntriesOf(item.barcodes).some(({ barcode }) => barcodeZtoSigned(barcode))) item.restoreBlocked = true;
+    if (item.trashMode === 'palm' && item.trashReason === 'pickup' || barcodeEntriesOf(item.barcodes).some(({ barcode }) => barcodeZtoSigned(barcode))) item.restoreBlocked = true;
     return item;
 }
 

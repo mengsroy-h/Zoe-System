@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 /**
  * ឧបករណ៍រួមសម្រាប់តេស្ត ZTO Palm ៖ App ពិត + Function ពិត (`zto-order-detail-core.cjs` ➜ `_shared/zto-palm.js`) + ZTO Palm ក្លែង +
  * អត្តសញ្ញាណ backend ទាំង ២ ៖ Firebase (ID token ចុះហត្ថលេខាពិតពី `tools/audit-tools/idtoken-fixture.js`) · Supabase (`my_account()` ក្លែង)។
@@ -225,7 +226,7 @@ export function installFetch() {
             new URL(href).searchParams.forEach((v, k) => { q[k] = v; });
             const h: any = {};
             Object.entries((init && init.headers) || {}).forEach(([k, v]) => { h[k.toLowerCase()] = String(v); });
-            if (q.list === '1' || q.status === '1') world.functionQueries.push(q);
+            if (q.list === '1' || q.status === '1' || q.restore === '1') world.functionQueries.push(q);
             const r = await fn.handler({ httpMethod: init && init.method === 'POST' ? 'POST' : 'GET', headers: h, queryStringParameters: q,
                 body: init && init.body, ...(world.blobs ? { blobs: BLOB_CONTEXT } : {}) });
             return new Response(r.body, { status: r.statusCode });
@@ -286,6 +287,8 @@ export function signIn(backend: Backend, token: string, site = SITE) {
         firebaseState.fb = { getIdTokenResult: async () => ({ token }), tenantScope: () => 't-' + site,
             ref: (_db: unknown, path: string) => ({ path }) } as any;
     }
+    firebaseState.firebaseConfig = JSON.parse(appLocalStore.getItem('zoew_firebase_config')!);
+    acceptFixtureSession();
 }
 
 export async function storePalmConfig(backend: Backend, session: string, site = SITE, extra: Record<string, unknown> = {}) {

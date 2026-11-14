@@ -45,7 +45,87 @@ for (const [label, lock] of [['ZoeW', packageLock], ['Firebase Provision', provi
                 && (!versionAtLeast(version, lower) || versionAtLeast(version, fixed))), versions);
     }
 }
-for (const [name, floor] of [['basic-ftp', '6.2.1'], ['@opentelemetry/core', '2.8.0'], ['uuid', '11.1.1'], ['@modelcontextprotocol/sdk', '1.32.0'], ['fast-uri', '3.1.9'], ['ip-address', '10.7.4'], ['zod', '4.6.6']]) {
+// basic-ftp was removed from the current official CLI graph. Absence is safe only
+// when the selected graph has no demand; available installed versions add vetoes.
+function basicFtpFloor(lock, manifest, installed) {
+    const object = value => !!value && typeof value === 'object' && !Array.isArray(value);
+    const fields = ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies'];
+    const declarationsValid = value => fields.every(field => value[field] === undefined || object(value[field])
+        && Object.values(value[field]).every(spec => typeof spec === 'string'));
+    if (!object(lock) || ![2, 3].includes(lock.lockfileVersion) || !object(lock.packages)
+        || !object(lock.packages['']) || lock.dependencies !== undefined && !object(lock.dependencies)
+        || !object(manifest) || !Array.isArray(installed)
+        || !declarationsValid(manifest) || manifest.overrides !== undefined && !object(manifest.overrides)
+        || Object.values(lock.packages).some(value => !object(value) || !declarationsValid(value))) return false;
+    const versions = Object.entries(lock.packages).filter(([rel, value]) => rel.endsWith('/basic-ftp') || value.name === 'basic-ftp')
+        .map(([, value]) => value.version);
+    if (!installed.every(version => versionAtLeast(version, '6.2.1'))) return false;
+    if (versions.length) return versions.every(version => versionAtLeast(version, '6.2.1'));
+    const alias = spec => typeof spec === 'string' && spec.slice(0, 4).toLowerCase() === 'npm:'
+        && /^basic-ftp(?:@|$)/.test(spec.slice(4));
+    const requires = value => ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies'].some(field =>
+        Object.entries(value[field] || {}).some(([name, spec]) => name === 'basic-ftp' || alias(spec)));
+    const overrideRequires = value => object(value) && Object.entries(value).some(([name, spec]) =>
+        /^basic-ftp(?:@|$)/.test(name) || alias(spec) || overrideRequires(spec));
+    return installed.length === 0 && !requires(manifest) && !Object.values(lock.packages).some(requires)
+        && !Object.hasOwn(lock.dependencies || {}, 'basic-ftp') && !overrideRequires(manifest.overrides);
+}
+
+function installedBasicFtpVersions(roots) {
+    const versions = [], seen = new Set();
+    const visit = directory => {
+        if (!fs.existsSync(directory)) return;
+        const real = fs.realpathSync(directory);
+        if (seen.has(real)) return;
+        seen.add(real);
+        const inspect = directory => {
+            if (!fs.statSync(directory).isDirectory()) return;
+            const file = path.join(directory, 'package.json');
+            const metadata = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
+            if (path.basename(directory) === 'basic-ftp' || metadata.name === 'basic-ftp') versions.push(metadata.version);
+            visit(path.join(directory, 'node_modules'));
+        };
+        for (const name of fs.readdirSync(directory)) {
+            if (name.startsWith('.')) continue;
+            const entry = path.join(directory, name);
+            if (name.startsWith('@') && fs.statSync(entry).isDirectory()) {
+                for (const child of fs.readdirSync(entry)) inspect(path.join(entry, child));
+            } else inspect(entry);
+        }
+    };
+    try { roots.forEach(visit); return versions; } catch (_) { return null; }
+}
+
+let provisionManifest = null;
+try { provisionManifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'tools/firebase-provision/package.json'), 'utf8')); } catch (_) {}
+const installedFtp = installedBasicFtpVersions([path.join(ROOT, 'tools/firebase-provision/node_modules'),
+    ...(process.env.ZOE_REPO_ROOT ? [path.resolve(process.env.ZOE_REPO_ROOT, 'tools/firebase-provision/node_modules')] : [])]);
+ok('⛔ Firebase Provision basic-ftp ៖ គ្មាន consumer ឬរាល់កំណែដល់ patch សុវត្ថិភាព',
+    basicFtpFloor(provisionLock, provisionManifest, installedFtp), installedFtp);
+
+const ftpAbsent = { lockfileVersion: 3, packages: { '': { name: 'synthetic-dependency-fixture' } } };
+const ftpFixed = JSON.parse(JSON.stringify(ftpAbsent));
+ftpFixed.packages['node_modules/basic-ftp'] = { version: '6.2.1' };
+const ftpVulnerable = JSON.parse(JSON.stringify(provisionLock && provisionLock.packages && !Array.isArray(provisionLock.packages) ? provisionLock : ftpAbsent));
+ftpVulnerable.packages['node_modules/basic-ftp'] = { version: '6.2.0' };
+const ftpRequired = JSON.parse(JSON.stringify(ftpAbsent));
+ftpRequired.packages['node_modules/synthetic-consumer'] = { version: '1.0.0', dependencies: { 'basic-ftp': '^6.2.1' } };
+ok('basic-ftp floor control ៖ safe absence គ្មាន demand ទទួល', basicFtpFloor(ftpAbsent, {}, []));
+ok('basic-ftp floor control ៖ fixed present ទទួល', basicFtpFloor(ftpFixed, {}, ['6.2.1']));
+ok('basic-ftp floor control ៖ vulnerable version ក្នុង isolated lock បដិសេធ', !basicFtpFloor(ftpVulnerable, provisionManifest || {}, []));
+ok('basic-ftp floor control ៖ missing root dependency បដិសេធ', !basicFtpFloor(ftpAbsent, { dependencies: { 'basic-ftp': '^6.2.1' } }, []));
+ok('basic-ftp floor control ៖ missing transitive dependency បដិសេធ', !basicFtpFloor(ftpRequired, {}, []));
+ok('basic-ftp floor control ៖ installed vulnerable branch មិនលាក់ដោយ fixed lock', !basicFtpFloor(ftpFixed, {}, ['6.2.0']));
+ok('basic-ftp floor control ៖ npm alias demand មិនអាចបាត់ស្ងាត់', !basicFtpFloor(ftpAbsent, { dependencies: { 'ftp-alias': 'npm:basic-ftp@6.2.1' } }, []));
+ok('basic-ftp floor control ៖ uppercase NPM protocol alias demand បដិសេធ', !basicFtpFloor(ftpAbsent, { dependencies: { 'ftp-alias': 'NPM:basic-ftp@6.2.1' } }, []));
+ok('basic-ftp floor control ៖ uppercase NPM protocol override demand បដិសេធ', !basicFtpFloor(ftpAbsent, { overrides: { 'ftp-alias': 'NPM:basic-ftp@6.2.1' } }, []));
+ok('basic-ftp floor control ៖ malformed legacy dependency map បដិសេធ', !basicFtpFloor({ ...ftpAbsent, dependencies: [] }, {}, [])
+    && !basicFtpFloor({ ...ftpAbsent, dependencies: 'basic-ftp' }, {}, []));
+ok('basic-ftp floor control ៖ missing root demand ទោះ ambient fixed ក៏បដិសេធ', !basicFtpFloor(ftpAbsent, { dependencies: { 'basic-ftp': '^6.2.1' } }, ['6.2.1']));
+ok('basic-ftp floor control ៖ missing transitive demand ទោះ ambient fixed ក៏បដិសេធ', !basicFtpFloor(ftpRequired, {}, ['6.2.1']));
+ok('basic-ftp floor control ៖ ambient fixed មិនអនុម័ត selected absence', !basicFtpFloor(ftpAbsent, {}, ['6.2.1']));
+
+for (const [name, floor] of [['@opentelemetry/core', '2.8.0'], ['uuid', '11.1.1'], ['@modelcontextprotocol/sdk', '1.32.0'], ['fast-uri', '3.1.9'], ['ip-address', '10.7.4'], ['zod', '4.6.6']]) {
     const versions = Object.entries(provisionLock && provisionLock.packages || {})
         .filter(([rel]) => rel.endsWith('/' + name)).map(([, value]) => value.version);
     ok('⛔ Firebase Provision dependency ' + name + ' ៖ lockfile មាន និងគ្រប់កំណែដល់ patch សុវត្ថិភាព',

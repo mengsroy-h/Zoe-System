@@ -11,6 +11,7 @@ import { dataState, firebaseState, uiState } from '../../../../ZoeW/src/core/sta
 import { removeSingleBarcode } from '../../../../ZoeW/src/features/barcode-ops';
 import { confirmScannedRemoval } from '../../../../ZoeW/src/features/scan-remove';
 import { cleanupInFlight, cleanupJournalLive, readCleanupJournal } from '../../../../ZoeW/src/domain/cleanup';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 const DAY = '2026-10-07';
 type Pending = { path: string; fn: any; resolve: (v: any) => void };
@@ -58,6 +59,7 @@ beforeEach(() => {
     vi.stubGlobal('alert', () => undefined);
     firebaseState.authGeneration = 1;
     const options = { databaseURL: 'https://remove-session.firebaseio.com' };
+    firebaseState.firebaseConfig = options;
     firebaseState.db = { name: 'db', app: { options } } as any;
     firebaseState.auth = { currentUser: { uid: 'remove-owner' }, app: { options } } as any;
     localStorage.setItem('zoew_firebase_config', JSON.stringify(options));
@@ -92,6 +94,7 @@ beforeEach(() => {
             });
         }
     } as any;
+    acceptFixtureSession();
     dataState.scanHistory = [{
         id: 'item1', phone: '0961111111', scanDate: DAY, time: '10:00:00 (' + DAY + ')', cod: 8, dod: 0, price: 8, count: 2, isClosed: false,
         barcodes: [

@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { firebaseState, securityState, uiState } from '../../../../ZoeW/src/core/state';
@@ -38,6 +39,7 @@ function connect() {
     Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db, isDatabaseInitialized: true, isInitializingFirebase: false,
         firebaseSdkUnavailable: false, isDatabaseConnected: true, serverClockTrusted: true, sessionExpiryCheck: 'live', authLoginOperation: null });
     firebaseState.authGeneration++;
+    acceptFixtureSession();
     return { write, raw };
 }
 

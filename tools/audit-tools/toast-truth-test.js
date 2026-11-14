@@ -25,6 +25,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 
 let chromium;
 try { chromium = require('playwright-core').chromium; } catch (e) { chromium = null; }
@@ -208,6 +209,57 @@ console.log('\n-- ៤. ZoeW ៖ «ភ្ជាប់រួច» មិនដូ�
 // «តើគេនៅចូលប្រព័ន្ធទេ?» សោះ។ ដូច្នេះការអះអាងទាំងពីរខាងត្រូវការ៖ វាត្រូវ
 // បដិសេធការប្រកាសពេលវគ្គស្លាប់ **ហើយនៅតែប្រកាសពេលវគ្គរស់** — បើមិនដូច្នេះ
 // «កុំប្រកាសសោះ» ក៏ជាប់តេស្តដែរ។
+let expiryAnnouncementProof = Promise.resolve();
+async function expiryAnnouncementsMatch(js, expire) {
+    const authRuntime = require('./local-auth-runtime.cjs').localAuthRuntime(ROOT, js);
+    const wanted = ['SESSION_EXPIRED_TOAST', 'LOCAL_LOGOUT_UNPERSISTED_TOAST', 'DB_OP_TIMEOUT_MS'];
+    const constants = [];
+    const programs = require('./audit-module-ast').modulePrograms(js, path.join(ROOT, 'ZoeW/app.js'), { ecmaVersion: 'latest' });
+    for (const program of programs) for (const node of program.body) if (node.type === 'VariableDeclaration') {
+        for (const binding of node.declarations) if (binding.id.type === 'Identifier' && wanted.includes(binding.id.name))
+            constants.push(node.kind + ' ' + js.slice(binding.start, binding.end) + ';');
+    }
+    const withTimeout = sliceFn(js, 'withTimeout');
+    if (constants.length !== wanted.length || !withTimeout || !expire) return false;
+    for (const durable of [true, false]) for (const confirmed of [true, false]) {
+        const local = require('./react-view.js').memoryStorage();
+        const session = require('./react-view.js').memoryStorage();
+        const messages = [];
+        const auth = { currentUser: { uid: 'toast-expiry-fixture' } };
+        const context = vm.createContext({ Promise, setTimeout, clearTimeout, auth, authGeneration: 1,
+            appLocalStore: local, appSessionStore: session, window: { localStorage: local, sessionStorage: session },
+            authLoginOperation: null, sessionExpiryCheck: 'live', isDatabaseInitialized: true,
+            fb: { signOut: async owner => { if (!confirmed) throw new Error('controlled signout rejection'); owner.currentUser = null; } },
+            detachDatabaseListeners() {}, refreshLiveToasts() {}, clearRememberedSession() {}, hideAppLockScreen() {}, showLoginModalWithPrefill() {},
+            reannounceOrShowToast: message => messages.push(message)
+        });
+        authRuntime.install(context, { databaseURL: 'https://toast-expiry-fixture.firebaseio.com' });
+        if (!durable) local.setItem = () => { throw new Error('controlled persistent storage rejection'); };
+        vm.runInContext(constants.concat(withTimeout, expire).join('\n'), context);
+        context.forceExpireSession();
+        await new Promise(resolve => setImmediate(resolve));
+        const expected = vm.runInContext(!confirmed && !durable ? 'LOCAL_LOGOUT_UNPERSISTED_TOAST' : 'SESSION_EXPIRED_TOAST', context);
+        if (messages.length !== 1 || messages[0] !== expected) return false;
+    }
+    return true;
+}
+function expiryAnnouncementMutants(expire) {
+    const acorn = require('acorn');
+    const matches = [];
+    const walk = node => {
+        if (!node || typeof node !== 'object') return;
+        if (node.type === 'ExpressionStatement' && node.expression.type === 'CallExpression'
+            && node.expression.callee.type === 'Identifier' && node.expression.callee.name === 'reannounceOrShowToast') matches.push(node);
+        for (const value of Object.values(node)) { if (Array.isArray(value)) value.forEach(walk); else if (value && typeof value === 'object') walk(value); }
+    };
+    walk(acorn.parse(expire, { ecmaVersion: 'latest' }));
+    if (matches.length !== 1 || matches[0].expression.arguments.length !== 1) return [];
+    const statement = matches[0], arg = statement.expression.arguments[0], original = expire.slice(statement.start, statement.end);
+    return [expire.slice(0, statement.start) + expire.slice(statement.end),
+        expire.slice(0, statement.start) + original + original + expire.slice(statement.end),
+        expire.slice(0, arg.start) + "'wrong-message'" + expire.slice(arg.end)];
+}
+
 console.log('\n-- ៤ខ. វគ្គដែលបានបញ្ចប់ ➜ toast ត្រូវនិយាយការពិត --');
 {
     const js = read('ZoeW/app.js');
@@ -243,8 +295,13 @@ console.log('\n-- ៤ខ. វគ្គដែលបានបញ្ចប់ ➜ t
         /refreshLiveToasts\(\)/.test(expire));
     ok('ZoeW ៖ សារផុតកំណត់ជាថេរតែមួយ ចែករំលែករវាង toast រស់ និង toast ថ្មី',
         /SESSION_EXPIRED_TOAST/.test(expire) && /SESSION_EXPIRED_TOAST/.test(state));
-    ok('ZoeW ៖ សារផុតកំណត់លេចជាក់ស្តែងតែ **១** (មិនប្រកាសស្ទួន មិនបាត់)',
-        /reannounceOrShowToast\(SESSION_EXPIRED_TOAST\)/.test(expire));
+    expiryAnnouncementProof = (async () => {
+        ok('ZoeW ៖ សារផុតកំណត់លេចជាក់ស្តែងតែ **១** (មិនប្រកាសស្ទួន មិនបាត់)',
+            await expiryAnnouncementsMatch(js, expire));
+        const mutants = expiryAnnouncementMutants(expire);
+        ok('Expiry announcement negative controls cover missing, duplicate and wrong-message effects', mutants.length === 3);
+        for (const mutant of mutants) ok('Expiry announcement mutation is rejected by actual signout/durability outcomes', !(await expiryAnnouncementsMatch(js, mutant)));
+    })();
     const reannounce = sliceFn(js, 'reannounceOrShowToast') || '';
     // App React ៖ toast ជាធាតុក្នុង `uiState.toasts` (`.show = true` ជំនួស `classList.add('show')`)
     ok('ZoeW ៖ បើ toast នោះនៅលើអេក្រង់ ➜ រស់វិញពេញ ៣ វិ. ជំនួសការបន្ថែមថ្មី',
@@ -399,6 +456,7 @@ function readToast(page) {
 }
 
 (async () => {
+    await expiryAnnouncementProof;
     if (!chromium || !fs.existsSync(CHROME)) {
         console.log('\nSKIP ៦. browser ពិត — គ្មាន playwright-core ឬ Chromium');
         console.log('\nសរុប: ' + pass + ' ok, ' + fail + ' FAIL');

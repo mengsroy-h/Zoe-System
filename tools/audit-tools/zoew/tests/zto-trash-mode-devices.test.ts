@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState, ztoState } from '../../../../ZoeW/src/core/state';
 import { getServerNow } from '../../../../ZoeW/src/core/clock';
@@ -137,6 +138,7 @@ beforeEach(() => {
         return new Response(JSON.stringify(at(decodeURIComponent(url.pathname.slice(1, -5)))), { status: 200 });
     });
     appLocalStore.setItem('zoew_firebase_config', SHOP_CONFIG);
+    acceptFixtureSession();
     freshPage = { local: { zoew_firebase_config: SHOP_CONFIG }, wrote: clone(ztoState.ztoTrashModeWrote) };
     pages.clear(); current = '';
     attachZtoTrashModeListener(firebaseState.dbListenerGeneration);
@@ -161,7 +163,8 @@ describe('FIXSHOP-3 ៖ ត្រារបៀបធុងសំរាមហា�
         await settle(); await claimAndCleanupItem('noop', 'close'); await settle();
         expect(at(`${H}/unsigned`), 'closed in ZoeW but not signed in ZTO ➜ stays in history').toBeTruthy();
         expect(await deleteSingleItem('del', { confirmed: true, quiet: true })).toBe('deleted');
-        expect(at(`${T}/del`)).toMatchObject({ trashMode: 'palm', restoreBlocked: true });
+        expect(at(`${T}/del`)).toMatchObject({ trashMode: 'palm' });
+        expect(at(`${T}/del`).restoreBlocked).toBeUndefined();
         device('X');
         expect(storeLookupApiConfig(lookupCfg(PALM_URL, false))).toBe(true);
         await settle();
@@ -538,7 +541,8 @@ describe('FIXSHOP-3 ៖ ត្រារបៀបធុងសំរាមហា�
             await settle(); await claimAndCleanupItem('noop', 'close'); await settle();
             expect(at(`${H}/unsigned`), 'Palm shop: closed in ZoeW but not signed ➜ stays').toBeTruthy();
             expect(await deleteSingleItem('del', { confirmed: true, quiet: true })).toBe('deleted');
-            expect(at(`${T}/del`)).toMatchObject({ trashMode: 'palm', restoreBlocked: true });
+            expect(at(`${T}/del`)).toMatchObject({ trashMode: 'palm' });
+        expect(at(`${T}/del`).restoreBlocked).toBeUndefined();
         } finally {
             vi.mocked(Date.now).mockRestore();
             firebaseState.serverTimeOffsetMs = 0;
@@ -802,6 +806,7 @@ describe('FIXSHOP-3 ៖ ត្រារបៀបធុងសំរាម ↔ jou
         const sdk: any = withTransactionOutcomeResolution(raw); sdk.getAuth(app); sdk.getDatabase(app);
         Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db: ndb, isDatabaseInitialized: true,
             isInitializingFirebase: false, firebaseSdkUnavailable: false, sessionExpiryCheck: 'live', authLoginOperation: null });
+        acceptFixtureSession();
         firebaseState.dbRefZtoTrashMode = sdk.ref(ndb, ZTO_TRASH_MODE_PATH);
         return { sdk, db: ndb, app };
     }
@@ -1028,7 +1033,8 @@ describe('FIXSHOP-3 review 4 ៖ rollout before the rules · advisory writes · 
             const sdk: any = withTransactionOutcomeResolution(raw); sdk.getAuth(app); sdk.getDatabase(app);
             Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db: ndb, isDatabaseInitialized: true, isInitializingFirebase: false,
                 firebaseSdkUnavailable: false, isDatabaseConnected: true, serverClockTrusted: true, hasEverConnectedToDatabase: true, sessionExpiryCheck: 'live', authLoginOperation: null });
-            firebaseState.dbRefZtoTrashMode = sdk.ref(ndb, ZTO_TRASH_MODE_PATH);
+            acceptFixtureSession();
+        firebaseState.dbRefZtoTrashMode = sdk.ref(ndb, ZTO_TRASH_MODE_PATH);
             vi.stubGlobal('fetch', async () => new Response(JSON.stringify(getServerNow()), { status: 200 }));
             appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(lookupCfg(COOKIE_URL)));
             const key = ztoTrashModeDeviceKey();
@@ -1241,6 +1247,7 @@ describe('FIXSHOP-3 review 5 ៖ advisory transactions on Firebase · late refus
         const sdk: any = withTransactionOutcomeResolution(raw); sdk.getAuth(app); sdk.getDatabase(app);
         Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db: ndb, isDatabaseInitialized: true, isInitializingFirebase: false,
             firebaseSdkUnavailable: false, isDatabaseConnected: true, serverClockTrusted: true, hasEverConnectedToDatabase: true, sessionExpiryCheck: 'live', authLoginOperation: null });
+        acceptFixtureSession();
         firebaseState.dbRefZtoTrashMode = sdk.ref(ndb, ZTO_TRASH_MODE_PATH);
         appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(lookupCfg(PALM_URL)));
         resetZtoTrashMode();
@@ -1318,6 +1325,7 @@ describe('FIXSHOP-3 review 5 ៖ advisory transactions on Firebase · late refus
                     next = lab(async (_r: any, update: any) => ({ committed: true, snapshot: { val: () => update(null) } }));
                 } else {
                     await first.sdk.signInWithEmailAndPassword(first.auth, 'a@zoew1.com', 'pw');
+                    acceptFixtureSession();
                 }
                 firebaseState.authGeneration++;
                 const later = await laterWrite(next);

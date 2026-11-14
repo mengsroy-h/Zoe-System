@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 // Owner-authorized locked-ZTO regression: a pre-restore status answer cannot supersede fresh restore verification.
 // Only the upstream response and SDK data semantics are mocked; lifecycle operations create their own receipts.
 import { it, expect, vi, afterEach } from 'vitest';
@@ -30,6 +31,8 @@ it.each([['restored', true], ['restored', false], ['unchanged', true], ['unchang
     const mem = createScanMemorySdk();
     const options = { databaseURL: 'https://audit.firebaseio.com' };
     firebaseState.auth = { currentUser: { uid: 'test' }, app: { options } } as any;
+    firebaseState.firebaseConfig = options;
+    acceptFixtureSession();
     firebaseState.db = { name: 'test', app: { options } } as any;
     firebaseState.fb = mem.sdk as any;
     firebaseState.serverTimeOffsetMs = 0;

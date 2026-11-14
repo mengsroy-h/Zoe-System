@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const vm = require('vm');
 const { isDeepStrictEqual } = require('util');
 const ROOT = process.env.SUPABASE_RESET_APP_DIR ? path.resolve(process.env.SUPABASE_RESET_APP_DIR) : path.join(__dirname, '../..');
+const { projectReviewedBusinessAudit, definesRulesFunction } = require(path.join(ROOT, 'tools/audit-tools/reviewed-business-audit-schema.cjs'));
 const MIGRATION = '20261101151500_zoe_pickup_reset_applied.sql';
 const BASELINE = process.env.SUPABASE_RESET_BASELINE === '1';
 const SHARED_VECTORS = [{"name":"legacy-ascii","tenant":"demo-f09","actorUid":"owner","dates":["2026-10-30"],"context":{"v":1,"scope":"https://f09.invalid","batchId":"batch-a","batchHash":"ced74c01c77bcdb25de6ff8f3f3b315cd7b55339540a1382bc84760cad8227e9","dayId":"batch-a:2026-10-30","day":"2026-10-30","nonce":"nonce-original"},"casText":"{\"k\":\"cas\",\"p\":[\"zoew_daily_pickup_cod_dod\",\"2026-10-30\"],\"x\":null,\"v\":{\"pickupRevision\":1,\"pickupResetEpoch\":1,\"packagesPickedUp\":0,\"pickedUpPhones\":null,\"pickedUpBarcodes\":null}}","batchPreimage":"[\"zoew-pickup-reset-batch-v1\",1,\"demo-f09\",\"https://f09.invalid\",\"owner\",\"batch-a\",[\"2026-10-30\"]]","batchHash":"ced74c01c77bcdb25de6ff8f3f3b315cd7b55339540a1382bc84760cad8227e9","attemptPreimage":"[\"zoew-pickup-reset-attempt-v1\",1,\"demo-f09\",\"owner\",\"https://f09.invalid\",\"batch-a\",\"ced74c01c77bcdb25de6ff8f3f3b315cd7b55339540a1382bc84760cad8227e9\",\"batch-a:2026-10-30\",\"2026-10-30\",\"nonce-original\",\"{\\\"k\\\":\\\"cas\\\",\\\"p\\\":[\\\"zoew_daily_pickup_cod_dod\\\",\\\"2026-10-30\\\"],\\\"x\\\":null,\\\"v\\\":{\\\"pickupRevision\\\":1,\\\"pickupResetEpoch\\\":1,\\\"packagesPickedUp\\\":0,\\\"pickedUpPhones\\\":null,\\\"pickedUpBarcodes\\\":null}}\"]","attemptId":"b9da1664a37f020c6fc2b841a54b0fe4428819c59a848d6ae5ba84bfd8b0985f"},{"name":"unicode-escaped","tenant":"tenant-uuid","actorUid":"owner \\\"\t\ud83d\ude00","dates":["2026-10-29","2026-10-30"],"context":{"v":1,"scope":"https://\u4f8b\u3048.invalid/\u5e97\\\n","batchId":"batch-b","batchHash":"0455236daeb826dbb353ac041bc189e97957a17f445dafb5875aca8006fcd4d7","dayId":"batch-b:2026-10-30","day":"2026-10-30","nonce":"nonce-original"},"casText":"{\"k\":\"cas\",\"p\":[\"zoew_daily_pickup_cod_dod\",\"2026-10-30\"],\"x\":{\"pickupRevision\":3,\"pickupResetEpoch\":1,\"packagesPickedUp\":1,\"pickedUpBarcodes\":{\"STRASSE\ud83d\ude00\":\"0001\"}},\"v\":{\"pickupRevision\":4,\"pickupResetEpoch\":2,\"packagesPickedUp\":0,\"pickedUpPhones\":null,\"pickedUpBarcodes\":null}}","batchPreimage":"[\"zoew-pickup-reset-batch-v1\",1,\"tenant-uuid\",\"https://\u4f8b\u3048.invalid/\u5e97\\\\\\n\",\"owner \\\\\\\"\\t\ud83d\ude00\",\"batch-b\",[\"2026-10-29\",\"2026-10-30\"]]","batchHash":"0455236daeb826dbb353ac041bc189e97957a17f445dafb5875aca8006fcd4d7","attemptPreimage":"[\"zoew-pickup-reset-attempt-v1\",1,\"tenant-uuid\",\"owner \\\\\\\"\\t\ud83d\ude00\",\"https://\u4f8b\u3048.invalid/\u5e97\\\\\\n\",\"batch-b\",\"0455236daeb826dbb353ac041bc189e97957a17f445dafb5875aca8006fcd4d7\",\"batch-b:2026-10-30\",\"2026-10-30\",\"nonce-original\",\"{\\\"k\\\":\\\"cas\\\",\\\"p\\\":[\\\"zoew_daily_pickup_cod_dod\\\",\\\"2026-10-30\\\"],\\\"x\\\":{\\\"pickupRevision\\\":3,\\\"pickupResetEpoch\\\":1,\\\"packagesPickedUp\\\":1,\\\"pickedUpBarcodes\\\":{\\\"STRASSE\ud83d\ude00\\\":\\\"0001\\\"}},\\\"v\\\":{\\\"pickupRevision\\\":4,\\\"pickupResetEpoch\\\":2,\\\"packagesPickedUp\\\":0,\\\"pickedUpPhones\\\":null,\\\"pickedUpBarcodes\\\":null}}\"]","attemptId":"1a88cdd6c7c0e0ec6e45ab4a2a9e8429c604e461e15cf67b6b8f0ad52844e46d"},{"name":"exact-cas-number-text","tenant":"tenant-uuid","actorUid":"owner","dates":["2026-10-30"],"context":{"v":1,"scope":"scope","batchId":"batch-c","batchHash":"d62eb4ea5b14d444a11ed2ace26bc22c7fd38c39327fc2599be82ac9889216de","dayId":"batch-c:2026-10-30","day":"2026-10-30","nonce":"nonce-original"},"casText":"{ \"k\":\"cas\", \"p\":[\"zoew_daily_pickup_cod_dod\",\"2026-10-30\"], \"x\":{\"pickupRevision\":3,\"pickupResetEpoch\":1,\"packagesPickedUp\":1.000,\"legacyRatio\":1e-7}, \"v\":{\"pickupRevision\":4,\"pickupResetEpoch\":2,\"packagesPickedUp\":0,\"pickedUpPhones\":null,\"pickedUpBarcodes\":null} }","batchPreimage":"[\"zoew-pickup-reset-batch-v1\",1,\"tenant-uuid\",\"scope\",\"owner\",\"batch-c\",[\"2026-10-30\"]]","batchHash":"d62eb4ea5b14d444a11ed2ace26bc22c7fd38c39327fc2599be82ac9889216de","attemptPreimage":"[\"zoew-pickup-reset-attempt-v1\",1,\"tenant-uuid\",\"owner\",\"scope\",\"batch-c\",\"d62eb4ea5b14d444a11ed2ace26bc22c7fd38c39327fc2599be82ac9889216de\",\"batch-c:2026-10-30\",\"2026-10-30\",\"nonce-original\",\"{ \\\"k\\\":\\\"cas\\\", \\\"p\\\":[\\\"zoew_daily_pickup_cod_dod\\\",\\\"2026-10-30\\\"], \\\"x\\\":{\\\"pickupRevision\\\":3,\\\"pickupResetEpoch\\\":1,\\\"packagesPickedUp\\\":1.000,\\\"legacyRatio\\\":1e-7}, \\\"v\\\":{\\\"pickupRevision\\\":4,\\\"pickupResetEpoch\\\":2,\\\"packagesPickedUp\\\":0,\\\"pickedUpPhones\\\":null,\\\"pickedUpBarcodes\\\":null} }\"]","attemptId":"a113402088e6a69f14e1dd3af0be959dc144bf838a565e60f44074cfcde736f6"}];
@@ -104,7 +105,7 @@ async function main() {
         }
         const uid = await H.makeAuthUser(c, 'reset-proof@u.zoe.test'), uidB = await H.makeAuthUser(c, 'reset-other@u.zoe.test');
         const ids = (await c.query("insert into public.tenants(name,branch_code,expires_at) values('reset A','reset_a',now()+interval '30 days'),('reset B','reset_b',now()+interval '30 days') returning id")).rows;
-        const A = ids[0].id, B = ids[1].id, who = { role: 'authenticated', sub: uid };
+        const A = ids[0].id, B = ids[1].id, who = await H.sessionClaims(c, { role: 'authenticated', sub: uid });
         await c.query("insert into public.tenant_members(user_id,tenant_id,username) values($1,$2,'reset_a'),($3,$4,'reset_b')", [uid, A, uidB, B]);
         const seed = async (value = prior()) => {
             for (const day of [DAY, OTHER]) await c.query(`insert into public.zoe_docs(tenant_id,root,key,value,seq) values($1,$2,$3,$4,1)
@@ -187,7 +188,7 @@ async function main() {
         const alteredBefore = await snapshot(), alteredResult = await call('execute', altered);
         check('same attemptID changed immutable intent rejected before effects', alteredResult.error?.code === 'PT409'
             && isDeepStrictEqual(await snapshot(), alteredBefore), alteredResult);
-        const foreign = await call('status', first, { role: 'authenticated', sub: uidB });
+        const foreign = await call('status', first, await H.sessionClaims(c, { role: 'authenticated', sub: uidB }));
         check('foreign authenticated tenant cannot read original proof', foreign.error?.code === 'PT409', foreign);
         await c.query("update public.zoe_ops set created_at=now()-interval '3 days' where tenant_id=$1 and op_id=$2", [A, first.attemptId]);
         await c.query('select private.zoe_housekeeping($1)', [A]);
@@ -228,7 +229,7 @@ async function main() {
             const tenant = (await c.query("insert into public.tenants(name,branch_code,expires_at) values($1,$2,now()+interval '30 days') returning id", [name, name])).rows[0].id;
             await c.query('insert into public.tenant_members(user_id,tenant_id,username) values($1,$2,$3)', [actor, tenant, name]);
             await c.query('insert into public.zoe_docs(tenant_id,root,key,value,seq) values($1,$2,$3,$4,1)', [tenant, PICKUP, DAY, basis]);
-            return { label, tenant, actor, who: { role: 'authenticated', sub: actor }, req: request(tenant, actor, basis) };
+            return { label, tenant, actor, who: await H.sessionClaims(c, { role: 'authenticated', sub: actor }), req: request(tenant, actor, basis) };
         };
         const empty = { pickupRevision: 5, pickupResetEpoch: 2, packagesPickedUp: 0 };
         const quota = await quotaFixture('positive final proof growth', empty);
@@ -236,7 +237,7 @@ async function main() {
         let baseGrowth;
         await c.query('begin');
         try {
-            await c.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role: 'authenticated', sub: quota.actor })]);
+            await c.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role: 'authenticated', sub: quota.actor, ...quota.who.extra })]);
             await c.query('set local role authenticated');
             const base = (await c.query('select public.zoe_write_v2($1,$2,$3::jsonb) as value', [quota.tenant, quota.req.attemptId, JSON.stringify([quota.req.operation])])).rows[0].value;
             await c.query('reset role');
@@ -295,7 +296,7 @@ async function main() {
         };
         const beginApplied = async (connection, req, actor) => {
             await connection.query('begin');
-            await connection.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role: 'authenticated', sub: actor.sub })]);
+            await connection.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role: 'authenticated', sub: actor.sub, ...actor.extra })]);
             await connection.query('set local role authenticated');
             callCounts.execute++;
             const result = (await connection.query('select public.zoe_pickup_reset_execute_v1($1,$2,$3::jsonb,$4) as value',
@@ -384,7 +385,7 @@ async function main() {
             waitingReset = call('execute', pickupRace.req, pickupRace.who, pickupWriter);
             const blocked = await waitForLock(pid, 'reset waits ordinary pickup state transaction');
             const latest = { pickupRevision: 6, pickupResetEpoch: 2, packagesPickedUp: 2, pickedUpPhones: { PHONE: 2 }, pickedUpBarcodes: { CODE: 'PHONE', CODE2: 'PHONE' } };
-            await pickupController.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role: 'authenticated', sub: pickupRace.actor })]);
+            await pickupController.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role: 'authenticated', sub: pickupRace.actor, ...pickupRace.who.extra })]);
             await pickupController.query('set local role authenticated');
             const pickup = (await pickupController.query('select public.zoe_write_v2($1,$2,$3::jsonb) as value', [pickupRace.tenant,
                 'ordinary_pickup_before_reset_' + serial, JSON.stringify([{ k: 'cas', p: [PICKUP, DAY], x: prior(), v: latest }])])).rows[0].value;
@@ -429,7 +430,7 @@ async function main() {
         let exactBaseGrowth;
         await c.query('begin');
         try {
-            await c.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role: 'authenticated', sub: concurrentQuota.actor })]);
+            await c.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role: 'authenticated', sub: concurrentQuota.actor, ...concurrentQuota.who.extra })]);
             await c.query('set local role authenticated');
             await c.query('select public.zoe_write_v2($1,$2,$3::jsonb)', [concurrentQuota.tenant, concurrentQuota.req.attemptId, JSON.stringify([concurrentQuota.req.operation])]);
             await c.query('reset role');
@@ -470,7 +471,8 @@ async function main() {
         const registrationRelations = new Set(['registration_protocol', 'registration_protocol_pkey']);
         const isDailyDelta = row => row.schema === 'private' && deltaRelations.has(row.name);
         const isRegistration = row => row.schema === 'private' && registrationRelations.has(row.name);
-        const withoutReviewedAdditions = { ...afterCatalog, relations: afterCatalog.relations.filter(row => !isDailyDelta(row) && !isRegistration(row)) };
+        const reviewedAuditCatalog = projectReviewedBusinessAudit(afterCatalog, 'forced_rls', true);
+        const withoutReviewedAdditions = { ...reviewedAuditCatalog, relations: reviewedAuditCatalog.relations.filter(row => !isDailyDelta(row) && !isRegistration(row)) };
         check('no new reset persistence tables or lifetime quota namespace', beforeCatalog !== null
             && isDeepStrictEqual(withoutReviewedAdditions, beforeCatalog)
             && isDeepStrictEqual(afterCatalog.relations.filter(isDailyDelta).map(row => row.name), [...deltaRelations])
@@ -493,7 +495,7 @@ async function main() {
                 nativeEngine: 'UNRUN', rawCasImmutable: true, observations: [] };
             codecEvidence.composition = composition;
             check('composition uses all current migrations including native-day compiled preservation', files.includes(nativeRules)
-                && files.slice(files.indexOf(nativeRules) + 1).every(name => !/\bzoe_rules\s*\(/.test(fs.readFileSync(path.join(ROOT, 'supabase/migrations', name), 'utf8')))
+                && files.slice(files.indexOf(nativeRules) + 1).every(name => !definesRulesFunction(fs.readFileSync(path.join(ROOT, 'supabase/migrations', name), 'utf8')))
                 && files.length >= 47
                 && files.length >= 50 && nativeRules > '20261101222215_zoe_rules.sql'
                 && composition.canonicalGeneratedFresh && composition.installedCanonicalEqual
@@ -510,7 +512,7 @@ async function main() {
                 const seeded = await H.as(c, { role: 'service_role' }, 'select public.zoe_admin_write($1,$2,$3::jsonb,false) as value',
                     [tenant, 'compose_import_' + String(serial).padStart(8, '0'), JSON.stringify(ops)]);
                 if (seeded.rows?.[0]?.value?.ok !== true) throw new Error('composition admin import failed: ' + JSON.stringify(seeded));
-                return { tenant, actor, label, who: { role: 'authenticated', sub: actor } };
+                return { tenant, actor, label, who: await H.sessionClaims(c, { role: 'authenticated', sub: actor }) };
             };
             const composedRequest = async (fixture, basis, label, proofTenant = fixture.tenant) => {
                 const scope = 'https://reset-composition.invalid#' + proofTenant, batchId = label + '_' + (++serial);
@@ -554,7 +556,7 @@ async function main() {
             basis = await valueOf(fixture.tenant);
             const otherPickup = { ...basis, pickupRevision: basis.pickupRevision + 1, packagesPickedUp: 2,
                 pickedUpPhones: { PHONE: 2 }, pickedUpBarcodes: { NATIVE_PICKUP: 'PHONE', OTHER_PICKUP: 'PHONE' } };
-            const pickupTwo = await composedGeneric(fixture, basis, otherPickup, 'other_owner', { role: 'authenticated', sub: otherActor });
+            const pickupTwo = await composedGeneric(fixture, basis, otherPickup, 'other_owner', await H.sessionClaims(c, { role: 'authenticated', sub: otherActor }));
             check('actual second same-tenant pickup actor preserves original receipt creator', pickupTwo.ok === true
                 && isDeepStrictEqual(await valueOf(fixture.tenant), otherPickup) && isDeepStrictEqual(await composedRetained(fixture), retainedBefore), pickupTwo);
             for (const kind of ['drop', 'tamper']) {
@@ -683,7 +685,7 @@ async function main() {
                 const actual = (await c.query('select root,key,value from public.zoe_docs where tenant_id=$1 order by root,key', [tenant])).rows;
                 const expected = ops.map(op => ({ root: op.p[0], key: op.p[1], value: op.v })).sort((a, b) => a.root.localeCompare(b.root) || a.key.localeCompare(b.key));
                 if (!isDeepStrictEqual(actual, expected)) throw new Error('paired synthetic seed differs from declared common dataset');
-                return { label, tenant, actor, who: { role: 'authenticated', sub: actor } };
+                return { label, tenant, actor, who: await H.sessionClaims(c, { role: 'authenticated', sub: actor }) };
             };
             const pairedRequest = async (fixture, basis, label) => {
                 const scope = 'https://paired-reset.invalid#' + fixture.tenant, batchId = label + '_' + (++serial);

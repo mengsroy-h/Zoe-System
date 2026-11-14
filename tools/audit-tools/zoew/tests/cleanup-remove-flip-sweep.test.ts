@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 // A Remove deducts through the keyed ledger event (ded/<trashId>) and only then flips the trash barcode to
 // isDeducted:true. When the device that owns the journal dies between the two, runCleanupLedgerKeySweep() flips the
 // trash copy from the day key for `remove` as for `returned` ➜ «ចំណូល (យករួច)» never subtracts the barcode twice.
@@ -95,6 +96,7 @@ beforeEach(() => {
     firebaseState.dbRefHistory = ref(H) as any; firebaseState.dbRefDeleted = ref(T) as any; firebaseState.dbRefDailyRevenue = ref(D) as any; firebaseState.dbRefMonthlyRevenue = ref(M) as any;
     firebaseState.dbRefDailyPickup = ref('zoew_daily_pickup_cod_dod') as any; firebaseState.dbRefDailyCollected = ref('zoew_daily_collected_cod_dod') as any;
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: HOST }));
+    acceptFixtureSession();
     resetZtoTrashMode(); noteZtoTrashMode(null); uiState.toasts = [];
     vi.stubGlobal('fetch', vi.fn(cleanupServerRead(getAt)));
     (window as any).ZoeErrors = { capture: vi.fn() };

@@ -36,6 +36,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { reactRuntime, renderedContainer, moduleRuntime } = require('./react-view');
+const { localAuthRuntime } = require('./local-auth-runtime.cjs');
 
 const ROOT = process.env.COLLECTED_APP_DIR
     ? path.resolve(process.env.COLLECTED_APP_DIR)
@@ -56,6 +57,7 @@ function scenario(name, fn) {
 function readOr(file) { try { return fs.readFileSync(file, 'utf8'); } catch (_) { return ''; } }
 
 const SRC = readOr(APP_JS);
+const authRuntime = localAuthRuntime(ROOT, SRC);
 const protocolRuntime = moduleRuntime(ROOT, SRC, [{ path: 'src/core/clock.ts', expose: ['serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'captureClockOperation', 'getServerClockBounds', 'acceptServerClockOffset', 'resetServerClock'] }, 'src/core/session-verification.ts', 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations'] }]);
 const HTML = readOr(INDEX_HTML);
 const RULES = readOr(RULES_JSON);
@@ -163,12 +165,14 @@ function makeSandbox(state) {
     box.__calls = calls;
     box.__server = server;
     vm.createContext(box);
+    authRuntime.prepare(box, { databaseURL: 'https://collected-fixture.invalid' });
     vm.runInContext(require('./react-view').moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts', 'src/services/row-operation-lock.ts']).code, box);
     // ⛔ ZoeW ជា React ៖ `openCollectedStatsModal()` សរសេរ `uiState.collectedStatsView` ហើយ JSX (`StatsCards.tsx`) គូរ ➜
     //    ឃ្លាំងពិតចូល sandbox · `__container` គូរ component ពិតពីស្ថានភាពរបស់ sandbox រាល់ការអាន
     vm.runInContext(reactRuntime(SRC, { exclude: WANT, context: box }), box);
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
     vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', box);
+    authRuntime.install(box, { databaseURL: 'https://collected-fixture.invalid' });
     const clock = moduleRuntime(ROOT, SRC, [{ path: 'src/core/clock.ts', expose: ['serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'captureClockOperation', 'getServerClockBounds', 'acceptServerClockOffset', 'resetServerClock'] }, 'src/core/session-verification.ts']);
     vm.runInContext(clock.withoutBindings(bodies) + '\n' + clock.code, box);
     box.acceptServerClockOffset(0, Object.freeze({ epochMs: Number.isFinite(opts.now) ? opts.now : Date.now(), wallMs: Date.now(), monotonicMs: performance.now(), uncertaintyMs: 0 }));
@@ -391,7 +395,7 @@ scenario('១៣. ⛔ UI ៖ ប៊ូតុង · ប្រអប់ · កា�
 const operationDeclarations = modulePrograms(SRC, path.join(ROOT, 'ZoeW', 'app.js'), { ecmaVersion: 'latest' }).flatMap(program => program.body);
 const fnCode = operationDeclarations.filter(node => node.type === 'FunctionDeclaration').map(node => SRC.slice(node.start, node.end)).join('\n');
 const operationModuleCode = moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts', 'src/services/row-operation-lock.ts']).code;
-const operationFunctionCode = protocolRuntime.withoutBindings(fnCode);
+const operationFunctionCode = authRuntime.withoutBindings(protocolRuntime.withoutBindings(fnCode));
 const clone = value => value == null ? value : JSON.parse(JSON.stringify(value));
 const HISTORY = 'zoew_scan_history_cod_dod';
 const TRASH = 'zoew_recently_deleted_cod_dod';
@@ -470,6 +474,7 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
     box.window = box;
     box.globalThis = box;
     vm.createContext(box);
+    authRuntime.install(box, box.db.app.options);
     vm.runInContext(operationModuleCode, box);
     vm.runInContext(operationFunctionCode, box);
     for (const name of ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'PICKUP_PHONE_KEY_MAX',

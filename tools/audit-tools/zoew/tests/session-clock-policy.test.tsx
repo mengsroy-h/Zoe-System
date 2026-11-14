@@ -19,6 +19,8 @@ import { processScannedCode } from '../../../../ZoeW/src/services/scan-engine';
 import { queueScannedCode, resetBatchScan } from '../../../../ZoeW/src/features/batch-scan';
 import { DB_OP_TIMEOUT_MS } from '../../../../ZoeW/src/services/network';
 import { TOAST_LIFETIME_MS, showToast } from '../../../../ZoeW/src/ui/toast';
+import { acceptLocalAuthSession } from '../../../../ZoeW/src/services/local-logout-intent';
+import { loginBackendScope } from '../../../../ZoeW/src/features/login-memory';
 
 const START = Date.UTC(2026, 10, 8, 8);
 const HOUR = 3600000;
@@ -26,6 +28,7 @@ let elapsed = 0;
 let skew = 0;
 let token: ReturnType<typeof vi.fn>;
 let signOut: ReturnType<typeof vi.fn>;
+let fixtureUser = 0;
 const turn = async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); };
 
 it('ផ្ទៀងផ្ទាត់វគ្គពិតរួច ចាប់អាយុសារដែលបានលាក់ដោយស្វ័យប្រវត្តិ', async () => {
@@ -58,11 +61,12 @@ beforeEach(() => {
     token = vi.fn(async () => ({ authTime: new Date(START - HOUR).toISOString() }));
     signOut = vi.fn(() => new Promise<void>(() => {}));
     Object.assign(firebaseState, {
-        auth: { currentUser: { uid: 'clock-policy' } }, fb: { getIdTokenResult: token, signOut }, db: {},
+        auth: { currentUser: { uid: 'clock-policy-' + (++fixtureUser) } }, fb: { getIdTokenResult: token, signOut }, db: {},
         firebaseConfig: { databaseURL: 'https://clock-policy.invalid' }, authGeneration: firebaseState.authGeneration + 1,
         authLoginOperation: null, sessionExpiryCheck: 'live', sessionExpiryCheckInFlight: false,
         hasEverConnectedToDatabase: false, isDatabaseConnected: false
     });
+    expect(acceptLocalAuthSession(firebaseState.auth, loginBackendScope(), firebaseState.auth.currentUser)).toBe(true);
     Object.assign(securityState, { appIsLocked: false, appLockVeiled: false });
     Object.assign(viewState, { appLockOpen: false, appLockMessage: '' });
     Object.assign(uiState, { isModalOpen: false, moreMenuOpen: false, modalDisplay: {}, modalStack: [], currentAppPage: 'entry', drawerOpen: false, notifyDrawerOpen: false });
@@ -325,6 +329,7 @@ it.each(['auth', 'user', 'sdk', 'database', 'scope', 'generation'])('ចម្�
     if (boundary === 'database') firebaseState.db = {};
     if (boundary === 'scope') firebaseState.firebaseConfig = { databaseURL: 'https://new-clock-policy.invalid' };
     if (boundary === 'generation') firebaseState.authGeneration++;
+    expect(acceptLocalAuthSession(firebaseState.auth, loginBackendScope(), firebaseState.auth.currentUser)).toBe(true);
     let newReply!: (value: any) => void;
     token.mockReturnValueOnce(new Promise(yes => { newReply = yes; }));
     armSessionExpiryCheck(firebaseState.auth.currentUser, firebaseState.authGeneration);

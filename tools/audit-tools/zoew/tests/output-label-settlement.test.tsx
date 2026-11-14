@@ -27,6 +27,7 @@ import { ViewListModal } from '../../../../ZoeW/src/app/components/modals/ViewLi
 import { EditBarcodePriceModal } from '../../../../ZoeW/src/app/components/modals/EditBarcodePriceModal';
 import { LabelPrintModal } from '../../../../ZoeW/src/app/components/modals/LabelPrintModal';
 import { mount, step, unmount } from './native/react-harness';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 const DAY = '2026-10-30', NOW = Date.UTC(2026, 9, 30, 9), HISTORY = 'zoew_scan_history_cod_dod';
 const copy = (v: any) => v === undefined ? undefined : JSON.parse(JSON.stringify(v));
@@ -69,6 +70,7 @@ beforeEach(() => {
     firebaseState.serverTimeOffsetMs = 0;
     const options = { supabaseUrl: 'https://synthetic-output.invalid' };
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
+    firebaseState.firebaseConfig = options;
     firebaseState.auth = { app: { options }, currentUser: { uid: 'output-user' } } as any;
     firebaseState.db = { app: { options } } as any;
     tree = { [HISTORY]: { row: ordinary() }, zoew_daily_revenue_cod_dod: copy(dataState.dailyRevenueData), zoew_monthly_revenue_cod_dod: copy(dataState.monthlyRevenueData) };
@@ -95,6 +97,7 @@ beforeEach(() => {
             }
         }
     } as any;
+    acceptFixtureSession();
     for (const [name, path] of Object.entries({ dbRefHistory: HISTORY, dbRefDailyRevenue: 'zoew_daily_revenue_cod_dod', dbRefMonthlyRevenue: 'zoew_monthly_revenue_cod_dod', dbRefDailyCollected: 'zoew_daily_collected_cod_dod' })) (firebaseState as any)[name] = { path };
     vi.stubGlobal('confirm', () => true);
     vi.stubGlobal('alert', () => {});

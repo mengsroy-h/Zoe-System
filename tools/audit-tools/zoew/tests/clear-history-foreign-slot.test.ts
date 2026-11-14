@@ -1,4 +1,5 @@
 import { cleanupServerRead } from './helpers/cleanup-server-read';
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../../../../ZoeW/src/core/state';
 import { getServerNow, resetServerClock } from '../../../../ZoeW/src/core/clock';
@@ -128,6 +129,7 @@ function install(items: any[], trash: Record<string, any>) {
     firebaseState.serverClockTrusted = true;
     firebaseState.dbRefHistory = makeRef(HISTORY) as any;
     firebaseState.dbRefDeleted = makeRef(TRASH) as any;
+    acceptFixtureSession();
     dataState.scanHistory = items.map((it) => clone(it));
     dataState.deletedItems = Object.values(clone(trash));
     uiState.currentFilterMode = 'all';
@@ -189,7 +191,8 @@ describe('«លុបទាំងអស់» ៖ slot ធុងសំរាម�
         for (const code of ['C', 'E']) {
             const copies = trashCopiesOf(code);
             expect(copies).toHaveLength(1);
-            expect(copies[0]).toMatchObject({ trashMode: 'palm', restoreBlocked: true, trashReason: 'delete' });
+            expect(copies[0]).toMatchObject({ trashMode: 'palm', trashReason: 'delete' });
+            expect(copies[0].restoreBlocked).toBeUndefined();
             expect(copies[0].clearClaim).toBeUndefined();
         }
         if (taken) expect(getAt(TRASH + '/' + ID)).toEqual(old);

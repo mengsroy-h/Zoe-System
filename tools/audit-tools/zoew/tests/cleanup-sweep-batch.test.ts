@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { cleanupServerRead } from './helpers/cleanup-server-read';
 /**
  * ⛔ SCALE-2 ៖ ការសម្អាតស្វ័យប្រវត្តិច្រើនរយកញ្ចប់ក្នុងពេលតែមួយ មិនត្រូវរារាំង main thread ៖ `runAutomaticCleanupRules()` ចាប់ផ្តើម
@@ -136,6 +137,7 @@ function install(count: number) {
     firebaseState.fb = makeFb() as any;
     firebaseState.firebaseConfig = { databaseURL: FIREBASE_HOST } as any;
     firebaseState.auth = { currentUser: { uid: 'u1', getIdToken: async () => 'tok' } } as any;
+    acceptFixtureSession();
     firebaseState.isDatabaseInitialized = true;
     firebaseState.isDatabaseConnected = true;
     firebaseState.sessionExpiryCheck = 'live'; firebaseState.serverClockTrusted = true;

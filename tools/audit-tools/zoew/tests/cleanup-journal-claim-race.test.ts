@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState } from '../../../../ZoeW/src/core/state';
 import { getServerNow } from '../../../../ZoeW/src/core/clock';
@@ -53,6 +54,7 @@ beforeEach(() => {
             return hook?.(r.path, result) ?? result;
         }
     } as any;
+    acceptFixtureSession();
     vi.stubGlobal('fetch', async (input: string) => {
         const url = new URL(String(input));
         if (url.origin !== 'https://journal-race.firebaseio.com' || !url.pathname.endsWith('.json')) throw new Error('Unexpected fixture read');
@@ -163,7 +165,9 @@ describe('a late cleanup may only clear its own durable claim', () => {
     });
 
     it.each([false, true])('an old-session history reply (committed=%s) cannot change an identical claim in a different shop', async (committed) => {
-        localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://shop-a.firebaseio.com' }));
+        firebaseState.firebaseConfig = { databaseURL: 'https://shop-a.firebaseio.com' };
+        localStorage.setItem('zoew_firebase_config', JSON.stringify(firebaseState.firebaseConfig));
+        acceptFixtureSession();
         seed('A');
         let abort!: () => void;
         const claimStep = firebaseState.fb.runTransaction;

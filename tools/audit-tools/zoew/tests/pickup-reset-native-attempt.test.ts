@@ -1,5 +1,7 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { appLocalStore } from '../../../../ZoeW/src/core/storage';
 import { firebaseState } from '../../../../ZoeW/src/core/state';
 import { pickupResetAttemptId, pickupResetBatchHash, pickupResetCasText, pickupResetAppliedReceipt } from '../../../../ZoeW/src/domain/pickup-reset-proof';
 import { executeNativePickupReset, nativePickupResetStatus, withTransactionOutcomeResolution } from '../../../../ZoeW/src/services/tx-outcome';
@@ -30,6 +32,9 @@ beforeEach(() => {
     server = basis(); current = true;
     firebaseState.firebaseConfig = { databaseURL: scope };
     firebaseState.auth = { currentUser: { uid: actorUid, getIdToken: vi.fn(async () => 'synthetic-token') } };
+    appLocalStore.clear();
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: scope }));
+    acceptFixtureSession();
     reads = vi.fn(async () => new Response(JSON.stringify(server), { status: 200 }));
     vi.stubGlobal('fetch', reads);
     raw = { runTransaction: vi.fn(async (_ref, updater, options) => {

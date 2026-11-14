@@ -214,6 +214,117 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
         crossorigin="anonymous"></script>
 <script>
 var FIELD_IDS = { barcode: 'mapBarcode', dod: 'mapDod', cod: 'mapCod', phone: 'mapPhone' };
+async function preparedSheetWrite_(kind, payload, env) {
+    var current = env.current || function () { return true; };
+    var responseCurrent = env.responseCurrent || current;
+    var fail = function (code, unknown = false) { return Object.assign(new Error(code), { outcomeUnknown: !!unknown }); };
+    var hash = async function (value) {
+        var bytes = await env.crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(value)));
+        return Array.from(new Uint8Array(bytes)).map(function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+    };
+    var dispatched = false;
+    var priorPending = false;
+    try {
+        if (!current()) throw fail('IMPORT_SESSION_CHANGED');
+        if (!env.storage) throw fail('IMPORT_CLIENT_STORAGE_HOLD');
+        var scopeHash = await hash({ scope: env.scope });
+        var inputHash = await hash({ kind: kind, source: payload });
+        if (!current()) throw fail('IMPORT_SESSION_CHANGED');
+        for (var pendingIndex = 0; pendingIndex < env.storage.length; pendingIndex++) {
+            var pendingKey = env.storage.key(pendingIndex);
+            if (!pendingKey || pendingKey.indexOf('zoe_sheet_pending_v1_') !== 0) continue;
+            var prior;
+            try { prior = JSON.parse(env.storage.getItem(pendingKey)); } catch (err) { throw fail('IMPORT_CLIENT_STORAGE_HOLD'); }
+            if (!prior || prior.v !== 1 || !prior.intent || ['pending', 'done'].indexOf(prior.state) < 0) throw fail('IMPORT_CLIENT_STORAGE_HOLD');
+            if (prior.state === 'pending' && prior.scopeHash === scopeHash && prior.kind === kind && (!prior.inputHash || prior.inputHash === inputHash)) priorPending = true;
+        }
+        var status = await env.rpc('status');
+        if (!current()) throw fail('IMPORT_SESSION_CHANGED');
+        if (!status || status.writeProtocol !== 1 || !/^[a-f0-9]{64}$/.test(status.writeScope)) throw fail('IMPORT_UPGRADE_REQUIRED');
+        var prefix = 'zoe_sheet_pending_v1_' + await hash({ scope: env.scope, writer: status.writeScope, kind: kind, source: payload }) + '_';
+        if (!current()) throw fail('IMPORT_SESSION_CHANGED');
+        var pending = [];
+        for (var i = 0; i < env.storage.length; i++) {
+            var key = env.storage.key(i);
+            if (!key || key.indexOf(prefix) !== 0) continue;
+            var raw = env.storage.getItem(key), saved;
+            try { saved = JSON.parse(raw); } catch (err) { throw fail('IMPORT_CLIENT_STORAGE_HOLD'); }
+            if (!saved || saved.v !== 1 || ['pending', 'done'].indexOf(saved.state) < 0 || saved.scopeHash !== scopeHash || saved.kind !== kind || saved.inputHash && saved.inputHash !== inputHash || !saved.intent || typeof saved.intent.id !== 'string' || key !== prefix + saved.intent.id) throw fail('IMPORT_CLIENT_STORAGE_HOLD');
+            pending.push({ key: key, raw: raw, saved: saved });
+        }
+        pending.sort(function (a, b) { return a.saved.intent.preparedAt - b.saved.intent.preparedAt || a.saved.intent.id.localeCompare(b.saved.intent.id); });
+        var entry = pending[0];
+        if (!entry) {
+            var prepared = await env.rpc('prepare', { kind: kind, payload: payload });
+            if (!current()) throw fail('IMPORT_SESSION_CHANGED');
+            if (!prepared || prepared.protocol !== 1 || !prepared.intent || prepared.intent.kind !== kind || !/^[0-9a-f-]{36}$/i.test(prepared.intent.id)) throw fail('IMPORT_PREPARE_UNREADABLE');
+            var created = { v: 1, state: 'pending', scopeHash: scopeHash, inputHash: inputHash, kind: kind, intent: prepared.intent };
+            entry = { key: prefix + prepared.intent.id, raw: JSON.stringify(created), saved: created };
+            env.storage.setItem(entry.key, entry.raw);
+            if (env.storage.getItem(entry.key) !== entry.raw) throw fail('IMPORT_CLIENT_STORAGE_HOLD');
+        }
+        if (!current()) throw fail('IMPORT_SESSION_CHANGED');
+        if (env.storage.getItem(entry.key) !== entry.raw) throw fail('IMPORT_CLIENT_STORAGE_HOLD');
+        dispatched = true;
+        var result = await env.rpc('execute', { kind: kind, payload: payload, intent: entry.saved.intent });
+        if (!responseCurrent()) throw fail('IMPORT_SESSION_CHANGED', true);
+        var receipt = result && result.importReceipt;
+        if (!receipt || receipt.v !== 1 || receipt.id !== entry.saved.intent.id || receipt.sourceHash !== entry.saved.intent.sourceHash || typeof receipt.revision !== 'string' || typeof receipt.current !== 'boolean' || result.importCurrent !== receipt.current) throw fail('IMPORT_REPLY_UNREADABLE', true);
+        if (!receipt.current) {
+            var fresh = await env.rpc('status');
+            if (!responseCurrent()) throw fail('IMPORT_SESSION_CHANGED', true);
+            result.currentStatus = fresh;
+        }
+        if (env.storage.getItem(entry.key) !== entry.raw) throw fail('IMPORT_CLIENT_STORAGE_HOLD', true);
+        entry.saved.state = 'done';
+        var completed = JSON.stringify(entry.saved);
+        env.storage.setItem(entry.key, completed);
+        if (env.storage.getItem(entry.key) !== completed) throw fail('IMPORT_CLIENT_STORAGE_HOLD', true);
+        return result;
+    } catch (err) {
+        if (dispatched || priorPending) err.outcomeUnknown = true;
+        var code = err && err.message ? err.message : String(err);
+        var text = /^(?:Error: )?ពាក្យសម្ងាត់មិនត្រឹមត្រូវ$/.test(code) ? 'ពាក្យសម្ងាត់មិនត្រឹមត្រូវ'
+            : !(err && err.outcomeUnknown) && code === 'ឧបករណ៍ក្រៅបណ្ដាញ — សូមភ្ជាប់អ៊ីនធឺណិតជាមុនសិន' ? 'ឧបករណ៍ក្រៅបណ្ដាញ — សូមភ្ជាប់អ៊ីនធឺណិតជាមុនសិន'
+            : /STORAGE/.test(code) ? 'មិនអាចរក្សាភស្តុតាងសង្គ្រោះក្នុងឧបករណ៍។ បានផ្អាកការសរសេរ; សូមរក្សាទិន្នន័យ និងពិនិត្យការផ្ទុក។'
+            : /STALE|SHEET_CHANGED|TARGET_CHANGED|SOURCE_CHANGED/.test(code) ? 'Sheet ឬឯកសារបានផ្លាស់ប្ដូរក្រោយការពិនិត្យ។ បានផ្អាកប្រតិបត្តិការដើម; សូមផ្ទៀងផ្ទាត់ទិន្នន័យមុនប្រតិបត្តិការថ្មី។'
+            : /UPGRADE|INTENT_REQUIRED/.test(code) ? 'Apps Script នាំចូលត្រូវធ្វើបច្ចុប្បន្នភាពជាមួយ App មុនប្រើ។ មិនបានសរសេរទិន្នន័យ។'
+            : 'លទ្ធផលប្រតិបត្តិការមុនមិនទាន់អាចផ្ទៀងផ្ទាត់បាន។ បានរក្សាភស្តុតាងដើម និងមិនសរសេរឡើងវិញ; សូមពិនិត្យ Sheet និងឯកសារដើម។';
+        throw Object.assign(new Error(text), { code: code, outcomeUnknown: !!(err && err.outcomeUnknown) });
+    }
+}
+
+async function forgetCompletedSheetWrites_(storage, scope, kind, cryptoApi, current) {
+    if (!storage) throw new Error('IMPORT_CLIENT_STORAGE_HOLD');
+    var bytes = await cryptoApi.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify({ scope: scope })));
+    var scopeHash = Array.from(new Uint8Array(bytes)).map(function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+    if (current && !current()) throw new Error('IMPORT_SESSION_CHANGED');
+    var remove = [];
+    for (var i = 0; i < storage.length; i++) {
+        var key = storage.key(i);
+        if (!key || key.indexOf('zoe_sheet_pending_v1_') !== 0) continue;
+        var raw = storage.getItem(key), saved;
+        try { saved = JSON.parse(raw); } catch (err) { throw new Error('IMPORT_CLIENT_STORAGE_HOLD'); }
+        if (saved && saved.v === 1 && saved.state === 'done' && saved.scopeHash === scopeHash && saved.kind === kind) remove.push({ key: key, raw: raw });
+    }
+    remove.forEach(function (entry) {
+        if (storage.getItem(entry.key) !== entry.raw) throw new Error('IMPORT_CLIENT_STORAGE_HOLD');
+        storage.removeItem(entry.key);
+        if (storage.getItem(entry.key) !== null) throw new Error('IMPORT_CLIENT_STORAGE_HOLD');
+    });
+}
+
+function runPreparedWebWrite_(kind, payload, current) {
+    var password = state.password, writerScope = state.writeScope;
+    var owned = function () { return state.password === password && state.writeScope === writerScope && (!current || current()); };
+    return preparedSheetWrite_(kind, payload, { storage: window.localStorage, crypto: window.crypto, scope: 'apps-script-web|' + writerScope, current: owned,
+        rpc: function (step, body) {
+            if (step === 'status') return callServer('getStatus', [password]);
+            if (step === 'prepare') return callServer('prepareWrite', [password, { kind: body.kind, payload: body.payload, confirm: 'CLEAR' }]);
+            return body.kind === 'clear' ? callServer('clearRows', [password, 'CLEAR', body.intent]) : callServer('importRows', [password, Object.assign({}, body.payload, { intent: body.intent })]);
+        } });
+}
+
 var state = { password: '', workbook: null, sheetNames: [], rows: [], headers: [], signature: '', prepared: null, generation: 0, preparedGeneration: -1, fileGeneration: 0 };
 
 function $(id) { return document.getElementById(id); }
@@ -248,6 +359,7 @@ function unlock() {
     callServer('getStatus', [value]).then(function (status) {
         $('unlockBtn').disabled = false;
         state.password = value;
+        state.writeScope = status.writeScope;
         $('password').value = '';
         show('authCard', false);
         show('fileCard', true);
@@ -344,9 +456,12 @@ function preparationIsCurrent() {
     return !!state.prepared && state.preparedGeneration === state.generation;
 }
 
-function handleFile(file) {
+async function handleFile(file) {
     if (!file) return;
-    var fileGeneration = ++state.fileGeneration;
+    var pendingFileGeneration = ++state.fileGeneration, pendingPassword = state.password, pendingScope = state.writeScope;
+    try { await forgetCompletedSheetWrites_(window.localStorage, 'apps-script-web|' + state.writeScope, 'import', window.crypto, function () { return pendingFileGeneration === state.fileGeneration && pendingPassword === state.password && pendingScope === state.writeScope; }); } catch (err) { if (pendingFileGeneration !== state.fileGeneration || pendingPassword !== state.password || pendingScope !== state.writeScope) return; setMsg('fileMsg', 'មិនអាចពិនិត្យភស្តុតាងសង្គ្រោះក្នុងឧបករណ៍; បានផ្អាកការនាំចូល។', 'bad'); return; }
+    if (pendingFileGeneration !== state.fileGeneration || pendingPassword !== state.password || pendingScope !== state.writeScope) return;
+    var fileGeneration = pendingFileGeneration;
     invalidatePreparation();
     state.workbook = null;
     state.sheetNames = [];
@@ -556,7 +671,7 @@ function addChip(host, text, kind) {
 
 function runImport() {
     if (!preparationIsCurrent()) { setMsg('goMsg', 'សូមរង់ចាំការផ្គូផ្គងបច្ចុប្បន្នជាមុនសិន', 'warn'); return; }
-    var generation = state.generation;
+    var generation = state.generation, password = state.password, writerScope = state.writeScope;
     var rows = mappedRows().filter(function (r) { return r[0] !== ''; });
     if (!rows.length) { setMsg('goMsg', 'គ្មានជួរដេកត្រូវនាំចូលទេ', 'bad'); return; }
     var unclear = unclearMoneyRows(rows);
@@ -568,15 +683,15 @@ function runImport() {
     $('importBtn').disabled = true;
     $('importBtn').innerHTML = '<span class="spin"></span>កំពុងនាំចូល...';
     setMsg('goMsg', '');
-    callServer('importRows', [state.password, {
-        rows: rows,
-        mode: mode,
-        mapping: currentMapping(),
-        signature: state.signature
-    }]).then(function (result) {
-        if (generation !== state.generation) return;
+    runPreparedWebWrite_('import', { rows: rows, mode: mode, mapping: currentMapping(), signature: state.signature }, function () { return generation === state.generation; }).then(function (result) {
+        if (generation !== state.generation || password !== state.password || writerScope !== state.writeScope) return;
         $('importBtn').disabled = false;
         $('importBtn').textContent = 'នាំចូលទៅ Sheet';
+        if (!result.importCurrent) {
+            setMsg('goMsg', 'ប្រតិបត្តិការមុនបានបញ្ជាក់។ Sheet មានការកែថ្មីជាងនេះ; សូមមើលទិន្នន័យបច្ចុប្បន្ន។', 'warn');
+            if (result.currentStatus) $('foot').textContent = 'គោលដៅ៖ tab «' + result.currentStatus.sheetName + '» · មាន ' + result.currentStatus.rowCount + ' ជួរដេក';
+            return;
+        }
         var parts = ['✅ រួចរាល់ — បន្ថែម ' + result.added, 'កែ ' + result.updated, 'ដដែល ' + result.unchanged];
         if (result.skippedNoBarcode) parts.push('រំលង ' + result.skippedNoBarcode);
         if (result.duplicatesInFile) parts.push('ស្ទួនក្នុងឯកសារ ' + result.duplicatesInFile);
@@ -584,7 +699,7 @@ function runImport() {
         setMsg('goMsg', parts.join(' · '), 'ok');
         $('foot').textContent = 'គោលដៅ៖ tab «' + result.sheetName + '» · មាន ' + result.rowsAfter + ' ជួរដេក';
     }, function (err) {
-        if (generation !== state.generation) return;
+        if (generation !== state.generation || password !== state.password || writerScope !== state.writeScope) return;
         $('importBtn').disabled = false;
         $('importBtn').textContent = 'នាំចូលទៅ Sheet';
         setMsg('goMsg', err && err.message ? err.message : 'នាំចូលមិនបាន', 'bad');
@@ -620,19 +735,29 @@ $('mode').addEventListener('change', renderPreview);
 Object.keys(FIELD_IDS).forEach(function (field) {
     $(FIELD_IDS[field]).addEventListener('change', renderPreview);
 });
-function runClear() {
+async function runClear() {
+    var clearGeneration = state.generation, clearPassword = state.password, clearScope = state.writeScope;
     if (!window.confirm('ជួរដេកទាំងអស់ក្នុង tab គោលដៅនឹងត្រូវលុប ដោយទុកតែជួរ header។ សកម្មភាពនេះមិនអាចដកវិញបានទេ។ ប្រាកដទេ?')) {
         return;
     }
     $('clearBtn').disabled = true;
+    try { await forgetCompletedSheetWrites_(window.localStorage, 'apps-script-web|' + state.writeScope, 'clear', window.crypto, function () { return clearGeneration === state.generation && clearPassword === state.password && clearScope === state.writeScope; }); } catch (err) { if (clearGeneration !== state.generation || clearPassword !== state.password || clearScope !== state.writeScope) return; $('clearBtn').disabled = false; setMsg('clearMsg', 'មិនអាចពិនិត្យភស្តុតាងសង្គ្រោះក្នុងឧបករណ៍; បានផ្អាកការសម្អាត។', 'bad'); return; }
+    $('clearBtn').disabled = true;
     $('clearBtn').innerHTML = '<span class="spin"></span>កំពុងសម្អាត...';
     setMsg('clearMsg', '');
-    callServer('clearRows', [state.password, 'CLEAR']).then(function (result) {
+    runPreparedWebWrite_('clear', {}, function () { return clearGeneration === state.generation && clearPassword === state.password && clearScope === state.writeScope; }).then(function (result) {
+        if (clearGeneration !== state.generation || clearPassword !== state.password || clearScope !== state.writeScope) return;
         $('clearBtn').disabled = false;
         $('clearBtn').textContent = 'សម្អាតទិន្នន័យក្នុង Sheet';
+        if (!result.importCurrent) {
+            setMsg('clearMsg', 'ប្រតិបត្តិការមុនបានបញ្ជាក់។ Sheet មានការកែថ្មីជាងនេះ; សូមមើលទិន្នន័យបច្ចុប្បន្ន។', 'warn');
+            if (result.currentStatus) $('foot').textContent = 'គោលដៅ៖ tab «' + result.currentStatus.sheetName + '» · មាន ' + result.currentStatus.rowCount + ' ជួរដេក';
+            return;
+        }
         setMsg('clearMsg', '✅ សម្អាតរួចរាល់ — លុប ' + result.removed + ' ជួរដេក', 'ok');
         $('foot').textContent = 'គោលដៅ៖ tab «' + result.sheetName + '» · មាន ' + result.rowsAfter + ' ជួរដេក';
     }, function (err) {
+        if (clearGeneration !== state.generation || clearPassword !== state.password || clearScope !== state.writeScope) return;
         $('clearBtn').disabled = false;
         $('clearBtn').textContent = 'សម្អាតទិន្នន័យក្នុង Sheet';
         setMsg('clearMsg', err && err.message ? err.message : 'សម្អាតមិនបាន', 'bad');

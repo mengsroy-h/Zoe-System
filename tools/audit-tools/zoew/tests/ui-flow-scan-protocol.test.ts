@@ -14,6 +14,7 @@ import { toggleIndividualBarcodeClose } from '../../../../ZoeW/src/features/barc
 import { deleteSingleItem, toggleCloseStatus } from '../../../../ZoeW/src/features/entry-ops';
 import { withConnectionOwnership } from '../../../../ZoeW/src/services/connection-flow';
 import { preparePendingScan } from '../../../../ZoeW/src/services/scan-pending';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 const H = 'zoew_scan_history_cod_dod', D = 'zoew_daily_revenue_cod_dod', M = 'zoew_monthly_revenue_cod_dod', P = 'zoew_daily_pickup_cod_dod';
 const NOW = Date.UTC(2026, 9, 30, 9), DAY = '2026-10-30', HOST = 'https://fake-default-rtdb.firebaseio.com';
@@ -39,6 +40,7 @@ beforeEach(() => {
     firebaseState.authGeneration++; firebaseState.firebaseConfig = { databaseURL: HOST } as any;
     Object.assign(firebaseState, { fb: sdk, db: sdk.getDatabase(), auth: sdk.getAuth(), isDatabaseConnected: true, isDatabaseInitialized: true,
         isInitializingFirebase: false, serverClockTrusted: true, serverTimeOffsetMs: 0 });
+    acceptFixtureSession();
     firebaseState.dbRefHistory = sdk.ref(firebaseState.db, H); firebaseState.dbRefDailyRevenue = sdk.ref(firebaseState.db, D); firebaseState.dbRefMonthlyRevenue = sdk.ref(firebaseState.db, M);
     dataState.scanHistory = [clone(row)]; dataState.deletedItems = [];
     dataState.dailyRevenueData = clone(seed[D]); dataState.monthlyRevenueData = clone(seed[M]);
@@ -143,6 +145,7 @@ it.each(['settled', 'delayed', 'rules-reject-marker', 'old-marker', 'rules-rejec
         vi.stubGlobal('fetch', fixture.fetch);
         const sdk = fixture.firebaseSDK;
         Object.assign(firebaseState, { fb: sdk, db: sdk.getDatabase(), auth: sdk.getAuth() });
+        acceptFixtureSession();
         firebaseState.dbRefHistory = sdk.ref(firebaseState.db, H); firebaseState.dbRefDailyRevenue = sdk.ref(firebaseState.db, D); firebaseState.dbRefMonthlyRevenue = sdk.ref(firebaseState.db, M);
     }
     const sdk = fixture.firebaseSDK, store = fixture.__fakeStore;

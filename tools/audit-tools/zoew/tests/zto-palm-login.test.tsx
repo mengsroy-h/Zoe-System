@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { act } from 'react';
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -55,6 +56,7 @@ beforeEach(async () => {
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://palm-shop.firebaseio.com' }));
     firebaseState.authGeneration++;
     firebaseState.auth = null;
+    firebaseState.firebaseConfig = { databaseURL: 'https://palm-shop.firebaseio.com' } as any;
     firebaseState.fb = null;
     securityState.lookupSecretKey = await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']) as any;
     initialConfig = JSON.stringify({ enabled: true, url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}',
@@ -91,6 +93,7 @@ it.each(['login', 'shared'])('Palm %s រៀបចំសោភ្ជាប់ �
     const identity = vi.fn(async () => ({ token: 'synthetic-shop-identity' }));
     firebaseState.auth = { currentUser: { uid: 'audit-user' } } as any;
     firebaseState.fb = { getIdTokenResult: identity } as any;
+    acceptFixtureSession();
     vi.stubGlobal('fetch', vi.fn(async () => mode === 'login' ? success() : response({ success: true, shared: true, account: { siteCode: 'KH001' } })));
     const work = mode === 'login' ? submitZtoPalmLogin() : connectSharedZtoPalm();
     try {
@@ -116,6 +119,7 @@ it.each(['device', 'shared'])('🩺 Palm %s ដែល Server ពិនិត្�
     }
     firebaseState.auth = { currentUser: { uid: 'audit-user' } } as any;
     firebaseState.fb = { getIdTokenResult: async () => ({ token: 'synthetic-health-identity' }) } as any;
+    acceptFixtureSession();
     vi.stubGlobal('fetch', vi.fn(async () => response({ success: true, provider: 'zto-palm', configured: true, verified: true,
         session: { source, shared: source === 'shared', rejected: false, site: 'KH001' } })));
     const row = await healthLookupRow();
@@ -317,6 +321,7 @@ describe('Palm login UI and existing lookup flow', () => {
     it('sends the signed-in ZoeW account with the login so ZTO_DETAIL_IDENTITY can gate it', async () => {
         firebaseState.auth = { currentUser: { uid: 'palm-shop-user' } } as any;
         firebaseState.fb = { getIdTokenResult: async () => ({ token: 'synthetic-id-token' }) } as any;
+        acceptFixtureSession();
         const cfg = await signIn();
         expect(cfg.palmTokenEnc).toBeTruthy();
         expect(vi.mocked(fetch).mock.calls[0][1]?.headers).toMatchObject({ 'X-Zoe-Proxy-Key': PROXY_KEY, 'X-Zoe-Id-Token': 'synthetic-id-token' });

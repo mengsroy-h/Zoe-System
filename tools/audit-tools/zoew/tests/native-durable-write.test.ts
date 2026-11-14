@@ -5,6 +5,8 @@ import { txRestUrl, withTransactionOutcomeResolution } from '../../../../ZoeW/sr
 import { dbListenerPendingPaths } from '../../../../ZoeW/src/core/text';
 import { createLocalWriteJournal } from '../../../../ZoeW/src/services/write-journal';
 import { commitDailyRevenueDelta, ledgerOpRing } from '../../../../ZoeW/src/domain/ledger';
+import { appLocalStore } from '../../../../ZoeW/src/core/storage';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 async function recoveryState(db: any) {
   try { return (await import('../../../../ZoeW/src/services/native-write-recovery')).nativeWriteRecoveryState(db); } catch { return { blocked: 0 }; }
@@ -27,6 +29,8 @@ function lab(update: any, transaction?: any, databaseURL = host, rootHost = fixt
   const sdk = withTransactionOutcomeResolution(raw); sdk.getAuth(app); sdk.getDatabase(app);
   Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db, isDatabaseInitialized: true,
     isInitializingFirebase: false, firebaseSdkUnavailable: false, isDatabaseConnected: true, sessionExpiryCheck: 'live', authLoginOperation: null });
+  appLocalStore.setItem('zoew_firebase_config', JSON.stringify(app.options));
+  acceptFixtureSession();
   resetServerClock(); acceptServerClockOffset(0, null, false);
   return { sdk, db, app };
 }

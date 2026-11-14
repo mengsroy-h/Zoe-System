@@ -31,9 +31,11 @@ function loadFixture(file: string) {
         if (call.callee.object?.name !== 'Object' || call.callee.property?.name !== 'assign'
             || call.arguments[0]?.object?.name !== 'api' || call.arguments[0]?.property?.name !== 'firebaseState') return;
         const parent = ancestors[ancestors.length - 2];
-        const next = parent.body[parent.body.indexOf(node) + 1];
         setup = source.slice(node.start, node.end);
-        if (next?.type === 'ExpressionStatement' && next.expression.callee?.name === 'initializeSdkClock') setup += '\n' + source.slice(next.start, next.end);
+        for (const next of parent.body.slice(parent.body.indexOf(node) + 1)) {
+            if (next?.type !== 'ExpressionStatement' || !['initializeSdkSession', 'initializeSdkClock'].includes(next.expression.callee?.name)) break;
+            setup += '\n' + source.slice(next.start, next.end);
+        }
     });
     expect(entry).toContain('scan-action');
     expect(setup).toContain('sessionExpiryCheck');
@@ -43,12 +45,26 @@ function loadFixture(file: string) {
     const api = module.exports;
     let initializeSdkClock: any;
     if (setup.includes('initializeSdkClock')) initializeSdkClock = require(path.join(ROOT, 'tools/audit-tools/emu/sdk-clock-fixture.cjs')).initializeSdkClock;
-    const install = () => new Function('api', 'sdk', 'db', 'auth', 'app', 'initializeSdkClock', setup)(api, {}, {}, { currentUser: { uid: 'fixture' } }, { options: {} }, initializeSdkClock);
+    const initializeSdkSession = require(path.join(ROOT, 'tools/audit-tools/emu/sdk-session-fixture.cjs')).initializeSdkSession;
+    const install = () => {
+        const config = { databaseURL: 'https://sdk-clock-fixture.firebaseio.com/' + file };
+        const app = { options: config }, db = { app }, auth = { app, currentUser: { uid: 'fixture' } };
+        localStorage.setItem('zoew_firebase_config', JSON.stringify(config));
+        new Function('api', 'sdk', 'db', 'auth', 'app', 'initializeSdkClock', 'initializeSdkSession', setup)(api, {}, db, auth, app, initializeSdkClock, initializeSdkSession);
+    };
     install();
     return { api, install, initializeSdkClock };
 }
 
 for (const file of files) describe(file, () => {
+    it('SDK session bootstrap rejects missing saved Config and preserves an accepted configuration witness', () => {
+        const { api } = loadFixture(file);
+        const { initializeSdkSession } = require(path.join(ROOT, 'tools/audit-tools/emu/sdk-session-fixture.cjs'));
+        localStorage.removeItem('zoew_firebase_config');
+        expect(() => initializeSdkSession(api)).toThrow(/declared saved backend/);
+        localStorage.setItem('zoew_firebase_config', JSON.stringify({ ...api.firebaseState.firebaseConfig, changed: true }));
+        expect(() => initializeSdkSession(api)).toThrow(/accepted actual actor/);
+    });
     it('រៀបចំ clock ពិត និង session live មុន scan', () => {
         const { api } = loadFixture(file);
         expect(api.fixtureClock.serverClockIsTrustworthy()).toBe(true);

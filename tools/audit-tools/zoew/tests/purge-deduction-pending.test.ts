@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState, ztoState } from '../../../../ZoeW/src/core/state';
 import { pendingRegistryReleases, resetServerClock } from '../../../../ZoeW/src/core/clock';
@@ -66,6 +67,7 @@ beforeEach(() => {
     firebaseState.db = { app: { options: { databaseURL: HOST } } } as any;
     firebaseState.firebaseConfig = { databaseURL: HOST } as any;
     firebaseState.auth = { currentUser: { uid: 'purge-user', getIdToken: async () => 'synthetic-token' } } as any;
+    acceptFixtureSession();
     firebaseState.isInitializingFirebase = false; firebaseState.isDatabaseInitialized = true; firebaseState.isDatabaseConnected = true;
     firebaseState.serverClockTrusted = true; firebaseState.serverTimeOffsetMs = 0; firebaseState.hasEverConnectedToDatabase = true; firebaseState.sessionExpiryCheck = 'live';
     firebaseState.fb = {

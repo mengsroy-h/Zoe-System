@@ -458,7 +458,7 @@ Service របស់ runner ត្រូវ Running។ បើបានដំឡ�
 | Value | Audit | APK | PC ត្រូវបើក? |
 |---|---|---|---|
 | `self-hosted` | Linux runner របស់អ្នក ៤ | Windows runner របស់អ្នក | ត្រូវបើក |
-| `github` | GitHub `ubuntu-latest` ចំនួន ៤ job | GitHub `windows-latest` | មិនចាំបាច់ |
+| `github` | GitHub `ubuntu-latest`៖ public ៥ shard · private ៤ shard | GitHub `windows-latest` | មិនចាំបាច់ |
 
 វាត្រូវជា **Repository variable** ក្នុង tab Variables។ Secret, `.env`, Windows environment variable ឬ variable ក្នុង Settings → Environments មិនត្រូវបានអានដោយ selector របស់ workflow នេះទេ។
 
@@ -504,13 +504,13 @@ Self-hosted compute មិនប្រើ quota នាទី GitHub-hosted; arti
 
 ៣. ចុច **Run workflow** → Branch ជ្រើស **main** → Run workflow។
 
-៤. បើក run ថ្មីមើល jobs។ ត្រូវមានផ្នែក 1/4, 2/4, 3/4, 4/4; ទាំង ៤អាចចាប់ព្រមគ្នាបើ runner capacity គ្រប់គ្រាន់។
+៤. បើក run ថ្មីមើល jobs៖ self-hosted ឬ private មានផ្នែក 1/4 ដល់ 4/4; GitHub mode លើ public មាន 1/5 ដល់ 5/5។ Shard អាចចាប់ព្រមគ្នាតាម runner capacity; jobs ភស្តុតាងបន្ថែមរបស់ workflow ដាច់ពី matrix នេះ។
 
-៥. រង់ចាំ jobs ទាំង ៤ចប់។ លទ្ធផលត្រូវបៃតង ហើយ STRICT tests មិន SKIP។
+៥. រង់ចាំគ្រប់ shard ដែល workflow បានជ្រើស និង jobs ភស្តុតាងបន្ថែមចប់។ លទ្ធផលត្រូវបៃតង ហើយ STRICT tests មិន SKIP។
 
 បើរត់នៅ PR ហើយត្រូវការបង្កើត run ថ្មីដោយមិនកែ source អាច Close PR រួច Reopen PR។ Draft អាចទុកដដែល។ បើចង់សាក workflow code ដែលទើបកែ ត្រូវរត់ event លើ commit ថ្មី; rerun របស់ run ចាស់នៅប្រើ commit/ref ដើម។
 
-**ចំណុចត្រូវឆ្លង៖** Audit ទាំង ៤ job ឆ្លង។ ការមាន runner Online តែឯងមិនបញ្ជាក់ audit បានឆ្លងទេ។
+**ចំណុចត្រូវឆ្លង៖** គ្រប់ Audit shard និង job ភស្តុតាងដែលត្រូវរត់បានឆ្លង។ ការមាន runner Online តែឯងមិនបញ្ជាក់ audit បានឆ្លងទេ។
 
 ## ១៦. សាក Windows APK workflow
 

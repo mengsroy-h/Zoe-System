@@ -10,6 +10,7 @@ import { viewState } from '../../../../ZoeW/src/core/view-state';
 import { dbListenerPendingPaths } from '../../../../ZoeW/src/core/text';
 import { renderConnectionStatus } from '../../../../ZoeW/src/services/connection';
 import { TOAST_LIVE_LIMIT_MS } from '../../../../ZoeW/src/ui/toast';
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 
 const live = () => uiState.toasts.filter((t: any) => t.live === 'network');
 const texts = () => uiState.toasts.map((t: any) => t.msg);
@@ -25,10 +26,13 @@ function setNet(o: { online?: boolean; db?: boolean; failed?: boolean; pending?:
 
 beforeEach(() => {
     vi.useFakeTimers();
+    configureFixtureBackend('network-toast-fixture');
     vi.spyOn(navigator, 'onLine', 'get').mockImplementation(() => online);
     online = true;
     uiState.toasts = [];
     firebaseState.auth = { currentUser: { uid: 'u' } } as any;
+    Object.assign(firebaseState, { fb: {}, db: {}, isDatabaseInitialized: true, isInitializingFirebase: false, authLoginOperation: null });
+    acceptFixtureSession();
     firebaseState.sessionExpiryCheck = 'live' as any;
     firebaseState.serverClockTrusted = true;
     firebaseState.firebaseSdkUnavailable = false;
@@ -89,6 +93,7 @@ describe('toast បណ្តាញរស់', () => {
         firebaseState.auth = { currentUser: null } as any;
         setNet({ online: false, db: false });
         firebaseState.auth = { currentUser: { uid: 'u' } } as any;
+        acceptFixtureSession();
         firebaseState.reconnectWatchdogAttempt = 0;
         setNet({ online: true, db: false });
         expect(viewState.connectionStatus).toBe('connecting');

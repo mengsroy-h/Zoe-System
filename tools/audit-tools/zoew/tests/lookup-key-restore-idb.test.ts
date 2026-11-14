@@ -14,6 +14,8 @@ beforeAll(async () => {
         export { logoutApp, setupAuthListener } from './src/features/auth';
         export { clearSensitiveModalFields } from './src/features/session';
         export { appLocalStore, appSessionStore } from './src/core/storage';
+        export { acceptLocalAuthSession } from './src/services/local-logout-intent';
+        export { loginBackendScope } from './src/features/login-memory';
     `, resolveDir: path.resolve('.') }, bundle: true, write: false, format: 'iife', globalName: 'keyAudit',
         define: { __APP_VERSION__: '"test"', __CACHE_VERSION__: '"test"', __FCM_CONFIGURED__: 'false', 'import.meta.env.DEV': 'false', 'import.meta.env.VITE_NATIVE_WEB_ORIGIN': '""' } });
     bundle = built.outputFiles[0].text;
@@ -35,6 +37,7 @@ it.each(['initial-auth', 'early-auth', 'logout-off', 'config-change', 'reset', '
             api.appLocalStore.setItem('zoew_security_pin_hash', 'synthetic-pin-hash');
             api.appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://shop-a.firebaseio.com' }));
             if (mode === 'no-config') api.appLocalStore.removeItem('zoew_firebase_config');
+            api.firebaseState.firebaseConfig = JSON.parse(api.appLocalStore.getItem('zoew_firebase_config') || 'null');
             api.appSessionStore.setItem('zoew_app_unlocked', '1');
             if (mode === 'logout-off') api.appLocalStore.setItem('zoew_app_lock_v1', '0');
             api.securityState.lookupSecretKey = null;
@@ -113,6 +116,9 @@ it.each(['current', 'logout', 'lock', 'already-locked', 'replacement', 'session-
             api.securityState.lookupSecretKey = null;
             api.securityState.appIsLocked = false;
             api.firebaseState.auth = { currentUser: { uid: 'audit-user' } };
+            api.firebaseState.firebaseConfig = { databaseURL: 'https://lookup-key-restore.firebaseio.com' };
+            api.appLocalStore.setItem('zoew_firebase_config', JSON.stringify(api.firebaseState.firebaseConfig));
+            if (!api.acceptLocalAuthSession(api.firebaseState.auth, api.loginBackendScope(), api.firebaseState.auth.currentUser)) throw new Error('Fixture SDK session was not accepted');
             api.firebaseState.fb = { signOut: async (auth: any) => { auth.currentUser = null; } };
             const replacement = mode === 'replacement' ? await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']) : null;
             if (mode === 'already-locked') api.showAppLockScreen();

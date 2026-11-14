@@ -3,6 +3,7 @@ let failed = 0;
 const fs = require('fs'), path = require('path'), os = require('os'), http = require('http'), assert = require('assert/strict');
 const { pathToFileURL } = require('url');
 const { initializeSdkClock } = require('./sdk-clock-fixture.cjs');
+const { initializeSdkSession } = require('./sdk-session-fixture.cjs');
 const ROOT = path.resolve(process.env.SCANSDK_APP_DIR || process.env.ZOE_REPO_ROOT || path.join(__dirname, '../../..'));
 const deps = path.join(ROOT, 'ZoeW/node_modules');
 const port = Number(process.env.SCANRULES_EMU_PORT || 9000);
@@ -96,6 +97,9 @@ export { resumePendingScanOperations } from './ZoeW/src/services/scan-operation'
 export { createScanEvidenceJournal } from './ZoeW/src/services/scan-evidence';
 export { pendingScanScope } from './ZoeW/src/services/scan-pending';
 export { acceptServerClockOffset, resetServerClock } from './ZoeW/src/core/clock';
+export { acceptLocalAuthSession } from './ZoeW/src/services/local-logout-intent';
+export { loginBackendScope } from './ZoeW/src/features/login-memory';
+export { appLocalStore } from './ZoeW/src/core/storage';
 export { withTransactionOutcomeResolution, txResolvingPaths } from './ZoeW/src/services/tx-outcome';
 export { firebaseState, dataState, uiState } from './ZoeW/src/core/state';`, resolveDir: ROOT },
         bundle: true, platform: 'node', format: 'cjs', outfile: built, logLevel: 'error', define: { 'import.meta.env': '{}' } });
@@ -195,6 +199,7 @@ export { firebaseState, dataState, uiState } from './ZoeW/src/core/state';`, res
             const sdk = api.withTransactionOutcomeResolution(raw); sdk.getAuth(app); sdk.getDatabase(app);
             Object.assign(api.firebaseState, { fb: sdk, db, auth, firebaseConfig: app.options, isDatabaseInitialized: true,
                 isInitializingFirebase: false, firebaseSdkUnavailable: false, isDatabaseConnected: true, sessionExpiryCheck: 'live', authLoginOperation: null });
+            initializeSdkSession(api);
             initializeSdkClock(api);
             return { app, db, sdk };
         };

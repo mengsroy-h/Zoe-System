@@ -11,6 +11,7 @@ import { collectedValueIsMeasurable } from '../../../../ZoeW/src/features/export
 import { resolvePriceOperations } from '../../../../ZoeW/src/features/pending-writes';
 import { PRICE_PROTOCOL_V2_TAG, rowOperationActive } from '../../../../ZoeW/src/services/row-operation-lock';
 import * as priceOperation from '../../../../ZoeW/src/services/price-operation';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 const H = 'zoew_scan_history_cod_dod', D = 'zoew_daily_revenue_cod_dod', M = 'zoew_monthly_revenue_cod_dod';
 const HOST = 'https://price-resume.firebaseio.com';
@@ -111,6 +112,7 @@ beforeEach(() => {
         },
         onValue: () => () => {}, off: () => {}
     } as any;
+    acceptFixtureSession();
     vi.stubGlobal('fetch', vi.fn(async (inputUrl: any) => {
         const path = decodeURIComponent(new URL(String(inputUrl)).pathname).replace(/^\//, '').replace(/\.json$/, '');
         return new Response(JSON.stringify(getAt(path)), { status: 200, headers: { 'content-type': 'application/json' } });

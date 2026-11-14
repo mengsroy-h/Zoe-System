@@ -6,6 +6,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import vm from 'node:vm';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { dataState, firebaseState } from '../../../../ZoeW/src/core/state';
 import { acceptServerClockOffset, resetServerClock } from '../../../../ZoeW/src/core/clock';
 import * as storage from '../../../../ZoeW/src/core/storage';
@@ -157,6 +158,7 @@ beforeEach(() => {
     firebaseState.auth = { currentUser: { uid: 'audit-user', getIdToken: async () => 'synthetic-id' } } as any;
     firebaseState.firebaseConfig = { databaseURL: HOST } as any;
     localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: HOST }));
+    acceptFixtureSession();
     firebaseState.isDatabaseInitialized = true; firebaseState.isDatabaseConnected = true; firebaseState.hasEverConnectedToDatabase = true;
     firebaseState.sessionExpiryCheck = 'live';
     firebaseState.dbListenersFailed = false; firebaseState.serverClockTrusted = true; firebaseState.serverTimeOffsetMs = 0;
@@ -278,7 +280,9 @@ function useSupabase() {
     firebaseState.fb = sdk(true) as any;
     firebaseState.db = { name: 'audit-supabase-db', app: { options: { supabaseUrl: 'https://audit.supabase.co' } } } as any;
     (firebaseState.auth as any).app = { options: { supabaseUrl: 'https://audit.supabase.co' } };
+    firebaseState.firebaseConfig = { supabaseUrl: 'https://audit.supabase.co' };
     localStorage.setItem('zoew_firebase_config', JSON.stringify({ supabaseUrl: 'https://audit.supabase.co' }));
+    acceptFixtureSession();
 }
 const rootPages = (root: string) => lab.pages.filter(page => page.at === root);
 const savedCursors = () => Object.fromEntries(Object.keys(localStorage).filter(key => key !== 'zoew_firebase_config').map(key => [key, localStorage.getItem(key)]));
@@ -644,9 +648,11 @@ it('alternating owners preserve their independent cursor progress', async () => 
     const { root, held, tail } = heldHead(true);
     expect(await runEvidenceRetentionSweep()).toBe(0);
     firebaseState.auth.currentUser.uid = 'other-user';
+    acceptFixtureSession();
     expect(await runEvidenceRetentionSweep()).toBe(0);
     expect(rootPages(root).at(-1)?.after).toBeNull();
     firebaseState.auth.currentUser.uid = 'audit-user';
+    acceptFixtureSession();
     expect(await runEvidenceRetentionSweep()).toBe(1);
     expect(rootPages(root).at(-1)?.after).toBe(held.at(-1));
     expect(getAt(root + '/' + tail)).toBeNull();

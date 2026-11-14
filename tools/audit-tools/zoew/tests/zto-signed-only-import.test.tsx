@@ -16,6 +16,7 @@ import { createScanMemorySdk } from './helpers/scan-memory-sdk';
  * ៤. ជួរនីមួយៗក្នុងប្រអប់ ៖ «📥 មកដល់ ៖ …» និង «✍️ ZTO ចុះហត្ថលេខា (បិទ) ៖ …»។
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { refTo } from '../../../../ZoeW/src/app/refs';
 import { ztoListGroupModel } from '../../../../ZoeW/src/app/components/zto/model';
 import { dataState, firebaseState, uiState, ztoState } from '../../../../ZoeW/src/core/state';
@@ -94,11 +95,13 @@ beforeEach(() => {
     viewState.ztoListSyncNote = '';
     firebaseState.authGeneration++;
     const options = { databaseURL: 'https://signed-only-import-fixture.firebaseio.com' };
+    firebaseState.firebaseConfig = options;
     firebaseState.auth = { currentUser: { uid: 'audit-user' }, app: { options } } as any;
     firebaseState.db = { audit: true, app: { options } } as any;
     firebaseState.isInitializingFirebase = false;
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
     firebaseState.fb = createScanMemorySdk('audit-token').sdk as any;
+    acceptFixtureSession();
     resetServerClock(); acceptServerClockOffset(1, { epochMs: NOW, wallMs: Date.now(), monotonicMs: performance.now() }, false);
     for (const name of ['ztoListSyncFrom', 'ztoListSyncTo'] as const) {
         const input = document.createElement('input');

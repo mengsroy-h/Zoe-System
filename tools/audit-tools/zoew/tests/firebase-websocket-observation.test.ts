@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { firebaseState } from '../../../../ZoeW/src/core/state';
 import { viewState } from '../../../../ZoeW/src/core/view-state';
@@ -19,6 +20,7 @@ beforeEach(() => {
         firebaseSdkUnavailable: false, dbListenersFailed: false, reconnectWatchdogAttempt: 0
     });
     localStorage.setItem('zoew_firebase_config', JSON.stringify(firebaseState.firebaseConfig));
+    acceptFixtureSession();
     request = vi.fn(async () => new Response('null'));
     vi.stubGlobal('fetch', request);
 });

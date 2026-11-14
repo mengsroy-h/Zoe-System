@@ -1,3 +1,4 @@
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 /**
  * ⛔ ZTO-E14 (A161 · audit ZTO · ម្ចាស់គម្រោងជ្រើស «(ក) កែ Function») ៖ គម្រោង Firebase មួយចងសាខាច្រើន
  *    (`FIREBASE_PROJECT_IDS=zoew-v1:101|102` — `ZTO-SETUP-KH.md` ផ្នែក ៤គ គាំទ្រ) ➜ ប្រវត្តិ **តែមួយ** កាន់កញ្ចប់នៃសាខាទាំង ២។
@@ -129,6 +130,8 @@ beforeEach(async () => {
     firebaseState.isDatabaseConnected = true;
     firebaseState.auth = { currentUser: { uid: 'audit-user' } } as any;
     firebaseState.db = { name: 'audit-db' } as any;
+    configureFixtureBackend('zto-multibranch-signed-hold');
+    acceptFixtureSession();
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.stubGlobal('fetch', vi.fn(async (u: any, init: any) => {
         const href = String(u);

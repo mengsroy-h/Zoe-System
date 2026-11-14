@@ -1,3 +1,4 @@
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 /**
  * ⛔ ZTO-E13 (សំណើម្ចាស់គម្រោង ៖ «ZTO កែចុះ») ៖ ZTO ឆ្លើយបញ្ជីដោយ **គ្មាន** `meta.pages`/`total` ៖ Function ធ្លាប់រាយ `pages: 1` ទោះទំព័រពេញ
  * (១០០ ជួរ) ➜ client អានតែទំព័រ ១ ហើយចាត់ទុកថា «ពេញលេញ» ➜ ភស្តុតាងចុះហត្ថលេខានៅទំព័រ ២+ បាត់ ➜ ការសម្អាត ៨ ថ្ងៃលែងរង់ចាំ ➜ កញ្ចប់ដែលយករួចអាច
@@ -42,6 +43,8 @@ beforeEach(async () => {
     firebaseState.auth = { currentUser: { uid: 'u' } } as any;
     const token = fx.tokenForSite('777001');
     firebaseState.fb = { getIdTokenResult: async () => ({ token }) } as any;
+    configureFixtureBackend('zto-pages-unknown');
+    acceptFixtureSession();
     upstream.length = 0;
     withMeta = false;
     vi.stubGlobal('fetch', vi.fn(async (u: any, init: any) => {

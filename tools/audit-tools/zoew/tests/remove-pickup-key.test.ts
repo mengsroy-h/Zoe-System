@@ -10,6 +10,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../../../../ZoeW/src/core/state';
 import { resetServerClock } from '../../../../ZoeW/src/core/clock';
 import { appLocalStore } from '../../../../ZoeW/src/core/storage';
+import { acceptFixtureSession } from './helpers/accepted-session';
 import * as storageAdapter from '../../../../ZoeW/src/core/storage';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../../../../ZoeW/src/core/text';
 import { getZoneDateKey } from '../../../../ZoeW/src/core/timezone';
@@ -207,6 +208,7 @@ beforeEach(() => {
     firebaseState.serverClockTrusted = true;
     firebaseState.serverTimeOffsetMs = 0;
     firebaseState.fb = makeFb() as any;
+    acceptFixtureSession();
     for (const [name, path] of [['dbRefHistory', HISTORY], ['dbRefDeleted', TRASH], ['dbRefDailyRevenue', DAILY], ['dbRefMonthlyRevenue', MONTHLY],
         ['dbRefDailyCollected', MIRROR], ['dbRefDailyPickup', PICKUP], ['dbRefRegistry', 'zoew_barcode_registry']] as const) {
         (firebaseState as any)[name] = makeRef(DB, path);

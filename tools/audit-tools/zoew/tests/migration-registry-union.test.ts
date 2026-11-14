@@ -8,7 +8,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const require = createRequire(import.meta.url);
 const { validateTree, run } = require('../../../supabase-migrate/migrate.js');
-const { buildArchive } = require('../../../firebase-backup/supabase.js');
 const { writeBackup } = require('../../../firebase-backup/backup.js');
 const rules = JSON.parse(fs.readFileSync(path.resolve('../firebase-database.rules.json'), 'utf8')).rules;
 const registry = 'zoew_barcode_registry';
@@ -83,6 +82,9 @@ function migrationFixture() {
         } else if (url.endsWith('/zoe_admin_export')) {
             reply = { rows: structuredClone(rows.filter(row => row.s > args.p_after_seq)), more: false,
                 tombstones_after: args.p_tombstones_after === null ? 0 : args.p_tombstones_after, head: seq, purged: 0 };
+        } else if (url.endsWith('/zoe_admin_audit_export')) {
+            expect(args.p_tenant).toBe(tenant);
+            reply = { v: 1, tenant, through: '0', rows: [], more: false, next: null };
         } else if (url.endsWith('/zoe_admin_write')) {
             writes.push(structuredClone(args)); seq++;
             for (const op of args.p_ops) {
@@ -117,7 +119,10 @@ function migrationFixture() {
 
 const emptyInputs = [
     ['object', {}], ['root-object', { [registry]: {} }], ['root-null', { [registry]: null }], ['root-array', { [registry]: [] }],
-    ['archive-v1', buildArchive({ id: '00000000-0000-4000-8000-0000000000bb', name: 'Synthetic', branch_code: 'SRC' }, { data: {}, seq: 0 }, 'synthetic.invalid')],
+    ['archive-v1', { format: 'zoe-supabase-tenant', version: 1, manifest: {
+        tenant: { id: '00000000-0000-4000-8000-0000000000bb', name: 'Synthetic', branch_code: 'SRC' },
+        seq: 0, docs: 0, roots: {}, exported_at: '2026-11-14T00:00:00.000Z', source: { kind: 'supabase', host: 'synthetic.invalid' }
+    }, data: {} }],
     ['firebase-backup-null', null]
 ] as const;
 

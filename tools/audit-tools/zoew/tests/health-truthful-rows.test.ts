@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { firebaseState, lookupState } from '../../../../ZoeW/src/core/state';
 import { healthDatabaseLiveRow, healthLicenseRow, healthLookupRow, healthSheetScriptRow } from '../../../../ZoeW/src/features/health-check';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../../../../ZoeW/src/core/text';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 beforeEach(() => {
     localStorage.clear();
@@ -16,6 +17,7 @@ beforeEach(() => {
     firebaseState.serverClockTrusted = true;
     firebaseState.serverTimeOffsetMs = 0;
     firebaseState.dbLivenessProbe = null;
+    acceptFixtureSession();
     dbListenerPendingPaths.clear(); dbListenerFailedPaths.clear();
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
 });

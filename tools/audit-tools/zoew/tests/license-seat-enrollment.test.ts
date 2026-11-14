@@ -8,13 +8,17 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { mount, unmount } from './native/react-harness';
 import { ActivationModal } from '../../../../ZoeW/src/app/components/modals/ActivationModal';
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 let input = '';
 vi.mock('../../../../ZoeW/src/app/refs', () => ({ refTo: () => () => {}, fieldValue: () => input, setFieldValue: (_id: string, value: string) => { input = value; }, focusField: vi.fn() }));
 vi.mock('../../../../ZoeW/src/core/timezone', () => ({ safeFocusScanner: vi.fn() }));
 const api = () => license as any;
 beforeEach(() => {
+    configureFixtureBackend('license-seat-enrollment-fixture');
     firebaseState.auth = { currentUser: { uid: 'enrollment-user' } } as any; firebaseState.authGeneration++;
-    firebaseState.db = {} as any; firebaseState.isDatabaseInitialized = true;
+    firebaseState.db = {} as any; firebaseState.fb = {}; firebaseState.isDatabaseInitialized = true;
+    firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live';
+    acceptFixtureSession();
     viewState.backendKind = 'firebase'; input = 'ZOEKEY-synthetic'; uiState.modalDisplay = {}; uiState.isModalOpen = false;
     api().clearSeatEnrollment?.();
 });

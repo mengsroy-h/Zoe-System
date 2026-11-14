@@ -1,7 +1,18 @@
 'use strict';
 
+const crypto = require('node:crypto');
 const FORMAT = 'zoe-supabase-tenant';
-const FORMAT_VERSION = 1;
+const FORMAT_VERSION = 2;
+const AUDIT_FORMAT = 'zoe-business-audit';
+const AUDIT_VERSION = 1;
+const MAX_AUDIT_ARCHIVE_EVENTS = 20000;
+const MAX_AUDIT_ARCHIVE_BYTES = 32 * 1024 * 1024;
+const AUDIT_EVENT_KEYS = ['event_id', 'schema_version', 'tenant_id', 'origin_tenant_id', 'operation_id', 'seq', 'actor_uid', 'actor_kind',
+    'origin', 'root', 'record_key', 'action', 'reason', 'status_source', 'previous_status', 'new_status', 'before_value', 'after_value',
+    'changed_fields', 'changed_fields_truncated', 'summary_unchanged', 'projection_scope', 'committed_at'].sort();
+const AUDIT_ROOTS = new Set(['zoew_scan_history_cod_dod', 'zoew_recently_deleted_cod_dod', 'zoew_daily_revenue_cod_dod', 'zoew_monthly_revenue_cod_dod',
+    'zoew_daily_pickup_cod_dod', 'zoew_daily_collected_cod_dod', 'zoew_scan_operations', 'zoew_trash_consumptions', 'zoew_restore_finalizations', 'zoew_registry_releases']);
+const AUDIT_SUMMARY_KEYS = new Set(('id sourceId targetId restoreClaimId restoreSourceId restorePendingClaimId restoreSourceGeneration code barcode cod dod price count codDollar dodDollar totalCount packagesPickedUp pickupRevision pickupResetEpoch trashGeneration generation birth rowBirth createdAt deletedAt claimedAt finalizedAt closedAt restoredAt ztoSignedAt ztoSignedExact ztoReturnedAt ztoSentOutAt ztoMisplacedAt isClosed isDeducted restoreBlocked isFromDeletion isCalled trashReason trashMode phase kind c d exists location barcodes collected pickedUpPhoneCount pickedUpBarcodes opsCount dedCount backCount undoCount restoreClaim claimCorrelationHash restoreAddedCodes total sampleLimit truncated sample sha256 closed deducted signed returnEvidence returned entryKey entryKeyTruncated length malformed zoewClosed barcodeCount closedCount deductedCount observedSignedCount effectiveReturnedCount observedReturnEvidenceCount').split(' '));
 const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
 const TENANT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_RESPONSE_BYTES = 64 * 1024 * 1024;
@@ -111,6 +122,7 @@ function createClient(options) {
             } catch (e) {
                 throw Object.assign(new Error(fn + ' reply was cut off.'), { retryable: true });
             }
+            if (Buffer.byteLength(text) > MAX_RESPONSE_BYTES) throw Object.assign(new Error(fn + ' reply exceeds the response byte limit.'), { retryable: false });
             let body = null;
             try {
                 body = text ? JSON.parse(text) : null;
@@ -150,7 +162,203 @@ function putOwn(target, key, value) {
     Object.defineProperty(target, key, { value, enumerable: true, writable: true, configurable: true });
 }
 
-async function listTenants(client) {
+function object(value) {
+    return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function stableJson(value) {
+    return JSON.stringify(value, (_key, found) => {
+        if (!object(found)) return found;
+        const sorted = Object.create(null);
+        for (const key of Object.keys(found).sort()) putOwn(sorted, key, found[key]);
+        return sorted;
+    });
+}
+
+function auditDigest(events) {
+    auditBudget(events);
+    return crypto.createHash('sha256').update(stableJson(events)).digest('hex');
+}
+
+function auditLimits(options) {
+    const opts = options || {};
+    const events = opts.maxAuditEvents === undefined ? MAX_AUDIT_ARCHIVE_EVENTS : opts.maxAuditEvents;
+    const bytes = opts.maxAuditBytes === undefined ? MAX_AUDIT_ARCHIVE_BYTES : opts.maxAuditBytes;
+    if (!Number.isInteger(events) || events < 1 || events > MAX_AUDIT_ARCHIVE_EVENTS
+        || !Number.isInteger(bytes) || bytes < 2 || bytes > MAX_AUDIT_ARCHIVE_BYTES) throw new Error('Audit archive aggregate budget is invalid.');
+    return { events, bytes };
+}
+
+function auditJsonBytes(value, limit) {
+    let bytes = 0;
+    const add = size => {
+        bytes += size;
+        if (bytes > limit) throw new Error('Audit archive aggregate byte budget exceeded; no history was truncated. This history requires a segmented archive implementation before the full backup/import can continue.');
+    };
+    const string = text => {
+        add(2);
+        for (let index = 0; index < text.length; index++) {
+            const code = text.charCodeAt(index);
+            if (code < 32) add(6);
+            else if (code === 34 || code === 92) add(2);
+            else if (code < 128) add(1);
+            else if (code < 2048) add(2);
+            else if (code >= 0xd800 && code <= 0xdbff && text.charCodeAt(index + 1) >= 0xdc00 && text.charCodeAt(index + 1) <= 0xdfff) { add(4); index++; }
+            else add(code >= 0xd800 && code <= 0xdfff ? 6 : 3);
+        }
+    };
+    const walk = (found, depth) => {
+        if (depth > 32) throw new Error('Audit archive JSON nesting exceeds its bounded schema.');
+        if (found === null) add(4);
+        else if (typeof found === 'boolean') add(found ? 4 : 5);
+        else if (typeof found === 'string') string(found);
+        else if (typeof found === 'number' && Number.isFinite(found)) add(String(found).length);
+        else if (Array.isArray(found)) {
+            add(2 + Math.max(0, found.length - 1));
+            for (const child of found) walk(child, depth + 1);
+        } else if (object(found)) {
+            const keys = Object.keys(found);
+            add(2 + Math.max(0, keys.length - 1));
+            for (const key of keys) { string(key); add(1); walk(found[key], depth + 1); }
+        } else throw new Error('Audit archive contains a non-JSON value.');
+    };
+    walk(value, 0);
+    return bytes;
+}
+
+function auditBudget(events, options) {
+    const limits = auditLimits(options);
+    if (!Array.isArray(events) || events.length > limits.events) throw new Error('Audit archive aggregate event budget exceeded; no history was truncated. This history requires a segmented archive implementation before the full backup/import can continue.');
+    return auditJsonBytes(events, limits.bytes);
+}
+
+function assertAuditMergeBudget(existing, incoming) {
+    const limits = auditLimits();
+    let count = existing.length, bytes = auditBudget(existing);
+    const ids = new Set(existing.map(event => event.event_id));
+    for (const event of incoming) {
+        if (ids.has(event.event_id)) continue;
+        if (count >= limits.events) throw new Error('Merged audit history exceeds the aggregate event budget before import; no document writes were started.');
+        bytes += (count ? 1 : 0) + auditJsonBytes(event, limits.bytes - bytes - (count ? 1 : 0));
+        ids.add(event.event_id); count++;
+    }
+}
+
+function decimal(value, zero = true) {
+    return typeof value === 'string' && (zero ? /^(0|[1-9][0-9]*)$/ : /^[1-9][0-9]*$/).test(value)
+        && value.length <= 19 && BigInt(value) <= 9223372036854775807n;
+}
+
+function uuid(value) {
+    return typeof value === 'string' && TENANT_ID_RE.test(value) && value === value.toLowerCase();
+}
+
+function jsonSafe(value, depth = 0) {
+    if (depth > 32) return false;
+    if (value === null || typeof value === 'boolean') return true;
+    if (typeof value === 'number') return Number.isFinite(value) && (!Number.isInteger(value) || Number.isSafeInteger(value));
+    if (typeof value === 'string') return !/[\u0000]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(value);
+    if (!object(value) && !Array.isArray(value)) return false;
+    return Object.entries(value).every(([key, child]) => jsonSafe(key, depth + 1) && jsonSafe(child, depth + 1));
+}
+
+function auditSummary(value) {
+    if (!object(value) || typeof value.exists !== 'boolean' || !['absent', 'history', 'trash', 'business_record'].includes(value.location) || !jsonSafe(value)) return false;
+    const pending = [value];
+    while (pending.length) {
+        const node = pending.pop();
+        if (Array.isArray(node)) { pending.push(...node); continue; }
+        if (!object(node)) continue;
+        for (const [key, child] of Object.entries(node)) {
+            if (!AUDIT_SUMMARY_KEYS.has(key) && !(key.endsWith('Bounds') && AUDIT_SUMMARY_KEYS.has(key.slice(0, -6)))) return false;
+            pending.push(child);
+        }
+    }
+    return true;
+}
+
+function auditTimestamp(value) {
+    if (typeof value !== 'string' || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}Z$/.test(value) || Number(value.slice(0, 4)) < 1) return false;
+    const epoch = Date.parse(value);
+    return Number.isFinite(epoch) && new Date(epoch).toISOString().slice(0, 19) === value.slice(0, 19);
+}
+
+function validateAuditEvent(event, tenant) {
+    const text = value => typeof value === 'string' && value.length > 0 && Buffer.byteLength(value) <= 768 && jsonSafe(value);
+    if (!object(event) || stableJson(Object.keys(event).sort()) !== stableJson(AUDIT_EVENT_KEYS)
+        || event.schema_version !== 1 || !uuid(event.event_id) || event.tenant_id !== tenant || !uuid(event.origin_tenant_id)
+        || !decimal(event.seq, false) || typeof event.operation_id !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(event.operation_id)
+        || event.actor_uid !== null && !uuid(event.actor_uid) || !['user', 'admin', 'system'].includes(event.actor_kind)
+        || !['app_engine', 'admin_engine', 'direct_sql'].includes(event.origin) || !AUDIT_ROOTS.has(event.root)
+        || !text(event.record_key) || /[.#$/[\]\u0000-\u001f\u007f]/.test(event.record_key)
+        || !['create', 'update', 'delete', 'remove', 'cleanup', 'restore', 'purge', 'observed_zto_sign', 'observed_zto_return'].includes(event.action)
+        || !['record_created', 'record_removed', 'stored_fields_changed', 'delete', 'remove', 'pickup', 'returned', 'stored_consumption', 'stored_positive_sign_mark', 'stored_positive_return_mark'].includes(event.reason)
+        || event.actor_kind === 'user' && event.actor_uid === null || event.actor_kind === 'system' && event.actor_uid !== null
+        || event.origin === 'app_engine' && event.actor_kind !== 'user' || event.origin === 'admin_engine' && event.actor_kind !== 'admin'
+        || event.status_source !== 'stored_business_state' || event.projection_scope !== 'bounded_business_fields'
+        || !['previous_status', 'new_status', 'before_value', 'after_value'].every(key => auditSummary(event[key]))
+        || !Array.isArray(event.changed_fields) || event.changed_fields.length > 32 || !event.changed_fields.every(text)
+        || new Set(event.changed_fields).size !== event.changed_fields.length
+        || !event.changed_fields.every(key => Object.prototype.hasOwnProperty.call(event.before_value, key) || Object.prototype.hasOwnProperty.call(event.after_value, key))
+        || typeof event.changed_fields_truncated !== 'boolean' || typeof event.summary_unchanged !== 'boolean'
+        || !auditTimestamp(event.committed_at)
+        || Buffer.byteLength(JSON.stringify(event.before_value)) + Buffer.byteLength(JSON.stringify(event.after_value)) > 131072) {
+        throw new Error('Audit archive contains an unsupported, corrupt or incorrectly scoped event.');
+    }
+    return event;
+}
+
+function validateAuditEnvelope(audit, tenant) {
+    if (!object(audit) || stableJson(Object.keys(audit).sort()) !== stableJson(['events', 'format', 'tenant', 'through', 'version'])
+        || audit.format !== AUDIT_FORMAT || audit.version !== AUDIT_VERSION || !uuid(tenant) || audit.tenant !== tenant
+        || !decimal(audit.through) || !Array.isArray(audit.events)) throw new Error('Unsupported or corrupt audit archive envelope.');
+    auditBudget(audit.events);
+    const ids = new Set();
+    for (const event of audit.events) {
+        validateAuditEvent(event, tenant);
+        if (ids.has(event.event_id)) throw new Error('Audit archive contains duplicate event IDs.');
+        ids.add(event.event_id);
+    }
+    return audit;
+}
+
+async function exportAudit(client, tenantId, options) {
+    const opts = options || {};
+    const limit = opts.auditPageRows || 200, maxBytes = opts.auditPageBytes || DEFAULT_PAGE_BYTES;
+    if (!Number.isInteger(limit) || limit < 1 || limit > 500 || !Number.isInteger(maxBytes) || maxBytes < 65536 || maxBytes > 4194304) {
+        throw new Error('Audit export page bounds are invalid.');
+    }
+    let after = '0', through = null;
+    const limits = auditLimits(opts);
+    let bytes = 2;
+    const events = [], ids = new Set();
+    for (let page = 0; page < MAX_EXPORT_PAGES; page++) {
+        const res = await client.rpc('zoe_admin_audit_export', { p_tenant: tenantId, p_after: after, p_through: through, p_limit: limit, p_max_bytes: maxBytes });
+        if (!object(res) || res.v !== 1 || res.tenant !== tenantId || !decimal(res.through) || !Array.isArray(res.rows)
+            || res.rows.length > limit || typeof res.more !== 'boolean' || through !== null && res.through !== through) {
+            throw new Error('Audit export returned an invalid or changing snapshot ceiling.');
+        }
+        through = res.through;
+        for (const event of res.rows) {
+            if (events.length >= limits.events) throw new Error('Audit archive aggregate event budget exceeded; no history was truncated. This history requires a segmented archive implementation before the full backup/import can continue.');
+            bytes += (events.length ? 1 : 0) + auditJsonBytes(event, limits.bytes - bytes - (events.length ? 1 : 0));
+            validateAuditEvent(event, tenantId);
+            if (ids.has(event.event_id)) throw new Error('Audit export returned duplicate event IDs.');
+            ids.add(event.event_id); events.push(event);
+        }
+        if (!res.more) {
+            if (res.next !== null) throw new Error('Audit export returned an invalid final cursor.');
+            return validateAuditEnvelope({ format: AUDIT_FORMAT, version: AUDIT_VERSION, tenant: tenantId, through, events }, tenantId);
+        }
+        if (!res.rows.length || !decimal(res.next, false) || BigInt(res.next) <= BigInt(after) || BigInt(res.next) > BigInt(through)) {
+            throw new Error('Audit export paging did not advance within its snapshot.');
+        }
+        after = res.next;
+    }
+    throw new Error('Audit export paging did not finish.');
+}
+
+async function listTenants(client, options) {
     const out = [];
     let after = null;
     for (let page = 0; page < MAX_TENANT_PAGES; page += 1) {
@@ -160,7 +368,26 @@ async function listTenants(client) {
             if (!tenant || !TENANT_ID_RE.test(String(tenant.id))) throw new Error('zoe_admin_tenants returned an invalid tenant id.');
             out.push(tenant);
         }
-        if (!res.more) return out;
+        if (!res.more) {
+            if (!options || options.includeAudit !== true) return out;
+            const owners = new Set(out.map(tenant => tenant.id)), seen = new Set();
+            let cursor = null;
+            for (let auditPage = 0; auditPage < MAX_TENANT_PAGES; auditPage++) {
+                const audit = await client.rpc('zoe_admin_audit_tenants', { p_after: cursor, p_limit: TENANT_PAGE_ROWS });
+                if (!object(audit) || !Array.isArray(audit.tenants) || audit.tenants.length > TENANT_PAGE_ROWS || typeof audit.more !== 'boolean') throw new Error('Audit tenant enumeration returned an unexpected reply.');
+                let last = cursor;
+                for (const id of audit.tenants) {
+                    if (!uuid(id) || seen.has(id) || last && id <= last) throw new Error('Audit tenant enumeration returned an invalid or repeated owner.');
+                    seen.add(id);
+                    last = id;
+                    if (!owners.has(id)) { owners.add(id); out.push({ id, audit_only: true }); }
+                }
+                if (!audit.more) return out.sort((a, b) => a.id.localeCompare(b.id));
+                if (!audit.tenants.length || !uuid(audit.next) || audit.next !== last || cursor && audit.next <= cursor) throw new Error('Audit tenant enumeration did not advance.');
+                cursor = audit.next;
+            }
+            throw new Error('Audit tenant enumeration did not finish.');
+        }
         if (!TENANT_ID_RE.test(String(res.next)) || res.next === after) throw new Error('zoe_admin_tenants did not advance.');
         after = res.next;
     }
@@ -170,6 +397,7 @@ async function listTenants(client) {
 async function exportTenant(client, tenantId, options) {
     const o = options || {};
     if (!TENANT_ID_RE.test(String(tenantId))) throw new Error('Tenant id must be a UUID.');
+    if (o.auditOnly === true) return { data: Object.create(null), seq: 0, rows: 0, pages: 0, tombstonesAfter: 0, changes: [], audit: await exportAudit(client, tenantId, o) };
     const pageRows = o.pageRows || DEFAULT_PAGE_ROWS;
     const pageBytes = o.pageBytes || DEFAULT_PAGE_BYTES;
     const since = Number.isInteger(o.since) && o.since > 0 ? o.since : 0;
@@ -224,7 +452,7 @@ async function exportTenant(client, tenantId, options) {
         if (!moved || !res.rows.length) throw new Error('zoe_admin_export did not advance.');
         cursor = { seq: Number(next.seq), root: String(next.root), key: String(next.key) };
     }
-    return { data, seq: head, rows, pages, tombstonesAfter: threshold, changes };
+    return { data, seq: head, rows, pages, tombstonesAfter: threshold, changes, ...(o.includeAudit === false ? {} : { audit: await exportAudit(client, tenantId, o) }) };
 }
 
 function rootCounts(data) {
@@ -240,6 +468,7 @@ function rootCounts(data) {
 
 function buildArchive(tenant, exported, host) {
     const counts = rootCounts(exported.data);
+    const audit = validateAuditEnvelope(exported.audit, tenant.id);
     return {
         format: FORMAT,
         version: FORMAT_VERSION,
@@ -254,28 +483,57 @@ function buildArchive(tenant, exported, host) {
             seq: exported.seq,
             docs: counts.docs,
             roots: counts.roots,
+            audit: { version: AUDIT_VERSION, events: audit.events.length, sha256: auditDigest(audit.events) },
+            ...(tenant.audit_only === true || counts.docs === 0 && audit.events.length > 0 ? { audit_only: true } : {}),
             exported_at: new Date().toISOString(),
             source: { kind: 'supabase', host }
         },
-        data: exported.data
+        data: exported.data,
+        audit
     };
 }
 
 function isArchive(value) {
-    return !!value && typeof value === 'object' && value.format === FORMAT && value.version === FORMAT_VERSION
+    return !!value && typeof value === 'object' && value.format === FORMAT && [1, FORMAT_VERSION].includes(value.version)
         && !!value.manifest && typeof value.manifest === 'object' && !!value.data && typeof value.data === 'object' && !Array.isArray(value.data);
+}
+
+function validateArchive(value) {
+    if (!isArchive(value)) throw new Error('Unsupported or malformed Supabase archive (supported versions: 1 and 2).');
+    if (value.version === 1) {
+        if (Object.prototype.hasOwnProperty.call(value, 'audit') || Object.prototype.hasOwnProperty.call(value.manifest, 'audit')) {
+            throw new Error('Audit history requires a version 2 archive; legacy audit fields cannot be ignored.');
+        }
+        return null;
+    }
+    if (stableJson(Object.keys(value).sort()) !== stableJson(['audit', 'data', 'format', 'manifest', 'version'])) throw new Error('Audit archive contains unsupported envelope fields.');
+    const audit = validateAuditEnvelope(value.audit, value.manifest.tenant && value.manifest.tenant.id);
+    const summary = value.manifest.audit;
+    if (!object(summary) || stableJson(Object.keys(summary).sort()) !== stableJson(['events', 'sha256', 'version']) || summary.version !== AUDIT_VERSION || summary.events !== audit.events.length
+        || summary.sha256 !== auditDigest(audit.events) || value.manifest.audit_only !== undefined && typeof value.manifest.audit_only !== 'boolean'
+        || value.manifest.audit_only === true && Object.keys(value.data).length) throw new Error('Audit archive manifest or integrity digest is corrupt.');
+    return audit;
 }
 
 module.exports = {
     FORMAT,
     FORMAT_VERSION,
     TENANT_ID_RE,
+    AUDIT_FORMAT,
+    AUDIT_VERSION,
+    MAX_AUDIT_ARCHIVE_EVENTS,
+    MAX_AUDIT_ARCHIVE_BYTES,
+    auditDigest,
+    assertAuditMergeBudget,
     buildArchive,
     createClient,
     exportTenant,
+    exportAudit,
     isArchive,
     listTenants,
     normalizeSupabaseUrl,
     rootCounts,
-    validateSecretKey
+    validateSecretKey,
+    validateArchive,
+    validateAuditEnvelope
 };

@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { keygenLogoutRuntime } = require('./keygen-logout-runtime.cjs');
 
 const root = path.resolve(__dirname, '../..');
 const appRoot = process.env.AUTH_APP_DIR ? path.resolve(process.env.AUTH_APP_DIR) : root;
@@ -128,6 +129,8 @@ function buildContext(app) {
         body: { style: {} }
     };
 
+    const localValues = new Map();
+    const sessionValues = new Map();
     const sandbox = {
         console,
         setTimeout: fakeSetTimeout,
@@ -135,15 +138,17 @@ function buildContext(app) {
         Promise, Error, JSON, Date, String, Number, Object, Array, isNaN, parseFloat, URL,
         document: doc,
         localStorage: {
-            getItem: (k) => (k === 'zoew_firebase_config' ? configJson : null),
-            setItem() {}, removeItem() {}
+            get length() { return localValues.size + 1; }, key: i => i === 0 ? 'zoew_firebase_config' : [...localValues.keys()][i - 1] ?? null,
+            getItem: (k) => (k === 'zoew_firebase_config' ? configJson : localValues.get(k) ?? null),
+            setItem(k, v) { localValues.set(k, String(v)); }, removeItem(k) { localValues.delete(k); }
         },
         fetch: fakeFetch,
         navigator: { onLine: true },
         encodeURIComponent,
         alert: (m) => log.alerts.push(m),
         fb, auth, db: {},
-        window: { firebaseSDK: fb },
+        window: { firebaseSDK: fb, addEventListener() {}, removeEventListener() {} },
+        sessionStorage: { get length() { return sessionValues.size; }, key: i => [...sessionValues.keys()][i] ?? null, getItem: k => sessionValues.get(k) ?? null, setItem: (k, v) => sessionValues.set(k, String(v)) },
         __log: log, __clock: clock, __els: els,
         __restorePersistedUser: restorePersistedUser
     };
@@ -216,6 +221,9 @@ function buildContext(app) {
         'connectionLooksOnline', 'liveToastState', 'showLiveToast',
         'retryPendingRoleCheck', 'enforceSessionOnlyAuthPersistence', 'keygenLoginBackendIsReady', app.verify, app.login];
     const appSrc = fs.readFileSync(path.join(appRoot, app.file), 'utf8');
+    vm.runInContext(keygenLogoutRuntime(appSrc), ctx);
+    if (appSrc.includes('async function logoutApp(')) wanted.push('logoutApp');
+    vm.runInContext('function hasUncopiedKeypair() { return false; }', ctx);
     const configKeys = appSrc.match(/^const FIREBASE_CONFIG_KEYS = .*;$/m);
     if (!configKeys) throw new Error('not found: FIREBASE_CONFIG_KEYS in ' + app.file);
     vm.runInContext(configKeys[0], ctx);

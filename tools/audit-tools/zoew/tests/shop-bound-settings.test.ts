@@ -5,6 +5,9 @@
  *    (`shop` = `shopScope()`) ➜ ហាងផ្សេង (ឬហាងមិនទាន់ស្គាល់) ➜ មិនប្រើ · ការកំណត់ចាស់គ្មាន `shop` ➜ ចងទៅហាងដែលអានវាដំបូង។
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createRequire } from 'node:module';
+import { resolve } from 'node:path';
+const { writerTransport } = createRequire(import.meta.url)('./helpers/sheet-import-fixture.cjs');
 
 const fields = vi.hoisted(() => ({ values: {} as Record<string, string>, checks: {} as Record<string, boolean> }));
 vi.mock('../../../../ZoeW/src/app/refs', async (importOriginal) => {
@@ -206,12 +209,20 @@ describe('Deep audit ៖ លទ្ធផល Sheet មិនប៉ះ cache/UI �
         vi.stubGlobal('confirm', () => true);
         const cleared = vi.spyOn(customerTable, 'clearCustomerDataTableCache').mockImplementation(() => {});
         let finish!: (value: any) => void;
-        vi.spyOn(network, 'fetchWithTimeout').mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+        const transport = writerTransport(resolve(__dirname, '../../../zto-import/Code.gs'), {
+            password: 'a', rows: Array.from({ length: 5 }, (_, i) => ['A' + i, 0, 0, '012']),
+            commit: () => new Promise<Response>((done) => { finish = done; })
+        });
+        vi.spyOn(network, 'fetchWithTimeout').mockImplementation(async (url, init) => {
+            const response = await transport.respond(url, init);
+            return { res: response, body: await response.text() } as any;
+        });
         const task = runSheetImportClear();
+        await vi.waitFor(() => expect(transport.calls.filter((body: any) => body.action === 'clear')).toHaveLength(1));
         expect(shopScope()).toBe(FB_A);
         useFirebase(FB_B);
         expect(shopScope()).toBe(FB_B);
-        finish({ res: { ok: true }, body: JSON.stringify({ ok: true, data: { removed: 5, sheetName: 'A', rowsAfter: 0 } }) });
+        finish(new Response(JSON.stringify({ ok: true, data: { removed: 5, sheetName: 'A', rowsAfter: 0 } }), { status: 200 }));
         await task;
         expect(cleared).not.toHaveBeenCalled();
     });

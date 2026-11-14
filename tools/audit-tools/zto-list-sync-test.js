@@ -54,6 +54,7 @@ const path = require('path');
 const vm = require('vm');
 const crypto = require('crypto');
 const { scanEvidenceRuntime, memoryStorage } = require('./react-view');
+const { localAuthRuntime } = require('./local-auth-runtime.cjs');
 
 const ROOT = process.env.ZTOLIST_APP_DIR
     ? path.resolve(process.env.ZTOLIST_APP_DIR)
@@ -82,6 +83,7 @@ const FUNCTION_SRC = readOr(FUNCTION_JS);
 const PALM_SRC = readOr(path.join(ROOT, 'ZoeW', 'netlify', 'functions', '_shared', 'zto-palm.js'));
 const APP_SRC = readOr(APP_JS);
 const HTML_SRC = readOr(INDEX_HTML);
+const listAuthRuntime = localAuthRuntime(ROOT, APP_SRC);
 
 // ─── ជាន់អប្បបរមា ៖ ថតទទេ ➜ គ្មានការអះអាងណាបៃតងបានឡើយ ───────────────────
 ok('ជាន់អប្បបរមា ៖ អាន Function បាន', FUNCTION_SRC.length > 8000, FUNCTION_SRC.length);
@@ -98,7 +100,10 @@ function installListClockFixture(context) {
     context.serverTimeOffsetMs = 0;
     context.isDatabaseConnected = true;
     context.sessionExpiryCheck = 'live';
-    if (!context.db) context.db = {};
+    const config = context.db?.app?.options || { databaseURL: 'https://zto-list-clock-fixture.invalid' };
+    if (!context.db) context.db = { app: { options: config } };
+    if (!context.auth) context.auth = { currentUser: { uid: 'zto-list-fixture' }, app: { options: config } };
+    listAuthRuntime.install(context, config);
     const clockRuntime = require('./react-view').moduleRuntime(ROOT, APP_SRC, [
         { path: 'src/core/clock.ts', expose: ['getServerClockBounds', 'captureClockOperation', 'serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'resetServerClock'] },
         { path: 'src/core/session-verification.ts', expose: ['sessionVerificationRequired'] }
@@ -1592,6 +1597,7 @@ function firstBody(requests) {
                 calls.probe.length = 0; calls.close.length = 0; calls.verdict.length = 0; calls.origin.length = 0;
                 box.scanHistory.length = 0;
                 box.localStorage.clear();
+                listAuthRuntime.seed(box, box.db.app.options);
                 if (box.__signedEvidence) box.__signedEvidence.clear();
                 box.__autoClose = true;
                 box.__closeHangs = false;
@@ -2539,6 +2545,7 @@ function firstBody(requests) {
         vm.runInContext(fakeSource.slice(bootStart, bootEnd) + '\nBOOT({});', vbox);
         vbox.fb = vbox.firebaseSDK; vbox.db = { app: { options: { databaseURL: 'https://v2-entry-fixture.invalid' } } };
         vbox.auth = vbox.fb.getAuth();
+        listAuthRuntime.seed(vbox, vbox.db.app.options);
         vbox.readRestoreServerNode = async (sdk, db, node) => (await sdk.get(sdk.ref(db, node))).val();
         const runtime = require('./react-view').moduleRuntime(ROOT, APP_SRC, [
             'src/domain/barcode-key.ts', 'src/core/storage.ts', 'src/core/shop-scope.ts',

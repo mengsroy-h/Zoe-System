@@ -22,6 +22,24 @@ Deploy ជាកំណែថ្មី។ វា **មិនប៉ះ `APP_VERSIO
 `jsonOut_()` ដែលជាចំណុចចេញតែមួយ) ➜ ក្រោយ Deploy អ្នកអាចបញ្ជាក់បានថា
 deployment ពិតជាទទួលកូដថ្មី។
 
+### Writer protocol 1 · `SCRIPT_VERSION = 7`
+
+App និងទំព័រ Web ត្រូវប្រើ writer ថ្មីជាមួយគ្នា។ `prepareWrite` ដែលផ្ទៀងពាក្យសម្ងាត់ បង្កើត intent ចង request ID, fingerprint នៃទិន្នន័យនាំចូល, Spreadsheet/tab ពិត, revision និង fingerprint នៃតម្លៃ/រូបមន្តក្នុង A:D មុនសរសេរ។ Client រក្សា intent ក្នុង local storage មុន dispatch; បើ storage មិនអាចសរសេរ/អានត្រឡប់បាន មិនសរសេរ Sheet ទេ។ គ្មាន source rows, URL, query credential ឬពាក្យសម្ងាត់ក្នុង journal ថ្មី; scope រក្សាជា hash។
+
+- Import ទាំងបីរបៀប, clear និង watcher ប្រើ fence ដូចគ្នាក្នុងគម្រោង Apps Script មួយ។ Client ចាស់ដែលគ្មាន intent ត្រូវបដិសេធមុនសរសេរ។ កុំ fallback ទៅ writer ចាស់។
+- A commit តែបាត់ចម្លើយ → B នាំចូលថ្មី → A retry៖ receipt ដើមរបស់ A ត្រឡប់ដោយមិនសរសេរ A ជាន់ B។ Client មិនយកទិន្នន័យ A ចាស់ទៅ seed cache ឬរាយថាជាស្ថានភាពបច្ចុប្បន្នទេ; វាទាញស្ថានភាពថ្មី។ Double-click នៃ input ដដែលប្រើ receipt ដើម។
+- បិទ modal ក្រោយ dispatch មិនលុប business outcome ទេ៖ ACK អាចកែតារាងរបស់ហាង/វគ្គដដែល ប៉ុន្តែមិនកែ UI ចាស់ ឬទិន្នន័យហាងថ្មី។ បើតារាងត្រូវបានកែថ្មីដោយ import, GET ឬ lookup តាម barcode ក្នុងពេលរង់ចាំ ACK ត្រូវទាញថ្មី ជំនួសការយកតម្លៃចាស់មកជាន់។ Endpoint/password របស់សំណើត្រូវចាប់ទុកមុនការរង់ចាំ។
+- Auth rejection មុនបង្កើត intent បង្ហាញមូលហេតុពាក្យសម្ងាត់ដោយមិនសរសេរ។ បើមាន pending ពីមុន សូម្បី retry ត្រូវបដិសេធនៅ status ដំបូង ឬបាន `written:false` ក៏មិនបញ្ជាក់ថា operation ដើមមិនបានអនុវត្តទេ; រក្សាភស្តុតាង និង UNKNOWN។ Tab មួយអាចបាន commit intent ដូចគ្នាមុន Tab មួយទៀតទទួល auth rejection។
+- Prepared intent ចាស់ ឬ Sheet ដែលប្រែពី fingerprint មុន dispatch ត្រូវបដិសេធ។ ការបាត់ response របស់ prepare អាចទុក prepared record ដែលមិនបានប្រើ; មិនមាន business write មុន client ទទួល និងរក្សា intent បានទេ។ ការជ្រើសឯកសារថ្មីជាប្រតិបត្តិការថ្មី; លុបតែ client proof ដែលបាន ACK រួច។ Pending/unknown មិនត្រូវលុបដោយការជ្រើសឯកសារ ឬ reload ទេ។
+- Partial write ឬ crash មុនរក្សា receipt ចប់ នៅ HOLD។ Retry អាចបញ្ជាក់តាម postimage តម្លៃ A:D ដែលស្មើផែនការដើម និង fence/target ដើមប៉ុណ្ណោះ ដោយមិនសរសេរឡើងវិញ។ Mismatch មិនមានន័យថា NOT_APPLIED។ រក្សា file ដើម, Sheet និង Script Properties; ម្ចាស់ត្រូវផ្ទៀងមុនជួសជុលទិន្នន័យ។ កុំកែ hash/state ឬលុប receipt ដើម្បីបង្ខំឱ្យបន្ត។
+- Server រក្សារហូតដល់ ២០០ receipt និងកំណត់ serialized record មួយមិនលើស 8 KiB; មិនរក្សា source rows ក្នុង Properties ទេ។ Prepared/done ដែលលែងជាភស្តុតាងរបស់ fence បច្ចុប្បន្ន អាចត្រូវ retire ពេលដល់ពិដាន។ Pending/unknown មិនផុតកំណត់ និងមិនត្រូវ evict។ Receipt ចាស់ដែលខ្វះនៅ HOLD មិនក្លាយជាសំណើថ្មី; quota របស់ Script Properties អាចទប់ការងារថ្មីមុនពិដាននេះ។ កម្រិត input ២០,០០០ ជួរនៅដដែល។
+
+`ScriptLock` គ្របតែគម្រោង Apps Script ដដែល។ មិនអាចធ្វើ atomic compare-and-set ជាមួយការកែ Sheet ដោយដៃ ឬ writer ក្នុងគម្រោងផ្សេងបានទេ។ Fingerprint ចាប់ការកែដែលឃើញមុន dispatch និង postimage mismatch; មិនធានាទប់ការកែខាងក្រៅក្នុងចន្លោះ read/write ទេ។ ត្រូវផ្អាក editors/writers ផ្សេងពេលនាំចូលដែលត្រូវការលទ្ធផលតែមួយ។
+
+**Cutover មុនប្រើ**៖ inventory រាល់ URL/deployment និងគម្រោងផ្សេងដែលសរសេរ Sheet ដដែល រួមទាំង trigger របស់គ្រប់គណនី។ ផ្អាក import/editor និង trigger ទាំងអស់; រង់ចាំ execution ចាស់ចប់; backup Sheet, Script Properties និង Inbox/Done/Failed ដែលអាចស្តារបាន។ សាក Code.gs/Watch.gs/Index.html និង App ថ្មីលើ Sheet/folder ដាច់ដោយឡែក រួមទាំង lost response, partial write និង client ចាស់ត្រូវបដិសេធ។ ក្រោយការអនុញ្ញាត deploy ដោយឡែក ទើប update រាល់ URL សកម្ម និង archive ច្រកកូដចាស់/គម្រោង writer ផ្សេងដែលអាច bypass fence; បើក schedule ម្ចាស់តែមួយក្រោយផ្ទៀងរួច។ Repo edit និងតេស្ត VM មិនធ្វើជំហាន Google ទាំងនេះជំនួសទេ។
+
+**Rollback**៖ ផ្អាក writer/trigger និង editor វិញ ហើយរក្សា client journals, Sheet និង Properties ទាំងមូល។ កុំបើក writer ចាស់ដែលមិនស្គាល់ fence ឬ restore តែ Properties ខណៈ Sheet នៅជាស្ថានភាពថ្មី។ រក្សាការផ្អាករហូតដល់បានផ្ទៀងច្បាប់ចម្លង និង pending postimage ដោយម្ចាស់; receipt ខ្វះ/ខុសមិនអនុញ្ញាត replay ដោយស្វ័យប្រវត្តិទេ។
+
 ## មុខងារ
 
 ### រចនាសម្ព័ន្ធថត
@@ -226,7 +244,7 @@ file — លើកក្រោយ file ZTO បែបដដែលនឹងផ្�
   មិនគ្រប់ លុះត្រាតែ Script ដែលភ្ជាប់ប្រាប់ (`scriptVersion` ក្នុងចម្លើយ) ថាវារក្សា Column ទាំងនោះ — បើមិនដូច្នោះ ZoeW បដិសេធ ហើយប្រាប់ឲ្យ
   Deploy `Code.gs` នេះ ឬជ្រើស Column ឲ្យគ្រប់។
 - ZoeW អស់ពេលរង់ចាំ · ចម្លើយមិនមែន JSON · HTTP មិនមែន 2xx · ឬ Script ឆ្លើយបរាជ័យក្រោយចាប់ផ្ដើមសរសេរ (`written: true`) ➜ «មិនទាន់ដឹងលទ្ធផល»
-  (Sheet អាចបានទទួលរួច · ZoeW បោះតារាងអតិថិជនក្នុងឧបករណ៍ចោល ហើយទាញថ្មី · ចុចម្ដងទៀតបានដោយសុវត្ថិភាព)។ ការបដិសេធមុនសរសេរ
+  (Sheet អាចបានទទួលរួច · ZoeW បោះតារាងអតិថិជនក្នុងឧបករណ៍ចោល ហើយទាញថ្មី · writer protocol ថ្មីរក្សា intent ដើមសម្រាប់ការផ្ទៀង មិនបង្កើតការសរសេរថ្មីពី unknown ទេ)។ ការបដិសេធមុនសរសេរ
   (`written: false` ៖ ពាក្យសម្ងាត់ខុស · ការនាំចូលផ្សេងកំពុងរត់ · tab បាត់ …) ➜ ❌ ច្បាស់។ ការរក្សាការផ្គូផ្គង Column បរាជ័យក្រោយសរសេររួច
   មិនធ្វើឲ្យការនាំចូលបរាជ័យទេ។
 - ឧបករណ៍នេះ **មិនកែទម្រង់លេខទូរស័ព្ទ ឬ Barcode ទេ** — វាដាក់តម្លៃចូលដូចអ្នក
@@ -257,6 +275,8 @@ node tools/audit-tools/zto-import/test.js
 វាចាស់លឿន។ តេស្តត្រូវផ្ទៀងផ្ទាត់ដោយ **mutation** — បង្ខូចកូដដោយចេតនា
 (ដក hint ខ្មែរចេញ, ដកការបង្គត់លុយ, អនុញ្ញាតឲ្យ Column ត្រូវយកស្ទួន...)
 រួចប្រាកដថាតេស្តធ្លាក់មែន។
+
+Protocol/recovery និង client journal controls បន្ថែម៖ `npm --prefix ZoeW test -- sheet-import-protocol.test.ts --maxWorkers=1`។ វារត់ Code.gs និង helper/handler ពិតដែលដកពី App/Web ជាមួយ Google services, storage និង transport ដែលគ្រប់គ្រងក្នុងម៉ាស៊ីន។ មិនមែនភស្តុតាង Google deployment, actual ScriptLock concurrency ឬ atomicity ទល់ manual editor ទេ។
 
 ---
 

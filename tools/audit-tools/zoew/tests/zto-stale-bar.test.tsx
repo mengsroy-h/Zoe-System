@@ -1,3 +1,4 @@
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 /**
  * ⛔ ZTO-E6 ៖ របា «N កញ្ចប់បិទក្នុង ZoeW តែ ZTO មិនទាន់បិទ» ត្រូវរលត់ពេល ZTO ចុះហត្ថលេខា (ZTO Palm) ដោយមិនរង់ចាំការចុច។
  *
@@ -151,6 +152,8 @@ beforeEach(() => {
         },
         getIdTokenResult: async () => ({ token: 'audit-token' })
     } as any;
+    configureFixtureBackend('zto-stale-bar');
+    acceptFixtureSession();
     vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 

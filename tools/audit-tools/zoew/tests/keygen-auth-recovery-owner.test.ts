@@ -7,8 +7,8 @@ const vm = require('node:vm');
 const sourceRoot = process.env.KEYGEN_AUTH_RECOVERY_SOURCE_ROOT || path.resolve(__dirname, '../../../..');
 const source = fs.readFileSync(path.join(sourceRoot, 'ZoeKeyGen/app.js'), 'utf8');
 const nodes = require('acorn').parse(source, { ecmaVersion: 'latest' }).body;
-const functions = ['attemptAuthStorageRecovery', 'setupAuthListener'].map(name => {
-  const node = nodes.find(node => node.type === 'FunctionDeclaration' && node.id.name === name);
+const functions = ['LOCAL_LOGOUT_INTENT_PREFIX', 'createLocalLogoutIntentStore', 'localLogoutIntent', 'acceptedLogoutIntents', 'initialAuthLogoutIntents', 'captureInitialAuthLogoutIntent', 'keygenAuthScope', 'attemptAuthStorageRecovery', 'setupAuthListener'].map(name => {
+  const node = nodes.find(node => node.type === 'FunctionDeclaration' && node.id.name === name || node.type === 'VariableDeclaration' && node.declarations.some(d => d.id.name === name));
   if (!node) throw new Error('Missing actual function: ' + name);
   return source.slice(node.start, node.end);
 }).join('\n');
@@ -29,7 +29,9 @@ function fixture(options: { hidden?: boolean; enumerationPending?: boolean; dele
   const rows = [{ name: 'firebaseLocalStorageDb' }, { name: 'business-retained' }, { name: 'firebase-heartbeat-database' }];
   let config = '{"project":"synthetic-A"}';
   let now = 0;
-  const authA = { currentUser: null };
+  const authA = { currentUser: null, app: { options: { databaseURL: 'https://synthetic-a.firebaseio.com' } } };
+  const intentValues = new Map();
+  Object.assign(storage, { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) });
   const sdk = { onAuthStateChanged: (auth, callback) => { const row = { auth, callback, unsubscribed: false }; callbacks.push(row); return () => { row.unsubscribed = true; }; } };
   const indexedDB = {
     databases: () => { calls.enumerations++; if (options.enumerationError) throw new Error('synthetic enumeration refusal'); return options.enumerationPending ? enumeration.promise : Promise.resolve(rows); },
@@ -44,9 +46,9 @@ function fixture(options: { hidden?: boolean; enumerationPending?: boolean; dele
     addEventListener: (name, callback) => { if (name === 'visibilitychange') events.add(callback); },
     removeEventListener: (name, callback) => { if (name === 'visibilitychange') events.delete(callback); } };
   const ctx = vm.createContext({ console, Promise, document, indexedDB,
-    window: { ...(options.noIndexedDB ? {} : { indexedDB }), location: { reload: () => calls.reloads++ } },
-    auth: authA, fb: sdk, authGeneration: 7, authRecoveryTimeout: null, authUnsubscribe: null, pendingRoleRecheck: false,
-    appLocalStore: { getItem: () => config }, appSessionStore: storage,
+    window: { addEventListener() {}, removeEventListener() {}, ...(options.noIndexedDB ? {} : { indexedDB }), location: { reload: () => calls.reloads++ } },
+    auth: authA, fb: sdk, keygenLoginOwner: null, authGeneration: 7, authRecoveryTimeout: null, authUnsubscribe: null, pendingRoleRecheck: false,
+    appLocalStore: { getItem: key => key === 'zoew_firebase_config' ? config : intentValues.get(key) ?? null }, appSessionStore: storage,
     safeStoreGet: (store, key) => store instanceof Map ? store.get(key) : store.getItem(key),
     safeStoreSet: (store, key, value) => { store.set(key, value); return true; },
     showLoginModalWithPrefill: () => calls.login++,

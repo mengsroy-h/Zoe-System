@@ -1,3 +1,4 @@
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 /**
  * ⛔ ZTO-E1 (លុយ) ៖ ការសម្អាត ៧ ថ្ងៃ (`claimAndCleanupItem('abandon')` ➜ `returned` ➜ **ដកលុយ**) ត្រូវរង់ចាំការអានបញ្ជី
  * «ចុះហត្ថលេខា» (ZTO Palm) ដែលពេញលេញ មុនដកកញ្ចប់ដែលអតិថិជនយករួច។
@@ -120,6 +121,8 @@ beforeEach(() => {
         },
         getIdTokenResult: async () => ({ token: 'audit-token' })
     } as any;
+    configureFixtureBackend('zto-abandon-signed-gate');
+    acceptFixtureSession();
     vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 

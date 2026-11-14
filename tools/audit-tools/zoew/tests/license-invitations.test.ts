@@ -9,6 +9,7 @@ import { proceedAfterLogin } from '../../../../ZoeW/src/features/license';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement } from 'react';
 import { ActivationModal } from '../../../../ZoeW/src/app/components/modals/ActivationModal';
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 vi.mock('../../../../ZoeW/src/features/license', async importOriginal => ({ ...await importOriginal<any>(), proceedAfterLogin: vi.fn(async () => true) }));
 const native = vi.hoisted(() => ({ android: false, native: false }));
 vi.mock('../../../../ZoeW/src/platform/native', async importOriginal => ({ ...await importOriginal<any>(), isNativeAndroid: () => native.android, isNativeApp: () => native.native }));
@@ -24,6 +25,9 @@ beforeEach(() => {
     invitation.cancelLicenseInvitation(); invitation.clearLicenseInvitationIntent(); securityState.appIsLocked = false; securityState.pinTargetAction = null; appLocalStore.clear(); vi.clearAllMocks();
     firebaseState.auth = { currentUser: { uid: 'test-user' } } as any;
     firebaseState.authGeneration++; firebaseState.db = {} as any;
+    configureFixtureBackend('license-invitations');
+    firebaseState.fb = {}; firebaseState.sessionExpiryCheck = 'live'; firebaseState.serverClockTrusted = true;
+    acceptFixtureSession();
     viewState.backendKind = 'firebase'; viewState.activationBusy = false; viewState.seatEnrollmentBusy = false;
     viewState.invitationCode = code; uiState.modalDisplay = { activationModal: 'flex' };
     standalone = true; native.android = false; native.native = false;
@@ -219,7 +223,7 @@ describe('ការអញ្ជើញឧបករណ៍អតិថិជន', (
         for (let i = 0; i < appLocalStore.length; i++) {
             const key = appLocalStore.key(i)!;
             const raw = appLocalStore.getItem(key)!;
-            if (raw.startsWith('{')) appLocalStore.setItem(key, JSON.stringify({ ...JSON.parse(raw), paused: false }));
+            if (key.startsWith('zoew_license_invitation_v1:') && raw.startsWith('{')) appLocalStore.setItem(key, JSON.stringify({ ...JSON.parse(raw), paused: false }));
         }
         viewState.invitationCode = '';
         await invitation.resumeLicenseInvitation();
@@ -267,7 +271,7 @@ describe('ការអញ្ជើញឧបករណ៍អតិថិជន', (
         let pendingKey = '';
         for (let i = 0; i < appLocalStore.length; i++) {
             const key = appLocalStore.key(i)!;
-            if (appLocalStore.getItem(key)!.startsWith('{')) pendingKey = key;
+            if (key.startsWith('zoew_license_invitation_v1:') && appLocalStore.getItem(key)!.startsWith('{')) pendingKey = key;
         }
         appLocalStore.setItem(pendingKey, '{broken');
         await invitation.submitLicenseInvitation();

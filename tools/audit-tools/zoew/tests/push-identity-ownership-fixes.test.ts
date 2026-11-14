@@ -4,6 +4,7 @@ import { viewState } from '../../../../ZoeW/src/core/view-state';
 import { appLocalStore } from '../../../../ZoeW/src/core/storage';
 import { acceptServerClockOffset, resetServerClock } from '../../../../ZoeW/src/core/clock';
 import { enablePush, ensureNativePushListeners, resyncPush, togglePush, watchPushIdentity, PUSH_STATE_KEY, pushRuntime } from '../../../../ZoeW/src/features/push';
+import { acceptFixtureSession } from './helpers/accepted-session';
 const nativePush = vi.hoisted(() => ({ listeners: {} as Record<string, (value: any) => void>, addListener: vi.fn(async (name, fn) => { nativePush.listeners[name] = fn; return { remove: async () => {} }; }) }));
 vi.mock('@capacitor/push-notifications', () => ({ PushNotifications: nativePush }));
 vi.mock('../../../../ZoeW/src/core/action-registry', () => ({ ACTION_REGISTRY: {}, ACTION_NAMES: [], lookupAction: () => null }));
@@ -43,10 +44,12 @@ function shop(tenant:string, token:()=>Promise<string> = async()=> 'token-'+tena
  firebaseState.authGeneration++;
  firebaseState.auth={currentUser:{uid:tenant,getIdToken:token},_account:{tenant_id:tenant}} as any;
  firebaseState.db={shop:tenant} as any;
+ acceptFixtureSession();
 }
 beforeEach(()=> {
  appLocalStore.clear();
  appLocalStore.setItem('zoew_firebase_config',JSON.stringify({supabaseUrl:BASE}));
+ firebaseState.firebaseConfig={supabaseUrl:BASE};
  firebaseState.fb={tenantScope:(a:any)=>a?._account?.tenant_id||''} as any;
  firebaseState.isInitializingFirebase=false;firebaseState.isDatabaseInitialized=false;
  viewState.backendKind='supabase';dataState.scanHistory=[];
@@ -97,6 +100,7 @@ it('F06៖ SDK/transport ពិតមិនយក credential ចាស់ក្�
  try {
   await vi.waitFor(()=>expect(auth.currentUser?.uid).toBe('user-a'));
   await vi.waitFor(()=>expect(auth._account?.tenant_id).toBe('a'));
+  acceptFixtureSession();
   const originalUser=auth.currentUser;expect(await originalUser.getIdToken()).toBe(tokenA);
   appLocalStore.removeItem(SB_AUTH_STORAGE_KEY);appLocalStore.removeItem(SB_ACCOUNT_STORAGE_KEY);
   await expect(originalUser.getIdToken()).rejects.toThrow();
@@ -204,6 +208,7 @@ it.each([1,5])('F06 metadata៖ offline %sh អាន authTime ដោយគ្�
   const result=await f.sdk.getIdTokenResult(f.auth.currentUser);
   expect(result.token).toBe('');expect(result.authTime).toBe(new Date(cached.authTime*1000).toISOString());
   firebaseState.fb=f.sdk;firebaseState.auth=f.auth;firebaseState.db={};resetServerClock();
+  acceptFixtureSession();
   const {getFirebaseSessionVerdict}=await import('../../../../ZoeW/src/features/session');
   expect(await getFirebaseSessionVerdict(f.auth.currentUser)).toBe('unverified');
   firebaseState.isDatabaseConnected=true;
@@ -222,6 +227,7 @@ it.each(['generation','user','auth','sdk','db','backend'])('F06 metadata៖ ម�
  try{
   firebaseState.fb=f.sdk;firebaseState.auth=f.auth;firebaseState.db={};resetServerClock();
   firebaseState.firebaseConfig={supabaseUrl:BASE};
+  acceptFixtureSession();
   firebaseState.isDatabaseConnected=true;
   expect(acceptServerClockOffset(0,{epochMs:Date.now(),wallMs:Date.now(),monotonicMs:performance.now()},false)).toBe(true);
   const {getFirebaseSessionVerdict}=await import('../../../../ZoeW/src/features/session');
@@ -243,6 +249,7 @@ it('F06 metadata control៖ token ថ្មីរក្សារូបរាង 
   const result=await f.sdk.getIdTokenResult(f.auth.currentUser),claims=JSON.parse(atob(fresh.token.split('.')[1]));
   expect(result).toEqual({token:fresh.token,claims,authTime:new Date(fresh.authTime*1000).toISOString(),issuedAtTime:new Date(claims.iat*1000).toISOString(),expirationTime:new Date(claims.exp*1000).toISOString(),signInProvider:'password',signInSecondFactor:null});
   firebaseState.fb=f.sdk;firebaseState.auth=f.auth;
+  acceptFixtureSession();
   const {ztoIdToken}=await import('../../../../ZoeW/src/features/lookup-api');
   expect(await ztoIdToken()).toBe(fresh.token);
  }finally{await f.sdk.deleteApp(f.app);}

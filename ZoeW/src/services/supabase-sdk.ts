@@ -3,6 +3,7 @@ import { createIdbDocsCache } from './supabase-docs-cache';
 import { createLocalWriteJournal } from './write-journal';
 import { SB_LOGIN_DOMAIN_DEFAULT, isSupabaseConfig } from './supabase-config';
 import { documentIsHidden, onDocumentVisibilityChange } from '../platform/document-io';
+import { localAuthSessionCurrent, localLogoutIntent } from './local-logout-intent';
 
 export { SB_LOGIN_DOMAIN_DEFAULT, isSupabaseConfig };
 
@@ -308,6 +309,13 @@ function availableWriteJournal() {
 
 export function createSupabaseSdk(makeTransport, env) {
     const apps = [];
+    const writeSessionWitness = (app) => {
+        const auth = app?._auth, user = auth?.currentUser;
+        const scope = 'sb:' + String(app?.options?.supabaseUrl || '').trim().replace(/\/+$/, '').toLowerCase();
+        const logoutCurrent = localLogoutIntent.witness(scope, user?.uid);
+        return () => apps.includes(app) && app._auth === auth && auth?.currentUser === user
+            && localAuthSessionCurrent(auth, scope, user) && logoutCurrent();
+    };
     const sdk: any = {
         __supabase: true,
         browserLocalPersistence: { type: 'LOCAL' },
@@ -344,6 +352,11 @@ export function createSupabaseSdk(makeTransport, env) {
         setPersistence(auth, persistence) {
             return auth._setPersistence(persistence);
         },
+        resumeAcceptedSession(auth) {
+            const app = auth?.app;
+            if (!app || app._auth !== auth || !writeSessionWitness(app)()) return false;
+            return app._db ? app._db.resumeAcceptedSession() : true;
+        },
         tenantScope(auth) {
             return auth && auth._account && auth._account.tenant_id ? String(auth._account.tenant_id) : '';
         },
@@ -356,9 +369,10 @@ export function createSupabaseSdk(makeTransport, env) {
             return out && Array.isArray(out.docs) ? out.docs : null;
         },
         async noteDevice(auth, meta) {
-            if (!auth || !auth.currentUser || !auth._account || !meta || !meta.serial) return false;
+            const admitted = writeSessionWitness(auth?.app);
+            if (!auth || !auth.currentUser || !auth._account || !meta || !meta.serial || !admitted()) return false;
             await auth._transport.rpc('note_my_device', { p_serial: String(meta.serial), p_model: String(meta.model || ''), p_platform: String(meta.platform || '') }, 20000);
-            return true;
+            return admitted();
         },
         async getIdTokenResult(user) {
             const app = user && apps.find((candidate) => candidate._auth?.currentUser === user);
@@ -394,6 +408,7 @@ export function createSupabaseSdk(makeTransport, env) {
         getDatabase(app) {
             if (!app._db) {
                 app._db = createSupabaseDatabase(app._transport, {
+                    writeSessionWitness: () => writeSessionWitness(app),
                     onListenerError: env.onListenerError,
                     onSynced: () => { if (app._auth && app._auth.currentUser && (!app._tenantTopic || app._auth._accountUnverified)) app._auth._verifyAccount(); },
                     onForbidden: () => { if (app._auth && app._auth.currentUser) app._auth._verifyAccount(); },

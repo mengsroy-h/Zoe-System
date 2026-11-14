@@ -3,18 +3,23 @@ import { firebaseState, dataState } from '../../../../ZoeW/src/core/state';
 import { loadSupabaseFb } from '../../../../ZoeW/src/services/firebase-init';
 import { captureAuthDatabaseGuard } from '../../../../ZoeW/src/features/exchange-rate';
 import { createSupabaseSdk } from '../../../../ZoeW/src/services/supabase-sdk';
+import { appLocalStore } from '../../../../ZoeW/src/core/storage';
+import { acceptFixtureSession } from './helpers/accepted-session';
 const lab = vi.hoisted(() => ({ env: null as any }));
 vi.mock('../../../../ZoeW/src/services/supabase-backend', () => ({ createZoeSupabaseSdk: (env: any) => { lab.env = env; return { __supabase: true }; } }));
 beforeEach(async () => {
-  await loadSupabaseFb();
+  const sdk = await loadSupabaseFb();
   firebaseState.authGeneration++;
   firebaseState.firebaseConfig = { supabaseUrl: 'https://abcdefghijklmnopqrst.supabase.co' };
-  firebaseState.auth = { currentUser: { uid: 'same-user' }, _account: { tenant_id: 'B' } } as any;
-  firebaseState.db = { shop: 'shared-project' } as any;
-  firebaseState.fb = null;
+  const app = { options: firebaseState.firebaseConfig };
+  appLocalStore.setItem('zoew_firebase_config', JSON.stringify(firebaseState.firebaseConfig));
+  firebaseState.auth = { app, currentUser: { uid: 'same-user' }, _account: { tenant_id: 'B' } } as any;
+  firebaseState.db = { shop: 'shared-project', app } as any;
+  firebaseState.fb = sdk;
   firebaseState.isDatabaseInitialized = true;
   dataState.scanHistory = [{ id: 'private-A', barcodes: [] }] as any;
   dataState.dailyRevenueData = { day: { codDollar: 9 } };
+  acceptFixtureSession();
 });
 afterEach(() => { vi.clearAllTimers(); });
 describe('actual App tenant-change handler invalidates previous async feature flows', () => {

@@ -300,6 +300,21 @@ describe('Palm login and lookup through the real Netlify handler', () => {
         expect(JSON.parse(res.body).queryTrackInfo).toBeUndefined();
     });
 
+    it.each([0, 1, null])('Palm restore=1 ផ្ទៀង track ថ្មី និងសម្គាល់ freshness ដោយមិនបង្ហាញ session (%s)', async (isSign) => {
+        const { sessionToken } = await login();
+        const tracks = [{ action: '3', siteCode: 'KH001', mailNo: CODE, time: '2026-10-15 08:03:42' },
+            ...(isSign === 1 ? [{ action: '5', siteCode: 'KH001', mailNo: CODE, time: '2026-10-15 09:00:00' }] : [])];
+        vi.stubGlobal('fetch', vi.fn(async () => upstream({ status: true, result: [{ mail: { mailNo: CODE, isSign }, tracks }] })));
+        const res = await call({ palm: '1', barcode: CODE, restore: '1' }, sessionToken);
+        expect(res.statusCode).toBe(200);
+        const body = JSON.parse(res.body);
+        expect(body).toMatchObject({ success: true, found: true, barcode: CODE, cached: false,
+            verifiedForRestore: true, ztoClosed: isSign === null ? null : isSign === 1 });
+        expect(vi.mocked(fetch).mock.calls[0][0]).toBe('https://aargus-api.ztoglobal.net/zto/locus/v1/queryTrackInfo');
+        expect(res.body).not.toContain(TOKEN);
+        expect(body.queryTrackInfo).toBeUndefined();
+    });
+
     it.each([
         [0, [{ action: '4', at: '2026-10-16 08:02:24' }, { action: '-579', at: '2026-10-16 08:02:44' }], false, null],
         [1, [{ action: '5', at: '2026-10-16 09:40:57' }], true, '2026-10-16 09:40:57'],
@@ -685,15 +700,15 @@ describe('Palm follows the same server rules as /detail', () => {
         }
     });
 
-    it('status=1 ផ្ទៀងគណនី ZoeW ជាមួយសាខា session មុនអាន track', async () => {
+    it.each(['status', 'restore'])('%s=1 ផ្ទៀងគណនី ZoeW ជាមួយសាខា session មុនអាន track', async queryKey => {
         const { sessionToken: session } = await login();
         vi.stubEnv('ZTO_DETAIL_IDENTITY', 'require');
         vi.stubEnv('FIREBASE_PROJECT_IDS', TEST_PROJECT + ':12345|99999');
         const palm = vi.fn();
         vi.stubGlobal('fetch', withCerts(palm));
-        const missing = await callWith({ palm: '1', barcode: CODE, status: '1' }, { 'x-zoe-palm-token': session });
+        const missing = await callWith({ palm: '1', barcode: CODE, [queryKey]: '1' }, { 'x-zoe-palm-token': session });
         expect(missing.statusCode).toBe(401);
-        const other = await callWith({ palm: '1', barcode: CODE, status: '1' },
+        const other = await callWith({ palm: '1', barcode: CODE, [queryKey]: '1' },
             { 'x-zoe-palm-token': session, 'x-zoe-id-token': tokenForSite('12345') });
         expect(JSON.parse(other.body)).toMatchObject({ found: false, code: 'ZTO_OTHER_BRANCH' });
         expect(palm).not.toHaveBeenCalled();

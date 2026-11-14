@@ -25,10 +25,13 @@ import { setFieldValue } from '../../../../ZoeW/src/app/refs';
 import { hashPin } from '../../../../ZoeW/src/services/crypto';
 import { installAuditActionAnnotations } from '../runtime/audit-compat';
 import { loadedScriptPromises } from '../../../../ZoeW/src/features/export';
+import { configureFixtureBackend } from './helpers/accepted-session';
+import { shopScope } from '../../../../ZoeW/src/core/shop-scope';
 
 // គំរូដំណើរការ SW និង React ក្នុង happy-dom; មិនអះអាងថាបានបើក browser ពិត។
 const ROOT = path.resolve(process.env.BROWSER_ROUTE_ROOT || '..');
 const localRequire = createRequire(path.join(ROOT, 'tools/audit-tools/sheet-import-test.js'));
+const sheetFixture = localRequire('./zoew/tests/helpers/sheet-import-fixture.cjs');
 const turn = async () => { for (let i = 0; i < 80; i++) await Promise.resolve(); };
 const files = ['sheet-import-test.js', 'app-lock-test.js'];
 const ORIGIN = 'http://127.0.0.1:9876';
@@ -132,7 +135,7 @@ async function startSession(fixture: ReturnType<typeof checker>, defect = '') {
         sdk.signOut = vi.fn(() => new Promise(() => {}));
     }
     Object.assign(firebaseState, { fb: sdk, auth: sdk.getAuth(), db: sdk.getDatabase(),
-        firebaseConfig: { databaseURL: 'https://fixture.invalid' }, sessionExpiryCheck: 'pending',
+        sessionExpiryCheck: 'pending',
         authGeneration: firebaseState.authGeneration + 1 });
     firebaseState.dbRefConnected = sdk.ref(firebaseState.db, '.info/connected');
     firebaseState.dbRefServerTimeOffset = sdk.ref(firebaseState.db, '.info/serverTimeOffset');
@@ -151,6 +154,8 @@ beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('external requests blocked'); }));
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
     appLocalStore.clear(); sessionStorage.clear(); resetServerClock();
+    configureFixtureBackend('browser-route-isolation');
+    clearSheetImportSession();
     firebaseState.auth = null as any; firebaseState.sessionExpiryCheck = 'pending';
     securityState.isVerifyingPin = false; securityState.appIsLocked = false; viewState.appLockOpen = false;
     uiState.modalDisplay = {}; uiState.modalStack = []; uiState.isModalOpen = false;
@@ -198,7 +203,7 @@ it.each(['csv', 'xlsx'])('PIN ខុសរក្សា ciphertext ហើយ PIN 
     expect(firebaseState.sessionExpiryCheck).toBe('live');
     appLocalStore.setItem('zoew_security_pin_hash', await hashPin('123456'));
     sheetImportState.sheetImportKey = await deriveSheetImportKey('123456');
-    const stored = JSON.stringify({ u: await encryptSheetImportSecret(URL_VALUE), p: await encryptSheetImportSecret('synthetic-password') });
+    const stored = JSON.stringify({ shop: shopScope(), u: await encryptSheetImportSecret(URL_VALUE), p: await encryptSheetImportSecret('synthetic-password') });
     appLocalStore.setItem('zoew_sheet_import_config', stored);
     step(() => requestPinBeforeConfig(openSheetImportModal, 'sheetImport'));
     expect(document.getElementById('pinModal')!.style.display).toBe('flex');
@@ -214,15 +219,28 @@ it.each(['csv', 'xlsx'])('PIN ខុសរក្សា ciphertext ហើយ PIN 
     expect(appLocalStore.getItem('zoew_sheet_import_config')).toBe(stored);
     let importRefused = false;
     const sent: any[] = [];
+    const writer = sheetFixture(readFileSync(path.join(ROOT, 'tools/zto-import/Code.gs'), 'utf8'));
+    writer.store.props.IMPORT_PASSWORD = 'synthetic-password';
+    writer.store.props.SHEET_NAME = 'Data';
+    writer.store.rows = [['Barcode', 'DOD', 'COD', 'Phone'], ...Array.from({ length: 128 }, (_, i) => ['EXISTING-' + i, 0, 1, '012'])];
+    writer.store.capacity = writer.store.rows.length;
+    const clientProofs: string[] = [];
     vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => {
+        expect(String(_url)).toBe(URL_VALUE);
         const request = JSON.parse(String(init.body));
         sent.push({ ...request, headers: init.headers });
-        if (request.action === 'import' && importRefused) return new Response(JSON.stringify({ ok: false, written: false, error: 'synthetic refusal' }));
-        return new Response(JSON.stringify({ ok: true, data: request.action === 'import'
-            ? { added: 3, updated: 1, unchanged: 0, skippedNoBarcode: 1, duplicatesInFile: 1, rowsAfter: 131, sheetName: 'Data' }
-            : request.action === 'prepare'
-            ? { signature: 'synthetic', source: 'auto', mapping: { barcode: 0, dod: 1, cod: 2, phone: 3 } }
-            : { spreadsheetName: 'Synthetic', sheetName: 'Data', rowCount: 1 } }));
+        if (request.action === 'import') {
+            const keys = Array.from({ length: appLocalStore.length }, (_, i) => appLocalStore.key(i))
+                .filter((key): key is string => !!key && key.startsWith('zoe_sheet_pending_v1_'));
+            expect(keys).toHaveLength(1);
+            const proof = appLocalStore.getItem(keys[0])!;
+            expect(JSON.parse(proof).intent.id).toBe(request.payload.intent.id);
+            clientProofs.push(proof);
+        }
+        const held = writer.store.held;
+        if (request.action === 'import' && importRefused) writer.store.held = true;
+        try { return new Response(JSON.stringify(writer.post(request))); }
+        finally { writer.store.held = held; }
     }));
     await reactAct(() => openSheetImportModal('123456'));
     expect(viewState.siParts.siFileCard).toBe(true);
@@ -248,6 +266,12 @@ it.each(['csv', 'xlsx'])('PIN ខុសរក្សា ciphertext ហើយ PIN 
     expect(chips.some(chip => /Barcode 4$/.test(chip))).toBe(true);
     expect(chips.some(chip => /ស្ទួន/.test(chip))).toBe(true);
     expect(appLocalStore.getItem('zoew_sheet_import_config')).toBe(stored);
+    step(() => {
+        const mode = document.getElementById('siModeSel') as HTMLSelectElement;
+        mode.value = 'upsert';
+        mode.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect((document.getElementById('siModeSel') as HTMLSelectElement).value).toBe('upsert');
     step(() => document.querySelector<HTMLButtonElement>('#siImportBtn')!.click());
     await reactAct(async () => { await vi.waitFor(() => expect(document.getElementById('siActionMsg')!.textContent).toContain('131')); });
     const imports = sent.filter(request => request.action === 'import');
@@ -256,11 +280,28 @@ it.each(['csv', 'xlsx'])('PIN ខុសរក្សា ciphertext ហើយ PIN 
     expect(imports[0].payload.rows[0]).toEqual(['ZTO0001', 1.5, 12, '0970008508']);
     expect(new Headers(imports[0].headers).get('content-type')).toBe('text/plain;charset=utf-8');
     expect(document.getElementById('siActionMsg')!.textContent).toMatch(/^✅/);
+    expect(writer.rows()).toHaveLength(131);
+    expect(writer.rows().find((row: any[]) => row[0] === 'ZTO0001')).toEqual(['ZTO0001', 1.5, 12, '0970008508']);
+    expect(JSON.parse(clientProofs[0]).state).toBe('pending');
+    expect(sent.filter(request => request.action === 'prepareWrite')).toHaveLength(1);
+    const committedWrites = writer.store.writes;
+    expect(committedWrites).toBeGreaterThan(0);
+    const completedProof = appLocalStore.getItem(Array.from({ length: appLocalStore.length }, (_, i) => appLocalStore.key(i)).find(key => key?.startsWith('zoe_sheet_pending_v1_'))!)!;
+    expect(JSON.parse(completedProof).state).toBe('done');
     importRefused = true;
     step(() => document.querySelector<HTMLButtonElement>('#siImportBtn')!.click());
-    await reactAct(async () => { await vi.waitFor(() => expect(document.getElementById('siActionMsg')!.textContent).toContain('synthetic refusal')); });
+    await reactAct(async () => { await vi.waitFor(() => expect(document.getElementById('siActionMsg')!.textContent).toContain('មិនទាន់ដឹងលទ្ធផល')); });
     expect(document.getElementById('siActionMsg')!.textContent).not.toContain('✅');
+    expect(writer.store.writes).toBe(committedWrites);
+    expect(writer.rows()).toHaveLength(131);
+    expect(clientProofs[1]).toBe(completedProof);
+    expect(sent.filter(request => request.action === 'prepareWrite')).toHaveLength(1);
+    expect(JSON.parse(clientProofs[1]).intent.id).toBe(JSON.parse(clientProofs[0]).intent.id);
     expect((document.getElementById('siImportBtn') as HTMLButtonElement).disabled).toBe(false);
+    const retainedProof = appLocalStore.getItem(Array.from({ length: appLocalStore.length }, (_, i) => appLocalStore.key(i)).find(key => key?.startsWith('zoe_sheet_pending_v1_'))!)!;
+    expect(retainedProof).toBe(completedProof);
+    expect(JSON.parse(retainedProof).state).toBe('done');
+    expect(writer.store.writes).toBe(committedWrites);
     const beforeOffline = sent.length;
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
     step(() => document.querySelector<HTMLButtonElement>('#siImportBtn')!.click());

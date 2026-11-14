@@ -18,6 +18,7 @@ import { testLookupApiConfig } from '../../../../ZoeW/src/features/lookup-config
 import { refTo } from '../../../../ZoeW/src/app/refs';
 import { checkZtoStatusForBarcode } from '../../../../ZoeW/src/features/zto-status';
 import { healthLookupRow } from '../../../../ZoeW/src/features/health-check';
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 
 const ZTO_URL = window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}';
 const OTHER_URL = 'https://api.example.invalid/lookup?code={barcode}';
@@ -55,12 +56,14 @@ function signIn(token: string | null) {
     firebaseState.authGeneration++;
     firebaseState.auth = token === null ? ({ currentUser: null } as any) : ({ currentUser: { uid: 'audit-user' } } as any);
     firebaseState.fb = { getIdTokenResult: async () => ({ token }) } as any;
+    if (firebaseState.auth.currentUser) acceptFixtureSession();
 }
 
 function signInHungToken() {
     firebaseState.authGeneration++;
     firebaseState.auth = { currentUser: { uid: 'audit-user' } } as any;
     firebaseState.fb = { getIdTokenResult: () => new Promise(() => {}) } as any;
+    acceptFixtureSession();
 }
 
 function cooldownMs() {
@@ -76,6 +79,7 @@ function bindField(name: string, value: string) {
 
 beforeEach(async () => {
     appLocalStore.clear();
+    configureFixtureBackend('zto-detail-identity');
     await useConfig(ZTO_URL);
     uiState.isModalOpen = true;
     autoLookupFailureAt.clear();

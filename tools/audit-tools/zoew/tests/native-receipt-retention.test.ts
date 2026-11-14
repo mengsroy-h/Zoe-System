@@ -4,8 +4,10 @@ import path from 'node:path';
 import { firebaseState } from '../../../../ZoeW/src/core/state';
 import { acceptServerClockOffset, resetServerClock } from '../../../../ZoeW/src/core/clock';
 import { withTransactionOutcomeResolution } from '../../../../ZoeW/src/services/tx-outcome';
-import { NATIVE_RECEIPT_PURGE_GAP_MS, NATIVE_RECEIPT_PURGE_MARGIN_MS, NATIVE_RECEIPT_PURGE_MAX, NATIVE_RECEIPT_PURGE_ROUNDS, NATIVE_RECEIPT_RETENTION_MS, NATIVE_WRITE_RECEIPTS, nativeWriteRecoveryState } from '../../../../ZoeW/src/services/native-write-recovery';
+import { NATIVE_RECEIPT_PURGE_GAP_MS, NATIVE_RECEIPT_PURGE_MARGIN_MS, NATIVE_RECEIPT_PURGE_MAX, NATIVE_RECEIPT_PURGE_ROUNDS, NATIVE_RECEIPT_PURGE_STAMP_KEY, NATIVE_RECEIPT_RETENTION_MS, NATIVE_WRITE_RECEIPTS, nativeWriteRecoveryState } from '../../../../ZoeW/src/services/native-write-recovery';
 import { dbListenerPendingPaths } from '../../../../ZoeW/src/core/text';
+import { appLocalStore } from '../../../../ZoeW/src/core/storage';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 const host = 'https://shop.firebaseio.com';
 let receiptsOnServer: any = null;
@@ -20,6 +22,8 @@ function lab(update: any, uid = 'A', get: any = async () => ({ val: () => receip
   const sdk = withTransactionOutcomeResolution(raw); sdk.getAuth(app); sdk.getDatabase(app);
   Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db, isDatabaseInitialized: true,
     isInitializingFirebase: false, firebaseSdkUnavailable: false, isDatabaseConnected: true, sessionExpiryCheck: 'live', authLoginOperation: null });
+  appLocalStore.setItem('zoew_firebase_config', JSON.stringify(app.options));
+  acceptFixtureSession();
   resetServerClock(); acceptServerClockOffset(0, null, false);
   return { sdk, db, app };
 }
@@ -133,7 +137,7 @@ it('a purge that stops at its round cap keeps the gap open, so the next load con
     .toEqual({ rounds: true, first: NATIVE_RECEIPT_PURGE_MAX * NATIVE_RECEIPT_PURGE_ROUNDS, second: 7, left: 0, batches: NATIVE_RECEIPT_PURGE_ROUNDS + 1 });
 });
 
-it('a refused batch ends the purge without retrying it on every reload, and a device without storage purges once per load as before', async () => {
+it('a refused batch ends the purge without retrying it on every reload; unavailable receipt-gap storage purges once per load', async () => {
   const old = expiredAt();
   receiptsOnServer = { mine_old: { uid: 'A', at: old, hash: 'h' } };
   vi.stubGlobal('fetch', vi.fn(async () => Response.json(null)));
@@ -143,13 +147,26 @@ it('a refused batch ends the purge without retrying it on every reload, and a de
   await pageLoad(refuse, 'A', reads); await pageLoad(refuse, 'A', reads);
   const withStorage = { reads: reads.mock.calls.length, refusals };
   localStorage.clear(); reads.mockClear(); refusals = 0;
+  const getItem = localStorage.getItem.bind(localStorage);
   const blocked = vi.spyOn(localStorage, 'getItem').mockImplementation((key: string) => {
     if (key.startsWith('zoew_connection_writes_v1:')) return null;
-    throw new Error('SecurityError');
+    if (key.startsWith(NATIVE_RECEIPT_PURGE_STAMP_KEY)) throw new Error('SecurityError');
+    return getItem(key);
   });
   await pageLoad(refuse, 'A', reads); await pageLoad(refuse, 'A', reads);
-  const refusedReads = blocked.mock.calls.filter(([key]) => !String(key).startsWith('zoew_connection_writes_v1:')).length;
+  const refusedReads = blocked.mock.calls.filter(([key]) => String(key).startsWith(NATIVE_RECEIPT_PURGE_STAMP_KEY)).length;
   blocked.mockRestore();
   expect({ withStorage, withoutStorage: { reads: reads.mock.calls.length, refusals, storageRefused: refusedReads > 0 } })
     .toEqual({ withStorage: { reads: 1, refusals: 1 }, withoutStorage: { reads: 2, refusals: 2, storageRefused: true } });
+});
+
+it('auth storage ដែលមិនអាចផ្ទៀងផ្ទាត់ មិនអនុញ្ញាត write ឬ purge ដោយសន្មត session នៅរស់', async () => {
+  const update = vi.fn(async () => {}), get = vi.fn(async () => ({ val: () => null }));
+  const native = lab(update, 'A', get);
+  vi.spyOn(localStorage, 'getItem').mockImplementation(() => { throw new Error('SecurityError'); });
+  const verdict = await native.sdk.set(native.sdk.ref(native.db, 'zoew_settings/exchange_rate'), 4200).then(() => 'sent', (error: any) => error.code);
+  expect(verdict).toBe('CONNECTION_SCOPE_CHANGED');
+  expect(update).not.toHaveBeenCalled();
+  expect(get).not.toHaveBeenCalled();
+  await native.sdk.deleteApp(native.app);
 });

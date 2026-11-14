@@ -5,9 +5,11 @@ import { viewState } from '../../../../ZoeW/src/core/view-state';
 import { dbListenerPendingPaths } from '../../../../ZoeW/src/core/text';
 import { withTransactionOutcomeResolution } from '../../../../ZoeW/src/services/tx-outcome';
 import { noteDbListenerAlive } from '../../../../ZoeW/src/services/db-listeners';
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 
 const online = vi.fn();
 beforeEach(() => { vi.useFakeTimers(); online.mockClear(); dbListenerPendingPaths.clear();
+  configureFixtureBackend('connection-flow-fixture');
   Object.assign(firebaseState, { db: {}, fb: { goOnline: online }, isDatabaseConnected: true, dbListenersFailed: false, firebaseSdkUnavailable: false }); });
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
@@ -23,6 +25,7 @@ it('repeated lifecycle setup keeps one online handler and cleanup removes it', (
 it('connected transport with pending data is syncing; only fresh data becomes ready', () => {
   Object.assign(firebaseState, { auth: { currentUser: { uid: 'A' } }, db: {}, fb: {}, isInitializingFirebase: false,
     isDatabaseConnected: true, isDatabaseInitialized: true, dbListenersFailed: false, sessionExpiryCheck: 'live' });
+  acceptFixtureSession();
   dbListenerPendingPaths.add('history'); renderConnectionStatus();
   const pendingPhase = (viewState as any).connectionPhase;
   const pendingStatus = viewState.connectionStatus;
@@ -34,6 +37,7 @@ it('connected transport with pending data is syncing; only fresh data becomes re
 it('the last initial listener snapshot publishes ready without another transport event', () => {
   Object.assign(firebaseState, { auth: { currentUser: { uid: 'A' } }, db: {}, fb: {}, isInitializingFirebase: false,
     isDatabaseConnected: true, isDatabaseInitialized: true, dbListenersFailed: false, sessionExpiryCheck: 'live', authLoginOperation: null });
+  acceptFixtureSession();
   dbListenerPendingPaths.add('history'); renderConnectionStatus();
   noteDbListenerAlive('history');
   expect(viewState.connectionPhase).toBe('ready'); expect(viewState.connectionStatus).toBe('online');

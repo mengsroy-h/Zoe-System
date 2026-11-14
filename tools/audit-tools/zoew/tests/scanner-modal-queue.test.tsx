@@ -58,6 +58,7 @@ import { ScanRemoveModal } from '../../../../ZoeW/src/app/components/modals/Scan
 import { closeModal, openModalHelper } from '../../../../ZoeW/src/ui/modal';
 import '../../../../ZoeW/src/app/flush';
 import { byId, mount, step, unmount } from './native/react-harness';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 function deferred<T>() {
     let resolve!: (v: T) => void;
@@ -151,6 +152,7 @@ beforeEach(() => {
     firebaseState.db = { name: 'db' + seq, app: { options } } as any;
     firebaseState.auth = { currentUser: { uid: 'scanner-user' }, app: { options } } as any;
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
+    firebaseState.firebaseConfig = options;
     firebaseState.authGeneration++;
     const memory = createScanMemorySdk();
     firebaseState.fb = { ...memory.sdk, update: async (ref: any, changes: any) => {
@@ -159,6 +161,7 @@ beforeEach(() => {
             if (value?.phase === 'committed') h.saves.push(memory.get('zoew_scan_history_cod_dod/' + value.targetId));
         }
     } } as any;
+    acceptFixtureSession();
     clearCustomerDataTableCache();
     autoLookupInFlight.clear(); autoLookupFailureAt.clear(); lookupFastCache.clear();
     fetchGates = [];

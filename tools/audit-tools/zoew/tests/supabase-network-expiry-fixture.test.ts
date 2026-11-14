@@ -7,12 +7,15 @@ import { attachInfoListeners, detachInfoListeners } from '../../../../ZoeW/src/s
 import { firebaseState } from '../../../../ZoeW/src/core/state';
 import { getServerClockBounds, resetServerClock, serverClockIsTrustworthy } from '../../../../ZoeW/src/core/clock';
 import { armSessionExpiryCheck } from '../../../../ZoeW/src/features/session';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 const root = path.resolve(process.env.NETWORK_FIXTURE_ROOT || '..');
 const source = readFileSync(path.join(root, 'tools/audit-tools/supabase-app-network-e2e-test.js'), 'utf8');
 const START = Date.UTC(2026, 10, 9), HOUR = 3600000;
 const turn = async () => { for (let i = 0; i < 100; i++) await Promise.resolve(); };
 let database: any;
+let fixtureNumber = 0;
+let config: { supabaseUrl: string; supabaseKey: string };
 function pageFixture() {
     const tree: any = parse(source, { ecmaVersion: 'latest', sourceType: 'script' });
     let found: any;
@@ -39,6 +42,8 @@ beforeEach(() => {
     vi.spyOn(performance, 'now').mockImplementation(() => Date.now() - START + 1000);
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
     localStorage.clear(); sessionStorage.clear(); resetServerClock();
+    config = { supabaseUrl: 'https://expiry-' + (++fixtureNumber) + '.fixture.test', supabaseKey: 'fixture' };
+    localStorage.setItem('zoew_firebase_config', JSON.stringify(config));
 });
 afterEach(() => {
     database?.close('test'); detachInfoListeners(); resetServerClock();
@@ -63,7 +68,7 @@ it.each(['valid', 'missing'])('fixture ផុតកំណត់ទាមទា�
         events.push({ phase: 'response', id: request.id, path: request.path, at: Date.now() - START });
         return new Response(JSON.stringify(result), { status: 200 });
     });
-    const transport = { rpc: (fn: string, body: any) => window.fetch('https://fixture.test/rest/v1/rpc/' + fn,
+    const transport = { rpc: (fn: string, body: any) => window.fetch(config.supabaseUrl + '/rest/v1/rpc/' + fn,
         { method: 'POST', body: JSON.stringify(body) }).then(response => response.json()), ping: async () => true, subscribe: () => () => {} };
     database = createSupabaseDatabase(transport, { onListenerError: (error: any) => { throw error; }, onSynced() {}, onForbidden() {}, onTxOutcomeUnknown() {} },
         { deltaPull: true, pollFallbackMs: 600000, docsCache: { load: async (scope: string) => ({ v: 1, scope, tenant: 't1', cursor: 5, docs: [] }), save: async () => {}, clear: async () => {} } });
@@ -85,11 +90,12 @@ it.each(['valid', 'missing'])('fixture ផុតកំណត់ទាមទា�
             void fake.authHook({ path: '/auth/v1/logout' });
             return new Promise<void>(() => {});
         } };
-    Object.assign(firebaseState, { db: database, fb: sdk, auth: { currentUser: user }, authGeneration: firebaseState.authGeneration + 1,
-        firebaseConfig: { supabaseUrl: 'https://fixture.test', supabaseKey: 'fixture' }, authLoginOperation: null,
+    Object.assign(firebaseState, { db: database, fb: sdk, auth: { app: { options: config }, currentUser: user }, authGeneration: firebaseState.authGeneration + 1,
+        firebaseConfig: config, authLoginOperation: null,
         sessionExpiryCheck: 'live', sessionExpiryCheckInFlight: false, isDatabaseConnected: false, hasEverConnectedToDatabase: false,
         infoListenersFailed: false, infoListenerRecoveryTimer: null, reconnectWatchdogTimer: null,
         dbRefConnected: database.ref('.info/connected'), dbRefServerTimeOffset: database.ref('.info/serverTimeOffset') });
+    acceptFixtureSession();
     (window as any).firebaseState = firebaseState;
     sessionStorage.setItem('__zoeExpiryRace', '1'); pageFixture();
     attachInfoListeners(); database.setTenantTopic('zoe:t1'); database.setAuthed(true, 'scope');

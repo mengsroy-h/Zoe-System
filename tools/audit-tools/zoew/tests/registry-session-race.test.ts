@@ -34,6 +34,7 @@ import { applyCurrentFilter } from '../../../../ZoeW/src/features/monthly-report
 import { getFormattedDate } from '../../../../ZoeW/src/core/timezone';
 import { clearSensitiveModalFields } from '../../../../ZoeW/src/features/session';
 import { setFieldValue } from '../../../../ZoeW/src/app/refs';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 function deferred<T>() {
     let resolve!: (value: T) => void;
@@ -48,12 +49,14 @@ beforeEach(() => {
     const options = { databaseURL: 'https://registry-session-fixture.firebaseio.com' };
     firebaseState.db = { name: 'original', app: { options } } as any;
     firebaseState.auth = { currentUser: { uid: 'registry-user' }, app: { options } } as any;
+    firebaseState.firebaseConfig = options;
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
     firebaseState.authGeneration++;
     scanState.pendingScanSession = null;
     pendingRegistryReleases.clear();
     dataState.scanHistory = [];
     dataState.deletedItems = [];
+    acceptFixtureSession();
 });
 afterEach(() => {
     scanStorageFault.enabled = false;

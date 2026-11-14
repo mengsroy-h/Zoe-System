@@ -7,6 +7,7 @@ import { claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, cleanupOperat
 import { saveRestoreClaim, storedRestoreClaims } from '../../../../ZoeW/src/features/restore';
 import { ABANDON_AGE_MS } from '../../../../ZoeW/src/features/session';
 import { withConnectionOwnership } from '../../../../ZoeW/src/services/connection-flow';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 // Two tabs share localStorage: one saves shop B's Config while the other stays connected to shop A. The shop identity of
 // a journal must be the database the operation writes to, and a tab whose stored Config no longer names its live database
@@ -95,6 +96,7 @@ function connectTabTo(db: any, api: any = firebaseState.fb) {
     dataState.monthlyRevenueData = getAt(db, MONTHLY) || {};
     dataState.dailyPickupData = {};
     dataState.dailyCollectedData = {};
+    if (JSON.parse(localStorage.getItem('zoew_firebase_config') || 'null')?.databaseURL === urlOf(db)) acceptFixtureSession();
 }
 const store = (url: string) => localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: url }));
 const revenueStore = () => ({ [DAILY]: { [DAY]: { codDollar: 100, dodDollar: 0, totalCount: 10 } }, [MONTHLY]: { [MONTH]: { codDollar: 100, dodDollar: 0, totalCount: 10 } } });
@@ -145,9 +147,9 @@ async function staleTabClaimsShopA(diesAt: 'slot' | 'ledger') {
     lab.hangPath = diesAt === 'slot' ? (path: string) => path === TRASH + '/' + ID : ledgerPath;
     store(URL_A);
     connectTabTo(DB_A);
-    store(URL_B);
     void claimAndCleanupItem(ID, 'abandon');
     await flush();
+    store(URL_B);
     expect(getAt(DB_A, HISTORY + '/' + ID), 'the stale tab claimed its own shop A parcel').toBeNull();
     expect(readCleanupJournal()).toHaveLength(1);
     forgetTabMemory();
@@ -209,9 +211,9 @@ describe('shop identity across tabs that share one stored Config', () => {
             lab.hangPath = (path: string) => path === TRASH + '/' + ID;
             store(URL_A);
             connectTabTo(owned.getDatabase(APP_A), owned);
-            store(URL_B);
             void claimAndCleanupItem(ID, 'abandon');
             await flush();
+            store(URL_B);
             expect(readCleanupJournal().map((e: any) => e.scope)).toEqual([URL_A]);
             forgetTabMemory();
             lab.hangOn = null;

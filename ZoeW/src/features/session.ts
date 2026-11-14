@@ -35,6 +35,9 @@ import { showAppChrome } from '../ui/chrome-autohide';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { endPanelGlideSnapPause } from '../app/behaviors/panel-motion';
 import { reannounceOrShowToast, refreshLiveToasts } from '../ui/toast';
+import { detachDatabaseListeners } from '../services/db-listeners';
+import { hideAppLockScreen } from './app-lock';
+import { localAuthSessionCurrent, localLogoutIntent } from '../services/local-logout-intent';
 
 export const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
 
@@ -69,9 +72,11 @@ function sessionExpiryOwner(user) {
     const sessionDb = firebaseState.db;
     const generation = firebaseState.authGeneration;
     const scope = loginBackendScope();
+    const logoutCurrent = user?.uid ? localLogoutIntent.witness(scope, user.uid) : () => true;
     return { auth: sessionAuth, sdk, db: sessionDb, generation, scope, user,
         current: () => sessionAuth === firebaseState.auth && sdk === firebaseState.fb && sessionDb === firebaseState.db
-            && generation === firebaseState.authGeneration && scope === loginBackendScope() && sessionAuth?.currentUser === user };
+            && generation === firebaseState.authGeneration && scope === loginBackendScope() && sessionAuth?.currentUser === user
+            && localAuthSessionCurrent(sessionAuth, scope, user) && logoutCurrent() };
 }
 
 function sessionVerdictAt(authTimeMs) {
@@ -106,25 +111,34 @@ export const SESSION_EXPIRED_TOAST = '⏱️ ផុតកំណត់ ៤ ម៉
 
 export const SESSION_SIGNED_OUT_TOAST = '⚠️ បានចាកចេញពីប្រព័ន្ធ — សូមចូលប្រព័ន្ធម្ដងទៀត';
 
+export const LOCAL_LOGOUT_UNPERSISTED_TOAST = '⚠️ មិនទាន់អាចចាកចេញ ឬរក្សាស្ថានភាពចាកចេញបានទេ។ កុំបិទ ឬ Refresh App និងកុំបើក tab ថ្មី; សូមអនុញ្ញាត Storage រួចសាកចាកចេញម្ដងទៀត។';
+
 export function forceExpireSession() {
     const expiryGeneration = ++firebaseState.authGeneration;
     const expiryAuth = firebaseState.auth;
     const expiryFb = firebaseState.fb;
     const expiryScope = loginBackendScope();
     const expiredUser = expiryAuth && expiryAuth.currentUser;
+    const intentDurable = !expiredUser?.uid || localLogoutIntent.note(expiryScope, expiredUser.uid);
     firebaseState.sessionExpiryCheck = 'expired';
+    detachDatabaseListeners();
+    firebaseState.isDatabaseInitialized = false;
     refreshLiveToasts();
-    const finish = () => {
-        if (firebaseState.auth !== expiryAuth || firebaseState.fb !== expiryFb || loginBackendScope() !== expiryScope || (expiryAuth.currentUser && (expiryAuth.currentUser !== expiredUser || firebaseState.authGeneration !== expiryGeneration)) || firebaseState.authLoginOperation) return;
+    const isCurrent = () => firebaseState.auth === expiryAuth && firebaseState.fb === expiryFb && loginBackendScope() === expiryScope
+        && (!expiryAuth.currentUser || expiryAuth.currentUser === expiredUser && firebaseState.authGeneration === expiryGeneration) && !firebaseState.authLoginOperation;
+    const finish = (confirmed) => {
+        if (!isCurrent()) return;
+        firebaseState.sessionExpiryCheck = 'signed-out';
         clearRememberedSession(true);
+        hideAppLockScreen();
         showLoginModalWithPrefill();
-        reannounceOrShowToast(SESSION_EXPIRED_TOAST);
+        reannounceOrShowToast(!confirmed && !intentDurable ? LOCAL_LOGOUT_UNPERSISTED_TOAST : SESSION_EXPIRED_TOAST);
     };
-    expiryFb.signOut(expiryAuth).then(finish, finish);
+    withTimeout(Promise.resolve().then(() => isCurrent() ? expiryFb.signOut(expiryAuth) : undefined), DB_OP_TIMEOUT_MS, 'Session sign out stalled').then(() => finish(true), () => finish(false));
 }
 
 export function armSessionExpiryCheck(user, generation) {
-    if (!user) return false;
+    if (!localAuthSessionCurrent(firebaseState.auth, loginBackendScope(), user)) return false;
     if (sessionExpiryArm?.current() && sessionExpiryArm.user === user && sessionExpiryArm.generation === generation) return true;
     const owner = sessionExpiryOwner(user);
     if (generation !== owner.generation || !owner.current()) return false;
@@ -145,7 +159,7 @@ export function armSessionExpiryCheck(user, generation) {
 }
 
 export function runSessionExpiryCheck() {
-    if (firebaseState.sessionExpiryCheckInFlight || firebaseState.sessionExpiryCheck === 'pending' || firebaseState.sessionExpiryCheck === 'expired') return Promise.resolve(false);
+    if (firebaseState.sessionExpiryCheckInFlight || firebaseState.sessionExpiryCheck === 'pending' || firebaseState.sessionExpiryCheck === 'expired' || firebaseState.sessionExpiryCheck === 'signed-out') return Promise.resolve(false);
     if (!firebaseState.auth || !firebaseState.auth.currentUser) return Promise.resolve(false);
     firebaseState.sessionExpiryCheckInFlight = true;
     const user = firebaseState.auth.currentUser;

@@ -13,6 +13,7 @@ import { firebaseState, securityState, uiState } from '../../../../ZoeW/src/core
 import { dbListenerPendingPaths } from '../../../../ZoeW/src/core/text';
 import { hideAppLockScreen, showAppLockScreen } from '../../../../ZoeW/src/features/app-lock';
 import { TOAST_LIFETIME_MS, TOAST_LIVE_LIMIT_MS, refreshLiveToasts, showLiveToast, showToast } from '../../../../ZoeW/src/ui/toast';
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 
 let host: HTMLElement;
 let root: any;
@@ -23,8 +24,15 @@ function step(fn: () => void) {
 
 const texts = () => Array.from(host.querySelectorAll('.toast')).map((t) => t.textContent);
 
+function authenticatedUser(uid: string) {
+    firebaseState.auth = { currentUser: { uid } } as any;
+    acceptFixtureSession();
+}
+
 beforeEach(() => {
     vi.useFakeTimers();
+    configureFixtureBackend('toast-visibility-fixture');
+    Object.assign(firebaseState, { fb: {}, db: {}, isInitializingFirebase: false, isDatabaseInitialized: true, firebaseSdkUnavailable: false, authLoginOperation: null });
     document.body.innerHTML = '';
     host = document.createElement('div');
     host.className = 'toast-container';
@@ -49,7 +57,7 @@ afterEach(() => {
 describe('សម័យរង់ចាំផ្ទៀងផ្ទាត់ ៖ toast លាក់ត្រូវរក្សាអាយុ', () => {
     for (const state of ['pending', 'unverified', 'expired']) {
         it('សារ ' + state + ' រង់ចាំសម័យច្បាស់ រួចទើបចាប់អាយុពេញ', () => {
-            firebaseState.auth = { currentUser: { uid: 'held' } } as any;
+            authenticatedUser('held');
             firebaseState.sessionExpiryCheck = state;
             step(() => { showToast('⚠️ ប្រាក់រង់ចាំផ្ទៀងផ្ទាត់'); });
             step(() => { vi.advanceTimersByTime(60000); refreshLiveToasts(); });
@@ -67,7 +75,7 @@ describe('សម័យរង់ចាំផ្ទៀងផ្ទាត់ ៖ to
     }
 
     it('toast មាន timer រួច ប៉ុន្តែនាឡិកាបាត់ទំនុកចិត្ត មិនបាត់ក្រោយវាំងនន', () => {
-        firebaseState.auth = { currentUser: { uid: 'held' } } as any;
+        authenticatedUser('held');
         firebaseState.sessionExpiryCheck = 'live';
         step(() => { showToast('⚠️ លទ្ធផលរក្សាទុកមិនទាន់ច្បាស់'); });
         step(() => { vi.advanceTimersByTime(1000); });
@@ -82,7 +90,7 @@ describe('សម័យរង់ចាំផ្ទៀងផ្ទាត់ ៖ to
     });
 
     it('សម័យផ្ទៀងផ្ទាត់រួច តែ PIN នៅជាប់សោ មិនចាប់អាយុមុនពេលដោះ', () => {
-        firebaseState.auth = { currentUser: { uid: 'held' } } as any;
+        authenticatedUser('held');
         firebaseState.sessionExpiryCheck = 'unverified';
         step(() => { showToast('⚠️ សារដែលត្រូវអាន'); });
         showAppLockScreen(true);
@@ -94,7 +102,7 @@ describe('សម័យរង់ចាំផ្ទៀងផ្ទាត់ ៖ to
 
     it('toast បណ្តាញរស់រង់ចាំផ្ទៀងផ្ទាត់ ហើយអានភាពជោគជ័យថ្មីមុនចាប់អាយុ', () => {
         vi.spyOn(navigator, 'onLine', 'get').mockImplementation(() => true);
-        firebaseState.auth = { currentUser: { uid: 'held' } } as any;
+        authenticatedUser('held');
         firebaseState.sessionExpiryCheck = 'unverified';
         firebaseState.isDatabaseConnected = false;
         firebaseState.dbListenersFailed = false;
@@ -173,7 +181,7 @@ describe('សោ App ៖ toast រង់ចាំដោះសោ', () => {
 
     it('toast បណ្តាញរស់ពេលជាប់សោ ➜ មិនក្លាយជា «យូរជាងធម្មតា» ស្ងាត់ ➜ ដោះសោ ➜ អានស្ថានភាពពិត (✅)', () => {
         vi.spyOn(navigator, 'onLine', 'get').mockImplementation(() => true);
-        firebaseState.auth = { currentUser: { uid: 'u' } } as any;
+        authenticatedUser('u');
         firebaseState.sessionExpiryCheck = 'live' as any;
         firebaseState.isDatabaseConnected = false;
         firebaseState.dbListenersFailed = false;

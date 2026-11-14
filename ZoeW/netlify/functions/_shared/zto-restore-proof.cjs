@@ -122,11 +122,19 @@ function sourceCodes(source, now = Date.now) {
     if (!codes.size) throw new RestoreFailure('ZTO_RESTORE_UNCONFIRMED');
     return [...codes].map(([code, basis]) => ({ code, basis }));
 }
+function terminalDecisionRank(source) {
+    if (!plain(source)) throw new RestoreFailure('ZTO_RESTORE_UNCONFIRMED');
+    if (!Object.hasOwn(source, 'ztoTerminalDecision')) return 0;
+    if (source.ztoTerminalDecision === 'returned') return 1;
+    if (source.ztoTerminalDecision === 'signed') return 2;
+    throw new RestoreFailure('ZTO_RESTORE_UNCONFIRMED');
+}
 function terminalSource(source) {
+    const decision = terminalDecisionRank(source);
     const rows = Object.values(source?.barcodes || {});
-    if (source?.restoreBlocked === true || source?.trashMode === 'palm' && source?.trashReason === 'pickup'
+    if (decision === 2 || source?.restoreBlocked === true || source?.trashMode === 'palm' && source?.trashReason === 'pickup'
         || rows.some(row => Number.isFinite(row?.ztoSignedAt) && row.ztoSignedAt > 0)) return 'signed';
-    if (source?.trashReason === 'returned' && rows.some(row => Number.isFinite(row?.ztoReturnedAt) && row.ztoReturnedAt > 0
+    if (decision === 1 || source?.trashReason === 'returned' && rows.some(row => Number.isFinite(row?.ztoReturnedAt) && row.ztoReturnedAt > 0
         && row.ztoReturnedAt !== row.ztoMisplacedAt && row.ztoReturnedAt !== row.ztoSentOutAt)) return 'returned';
     return '';
 }
@@ -163,12 +171,14 @@ function createRestoreProofHandler({ lookup, firebaseBackend, env = process.env,
                 || (context.source.trashGeneration ?? 0) !== input.expectedGeneration) throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
             const mode = effectiveMode(context);
             if (mode === 'local') throw new RestoreFailure('ZTO_RESTORE_LOCAL_POLICY', 409);
-            const existing = context.source.restoreAttestationId;
+            const existing = context.source.restoreAttestationId || context.reservedAttestationId;
             const attestationId = typeof existing === 'string' && ID.test(existing) ? existing : crypto.randomBytes(24).toString('hex');
             context.verifiedAt = now();
             let verdict = terminalSource(context.source);
             if (context.attestation?.status === 'deny' && context.attestation.generation === input.expectedGeneration
-                && ['signed', 'returned'].includes(context.attestation.verdict)) verdict = context.attestation.verdict;
+                && ['signed', 'returned'].includes(context.attestation.verdict)) {
+                verdict = verdict === 'signed' || context.attestation.verdict === 'signed' ? 'signed' : 'returned';
+            }
             if (input.action === 'release') verdict = 'unconfirmed';
             else if (!verdict) {
                 try {
@@ -265,4 +275,4 @@ function createRestoreProofHandler({ lookup, firebaseBackend, env = process.env,
     };
 }
 
-module.exports = { createRestoreProofHandler, parseRequest, routingClaims, sourceCodes, effectiveMode, terminalSource, completedTuple, supabaseBackend, PROOF_TTL_MS };
+module.exports = { createRestoreProofHandler, parseRequest, routingClaims, sourceCodes, effectiveMode, terminalSource, terminalDecisionRank, completedTuple, supabaseBackend, PROOF_TTL_MS };

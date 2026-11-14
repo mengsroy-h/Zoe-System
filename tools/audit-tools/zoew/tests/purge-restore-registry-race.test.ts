@@ -89,6 +89,7 @@ beforeEach(() => {
         }, onValue: () => () => {}, off: () => {}
     } as any;
     acceptFixtureSession();
+    put('zoew_restore_policy/shop', { v: 1, mode: 'local', scope: liveShopScope(), branch: '', epoch: 1 });
     for (const [field, path] of Object.entries({ dbRefHistory: H, dbRefDeleted: T, dbRefDailyRevenue: D, dbRefMonthlyRevenue: M,
         dbRefDailyPickup: 'zoew_daily_pickup_cod_dod', dbRefDailyCollected: 'zoew_daily_collected_cod_dod' })) (firebaseState as any)[field] = ref(firebaseState.db, path);
     dataState.scanHistory = []; dataState.deletedItems = [clone(source)]; dataState.dailyRevenueData = clone(store[D]); dataState.monthlyRevenueData = clone(store[M]);

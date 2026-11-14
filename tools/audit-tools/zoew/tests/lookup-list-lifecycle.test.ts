@@ -7,9 +7,10 @@
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanupServerRead } from './helpers/cleanup-server-read';
+import { createRestoreAttestationFixture } from './helpers/restore-attestation';
 import { fieldValue, refTo } from '../../../../ZoeW/src/app/refs';
 import { dataState, firebaseState, lookupState, scanState, securityState, uiState, ztoState } from '../../../../ZoeW/src/core/state';
-import { shopScope } from '../../../../ZoeW/src/core/shop-scope';
+import { liveShopScope, shopScope } from '../../../../ZoeW/src/core/shop-scope';
 import { appLocalStore } from '../../../../ZoeW/src/core/storage';
 import { viewState } from '../../../../ZoeW/src/core/view-state';
 import { registerModalMeta, unregisterModalMeta } from '../../../../ZoeW/src/core/modals';
@@ -49,6 +50,7 @@ const lab = {
 };
 let network: (url: URL, body: any) => Promise<Response>;
 let requests: { url: URL; body: any }[];
+let restoreAuthority: ReturnType<typeof createRestoreAttestationFixture>;
 const clone = <T,>(value: T): T => value === undefined ? value : JSON.parse(JSON.stringify(value));
 const parts = (path: string) => path.split('/').filter(Boolean);
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
@@ -138,6 +140,16 @@ async function configure(backend: 'firebase' | 'supabase', mode: Mode) {
         headerName: 'X-Zoe-Proxy-Key', headerValueEnc: await encryptLookupSecret('synthetic-key'),
         ...(mode === 'palm' ? { palmTokenEnc: await encryptLookupSecret('synthetic-session') } : {}) }));
     resetZtoTrashMode(); noteZtoTrashMode(null); establishTime(NOW);
+    // Real issuer/verdict processing; SDK/auth CAS and projected upstream facts
+    // remain controlled here. Actual Rules/RLS are separate integration gates.
+    restoreAuthority = createRestoreAttestationFixture({ get: getAt, set: setAt,
+        policy: { v: 1, mode, scope: liveShopScope(), branch: '881859', epoch: 1 },
+        lookup: async event => {
+            const cfg = JSON.parse(appLocalStore.getItem('zoew_lookup_api_config')!);
+            const url = new URL(cfg.url.replace('{barcode}', encodeURIComponent(event.queryStringParameters.barcode)));
+            url.searchParams.set('restore', '1'); requests.push({ url, body: null });
+            return network(url, null);
+        } });
 }
 async function scanned(extra: any = {}) {
     network = async url => json({ success: true, found: true, barcode: url.searchParams.get('barcode'),
@@ -175,7 +187,7 @@ function upstream(signedAt = 0, returnedAt = 0, listSigned = false) {
             signed: listSigned && signedAt ? [CODE, SECOND] : [],
             signedRows: listSigned && signedAt ? [CODE, SECOND].map(barcode => ({ barcode, at: ztoStamp(signedAt) })) : [], signedOk: true, signedPages: 1,
             returned: [], returnedOk: true, sent: [], sentOk: true, problem: [], problemOk: true });
-        return json({ success: true, found: true, barcode: url.searchParams.get('barcode'), cached: false, verifiedForRestore: true,
+        return json({ success: true, found: true, barcode: url.searchParams.get('barcode'), cached: false, verifiedForRestore: true, restoreTransitionsVerified: true,
             phone: '012345678', cod: 10, dod: 2, ztoClosed: !!signedAt,
             ...(signedAt ? { ztoSignedAt: ztoStamp(signedAt) } : {}), ...(returnedAt ? { ztoReturnedAt: ztoStamp(returnedAt) } : {}) });
     };
@@ -221,6 +233,7 @@ beforeEach(async () => {
     vi.stubGlobal('fetch', vi.fn(async (url, init) => {
         const parsed = new URL(String(url), window.location.href), body = init?.body ? JSON.parse(String(init.body)) : null;
         if (parsed.origin === HOST) return cleanupServerRead(getAt)(parsed, init);
+        if (parsed.pathname.endsWith('/zto-restore-proof')) return restoreAuthority.route(parsed, init);
         requests.push({ url: parsed, body }); return network(parsed, body);
     }));
     (window as any).ZoeErrors = { capture: vi.fn() };

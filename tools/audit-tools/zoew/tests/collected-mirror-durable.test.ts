@@ -307,6 +307,7 @@ beforeEach(() => {
     firebaseState.authGeneration++;
     firebaseState.auth = { currentUser: { uid: 'mx1-durable' } } as any;
     firebaseState.firebaseConfig = JSON.parse(SHOP_CONFIG);
+    setPath('zoew_restore_policy/shop', { v: 1, mode: 'local', scope: JSON.parse(SHOP_CONFIG).databaseURL, branch: '', epoch: 1 });
     firebaseState.db = { mx1: true } as any;
     firebaseState.isDatabaseInitialized = true;
     firebaseState.dbListenersFailed = false;

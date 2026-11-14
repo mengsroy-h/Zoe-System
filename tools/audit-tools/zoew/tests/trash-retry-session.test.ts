@@ -3,6 +3,7 @@ import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../../../../ZoeW/src/core/state';
 import { getServerNow } from '../../../../ZoeW/src/core/clock';
+import { liveShopScope } from '../../../../ZoeW/src/core/shop-scope';
 import { normalizeBarcodesOf } from '../../../../ZoeW/src/domain/barcode';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../../../../ZoeW/src/core/text';
 import { claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, prepareCleanupClaim, readCleanupJournal, resumeCleanupJournalEntry, restoreClaimedItemToScanHistory } from '../../../../ZoeW/src/domain/cleanup';
@@ -110,6 +111,7 @@ function install(createdAt: number) {
     firebaseState.auth = { currentUser: { uid: 'u1', getIdToken: async () => 'tok' } } as any;
     localStorage.setItem('zoew_firebase_config', JSON.stringify(firebaseState.firebaseConfig));
     acceptFixtureSession();
+    setAt('zoew_restore_policy/shop', { v: 1, mode: 'local', scope: liveShopScope(), branch: '', epoch: 1 });
     firebaseState.isDatabaseInitialized = true;
     firebaseState.isDatabaseConnected = true;
     firebaseState.sessionExpiryCheck = 'live'; firebaseState.serverClockTrusted = true;

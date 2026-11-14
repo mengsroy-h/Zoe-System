@@ -144,6 +144,7 @@ function barcode(code: string, cod: number, createdAt: number) {
 }
 function seed(items: any[]) {
     lab.store = {
+        zoew_restore_policy: { shop: { v: 1, mode: 'local', scope: HOST, branch: '', epoch: 1 } },
         [HISTORY]: Object.fromEntries(items.map((it) => [it.id, clone(it)])),
         [TRASH]: {},
         [DAILY]: { [DAY]: { codDollar: 100, dodDollar: 0, totalCount: 10, op: 'op_seeddaily01', ops: { op_seeddaily01: 1 } } },

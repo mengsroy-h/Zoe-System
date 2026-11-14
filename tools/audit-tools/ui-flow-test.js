@@ -8,6 +8,7 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const { isDeepStrictEqual } = require('node:util');
+const { localRestorePolicy } = require('./fixtures/trusted-restore-policy.cjs');
 
 // ⛔ ថ្ងៃដែល seed ត្រូវគណនាតាម **ប្រតិទិនកម្ពុជា** ដូច App (កំណែ 2.20.5)។
 // មុននេះវាប្រើប្រតិទិន **ឧបករណ៍** ➜ ក្នុងបង្អួច ៧ ម៉ោងរៀងរាល់យប់
@@ -185,6 +186,7 @@ function seedData() {
     const d = zoneDateKey(Date.now(), 0);
     return {
         user_roles: { 'admin-uid': 'admin' },
+        zoew_restore_policy: { shop: localRestorePolicy('https://fake-default-rtdb.firebaseio.com') },
         zoew_scan_history_cod_dod: {
             id_1000_aaa: {
                 id: 'id_1000_aaa', phone: '0960000421', scanDate: d, createdAt: Date.now() - 1000,

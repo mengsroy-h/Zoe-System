@@ -7,7 +7,10 @@ import { expect, it, vi } from 'vitest';
 const require = createRequire(import.meta.url);
 const root = resolve(import.meta.dirname, '../../../..');
 const core = require(resolve(root, 'ZoeW/netlify/functions/_shared/zto-order-detail-core.cjs'));
-const { createFirebaseBackend, allowedTargetSlots } = require(resolve(root, 'ZoeW/netlify/functions/_shared/zto-restore-firebase.cjs'));
+const { createFirebaseBackend, allowedTargetSlots, sameTerminalBusiness } = require(resolve(root, 'ZoeW/netlify/functions/_shared/zto-restore-firebase.cjs'));
+const { terminalEnrichmentCases }: { terminalEnrichmentCases: () => Array<{ name: string; expected: boolean;
+    sourceId: string; before: Record<string, any>; after: Record<string, any> }> } = require(resolve(root, 'tools/audit-tools/fixtures/restore-terminal-enrichment.cjs'));
+const { createRestoreProofHandler } = require(resolve(root, 'ZoeW/netlify/functions/_shared/zto-restore-proof.cjs'));
 const { deadlineBudget } = require(resolve(root, 'ZoeW/netlify/functions/_shared/zto-restore-http.cjs'));
 const pair = generateKeyPairSync('rsa', { modulusLength: 2048 });
 const pem = pair.publicKey.export({ type: 'spki', format: 'pem' });
@@ -34,6 +37,7 @@ function world({ project = 'restore-proof-test', branch = '001', disabled = fals
     const writes: Array<{ path: string; value: any }> = [];
     const calls: string[] = [];
     let beforePut: ((path: string, value: any) => void | Promise<void>) | undefined;
+    let afterPut: ((path: string, value: any) => void) | undefined;
     let beforeGet: ((path: string) => void) | undefined;
     let revokeDuring = false;
     let conflicts = 0;
@@ -73,6 +77,7 @@ function world({ project = 'restore-proof-test', branch = '001', disabled = fals
         versions.set(path, (versions.get(path) || 0) + 1);
         nodes.set(path, value);
         writes.push({ path, value });
+        afterPut?.(path, value);
         return Response.json(value);
     };
     const open = () => createFirebaseBackend({ verifyActor: core.verifyRestoreFirebaseActor })({ env, token, claims, budget: deadlineBudget(), fetchImpl });
@@ -85,7 +90,11 @@ function world({ project = 'restore-proof-test', branch = '001', disabled = fals
             claims: current, budget: deadlineBudget(), fetchImpl });
     };
     return { open, openAs, nodes, versions, writes, calls, env, claims, issuers, get conflicts() { return conflicts; }, setBeforePut(fn: typeof beforePut) { beforePut = fn; },
-        setBeforeGet(fn: typeof beforeGet) { beforeGet = fn; }, revoke() { revokeDuring = true; } };
+        setAfterPut(fn: typeof afterPut) { afterPut = fn; },
+        setBeforeGet(fn: typeof beforeGet) { beforeGet = fn; }, revoke() { revokeDuring = true; },
+        handler: (lookup: any) => createRestoreProofHandler({ env, fetchImpl, lookup, firebaseBackend: createFirebaseBackend({ verifyActor: core.verifyRestoreFirebaseActor }) }),
+        request: (body = input) => new Request('https://app.invalid/.netlify/functions/zto-restore-proof', { method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-zoe-id-token': token }, body: JSON.stringify(body) }) };
 }
 
 it('actual RSA actor + OAuth assertion + revocation lookup reserve proof before exact-source ETag seal', async () => {
@@ -99,7 +108,7 @@ it('actual RSA actor + OAuth assertion + revocation lookup reserve proof before 
     expect(w.nodes.get(proofPath)).toMatchObject({ v: 1, id: 'server-proof-1', revision: 1, status: 'allow',
         actorUid: 'owned-user', authTime: w.claims.auth_time * 1000, sourceId: input.sourceId, scope: db,
         codes: { TEST0001: true }, allowedTargetSlots: { '0': 'TEST0001' }, snapshot: source });
-    expect(w.nodes.get(sourcePath)).toEqual({ ...source, restoreAttestationId: 'server-proof-1',
+    expect(w.nodes.get(sourcePath)).toEqual({ ...source, restorePublication: 1, restoreAttestationId: 'server-proof-1',
         restoreClaim: { token: input.token, targetId: input.targetId, claimedAt: result.source.restoreClaim.claimedAt } });
     expect(JSON.stringify(w.nodes.get(proofPath))).not.toContain('synthetic-access');
     expect(w.writes.every(write => write.path === sourcePath || write.path === proofPath)).toBe(true);
@@ -127,6 +136,329 @@ it('source changes after verification lose the source CAS, leaving an unusable u
     expect(w.writes.map(write => write.path)).toEqual([proofPath]);
     expect(w.nodes.get(sourcePath)).not.toHaveProperty('restoreAttestationId');
 });
+it.each([false, true])('a pending reservation cannot be replaced by another operation before its source seal commits (foreign actor=%s)', async foreign => {
+    const w = world({ rawEtags: true });
+    const a = await w.open(), b = foreign ? await w.openAs('other-user') : await w.open();
+    const otherInput = { ...input, token: 'other-attempt', targetId: 'other-target' };
+    const contextA = await a.context(input);
+    let reached!: () => void, resume!: () => void;
+    const reachedSource = new Promise<void>(resolve => { reached = resolve; });
+    const releaseSource = new Promise<void>(resolve => { resume = resolve; });
+    w.setBeforePut(async (path, value) => {
+        if (path === sourcePath && value.restoreAttestationId === 'owner-proof-1') {
+            reached(); await releaseSource;
+        } else if (path === proofPath && value.id === 'other-proof-2') {
+            resume(); await aResult;
+        }
+    });
+    const aResult = a.apply(input, contextA, 'allow', 'owner-proof-1');
+    await reachedSource;
+    const error = await b.context(otherInput).then(context => b.apply(otherInput, context, 'allow', 'other-proof-2'))
+        .then(() => null, error => error);
+    resume();
+    expect((await aResult).kind).toBe('allow');
+    expect(w.nodes.get(proofPath).id).toBe(w.nodes.get(sourcePath).restoreAttestationId);
+    expect(w.nodes.get(proofPath)).toMatchObject({ id: 'owner-proof-1', token: input.token,
+        targetId: input.targetId, actorUid: 'owned-user' });
+    expect(error).toMatchObject({ code: 'ZTO_RESTORE_IN_PROGRESS' });
+    expect(w.writes.filter(write => write.path === proofPath)).toHaveLength(1);
+});
+it('a retry after proof reservation committed but source publication crashed retains the original proof id', async () => {
+    const w = world();
+    const backend = await w.open();
+    w.setBeforePut(path => { if (path === sourcePath) throw new Error('crash after private reservation'); });
+    await expect(backend.apply(input, await backend.context(input), 'allow', 'owner-proof-1')).rejects.toBeTruthy();
+    expect(w.nodes.get(sourcePath)).not.toHaveProperty('restoreAttestationId');
+    expect(w.nodes.get(proofPath).id).toBe('owner-proof-1');
+    w.setBeforePut(undefined);
+    const retry = await backend.context(input);
+    expect(retry.reservedAttestationId).toBe('owner-proof-1');
+    const result = await backend.apply(input, retry, 'allow', retry.reservedAttestationId);
+    expect(result.kind).toBe('allow');
+    expect(w.nodes.get(sourcePath).restoreAttestationId).toBe('owner-proof-1');
+    expect(w.nodes.get(proofPath)).toMatchObject({ id: 'owner-proof-1', token: input.token, revision: 2 });
+});
+it('a terminal observer preserves a takeover reservation while its previous source claim is still sealed', async () => {
+    vi.useFakeTimers();
+    try {
+        const w = world();
+        const a = await w.open();
+        await a.apply(input, await a.context(input), 'allow', 'owner-proof-1');
+        await vi.advanceTimersByTimeAsync(120001);
+        const b = await w.openAs('next-user'), observer = await w.openAs('observer-user');
+        const takeover = { ...input, token: 'next-attempt', targetId: 'next-target' };
+        const seen = { ...input, token: 'observer-attempt', targetId: 'observer-target' };
+        const context = await b.context(takeover);
+        let denied: any, held = false;
+        w.setBeforePut(async (path, value) => {
+            if (path === sourcePath && value.restoreClaim?.token === takeover.token && !held) {
+                held = true;
+                const foreign = await observer.context(seen);
+                await expect(observer.apply(seen, foreign, 'allow', 'foreign-proof')).rejects.toMatchObject({ code: 'ZTO_RESTORE_IN_PROGRESS' });
+                denied = await observer.apply(seen, await observer.context(seen), 'signed', 'observer-proof');
+            }
+        });
+        await expect(b.apply(takeover, context, 'allow', 'owner-proof-1')).rejects.toBeTruthy();
+        expect(denied).toMatchObject({ kind: 'deny', code: 'ZTO_RESTORE_TERMINAL_SIGNED' });
+        expect(w.nodes.get(proofPath)).toMatchObject({ id: 'owner-proof-1', actorUid: 'next-user',
+            token: takeover.token, targetId: takeover.targetId, status: 'deny', verdict: 'signed' });
+        expect(w.nodes.get(sourcePath)).toMatchObject({ restorePublication: 2, restoreBlocked: true,
+            restoreClaim: { token: takeover.token, targetId: takeover.targetId } });
+    } finally { vi.useRealTimers(); }
+});
+it('an old terminal source read cannot overwrite a newer generation proof read in the same context refresh', async () => {
+    const w = world(), a = await w.open();
+    const old = await a.context(input), oldSource = structuredClone(w.nodes.get(sourcePath)), oldProof = w.nodes.get(proofPath) ?? null;
+    const oldSourceVersion = w.versions.get(sourcePath) || 0, oldProofVersion = w.versions.get(proofPath) || 0;
+    await a.apply(input, old, 'allow', 'owner-proof-1');
+    const nextSource = { ...oldSource, trashGeneration: 1, deletedAt: oldSource.deletedAt + 1000 };
+    delete nextSource.restoreAttestationId; delete nextSource.restoreClaim; delete nextSource.restorePublication;
+    w.nodes.set(sourcePath, nextSource);
+    w.nodes.set('zoew_trash_consumptions/' + input.sourceId, { v: 1, kind: 'restore', sourceId: input.sourceId,
+        generation: 0, token: input.token, targetId: input.targetId, actorUid: 'owned-user', scope: db,
+        deletedAt: oldSource.deletedAt, rowBirth: oldSource.createdAt });
+    const b = await w.openAs('next-user'), next = { ...input, expectedGeneration: 1, token: 'next-attempt', targetId: 'next-target' };
+    await b.apply(next, await b.context(next), 'allow', 'next-proof-2');
+    const publishedSource = structuredClone(w.nodes.get(sourcePath)), publishedProof = structuredClone(w.nodes.get(proofPath));
+    const sourceVersion = w.versions.get(sourcePath)!, proofVersion = w.versions.get(proofPath)!, before = w.writes.length;
+    w.nodes.set(sourcePath, oldSource); w.nodes.set(proofPath, oldProof);
+    w.versions.set(sourcePath, oldSourceVersion); w.versions.set(proofPath, oldProofVersion);
+    let advanced = false;
+    w.setBeforeGet(path => {
+        if (path === proofPath && !advanced) {
+            advanced = true;
+            w.nodes.set(sourcePath, publishedSource); w.nodes.set(proofPath, publishedProof);
+            w.versions.set(sourcePath, sourceVersion); w.versions.set(proofPath, proofVersion);
+        }
+    });
+    await expect(a.apply(input, old, 'signed', 'stale-proof')).rejects.toMatchObject({ code: 'ZTO_RESTORE_SOURCE_CHANGED' });
+    expect(w.nodes.get(sourcePath)).toEqual(publishedSource);
+    expect(w.nodes.get(proofPath)).toEqual(publishedProof);
+    expect(w.writes).toHaveLength(before);
+});
+it('the real controller rechecks providers and reuses its reserved id after an interrupted source publication', async () => {
+    const w = world();
+    const lookup = vi.fn(async (event: any) => ({ statusCode: 200, body: JSON.stringify({ success: true, found: true, barcode: event.queryStringParameters.barcode,
+        cached: false, verifiedForRestore: true, restoreTransitionsVerified: true, ztoClosed: false }) }));
+    const handler = w.handler(lookup);
+    w.setBeforePut(path => { if (path === sourcePath) throw new Error('crash after proof'); });
+    expect((await handler(w.request())).status).toBe(503);
+    const reservedId = w.nodes.get(proofPath).id;
+    expect(w.nodes.get(sourcePath)).not.toHaveProperty('restoreAttestationId');
+    w.setBeforePut(undefined);
+    const response = await handler(w.request());
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ kind: 'allow', attestationId: reservedId });
+    expect(lookup).toHaveBeenCalledTimes(2);
+    expect(w.nodes.get(sourcePath)).toMatchObject({ restoreAttestationId: reservedId, restorePublication: 1 });
+});
+it('expired unchanged reservations settle as expired HOLD before a new actor may obtain fresh authority', async () => {
+    vi.useFakeTimers();
+    try {
+        const w = world();
+        const a = await w.open();
+        w.setBeforePut(path => { if (path === sourcePath) throw new Error('crash after proof'); });
+        await expect(a.apply(input, await a.context(input), 'allow', 'owner-proof-1')).rejects.toBeTruthy();
+        const reserved = structuredClone(w.nodes.get(proofPath));
+        await vi.advanceTimersByTimeAsync(120001);
+        w.setBeforePut(undefined);
+        const b = await w.openAs('next-user'), nextInput = { ...input, token: 'next-attempt', targetId: 'next-target' };
+        const context = await b.context(nextInput);
+        expect(context.source).toMatchObject({ restorePublication: 1, restoreAttestationId: reserved.id,
+            restoreClaim: { token: reserved.token, targetId: reserved.targetId, claimedAt: reserved.issuedAt } });
+        expect(w.nodes.get(proofPath)).toMatchObject({ status: 'hold', verdict: 'unconfirmed', id: reserved.id,
+            actorUid: reserved.actorUid, authTime: reserved.authTime, issuedAt: reserved.issuedAt, expiresAt: reserved.expiresAt,
+            recovery: { state: 'recovering', actorUid: 'next-user' } });
+        expect(w.nodes.get(proofPath).expiresAt).toBeLessThanOrEqual(Date.now());
+        const restored = await b.apply(nextInput, context, 'allow', context.source.restoreAttestationId);
+        expect(restored.kind).toBe('allow');
+        expect(w.nodes.get(sourcePath)).toMatchObject({ restorePublication: 2,
+            restoreClaim: { token: nextInput.token, targetId: nextInput.targetId } });
+        expect(w.nodes.get(proofPath)).toMatchObject({ status: 'allow', actorUid: 'next-user', token: nextInput.token });
+        expect(w.nodes.get(proofPath)).not.toHaveProperty('recovery');
+    } finally { vi.useRealTimers(); }
+});
+it('a crash after the recovery HOLD latch resumes only settlement and fences an old ALLOW context', async () => {
+    vi.useFakeTimers();
+    try {
+        const w = world();
+        const a = await w.open(), old = await a.context(input);
+        w.setBeforePut(path => { if (path === sourcePath) throw new Error('crash before seal'); });
+        await expect(a.apply(input, old, 'allow', 'owner-proof-1')).rejects.toBeTruthy();
+        await vi.advanceTimersByTimeAsync(120001);
+        const b = await w.openAs('next-user'), next = { ...input, token: 'next-attempt', targetId: 'next-target' };
+        await expect(b.context(next)).rejects.toBeTruthy();
+        const held = structuredClone(w.nodes.get(proofPath));
+        expect(held).toMatchObject({ id: 'owner-proof-1', status: 'hold', recovery: { state: 'recovering' } });
+        await expect((await w.open()).apply(input, old, 'allow', 'old-proof')).rejects.toBeTruthy();
+        expect(w.nodes.get(proofPath)).toEqual(held);
+        w.setBeforePut(undefined);
+        const context = await b.context(next);
+        expect(context.source).toMatchObject({ restorePublication: 1, restoreAttestationId: 'owner-proof-1' });
+        expect(w.nodes.get(proofPath)).toEqual(held);
+        expect(w.writes.filter(write => write.path === proofPath)).toHaveLength(2);
+    } finally { vi.useRealTimers(); }
+});
+it.each(['business', 'policy'])('expired orphan recovery holds when the %s differs from its verified reservation', async change => {
+    vi.useFakeTimers();
+    try {
+        const w = world(), a = await w.open();
+        w.setBeforePut(path => { if (path === sourcePath) throw new Error('crash before seal'); });
+        await expect(a.apply(input, await a.context(input), 'allow', 'owner-proof-1')).rejects.toBeTruthy();
+        await vi.advanceTimersByTimeAsync(120001);
+        if (change === 'business') w.nodes.get(sourcePath).barcodes[0].cod++;
+        else w.nodes.get('zoew_restore_policy/shop').epoch++;
+        const before = structuredClone([...w.nodes]);
+        w.setBeforePut(undefined);
+        const b = await w.openAs('next-user');
+        await expect(b.context({ ...input, token: 'next-attempt' })).rejects.toBeTruthy();
+        expect([...w.nodes]).toEqual(before);
+    } finally { vi.useRealTimers(); }
+});
+it('the persistent publication fence rejects an old source PUT during a new reservation after release', async () => {
+    const w = world(), a = await w.open();
+    const old = await a.context(input);
+    let ready!: () => void, resume!: () => void;
+    const reached = new Promise<void>(resolve => { ready = resolve; }), release = new Promise<void>(resolve => { resume = resolve; });
+    let first = true;
+    w.setBeforePut(async (path, value) => {
+        if (path === sourcePath && value.restoreAttestationId === 'owner-proof-1' && first) { first = false; ready(); await release; }
+    });
+    const pending = a.apply(input, old, 'allow', 'owner-proof-1').catch(error => error);
+    await reached;
+    const retry = await a.context(input);
+    await a.apply(input, retry, 'allow', retry.reservedAttestationId);
+    const drop = { ...input, action: 'release' };
+    await a.apply(drop, await a.context(drop), 'unconfirmed', 'owner-proof-1');
+    expect(w.nodes.get(sourcePath)).toMatchObject({ restorePublication: 2 });
+    expect(w.nodes.get(sourcePath)).not.toHaveProperty('restoreAttestationId');
+    const b = await w.openAs('next-user'), next = { ...input, token: 'next-attempt', targetId: 'next-target' };
+    const nextContext = await b.context(next);
+    w.setBeforePut(async path => { if (path === sourcePath) { resume(); expect((await pending).code).toBe('ZTO_RESTORE_SOURCE_CHANGED'); } });
+    await b.apply(next, nextContext, 'allow', 'next-proof-2');
+    expect(w.nodes.get(sourcePath)).toMatchObject({ restorePublication: 3, restoreAttestationId: 'next-proof-2',
+        restoreClaim: { token: next.token, targetId: next.targetId } });
+    expect(w.nodes.get(proofPath)).toMatchObject({ id: 'next-proof-2', actorUid: 'next-user', token: next.token });
+});
+it.each([0, -1, 1.5, '1', null, 9007199254740991])('invalid persisted publication %j fails closed before authority writes', async value => {
+    const w = world(), a = await w.open();
+    w.nodes.get(sourcePath).restorePublication = value;
+    await expect(a.context(input)).rejects.toBeTruthy();
+    expect(w.writes).toHaveLength(0);
+});
+it('publication MAX never wraps or writes a fresh ALLOW', async () => {
+    const w = world(), a = await w.open();
+    w.nodes.get(sourcePath).restorePublication = 9007199254740990;
+    await expect(a.apply(input, await a.context(input), 'allow', 'owner-proof-1')).rejects.toBeTruthy();
+    expect(w.nodes.get(sourcePath).restorePublication).toBe(9007199254740990);
+    expect(w.writes).toHaveLength(0);
+});
+it('a legacy published source upgrades its absent publication fence on a fresh owned refresh', async () => {
+    const w = world(), a = await w.open();
+    await a.apply(input, await a.context(input), 'allow', 'owner-proof-1');
+    delete w.nodes.get(sourcePath).restorePublication;
+    const refresh = { ...input, action: 'refresh' }, context = await a.context(refresh);
+    expect(context).not.toHaveProperty('reservedAttestationId');
+    await a.apply(refresh, context, 'allow', 'owner-proof-1');
+    expect(w.nodes.get(sourcePath)).toMatchObject({ restorePublication: 1, restoreAttestationId: 'owner-proof-1' });
+});
+it('a pending legacy refresh is not mistaken for a published expired source claim', async () => {
+    vi.useFakeTimers();
+    try {
+        const w = world(), a = await w.open();
+        await a.apply(input, await a.context(input), 'allow', 'owner-proof-1');
+        delete w.nodes.get(sourcePath).restorePublication;
+        await vi.advanceTimersByTimeAsync(120001);
+        const b = await w.openAs('next-user'), other = { ...input, token: 'next-attempt', targetId: 'next-target' };
+        let held = false;
+        w.setBeforePut(async (path, value) => {
+            if (path === sourcePath && !held) {
+                held = true;
+                const context = await b.context(other);
+                await expect(b.apply(other, context, 'allow', 'other-proof')).rejects.toMatchObject({ code: 'ZTO_RESTORE_IN_PROGRESS' });
+                expect(w.nodes.get(proofPath).token).toBe(input.token);
+                expect(value.restorePublication).toBe(1);
+            }
+        });
+        const current = await w.open();
+        await current.apply(input, await current.context(input), 'allow', 'owner-proof-1');
+        expect(w.nodes.get(sourcePath).restorePublication).toBe(1);
+        expect(w.nodes.get(proofPath).id).toBe(w.nodes.get(sourcePath).restoreAttestationId);
+    } finally { vi.useRealTimers(); }
+});
+it('an old source publication may win recovery settlement only with the same id and expired HOLD authority', async () => {
+    vi.useFakeTimers();
+    try {
+        const w = world(), a = await w.open();
+        let ready!: () => void, resume!: () => void;
+        const reached = new Promise<void>(resolve => { ready = resolve; }), released = new Promise<void>(resolve => { resume = resolve; });
+        let first = true;
+        w.setBeforePut(async path => { if (path === sourcePath && first) { first = false; ready(); await released; } });
+        const old = a.apply(input, await a.context(input), 'allow', 'owner-proof-1').catch(error => error);
+        await reached;
+        await vi.advanceTimersByTimeAsync(120001);
+        const b = await w.openAs('next-user'), next = { ...input, token: 'next-attempt', targetId: 'next-target' };
+        let committed!: () => void;
+        const sourceCommitted = new Promise<void>(resolve => { committed = resolve; });
+        w.setAfterPut(path => { if (path === sourcePath) committed(); });
+        w.setBeforePut(async path => { if (path === sourcePath) { resume(); await sourceCommitted; } });
+        const settled = await b.context(next);
+        expect((await old).code).toBe('ZTO_RESTORE_TIMEOUT');
+        expect(settled.source).toMatchObject({ restorePublication: 1, restoreAttestationId: 'owner-proof-1',
+            restoreClaim: { token: input.token, targetId: input.targetId } });
+        expect(w.conflicts).toBe(1);
+        expect(w.nodes.get(proofPath)).toMatchObject({ status: 'hold', verdict: 'unconfirmed', token: input.token });
+        expect(w.nodes.get(proofPath).expiresAt).toBeLessThanOrEqual(Date.now());
+        expect(w.writes.filter(write => write.path === sourcePath)).toHaveLength(1);
+    } finally { vi.useRealTimers(); }
+});
+it('recovery CAS conflicts stop after the bounded budget and retain HOLD for a later settlement', async () => {
+    vi.useFakeTimers();
+    try {
+        const w = world(), a = await w.open();
+        w.setBeforePut(path => { if (path === sourcePath) throw new Error('crash before seal'); });
+        await expect(a.apply(input, await a.context(input), 'allow', 'owner-proof-1')).rejects.toBeTruthy();
+        await vi.advanceTimersByTimeAsync(120001);
+        w.setBeforePut(path => { if (path === sourcePath) w.versions.set(path, (w.versions.get(path) || 0) + 1); });
+        const b = await w.openAs('next-user'), next = { ...input, token: 'next-attempt', targetId: 'next-target' };
+        await expect(b.context(next)).rejects.toMatchObject({ code: 'ZTO_RESTORE_IN_PROGRESS' });
+        expect(w.conflicts).toBe(3);
+        expect(w.nodes.get(proofPath)).toMatchObject({ status: 'hold', recovery: { state: 'recovering' } });
+        expect(w.nodes.get(sourcePath)).not.toHaveProperty('restoreAttestationId');
+        expect(w.writes.filter(write => write.path === proofPath)).toHaveLength(2);
+        w.setBeforePut(undefined);
+        expect((await b.context(next)).source.restorePublication).toBe(1);
+        expect(w.nodes.get(proofPath).status).toBe('hold');
+    } finally { vi.useRealTimers(); }
+});
+it.each(['signed', 'returned'])('a released %s denial remains repeatable without recreating a source claim', async verdict => {
+    const w = world(), a = await w.open();
+    await a.apply(input, await a.context(input), verdict, 'owner-proof-1');
+    const release = { ...input, action: 'release' };
+    await a.apply(release, await a.context(release), 'unconfirmed', 'owner-proof-1');
+    for (let attempt = 0; attempt < 2; attempt++) {
+        expect((await a.apply(input, await a.context(input), verdict, 'owner-proof-1')).kind).toBe('deny');
+        expect(w.nodes.get(sourcePath)).not.toHaveProperty('restoreAttestationId');
+        expect(w.nodes.get(sourcePath)).not.toHaveProperty('restoreClaim');
+        expect(w.nodes.get(proofPath)).toMatchObject({ status: 'deny', verdict });
+    }
+    expect(w.nodes.get(sourcePath).restorePublication).toBe(4);
+});
+it.each(['signed', 'returned'])('a fresh %s observed after an unsigned release persists a sticky terminal denial', async verdict => {
+    const w = world(), a = await w.open();
+    await a.apply(input, await a.context(input), 'allow', 'owner-proof-1');
+    const release = { ...input, action: 'release' };
+    await a.apply(release, await a.context(release), 'unconfirmed', 'owner-proof-1');
+    expect(w.nodes.get(proofPath).status).toBe('hold');
+    const observer = await w.openAs('observer-user'), seen = { ...input, token: 'observer-attempt', targetId: 'observer-target' };
+    const denied = await observer.apply(seen, await observer.context(seen), verdict, 'observer-proof');
+    expect(denied).toMatchObject({ kind: 'deny', code: 'ZTO_RESTORE_TERMINAL_' + verdict.toUpperCase() });
+    expect(w.nodes.get(proofPath)).toMatchObject({ status: 'deny', verdict, actorUid: 'owned-user', id: 'owner-proof-1' });
+    expect(w.nodes.get(sourcePath)).toMatchObject({ restorePublication: 3 });
+    expect(w.nodes.get(sourcePath)).not.toHaveProperty('restoreAttestationId');
+    expect(w.nodes.get(sourcePath)).not.toHaveProperty('restoreClaim');
+    expect((await observer.apply(seen, await observer.context(seen), 'allow', 'unused-proof')).kind).toBe('deny');
+});
 it('a late allow cannot overwrite a newer HOLD or DENY revision', async () => {
     const w = world();
     const backend = await w.open();
@@ -146,6 +478,66 @@ it('terminal return denies without fabricating a provider timestamp or Signed fl
     expect(w.nodes.get(sourcePath)).not.toHaveProperty('restoreBlocked');
     expect(w.nodes.get(sourcePath).barcodes[0]).not.toHaveProperty('ztoReturnedAt');
     expect(w.nodes.get(sourcePath).barcodes[0]).not.toHaveProperty('ztoSignedAt');
+});
+it.each(['remove', 'delete', 'pickup'].flatMap(reason => ['signed', 'returned'].map(verdict => [reason, verdict])))('terminal %s trash retains its financial reason while publishing the %s decision', async (reason, verdict) => {
+    const w = world();
+    w.nodes.get('zoew_restore_policy/shop').mode = 'cookie';
+    Object.assign(w.nodes.get(sourcePath), { trashMode: 'cookie', trashReason: reason, cod: 10, dod: 2, count: 1, price: 12 });
+    Object.assign(w.nodes.get(sourcePath).barcodes[0], { isDeducted: reason === 'remove', isFromDeletion: reason !== 'remove' });
+    const original = structuredClone(w.nodes.get(sourcePath)), a = await w.open();
+    const response = await a.apply(input, await a.context(input), verdict, 'owner-proof-1');
+    expect(response.kind).toBe('deny');
+    expect(w.nodes.get(sourcePath)).toMatchObject({ ztoTerminalDecision: verdict, restorePublication: 1,
+        trashReason: reason, cod: original.cod, dod: original.dod, count: original.count, price: original.price });
+    expect(w.nodes.get(sourcePath).barcodes).toEqual(original.barcodes);
+    expect(w.nodes.get(proofPath).snapshot).toEqual(original);
+    expect(w.nodes.get(proofPath).snapshot).not.toHaveProperty('ztoTerminalDecision');
+    const release = { ...input, action: 'release' };
+    await a.apply(release, await a.context(release), 'unconfirmed', 'owner-proof-1');
+    expect(w.nodes.get(sourcePath)).toMatchObject({ ztoTerminalDecision: verdict, trashReason: reason, restorePublication: 2 });
+    expect(w.nodes.get(sourcePath)).not.toHaveProperty('restoreClaim');
+    expect(w.nodes.get(sourcePath).barcodes).toEqual(original.barcodes);
+});
+it.each(terminalEnrichmentCases())('terminal enrichment parity: $name', ({ before, after, sourceId, expected }) => {
+    expect(sameTerminalBusiness(before, after, sourceId)).toBe(expected);
+});
+it('a released returned decision accepts real Sign timestamp enrichment and promotes its source and private verdict', async () => {
+    const w = world(), a = await w.open();
+    w.nodes.get(sourcePath).trashReason = 'remove';
+    await a.apply(input, await a.context(input), 'returned', 'owner-proof-1');
+    const release = { ...input, action: 'release' };
+    await a.apply(release, await a.context(release), 'unconfirmed', 'owner-proof-1');
+    const source = w.nodes.get(sourcePath);
+    source.barcodes[0].ztoSignedAt = Date.now() - 1000;
+    source.barcodes[0].ztoSignedExact = true;
+    source.restoreBlocked = true;
+    const raw = structuredClone(source);
+    const observer = await w.openAs('observer-user'), seen = { ...input, token: 'observer-attempt', targetId: 'observer-target' };
+    const response = await observer.apply(seen, await observer.context(seen), 'returned', 'unused-proof');
+    expect(response).toMatchObject({ kind: 'deny', code: 'ZTO_RESTORE_TERMINAL_SIGNED' });
+    expect(w.nodes.get(sourcePath)).toMatchObject({ ztoTerminalDecision: 'signed', restoreBlocked: true,
+        restorePublication: 3, trashReason: 'remove' });
+    expect(w.nodes.get(sourcePath).barcodes).toEqual(raw.barcodes);
+    expect(w.nodes.get(sourcePath)).not.toHaveProperty('restoreClaim');
+    expect(w.nodes.get(proofPath)).toMatchObject({ verdict: 'signed', actorUid: 'owned-user', token: input.token, snapshot: raw });
+});
+it('a pending ALLOW still requires the full raw snapshot after otherwise valid terminal enrichment', async () => {
+    const w = world(), a = await w.open();
+    w.setBeforePut(path => { if (path === sourcePath) throw new Error('crash before source publication'); });
+    await expect(a.apply(input, await a.context(input), 'allow', 'owner-proof-1')).rejects.toBeTruthy();
+    w.setBeforePut(undefined);
+    w.nodes.get(sourcePath).barcodes[0].ztoReturnedAt = Date.now() - 1000;
+    const proof = structuredClone(w.nodes.get(proofPath));
+    const context = await a.context(input);
+    await expect(a.apply(input, context, 'allow', 'owner-proof-1')).rejects.toMatchObject({ code: 'ZTO_RESTORE_IN_PROGRESS' });
+    expect(w.nodes.get(proofPath)).toEqual(proof);
+    expect(w.nodes.get(sourcePath)).not.toHaveProperty('restoreAttestationId');
+});
+it.each([null, false, 0, 'unknown', 'Signed'])('native malformed terminal marker %j cannot create authority', async marker => {
+    const w = world(), a = await w.open();
+    w.nodes.get(sourcePath).ztoTerminalDecision = marker;
+    await expect(a.context(input)).rejects.toMatchObject({ code: 'ZTO_RESTORE_UNCONFIRMED' });
+    expect(w.writes).toHaveLength(0);
 });
 it('lost source-ACK retries retain the original logical attempt and proof ID', async () => {
     const w = world();

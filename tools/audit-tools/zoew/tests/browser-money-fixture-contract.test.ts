@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import path from 'node:path';
 import vm from 'node:vm';
 import { createRequire } from 'node:module';
 import { claimAndCleanupItem, cleanupInFlight, readCleanupJournal } from '../../../../ZoeW/src/domain/cleanup';
@@ -14,10 +15,11 @@ import { acceptFixtureSession } from './helpers/accepted-session';
 
 const H = 'zoew_scan_history_cod_dod', D = 'zoew_daily_revenue_cod_dod', M = 'zoew_monthly_revenue_cod_dod', R = 'zoew_barcode_registry';
 const HOST = 'https://fake-default-rtdb.firebaseio.com', NOW = Date.UTC(2026, 9, 30, 9);
-const duplicateSource = fs.readFileSync('../tools/audit-tools/duplicate-scan-test.js', 'utf8');
-const moneySource = fs.readFileSync('../tools/audit-tools/duplicate-money-test.js', 'utf8');
-const slowSource = fs.readFileSync('../tools/audit-tools/slow-write-test.js', 'utf8');
-const cleanupSource = fs.readFileSync('../tools/audit-tools/zoew/scripts/cleanup-rules-check.mjs', 'utf8');
+const auditRoot = path.resolve(__dirname, '../..');
+const duplicateSource = fs.readFileSync(path.join(auditRoot, 'duplicate-scan-test.js'), 'utf8');
+const moneySource = fs.readFileSync(path.join(auditRoot, 'duplicate-money-test.js'), 'utf8');
+const slowSource = fs.readFileSync(path.join(auditRoot, 'slow-write-test.js'), 'utf8');
+const cleanupSource = fs.readFileSync(path.join(auditRoot, 'zoew/scripts/cleanup-rules-check.mjs'), 'utf8');
 function duplicateFixture(slow: boolean | 'money' = false, missingIncrement = false) {
     const context: any = vm.createContext({ window: { dispatchEvent() {}, setTimeout, setInterval }, Event, Date, setTimeout });
     let source = slow === 'money' ? moneySource : slow ? slowSource : duplicateSource;
@@ -26,7 +28,7 @@ function duplicateFixture(slow: boolean | 'money' = false, missingIncrement = fa
     return context.window;
 }
 function cleanupFixture() {
-    const context: any = vm.createContext({ NOW, TODAY: '2026-10-30', D15: '2026-10-23', D14: '2026-10-22', HOUR: 3600000, MIN: 60000, DAY: 86400000,
+    const context: any = vm.createContext({ NOW, CONFIG: JSON.stringify({ databaseURL: HOST }), TODAY: '2026-10-30', D15: '2026-10-23', D14: '2026-10-22', HOUR: 3600000, MIN: 60000, DAY: 86400000,
         TWO_HOURS: 7200000, ABANDON: 604800000, RETURNED_RETENTION: 172800000, TRASH_RETENTION: 2592000000 });
     vm.runInContext(cleanupSource.slice(cleanupSource.indexOf('function bc('), cleanupSource.indexOf('/* ── build React')) + '\nglobalThis.initial = seed();', context);
     return context;
@@ -187,7 +189,7 @@ it('slow claim oracle ៖ v2 owner ត្រូវ receipt និង lifecycle �
     }
 });
 
-const multiSource = fs.readFileSync('../tools/audit-tools/emu/money-multidevice-emu-test.js', 'utf8');
+const multiSource = fs.readFileSync(path.join(auditRoot, 'emu/money-multidevice-emu-test.js'), 'utf8');
 const { invariant, invariantBroken } = createRequire(import.meta.url)('../../money-multidevice-core.js');
 function agePatch(item, registry) {
     const context: any = vm.createContext({});
@@ -221,6 +223,7 @@ it('historical v2 admission → abandon → Restore ៖ birth/receipt/registry �
     expect(await claimScanOperation(handle, 'HISTORYV2')).toBe('claimed');
     expect(await saveScanOperation(handle, '012345678', 'A1')).toBe(true);
     const store = fixture.__fakeStore, receipt = structuredClone(store.zoew_scan_operations[handle.record.id]);
+    store.zoew_restore_policy = { shop: { v: 1, mode: 'local', scope: HOST, branch: '', epoch: 1 } };
     expect(receipt.birth).toBe(birth);
     const sync = () => {
         dataState.scanHistory = structuredClone(Object.values(store[H] || {}));

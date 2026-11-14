@@ -2,7 +2,7 @@
 
 const crypto = require('crypto');
 const { RestoreFailure, fetchJson, configuredOrigin } = require('./zto-restore-http.cjs');
-const { sourceCodes, effectiveMode, completedTuple, PROOF_TTL_MS } = require('./zto-restore-proof.cjs');
+const { sourceCodes, effectiveMode, completedTuple, terminalSource, terminalDecisionRank, PROOF_TTL_MS } = require('./zto-restore-proof.cjs');
 const SOURCE_ROOT = 'zoew_recently_deleted_cod_dod';
 const HISTORY_ROOT = 'zoew_scan_history_cod_dod';
 const PROOF_ROOT = 'zoew_restore_attestations';
@@ -43,17 +43,60 @@ function allowedTargetSlots(source, target, sourceId = source.id) {
 function appliedConsumption(input, actor, scope, source, consumption, finalization) {
     return completedTuple(input, { actorUid: actor.uid, scope }, { source, consumption, finalization });
 }
+function publication(source) {
+    if (!Object.hasOwn(source, 'restorePublication')) return 0;
+    if (!integer(source.restorePublication) || source.restorePublication < 1) throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
+    return source.restorePublication;
+}
+function nextPublication(source) {
+    const current = publication(source);
+    if (current >= 9007199254740990) throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
+    return current + 1;
+}
+function sameTerminalBarcodes(before, current) {
+    if ((!plain(before) && !Array.isArray(before)) || (!plain(current) && !Array.isArray(current))) return canonical(before) === canonical(current);
+    if (Array.isArray(before) !== Array.isArray(current)) return false;
+    const keys = Object.keys(before).sort();
+    if (canonical(keys) !== canonical(Object.keys(current).sort())) return false;
+    const timeFields = ['ztoSignedAt', 'ztoReturnedAt', 'ztoMisplacedAt', 'ztoSentOutAt'];
+    const positive = value => typeof value === 'number' && Number.isFinite(value) && value > 0;
+    const measured = value => integer(value) && value > 0;
+    return keys.every(key => {
+        const a = before[key], b = current[key];
+        if (!plain(a) || !plain(b)) return canonical(a) === canonical(b);
+        const unchanged = field => Object.hasOwn(a, field) === Object.hasOwn(b, field) && canonical(a[field]) === canonical(b[field]);
+        const unmeasuredExact = !Object.hasOwn(a, 'ztoSignedExact') || a.ztoSignedExact === null || a.ztoSignedExact === false;
+        const firstExact = unmeasuredExact && b.ztoSignedExact === true;
+        for (const field of timeFields) {
+            if (unchanged(field)) continue;
+            if (!Object.hasOwn(b, field) || !measured(b[field])) return false;
+            if (Object.hasOwn(a, field) && a[field] !== null && a[field] !== 0
+                && !(field === 'ztoSignedAt' && positive(a[field]) && firstExact)) return false;
+        }
+        if (!unchanged('ztoSignedExact') && !(firstExact && measured(b.ztoSignedAt))) return false;
+        if (b.ztoSignedExact === true && !positive(b.ztoSignedAt)) return false;
+        const core = value => {
+            const out = { ...value };
+            for (const field of [...timeFields, 'ztoSignedExact']) delete out[field];
+            return out;
+        };
+        return canonical(core(a)) === canonical(core(b));
+    });
+}
 function sameTerminalBusiness(before, current, sourceId) {
     if (!plain(before) || !plain(current)) return false;
     if (Object.hasOwn(before, 'id') ? before.id !== sourceId || current.id !== before.id
         : Object.hasOwn(current, 'id') && current.id !== sourceId) return false;
     if (canonical(before.restoreBlocked) !== canonical(current.restoreBlocked) && current.restoreBlocked !== true) return false;
+    try {
+        if (publication(current) < publication(before) || terminalDecisionRank(current) < terminalDecisionRank(before)) return false;
+    } catch (_) { return false; }
     const strip = value => {
         const out = { ...value };
-        for (const key of ['restoreAttestationId', 'restoreClaim', 'restoreBlocked', 'id']) delete out[key];
+        for (const key of ['restoreAttestationId', 'restoreClaim', 'restoreBlocked', 'id', 'restorePublication', 'ztoTerminalDecision', 'barcodes']) delete out[key];
         return out;
     };
-    return canonical(strip(before)) === canonical(strip(current));
+    return canonical(strip(before)) === canonical(strip(current)) && sameTerminalBarcodes(before.barcodes, current.barcodes);
 }
 
 function createFirebaseBackend({ verifyActor, resolveOrigin = configuredOrigin }) {
@@ -144,6 +187,63 @@ function createFirebaseBackend({ verifyActor, resolveOrigin = configuredOrigin }
                 headers: { ...serviceHeaders, 'if-match': etag }, body: JSON.stringify(value)
             }, budget, { fetchImpl: conditionalFetch });
         }
+        function reservation(input, context) {
+            const proof = context.attestation, source = context.source;
+            const current = publication(source);
+            if (!proof || proof.generation < input.expectedGeneration) return { pending: false };
+            if (proof.generation !== input.expectedGeneration || !plain(proof.snapshot) || proof.sourceHash !== hash(proof.snapshot)
+                || typeof proof.id !== 'string' || !ID.test(proof.id) || proof.sourceId !== input.sourceId || proof.scope !== databaseURL || proof.branch !== actor.branch
+                || proof.deletedAt !== source.deletedAt || proof.rowBirth !== (source.createdAt ?? 0)
+                || proof.snapshot.deletedAt !== proof.deletedAt || (proof.snapshot.createdAt ?? 0) !== proof.rowBirth
+                || (proof.snapshot.trashGeneration ?? 0) !== input.expectedGeneration
+                || typeof proof.token !== 'string' || !proof.token || typeof proof.targetId !== 'string' || !ID.test(proof.targetId)
+                || !integer(proof.revision) || proof.revision < 1 || !integer(proof.policyEpoch) || proof.policyEpoch < 1
+                || typeof proof.actorUid !== 'string' || !proof.actorUid || proof.sessionId != null || !integer(proof.authTime) || proof.authTime <= 0
+                || !integer(proof.issuedAt) || proof.issuedAt <= 0 || !integer(proof.expiresAt) || proof.expiresAt <= proof.issuedAt
+                || proof.expiresAt - proof.issuedAt > PROOF_TTL_MS || !['allow', 'hold', 'deny'].includes(proof.status)
+                || !(proof.status === 'allow' && proof.verdict === 'allow' || proof.status === 'hold' && proof.verdict === 'unconfirmed'
+                    || proof.status === 'deny' && ['signed', 'returned'].includes(proof.verdict))) throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
+            if (proof.recovery && (!plain(proof.recovery) || Object.keys(proof.recovery).length !== 5 || proof.recovery.v !== 1
+                || proof.recovery.state !== 'recovering' || typeof proof.recovery.actorUid !== 'string' || !proof.recovery.actorUid
+                || !integer(proof.recovery.authTime) || proof.recovery.authTime <= 0 || !integer(proof.recovery.at) || proof.recovery.at <= 0)) {
+                throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
+            }
+            const previous = publication(proof.snapshot);
+            const bound = source.restoreAttestationId === proof.id && plain(source.restoreClaim)
+                && source.restoreClaim.token === proof.token && source.restoreClaim.targetId === proof.targetId;
+            const legacy = !Object.hasOwn(source, 'restorePublication') && !Object.hasOwn(proof.snapshot, 'restorePublication');
+            if ((current === previous + 1 || legacy && canonical(source) !== canonical(proof.snapshot))
+                && bound && sameTerminalBusiness(proof.snapshot, source, input.sourceId)) return { pending: false };
+            const released = current === previous + 1 && !Object.hasOwn(source, 'restoreAttestationId') && !Object.hasOwn(source, 'restoreClaim')
+                && (proof.status !== 'allow' && proof.snapshot.restoreAttestationId === proof.id
+                    && proof.snapshot.restoreClaim?.token === proof.token && proof.snapshot.restoreClaim?.targetId === proof.targetId
+                    || proof.status === 'deny' && !Object.hasOwn(proof.snapshot, 'restoreAttestationId') && !Object.hasOwn(proof.snapshot, 'restoreClaim')
+                    && sameTerminalBusiness(proof.snapshot, source, input.sourceId));
+            if (released) return { pending: false };
+            if (current !== previous || proof.policyEpoch !== context.policy.epoch || proof.mode !== effectiveMode(context)) {
+                throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
+            }
+            const unchanged = canonical(source) === canonical(proof.snapshot);
+            const own = unchanged && proof.actorUid === actor.uid && proof.authTime === actor.authTime
+                && proof.token === input.token && proof.targetId === input.targetId;
+            return { pending: true, unchanged, own };
+        }
+        async function settleReservation(input, context, pending) {
+            const proof = context.attestation;
+            if (!pending.unchanged || proof.expiresAt > now() || proof.status === 'deny') throw new RestoreFailure('ZTO_RESTORE_IN_PROGRESS', 409);
+            await currentActor();
+            const policy = (await read('zoew_restore_policy/shop')).value;
+            if (canonical(policy) !== canonical(context.policy)) throw new RestoreFailure('ZTO_RESTORE_POLICY_UNCONFIRMED');
+            if (!proof.recovery) {
+                const revision = proof.revision + 1;
+                if (!integer(revision)) throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
+                await put(PROOF_ROOT + '/' + input.sourceId, { ...proof, revision, status: 'hold', verdict: 'unconfirmed',
+                    recovery: { v: 1, state: 'recovering', actorUid: actor.uid, authTime: actor.authTime, at: now() } }, context.attestationEtag);
+            }
+            const next = { ...context.source, id: input.sourceId, restorePublication: nextPublication(context.source),
+                restoreAttestationId: proof.id, restoreClaim: { token: proof.token, targetId: proof.targetId, claimedAt: proof.issuedAt } };
+            return put(SOURCE_ROOT + '/' + input.sourceId, next, context.sourceEtag);
+        }
         async function applyTerminal(input, context, observed, proposedId) {
             for (let attempt = 0; attempt < 3; attempt++) {
                 await currentActor();
@@ -162,6 +262,10 @@ function createFirebaseBackend({ verifyActor, resolveOrigin = configuredOrigin }
                 if (!sameTerminalBusiness(context.source, source, input.sourceId)
                     || (source.trashGeneration ?? 0) !== input.expectedGeneration) throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
                 const mode = effectiveMode({ ...context, source, policy });
+                if (prior !== null && (!plain(prior) || prior.v !== 1 || prior.sourceId !== input.sourceId
+                    || !integer(prior.generation) || prior.generation > input.expectedGeneration || !integer(prior.revision) || prior.revision < 1)) {
+                    throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
+                }
                 const sameGeneration = prior && prior.generation === input.expectedGeneration;
                 let owner = null, claim = null, released = false;
                 if (sameGeneration) {
@@ -173,12 +277,16 @@ function createFirebaseBackend({ verifyActor, resolveOrigin = configuredOrigin }
                         || !['allow', 'hold', 'deny'].includes(prior.status) || prior.status === 'deny' && !['signed', 'returned'].includes(prior.verdict)
                         || !plain(prior.snapshot) || prior.sourceHash !== hash(prior.snapshot)
                         || !sameTerminalBusiness(prior.snapshot, source, input.sourceId)) throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
-                    if (Object.hasOwn(source, 'restoreAttestationId')) {
+                    if (publication(source) === publication(prior.snapshot) && canonical(source) === canonical(prior.snapshot)) {
+                        if (!integer(prior.issuedAt) || prior.issuedAt <= 0) throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
+                        claim = { token: prior.token, targetId: prior.targetId, claimedAt: prior.issuedAt };
+                    } else if (Object.hasOwn(source, 'restoreAttestationId')) {
                         if (source.restoreAttestationId !== prior.id || !plain(source.restoreClaim)
                             || source.restoreClaim.token !== prior.token || source.restoreClaim.targetId !== prior.targetId
                             || !integer(source.restoreClaim.claimedAt) || source.restoreClaim.claimedAt <= 0) throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
                         claim = { ...source.restoreClaim };
-                    } else if (prior.status === 'deny' && !Object.hasOwn(source, 'restoreClaim')) released = true;
+                    } else if (!Object.hasOwn(source, 'restoreClaim') && (prior.status === 'deny'
+                        || !reservation(input, { ...context, source, attestation: prior }).pending)) released = true;
                     else {
                         if (canonical(source.restoreClaim) !== canonical(prior.snapshot.restoreClaim)
                             || !integer(prior.issuedAt) || prior.issuedAt <= 0) throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
@@ -193,7 +301,8 @@ function createFirebaseBackend({ verifyActor, resolveOrigin = configuredOrigin }
                     claim = plain(source.restoreClaim) && source.restoreClaim.token === input.token && source.restoreClaim.targetId === input.targetId
                         ? { ...source.restoreClaim } : { token: input.token, targetId: input.targetId, claimedAt: now() };
                 }
-                const verdict = observed === 'signed' || sameGeneration && prior.status === 'deny' && prior.verdict === 'signed' ? 'signed' : 'returned';
+                const verdict = observed === 'signed' || terminalSource(source) === 'signed'
+                    || sameGeneration && prior.status === 'deny' && prior.verdict === 'signed' ? 'signed' : 'returned';
                 const revision = prior ? prior.revision + 1 : 1;
                 if (!integer(revision) || revision < 1) throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
                 const issuedAt = now(), expiresAt = Math.min(issuedAt + PROOF_TTL_MS, actor.expiresAt);
@@ -203,10 +312,12 @@ function createFirebaseBackend({ verifyActor, resolveOrigin = configuredOrigin }
                     scope: databaseURL, branch: actor.branch, mode, policyEpoch: policy.epoch, issuedAt, expiresAt, status: 'deny', verdict,
                     sourceHash: hash(source), codeSetHash: sameGeneration ? prior.codeSetHash : hash([]), snapshot: source,
                     codes: sameGeneration ? prior.codes || {} : {}, allowedTargetSlots: sameGeneration ? prior.allowedTargetSlots || {} : {} };
-                const next = { ...source, id: input.sourceId, ...(released ? {} : { restoreAttestationId: owner.id, restoreClaim: claim }),
-                    ...(verdict === 'signed' ? { restoreBlocked: true } : {}) };
                 try {
                     await put(PROOF_ROOT + '/' + input.sourceId, grant, proofRead.etag);
+                    const next = { ...source, id: input.sourceId, restorePublication: nextPublication(source),
+                        ztoTerminalDecision: verdict,
+                        ...(released ? {} : { restoreAttestationId: owner.id, restoreClaim: claim }),
+                        ...(verdict === 'signed' ? { restoreBlocked: true } : {}) };
                     const committed = await put(SOURCE_ROOT + '/' + input.sourceId, next, sourceRead.etag);
                     return { v: 1, success: true, kind: 'deny', attestationId: owner.id, expiresAt, source: committed.value,
                         code: 'ZTO_RESTORE_TERMINAL_' + verdict.toUpperCase() };
@@ -217,8 +328,8 @@ function createFirebaseBackend({ verifyActor, resolveOrigin = configuredOrigin }
             throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
         }
         await currentActor();
-        return {
-            async context(input) {
+        const backend = {
+            async context(input, recoveries = 0) {
                 const [policy, source, consumption, finalization, target, attestation] = await Promise.all([
                     read('zoew_restore_policy/shop'), read(SOURCE_ROOT + '/' + input.sourceId, true),
                     read('zoew_trash_consumptions/' + input.sourceId), read('zoew_restore_finalizations/' + input.sourceId),
@@ -240,6 +351,7 @@ function createFirebaseBackend({ verifyActor, resolveOrigin = configuredOrigin }
                     || !integer(source.value.deletedAt) || source.value.deletedAt <= 0 || !integer(source.value.createdAt ?? 0)) {
                     throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
                 }
+                terminalDecisionRank(source.value);
                 const previous = consumption.value;
                 if (previous !== null && (!plain(previous) || previous.sourceId !== input.sourceId
                     || !integer(previous.generation) || previous.generation + 1 !== input.expectedGeneration
@@ -247,17 +359,26 @@ function createFirebaseBackend({ verifyActor, resolveOrigin = configuredOrigin }
                     throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
                 }
                 const proof = attestation.value;
-                if (proof !== null && (!plain(proof) || proof.v !== 1 || proof.sourceId !== input.sourceId || !integer(proof.revision))) {
+                if (proof !== null && (!plain(proof) || proof.v !== 1 || proof.sourceId !== input.sourceId || !integer(proof.revision) || !integer(proof.generation))) {
                     throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
                 }
+                const pending = reservation(input, context);
+                if (pending.pending && proof.status !== 'deny' && (proof.recovery || proof.expiresAt <= now())) {
+                    if (recoveries >= 3) throw new RestoreFailure('ZTO_RESTORE_IN_PROGRESS', 409);
+                    try { await settleReservation(input, context, pending); }
+                    catch (error) { if (!error.conditionalConflict) throw error; }
+                    return backend.context(input, recoveries + 1);
+                }
+                if (pending.own) context.reservedAttestationId = proof.id;
                 const claim = source.value.restoreClaim;
                 if (source.value.restoreAttestationId && (!proof || proof.id !== source.value.restoreAttestationId)) throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
                 if (claim) {
                     if (!plain(claim) || typeof claim.token !== 'string' || !ID.test(claim.targetId) || !integer(claim.claimedAt)) throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
-                    if (claim.token === input.token && proof && proof.actorUid !== actor.uid) throw new RestoreFailure('ZTO_RESTORE_AUTH_REQUIRED', 401);
+                    if (!pending.pending && claim.token === input.token && proof && proof.actorUid !== actor.uid) throw new RestoreFailure('ZTO_RESTORE_AUTH_REQUIRED', 401);
                     if (claim.token !== input.token || claim.targetId !== input.targetId) {
                         const oldTarget = claim.targetId === input.targetId ? target.value : (await read(HISTORY_ROOT + '/' + claim.targetId)).value;
-                        if (oldTarget?.restoreClaimId === input.sourceId || claim.token !== input.token && claim.claimedAt + PROOF_TTL_MS > now()
+                        const recoveredExpiry = proof?.recovery && proof.status === 'hold' && proof.expiresAt <= now();
+                        if (oldTarget?.restoreClaimId === input.sourceId || claim.token !== input.token && !recoveredExpiry && claim.claimedAt + PROOF_TTL_MS > now()
                             || claim.token === input.token && input.action !== 'rebind') throw new RestoreFailure('ZTO_RESTORE_IN_PROGRESS', 409);
                     }
                 } else if (input.action !== 'authorize') throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
@@ -286,13 +407,19 @@ function createFirebaseBackend({ verifyActor, resolveOrigin = configuredOrigin }
                 const policy = (await read('zoew_restore_policy/shop')).value;
                 if (canonical(policy) !== canonical(context.policy)) throw new RestoreFailure('ZTO_RESTORE_POLICY_UNCONFIRMED');
                 const currentProof = context.attestation;
+                const pending = reservation(input, context);
+                if (pending.pending && (!pending.own || currentProof.recovery)) throw new RestoreFailure('ZTO_RESTORE_IN_PROGRESS', 409);
+                if (pending.pending && attestationId !== currentProof.id) throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
                 const terminal = currentProof && currentProof.generation === input.expectedGeneration && currentProof.status === 'deny';
                 if (terminal) verdict = currentProof.verdict;
                 const revision = currentProof ? currentProof.revision + 1 : 1;
                 if (!integer(revision)) throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
                 const issuedAt = now();
+                if (actor.expiresAt <= issuedAt) throw new RestoreFailure('ZTO_RESTORE_AUTH_REQUIRED', 401);
                 const expiresAt = Math.min(issuedAt + PROOF_TTL_MS, (context.verifiedAt ?? issuedAt) + PROOF_TTL_MS, actor.expiresAt);
                 const allowing = verdict === 'allow' && input.action !== 'release';
+                if (allowing && expiresAt <= issuedAt) throw new RestoreFailure('ZTO_RESTORE_UNCONFIRMED');
+                const publicationId = nextPublication(context.source);
                 const codes = allowing ? sourceCodes(context.source, now) : [];
                 const codeKeys = allowing ? Object.create(null) : currentProof?.codes || {};
                 if (allowing) rows(context.source.barcodes).forEach(row => { codeKeys[row.code] = true; });
@@ -314,7 +441,9 @@ function createFirebaseBackend({ verifyActor, resolveOrigin = configuredOrigin }
                     const target = (await read(HISTORY_ROOT + '/' + input.targetId)).value;
                     if (target?.restoreClaimId === input.sourceId) throw new RestoreFailure('ZTO_RESTORE_IN_PROGRESS', 409);
                 }
+                if (allowing && expiresAt <= now()) throw new RestoreFailure('ZTO_RESTORE_UNCONFIRMED');
                 let next = { ...context.source, id: input.sourceId, restoreAttestationId: attestationId,
+                    restorePublication: publicationId,
                     restoreClaim: { token: input.token, targetId: input.targetId, claimedAt: issuedAt } };
                 if (grant.status === 'deny' && verdict === 'signed') next.restoreBlocked = true;
                 if (input.action === 'release') {
@@ -326,7 +455,8 @@ function createFirebaseBackend({ verifyActor, resolveOrigin = configuredOrigin }
                     attestationId, expiresAt, source: committed.value };
             }
         };
+        return backend;
     };
 }
 
-module.exports = { createFirebaseBackend, canonical, hash, allowedTargetSlots, appliedConsumption };
+module.exports = { createFirebaseBackend, canonical, hash, allowedTargetSlots, appliedConsumption, sameTerminalBusiness };

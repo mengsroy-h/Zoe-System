@@ -13,6 +13,21 @@ import * as storage from '../../../../ZoeW/src/core/storage';
 import * as evidenceRetention from '../../../../ZoeW/src/services/evidence-retention';
 import { dbListenerFailedPaths, dbListenerPendingPaths, DB_LISTENER_KEY_DELETED } from '../../../../ZoeW/src/core/text';
 import { EVIDENCE_RETENTION_MS, EVIDENCE_SWEEP_BATCH, EVIDENCE_SWEEP_GAP_MS, evidenceSweep, runEvidenceRetentionSweep } from '../../../../ZoeW/src/services/evidence-retention';
+import { parseExpression } from '../../../../supabase/scripts/rtdb-rules.mjs';
+
+function containsRuleExpression(expression: string, expected: string, variables: string[]) {
+    const normalize = (value: any): any => {
+        if (Array.isArray(value)) return value.map(normalize);
+        if (!value || typeof value !== 'object') return value;
+        const node = Object.fromEntries(Object.entries(value).map(([key, child]) => [key, normalize(child)]));
+        return node.t === 'm' && node.n === 'hasChild' && node.a.length === 1
+            ? { t: 'm', n: 'exists', o: { t: 'm', n: 'child', o: node.o, a: node.a }, a: [] } : node;
+    };
+    const wanted = JSON.stringify(normalize(parseExpression(expected, variables)));
+    const includes = (value: any): boolean => !!value && typeof value === 'object'
+        && (JSON.stringify(value) === wanted || Object.values(value).some(includes));
+    return includes(normalize(parseExpression(expression, variables)));
+}
 
 const HOST = 'https://audit-evidence.firebaseio.com';
 const NOW = Date.UTC(2026, 10, 5, 2);
@@ -246,11 +261,19 @@ it('rules ពិតមានលក្ខខណ្ឌលុបដូចគ្ន�
     const age = 'now - ' + EVIDENCE_RETENTION_MS;
     const scan = rules.zoew_scan_operations, rel = rules.zoew_registry_releases, con = rules.zoew_trash_consumptions;
     expect(scan['.indexOn']).toEqual(['birth']); expect(rel['.indexOn']).toEqual(['deletedAt']); expect(con['.indexOn']).toEqual(['deletedAt']);
-    expect(scan.$scanId['.write']).toContain("data.child('birth').val() < " + age);
-    expect(scan.$scanId['.write']).toContain("root.child('zoew_scan_pending').child($scanId).exists()");
-    expect(rel.$releaseId['.write']).toContain("data.child('deletedAt').val() < " + age);
-    expect(con.$sourceId['.write']).toContain("data.child('deletedAt').val() < " + age);
-    expect(con.$sourceId['.write']).toContain("root.child('zoew_restore_finalizations').child($sourceId).exists()");
+    expect(containsRuleExpression(scan.$scanId['.write'], "data.child('birth').val() < " + age, ['$scanId'])).toBe(true);
+    expect(containsRuleExpression(scan.$scanId['.write'], "root.child('zoew_scan_pending').child($scanId).exists()", ['$scanId'])).toBe(true);
+    expect(containsRuleExpression(rel.$releaseId['.write'], "data.child('deletedAt').val() < " + age, ['$releaseId'])).toBe(true);
+    expect(containsRuleExpression(con.$sourceId['.write'], "data.child('deletedAt').val() < " + age, ['$sourceId'])).toBe(true);
+    expect(containsRuleExpression(con.$sourceId['.write'], "root.child('zoew_restore_finalizations').child($sourceId).exists()", ['$sourceId'])).toBe(true);
+});
+
+it('rule predicate oracle ignores whitespace/hasChild spelling but preserves field, cutoff and comparison semantics', () => {
+    const predicate = "data.child('birth').val() < now - 123";
+    expect(containsRuleExpression("auth!=null&&data.child('birth').val()<now-123", predicate, [])).toBe(true);
+    expect(containsRuleExpression("!root.child('refs').hasChild($id)", "root.child('refs').child($id).exists()", ['$id'])).toBe(true);
+    for (const changed of ["data.child('other').val()<now-123", "data.child('birth').val()<=now-123", "data.child('birth').val()<now-124"])
+        expect(containsRuleExpression(changed, predicate, [])).toBe(false);
 });
 
 

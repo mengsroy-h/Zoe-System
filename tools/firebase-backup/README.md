@@ -321,6 +321,8 @@ Supabase app archive ទប់ការបោះពុម្ព backup ពេល
 - **សូមប្រើសោអានតែម្យ៉ាង** (`Firebase Realtime Database Viewer`) សម្រាប់ backup —
   សោដែលសរសេរបាន គឺជាហានិភ័យដែលមិនចាំបាច់។
 
+ត្រា server `restorePublication` និង `ztoTerminalDecision` ត្រូវរក្សាទុកទោះបាន release claim រួច។ Ordinary archive/import បដិសេធ source ដែលមានត្រាទាំងនេះ; ប្រើ DB-level recovery ដែលរក្សា private authority និង drain ប្រតិបត្តិការមុន rollback។ Decision ជាការហាមស្តារ មិនមែនត្រាម៉ោង Sign/Return ថ្មីទេ។
+
 ---
 
 ## អាជ្ញាប័ណ្ណ

@@ -66,20 +66,21 @@ function setPath(path: string, value: any) {
     cur[parts[parts.length - 1]] = JSON.parse(JSON.stringify(value));
 }
 const rules = JSON.parse(readFileSync(path.join(__dirname, '../../../../ZoeW', '..', 'firebase-database.rules.json'), 'utf8')).rules;
+function ruleSnapshot(store: any, path: string[]): any {
+    const value = path.reduce((v,k) => v?.[k],store) ?? null;
+    const child = (key: string) => ruleSnapshot(store, [...path, ...key.split('/').filter(Boolean)]);
+    return { val:()=>structuredClone(value), exists:()=>value!==null,
+        isNumber:()=>typeof value==='number' && Number.isFinite(value), isString:()=>typeof value==='string', isBoolean:()=>typeof value==='boolean',
+        hasChildren:(keys?: string[])=>value!==null && typeof value==='object' && (keys ? keys.every(k=>value[k]!=null) : Object.keys(value).length>0),
+        hasChild: (key: string) => child(key).exists(), child, parent:()=>ruleSnapshot(store,path.slice(0,-1)) };
+}
 function validateStore(previous: any) {
-    function snap(store: any, path: string[]): any {
-        const value = path.reduce((v,k) => v?.[k],store) ?? null;
-        return { val:()=>structuredClone(value), exists:()=>value!==null,
-            isNumber:()=>typeof value==='number' && Number.isFinite(value), isString:()=>typeof value==='string', isBoolean:()=>typeof value==='boolean',
-            hasChildren:(keys?: string[])=>value!==null && typeof value==='object' && (keys ? keys.every(k=>value[k]!=null) : Object.keys(value).length>0),
-            child:(key: string)=>snap(store,[...path,...String(key).split('/')]), parent:()=>snap(store,path.slice(0,-1)) };
-    }
     function walk(rule: any, path: string[], vars: Record<string,string>) {
         const value = path.reduce((v,k)=>v?.[k],lab.store);
         if(value == null) return;
         if(rule['.validate'] !== undefined) {
             const expression = rule['.validate'];
-            const valid = typeof expression==='boolean' ? expression : new Function('newData','data','root','auth','now',...Object.keys(vars), 'return ('+expression+');')(snap(lab.store,path),snap(previous,path),snap(previous,[]),{uid:'synthetic'},NOW,...Object.values(vars));
+            const valid = typeof expression==='boolean' ? expression : new Function('newData','data','root','auth','now',...Object.keys(vars), 'return ('+expression+');')(ruleSnapshot(lab.store,path),ruleSnapshot(previous,path),ruleSnapshot(previous,[]),{uid:'synthetic'},NOW,...Object.values(vars));
             if(!valid) throw new Error('permission_denied: '+path.join('/'));
         }
         if(typeof value==='object') for(const key of Object.keys(value)) {
@@ -89,6 +90,17 @@ function validateStore(previous: any) {
     }
     walk(rules,[],{});
 }
+it('partial-close validator ៖ child/hasChild អាន nested aliases ដូចគ្នា និង presence មិនអាស្រ័យលើ truthiness', () => {
+    const snapshot = ruleSnapshot({ nested: { zero: 0, no: false, empty: '' } }, []);
+    for (const key of ['zero', 'no', 'empty']) {
+        expect(snapshot.hasChild(`/nested/${key}`)).toBe(true);
+        expect(snapshot.child(`nested/${key}`).val()).toBe(snapshot.child('nested').child(key).val());
+    }
+    expect(snapshot.hasChild('nested/missing')).toBe(false);
+    expect(() => snapshot.child(0)).toThrow();
+    expect(() => snapshot.hasChild(null)).toThrow();
+});
+
 function checkedWrite(action:()=>void) {
     const previous=structuredClone(lab.store);
     try { action(); validateStore(previous); } catch(error) { lab.store=previous; throw error; }

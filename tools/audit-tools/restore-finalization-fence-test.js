@@ -5,6 +5,45 @@ const path = require('path');
 // `checker-coverage.js` បញ្ជាក់បានថា checker នេះពិតជាអានកូដមែន។
 const root = process.env.RESTOREFENCE_APP_DIR ? path.resolve(process.env.RESTOREFENCE_APP_DIR) : path.resolve(__dirname, '../..');
 const rules = JSON.parse(fs.readFileSync(path.join(root, 'firebase-database.rules.json'), 'utf8'));
+// Match rule ASTs after equivalent child-path/hasChild and Boolean grouping
+// normalization, without depending on whitespace or compressed path spelling.
+const { parseExpression } = require(path.join(root, 'supabase/scripts/rtdb-expression.cjs'));
+function ruleGuard(expression, fragment) {
+    const normalize = node => {
+        if (!node || typeof node !== 'object') return node;
+        if (Array.isArray(node)) return node.map(normalize);
+        if (node.t === 'm' && node.n === 'hasChild') return normalize({ t: 'm', n: 'exists',
+            o: { t: 'm', n: 'child', o: node.o, a: node.a }, a: [] });
+        if (node.t === 'm' && node.n === 'child') {
+            const parts = n => n.t === 'l' && typeof n.v === 'string' ? n.v : n.t === 'v' ? '\u0001' + n.n + '\u0001'
+                : n.t === 'b' && n.o === '+' && parts(n.l) !== null && parts(n.r) !== null ? parts(n.l) + parts(n.r) : null;
+            const joined = parts(node.a[0]);
+            if (joined !== null) {
+                const segments = joined.split('/').filter(Boolean);
+                if (segments.every(p => !p.includes('\u0001') || /^\u0001\$[A-Za-z0-9_]+\u0001$/.test(p))) {
+                    return segments.reduce((out, p) => ({ t: 'm', n: 'child', o: out,
+                        a: [p.startsWith('\u0001') ? { t: 'v', n: p.slice(1, -1) } : { t: 'l', v: p }] }), normalize(node.o));
+                }
+            }
+        }
+        if (node.t === '&&' || node.t === '||') {
+            const ordered = n => n.t === node.t ? [...ordered(n.l), ...ordered(n.r)] : [normalize(n)];
+            return { t: node.t, ordered: ordered(node) };
+        }
+        return Object.fromEntries(Object.entries(node).map(([k, v]) => [k, normalize(v)]));
+    };
+    const scope = ['$itemId', '$sourceId', '$idx'];
+    const wanted = normalize(parseExpression(fragment, scope)), needle = JSON.stringify(wanted);
+    const visit = node => {
+        if (!node || typeof node !== 'object') return false;
+        if (JSON.stringify(node) === needle) return true;
+        if (wanted.ordered && node.t === wanted.t && node.ordered?.some((_, i) =>
+            JSON.stringify(node.ordered.slice(i, i + wanted.ordered.length)) === JSON.stringify(wanted.ordered))) return true;
+        return Object.values(node).some(value => Array.isArray(value) ? value.some(visit) : visit(value));
+    };
+    return visit(normalize(parseExpression(expression, scope)));
+}
+
 let pass = 0;
 let fail = 0;
 
@@ -29,6 +68,7 @@ function ruleSnapshot(tree, parts = []) {
     return {
         val, exists: () => val() !== null,
         hasChildren: (keys) => keys ? keys.every(key => ruleSnapshot(tree, parts.concat(String(key).split('/'))).exists()) : val() !== null && typeof val() === 'object' && Object.keys(val()).length > 0,
+        hasChild: (key) => ruleSnapshot(tree, parts.concat(String(key).split('/').filter(Boolean))).exists(),
         child: (key) => ruleSnapshot(tree, parts.concat(String(key).split('/').filter(Boolean))),
         parent: () => ruleSnapshot(tree, parts.slice(0, -1)),
         isString: () => typeof val() === 'string',
@@ -66,6 +106,7 @@ function finalFanout(before, sourceId, token, targetId) {
 const sourceId = 'source-1';
 const targetId = 'target-1';
 const base = {
+    zoew_restore_policy: { shop: { v: 1, mode: 'local', scope: 'audit-scope', branch: '', epoch: 1 } },
     zoew_recently_deleted_cod_dod: {
         [sourceId]: { id: sourceId, createdAt: 100, deletedAt: 200, restoreClaim: { token: 'claim-A', targetId, claimedAt: 100 } }
     },
@@ -80,13 +121,17 @@ const trashWrite = rules.rules.zoew_recently_deleted_cod_dod.$itemId['.write'];
 const witnessRules = rules.rules.zoew_restore_finalizations.$sourceId;
 const witnessWrite = witnessRules['.write'];
 ok('trash delete ពិនិត្យ witness post-write',
-    trashWrite.includes("newData.parent().parent().child('zoew_restore_finalizations')") && trashWrite.includes("child('token')") && trashWrite.includes("child('targetId')"));
+    ruleGuard(trashWrite, "newData.parent().parent().child('zoew_restore_finalizations').child($itemId).child('token').val() === data.child('restoreClaim').child('token').val()")
+    && ruleGuard(trashWrite, "newData.parent().parent().child('zoew_restore_finalizations').child($itemId).child('targetId').val() === data.child('restoreClaim').child('targetId').val()"));
 ok('witness បង្កើតតែពី claim បច្ចុប្បន្ន និង final fanout',
-    witnessWrite.includes("root.child('zoew_recently_deleted_cod_dod')") && witnessWrite.includes("root.child('zoew_scan_history_cod_dod')") && witnessWrite.includes("restoreClaimToken") && witnessWrite.includes("!newData.parent().parent().child('zoew_recently_deleted_cod_dod')") && witnessWrite.includes("restoreClaimId"));
+    ruleGuard(witnessWrite, "root.child('zoew_recently_deleted_cod_dod').child($sourceId).child('restoreClaim').child('token').val() === newData.child('token').val()")
+    && ruleGuard(witnessWrite, "root.child('zoew_scan_history_cod_dod').child(newData.child('targetId').val()).child('restoreClaimToken').val() === newData.child('token').val()")
+    && ruleGuard(witnessWrite, "!newData.parent().parent().child('zoew_recently_deleted_cod_dod').child($sourceId).exists()")
+    && ruleGuard(witnessWrite, "root.child('zoew_scan_history_cod_dod').child(newData.child('targetId').val()).child('restoreClaimId').val() === $sourceId"));
 ok('⛔ witness ចាស់ដែលបន្សល់ មិនត្រូវចាក់សោ id ជារៀងរហូត (deadlock ៣ ខាង)',
-    !witnessWrite.includes("!data.exists() && newData.exists()"));
+    !ruleGuard(witnessWrite, "!data.exists() && newData.exists()"));
 ok('witness មិនអនុញ្ញាត overwrite ហើយ cleanup ត្រូវការធុងសំរាមលុបរួច',
-    witnessWrite.includes("data.exists() && !newData.exists() && !root.child('zoew_recently_deleted_cod_dod')"));
+    ruleGuard(witnessWrite, "data.exists() && !newData.exists() && !root.child('zoew_recently_deleted_cod_dod').child($sourceId).exists()"));
 ok('witness schema តម្រូវ token/targetId/finalizedAt',
     witnessRules['.validate'].includes("['token','targetId','finalizedAt']") && witnessRules.$other['.validate'] === false);
 

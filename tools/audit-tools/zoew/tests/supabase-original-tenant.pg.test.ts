@@ -12,6 +12,7 @@ const ROOT = path.resolve(__dirname, '../../../..');
 const require = createRequire(import.meta.url);
 const { createPgHarness } = require(ROOT + '/tools/audit-tools/supabase-pg.js');
 const { reviewedAuditRelations, projectAuditEngine, projectReviewedBusinessAudit, definesRulesFunction } = require(ROOT + '/tools/audit-tools/reviewed-business-audit-schema.cjs');
+const { reviewedAttestationRelations, projectAttestationEngine, projectReviewedAttestation } = require(ROOT + '/tools/audit-tools/reviewed-restore-attestation-schema.cjs');
 const PG = createPgHarness({ depsDirs: [ROOT + '/supabase/node_modules'], shimDir: ROOT + '/tools/audit-tools/supabase-shim', wantMajor: 17 });
 const URL = 'https://abcdefghijklmnopqrst.supabase.co';
 const evidence: any[] = [];
@@ -723,13 +724,13 @@ it('C04 SQL៖ v2 RPC ACL បិទ anon និង service_role ហើយ public
     expect(flags).toEqual([{ nspname: 'private', prosecdef: true }, { nspname: 'public', prosecdef: false }]);
 });
 
-it('C04 minimum៖ schema និង receipt/quota/retention contract ដដែល ក្រៅពី reviewed registration និង business audit', async () => {
+it('C04 minimum៖ schema និង receipt/quota/retention contract ដដែល ក្រៅពី reviewed registration · business audit · restore authority', async () => {
     expect(contractBefore).not.toBeNull(); expect(contractAfter).toEqual(contractBefore);
     const deltaRelations = new Set(['zoe_daily_delta_heads', 'zoe_daily_delta_heads_pkey', 'zoe_daily_deltas', 'zoe_daily_deltas_pkey']);
     const registrationRelations = new Set(['registration_protocol', 'registration_protocol_pkey']);
     const isDailyDelta = (row: any) => row.schema === 'private' && deltaRelations.has(row.name);
     const isRegistration = (row: any) => row.schema === 'private' && registrationRelations.has(row.name);
-    const reviewedRuntime = projectReviewedBusinessAudit(contractRuntime, 'force_rls');
+    const reviewedRuntime = projectReviewedBusinessAudit(projectReviewedAttestation(contractRuntime, 'force_rls'), 'force_rls');
     const runtimeC04Relations = reviewedRuntime.relations.filter((row: any) => !isDailyDelta(row) && !isRegistration(row));
     expect(runtimeC04Relations).toEqual(contractAfter.relations);
     expect(contractRuntime.relations.filter(isDailyDelta).map((row: any) => row.name)).toEqual([...deltaRelations]);
@@ -761,12 +762,32 @@ it('C04 reviewed audit schema allowance rejects ACL, RLS, column, index, sequenc
     ]) expect(() => projectReviewedBusinessAudit(changed, 'force_rls')).toThrow('Reviewed audit table/index/sequence shape or ACL changed');
     const engine = (await admin.query("select pg_get_functiondef('private.zoe_apply_engine_v1(uuid,text,jsonb,boolean,boolean,jsonb)'::regprocedure) as definition")).rows[0].definition;
     expect(auditEngineBefore).not.toBeNull();
-    expect(projectAuditEngine(engine)).toBe(auditEngineBefore);
+    expect(projectAuditEngine(projectAttestationEngine(engine))).toBe(auditEngineBefore);
     expect(() => projectAuditEngine(engine.replace("    perform set_config('zoe.audit_context', coalesce(prior_audit_context, ''), true);\n", ''))).toThrow('Reviewed audit engine context changed');
     expect(projectAuditEngine(engine.replace("'quota_exceeded'", "'mutated_quota_check'"))).not.toBe(auditEngineBefore);
     expect(definesRulesFunction('select private.zoe_rules();')).toBe(false);
     for (const source of ['create function private.zoe_rules() returns jsonb', 'CREATE OR REPLACE FUNCTION "private"."zoe_rules"() returns jsonb', 'create function zoe_rules() returns jsonb'])
         expect(definesRulesFunction(source)).toBe(true);
+});
+
+it('C04 reviewed restore authority rejects ACL, RLS, column, index, namespace and engine-hook mutations', async () => {
+    const reviewed = { relations: reviewedAttestationRelations('force_rls') };
+    expect(projectReviewedAttestation(reviewed, 'force_rls')).toEqual({ relations: [] });
+    const mutated = (change: (rows: any[]) => void) => { const rows = structuredClone(reviewed.relations); change(rows); return { relations: rows }; };
+    for (const changed of [
+        mutated(rows => { rows[0].acl += ',authenticated=r/postgres'; }),
+        mutated(rows => { rows[2].acl += ',service_role=w/postgres'; }),
+        mutated(rows => { rows[0].rls = false; }),
+        mutated(rows => { rows[2].force_rls = true; }),
+        mutated(rows => { rows[4].columns[1][1] = 'text'; }),
+        mutated(rows => { rows[1].index_definition = rows[1].index_definition.replace('UNIQUE ', ''); }),
+        mutated(rows => { rows.push({ ...rows[0], name: 'zoe_restore_attest_unreviewed' }); })
+    ]) expect(() => projectReviewedAttestation(changed, 'force_rls')).toThrow('Reviewed attestation table/index shape or ACL changed');
+    const engine = (await admin.query("select pg_get_functiondef('private.zoe_apply_engine_v1(uuid,text,jsonb,boolean,boolean,jsonb)'::regprocedure) as definition")).rows[0].definition;
+    const fragment = "        ctx := private.zoe_restore_rules_cache_v1(ctx) || jsonb_build_object('now',private.zoe_now_ms());\n";
+    for (const changed of [engine.replace(fragment, ''), engine.replace(fragment, fragment + fragment), engine.replace('private.zoe_now_ms());\n        foreach loc', '0);\n        foreach loc')])
+        expect(() => projectAttestationEngine(changed)).toThrow('Reviewed attestation engine cache changed');
+    expect(projectAuditEngine(projectAttestationEngine(engine.replace("'quota_exceeded'", "'mutated_quota_check'")))).not.toBe(auditEngineBefore);
 });
 
 it('C04 minimum៖ CAS conflicts គ្មាន metadata ថ្មី ហើយ no-op ប្រើ receipt/quota ដើមតែប៉ុណ្ណោះ', async () => {

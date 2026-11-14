@@ -20,7 +20,7 @@ const BASE = { host: '127.0.0.1', port: 9000 };
 const NS = 'ns=' + emuNamespace('demo-zoe-crud');
 const AUTH = 'auth_variable_override=' + encodeURIComponent(JSON.stringify({ uid: 'userA' }));
 
-let pass = 0, fail = 0;
+let pass = 0, fail = 0, unmodeledRestoreAuthorityCalls = 0;
 const check = (c, label, detail) => { if (c) { pass++; console.log('  ok    ' + label); } else { fail++; console.log('  FAIL  ' + label + (detail ? '\n        ' + detail : '')); } };
 const clone = (v) => v === undefined ? undefined : JSON.parse(JSON.stringify(v));
 
@@ -230,7 +230,13 @@ function makeSandbox(store, now) {
         clearScannedRemovalInFlight: () => {},
         document: { getElementById: () => null },
         scanHistory: [], deletedItems: [], pendingPermanentDeleteId: null, activeParentItemId: null, scanRemoveInFlight: null,
-        uiState: {}
+        uiState: {},
+        // Fixture នេះវាស់ local cleanup/cancellation; authority ZTO ពិតមាន
+        // matrix ដាច់ដោយឡែក។ ច្រកមិនបានគំរូត្រូវបរាជ័យ ហើយរាប់នៅចុង suite។
+        requestRestoreAuthorization: async () => {
+            unmodeledRestoreAuthorityCalls++;
+            throw new Error('crud-rules-flow: trusted ZTO authority មិនត្រូវបានគំរូ');
+        }
     });
     const assembled = [
         ...['TX_ROOT_READ_TIMEOUT_MS', 'RETURNED_TRASH_RETENTION_MS', 'TRASH_RETENTION_MS', 'DB_LISTENER_KEY_DAILY_REVENUE', 'DB_LISTENER_KEY_DAILY_COLLECTED', 'REGISTRY_RELEASE_RETRY_MAX', 'REGISTRY_RELEASE_QUEUE_MAX', 'DAILY_COLLECTED_DAY_PATTERN'].map(name => extractConst(src, name)),
@@ -879,6 +885,8 @@ async function clearOrphanBeforeRetry(w, label) {
             'rules ពិត ៖ ជួរគ្មាន provenance ➜ ការដក markers (ទោះដោះ claim T ក្នុងការសរសេរដដែល) បដិសេធ · server មិនប្តូរ',
             atomic.status + ' · ' + single.status);
     }
+
+    check(unmodeledRestoreAuthorityCalls === 0, 'local cleanup/cancellation មិនហៅ trusted ZTO authority ដែលមិនបានគំរូ', unmodeledRestoreAuthorityCalls);
 
     console.log('\n' + pass + ' ok, ' + fail + ' fail');
 

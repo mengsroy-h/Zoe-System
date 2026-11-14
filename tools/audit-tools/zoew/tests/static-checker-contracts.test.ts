@@ -186,7 +186,7 @@ it('daily checker រត់សេណារីយ៉ូ operation ទាំងអ
         expect(result.status, outcome + '\n' + result.stdout + result.stderr).toBe(0);
         expect(result.signal).toBeNull();
         const summary = /✅ ចំណូលប្រចាំថ្ងៃ — ok (\d+)/.exec(result.stdout);
-        expect(Number(summary?.[1])).toBe(110);
+        expect(Number(summary?.[1])).toBe(112);
     } finally { fs.rmSync(file, { force: true }); }
 }, 50000);
 
@@ -386,4 +386,35 @@ it('local auth VM runtime executes a consistently mutated target instead of a di
     fs.writeFileSync(path.join(target, 'ZoeW/audit-module-views.json'), JSON.stringify(views));
     const { context, config, runtime } = declaredLocalAuthFixture(target);
     expect(() => runtime.install(context, config)).toThrow(/did not establish an accepted SDK actor/);
+});
+
+it.each(['restore-finalization-fence-test.js', 'clear-history-finalization-fence-test.js'])(
+    'fence rule AST guard preserves compressed child/hasChild semantics and rejects changed bindings: %s', file => {
+        const source = checkerSource(file), ast = parse(source);
+        const declaration = ast.body.find((node: any) => node.type === 'FunctionDeclaration' && node.id.name === 'ruleGuard');
+        assert(declaration);
+        const { parseExpression } = require(root + '/supabase/scripts/rtdb-expression.cjs');
+        const guard = vm.runInNewContext('(' + source.slice(declaration.start, declaration.end) + ')', { parseExpression });
+        const expanded = "data.exists() && !newData.exists() && !root.child('business').child($itemId).exists()";
+        for (const actual of [expanded, "(data.exists()&&(!newData.exists()&&!root.child('business').hasChild($itemId)))",
+            "data.exists() && !newData.exists() && !root.hasChild('business/'+$itemId)"]) {
+            expect(guard(actual, expanded)).toBe(true);
+        }
+        for (const actual of ["data.exists() && !newData.exists() && root.child('business').hasChild($itemId)",
+            "data.exists() && !newData.exists() && !root.child('other').hasChild($itemId)",
+            "data.exists() && !newData.exists() && !root.child('business').hasChild($sourceId)",
+            "data.exists() || !newData.exists() || !root.child('business').hasChild($itemId)",
+            "!newData.exists() && data.exists() && !root.child('business').hasChild($itemId)"]) {
+            expect(guard(actual, expanded)).toBe(false);
+        }
+    });
+
+it('restore rule snapshot hasChild counts present falsy values and resolves slash paths faithfully', () => {
+    const source = checkerSource('restore-finalization-fence-test.js');
+    const declaration = parse(source).body.find((node: any) => node.type === 'FunctionDeclaration' && node.id.name === 'ruleSnapshot');
+    assert(declaration);
+    const snapshot = vm.runInNewContext('(' + source.slice(declaration.start, declaration.end) + ')');
+    const row = snapshot({ row: { zero: 0, no: false, empty: '', missing: null, nested: { value: 'present' } } }).child('row');
+    for (const key of ['zero', 'no', 'empty', 'nested/value']) expect(row.hasChild(key)).toBe(true);
+    for (const key of ['missing', 'absent', 'nested/absent']) expect(row.hasChild(key)).toBe(false);
 });

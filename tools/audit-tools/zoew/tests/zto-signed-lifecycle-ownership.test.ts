@@ -4,6 +4,7 @@ import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepte
 import { it, expect, vi, afterEach } from 'vitest';
 import { webcrypto } from 'node:crypto';
 import { createScanMemorySdk } from './helpers/scan-memory-sdk';
+import { createRestoreAttestationFixture } from './helpers/restore-attestation';
 import { dataState, firebaseState, uiState, ztoState } from '../../../../ZoeW/src/core/state';
 import { appLocalStore } from '../../../../ZoeW/src/core/storage';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../../../../ZoeW/src/core/text';
@@ -45,9 +46,9 @@ it.each(['firebase', 'supabase'].flatMap((provider) => ['unchanged', 'open-resto
     if (provider === 'supabase') (mem.sdk as any).tenantScope = () => 'tenant-a';
     firebaseState.auth = { currentUser: { uid: 'test' }, app: { options } } as any;
     firebaseState.firebaseConfig = options;
-    acceptFixtureSession();
     firebaseState.db = { name: 'test', app: { options } } as any;
     firebaseState.fb = mem.sdk as any;
+    acceptFixtureSession();
     firebaseState.serverTimeOffsetMs = 0;
     firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live';
     firebaseState.isDatabaseConnected = true;
@@ -81,12 +82,21 @@ it.each(['firebase', 'supabase'].flatMap((provider) => ['unchanged', 'open-resto
     let answer: any;
     let started: any;
     const ready = new Promise(r => started = r);
-    let restoreChecks = 0;
-    vi.stubGlobal('fetch', async (target) => {
+    let authorizationChecks = 0, refreshChecks = 0, providerReadChecks = 0;
+    const issuer = createRestoreAttestationFixture({ get: mem.get, set: mem.put, scope,
+        policy: { v: 1, mode: 'cookie', scope, branch: '001', epoch: 1 },
+        lookup: async (event) => {
+            providerReadChecks++;
+            return Response.json({ barcode: event.queryStringParameters.barcode, cached: false, found: true, success: true,
+                verifiedForRestore: true, restoreTransitionsVerified: true, ztoClosed: false });
+        } });
+    vi.stubGlobal('fetch', async (target, init) => {
         const url = new URL(String(target));
-        if (url.searchParams.has('restore')) {
-            restoreChecks++;
-            return new Response(JSON.stringify({ barcode: code, cached: false, found: true, success: true, verifiedForRestore: true, ztoClosed: false }), { status: 200 });
+        if (url.pathname.endsWith('/zto-restore-proof')) {
+            const action = JSON.parse(String(init?.body || '{}')).action;
+            if (action === 'authorize') authorizationChecks++;
+            if (action === 'refresh') refreshChecks++;
+            return issuer.route(target, init);
         }
         if (url.searchParams.get('signed') === '1') { started(); return await new Promise(r => answer = r); }
         throw new Error('Unexpected request ' + target);
@@ -126,11 +136,15 @@ it.each(['firebase', 'supabase'].flatMap((provider) => ['unchanged', 'open-resto
         uiState.pendingRestoreId = trashId;
         await executeRestoreItem();
         sync();
-        expect(restoreChecks).toBe(1);
+        expect(authorizationChecks).toBe(1);
+        expect(refreshChecks).toBe(1);
+        expect(providerReadChecks).toBe(2);
         expect(dataState.deletedItems).toHaveLength(0);
         expect(dataState.scanHistory).toHaveLength(1);
         const item = dataState.scanHistory[0];
         expect(item.barcodes[0].restoredAt).toBe(NOW + 1000);
+        expect(mem.get('zoew_daily_revenue_cod_dod')['2026-10-31']).toMatchObject({ codDollar: 5, dodDollar: 0, totalCount: 1 });
+        expect(mem.get('zoew_monthly_revenue_cod_dod')['2026-10']).toMatchObject({ codDollar: 5, dodDollar: 0, totalCount: 1 });
     }
     const restored = mode === 'open-restored' ? dataState.scanHistory[0].barcodes[0].restoredAt : 0;
     vi.setSystemTime(NOW + 2000);
@@ -165,9 +179,13 @@ it.each(['firebase', 'supabase'].flatMap((provider) => ['unchanged', 'open-resto
         uiState.pendingRestoreId = dataState.deletedItems[0].id;
         await executeRestoreItem();
         sync();
-        console.log(JSON.stringify({ provider, mode, secondRestoreChecks: restoreChecks, finalHistory: dataState.scanHistory.length, finalTrash: dataState.deletedItems.length, restoreBlocked: dataState.deletedItems[0]?.restoreBlocked }));
-        expect.soft(restoreChecks).toBe(2);
+        console.log(JSON.stringify({ provider, mode, secondAuthorizationChecks: authorizationChecks, refreshChecks, providerReadChecks, finalHistory: dataState.scanHistory.length, finalTrash: dataState.deletedItems.length, restoreBlocked: dataState.deletedItems[0]?.restoreBlocked }));
+        expect.soft(authorizationChecks).toBe(2);
+        expect(refreshChecks).toBe(2);
+        expect(providerReadChecks).toBe(4);
         expect(dataState.scanHistory).toHaveLength(1);
+        expect(mem.get('zoew_daily_revenue_cod_dod')['2026-10-31']).toMatchObject({ codDollar: 5, dodDollar: 0, totalCount: 1 });
+        expect(mem.get('zoew_monthly_revenue_cod_dod')['2026-10']).toMatchObject({ codDollar: 5, dodDollar: 0, totalCount: 1 });
     }
 });
 
@@ -221,9 +239,9 @@ it.each([['firebase', 'unchanged'], ['firebase', 'open-restored'], ['supabase', 
     if (provider === 'supabase') (mem.sdk as any).tenantScope = () => 'tenant-a';
     firebaseState.auth = { currentUser: { uid: 'test' }, app: { options } } as any;
     firebaseState.firebaseConfig = options;
-    acceptFixtureSession();
     firebaseState.db = { name: 'test', app: { options } } as any;
     firebaseState.fb = mem.sdk as any;
+    acceptFixtureSession();
     firebaseState.serverTimeOffsetMs = 0;
     firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live';
     firebaseState.isDatabaseConnected = true;
@@ -252,12 +270,21 @@ it.each([['firebase', 'unchanged'], ['firebase', 'open-restored'], ['supabase', 
     let answer: any;
     let started: any;
     const ready = new Promise(r => started = r);
-    let restoreChecks = 0;
-    vi.stubGlobal('fetch', async (target) => {
+    let authorizationChecks = 0, refreshChecks = 0, providerReadChecks = 0;
+    const issuer = createRestoreAttestationFixture({ get: mem.get, set: mem.put, scope,
+        policy: { v: 1, mode: 'cookie', scope, branch: '001', epoch: 1 },
+        lookup: async (event) => {
+            providerReadChecks++;
+            return Response.json({ barcode: event.queryStringParameters.barcode, cached: false, found: true, success: true,
+                verifiedForRestore: true, restoreTransitionsVerified: true, ztoClosed: false });
+        } });
+    vi.stubGlobal('fetch', async (target, init) => {
         const url = new URL(String(target));
-        if (url.searchParams.has('restore')) {
-            restoreChecks++;
-            return new Response(JSON.stringify({ barcode: code, cached: false, found: true, success: true, verifiedForRestore: true, ztoClosed: false }), { status: 200 });
+        if (url.pathname.endsWith('/zto-restore-proof')) {
+            const action = JSON.parse(String(init?.body || '{}')).action;
+            if (action === 'authorize') authorizationChecks++;
+            if (action === 'refresh') refreshChecks++;
+            return issuer.route(target, init);
         }
         if (url.searchParams.get('signed') === '1') { started(); return await new Promise(r => answer = r); }
         throw new Error('Unexpected request ' + target);
@@ -279,11 +306,15 @@ it.each([['firebase', 'unchanged'], ['firebase', 'open-restored'], ['supabase', 
         uiState.pendingRestoreId = trashId;
         await executeRestoreItem();
         sync();
-        expect(restoreChecks).toBe(1);
+        expect(authorizationChecks).toBe(1);
+        expect(refreshChecks).toBe(1);
+        expect(providerReadChecks).toBe(2);
         expect(dataState.deletedItems).toHaveLength(0);
         expect(dataState.scanHistory).toHaveLength(1);
         const item = dataState.scanHistory[0];
         expect(item.barcodes[0].restoredAt).toBe(NOW + 1000);
+        expect(mem.get('zoew_daily_revenue_cod_dod')['2026-10-31']).toMatchObject({ codDollar: 5, dodDollar: 0, totalCount: 1 });
+        expect(mem.get('zoew_monthly_revenue_cod_dod')['2026-10']).toMatchObject({ codDollar: 5, dodDollar: 0, totalCount: 1 });
     }
     const restored = mode === 'open-restored' ? dataState.scanHistory[0].barcodes[0].restoredAt : 0;
     lane.resume('own');
@@ -306,8 +337,12 @@ it.each([['firebase', 'unchanged'], ['firebase', 'open-restored'], ['supabase', 
         uiState.pendingRestoreId = dataState.deletedItems[0].id;
         await executeRestoreItem();
         sync();
-        console.log(JSON.stringify({ provider, mode, secondRestoreChecks: restoreChecks, finalHistory: dataState.scanHistory.length, finalTrash: dataState.deletedItems.length, restoreBlocked: dataState.deletedItems[0]?.restoreBlocked }));
-        expect.soft(restoreChecks).toBe(2);
+        console.log(JSON.stringify({ provider, mode, secondAuthorizationChecks: authorizationChecks, refreshChecks, providerReadChecks, finalHistory: dataState.scanHistory.length, finalTrash: dataState.deletedItems.length, restoreBlocked: dataState.deletedItems[0]?.restoreBlocked }));
+        expect.soft(authorizationChecks).toBe(2);
+        expect(refreshChecks).toBe(2);
+        expect(providerReadChecks).toBe(4);
         expect(dataState.scanHistory).toHaveLength(1);
+        expect(mem.get('zoew_daily_revenue_cod_dod')['2026-10-31']).toMatchObject({ codDollar: 5, dodDollar: 0, totalCount: 1 });
+        expect(mem.get('zoew_monthly_revenue_cod_dod')['2026-10']).toMatchObject({ codDollar: 5, dodDollar: 0, totalCount: 1 });
     }
 });

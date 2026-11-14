@@ -706,6 +706,7 @@ it.each(['legacy', 'scan'].flatMap(kind => ['copy', 'purge-race', 'purge-termina
         expect(Object.values(getAt(HISTORY) || {}).some((row: any) => row.barcodes.some((barcode: any) => barcode.code === 'A'))).toBe(false);
         return;
     }
+    setAt('zoew_restore_policy/shop', { v: 1, mode: 'local', scope: FIREBASE_HOST, branch: '', epoch: 1 });
     uiState.pendingRestoreId = oldTrashId;
     await executeRestoreItem();
     expect(getAt(TRASH + '/' + oldTrashId), JSON.stringify(uiState.toasts)).toBeNull();

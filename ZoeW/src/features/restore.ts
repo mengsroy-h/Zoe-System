@@ -623,6 +623,10 @@ export async function executeRestoreItem() {
             stopIfSwitched();
         }
         saveRestoreClaim(restoredId, { token, targetId });
+        if (Array.isArray(previewItem.barcodes)) {
+            await restoreLedgerKeyFor(previewItem, restoredId, []);
+            stopIfSwitched();
+        }
         let authorization;
         try {
             authorization = await verifyZtoRestoreStatus(previewItem, { token, targetId, current: restoreIsCurrent });
@@ -684,6 +688,8 @@ export async function executeRestoreItem() {
         delete itemToRestore.restoreClaimToken;
         delete itemToRestore.restoreAddedCodes;
         delete itemToRestore.restoreAttestationId;
+        delete itemToRestore.restorePublication;
+        delete itemToRestore.ztoTerminalDecision;
         if (!restoreClock.current()) throw new Error('RESTORE_CLOCK_UNTRUSTED');
         if (itemToRestore.isClosed) {
             itemToRestore.closedAt = getServerNow();

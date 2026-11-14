@@ -172,6 +172,8 @@ Ordinary import បដិសេធ input ដែលមាន sealed restore sourc
 - អ្នកយាម ៖ `tools/audit-tools/supabase-data-tools-test.js` (Postgres ពិត · CLI ពិត · ចម្លើយបាត់ · ព្យួរ · សោខុស · mutation)។
 - Audit archive ៖ `tools/audit-tools/supabase-audit-archive-test.js` (PostgreSQL 17 ពិត · v2/legacy · audit-only · ទិន្នន័យប៉ះទង្គិច · ពិដានសរុប · mutation)។ លំនាំដើមត្រូវរត់គ្រប់ phase; `--unit` ជា `PARTIAL PASS` សម្រាប់ diagnostic ហើយ strict mode បដិសេធ។
 
+ត្រា server `restorePublication` និង `ztoTerminalDecision` ត្រូវរក្សាទុកទោះបាន release claim រួច។ Ordinary archive/import បដិសេធ source ដែលមានត្រាទាំងនេះ; ប្រើ DB-level recovery ដែលរក្សា private authority និង drain ប្រតិបត្តិការមុន rollback។ Decision ជាការហាមស្តារ មិនមែនត្រាម៉ោង Sign/Return ថ្មីទេ។
+
 ## អាជ្ញាប័ណ្ណ
 
 **កម្មសិទ្ធិឯកជន** — រក្សាសិទ្ធិគ្រប់យ៉ាង © 2026 **ហ៊ុន ម៉េង ស្រូយ (MENGSROY HEN)**។ ផ្នែកមួយនៃ Zoe-System សម្រាប់ប្រើក្នុងអាជីវកម្មរបស់ម្ចាស់ប៉ុណ្ណោះ —

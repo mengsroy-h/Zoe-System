@@ -133,6 +133,10 @@ afterEach(() => {
 describe('ordinary Supabase archives preserve pending server restore authority by refusing incomplete transfer', () => {
     it('detects every non-null seal without treating falsy/malformed authority as absence', () => {
         for (const seal of ['proof', '', 0, false, {}, []]) expect(supabase.hasPendingSeal({ [TRASH]: { source: { restoreAttestationId: seal } } })).toBe(true);
+        for (const fence of [1, 9007199254740990, 0, false, {}, []]) expect(supabase.hasPendingSeal({ [TRASH]: { source: { restorePublication: fence } } })).toBe(true);
+        expect(supabase.hasPendingSeal({ [TRASH]: { source: { restorePublication: null } } })).toBe(false);
+        for (const decision of ['signed', 'returned', '', 0, false, {}, []]) expect(supabase.hasPendingSeal({ [TRASH]: { source: { ztoTerminalDecision: decision } } })).toBe(true);
+        expect(supabase.hasPendingSeal({ [TRASH]: { source: { ztoTerminalDecision: null } } })).toBe(false);
         for (const value of [undefined, null, {}, { [TRASH]: {} }, { [TRASH]: { source: { restoreAttestationId: null } } }]) expect(supabase.hasPendingSeal(value)).toBe(false);
         expect(supabase.hasPendingSeal(firebaseAuthorityData())).toBe(true);
         expect(supabase.hasPendingSeal(firebaseAuthorityData(1))).toBe(false);
@@ -168,8 +172,30 @@ describe('ordinary Supabase archives preserve pending server restore authority b
         await expect(apply(input, wire, skip ? ['--skip-invalid'] : [])).rejects.toThrow(/database-level.*private restore grants/i);
         expect(wire.fetchImpl).not.toHaveBeenCalled(); expect(wire.writes()).toHaveLength(0);
     });
+    for (const skip of [false, true]) it('refuses a released publication fence even without seal or private grant' + (skip ? ' with skip-invalid' : ''), async () => {
+        const input = tree(false); (input[TRASH].trash_fixture as any).restorePublication = 2;
+        const wire = transport({});
+        await expect(apply(input, wire, skip ? ['--skip-invalid'] : [])).rejects.toThrow(/database-level.*private restore grants/i);
+        expect(wire.fetchImpl).not.toHaveBeenCalled(); expect(wire.writes()).toHaveLength(0);
+    });
+    it('refuses ordinary archive publication of a released fence and preserves the previous backup', async () => {
+        const data = tree(false); (data[TRASH].trash_fixture as any).restorePublication = 2;
+        const { result, out, previous } = await publish(data);
+        expect(result.files).toHaveLength(0); expect(result.failed).toHaveLength(1);
+        expect(result.failed[0]).toMatch(/database-level.*private restore grants/i);
+        expect(fs.readdirSync(out)).toEqual(['previous.json.gz']);
+        expect(fs.readFileSync(path.join(out, 'previous.json.gz'))).toEqual(previous);
+    });
+    for (const skip of [false, true]) it('refuses a terminal decision without its private authority' + (skip ? ' with skip-invalid' : ''), async () => {
+        const input = tree(false); (input[TRASH].trash_fixture as any).ztoTerminalDecision = 'returned';
+        const wire = transport({});
+        await expect(apply(input, wire, skip ? ['--skip-invalid'] : [])).rejects.toThrow(/database-level.*private restore grants/i);
+        expect(wire.fetchImpl).not.toHaveBeenCalled(); expect(wire.writes()).toHaveLength(0);
+    });
     it('preserves Firebase full physical backup including unsealed current Returned authority', async () => {
         const dir = folder(), data = firebaseAuthorityData();
+        (data[TRASH].trash_fixture as any).restorePublication = 1;
+        (data[TRASH].trash_fixture as any).ztoTerminalDecision = 'returned';
         const fx = require(path.join(ROOT, 'tools/audit-tools/idtoken-fixture.js'));
         fs.writeFileSync(path.join(dir, 'service.json'), JSON.stringify({ client_email: 'fixture@synthetic-backup.iam.gserviceaccount.com',
             private_key: fx.TEST_KEY_PEM }), { mode: 0o600 });

@@ -111,6 +111,7 @@ function seed() {
         zoew_monthly_revenue_cod_dod: { '2026-09': { codDollar: 190, dodDollar: 19, totalCount: 29 } },
         zoew_daily_pickup_cod_dod: { [TODAY]: { packagesPickedUp: 2, pickedUpPhones: { '0101': 1, '0102': 1 }, pickedUpBarcodes: { PO1: '0101', PI1: '0102' } } },
         zoew_settings: { exchange_rate: 4100 },
+        zoew_restore_policy: { shop: { v: 1, mode: 'local', scope: JSON.parse(CONFIG).databaseURL, branch: '', epoch: 1 } },
         zoew_barcode_registry: registry
     };
 }

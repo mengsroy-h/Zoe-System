@@ -5492,6 +5492,39 @@
     },
     "tools/audit-tools/zto-restore-attestation-cases.cjs": {
       "policy": "restore-trusted-authority"
+    },
+    "tools/audit-tools/reviewed-restore-attestation-schema.cjs": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/zto-restore-authoritative-read.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "supabase/migrations/20261114181432_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "tools/audit-tools/zoew/tests/restore-publication.pg.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "supabase/migrations/20261114191827_zoe_restore_terminal_decision.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261114192006_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "tools/audit-tools/fixtures/restore-terminal-enrichment.cjs": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/zto-terminal-decision-local-policy.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/zto-terminal-decision-sync.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/zto-terminal-decision-ui.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/zto-terminal-decision.pg.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

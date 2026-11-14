@@ -1,11 +1,14 @@
 import { acceptFixtureSession } from './helpers/accepted-session';
 import { cleanupServerRead } from './helpers/cleanup-server-read';
+import { createRestoreAttestationFixture } from './helpers/restore-attestation';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../../../../ZoeW/src/core/state';
 import { getServerNow } from '../../../../ZoeW/src/core/clock';
 import { CLEANUP_JOURNAL_KEY } from '../../../../ZoeW/src/core/storage-keys';
 import { appLocalStore } from '../../../../ZoeW/src/core/storage';
+import { liveShopScope } from '../../../../ZoeW/src/core/shop-scope';
 import { trashClaimPolicy } from '../../../../ZoeW/src/domain/trash-claim';
+import { addRevenueToDailyAndMonthlyRecord } from '../../../../ZoeW/src/domain/ledger';
 import { dbListenerFailedPaths, dbListenerPendingPaths, DB_LISTENER_KEY_HISTORY } from '../../../../ZoeW/src/core/text';
 import { beginCleanupOperation, releaseCleanupOperation, prepareCleanupClaim, cleanupJournalStorageKeys, claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, cleanupResumeBarrier, noteCleanupJournalEntry, readCleanupJournal, resumeCleanupJournalEntry } from '../../../../ZoeW/src/domain/cleanup';
 import { activeRestoreClaims, executeRestoreItem } from '../../../../ZoeW/src/features/restore';
@@ -127,6 +130,7 @@ function seed(items: any[]) {
     firebaseState.auth = { currentUser: { uid: 'u1', getIdToken: async () => 'tok' } } as any;
     localStorage.setItem('zoew_firebase_config', JSON.stringify(firebaseState.firebaseConfig));
     acceptFixtureSession();
+    setAt('zoew_restore_policy/shop', { v: 1, mode: 'local', scope: liveShopScope(), branch: '', epoch: 1 });
     firebaseState.isDatabaseInitialized = true;
     firebaseState.isDatabaseConnected = true;
     firebaseState.sessionExpiryCheck = 'live'; firebaseState.serverClockTrusted = true;
@@ -452,4 +456,81 @@ it.each([false, true])('cleanup v2 keeps one final admission across retried upda
     expect(ledger().codDollar).toBe(100);
     expect(month().codDollar).toBe(100);
     expect(getAt(HISTORY + '/' + ID).barcodes.map((barcode: any) => barcode.code)).toEqual(['A']);
+});
+
+
+// A trusted restore seal must not prevent the cleanup journal from completing
+// a partial daily/monthly deduction. Real app/issuer code runs; only auth/DB CAS
+// and projected upstream facts use the established controlled fixture seams.
+async function partialZtoCleanup(mode: 'cookie' | 'palm') {
+    vi.stubGlobal('alert', vi.fn());
+    const code = '77130500000012', row = returnedItem(); row.barcode = code; row.barcodes[0].code = code;
+    seed([row]);
+    for (const delta of [1, -1]) {
+        const operation = addRevenueToDailyAndMonthlyRecord(DAY, delta, 0, 0);
+        await Promise.all([operation.dailyServer, operation.monthlyServer]);
+    }
+    expect(ledger().codDollar).toBe(100); expect(month().codDollar).toBe(100);
+    expect(ledger().op).toBeTruthy(); expect(month().op).toBeTruthy();
+    localStorage.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true,
+        url: window.location.origin + `/.netlify/functions/zto-order-detail?${mode === 'palm' ? 'palm=1&' : ''}barcode={barcode}` }));
+    const issuer = createRestoreAttestationFixture({ get: getAt, set: setAt,
+        policy: { v: 1, mode, scope: HOST, branch: '881859', epoch: 1 },
+        lookup: async () => Response.json({ success: true, found: true, barcode: code, cached: false,
+            verifiedForRestore: true, restoreTransitionsVerified: true, ztoClosed: false }) });
+    const read = cleanupServerRead(getAt);
+    vi.stubGlobal('fetch', (url: any, init: any) => new URL(String(url)).pathname.endsWith('/zto-restore-proof') ? issuer.route(url, init) : read(url, init));
+    lab.hook = ({ path }) => path === DAILY + '/' + DAY
+        ? Promise.reject(Object.assign(new Error('controlled daily disconnection after monthly commit'), { code: 'DISCONNECT', txOutcome: 'not-applied' })) : undefined;
+    await claimAndCleanupItem(ID, 'abandon'); await flush();
+    expect(month()).toMatchObject({ codDollar: 90, totalCount: 9 });
+    expect(ledger()).toMatchObject({ codDollar: 100, totalCount: 10 });
+    expect(journalStage()).toBe('ledger');
+    expect(getAt(TRASH + '/' + ID).barcodes[0].isDeducted).toBe(false);
+    return { issuer, code };
+}
+
+it.each(['cookie', 'palm'] as const)('%s partial cleanup: readiness precedes issuer sealing, then recovery restores money exactly once', async mode => {
+    const { issuer, code } = await partialZtoCleanup(mode);
+    await restoreOnOtherDevice(ID); await restoreOnOtherDevice(ID);
+    expect(issuer.requests).toEqual([]);
+    expect(getAt('zoew_restore_attestations/' + ID)).toBeNull();
+    expect(getAt(TRASH + '/' + ID).restoreAttestationId).toBeUndefined();
+    expect(getAt(TRASH + '/' + ID).restoreClaim).toBeUndefined();
+    expect(getAt(HISTORY + '/' + ID)).toBeNull();
+    expect(ledger()).toMatchObject({ codDollar: 100, totalCount: 10 });
+    expect(month()).toMatchObject({ codDollar: 90, totalCount: 9 });
+    lab.hook = null;
+    await resumeCleanupJournalEntry(ID); await flush();
+    expect(ledger()).toMatchObject({ codDollar: 90, totalCount: 9 });
+    expect(month()).toMatchObject({ codDollar: 90, totalCount: 9 });
+    expect(getAt(TRASH + '/' + ID).barcodes[0].isDeducted).toBe(true);
+    expect(readCleanupJournal()).toEqual([]);
+    await restoreOnOtherDevice(ID); await restoreOnOtherDevice(ID);
+    expect(ledger()).toMatchObject({ codDollar: 100, totalCount: 10 });
+    expect(month()).toMatchObject({ codDollar: 100, totalCount: 10 });
+    expect(getAt(TRASH + '/' + ID)).toBeNull();
+    expect(getAt(HISTORY + '/' + ID).barcodes).toEqual([expect.objectContaining({ code, isDeducted: false })]);
+    expect(Object.keys(getAt(HISTORY) || {})).toEqual([ID]);
+    expect(Object.keys(getAt('zoew_trash_consumptions') || {})).toEqual([ID]);
+    expect(getAt('zoew_trash_consumptions/' + ID)).toMatchObject({ kind: 'restore', sourceId: ID, actorUid: 'u1', generation: 1 });
+    expect(issuer.requests.map(request => request.action)).toEqual(['authorize', 'refresh']);
+});
+
+it.each(['cookie', 'palm'] as const)('%s partial cleanup control: without a premature restore the journal converges before authorization', async mode => {
+    const { issuer, code } = await partialZtoCleanup(mode);
+    lab.hook = null;
+    await resumeCleanupJournalEntry(ID); await flush();
+    expect(ledger()).toMatchObject({ codDollar: 90, totalCount: 9 });
+    expect(month()).toMatchObject({ codDollar: 90, totalCount: 9 });
+    expect(getAt(TRASH + '/' + ID).barcodes[0].isDeducted).toBe(true);
+    expect(readCleanupJournal()).toEqual([]);
+    await restoreOnOtherDevice(ID); await restoreOnOtherDevice(ID);
+    expect(ledger()).toMatchObject({ codDollar: 100, totalCount: 10 });
+    expect(month()).toMatchObject({ codDollar: 100, totalCount: 10 });
+    expect(getAt(TRASH + '/' + ID)).toBeNull();
+    expect(getAt(HISTORY + '/' + ID).barcodes).toEqual([expect.objectContaining({ code, isDeducted: false })]);
+    expect(Object.keys(getAt(HISTORY) || {})).toEqual([ID]);
+    expect(Object.keys(getAt('zoew_trash_consumptions') || {})).toEqual([ID]);
+    expect(issuer.requests.map(request => request.action)).toEqual(['authorize', 'refresh']);
 });

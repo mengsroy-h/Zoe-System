@@ -23,7 +23,7 @@ const LOCK: Record<string, string> = {
     'netlify/functions/_shared/zto-order-detail-core.cjs': '7b860beb726bf686e091ae49b018be2deadaa8258a23de8b6ab4ff5646ec068c',
     'netlify/functions/zto-order-detail.mjs': '03b8bdc2ad2fa38c60880c3014e85c2de98238dc81439521941846c943833dd1',
     'src/features/zto-list-sync.ts': '5ae571876ac06fd35c65ecbf9760aa1a9aafe1e784aa7757856b57669e8c3732',
-    'src/features/zto-status.ts': 'cd9b4c89fa45629e72d43caf66e73c9de1cea163a9f0d694769f8bb626a49525',
+    'src/features/zto-status.ts': 'e5a41fdadc18a6bac4b67e6bb0b758e1fe333d3fb97a6ab857170f86ee63a1a0',
     'src/services/zto-shop-sweep.ts': '492a026573d2dab1540b079810d85fd467a4a229516fa554e784d2742f696a0b',
     'src/services/zto-sweep-lane.ts': '79b926de32d0783f6018e3a9d686bd23cbaef8777db9c36548640550614867db',
     'src/features/auto-lookup.ts': '74927a7e13e8dc1803445d596dd769d0071657e74eb61e31d61c473a3461efb4',

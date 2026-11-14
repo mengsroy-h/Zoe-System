@@ -1,6 +1,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { createHash } = require('node:crypto');
+const { parseExpression } = require('../../supabase/scripts/rtdb-expression.cjs');
 const clone = value => JSON.parse(JSON.stringify(value));
 
 function normalized(value) {
@@ -76,8 +77,53 @@ function rawCanonical(value) {
     if (!value || typeof value !== 'object') return value;
     return Object.fromEntries(Object.keys(value).sort().map(key => [key, rawCanonical(value[key])]));
 }
+const rawDigest = value => createHash('sha256').update(JSON.stringify(rawCanonical(value))).digest('hex');
+function restoreTerminalDecisionRulesProjection(current) {
+    assert.equal(rawDigest(current), 'cc8e93bad4ba527e7ae740cdc4f1cdfeba7ae2f2dd4d73216d29dec30435f994', 'reviewed terminal decision Rules AST or optimization hint changed');
+    const projected = clone(current), row = projected.c.zoew_recently_deleted_cod_dod.x.r;
+    const equality = parseExpression("newData.child('ztoTerminalDecision').val()===data.child('ztoTerminalDecision').val()", []);
+    const field = { w: { t: 'l', v: false }, v: parseExpression("newData.val()==='signed'||newData.val()==='returned'", []) };
+    const finalDelete = parseExpression("!data.hasChild('ztoTerminalDecision')||newData.exists()||!data.hasChild('restoreClaim')", []);
+    assert.equal(row.v.t, '&&'); assert.equal(digest(row.v.r), digest(equality));
+    assert.equal(digest(row.c.ztoTerminalDecision), digest(field));
+    assert.equal(row.w.t, '&&'); assert.equal(digest(row.w.r), digest(finalDelete));
+    row.v = row.v.l; row.w = row.w.l; delete row.c.ztoTerminalDecision;
+    const localVetoes = [
+        [projected.c.zoew_scan_history_cod_dod.x.r, 'v', "root.child('zoew_recently_deleted_cod_dod').child(newData.child('restoreClaimId').val())"],
+        [projected.c.zoew_scan_history_cod_dod.x.r.c.barcodes.x.r.c.code, 'v', "root.child('zoew_recently_deleted_cod_dod').child(newData.parent().parent().parent().child('restoreClaimId').val())"],
+        [row.c.restoreClaim, 'v', 'newData.parent()'],
+        [projected.c.zoew_trash_consumptions.x.r, 'w', "root.child('zoew_recently_deleted_cod_dod').child($sourceId)"]
+    ];
+    for (const [node, key, reference] of localVetoes) {
+        const veto = digest(parseExpression('!' + reference + ".hasChild('ztoTerminalDecision')", ['$sourceId']));
+        let removed = 0;
+        const strip = value => {
+            if (!value || typeof value !== 'object') return value;
+            if (Array.isArray(value)) return value.map(strip);
+            if (value.t === '&&' && digest(value.r) === veto) { removed++; return strip(value.l); }
+            return Object.fromEntries(Object.entries(value).map(([name, child]) => [name, strip(child)]));
+        };
+        node[key] = strip(node[key]);
+        assert.equal(removed, 1, 'exact local terminal decision veto must occur once');
+    }
+    assert.equal(rawDigest(projected), 'def6cbc9bfb965bfe0d1f13e16fb5adf2cee12d1eff673f9f0dbc04af2e1c076', 'terminal decision projection changed an existing rule or optimization hint');
+    return projected;
+}
+function restorePublicationRulesProjection(current) {
+    assert.equal(rawDigest(current), 'def6cbc9bfb965bfe0d1f13e16fb5adf2cee12d1eff673f9f0dbc04af2e1c076', 'reviewed publication Rules AST or optimization hint changed');
+    const projected = clone(current), row = projected.c.zoew_recently_deleted_cod_dod.x.r;
+    const equality = parseExpression("newData.child('restorePublication').val()===data.child('restorePublication').val()", []);
+    const field = { w: { t: 'l', v: false }, v: parseExpression('newData.isNumber()&&newData.val()>=1&&newData.val()<=9007199254740990&&newData.val()%1===0', []) };
+    assert.equal(row.v.t, '&&', 'publication preservation must extend the original row validator');
+    assert.equal(digest(row.v.r), digest(equality), 'reviewed publication preservation predicate changed');
+    assert.equal(digest(row.c.restorePublication), digest(field), 'reviewed publication field guard changed');
+    row.v = row.v.l; delete row.c.restorePublication;
+    assert.equal(rawDigest(projected), '036e82896add6cecf82436d716071bbf169a73a7a22a65850cc2d8b803d1a84d', 'publication projection changed an existing rule or optimization hint');
+    return projected;
+}
 function restoreAttestationRulesProjection(current, legacy) {
-    const rawDigest = value => createHash('sha256').update(JSON.stringify(rawCanonical(value))).digest('hex');
+    if (rawDigest(current) === 'cc8e93bad4ba527e7ae740cdc4f1cdfeba7ae2f2dd4d73216d29dec30435f994') current = restoreTerminalDecisionRulesProjection(current);
+    if (rawDigest(current) === 'def6cbc9bfb965bfe0d1f13e16fb5adf2cee12d1eff673f9f0dbc04af2e1c076') current = restorePublicationRulesProjection(current);
     assert.deepEqual([rawDigest(legacy), rawDigest(current)], ["043609a50954502fd3f83446738653ba72663b41c2446f748b194149e2a16af6","036e82896add6cecf82436d716071bbf169a73a7a22a65850cc2d8b803d1a84d"], 'reviewed full Rules AST or optimization hint changed');
     const seen = new Set();
     function walk(before, after, location) {
@@ -94,4 +140,4 @@ function restoreAttestationRulesProjection(current, legacy) {
     assert.equal(seen.size, Object.keys(REVIEWED).length, 'reviewed restore attestation delta missing');
     return clone(legacy);
 }
-module.exports = { restoreAttestationRulesProjection };
+module.exports = { restoreAttestationRulesProjection, restorePublicationRulesProjection, restoreTerminalDecisionRulesProjection };

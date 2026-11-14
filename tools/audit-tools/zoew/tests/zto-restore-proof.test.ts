@@ -304,6 +304,34 @@ it.each(['signed', 'returned'])('reuses only a trusted generation terminal %s de
     expect(world.reads).toHaveLength(0);
     expect(world.applies[0].envelope.verdict).toBe(verdict);
 });
+
+it.each([{ restoreBlocked: true }, { ztoTerminalDecision: 'signed' }])('a current Signed source outranks a private Returned denial (%j)', async sourceMark => {
+    const world = fixture({ attestation: { status: 'deny', verdict: 'returned', generation: 0 } });
+    Object.assign(world.context.source, sourceMark);
+    const response = await world.handler(world.request());
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ kind: 'deny', code: 'ZTO_RESTORE_TERMINAL_SIGNED' });
+    expect(world.applies[0].envelope.verdict).toBe('signed');
+    expect(world.reads).toHaveLength(0);
+});
+it('a private Signed denial outranks a returned source decision without querying providers', async () => {
+    const world = fixture({ attestation: { status: 'deny', verdict: 'signed', generation: 0 } });
+    Object.assign(world.context.source, { ztoTerminalDecision: 'returned' });
+    const response = await world.handler(world.request());
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ code: 'ZTO_RESTORE_TERMINAL_SIGNED' });
+    expect(world.applies[0].envelope.verdict).toBe('signed');
+    expect(world.reads).toHaveLength(0);
+});
+
+it.each(['unknown', 'Signed', null, false, 0, {}, []])('malformed terminal decision %j holds before provider or authority writes', async marker => {
+    const world = fixture();
+    Object.assign(world.context.source, { ztoTerminalDecision: marker });
+    const response = await world.handler(world.request());
+    expect(response.status).toBe(503);
+    expect(world.reads).toHaveLength(0);
+    expect(world.applies).toHaveLength(0);
+});
 it('cancelling the request settles started lookups and publishes no private grant', async () => {
     const abort = new AbortController();
     const world = fixture({}, { onLookup: () => abort.abort() });

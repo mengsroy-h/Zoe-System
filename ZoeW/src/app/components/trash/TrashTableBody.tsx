@@ -2,15 +2,20 @@ import { Fragment, useEffect, useRef } from 'react';
 import { uiState } from '../../../core/state';
 import { useStoreFields } from '../../hooks/useStore';
 import { act, onAct } from '../../actions';
-import type { TrashRowModel, TrashView } from './model';
+import type { TrashRowModel, TrashTerminalBadge, TrashView } from './model';
 
 const TRASH_VIEW_FIELDS = ['trashView'] as const;
 
-function RowActions({ id, restoreBlock, restoreHalf }: { id: string; restoreBlock: string; restoreHalf: boolean }) {
+function TerminalBadges({ badges = [] }: { badges?: TrashTerminalBadge[] }) {
+    return badges.map(badge => <span key={badge.kind} data-zto-terminal={badge.kind} className={badge.cls}
+        style={{ padding: '1px 6px', borderRadius: 4, fontSize: 'calc(9 * var(--fs-unit))', fontWeight: 700, whiteSpace: 'nowrap' }}>{badge.label}</span>);
+}
+
+function RowActions({ id, restoreBlock, restoreExplain, restoreHalf }: { id: string; restoreBlock: string; restoreExplain?: string; restoreHalf: boolean }) {
     return (
         <div className="trash-row-actions">
             {restoreBlock
-                ? <button className="btn-sm trash-restore-btn is-zto-final" title="មិនអាចស្តារបាន" onClick={onAct('explainZtoRestoreBlock', { args: [restoreBlock] })}>🔒</button>
+                ? <button className="btn-sm trash-restore-btn is-zto-final" title="មិនអាចស្តារបាន" onClick={onAct('explainZtoRestoreBlock', { args: [restoreExplain || restoreBlock] })}>🔒</button>
                 : <button className={restoreHalf ? 'btn-sm trash-restore-btn is-half' : 'btn-sm trash-restore-btn'} title={restoreHalf ? 'ការស្តារមិនទាន់ចប់ — ចុចដើម្បីបញ្ចប់' : 'ស្តារមកវិញ'} onClick={onAct('promptRestoreDeletedItem', { args: [id] })}>{restoreHalf ? '⏳🔄' : '🔄'}</button>}
             <button className="btn-sm trash-purge-btn" title="លុបជាអចិន្ត្រៃយ៍" onClick={onAct('promptPermanentDelete', { args: [id] })}>✖️</button>
         </div>
@@ -24,6 +29,7 @@ function GroupRow({ row }: { row: TrashRowModel }) {
                 <div className="trash-cust">
                     <strong>{row.phone}</strong>
                     <span className={`trash-tag ${row.metaCls}`}>{row.metaLabel}</span>
+                    <TerminalBadges badges={row.terminalBadges} />
                 </div>
                 <div className="trash-when">🕒 {row.whenText}</div>
                 <div className="trash-codes">
@@ -40,7 +46,7 @@ function GroupRow({ row }: { row: TrashRowModel }) {
             </td>
             <td style={{ textAlign: 'center' }}>
                 {row.singleId
-                    ? <RowActions id={row.singleId} restoreBlock={row.singleBlock} restoreHalf={row.singleHalf} />
+                    ? <RowActions id={row.singleId} restoreBlock={row.singleBlock} restoreExplain={row.singleExplain} restoreHalf={row.singleHalf} />
                     : <button className="btn-sm trash-expand-btn" title="បង្ហាញធាតុនីមួយៗ"
                         onClick={onAct('toggleTrashGroup', { args: [row.key] })}>{row.expanded ? '▲' : '▼'} {row.itemCount}</button>}
             </td>
@@ -111,12 +117,13 @@ function ObservedGroup({ row }: { row: TrashRowModel }) {
                                 <Fragment key={code + i}>{i > 0 ? ' ' : null}<span className="barcode-tag">{code}</span></Fragment>
                             ))
                             : <span className="trash-more-codes">គ្មាន Barcode</span>}
+                        <TerminalBadges badges={sub.terminalBadges} />
                     </td>
                     <td>
                         <span className="count-badge">📦 {sub.count}</span>{' '}
                         <span className="trash-money">${sub.total.toFixed(2)}</span>
                     </td>
-                    <td style={{ textAlign: 'center' }}><RowActions id={sub.id} restoreBlock={sub.restoreBlock} restoreHalf={sub.restoreHalf} /></td>
+                    <td style={{ textAlign: 'center' }}><RowActions id={sub.id} restoreBlock={sub.restoreBlock} restoreExplain={sub.restoreExplain} restoreHalf={sub.restoreHalf} /></td>
                 </tr>
             ))}
         </>

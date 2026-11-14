@@ -178,6 +178,7 @@ it('ស្តារ lifecycle ថ្មីដក receipt ចាស់ ទោះ 
     const oldProof = clone(tree[HISTORY].target.barcodes[0].pickupTransition);
     tree.zoew_recently_deleted_cod_dod = { source: { ...clone(tree[HISTORY].target), id: 'source', trashMode: 'local', trashReason: 'delete', deletedAt: NOW, isFromDeletion: true } };
     delete tree[HISTORY].target; load();
+    put('zoew_restore_policy/shop', { v: 1, mode: 'local', scope: 'https://proof-test.firebaseio.com', branch: '', epoch: 1 });
     uiState.pendingRestoreId = 'source'; await executeRestoreItem();
     const history = Object.values(tree[HISTORY] || {}) as any[];
     expect(history).toHaveLength(1);

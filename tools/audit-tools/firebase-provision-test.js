@@ -210,7 +210,9 @@ function staticContract() {
         ['provision.js', 'firebase-api.js'].forEach((f) => fs.copyFileSync(path.join(TOOL, f), path.join(staleTool, f)));
         ['rtdb-rules-artifact.cjs', 'rtdb-canonical-key.cjs'].forEach((f) => fs.copyFileSync(path.join(ROOT, 'supabase', 'scripts', f), path.join(scripts, f)));
         const source = read('firebase-database.rules.json');
-        fs.writeFileSync(path.join(staleDir, 'firebase-database.rules.json'), source.replace('auth != null', 'auth !== null'));
+        const staleSource = source.replace(/\bauth\s*!=\s*null\b/, 'auth === null');
+        if (staleSource === source) throw new Error('stale-artifact control did not change the source');
+        fs.writeFileSync(path.join(staleDir, 'firebase-database.rules.json'), staleSource);
         fs.writeFileSync(path.join(staleDir, 'firebase-database.rules.min.json'), artifactText || '');
         const copyTool = require(path.join(staleTool, 'provision.js'));
         let staleError = null;

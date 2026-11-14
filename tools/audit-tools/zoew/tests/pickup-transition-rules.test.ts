@@ -15,12 +15,25 @@ const barcode = (receipt: any = marker()) => ({ code: 'PARCEL-A', createdAt: 170
 
 function snapshot(tree: any, parts: string[]): any {
     const value = parts.reduce((node, key) => node?.[key], tree) ?? null;
+    const child = (key: string) => snapshot(tree, [...parts, ...key.split('/').filter(Boolean)]);
     return { val: () => value, exists: () => value !== null, isString: () => typeof value === 'string',
         isNumber: () => typeof value === 'number' && Number.isFinite(value), isBoolean: () => typeof value === 'boolean',
         hasChildren: (keys?: string[]) => value !== null && typeof value === 'object'
             && (keys ? keys.every(key => value[key] != null) : Object.keys(value).length > 0),
-        child: (key: string) => snapshot(tree, [...parts, ...String(key).split('/')]), parent: () => snapshot(tree, parts.slice(0, -1)) };
+        hasChild: (key: string) => child(key).exists(), child, parent: () => snapshot(tree, parts.slice(0, -1)) };
 }
+
+it('RuleDataSnapshot path model preserves falsy children and rejects non-string paths', () => {
+    const root = snapshot({ nested: { zero: 0, no: false, empty: '', absent: null } }, []);
+    for (const key of ['zero', 'no', 'empty']) {
+        expect(root.hasChild(`nested/${key}`)).toBe(true);
+        expect(root.child(`/nested/${key}/`).val()).toBe(root.child('nested').child(key).val());
+    }
+    expect(root.hasChild('nested/absent')).toBe(false);
+    expect(root.hasChild('nested/missing')).toBe(false);
+    expect(() => root.child(0)).toThrow();
+    expect(() => root.hasChild(null)).toThrow();
+});
 
 function validate(root: string, next: any, previous: any = null) {
     const location = [root, 'item-A', 'barcodes', '0'];

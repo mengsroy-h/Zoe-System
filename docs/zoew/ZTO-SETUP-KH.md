@@ -578,6 +578,8 @@ Cookie authority ត្រូវការ `ZTO_DETAIL_BRANCH_PATHS` ដែលផ
 
 មុន upgrade/import/rollback ត្រូវបញ្ឈប់ការសរសេរថ្មី និង drain issuer/network operations ដែលកំពុងដំណើរការ ក្នុង maintenance window ផ្ដាច់មុខ។ Pending restores និង private authority របស់វដ្តដែលនៅមានប្រភព (រួមទាំង DENY ដែលដោះ seal រួច) ត្រូវរក្សា source, private grant, policy និង server-key state ក្នុង backup កម្រិត DB ដែលសាក restore បាន។ កុំលុប seal ឬ browser journals ដើម្បីបន្ត; បើ ordinary app archive បដិសេធ pending source ត្រូវសង្គ្រោះប្រតិបត្តិការ ឬប្រើផ្លូវ DB របស់អ្នកគ្រប់គ្រង។
 
+Source ដែលមាន `ztoTerminalDecision` រក្សាការហាមស្តាររួមក្រោយ release; ត្រានេះមិនបញ្ជាក់ពេល Sign/Return ពិតទេ។ ត្រាម៉ោងដែលបានផ្ទៀងពី provider បង្ហាញស្ថានភាពជាក់លាក់ដោយរក្សាមូលហេតុធុងសំរាម និងការគណនាប្រាក់ដើម។ Ordinary archive/import ក៏បដិសេធ source ដែលមាន decision ឬ `restorePublication` ដែរ; ត្រូវរក្សា backup កម្រិត DB តាមផ្លូវខាងលើ។
+
 ### ព្រំដែនពេលបន្ថែមហាង និងឧបករណ៍
 
 - ក្នុង Function deployment មួយ `FIREBASE_PROJECT_IDS` ទទួលអតិបរមា **១០២៤ គម្រោង** និង **១៦ សាខាក្នុងគម្រោងនីមួយៗ**។
@@ -989,3 +991,5 @@ ZTO។ បង្អួចដែលនៅសល់សម្រាប់ការ�
 
 ⛔ Cookie, Token, ឈ្មោះអតិថិជន និងអាសយដ្ឋាន **មិនដែលចេញទៅ browser ទេ**។
 វាល `reason` របស់សារកំហុសត្រូវច្រោះទាំង ២ ខាង (server និង client) មុនចូល DOM។
+
+Firebase issuer រក្សា `restorePublication` ជា monotonic server-only fence ក្នុង trash ដើម្បីទប់ source CAS ចាស់ក្រោយ release/retry។ កុំ clear ឬកែតម្លៃនេះពី client, ordinary import ឬ rollback; source ដែលមានត្រានេះត្រូវ DB-level backup/recovery ជាមួយ private grants។

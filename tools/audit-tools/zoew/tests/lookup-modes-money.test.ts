@@ -1,11 +1,12 @@
 import { acceptFixtureSession } from './helpers/accepted-session';
 import { createRequire } from 'node:module';
 import { cleanupServerRead } from './helpers/cleanup-server-read';
+import { createRestoreAttestationFixture } from './helpers/restore-attestation';
 import { createHash, webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fieldValue, refTo, setFieldValue } from '../../../../ZoeW/src/app/refs';
 import { dataState, firebaseState, lookupState, scanState, securityState, uiState } from '../../../../ZoeW/src/core/state';
-import { shopScope } from '../../../../ZoeW/src/core/shop-scope';
+import { liveShopScope, shopScope } from '../../../../ZoeW/src/core/shop-scope';
 import { appLocalStore } from '../../../../ZoeW/src/core/storage';
 import { viewState } from '../../../../ZoeW/src/core/view-state';
 import { registerModalMeta, unregisterModalMeta } from '../../../../ZoeW/src/core/modals';
@@ -78,6 +79,7 @@ const lab = {
 let key: CryptoKey;
 let network: (url: URL, body: any) => Promise<Response>;
 let requests: { url: URL; body: any }[];
+let restoreAuthority: ReturnType<typeof createRestoreAttestationFixture>;
 const clone = <T,>(value: T): T => value === undefined ? value : JSON.parse(JSON.stringify(value));
 const parts = (path: string) => path.split('/').filter(Boolean);
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
@@ -164,13 +166,26 @@ async function useMode(mode: Mode) {
     if (mode === 'palm') cfg.palmTokenEnc = await encryptLookupSecret('synthetic-session');
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(cfg));
     noteZtoTrashMode(null);
+    installRestoreAuthority(mode);
+}
+function installRestoreAuthority(mode: Mode = 'sheet') {
+    // The real issuer decides ALLOW/HOLD/DENY; only its backend/auth CAS and
+    // explicitly projected provider replies are controlled, not real DB Rules.
+    restoreAuthority = createRestoreAttestationFixture({ get: getAt, set: setAt,
+        policy: { v: 1, mode: mode === 'sheet' ? 'local' : mode, scope: liveShopScope(), branch: mode === 'sheet' ? '' : '881859', epoch: 1 },
+        lookup: async event => {
+            const cfg = JSON.parse(appLocalStore.getItem('zoew_lookup_api_config')!);
+            const url = new URL(cfg.url.replace('{barcode}', encodeURIComponent(event.queryStringParameters.barcode)));
+            url.searchParams.set('restore', '1'); requests.push({ url, body: null });
+            return network(url, null);
+        } });
 }
 async function scan(code = CODE, cod = 10, dod = 2, lookup = true) {
     scanState.pendingBarcode = code; scanState.phoneModalTyped = false;
     for (const field of fields) setFieldValue(field, '');
     openModalHelper('phoneModal');
     if (lookup) {
-        network = async (url) => json({ success: true, found: true, cached: false, verifiedForRestore: true,
+        network = async (url) => json({ success: true, found: true, cached: false, verifiedForRestore: true, restoreTransitionsVerified: true,
             barcode: url.searchParams.get('barcode') || url.searchParams.get('code'), phone: '012345678', cod, dod, ztoClosed: false });
         await attemptAutoLookup(code);
         expect(fieldValue('modalPhoneInput')).toBe('012345678');
@@ -216,6 +231,7 @@ beforeEach(async () => {
     firebaseState.dbLivenessProbe = Promise.resolve(null);
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: HOST }));
     acceptFixtureSession();
+    installRestoreAuthority();
     key = await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']) as CryptoKey;
     securityState.lookupSecretKey = key; securityState.appIsLocked = false; securityState.appLockVeiled = false;
     resetZtoTrashMode(); noteZtoTrashMode(null); sync();
@@ -227,6 +243,7 @@ beforeEach(async () => {
     vi.stubGlobal('fetch', vi.fn(async (url, init) => {
         const parsed = new URL(String(url), window.location.href); const body = init?.body ? JSON.parse(String(init.body)) : null;
         if (parsed.origin === HOST) return cleanupServerRead(getAt)(parsed, init);
+        if (parsed.pathname.endsWith('/zto-restore-proof')) return restoreAuthority.route(parsed, init);
         requests.push({ url: parsed, body }); return network(parsed, body);
     }));
     (window as any).ZoeErrors = { capture: vi.fn() };
@@ -253,10 +270,15 @@ describe('Lookup ទាំងបី៖ ប្រាក់ និងអត្ត�
         useSyntheticBackend(backend);
         await useMode(mode); const id = await scan(); await removeSingleBarcode(id, CODE); sync(); expectMoney(0, 0, 0);
         const removed = trashId(); const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(kind !== 'offline');
-        const fresh = { success: true, found: true, barcode: CODE, cached: false, verifiedForRestore: true, ztoClosed: false };
+        const fresh = { success: true, found: true, barcode: CODE, cached: false, verifiedForRestore: true, restoreTransitionsVerified: true, ztoClosed: false };
         network = async () => json({ ...fresh, ...(kind === 'cached' ? { cached: true } : { verifiedForRestore: false }) });
         await restore(removed); expectMoney(0, 0, 0); expectIdentities([], [CODE]);
-        expect(getAt(T + '/' + removed + '/restoreClaim')).toBeNull(); expect(getAt('zoew_restore_finalizations')).toBeNull();
+        if (kind === 'offline') expect(getAt(T + '/' + removed + '/restoreClaim')).toBeNull();
+        else {
+            expect(getAt(T + '/' + removed + '/restoreClaim')).toMatchObject({ token: restoreAuthority.requests[0].token, targetId: restoreAuthority.requests[0].targetId });
+            expect(getAt('zoew_restore_attestations/' + removed)).toMatchObject({ actorUid: 'money-user', sourceId: removed, status: 'hold', verdict: 'unconfirmed' });
+        }
+        expect(getAt('zoew_restore_finalizations')).toBeNull();
         online.mockReturnValue(true); network = async () => json(fresh);
         await restore(removed); expectMoney(10, 2, 1); expectIdentities([CODE], []);
     });
@@ -285,7 +307,8 @@ describe('Lookup ទាំងបី៖ ប្រាក់ និងអត្ត�
         await restore(deleted); expectMoney(10, 2, 1); expectIdentities([CODE], []);
         expect(getAt('zoew_trash_consumptions/' + deleted)).toEqual(deletionReceipt);
         const verification = requests.filter((request) => request.url.searchParams.get('restore') === '1');
-        expect(verification).toHaveLength(mode === 'sheet' ? 0 : 2);
+        expect(verification).toHaveLength(mode === 'sheet' ? 0 : 4);
+        expect(restoreAuthority.requests.map(request => request.action)).toEqual(mode === 'sheet' ? [] : ['authorize', 'refresh', 'authorize', 'refresh']);
         if (mode === 'palm') expect(verification.every(request => request.url.searchParams.get('palm') === '1')).toBe(true);
     });
 
@@ -373,7 +396,7 @@ describe('Lookup ទាំងបី៖ ប្រាក់ និងអត្ត�
         expect(dataState.deletedItems[0].barcodes[0].isDeducted).toBe(false);
         expect(!!dataState.deletedItems[0].restoreBlocked).toBe(signed);
         expect(readCleanupJournal()).toHaveLength(0);
-        network = async () => json({ success: true, found: true, barcode: CODE, cached: false, verifiedForRestore: true, ztoClosed: signed });
+        network = async () => json({ success: true, found: true, barcode: CODE, cached: false, verifiedForRestore: true, restoreTransitionsVerified: true, ztoClosed: signed });
         await restore(cleaned); await restore(cleaned);
         expectMoney(10, 2, 1); expectIdentities(signed ? [] : [CODE], signed ? [CODE] : []);
         if (!signed) expect(currentItem().barcodes[0]).toMatchObject({ isClosed: true, closedAt: NOW + 2 * 3600000 });
@@ -388,7 +411,7 @@ describe('Lookup ទាំងបី៖ ប្រាក់ និងអត្ត�
         expectMoney(13.5, 2.25, 2); expectIdentities([SECOND], [CODE]);
         expect(currentItem(SECOND)).toMatchObject({ isClosed: false, cod: 3.5, dod: 0.25, count: 1 });
         const cleaned = trashId();
-        network = async () => json({ success: true, found: true, barcode: CODE, cached: false, verifiedForRestore: true, ztoClosed: false });
+        network = async () => json({ success: true, found: true, barcode: CODE, cached: false, verifiedForRestore: true, restoreTransitionsVerified: true, ztoClosed: false });
         await restore(cleaned); await restore(cleaned);
         expectMoney(13.5, 2.25, 2); expectIdentities([CODE, SECOND], []);
         expect(currentItem(SECOND).barcodes.find((b) => b.code === SECOND)).toMatchObject({ isClosed: false, cod: 3.5, dod: 0.25 });
@@ -526,7 +549,7 @@ describe('Palm durable queue → recordSigned → close/ledger ពិត', () =>
             expect(row.due).toBeGreaterThan(Date.now()); expect(row.leaseUntil).toBe(0);
         });
         expectMoney(0, 0, 0); expect(getAt(P)).toEqual({ [day()]: emptyPickup }); expect(getAt(C)).toBeNull();
-        network = async () => json({ success: true, found: true, barcode: CODE, cached: false, verifiedForRestore: true, ztoClosed: true });
+        network = async () => json({ success: true, found: true, barcode: CODE, cached: false, verifiedForRestore: true, restoreTransitionsVerified: true, ztoClosed: true });
         await restore(trashId()); expectMoney(0, 0, 0); expectIdentities([], [CODE]);
         expect(requests.filter((row) => row.body?.stage === 'receipt')).toHaveLength(1);
         expect(requests.filter((row) => row.body?.stage === 'receipt-status')).toHaveLength(1);
@@ -628,7 +651,7 @@ it.each(lifecycleCases)('$backend $mode $action៖ ទិដ្ឋភាព A/B/
         dataState.scanHistory = clone(staleHistory); dataState.deletedItems = [];
         await move(); sync(); check('trash', action === 'remove', closed);
     }
-    network = async () => json({ success: true, found: true, barcode: CODE, cached: false, verifiedForRestore: true, ztoClosed: mode === 'cookie-signed' });
+    network = async () => json({ success: true, found: true, barcode: CODE, cached: false, verifiedForRestore: true, restoreTransitionsVerified: true, ztoClosed: mode === 'cookie-signed' });
     const allowed = mode === 'cookie' || mode === 'palm' && action !== 'pickup';
     await restore(removed); check(allowed ? 'history' : 'trash', !allowed && action === 'remove', closed);
     for (let device = 0; device < 2; device++) {
@@ -648,6 +671,7 @@ function useSyntheticBackend(backend: 'firebase' | 'supabase') {
         resetZtoTrashMode(); noteZtoTrashMode(null);
         acceptFixtureSession();
     }
+    installRestoreAuthority();
 }
 
 it.each(['firebase', 'supabase'] as const)('%s Cookie៖ ផ្ទៀង ZTO យឺតមុនស្តារ រក្សាប្រាក់/អត្តសញ្ញាណ ហើយចុចស្ទួនមិនបូកពីរដង', async backend => {
@@ -655,14 +679,14 @@ it.each(['firebase', 'supabase'] as const)('%s Cookie៖ ផ្ទៀង ZTO យ
     const id = await scan(); expectMoney(10, 2, 1); expectIdentities([CODE], []);
     await removeSingleBarcode(id, CODE); sync(); expectMoney(0, 0, 0); expectIdentities([], [CODE]);
     const removed = trashId(), reply = gate<Response>();
-    requests = []; network = async () => reply.promise;
+    requests = []; network = async () => (await reply.promise).clone();
     uiState.pendingRestoreId = removed; const pending = executeRestoreItem();
     await vi.waitFor(() => expect(requests.some(row => row.url.searchParams.get('restore') === '1')).toBe(true));
     expectMoney(0, 0, 0); expectIdentities([], [CODE]);
     expect(getAt(T + '/' + removed + '/restoreClaim')).toBeNull();
     uiState.pendingRestoreId = removed; await executeRestoreItem();
     expectMoney(0, 0, 0); expectIdentities([], [CODE]);
-    reply.resolve(json({ success: true, found: true, barcode: CODE, cached: false, verifiedForRestore: true, ztoClosed: false }));
+    reply.resolve(json({ success: true, found: true, barcode: CODE, cached: false, verifiedForRestore: true, restoreTransitionsVerified: true, ztoClosed: false }));
     await pending; sync(); expectMoney(10, 2, 1); expectIdentities([CODE], []);
     await restore(removed); expectMoney(10, 2, 1); expectIdentities([CODE], []);
     expectRegistryOwner();

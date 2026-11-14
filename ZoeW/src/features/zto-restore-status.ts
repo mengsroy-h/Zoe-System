@@ -5,6 +5,7 @@ import { trashGenerationOf } from '../domain/trash-generation';
 import { barcodeEntriesOf, barcodeReturnBasis } from '../domain/barcode';
 import { pickupBarcodeKey } from '../domain/pickup';
 import { dbOp, fetchWithTimeout } from '../services/network';
+import { txReadServerValue, txRestUrl } from '../services/tx-outcome';
 import { addZtoIdentityHeader, buildLookupRequestHeaders } from './lookup-api';
 import { getLookupApiConfig, getZtoTrashMode } from './lookup-config';
 import { getZtoPickupVerdict, setZtoPickupVerdict, ztoVerdictCandidate } from './zto-status';
@@ -86,8 +87,11 @@ export async function requestRestoreAuthorization(item, operation: RestoreProofO
     if (body.kind === 'already_applied') return { kind: 'already_applied' };
     if (!['allow', 'deny', 'released'].includes(body.kind)) throw new Error('RESTORE_ZTO_UNCONFIRMED');
     let source;
-    try { source = (await dbOp(api.get(api.ref(proofDatabase, `zoew_recently_deleted_cod_dod/${sourceId}`)))).val(); }
-    catch { throw new Error('RESTORE_ZTO_UNVERIFIED'); }
+    try {
+        const sourceRef = api.ref(proofDatabase, `zoew_recently_deleted_cod_dod/${sourceId}`);
+        const sourceUrl = txRestUrl(sourceRef);
+        source = sourceUrl ? await txReadServerValue(sourceUrl, undefined, current) : (await dbOp(api.get(sourceRef))).val();
+    } catch { throw new Error(current() ? 'RESTORE_ZTO_UNVERIFIED' : 'RESTORE_SESSION_SWITCHED'); }
     if (!current()) throw new Error('RESTORE_SESSION_SWITCHED');
     if (!source || trashGenerationOf(source) !== expectedGeneration) throw new Error('RESTORE_GENERATION_HOLD');
     source = { ...source, id: sourceId };
@@ -112,6 +116,10 @@ export async function requestRestoreAuthorization(item, operation: RestoreProofO
 
 export async function verifyZtoRestoreStatus(item, operation?: RestoreProofOperation): Promise<RestoreAuthorization> {
     const policy = await readRestorePolicy(operation?.current);
+    if (Object.prototype.hasOwnProperty.call(item || {}, 'ztoTerminalDecision')) {
+        if (item.ztoTerminalDecision === 'signed' || item.ztoTerminalDecision === 'returned') throw new Error('RESTORE_ZTO_FINAL');
+        throw new Error('RESTORE_ZTO_UNCONFIRMED');
+    }
     if (policy.mode === 'local' && item?.trashMode !== 'palm' && item?.trashMode !== 'cookie' && !item?.restoreAttestationId) {
         return { kind: 'local', policy };
     }

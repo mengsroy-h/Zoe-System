@@ -1,3 +1,4 @@
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, securityState, uiState, ztoState } from '../../../../ZoeW/src/core/state';
 import { appLocalStore } from '../../../../ZoeW/src/core/storage';
@@ -78,6 +79,8 @@ beforeEach(() => {
     firebaseState.serverClockTrusted = true;
     firebaseState.isDatabaseConnected = true;
     firebaseState.auth = { currentUser: { uid: 'audit-user' } } as any;
+    configureFixtureBackend('zto-abandon-blocked');
+    acceptFixtureSession();
     firebaseState.db = { name: 'audit-db' } as any;
     (firebaseState as any).dbRefZtoSignedSweep = { path: 'zoew_settings/zto_signed_sweep' };
     firebaseState.fb = {

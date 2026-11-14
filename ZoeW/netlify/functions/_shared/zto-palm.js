@@ -741,16 +741,18 @@ async function palmGet(query, session, keys, deps) {
     if (!BARCODE_RE.test(barcode)) return json(400, { code: 'ZTO_BARCODE_INVALID' });
     const access = await deps.lookupAccess();
     if (access && access.response) return access.response;
-    if (otherBranch(access, session.site) && query.status !== '1') {
+    const verifyRestore = query.restore === '1';
+    if (otherBranch(access, session.site) && query.status !== '1' && !verifyRestore) {
         return json(200, { success: false, found: false, barcode, code: 'ZTO_OTHER_BRANCH', reason: 'branch:palm-other-branch' });
     }
-    if (query.status === '1') {
+    if (query.status === '1' || verifyRestore) {
         if (access?.verified && trackingCode(access.site) !== trackingCode(session.site)) {
             return json(200, { success: false, found: false, barcode, code: 'ZTO_OTHER_BRANCH', reason: 'branch:other' });
         }
         const tracking = await palmTracking(barcode, session, keys, deps);
         if (tracking.response) return tracking.response;
-        return json(200, { success: true, found: true, barcode, provider: 'zto-palm', ...tracking.verdict });
+        return json(200, { success: true, found: true, barcode, provider: 'zto-palm', ...tracking.verdict,
+            ...(verifyRestore ? { cached: false, verifiedForRestore: true } : {}) });
     }
     const upstream = await requestPalm(BILL_INFO_PATH, { billCode: barcode }, session.token, keys, deps.upstreamMs(),
         meterFor(deps, 'palmDetail'), true);

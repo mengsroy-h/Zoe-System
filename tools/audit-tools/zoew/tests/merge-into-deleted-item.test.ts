@@ -1,5 +1,6 @@
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { dataState, firebaseState, uiState, ztoState } from '../../../../ZoeW/src/core/state';
 import { getFormattedDate } from '../../../../ZoeW/src/core/timezone';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../../../../ZoeW/src/core/text';
@@ -131,6 +132,7 @@ beforeEach(() => {
     firebaseState.authGeneration++;
     firebaseState.auth = { currentUser: { uid: 'u' } } as any;
     const options = { databaseURL: 'https://merge-gone.firebaseio.com' };
+    firebaseState.firebaseConfig = options;
     firebaseState.db = { name: 'db', app: { options } } as any;
     appLocalStore.clear();
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
@@ -138,6 +140,7 @@ beforeEach(() => {
     firebaseState.serverTimeOffsetMs = 0;
     firebaseState.serverClockTrusted = true;
     firebaseState.fb = makeFb() as any;
+    acceptFixtureSession();
     for (const [name, path] of [['dbRefHistory', HISTORY], ['dbRefDeleted', TRASH],
         ['dbRefDailyRevenue', DAILY], ['dbRefMonthlyRevenue', 'zoew_monthly_revenue_cod_dod'],
         ['dbRefDailyCollected', 'zoew_daily_collected_cod_dod'], ['dbRefDailyPickup', 'zoew_daily_pickup_cod_dod']] as const) {

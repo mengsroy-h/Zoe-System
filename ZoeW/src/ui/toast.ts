@@ -238,7 +238,7 @@ let networkToastEpisode = false;
 let connectionWasOnline = false;
 
 function signedInForToast() {
-    return !!(firebaseState.auth && firebaseState.auth.currentUser) && firebaseState.sessionExpiryCheck !== 'expired';
+    return !!(firebaseState.auth && firebaseState.auth.currentUser) && firebaseState.sessionExpiryCheck !== 'expired' && firebaseState.sessionExpiryCheck !== 'signed-out';
 }
 
 export function noteConnectionTransition(prev, next) {
@@ -295,6 +295,9 @@ export function liveToastState(key) {
         return liveWritePhaseState('ភ្ជាប់ Server វិញ') || { msg: '✅ ភ្ជាប់ Server វិញ — ទិន្នន័យទាន់សម័យ', kind: 'success', settled: true };
     }
     if (key !== 'signin' && key !== 'config') return null;
+    if (key === 'signin' && firebaseState.sessionExpiryCheck === 'signed-out' && firebaseState.auth?.currentUser) {
+        return { msg: '⚠️ វគ្គក្នុង App បានបិទ — សូមចូលប្រព័ន្ធម្ដងទៀត', kind: 'warn', settled: true };
+    }
     if (key === 'signin' && (firebaseState.sessionExpiryCheck === 'expired' || !firebaseState.auth || !firebaseState.auth.currentUser)) {
         return firebaseState.sessionExpiryCheck === 'expired'
             ? { msg: SESSION_EXPIRED_TOAST, kind: 'warn', settled: true }

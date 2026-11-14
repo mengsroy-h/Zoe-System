@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { createRequire } from 'node:module';
 import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { createHash, webcrypto } from 'node:crypto';
@@ -214,6 +215,7 @@ beforeEach(async () => {
     firebaseState.dbRefDailyPickup = ref(P); firebaseState.dbRefDailyCollected = ref(C);
     firebaseState.dbLivenessProbe = Promise.resolve(null);
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: HOST }));
+    acceptFixtureSession();
     key = await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']) as CryptoKey;
     securityState.lookupSecretKey = key; securityState.appIsLocked = false; securityState.appLockVeiled = false;
     resetZtoTrashMode(); noteZtoTrashMode(null); sync();
@@ -247,9 +249,9 @@ describe('Lookup ទាំងបី៖ ប្រាក់ និងអត្ត�
         expect(dataState.scanHistory).toHaveLength(1); expect(currentItem().id).toBe(id);
     });
 
-    it.each((['firebase', 'supabase'] as const).flatMap(backend => (['cached', 'unverified', 'offline'] as const).map(kind => ({ backend, kind }))))('Cookie $backend $kind៖ ស្តារហាម មិនបូកប្រាក់; ភស្តុតាងថ្មីអនុញ្ញាតស្តារតែម្តង', async ({ backend, kind }) => {
+    it.each((['firebase', 'supabase'] as const).flatMap(backend => (['cookie', 'palm'] as const).flatMap(mode => (['cached', 'unverified', 'offline'] as const).map(kind => ({ backend, mode, kind })))))('$mode $backend $kind៖ ស្តារហាម មិនបូកប្រាក់; ភស្តុតាងថ្មីអនុញ្ញាតស្តារតែម្តង', async ({ backend, mode, kind }) => {
         useSyntheticBackend(backend);
-        await useMode('cookie'); const id = await scan(); await removeSingleBarcode(id, CODE); sync(); expectMoney(0, 0, 0);
+        await useMode(mode); const id = await scan(); await removeSingleBarcode(id, CODE); sync(); expectMoney(0, 0, 0);
         const removed = trashId(); const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(kind !== 'offline');
         const fresh = { success: true, found: true, barcode: CODE, cached: false, verifiedForRestore: true, ztoClosed: false };
         network = async () => json({ ...fresh, ...(kind === 'cached' ? { cached: true } : { verifiedForRestore: false }) });
@@ -259,13 +261,17 @@ describe('Lookup ទាំងបី៖ ប្រាក់ និងអត្ត�
         await restore(removed); expectMoney(10, 2, 1); expectIdentities([CODE], []);
     });
 
-    it.each(['sheet', 'cookie'] as const)('%s៖ ដក→ស្តារ→លុប→ស្តារ និងធ្វើស្ទួនគ្រប់ជំហាន', async (mode) => {
+    it.each(modes)('%s៖ ដក→ស្តារ→លុប→ស្តារ និងធ្វើស្ទួនគ្រប់ជំហាន', async (mode) => {
         await useMode(mode); let id = await scan(); expectMoney(10, 2, 1);
         await Promise.all([removeSingleBarcode(id, CODE), removeSingleBarcode(id, CODE)]); sync();
         expectMoney(0, 0, 0); expectIdentities([], [CODE]); const removed = trashId();
         expect(dataState.deletedItems[0].barcodes[0].isDeducted).toBe(true);
         await restore(removed); expectMoney(10, 2, 1); expectIdentities([CODE], []);
+        const removalReceipt = getAt('zoew_trash_consumptions/' + removed);
+        expect(removalReceipt).toMatchObject({ v: 1, sourceId: removed, generation: 1, kind: 'restore', actorUid: 'money-user', deletedAt: NOW,
+            targetId: currentItem().id, token: expect.any(String), scope: shopScope() });
         await restore(removed); expectMoney(10, 2, 1); expectIdentities([CODE], []);
+        expect(getAt('zoew_trash_consumptions/' + removed)).toEqual(removalReceipt);
         vi.setSystemTime(Date.now() + 1);
         id = currentItem().id;
         await Promise.all([deleteSingleItem(id), deleteSingleItem(id)]); sync();
@@ -273,18 +279,23 @@ describe('Lookup ទាំងបី៖ ប្រាក់ និងអត្ត�
         expect(dataState.deletedItems[0]).toMatchObject({ trashGeneration: 2, deletedAt: NOW + 1 });
         expect(dataState.deletedItems[0].barcodes[0].isDeducted).toBe(false);
         await restore(deleted); expectMoney(10, 2, 1); expectIdentities([CODE], []);
+        const deletionReceipt = getAt('zoew_trash_consumptions/' + deleted);
+        expect(deletionReceipt).toMatchObject({ v: 1, sourceId: deleted, generation: 2, kind: 'restore', actorUid: 'money-user', deletedAt: NOW + 1,
+            targetId: currentItem().id, token: expect.any(String), scope: shopScope() });
         await restore(deleted); expectMoney(10, 2, 1); expectIdentities([CODE], []);
+        expect(getAt('zoew_trash_consumptions/' + deleted)).toEqual(deletionReceipt);
         const verification = requests.filter((request) => request.url.searchParams.get('restore') === '1');
-        expect(verification).toHaveLength(mode === 'cookie' ? 2 : 0);
+        expect(verification).toHaveLength(mode === 'sheet' ? 0 : 2);
+        if (mode === 'palm') expect(verification.every(request => request.url.searchParams.get('palm') === '1')).toBe(true);
     });
 
-    it.each(['palm', 'cookie-signed'] as const)('%s៖ ដក→ស្តារហាម→លុបគ្មានធាតុ→ស្តារហាម មិនបូកប្រាក់', async (mode) => {
-        await useMode(mode === 'palm' ? 'palm' : 'cookie'); const id = await scan();
-        if (mode === 'cookie-signed') { await recordSigned(id, CODE, () => true); await syncZtoFinalMarks(); sync(); }
+    it.each(['palm-signed', 'cookie-signed'] as const)('%s៖ ដក→ស្តារហាម→លុបគ្មានធាតុ→ស្តារហាម មិនបូកប្រាក់', async (mode) => {
+        await useMode(mode === 'palm-signed' ? 'palm' : 'cookie'); const id = await scan();
+        await recordSigned(id, CODE, () => true); await syncZtoFinalMarks(); sync();
         await removeSingleBarcode(id, CODE); sync(); expectMoney(0, 0, 0); expectIdentities([], [CODE]);
         const removed = trashId();
-        if (mode === 'palm') expect(dataState.deletedItems[0].restoreBlocked).toBe(true);
-        else expect(Number(dataState.deletedItems[0].barcodes[0].ztoSignedAt)).toBeGreaterThan(0);
+        expect(dataState.deletedItems[0].restoreBlocked).toBe(true);
+        expect(Number(dataState.deletedItems[0].barcodes[0].ztoSignedAt)).toBeGreaterThan(0);
         await restore(removed); expectMoney(0, 0, 0); expectIdentities([], [CODE]);
         expect(getAt(T + '/' + removed + '/restoreClaim')).toBeNull(); expect(getAt('zoew_restore_finalizations')).toBeNull();
         expect(await deleteSingleItem(id)).toBe('missing'); expectMoney(0, 0, 0);
@@ -292,9 +303,9 @@ describe('Lookup ទាំងបី៖ ប្រាក់ និងអត្ត�
         await useMode('sheet'); await restore(removed); expectMoney(0, 0, 0); expectIdentities([], [CODE]);
     });
 
-    it.each(['palm', 'cookie-signed'] as const)('%s៖ លុបរក្សាប្រាក់ ហើយស្តារហាមមិនបូកបន្ថែម', async (mode) => {
-        await useMode(mode === 'palm' ? 'palm' : 'cookie'); const id = await scan();
-        if (mode === 'cookie-signed') { await recordSigned(id, CODE, () => true); await syncZtoFinalMarks(); sync(); }
+    it.each(['palm-signed', 'cookie-signed'] as const)('%s៖ លុបរក្សាប្រាក់ ហើយស្តារហាមមិនបូកបន្ថែម', async (mode) => {
+        await useMode(mode === 'palm-signed' ? 'palm' : 'cookie'); const id = await scan();
+        await recordSigned(id, CODE, () => true); await syncZtoFinalMarks(); sync();
         await deleteSingleItem(id); sync(); expectMoney(10, 2, 1); expectIdentities([], [CODE]);
         const deleted = trashId(); await restore(deleted); expectMoney(10, 2, 1); expectIdentities([], [CODE]);
         await useMode('sheet'); await restore(deleted); expectMoney(10, 2, 1); expectIdentities([], [CODE]);
@@ -340,7 +351,7 @@ describe('Lookup ទាំងបី៖ ប្រាក់ និងអត្ត�
         expectMoney(10, 2, 1); expectIdentities([CODE], []); expectRegistryOwner();
     });
 
-    it.each(['sheet', 'cookie'] as const)('%s៖ ស្តារបាន commit តែ ACK ដាច់ → មិនបូកពីរដង', async (mode) => {
+    it.each(modes)('%s៖ ស្តារបាន commit តែ ACK ដាច់ → មិនបូកពីរដង', async (mode) => {
         await useMode(mode); const id = await scan(); await removeSingleBarcode(id, CODE); sync(); expectMoney(0, 0, 0);
         const removed = trashId(); lab.rootAckLost = true;
         await restore(removed); expect(lab.rootAckLostCount).toBe(1); expectMoney(10, 2, 1); expectIdentities([CODE], []);
@@ -515,10 +526,12 @@ describe('Palm durable queue → recordSigned → close/ledger ពិត', () =>
             expect(row.due).toBeGreaterThan(Date.now()); expect(row.leaseUntil).toBe(0);
         });
         expectMoney(0, 0, 0); expect(getAt(P)).toEqual({ [day()]: emptyPickup }); expect(getAt(C)).toBeNull();
+        network = async () => json({ success: true, found: true, barcode: CODE, cached: false, verifiedForRestore: true, ztoClosed: true });
         await restore(trashId()); expectMoney(0, 0, 0); expectIdentities([], [CODE]);
         expect(requests.filter((row) => row.body?.stage === 'receipt')).toHaveLength(1);
         expect(requests.filter((row) => row.body?.stage === 'receipt-status')).toHaveLength(1);
-        expect(requests.map(row => row.body.stage)).toEqual(['receipt-status', 'receipt']);
+        expect(requests.filter(row => row.body).map(row => row.body.stage)).toEqual(['receipt-status', 'receipt']);
+        expect(requests.filter(row => row.url.searchParams.get('restore') === '1')).toHaveLength(1);
         expect(await openSignJob([...disk.rows.values()][0], key)).toMatchObject({ photo, requestId });
     });
 });
@@ -546,7 +559,7 @@ describe('checker ឆ្លងថ្ងៃ៖ scan ពិតជាមួយ expe
     });
 });
 
-it.each([['sheet', false], ['sheet', true], ['cookie', false], ['cookie', true]] as const)('ជីកជម្រៅ %s បញ្ច្រាស %s៖ ដក/ស្តារកញ្ចប់ដដែល៦ជុំ បាត់ ACK រាល់ជុំ មិនស្ទួនប្រាក់', async (mode, reverse) => {
+it.each(modes.flatMap(mode => [false, true].map(reverse => [mode, reverse] as const)))('ជីកជម្រៅ %s បញ្ច្រាស %s៖ ដក/ស្តារកញ្ចប់ដដែល៦ជុំ បាត់ ACK រាល់ជុំ មិនស្ទួនប្រាក់', async (mode, reverse) => {
     await useMode(mode);
     const entries = [
         { code: CODE, cod: 111, dod: 11 },
@@ -616,7 +629,7 @@ it.each(lifecycleCases)('$backend $mode $action៖ ទិដ្ឋភាព A/B/
         await move(); sync(); check('trash', action === 'remove', closed);
     }
     network = async () => json({ success: true, found: true, barcode: CODE, cached: false, verifiedForRestore: true, ztoClosed: mode === 'cookie-signed' });
-    const allowed = mode === 'cookie';
+    const allowed = mode === 'cookie' || mode === 'palm' && action !== 'pickup';
     await restore(removed); check(allowed ? 'history' : 'trash', !allowed && action === 'remove', closed);
     for (let device = 0; device < 2; device++) {
         dataState.scanHistory = []; dataState.deletedItems = clone(staleTrash);
@@ -633,6 +646,7 @@ function useSyntheticBackend(backend: 'firebase' | 'supabase') {
         (firebaseState.fb as any).tenantScope = () => 'synthetic-shop';
         appLocalStore.setItem('zoew_firebase_config', JSON.stringify(config));
         resetZtoTrashMode(); noteZtoTrashMode(null);
+        acceptFixtureSession();
     }
 }
 
@@ -815,12 +829,14 @@ it.each(operationOracleCases)('[parcel-oracle-close] $backend $lookup $fault៖ 
     const inspect = () => expected.verify(clone(lab.store), [CODE, SECOND], 'close-' + fault, Date.now());
     if (fault === 'control') expect(inspect).not.toThrow(); else expect(inspect).toThrow();
 });
-it.each(operationOracleCases.filter(row => !['palm', 'cookie-signed'].includes(row.lookup)))('[parcel-oracle-restore] $backend $lookup $fault៖ ស្តារបិទ renew closedAt និងតម្លៃដើមតាម intent', async ({ backend, lookup, fault }) => {
+it.each(operationOracleCases.filter(row => row.lookup !== 'cookie-signed'))('[parcel-oracle-restore] $backend $lookup $fault៖ ស្តារបិទ renew closedAt និងតម្លៃដើមតាម intent', async ({ backend, lookup, fault }) => {
     useSyntheticBackend(backend); await configureOracleLookup(lookup);
     const scanDay = day(), useLookup = lookup !== 'absent' && lookup !== 'disabled';
     const id = await scan(CODE, 10, 2, useLookup); await scan(SECOND, 3.5, 0.25, useLookup);
     const expected = parcelExpectation(scanDay), firstCloseAt = Date.now();
-    await oracleClose(lookup, id); expected.expectParcel?.(CODE, { closed: true, closedAt: [firstCloseAt, firstCloseAt] });
+    if (lookup === 'palm') { await applyBarcodeCloseChange(id, CODE, true, { silent: true, showModal: false }); sync(); }
+    else await oracleClose(lookup, id);
+    expected.expectParcel?.(CODE, { closed: true, closedAt: [firstCloseAt, firstCloseAt] });
     expected.verify(clone(lab.store), [CODE, SECOND], 'closed-before-remove', Date.now());
     await removeSingleBarcode(id, CODE); sync();
     expected.adjust(scanDay, -10, -2, -1); expected.expectParcel?.(CODE, { root: 'trash', deducted: true });
@@ -853,7 +869,7 @@ it.each((['firebase', 'supabase'] as const).flatMap(backend => (['palm', 'cookie
     }
 );
 
-it.each((['firebase', 'supabase'] as const).flatMap(backend => (['absent', 'disabled', 'sheet', 'cookie'] as const).flatMap(lookup =>
+it.each((['firebase', 'supabase'] as const).flatMap(backend => (['absent', 'disabled', 'sheet', 'cookie', 'palm'] as const).flatMap(lookup =>
     (['control', 'old-restoredAt', 'forbidden-closedAt'] as const).map(fault => ({ backend, lookup, fault })))))(
     '[parcel-oracle-open-restore] $backend $lookup $fault៖ ស្តារបើកត្រូវ renew restoredAt ហើយគ្មាន closedAt', async ({ backend, lookup, fault }) => {
         useSyntheticBackend(backend); await configureOracleLookup(lookup);
@@ -902,14 +918,18 @@ it.each((['firebase', 'supabase'] as const).flatMap(backend => oracleLookups.map
         expected.verify(clone(lab.store), [CODE, SECOND], 'repeat-close', Date.now());
     }
 );
-it.each((['firebase', 'supabase'] as const).flatMap(backend => (['absent', 'disabled', 'sheet', 'cookie'] as const).flatMap(lookup =>
+it.each((['firebase', 'supabase'] as const).flatMap(backend => (['absent', 'disabled', 'sheet', 'cookie', 'palm'] as const).flatMap(lookup =>
     [false, true].map(closed => ({ backend, lookup, closed })))))(
     '[parcel-oracle-repeat-restore] $backend $lookup closed=$closed៖ ស្តារស្ទួនរក្សាពេលស្តារដើម មិនបន្ថែមប្រាក់', async ({ backend, lookup, closed }) => {
         useSyntheticBackend(backend); await configureOracleLookup(lookup);
         const scanDay = day(), useLookup = lookup !== 'absent' && lookup !== 'disabled';
         const id = await scan(CODE, 10, 2, useLookup); await scan(SECOND, 3.5, 0.25, useLookup);
         const expected = parcelExpectation(scanDay), originalClose = Date.now();
-        if (closed) { await oracleClose(lookup, id); expected.expectParcel?.(CODE, { closed: true, closedAt: [originalClose, originalClose] }); }
+        if (closed) {
+            if (lookup === 'palm') { await applyBarcodeCloseChange(id, CODE, true, { silent: true, showModal: false }); sync(); }
+            else await oracleClose(lookup, id);
+            expected.expectParcel?.(CODE, { closed: true, closedAt: [originalClose, originalClose] });
+        }
         await removeSingleBarcode(id, CODE); sync();
         expected.adjust(scanDay, -10, -2, -1); expected.expectParcel?.(CODE, { root: 'trash', deducted: true });
         expected.verify(clone(lab.store), [CODE, SECOND], 'before-repeat-restore', Date.now());

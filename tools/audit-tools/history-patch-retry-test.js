@@ -26,6 +26,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { reactRuntime, moduleRuntime, memoryStorage } = require('./react-view.js');
+const { localAuthRuntime } = require('./local-auth-runtime.cjs');
 
 const ROOT = process.env.HISTPATCH_APP_DIR ? path.resolve(process.env.HISTPATCH_APP_DIR) : path.resolve(__dirname, '../..');
 const APP_JS = path.join(ROOT, 'ZoeW', 'app.js');
@@ -39,6 +40,7 @@ function ok(label, cond, detail) {
 let SRC = '';
 try { SRC = fs.readFileSync(APP_JS, 'utf8'); } catch (e) { SRC = ''; }
 
+const authRuntime = localAuthRuntime(ROOT, SRC);
 // ⛔ ជាន់អប្បបរមា — «គ្មានលំនាំអាក្រក់» ពិតដោយស្វ័យប្រវត្តិលើ input ទទេ។
 ok('អាន ZoeW/app.js បាន (ជាន់អប្បបរមា)', SRC.length > 100000, SRC.length);
 const callSites = (SRC.match(/patchHistoryItemFields\(/g) || []).length;
@@ -109,7 +111,7 @@ function build(mode, opts) {
         AbortController: AbortController,
         fetch: () => Promise.reject(new TypeError('Failed to fetch')),
         firebaseConfig: { databaseURL: 'https://demo-zoew.firebaseio.com' },
-        auth: { currentUser: { getIdToken: () => Promise.resolve('token') } },
+        auth: { currentUser: { uid: 'history-fixture-owner', getIdToken: () => Promise.resolve('token') } },
         db: {}, dbRefHistory: {},
         authGeneration: 0,
         scanHistory: (opts && opts.scanHistory) || [],
@@ -151,9 +153,13 @@ function build(mode, opts) {
             return Promise.resolve({ committed: true, snapshot: { val: () => JSON.parse(JSON.stringify(out)) } });
         }
     };
+    if (opts && opts.storage) ctx.appLocalStore = opts.storage;
+    authRuntime.prepare(ctx, ctx.firebaseConfig);
     vm.createContext(ctx);
     vm.runInContext(require('./react-view').moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts', 'src/services/row-operation-lock.ts']).code, ctx);
     vm.runInContext(reactRuntime(SRC, { exclude: FNS, context: ctx }), ctx);
+    vm.runInContext(authRuntime.code, ctx);
+    authRuntime.seed(ctx, ctx.firebaseConfig);
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
     vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', ctx);
     decls.forEach((d) => { try { vm.runInContext(d, ctx); } catch (e) {} });
@@ -425,6 +431,7 @@ async function scenario(label, fn) {
             const storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://demo-zoew.firebaseio.com' }) });
             const ctx = build('ok', { server: { id1: { ...item } }, scanHistory: [item], storage });
             ctx.auth.currentUser.uid = 'phone-fixture-owner';
+            authRuntime.seed(ctx, ctx.firebaseConfig);
             ctx.isInitializingFirebase = false;
             vm.runInContext(sliceFn('generateUniqueId'), ctx);
             ctx.pickupPendingVersion = 0;

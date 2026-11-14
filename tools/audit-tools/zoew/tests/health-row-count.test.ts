@@ -197,22 +197,36 @@ describe('Postgres scan rules៖ អត្តសញ្ញាណ fixture ត្�
         expect(pattern).toBeTruthy();
         const valid = new RegExp(pattern!);
         const members: unknown[][] = [], emails: string[] = [];
+        const sessionOwners: unknown[] = [];
+        const pgSource = readFileSync('../tools/audit-tools/supabase-pg.js', 'utf8');
+        let sessionNode: any;
+        require('acorn-walk').simple(require('acorn').parse(pgSource, { ecmaVersion: 'latest' }), {
+            FunctionDeclaration(node: any) { if (node.id?.name === 'sessionClaims') sessionNode = node; }
+        });
+        expect(sessionNode).toBeDefined();
+        const sessionClaims = runInNewContext('(' + pgSource.slice(sessionNode.start, sessionNode.end) + ')');
         const start = file.indexOf('    const tenant = (await pgConnection.query(');
         const end = file.indexOf('    let sequence = 0;', start);
         expect(start).toBeGreaterThan(0); expect(end).toBeGreaterThan(start);
-        const seed = runInNewContext('(async () => {\n' + file.slice(start, end) + '\nreturn { user, foreignUser }; })', {
+        const seed = runInNewContext('(async () => {\n' + file.slice(start, end) + '\nreturn { user, foreignUser, userSession, foreignSession }; })', {
             pgConnection: { query: async (sql: string, args?: unknown[]) => {
                 if (sql.startsWith('insert into public.tenants ')) return { rows: [{ id: 'tenant-test' }] };
+                if (sql.startsWith('insert into auth.sessions')) {
+                    expect(args).toHaveLength(1); sessionOwners.push(args![0]);
+                    return { rows: [{ id: '30000000-0000-4000-8000-' + String(sessionOwners.length).padStart(12, '0') }] };
+                }
                 expect(sql).toContain('insert into public.tenant_members');
                 expect(args).toHaveLength(3); expect(valid.test(String(args![2]))).toBe(true);
                 members.push(args!); return { rows: [] };
             } },
-            pgHarness: { makeAuthUser: async (_connection: unknown, email: string) => {
+            pgHarness: { sessionClaims, makeAuthUser: async (_connection: unknown, email: string) => {
                 emails.push(email); return 'user-' + emails.length;
             } }
         });
         const identities = await seed();
         expect(identities.user).not.toBe(identities.foreignUser);
+        expect(sessionOwners).toEqual([identities.user, identities.foreignUser]);
+        expect(identities.userSession.extra.session_id).not.toBe(identities.foreignSession.extra.session_id);
         expect(members.map(row => row[0])).toEqual([identities.user, identities.foreignUser]);
         expect(members.map(row => row[1])).toEqual(['tenant-test', 'tenant-test']);
         expect(new Set(members.map(row => row[2])).size).toBe(2);

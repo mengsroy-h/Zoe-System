@@ -34,6 +34,7 @@
 //   ៥. ⛔ ទិសផ្ទុយ ៖ បណ្តាញធម្មតា ➜ លទ្ធផលដដែលបេះបិទ ដកម្តងគត់។
 const path = require('path');
 const vm = require('vm');
+const { localAuthRuntime } = require('./local-auth-runtime.cjs');
 const { moduleRuntime, memoryStorage } = require('./react-view');
 const { reactRuntime } = require('./react-view.js');
 
@@ -306,6 +307,11 @@ function buildWorld(seed, opts) {
         activeRestoreClaims: new Map()
     });
 
+    const declaredConfig = { databaseURL: 'https://fixture-late-commit-test.invalid' };
+    const authRuntime = localAuthRuntime(ROOT, src);
+    context.__storage = memoryStorage({ zoew_firebase_config: JSON.stringify(declaredConfig) });
+    context.appLocalStore = context.__storage;
+    authRuntime.prepare(context, declaredConfig);
     const code = [
         reactRuntime(src, { exclude: REAL_FNS.concat(OPTIONAL_FNS, ['appLocalStore']), context }),
         extractConst('TWO_HOURS_MS') || 'const TWO_HOURS_MS = 7200000;',
@@ -340,7 +346,6 @@ function buildWorld(seed, opts) {
         extractConst('CLEANUP_LEDGER_KEYED') || "const CLEANUP_LEDGER_KEYED = 'keyed';",
         extractConst('CLEANUP_LEDGER_RETRY_MAX') || 'const CLEANUP_LEDGER_RETRY_MAX = 10;',
         extractConst('CLEANUP_NO_PRIOR') || 'const CLEANUP_NO_PRIOR = { d: [], m: [] };',
-        'const appLocalStore = __storage;',
         ...['txCanonical', 'txSameValue'].map((name) => {
             const code = extractFn(name);
             if (!code) throw new Error('late commit: missing actual function ' + name);
@@ -350,12 +355,12 @@ function buildWorld(seed, opts) {
         optionalSrc
     ].join('\n\n');
     const protocol = moduleRuntime(ROOT, src, [{ path: 'src/core/session-verification.ts', expose: ['sessionVerificationRequired'] }, { path: 'src/core/clock.ts', expose: ['captureClockOperation', 'serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'getServerClockBounds'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/barcode.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations', 'clearRestoreFinalization'] }]);
-    context.__storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://fixture-late-commit-test.invalid' }) });
     context.auth = { currentUser: { uid: 'fixture-user' } };
     context.dataState = { pickupPendingVersion: 0 };
     context.pickupPendingVersion = 0;
     context.navigator = { onLine: true };
-    vm.runInContext(protocol.code + '\n' + protocol.withoutBindings(code), context);
+    vm.runInContext(authRuntime.code + '\n' + authRuntime.withoutBindings(protocol.code + '\n' + protocol.withoutBindings(code)), context);
+    authRuntime.seed(context, declaredConfig);
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
     vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', context);
 

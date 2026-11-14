@@ -18,6 +18,7 @@ import { connectionFlowSnapshot } from '../../../../ZoeW/src/services/connection
 import { renderConnectionStatus, setupConnectionRecovery } from '../../../../ZoeW/src/services/connection';
 import { initDatabaseListeners } from '../../../../ZoeW/src/services/db-listeners';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../../../../ZoeW/src/core/text';
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 
 const HISTORY = 'zoew_scan_history_cod_dod';
 const SHOP_A = { apiKey: 'k', databaseURL: 'https://shop-a.firebaseio.com' };
@@ -76,6 +77,8 @@ function attach(f: ReturnType<typeof fakeFirebase>, config: any) {
 
 beforeEach(() => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] });
+    SHOP_A.databaseURL = configureFixtureBackend('listener-shop-a').databaseURL;
+    SHOP_B.databaseURL = configureFixtureBackend('listener-shop-b').databaseURL;
     (window as any).ZoeLicense = { getStatus: async () => ({ state: 'active' }) };
     (window as any).ZoeErrors = { capture: vi.fn() };
     viewState.backendKind = 'firebase'; firebaseState.isDatabaseInitialized = false; firebaseState.authGeneration++;
@@ -118,7 +121,8 @@ describe('data listeners follow the session they belong to', () => {
         expect(ids(), 'precondition').toEqual(['h1']);
         await logoutApp(); await flush();
         expect(f.raw.getAuth(f.app).currentUser, 'precondition ៖ the SDK kept the user').toEqual({ uid: 'A' });
-        expect(firebaseState.isDatabaseInitialized, 'precondition ៖ the refused sign-out kept the dead rows').toBe(true);
+        expect(firebaseState.isDatabaseInitialized, 'local logout ដក listener ទោះ SDK មិនបញ្ជាក់ sign-out').toBe(false);
+        expect(ids(), 'local logout មិនទុកទិន្នន័យគណនីចាស់').toEqual([]);
         uiState.toasts = [];
         await performLogin('a@zoew1.com', 'pw', false, false); await flush();
         expect(uiState.toasts.filter((t: any) => t.live === 'signin').length, 're-attached session ➜ its live sign-in toast').toBe(1);
@@ -152,6 +156,7 @@ describe('data listeners follow the session they belong to', () => {
         (window as any).firebaseSDK = f.raw; (window as any).loadFirebaseSDK = () => {};
         attach(f, SHOP_A);
         firebaseState.auth.currentUser = { uid: 'A' };
+        acceptFixtureSession();
         initDatabaseListeners();
         const stop = setupConnectionRecovery();
         try {
@@ -159,7 +164,7 @@ describe('data listeners follow the session they belong to', () => {
             window.dispatchEvent(new StorageEvent('storage', { key: 'zoew_firebase_config', newValue: JSON.stringify(SHOP_B) }));
             await flush(); await vi.advanceTimersByTimeAsync(100); await flush();
             const live = firebaseState.db && firebaseState.db.app && firebaseState.db.app.options;
-            expect({ scope: loginBackendScope(), live: live && live.databaseURL }).toEqual({ scope: 'fb:https://shop-b.firebaseio.com', live: SHOP_B.databaseURL });
+            expect({ scope: loginBackendScope(), live: live && live.databaseURL }).toEqual({ scope: 'fb:' + SHOP_B.databaseURL, live: SHOP_B.databaseURL });
         } finally { stop(); }
     });
 
@@ -179,6 +184,7 @@ describe('data listeners follow the session they belong to', () => {
         const f = fakeFirebase();
         attach(f, SHOP_A);
         firebaseState.auth.currentUser = { uid: 'A' };
+        acceptFixtureSession();
         firebaseState.isDatabaseInitialized = true;
         renderConnectionStatus();
         expect(viewState.connectionStatus, 'control ៖ ready ➜ online').toBe('online');

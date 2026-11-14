@@ -10,6 +10,8 @@ import { securityState } from '../../../../ZoeW/src/core/state';
 import { SideDrawer } from '../../../../ZoeW/src/app/components/SideDrawer';
 import '../../../../ZoeW/src/app/flush';
 import { mount, step, unmount } from './native/react-harness';
+import { appLocalStore } from '../../../../ZoeW/src/core/storage';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 const host = 'https://shop.firebaseio.com';
 const turn = async () => { for (let i = 0; i < 60; i++) await Promise.resolve(); };
@@ -24,6 +26,8 @@ function lab(update: any) {
   const sdk = withTransactionOutcomeResolution(raw); sdk.getAuth(app); sdk.getDatabase(app);
   Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db, isDatabaseInitialized: true, isInitializingFirebase: false,
     firebaseSdkUnavailable: false, isDatabaseConnected: true, sessionExpiryCheck: 'live', authLoginOperation: null });
+  appLocalStore.setItem('zoew_firebase_config', JSON.stringify(app.options));
+  acceptFixtureSession();
   return { sdk, db, app };
 }
 const verdictOf = (p: Promise<any>) => p.then(() => 'sent', (e: any) => e.code || e.message);

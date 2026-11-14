@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { pickupBarcodeKey, pickupTruthMarks, readPickupTruthViews } from '../../../../ZoeW/src/domain/pickup';
 import { firebaseState } from '../../../../ZoeW/src/core/state';
 import { TX_OUTCOME_READ_TIMEOUT_MS } from '../../../../ZoeW/src/services/tx-outcome';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 const DAY = '2026-10-20';
 const bc = (code: string, closed: boolean) => ({ code, isClosed: closed, closedAt: closed ? 1760000000000 : undefined, cod: 1, dod: 0, isDeducted: false });
@@ -30,8 +31,11 @@ describe('A444 ៖ ការអានការពិត «យករួច» ទ�
     it('ឫសមកយឺតជាង TX_OUTCOME_READ_TIMEOUT_MS ➜ នៅតែអានបាន (មិនបរាជ័យនៅ ៨ វិនាទី)', async () => {
         const host = 'https://pickup-root-budget.firebaseio.com';
         const user = { uid: 'u1', getIdToken: async () => 'token' };
+        localStorage.clear();
+        localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: host }));
         Object.assign(firebaseState, { firebaseConfig: { databaseURL: host }, db: { app: { options: { databaseURL: host } } },
             fb: { ref: (_db: unknown, path: string) => ({ toString: () => host + '/' + path }) }, auth: { currentUser: user } });
+        acceptFixtureSession();
         vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
         const slowMs = TX_OUTCOME_READ_TIMEOUT_MS + 1500;
         vi.stubGlobal('fetch', async (url: string) => {

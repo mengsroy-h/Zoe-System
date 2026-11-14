@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 /**
  * ↩️ ម្ចាស់គម្រោង ៖ «អីវ៉ាន់ដែល ត្រលប់ អោយដកចេញពី ZoeW អោយដូច ផុតកំណត់ដែរទៅ … មិនបាច់មានច្បាប់ដក ថ្ងៃទី8 ក៏បាន … ដកលុយដូចគ្នា» ·
  * «ដកវាចេញភ្លាមទៅធុងសំរាម ស្លាក "ត្រឡប់" … ដកលុយដកចំនួនកញ្ចប់ … ដូចកញ្ចប់ផុតកំណត់បេះបិទ» · «ដកមុខងារ ផុតកំណត់ចេញ ព្រោះវាជា ត្រឡប់»។
@@ -149,6 +150,7 @@ function seed(items: any[]) {
     firebaseState.auth = { currentUser: { uid: 'u1', getIdToken: async () => 'tok' }, app: { options } } as any;
     firebaseState.isInitializingFirebase = false;
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
+    acceptFixtureSession();
     firebaseState.isDatabaseInitialized = true;
     firebaseState.isDatabaseConnected = true;
     firebaseState.serverClockTrusted = true;

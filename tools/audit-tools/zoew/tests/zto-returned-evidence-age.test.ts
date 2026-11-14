@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, ztoState } from '../../../../ZoeW/src/core/state';
 import { appLocalStore } from '../../../../ZoeW/src/core/storage';
@@ -50,6 +51,8 @@ beforeEach(() => {
     } as any;
     firebaseState.auth = { currentUser: { uid: 'u' }, app: { options: { databaseURL: 'https://guard.firebaseio.com' } } } as any;
     (firebaseState as any).firebaseConfig = { databaseURL: 'https://guard.firebaseio.com' };
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(firebaseState.firebaseConfig));
+    acceptFixtureSession();
     ztoState.ztoTrashMode = { state: 'ok', palmAt: 0, cookieAt: NOW, shop: '' } as any;
 });
 

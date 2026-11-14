@@ -17,6 +17,7 @@ import { pendingScanScope } from '../../../../ZoeW/src/services/scan-pending';
 import { finishScanImportCollected, resumePendingScanOperations } from '../../../../ZoeW/src/services/scan-operation';
 import { withTransactionOutcomeResolution } from '../../../../ZoeW/src/services/tx-outcome';
 import { resolveScanEvidence } from '../../../../ZoeW/src/features/pending-writes';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 const H = 'zoew_scan_history_cod_dod', D = 'zoew_daily_revenue_cod_dod', M = 'zoew_monthly_revenue_cod_dod';
 const P = 'zoew_daily_pickup_cod_dod', C = 'zoew_daily_collected_cod_dod';
@@ -152,6 +153,7 @@ it.each(['transient-exit', 'control-resume', 'interval-retention'])('⛔ ផ្�
     const sdk = withTransactionOutcomeResolution(raw); sdk.getAuth(app); sdk.getDatabase(app);
     Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db, isDatabaseInitialized: true,
         isInitializingFirebase: false, firebaseSdkUnavailable: false, isDatabaseConnected: true, serverClockTrusted: true, hasEverConnectedToDatabase: true, serverTimeOffsetMs: 0, sessionExpiryCheck: 'live', authLoginOperation: null });
+    acceptFixtureSession();
     firebaseState.authGeneration++;
     for (const [field, path] of Object.entries({ dbRefHistory: H, dbRefDailyRevenue: D, dbRefMonthlyRevenue: M, dbRefDailyPickup: P, dbRefDailyCollected: C })) (firebaseState as any)[field] = sdk.ref(db, path);
     dataState.scanHistory = []; dataState.deletedItems = []; dataState.dailyRevenueData = {}; dataState.monthlyRevenueData = {};

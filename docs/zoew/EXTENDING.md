@@ -145,7 +145,7 @@ oncePerPage('my-setup', setupSomething);         // ម្តងក្នុង�
 
 | ប្រភេទ | កន្លែង | ពាក្យបញ្ជា |
 |---|---|---|
-| unit (helper សុទ្ធ · component) | `tests/**/*.test.ts(x)` | `npm test` |
+| unit (helper សុទ្ធ · component) | `tools/audit-tools/zoew/tests/**/*.test.ts(x)` ពី root របស់ repo | `npm test` |
 | App ពិតក្នុង Chromium ជាមួយ bridge Android ក្លែង | `tools/audit-tools/zoew/scripts/native-check.mjs` | `npm run native:check` |
 | ស្នាមភ្ជាប់ Android (កំណែ · appId · សិទ្ធិ · logo · plugin) | `tools/audit-tools/zoew/scripts/android-check.mjs` | `npm run android:check` |
 | ច្បាប់លុប/ដក និងការសម្អាត លើ web និង Android | `tools/audit-tools/zoew/scripts/cleanup-rules-check.mjs` | `npm run rules:check` |

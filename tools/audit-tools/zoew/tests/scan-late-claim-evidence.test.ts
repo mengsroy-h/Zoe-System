@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { refTo, setFieldValue } from '../../../../ZoeW/src/app/refs';
 import { dataState, firebaseState, scanState, uiState, ztoState } from '../../../../ZoeW/src/core/state';
@@ -49,6 +50,7 @@ beforeEach(() => {
     firebaseState.isInitializingFirebase = false; firebaseState.isDatabaseConnected = true;
     firebaseState.dbLivenessProbe = Promise.resolve(null) as any;
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
+    firebaseState.firebaseConfig = options;
     transactions = vi.fn((ref: any) => {
         if (ref.path !== REGISTRY + '/' + CODE) { unexpectedWrites.push(ref.path); throw new Error('Unexpected transaction'); }
         return claim.promise;
@@ -62,6 +64,7 @@ beforeEach(() => {
     });
     firebaseState.fb = { ref: (db: any, path: string) => ({ db, path }), runTransaction: transactions, update: updates,
         set: (ref: any) => { unexpectedWrites.push(ref.path); throw new Error('Unexpected set'); } } as any;
+    acceptFixtureSession();
     scope = pendingScanScope();
     dataState.scanHistory = []; dataState.deletedItems = []; dataState.dailyRevenueData = {}; dataState.monthlyRevenueData = {};
     dataState.dailyCollectedData = {}; dataState.dailyPickupData = {};

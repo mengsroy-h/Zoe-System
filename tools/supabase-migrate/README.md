@@ -47,6 +47,8 @@ record ដែលទុកចោល (ឬ root ទាំងមូលដែលខ�
 input ដែល **គ្មាន record ណាឆ្លងការពិនិត្យ** (Firebase ទទេ export ជា `null` · array · root មិនស្គាល់ទាំងអស់ · record ខូចទាំងអស់) ➜ **បដិសេធ** ទោះមាន `--skip-invalid`
 (`--skip-invalid` ទុកចោលតែ record ខូច មិនមែន input ទាំងមូល ➜ គ្មានអ្វីត្រូវនាំចូល ហើយ `--replace` នឹងគ្រាន់តែលុប) — ពិនិត្យថាជាឯកសារត្រឹមត្រូវ។
 
+ករណីដាច់ដោយឡែក៖ archive Supabase v2 មាន `manifest.audit_only: true`, document ទទេ និង audit ដែលត្រឹមត្រូវមិនទទេ អាចនាំចូលតែប្រវត្តិបាន។ វារក្សា document របស់គោលដៅដដែល ទោះមាន `--replace`។
+
 ### ការសរសេរ និងការផ្ទៀងផ្ទាត់
 
 - **dry-run ជាលំនាំដើម** ៖ រាយចំនួន record និងទំហំតាម root · លទ្ធផលពិនិត្យ · ផែនការ (សរសេរ · លុប · ដដែល) ➜ **គ្មានការសរសេរ**។
@@ -109,7 +111,17 @@ node tools/supabase-migrate/migrate.js firebase-export.json --branch <លេខ�
 
 ### ស្តារហាង Supabase ពី backup
 
-⛔ Archive ហាង Supabase គ្របតែ record ក្នុង `zoe_docs`; វាមិនរក្សា `zoe_ops` ឬស្តារ operation receipt ទាំងនោះទេ។ `VERIFIED` មានន័យថា record ក្នុងវិសាលភាពនាំចូលស្មើ input មិនមែន Database និងភស្តុតាង recovery ទាំងមូលស្មើ backup ទេ។ រក្សា journal **pending/unknown** និងផ្ទៀង authoritative outcome ដាច់ដោយឡែក; កុំចាត់ receipt ដែលបាត់ជា NOT_APPLIED ឬ replay លុយស្វ័យប្រវត្តិ។ ផែនការ rollout/Reset និងព្រំដែន recovery នៅ [Supabase README](../../supabase/README.md)។
+Archive v2 រក្សា `zoe_docs` និងប្រវត្តិ `zoe_business_audit`។ CLI ពិនិត្យ audit schema, count, digest និង source scope មុនសរសេរ; `--skip-invalid` មិនអាចរំលង audit ខូច/មិនគាំទ្របានទេ។ Archive v1 ដែលគ្មាន audit នៅអានបាន ហើយមិនប្រឌិតប្រវត្តិចាស់; ការសរសេរនាំចូលថ្មីអាចបង្កើត audit ថ្មីពិតក្នុង DB តាម trigger។
+
+ការផ្ទេរទៅ tenant ថ្មីប្ដូរតែម្ចាស់ផ្ទុក `tenant_id` របស់ historical event។ Event ID, actor, operation, ពេល UTC ដើមដល់ microsecond និង `origin_tenant_id` នៅដដែល; មិនយកអ្នករត់ CLI ឬពេលនាំចូលទៅជំនួសត្រាដើមទេ។ `(target tenant, event ID)` និង payload ដូចគ្នា អាច retry បាន; ID ដដែលតែខ្លឹមសារខុស ➜ បដិសេធ មិន overwrite ប្រវត្តិ។ Audit របស់គោលដៅដែលមិនមានក្នុង input នៅតែរក្សា ទោះ `--replace`។
+
+Audit នាំចូលជាបាច់តាម `zoe_admin_audit_restore` មុន document writes ហើយក្រោយសរសេរ CLI បង្ហាញ `AUDIT VERIFIED` បន្ថែមលើ document `VERIFIED`។ Archive ទាំងមូលមិនមែន transaction តែមួយទេ៖ failure កណ្ដាលទីអាចទុកបាច់ដែល commit រួច; exit មិនស្មើ 0 ហើយត្រូវរត់ input ដដែលឡើងវិញ ដើម្បី reconcile ដោយ event ID ដដែល។ Audit RPC ខ្វះ ឬខ្លឹមសារប្រវត្តិប៉ះទង្គិច មិនអនុញ្ញាតឱ្យចាត់ជា restore ជោគជ័យទេ។
+
+ពិដានសរុប audit ក្នុង CLI៖ **២០,០០០ event និង 32 MiB compact JSON ក្នុង tenant មួយ** សម្រាប់ archive/target export។ គណនាមុនសន្សំក្នុង memory និងមុន serialize/hash; merged historical audit ដែលលើសក៏បដិសេធមុននាំចូល។ មិនកាត់/លុប audit ដើម្បីឱ្យឆ្លងទេ។ អត្រាប្រតិបត្តិការខ្ពស់អាចដល់ពិដាននេះលឿន; មិនទាន់មានភស្តុតាងសមត្ថភាពទំហំធំពីការកំណត់ពិដាននេះទេ។ ប្រវត្តិធំជាងនេះត្រូវការ database backup ដោយម្ចាស់ប្រព័ន្ធ ឬការងារ export/restore តាមទំព័រដែលមានការគ្រប់គ្រងដាច់ដោយឡែក; CLI full archive នេះមិនមានការចែកផ្នែកស្វ័យប្រវត្តិទេ។ ការរក្សា audit និងសកម្មភាពអាជីវកម្មក្នុង DB មិនត្រូវបានកំណត់ដោយពិដាន backup នេះទេ។
+
+Firebase export ដែលមាន `zoew_business_audit_v1` ឬ `zoew_business_audit_failures_v1` ត្រូវបដិសេធ ទោះមាន `--skip-invalid` ព្រោះ provenance របស់ Firebase មិនទាន់មានការបម្លែងដែលគាំទ្រទៅ audit Supabase។ រក្សាឯកសារដើម; កុំលុប namespace ដើម្បីរំលងការពិនិត្យ។
+
+⛔ Archive មិនរក្សា `zoe_ops` ឬស្តារ operation receipt ទាំងនោះទេ។ `VERIFIED`/`AUDIT VERIFIED` គ្របតែ document និង historical audit ក្នុងវិសាលភាពនេះ មិនមែន DB និងភស្តុតាង recovery ទាំងមូល។ រក្សា journal **pending/unknown** និងផ្ទៀង authoritative outcome ដាច់ដោយឡែក; កុំចាត់ receipt ដែលបាត់ជា NOT_APPLIED ឬ replay លុយស្វ័យប្រវត្តិ។ ផែនការ rollout/Reset និងព្រំដែន recovery នៅ [Supabase README](../../supabase/README.md)។
 
 ```
 export ZOE_BACKUP_PASSPHRASE=…        (ឯកសារ .enc ពី GitHub Actions)
@@ -138,7 +150,8 @@ node tools/supabase-migrate/migrate.js backups/<target>/<tenant-id>/ --branch <�
 | `VERIFY FAILED` | ហាងមិនស្មើ input។ ពិនិត្យ record ខុស និង concurrent writes ហើយរត់ dry-run ម្តងទៀត។ Retry សំណើ HTTP ដដែលរក្សា op id ដើម្បីមិនសរសេរស្ទួន; រត់ CLI ថ្មីអានស្ថានភាពបច្ចុប្បន្ន និងប្រើ ID ថ្មីសម្រាប់បាច់ដែលនៅត្រូវសរសេរ។ ត្រូវឃើញ `VERIFIED` និង exit code `0` មុនចាត់ថាស្តាររួច |
 | `CHANGED BY OTHERS` | ឧបករណ៍មួយកំពុងបើក ZoeW ➜ បិទ រួចរត់ម្តងទៀត |
 | `HTTP 401` | Secret key ខុស ឬត្រូវលុប |
-| `HTTP 404 PGRST202` | Project មិនទាន់មាន migration `zoe_admin_export` |
+| `HTTP 404 PGRST202` | Project មិនទាន់មាន migration សម្រាប់ document/audit RPC ដែល CLI ត្រូវការ |
+| `aggregate … budget exceeded` | រក្សា backup/DB ដដែល; ប្រវត្តិលើសពិដាន full archive និងត្រូវការទម្រង់ចែកផ្នែក មិនត្រូវកាត់ប្រវត្តិចោល |
 | `timed out` | បណ្តាញយឺត ➜ រត់ម្តងទៀត ឬបង្កើន `--timeout-ms` |
 
 ## ប្រព័ន្ធសុវត្ថិភាព
@@ -153,6 +166,7 @@ node tools/supabase-migrate/migrate.js backups/<target>/<tenant-id>/ --branch <�
 - **rules មិនត្រូវរំលងដោយស្ងាត់** ៖ record ដែល ZoeW អានមិនបាន ត្រូវរាយ មិនមែននាំចូល។
 - **ឯកសារ `.enc`** ស្រាយក្នុង memory តែប៉ុណ្ណោះ ➜ plaintext មិនចុះ Disk។
 - អ្នកយាម ៖ `tools/audit-tools/supabase-data-tools-test.js` (Postgres ពិត · CLI ពិត · ចម្លើយបាត់ · ព្យួរ · សោខុស · mutation)។
+- Audit archive ៖ `tools/audit-tools/supabase-audit-archive-test.js` (PostgreSQL 17 ពិត · v2/legacy · audit-only · ទិន្នន័យប៉ះទង្គិច · ពិដានសរុប · mutation)។ លំនាំដើមត្រូវរត់គ្រប់ phase; `--unit` ជា `PARTIAL PASS` សម្រាប់ diagnostic ហើយ strict mode បដិសេធ។
 
 ## អាជ្ញាប័ណ្ណ
 

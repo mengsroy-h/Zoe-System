@@ -8,6 +8,7 @@
  *    (ពិដាន) — មិនមែនចំនួន fake ms ថេរ (CI ដែលរវល់ ➜ digest យឺត ➜ `[]`)។
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { firebaseState } from '../../../../ZoeW/src/core/state';
 import { appLocalStore } from '../../../../ZoeW/src/core/storage';
 import { SHOP_DEVICE_RETRY_MS, noteShopDevice } from '../../../../ZoeW/src/features/shop-device';
@@ -98,8 +99,10 @@ async function bootShop(tenant: string, uid = 'u1') {
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ supabaseUrl: SB_URL, supabaseKey: 'sb_publishable_test' }));
     const sdk: any = await loadSupabaseFb();
     const app = sdk.initializeApp({ supabaseUrl: SB_URL, supabaseKey: 'sb_publishable_test' });
+    firebaseState.firebaseConfig = app.options;
     firebaseState.fb = sdk;
     firebaseState.auth = sdk.getAuth(app);
+    sdk.onAuthStateChanged(firebaseState.auth, (user: any) => { if (user) { acceptFixtureSession(); sdk.resumeAcceptedSession(firebaseState.auth); } });
     apps.push({ sdk, app });
     return { sdk, app, net };
 }

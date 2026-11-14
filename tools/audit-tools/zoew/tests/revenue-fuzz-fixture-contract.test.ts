@@ -5,6 +5,7 @@ import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { dataState, firebaseState } from '../../../../ZoeW/src/core/state';
 import { preparePendingScan } from '../../../../ZoeW/src/services/scan-pending';
 import { claimScanOperation, saveScanOperation } from '../../../../ZoeW/src/services/scan-operation';
+import { acceptFixtureSession } from './helpers/accepted-session';
 const H='zoew_scan_history_cod_dod', D='zoew_daily_revenue_cod_dod', M='zoew_monthly_revenue_cod_dod';
 const NOW=Date.UTC(2026,9,30,9), HOST='https://fake-default-rtdb.firebaseio.com';
 function fixture() {
@@ -21,7 +22,7 @@ beforeEach(()=>{localStorage.clear();localStorage.setItem('zoew_firebase_config'
 });
 afterEach(()=>{firebaseState.authGeneration++;vi.restoreAllMocks();vi.unstubAllGlobals();vi.useRealTimers();});
 it.each(['applied','lost'])('real coordinator atomic packet %s: truthful receipt, unchanged provisional money, independent oracle',async(mode)=>{
- const f=fixture(),sdk=f.firebaseSDK;vi.stubGlobal('fetch',f.fetch);Object.assign(firebaseState,{fb:sdk,db:sdk.getDatabase(),auth:sdk.getAuth()});
+ const f=fixture(),sdk=f.firebaseSDK;vi.stubGlobal('fetch',f.fetch);Object.assign(firebaseState,{fb:sdk,db:sdk.getDatabase(),auth:sdk.getAuth()});acceptFixtureSession();
  const h=preparePendingScan('FUZZCONTRACT',5,2,NOW,'direct',2);
  expect(await claimScanOperation(h,'FUZZCONTRACT')).toBe('claimed');
  f.__ledgerBlip=mode;
@@ -69,7 +70,7 @@ it('rules refusal precedes atomic patch application, leaving all paths unchanged
 });
 
 it('independent pending oracle accepts canonical trimmed special-character barcode and rejects old lossy key',async()=>{
- const f=fixture(),sdk=f.firebaseSDK;vi.stubGlobal('fetch',f.fetch);Object.assign(firebaseState,{fb:sdk,db:sdk.getDatabase(),auth:sdk.getAuth()});
+ const f=fixture(),sdk=f.firebaseSDK;vi.stubGlobal('fetch',f.fetch);Object.assign(firebaseState,{fb:sdk,db:sdk.getDatabase(),auth:sdk.getAuth()});acceptFixtureSession();
  const code='  fx.a/b#c$[d]%  ';
  const h=preparePendingScan(code,5,0,NOW,'direct',2);
  expect(await claimScanOperation(h,code)).toBe('claimed');

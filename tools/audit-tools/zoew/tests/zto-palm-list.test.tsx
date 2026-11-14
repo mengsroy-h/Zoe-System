@@ -1,3 +1,4 @@
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 /**
  * Palm ៖ URL/session ត្រូវសាខា · បញ្ជីមកដល់ផ្ទៀង track · ទំព័រពេញ · បិទតាម ZTO និងរបាររំលឹក។
  */
@@ -59,6 +60,8 @@ beforeEach(async () => {
     uiState.toasts = [];
     firebaseState.authGeneration++;
     firebaseState.auth = { currentUser: { uid: 'audit-user' } } as any;
+    configureFixtureBackend('zto-palm-list');
+    acceptFixtureSession();
     firebaseState.db = { audit: true } as any;
     firebaseState.fb = { getIdTokenResult: async () => ({ token: 'audit-token' }), ref: (_db: unknown, path: string) => ({ path }),
         runTransaction: async () => ({ committed: true, txOutcome: 'committed' }) } as any;

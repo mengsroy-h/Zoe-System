@@ -21,12 +21,15 @@ import { SideDrawer } from '../../../../ZoeW/src/app/components/SideDrawer';
 import { ActivationModal } from '../../../../ZoeW/src/app/components/modals/ActivationModal';
 import { LogoutConfirmModal } from '../../../../ZoeW/src/app/components/modals/LogoutConfirmModal';
 import { byId, mount, step, unmount } from './native/react-harness';
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 const fields = ['securityPinInput', 'newSecurityPinInput'] as const;
 beforeEach(() => {
     vi.clearAllMocks(); localStorage.clear(); sessionStorage.clear();
+    configureFixtureBackend('enrollment-fixture');
     localStorage.setItem('zoew_security_pin_hash', 'test-pin-hash');
-    Object.assign(firebaseState, { auth: { currentUser: { uid: 'owner' } }, db: {}, isDatabaseInitialized: true, authButtonIsLoggedIn: true, serverClockTrusted: true, serverTimeOffsetMs: 0, sessionExpiryCheck: 'live' });
+    Object.assign(firebaseState, { auth: { currentUser: { uid: 'owner' } }, fb: {}, db: {}, isDatabaseInitialized: true, authButtonIsLoggedIn: true, serverClockTrusted: true, serverTimeOffsetMs: 0, sessionExpiryCheck: 'live' });
     firebaseState.authGeneration++;
+    acceptFixtureSession();
     Object.assign(securityState, { isVerifyingPin: false, pinTargetAction: null, lookupSecretKey: null, appIsLocked: false });
     Object.assign(viewState, { backendKind: 'firebase', seatEnrollmentOnly: false, seatEnrollmentBusy: false, activationBusy: false });
     uiState.modalDisplay = {}; uiState.modalStack = [];
@@ -54,7 +57,7 @@ it('សុំ PIN មុនបើក ហើយ PIN ខុសមិនបើក�
     step(closeSeatEnrollment); expect(modalIsOpen('activationModal')).toBe(false);
 });
 it.each([false, true])('បោះបង់ PIN មិនបើកប្រអប់ និងអាចសាកម្ដងទៀត៖ setup=%s', async setup => {
-    if (setup) localStorage.clear();
+    if (setup) localStorage.removeItem('zoew_security_pin_hash');
     step(openSeatEnrollment);
     expect(modalIsOpen(setup ? 'pinSetupModal' : 'pinModal')).toBe(true);
     step(setup ? cancelPinSetupFlow : cancelPinEntryFlow);

@@ -15,7 +15,7 @@
 // ⛔ ជុំទី ១ នៃលំដាប់នីមួយៗជាការប្រជែង «ZTO ត្រឡប់» ជានិច្ច (ឧបករណ៍ទាំងអស់ហៅទ្វារលុយដដែល `claimAndCleanupItem(… 'abandon', { codes, returnedAt })`
 //    លើ barcode ដដែលព្រមគ្នា ដូចពេលឧបករណ៍ ៣ ក្នុងសាខាឃើញបញ្ជីត្រឡប់ដដែល) ➜ ការដកលុយត្រូវកើតម្តងតែប៉ុណ្ណោះ។
 // អថេរ · PAGE_OPS រួមជាមួយ `supabase-money-multishop-test` ➜ `../money-multidevice-core.js`។
-// Sheet/Cookie/Palm ៖ Lookup និងស្កេនពិត រួច Remove→Restore→Delete→Restore លើ barcode ដដែល; Palm/Sign ស្តារត្រូវបដិសេធតាមទ្វារពិត។
+// Sheet/Cookie/Palm ៖ Lookup និងស្កេនពិត រួច Remove→Restore→Delete→Restore លើ barcode ដដែល; Sign និង Palm pickup ស្តារត្រូវបដិសេធតាមទ្វារពិត; unsigned Palm ត្រូវផ្ទៀងស្ថានភាពថ្មី។
 // SKIP ≠ PASS ៖ គ្មាន emulator ➜ SKIPPED (STRICT ➜ FAIL)។ env ៖ MONEYMD_RUNS · MONEYMD_OPS · MONEYMD_RUN0 · MONEYMD_DEVICES · MONEYMD_DEBUG=1
 
 process.exitCode = 1;

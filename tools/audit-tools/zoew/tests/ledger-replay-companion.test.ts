@@ -12,6 +12,7 @@ import { TX_OUTCOME_READ_TIMEOUT_MS, withTransactionOutcomeResolution } from '..
 import { nativeWriteRecoveryState } from '../../../../ZoeW/src/services/native-write-recovery';
 import { addRevenueToDailyAndMonthlyRecord, ledgerCompanionCopyState, ledgerCompanionState, ledgerDeltaCompanion } from '../../../../ZoeW/src/domain/ledger';
 import { dbListenerPendingPaths } from '../../../../ZoeW/src/core/text';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 const host = 'https://shop.firebaseio.com';
 const DAY = '2026-10-14';
@@ -46,6 +47,8 @@ function lab(transaction: any, update: any = vi.fn(async () => {})) {
     const sdk = withTransactionOutcomeResolution(raw); sdk.getAuth(app); sdk.getDatabase(app);
     Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db, isDatabaseInitialized: true,
         isInitializingFirebase: false, firebaseSdkUnavailable: false, isDatabaseConnected: true, serverClockTrusted: true, sessionExpiryCheck: 'live', authLoginOperation: null });
+    localStorage.setItem('zoew_firebase_config', JSON.stringify(app.options));
+    acceptFixtureSession();
     firebaseState.dbRefDailyRevenue = sdk.ref(db, 'zoew_daily_revenue_cod_dod');
     firebaseState.dbRefMonthlyRevenue = sdk.ref(db, MONTHLY);
     dataState.dailyRevenueData = { [DAY]: { codDollar: 40, dodDollar: 0, totalCount: 2 } };

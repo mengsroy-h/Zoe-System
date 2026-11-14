@@ -14,12 +14,12 @@ Firebase config (បូក Setup Link បើអ្នកចង់)។
 ## កំណែ
 
 ឧបករណ៍មូលដ្ឋាន **1.0.2** — **មិន deploy ទេ** ហើយវា **មិនប៉ះ `APP_VERSION` ឬ `CACHE_VERSION` របស់ PWA
-ណាមួយឡើយ**។ វាពឹងលើ **`firebase-tools`** (Firebase CLI ផ្លូវការរបស់ Google) ដែលចាក់សោកំណែ
+ណាមួយឡើយ**។ វាពឹងលើ **`firebase-tools` 15.36.0** (Firebase CLI ផ្លូវការរបស់ Google) ដែលចាក់សោកំណែ
 **ពិតប្រាកដ** ក្នុង [`package.json`](package.json) និង [`package-lock.json`](package-lock.json)
 របស់ថតនេះ។ ⛔ ការឡើងកំណែ `firebase-tools` ត្រូវរត់ checker `firebase-provision-test`
 ជាមុន ៖ ឧបករណ៍ប្រើ function ខាងក្នុងរបស់វា ហើយ checker វាស់ថា function ទាំងនោះនៅមាន។
 
-ការដំឡើងប្រើ `braces` local backport ដែលមកជាមួយ `vendor/braces` និងពឹងលើ `npm ci` ដូចគ្នា។ ត្រូវចម្លងថតឧបករណ៍ទាំងមូល។ Glob ធម្មតានៅដើរ; nesting លើស 100 ឬ AST ជ្រៅ/child cycle ត្រូវបដិសេធដោយ `BRACES_MAX_DEPTH`។ ការយាមវាស់ source និង module ដែល CLI ផ្ទុកពិត។
+CLI បច្ចុប្បន្នប្រើ `chokidar` ដែលទទួល paths ជាក់លាក់ និងមិនបកស្រាយ glob strings។ Checker ផ្ទៀងផ្ទាត់ module ដែល resolve ពី consumer របស់ CLI ពិត រួមបញ្ចូលឯកសារក្នុងថត a/b និងមិនយកថត c។ Dependency graph លែងមាន consumer របស់ `braces`; ការដំឡើងពឹងលើ `npm ci` ដោយមិនត្រូវការ local backport ទៀតទេ។
 
 ## មុខងារ
 
@@ -61,7 +61,7 @@ Firebase config (បូក Setup Link បើអ្នកចង់)។
 
 ### ជំហានទី ១ — ដំឡើង (ម្តងគត់)
 
-1. ដំឡើង **Node.js 22 LTS** (យ៉ាងតិច `22.22.2`) ឬ **24 LTS** (យ៉ាងតិច `24.15.0` · CI ប្រើ 24) ពី <https://nodejs.org/>។ ទោះ `setup.cmd` ពិនិត្យត្រឹម Node 20 ក៏ដោយ dependency ក្នុង lockfile ត្រូវការកំណែទាំងនេះ។
+1. ដំឡើង **Node.js 22 LTS** (យ៉ាងតិច `22.22.2`) ឬ **24 LTS** (យ៉ាងតិច `24.15.0` · CI ប្រើ 24) ពី <https://nodejs.org/>។ `setup.cmd` និង package engines ផ្ទៀងខ្សែកំណែទាំងពីរតាម dependency ក្នុង lockfile; Node 26 មិនទាន់ទទួលស្គាល់។
 2. បើក <https://console.firebase.google.com/> ដោយគណនី Google ដែលអ្នកប្រើបង្កើតអតិថិជន ហើយយល់ព្រម
    **Terms of Service** របស់ Firebase ម្តង (បើមិនទាន់)។
 3. ចុចពីរដងលើ **`setup.cmd`** ➜ browser បើក ➜ Login គណនី Google ដដែល ➜ ត្រឡប់មកវិញ ➜
@@ -160,8 +160,6 @@ node provision.js new --project-id <project-id-ចាស់> --branch 881859 --a
 ផ្នែកមួយនៃ Zoe-System សម្រាប់ប្រើក្នុងអាជីវកម្មរបស់ម្ចាស់ប៉ុណ្ណោះ។ ឧបករណ៍នេះមិនត្រូវការ Activation Key ទេ
 ព្រោះវាមិនមែនជា App របស់អតិថិជន — វាជាឧបករណ៍ថែទាំដែលរត់លើកុំព្យូទ័ររបស់ម្ចាស់។ `firebase-tools`
 (អាជ្ញាប័ណ្ណ MIT របស់ Google) ត្រូវបានដំឡើងដោយ npm លើកុំព្យូទ័ររបស់អ្នក ហើយ **មិនចូល repo** ទេ។
-
-`braces` local backport ក្នុង repo គោរព [MIT License របស់ upstream](vendor/braces/LICENSE) និងមាន [provenance/hash](vendor/braces/UPSTREAM.json)។
 
 ⛔ **អត្ថបទអាជ្ញាប័ណ្ណពេញលេញជាឯកសារគ្រប់គ្រង** — សេចក្តីសង្ខេបខាងលើមិនជំនួសវាទេ ៖
 

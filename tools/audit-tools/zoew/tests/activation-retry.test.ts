@@ -10,6 +10,7 @@ import { viewState } from '../../../../ZoeW/src/core/view-state';
 import {
     ACTIVATION_GIVE_UP_TOAST, ACTIVATION_RETRY_STEPS_MS, ACTIVATION_RETRY_TOAST, cancelActivationRetry, ensureAppActivated, licenseFailureMessage, proceedAfterLogin
 } from '../../../../ZoeW/src/features/license';
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 
 const texts = () => uiState.toasts.map((t: any) => t.msg);
 const user = { uid: 'u1' };
@@ -19,12 +20,15 @@ async function flush() {
 }
 
 beforeEach(() => {
+    configureFixtureBackend('activation-retry-fixture');
     firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live';
     vi.useFakeTimers();
     uiState.toasts = [];
     viewState.backendKind = 'firebase';
     firebaseState.auth = { currentUser: user } as any;
+    firebaseState.fb = {}; firebaseState.db = {};
     firebaseState.authGeneration = 7;
+    acceptFixtureSession();
     (window as any).ZoeErrors = { capture: vi.fn() };
 });
 

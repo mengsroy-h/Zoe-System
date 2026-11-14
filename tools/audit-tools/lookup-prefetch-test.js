@@ -87,6 +87,7 @@ DECLS.forEach((n) => {
 // ⛔ ZoeW ជា React ៖ ស្ថានភាព Lookup · ប្រអប់ · វាលបញ្ចូល ជាឃ្លាំង/ច្រកចេញ (`viewState` · `setModalDisplay()` ·
 //    `fieldValue()`) ➜ ស្រទាប់ React ពិតចូលរាល់ sandbox (stub របស់ sandbox នៅឈ្នះ)
 const { reactRuntime, renderedElement } = require('./react-view');
+const authRuntime = require('./local-auth-runtime.cjs').localAuthRuntime(ROOT, SRC);
 // ⛔ `<body>` ជាធាតុក្រៅ root ៖ `DocumentEffects.tsx` ចាក់សោរមូរពី `uiState.isModalOpen` (`useLayoutEffect` ➜ SSR មិនរត់)
 //    ➜ ដេរីវេច្បាប់ពី bundle ពិត (ច្បាប់បាត់ ➜ `null` ➜ ការអះអាងធ្លាក់)
 const BODY_LOCK_RULE = (() => {
@@ -99,7 +100,10 @@ function bodyOverflow(ctx) { return BODY_LOCK_RULE ? (ctx.isModalOpen ? 'hidden'
 
 function withReact(ctx) {
     if (typeof ctx.queueMicrotask !== 'function') ctx.queueMicrotask = queueMicrotask;
-    vm.runInContext(reactRuntime(SRC, { context: ctx }), ctx);
+    const declaredConfig = { databaseURL: 'https://lookup-prefetch-fixture.firebaseio.com' };
+    authRuntime.prepare(ctx, declaredConfig);
+    vm.runInContext(authRuntime.withoutBindings(reactRuntime(SRC, { context: ctx })), ctx);
+    authRuntime.install(ctx, declaredConfig);
 }
 
 function makeClock() {
@@ -410,6 +414,7 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
         const inputs = { securityPinInput: { value: '' }, modalPhoneInput: { value: '', focus: () => {} } };
         const storeData = { zoew_security_pin_hash: 'pbkdf2:x' };
         const ctx = {
+            auth: { currentUser: { uid: 'lookup-auto-fixture' } }, db: {}, fb: {},
             console: { error: () => {}, log: () => {} },
             Object: Object, Array: Array, Promise: Promise, JSON: JSON, String: String, Number: Number,
             Math: Math, Date: Date, Error: Error, Set: Set, Map: Map, parseFloat: parseFloat, isNaN: isNaN,

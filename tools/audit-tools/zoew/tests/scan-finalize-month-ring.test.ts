@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, scanState, uiState, ztoState } from '../../../../ZoeW/src/core/state';
@@ -130,6 +131,7 @@ function makeNative() {
     Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db, isDatabaseInitialized: true,
         isInitializingFirebase: false, firebaseSdkUnavailable: false, isDatabaseConnected: true,
         serverClockTrusted: true, sessionExpiryCheck: 'live', authLoginOperation: null, dbLivenessProbe: Promise.resolve(null) });
+    acceptFixtureSession();
     firebaseState.dbRefHistory = sdk.ref(db, H);
     firebaseState.dbRefDailyRevenue = sdk.ref(db, D);
     firebaseState.dbRefMonthlyRevenue = sdk.ref(db, M);

@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.49';
+const APP_VERSION = '2.24.50';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -251,6 +251,135 @@ let authUnsubscribe = null;
 let authRecoveryTimeout = null;
 let authGeneration = 0;
 let keygenLoginOwner = null;
+const LOCAL_LOGOUT_INTENT_PREFIX = 'zoekeygen_local_logout_v1:';
+
+function createLocalLogoutIntentStore(local, session) {
+    const stores = [local, session];
+    const memory = new Map();
+    const identity = (scope, uid) => typeof scope === 'string' && scope.length > 0 && typeof uid === 'string' && uid.length > 0;
+    const prefix = (scope) => LOCAL_LOGOUT_INTENT_PREFIX + JSON.stringify(scope) + ':';
+    const keyFor = (scope, uid) => prefix(scope) + JSON.stringify(uid);
+    const valid = (value) => typeof value === 'string' && value.length > 0 && value.length <= 128;
+    const read = (store, key) => {
+        try {
+            if (!store) return { available: false, value: null };
+            const value = store.getItem(key);
+            return { available: value === null || typeof value === 'string', value };
+        } catch (e) { return { available: false, value: null }; }
+    };
+    const write = (store, key, value) => {
+        try {
+            if (!store) return false;
+            store.setItem(key, value);
+            const check = read(store, key);
+            return check.available && check.value === value;
+        } catch (e) { return false; }
+    };
+    const blocked = (scope, uid) => {
+        if (!identity(scope, uid)) return true;
+        const key = keyFor(scope, uid);
+        if (memory.has(key)) return true;
+        return stores.some((store) => {
+            const intent = read(store, key), acknowledged = read(store, key + ':ack');
+            return !intent.available || !acknowledged.available
+                || intent.value !== null && (!valid(intent.value) || acknowledged.value !== intent.value);
+        });
+    };
+    const capture = (scope) => {
+        const captured = { scope, ready: typeof scope === 'string' && scope.length > 0, stores: [], memory: new Map(), unacknowledged: new Set() };
+        if (!captured.ready) return captured;
+        for (const [key, value] of memory) if (key.startsWith(prefix(scope))) { captured.memory.set(key, value); captured.unacknowledged.add(key); }
+        for (const store of stores) {
+            const rows = new Map();
+            captured.stores.push(rows);
+            try {
+                if (!store || !Number.isSafeInteger(store.length) || store.length < 0 || typeof store.key !== 'function') throw new Error('unavailable');
+                if (!read(store, prefix(scope)).available) throw new Error('unavailable');
+                for (let i = 0; i < store.length; i++) {
+                    const key = store.key(i);
+                    if (typeof key !== 'string' || !key.startsWith(prefix(scope)) || key.endsWith(':ack')) continue;
+                    const current = read(store, key);
+                    if (!current.available || current.value !== null && !valid(current.value)) throw new Error('unavailable');
+                    if (current.value !== null) {
+                        rows.set(key, current.value);
+                        const acknowledged = read(store, key + ':ack');
+                        if (!acknowledged.available || acknowledged.value !== current.value) captured.unacknowledged.add(key);
+                    }
+                }
+            } catch (e) { captured.ready = false; }
+        }
+        return captured;
+    };
+    return {
+        blocked,
+        capture,
+        fence(scope, uid) {
+            if (identity(scope, uid)) {
+                const key = keyFor(scope, uid);
+                const current = stores.map((store) => read(store, key)).find((value) => value.available && valid(value.value));
+                memory.set(key, current?.value || 'unpersisted');
+            }
+        },
+        witness(scope, uid, captured = undefined, initial = false) {
+            if (!identity(scope, uid) || typeof initial !== 'boolean') return () => false;
+            if (captured !== undefined && (!captured?.ready || captured.scope !== scope || !Array.isArray(captured.stores)
+                || captured.stores.length !== stores.length || captured.stores.some((rows) => typeof rows?.get !== 'function'))) return () => false;
+            const key = keyFor(scope, uid), own = captured === undefined ? memory.get(key) : undefined;
+            let before;
+            try { before = captured === undefined ? stores.map((store) => read(store, key))
+                : stores.map((_store, index) => ({ available: true, value: captured.stores[index].get(key) ?? null })); }
+            catch (e) { return () => false; }
+            let ended = blocked(scope, uid);
+            try { if (initial && (typeof captured?.unacknowledged?.has !== 'function' || captured.unacknowledged.has(key))) ended = true; }
+            catch (e) { return () => false; }
+            return () => {
+                if (ended) return false;
+                ended = memory.get(key) !== own || stores.some((store, index) => {
+                    const current = read(store, key);
+                    return !current.available || !before[index].available || current.value !== before[index].value;
+                }) || blocked(scope, uid);
+                return !ended;
+            };
+        },
+        affects(scope, uid, key) { return identity(scope, uid) && key === keyFor(scope, uid); },
+        note(scope, uid) {
+            if (!identity(scope, uid)) return false;
+            let token;
+            try { token = crypto.randomUUID(); }
+            catch (e) { token = Date.now().toString(36) + ':' + Math.random().toString(36).slice(2); }
+            const key = keyFor(scope, uid);
+            memory.set(key, token);
+            const durable = write(stores[0], key, token);
+            write(stores[1], key, token);
+            return durable;
+        },
+        acknowledge(scope, uid, captured) {
+            if (!identity(scope, uid) || !captured?.ready || captured.scope !== scope) return false;
+            const key = keyFor(scope, uid);
+            const memoryToken = memory.get(key);
+            if (memoryToken !== captured.memory.get(key)) return false;
+            const tokens = [];
+            for (let i = 0; i < stores.length; i++) {
+                const current = read(stores[i], key);
+                if (!current.available || current.value !== (captured.stores[i].get(key) ?? null)) return false;
+                tokens.push(current.value);
+            }
+            for (let i = 0; i < stores.length; i++) if (tokens[i] !== null && !write(stores[i], key + ':ack', tokens[i])) return false;
+            for (let i = 0; i < stores.length; i++) {
+                const current = read(stores[i], key);
+                if (!current.available || current.value !== tokens[i]) return false;
+            }
+            if (memory.get(key) === memoryToken) memory.delete(key);
+            return !blocked(scope, uid);
+        }
+    };
+}
+
+
+const localLogoutIntent = createLocalLogoutIntentStore(appLocalStore, appSessionStore);
+const acceptedLogoutIntents = new WeakMap();
+const initialAuthLogoutIntents = new WeakMap();
+let keygenLogoutOwner = null;
 let sensitiveSessionGeneration = 0;
 let pendingRoleRecheck = false;
 let isDatabaseConnected = false;
@@ -702,18 +831,21 @@ function invalidateSensitiveSession() {
 
 function captureSensitiveSession(requireAuthorizedUi) {
     const user = auth && auth.currentUser ? auth.currentUser : null;
-    if (requireAuthorizedUi && (!user || !isSignedInUiActive)) return null;
-    return { sensitiveSessionGeneration, authGeneration, user };
+    if (requireAuthorizedUi && (!user || !isSignedInUiActive || !keygenSessionIntentCurrent(user))) return null;
+    return { sensitiveSessionGeneration, authGeneration, user, auth, scope: keygenAuthScope(),
+        intentCurrent: requireAuthorizedUi && user ? localLogoutIntent.witness(keygenAuthScope(), user.uid) : null };
 }
 
 function isSensitiveSessionCurrent(token, requireAuthorizedUi) {
     if (!token || token.sensitiveSessionGeneration !== sensitiveSessionGeneration) return false;
     if (!requireAuthorizedUi) return true;
-    return !!(auth && auth.currentUser === token.user && authGeneration === token.authGeneration && isSignedInUiActive);
+    return !!(adminOperationIsCurrent(token) && auth.currentUser === token.user);
 }
 
 function adminOwnerIsCurrent(operation) {
-    return !!(operation && operation.user && isSignedInUiActive && auth && auth.currentUser && auth.currentUser.uid === operation.user.uid);
+    return !!(operation && operation.user && isSignedInUiActive && auth && operation.auth === auth
+        && operation.scope === keygenAuthScope() && auth.currentUser && auth.currentUser.uid === operation.user.uid
+        && keygenSessionIntentCurrent(auth.currentUser) && typeof operation.intentCurrent === 'function' && operation.intentCurrent());
 }
 
 function adminOperationIsCurrent(operation) {
@@ -983,6 +1115,7 @@ async function initFirebase() {
 
         const firebaseApp = fb.getApps().length ? fb.getApps()[0] : fb.initializeApp(firebaseConfig);
         auth = fb.getAuth(firebaseApp);
+        captureInitialAuthLogoutIntent(auth);
         await enforceSessionOnlyAuthPersistence();
         db = fb.getDatabase(firebaseApp);
         try { fb.goOnline(db); } catch (e) {}
@@ -1758,6 +1891,36 @@ function showLoginModalWithPrefill() {
     if (rememberCb) rememberCb.checked = !!savedEmail;
 }
 
+function keygenAuthScope(value = auth) {
+    const options = value && value.app && value.app.options;
+    const url = options && typeof options.databaseURL === 'string' ? options.databaseURL.trim().replace(/\/+$/, '').toLowerCase() : '';
+    if (url) return 'fb:' + url;
+    return options && typeof options.projectId === 'string' && options.projectId.trim() ? 'fbp:' + options.projectId.trim().toLowerCase() : '';
+}
+
+function captureInitialAuthLogoutIntent(value = auth) {
+    if (!value || typeof value !== 'object') return null;
+    const scope = keygenAuthScope(value);
+    const config = safeStoreGet(appLocalStore, 'zoew_firebase_config');
+    let initialIntent = initialAuthLogoutIntents.get(value);
+    if (!initialIntent) {
+        initialIntent = { scope, config, captured: localLogoutIntent.capture(scope) };
+        initialAuthLogoutIntents.set(value, initialIntent);
+    }
+    return initialIntent;
+}
+
+function keygenSessionIntentCurrent(user) {
+    const scope = keygenAuthScope();
+    if (!user || !user.uid || localLogoutIntent.blocked(scope, user.uid)) return false;
+    const accepted = acceptedLogoutIntents.get(auth);
+    if (accepted) return accepted.user === user && accepted.scope === scope
+        && accepted.config === safeStoreGet(appLocalStore, 'zoew_firebase_config') && accepted.current();
+    const initialIntent = initialAuthLogoutIntents.get(auth);
+    return !initialIntent || localLogoutIntent.witness(scope, user.uid,
+        initialIntent.scope === scope && initialIntent.config === safeStoreGet(appLocalStore, 'zoew_firebase_config') ? initialIntent.captured : null, true)();
+}
+
 function keygenLoginBackendIsReady() {
     if (isInitializingFirebase || firebaseSdkUnavailable) return false;
     try {
@@ -1784,9 +1947,16 @@ async function doLogin() {
     }
 
     const scope = safeStoreGet(appLocalStore, 'zoew_firebase_config');
+    const intentScope = keygenAuthScope();
+    const intentAtLogin = localLogoutIntent.capture(intentScope);
+    if (!intentAtLogin.ready) {
+        showToast('⚠️ មិនអាចផ្ទៀងផ្ទាត់វគ្គក្នុងឧបករណ៍នេះបានទេ — សូមអនុញ្ញាត Storage រួចចូលម្ដងទៀត។');
+        return;
+    }
     if (keygenLoginOwner && keygenLoginOwner.auth === auth && keygenLoginOwner.fb === fb
         && keygenLoginOwner.scope === scope && keygenLoginOwner.generation === authGeneration) return;
     const owner = { auth: auth, fb: fb, scope: scope, generation: authGeneration };
+    keygenLogoutOwner = null;
     keygenLoginOwner = owner;
     const isCurrent = () => keygenLoginOwner === owner && auth === owner.auth && fb === owner.fb
         && safeStoreGet(appLocalStore, 'zoew_firebase_config') === owner.scope && keygenLoginBackendIsReady();
@@ -1805,6 +1975,17 @@ async function doLogin() {
         if (!isCurrent() || authGeneration !== owner.generation) return;
         const cred = await withTimeout(owner.fb.signInWithEmailAndPassword(owner.auth, email, password), 15000, 'Login timed out');
         if (!isCurrent() || (authGeneration !== owner.generation && (!cred || owner.auth.currentUser !== cred.user))) return;
+        const acknowledged = !!(cred && cred.user && localLogoutIntent.acknowledge(intentScope, cred.user.uid, intentAtLogin));
+        const intentCurrent = acknowledged ? localLogoutIntent.witness(intentScope, cred.user.uid, intentAtLogin) : () => false;
+        if (!acknowledged || !intentCurrent()) {
+            if (cred && cred.user) localLogoutIntent.fence(intentScope, cred.user.uid);
+            authGeneration++;
+            showLoginModalWithPrefill();
+            showToast('⚠️ វគ្គក្នុងឧបករណ៍នេះបានប្រែប្រួល ឬ Storage មិនអាចបញ្ជាក់បាន — សូមចូលម្ដងទៀត។');
+            return;
+        }
+        acceptedLogoutIntents.set(owner.auth, { user: cred.user, scope: intentScope, config: owner.scope,
+            current: intentCurrent });
         if (rememberMe) appLocalStore.setItem('remembered_email', email);
         else appLocalStore.removeItem('remembered_email');
         if (authGeneration === owner.generation && cred && cred.user) {
@@ -1981,22 +2162,47 @@ function readUserRole(user) {
 function retryPendingRoleCheck() {
     if (!pendingRoleRecheck) return;
     if (!auth || !auth.currentUser) return;
+    if (localLogoutIntent.blocked(keygenAuthScope(), auth.currentUser.uid)) return;
     authGeneration++;
     verifyAdminRoleThenProceed(auth.currentUser, authGeneration);
 }
 
 async function verifyAdminRoleThenProceed(user, myAuthGeneration) {
+    const roleAuth = auth, roleFb = fb, roleScope = safeStoreGet(appLocalStore, 'zoew_firebase_config');
+    const intentScope = keygenAuthScope(roleAuth);
+    const accepted = acceptedLogoutIntents.get(roleAuth);
+    const initialIntent = initialAuthLogoutIntents.get(roleAuth);
+    const useAccepted = accepted && accepted.user === user && accepted.scope === intentScope && accepted.config === roleScope;
+    const useInitial = !useAccepted && !!initialIntent;
+    const initialCapture = useInitial && initialIntent.scope === intentScope && initialIntent.config === roleScope ? initialIntent.captured : null;
+    const intentCurrent = useAccepted ? accepted.current : localLogoutIntent.witness(intentScope, user && user.uid, useInitial ? initialCapture : undefined, !!useInitial);
+    const current = () => {
+        if (auth !== roleAuth || fb !== roleFb || !roleAuth || !user || roleAuth.currentUser !== user
+            || safeStoreGet(appLocalStore, 'zoew_firebase_config') !== roleScope || myAuthGeneration !== authGeneration) return false;
+        if (!intentCurrent()) {
+            if (useInitial) {
+                localLogoutIntent.fence(intentScope, user.uid);
+                authGeneration++;
+                pendingRoleRecheck = false;
+                updateAuthButton(false);
+                showLoginModalWithPrefill();
+            }
+            return false;
+        }
+        return keygenSessionIntentCurrent(user);
+    };
+    if (!current()) return;
     pendingRoleRecheck = false;
     try {
         const role = await readUserRole(user);
-        if (myAuthGeneration !== authGeneration) return;
+        if (!current()) return;
         if (role !== 'admin') {
-            await fb.signOut(auth).catch(() => {});
             showToast("⛔ គណនីនេះគ្មានសិទ្ធិចូល ZoeKeyGen ទេ! តម្រូវឲ្យជា Admin ប៉ុណ្ណោះ។");
+            await logoutApp(true);
             return;
         }
     } catch (e) {
-        if (myAuthGeneration !== authGeneration) return;
+        if (!current()) return;
         console.error("Role verification failed:", e);
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Role verification failed:", connected: isDatabaseConnected, restRoleRead: lastRoleRestOutcome });
         if (e && e.message === 'Role check timed out') {
@@ -2005,11 +2211,13 @@ async function verifyAdminRoleThenProceed(user, myAuthGeneration) {
             showToast("⚠️ ការតភ្ជាប់អ៊ីនធឺណិតយឺត! មិនទាន់ផ្ទៀងផ្ទាត់សិទ្ធិបានទេ — ប្រព័ន្ធនឹងព្យាយាមម្ដងទៀតដោយស្វ័យប្រវត្តិ។");
             return;
         }
-        await fb.signOut(auth).catch(() => {});
         showToast("⚠️ មិនអាចផ្ទៀងផ្ទាត់សិទ្ធិបានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងចូលម្តងទៀត។");
+        await logoutApp(true);
         return;
     }
 
+    acceptedLogoutIntents.set(roleAuth, { user, scope: intentScope, config: roleScope, current: intentCurrent });
+    if (initialAuthLogoutIntents.get(roleAuth) === initialIntent) initialAuthLogoutIntents.delete(roleAuth);
     closeModal('loginModal');
     document.getElementById('appContainer').classList.remove('hidden');
     updateAuthButton(true);
@@ -2059,6 +2267,8 @@ function setupAuthListener() {
     const listenerAuth = auth;
     const listenerFb = fb;
     const listenerScope = safeStoreGet(appLocalStore, 'zoew_firebase_config');
+    const intentScope = keygenAuthScope(listenerAuth);
+    captureInitialAuthLogoutIntent(listenerAuth);
     const recoveryGeneration = authGeneration;
     let active = true;
     let pending = true;
@@ -2066,6 +2276,19 @@ function setupAuthListener() {
     let waitingVisibility = false;
     const isCurrent = () => active && auth === listenerAuth && fb === listenerFb
         && safeStoreGet(appLocalStore, 'zoew_firebase_config') === listenerScope;
+    const onLogoutStorage = (event) => {
+        if (!isCurrent() || event.storageArea && event.storageArea !== appLocalStore) return;
+        const user = listenerAuth.currentUser;
+        if (!user || !localLogoutIntent.affects(intentScope, user.uid, event.key)) return;
+        const accepted = acceptedLogoutIntents.get(listenerAuth);
+        if (accepted && accepted.user === user && accepted.scope === intentScope && accepted.current()) return;
+        if (event.oldValue === event.newValue && !localLogoutIntent.blocked(intentScope, user.uid)) return;
+        localLogoutIntent.fence(intentScope, user.uid);
+        authGeneration++;
+        pendingRoleRecheck = false;
+        updateAuthButton(false);
+        showLoginModalWithPrefill();
+    };
     const clearVisibilityWait = () => {
         if (waitingVisibility) document.removeEventListener('visibilitychange', recoverStuckAuth);
         waitingVisibility = false;
@@ -2098,18 +2321,30 @@ function setupAuthListener() {
         clearVisibilityWait();
         clearTimeout(recoveryTimer);
         if (authRecoveryTimeout === recoveryTimer) authRecoveryTimeout = null;
+        if (user && keygenLoginOwner && keygenLoginOwner.auth === listenerAuth && keygenLoginOwner.fb === listenerFb
+            && keygenLoginOwner.scope === listenerScope) return;
         authGeneration++;
         const myAuthGeneration = authGeneration;
         if (user) {
+            if (localLogoutIntent.blocked(intentScope, user.uid)) {
+                localLogoutIntent.fence(intentScope, user.uid);
+                pendingRoleRecheck = false;
+                updateAuthButton(false);
+                showLoginModalWithPrefill();
+                return;
+            }
             verifyAdminRoleThenProceed(user, myAuthGeneration);
         } else {
+            initialAuthLogoutIntents.delete(listenerAuth);
             pendingRoleRecheck = false;
             updateAuthButton(false);
             showLoginModalWithPrefill();
         }
     });
+    window.addEventListener('storage', onLogoutStorage);
     authUnsubscribe = () => {
         active = false;
+        window.removeEventListener('storage', onLogoutStorage);
         pending = false;
         clearVisibilityWait();
         clearTimeout(recoveryTimer);
@@ -2118,16 +2353,30 @@ function setupAuthListener() {
     };
 }
 
-function logoutApp(auto) {
+async function logoutApp(auto) {
     if (!auto && hasUncopiedKeypair() && !confirm('អ្នកមិនទាន់ចម្លង Private Key នៃ Keypair ថ្មីទេ! ការចាកចេញនឹងលុបវាជារៀងរហូត។ ចាកចេញមែនទេ?')) return;
     authGeneration++;
+    const owner = { auth, fb, scope: safeStoreGet(appLocalStore, 'zoew_firebase_config'), user: auth && auth.currentUser };
+    keygenLogoutOwner = owner;
+    const durable = !owner.user || !owner.user.uid || localLogoutIntent.note(keygenAuthScope(owner.auth), owner.user.uid);
+    const current = () => keygenLogoutOwner === owner && auth === owner.auth && fb === owner.fb
+        && safeStoreGet(appLocalStore, 'zoew_firebase_config') === owner.scope
+        && (!owner.auth || !owner.auth.currentUser || owner.auth.currentUser === owner.user);
     pendingRoleRecheck = false;
     updateAuthButton(false);
     showLoginModalWithPrefill();
-    if (!fb || !auth) return;
-    fb.signOut(auth).catch(() => {
-        showToast('⚠️ មិនអាចចាកចេញពី Firebase បានភ្លាមៗទេ។ សូម Refresh ហើយចូលម្ដងទៀត។');
-    });
+    try {
+        if (!owner.fb || !owner.auth || typeof owner.fb.signOut !== 'function') throw new Error('Sign out unavailable');
+        await withTimeout(Promise.resolve().then(() => current() ? owner.fb.signOut(owner.auth) : undefined), 15000, 'Sign out timed out');
+        if (current() && owner.auth.currentUser) throw new Error('Sign out not confirmed');
+        if (current()) showToast('✅ បានចាកចេញពីប្រព័ន្ធ!');
+    } catch (e) {
+        if (current()) showToast(durable
+            ? '⚠️ វគ្គក្នុងឧបករណ៍ត្រូវបានបិទ ប៉ុន្តែមិនអាចបញ្ជាក់ការចាកចេញពី Firebase — សូមចូលម្ដងទៀត។'
+            : '⚠️ មិនអាចបញ្ជាក់ការចាកចេញ ឬរក្សាសោវគ្គក្នុង Storage បានទេ — កុំបិទ ឬ Refresh ទំព័រ ឬបើក tab ថ្មី រហូតដល់ការចាកចេញបានបញ្ជាក់។');
+    } finally {
+        if (keygenLogoutOwner === owner) keygenLogoutOwner = null;
+    }
 }
 
 function navAuthFlow() {
@@ -4364,7 +4613,7 @@ function sbInputValue(id) {
 async function sbAdminRequest(session, path, method, body) {
     const headers = { apikey: session.key, 'Content-Type': 'application/json', Accept: 'application/json' };
     if (session.token) headers.Authorization = 'Bearer ' + session.token;
-    const init = { method: method, headers: headers, cache: 'no-store', credentials: 'omit' };
+    const init = { method: method, headers: headers, cache: 'no-store', credentials: 'omit', redirect: 'error' };
     if (body !== undefined) init.body = JSON.stringify(body);
     const out = await fetchWithTimeout(session.url + path, init, SB_ADMIN_TIMEOUT_MS, 'Supabase request timed out', (res) => res.text());
     let parsed = null;

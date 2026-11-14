@@ -35,7 +35,7 @@ function set(p, v) {
 const snap = (p, v) => ({ key: p.split("/").at(-1), val: () => clone(v), exists: () => v != null });
 const root = fs.mkdtempSync(path.join(require("os").tmpdir(), "zoe-three-device-"));
 const build = require("esbuild");
-const bundle = build.buildSync({ stdin: { contents: `export {dataState,firebaseState,uiState} from './src/core/state'; export {getServerNow} from './src/core/clock'; export {readCleanupJournal,resumeCleanupJournalEntry,resumeInterruptedCleanups} from './src/domain/cleanup'; export {executeRestoreItem} from './src/features/restore'; export {removeSingleBarcode} from './src/features/barcode-ops'; export {deleteSingleItem} from './src/features/entry-ops'; export {addRevenueToDailyAndMonthlyRecord} from './src/domain/ledger';`, resolveDir: path.resolve(__dirname, "../../../../../ZoeW"), loader: "ts" }, bundle: true, write: false, format: "iife", globalName: "APP", platform: "browser", define: { __APP_VERSION__: '"test"', __CACHE_VERSION__: '"test"', __FCM_CONFIGURED__: "true", "import.meta.env.VITE_NATIVE_WEB_ORIGIN": '""' } }).outputFiles[0].text;
+const bundle = build.buildSync({ stdin: { contents: `export {dataState,firebaseState,uiState} from './src/core/state'; export {acceptLocalAuthSession} from './src/services/local-logout-intent'; export {getServerNow} from './src/core/clock'; export {readCleanupJournal,resumeCleanupJournalEntry,resumeInterruptedCleanups} from './src/domain/cleanup'; export {executeRestoreItem} from './src/features/restore'; export {removeSingleBarcode} from './src/features/barcode-ops'; export {deleteSingleItem} from './src/features/entry-ops'; export {addRevenueToDailyAndMonthlyRecord} from './src/domain/ledger';`, resolveDir: path.resolve(__dirname, "../../../../../ZoeW"), loader: "ts" }, bundle: true, write: false, format: "iife", globalName: "APP", platform: "browser", define: { __APP_VERSION__: '"test"', __CACHE_VERSION__: '"test"', __FCM_CONFIGURED__: "true", "import.meta.env.VITE_NATIVE_WEB_ORIGIN": '""' } }).outputFiles[0].text;
 const deviceLocks = new Map();
 async function device(name, reset = false) {
   const { Window } = await import(require("url").pathToFileURL(require.resolve("happy-dom")).href);
@@ -163,7 +163,8 @@ async function device(name, reset = false) {
   }, off() {
   } };
   const s = dev.app.firebaseState, db = { name: "shop", app: { options: { databaseURL: "https://shop.firebaseio.com" } } };
-  Object.assign(s, { db, fb, firebaseConfig: { databaseURL: "https://shop.firebaseio.com" }, auth: { currentUser: { uid: name, getIdToken: async () => "tok" } }, isDatabaseInitialized: true, isDatabaseConnected: true, serverClockTrusted: true, hasEverConnectedToDatabase: true });
+  Object.assign(s, { db, fb, firebaseConfig: { databaseURL: "https://shop.firebaseio.com" }, auth: { currentUser: { uid: name, getIdToken: async () => "tok" } }, isDatabaseInitialized: true, isDatabaseConnected: true, serverClockTrusted: true, hasEverConnectedToDatabase: true, sessionExpiryCheck: "live" });
+  assert.equal(dev.app.acceptLocalAuthSession(s.auth, "fb:https://shop.firebaseio.com", s.auth.currentUser), true, "ឧបករណ៍ស្តារវគ្គ SDK ពិតរបស់ខ្លួនមុនធ្វើការងារ");
   for (const [key, p] of Object.entries({ History: H, Deleted: T, DailyRevenue: D, MonthlyRevenue: M, DailyPickup: "zoew_daily_pickup_cod_dod", DailyCollected: "zoew_daily_collected_cod_dod" })) s["dbRef" + key] = ref(db, p);
   dev.sync = () => Object.assign(dev.app.dataState, { scanHistory: Object.values(get(H) || {}), deletedItems: Object.values(get(T) || {}), dailyRevenueData: get(D) || {}, monthlyRevenueData: get(M) || {}, dailyPickupData: {}, dailyCollectedData: {} });
   dev.sync();

@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { firebaseState } from '../../../../ZoeW/src/core/state';
 import { fetchWithTimeout } from '../../../../ZoeW/src/services/network';
+import { configureFixtureBackend, acceptFixtureSession } from './helpers/accepted-session';
 
 const turn = async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); };
-beforeEach(() => { vi.useFakeTimers(); Object.assign(firebaseState, { db: {}, fb: {}, auth: { currentUser: { uid: 'A' }, _account: { tenant_id: 'A' } } }); firebaseState.authGeneration++; });
+beforeEach(() => { vi.useFakeTimers(); Object.assign(firebaseState, { db: {}, fb: {}, auth: { currentUser: { uid: 'A' }, _account: { tenant_id: 'A' } } }); firebaseState.authGeneration++; configureFixtureBackend('request-owner'); acceptFixtureSession(); });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 it('logout aborts a hanging request immediately instead of waiting for its timeout', async () => {

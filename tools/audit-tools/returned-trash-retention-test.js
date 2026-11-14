@@ -1,10 +1,13 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { localAuthRuntime } = require('./local-auth-runtime.cjs');
+const { memoryStorage } = require('./react-view');
 
 const ROOT = process.env.RETURNEDTRASH_APP_DIR ? path.resolve(process.env.RETURNEDTRASH_APP_DIR) : path.join(__dirname, '../..');
 const APP = path.join(ROOT, 'ZoeW', 'app.js');
 const source = fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, '\n');
+const authRuntime = localAuthRuntime(ROOT, source);
 
 let pass = 0;
 let fail = 0;
@@ -106,7 +109,7 @@ function build(items, ledgerDays, ledgerMonths, exitState = 'failed') {
         deletedCleanupInFlight: false,
         db: { app: { options: { databaseURL: 'https://retention.invalid' } } }, fb,
         auth: { currentUser: { uid: 'retention-user' } }, crypto: require('crypto').webcrypto,
-        appLocalStore: { getItem: () => null }, ztoStatusLoaded: true, ztoPickupStatus: new Map(),
+        appLocalStore: memoryStorage(), ztoStatusLoaded: true, ztoPickupStatus: new Map(),
         authGeneration: 0,
         getServerNow: () => NOW,
         serverClockTrusted: true, serverTimeOffsetMs: 0, isDatabaseConnected: true, sessionExpiryCheck: 'live',
@@ -130,6 +133,7 @@ function build(items, ledgerDays, ledgerMonths, exitState = 'failed') {
             return 'deducted';
         }
     });
+    authRuntime.install(context, context.db.app.options);
     const runtime = require('./react-view').moduleRuntime(ROOT, source, [
         { path: 'src/core/clock.ts', expose: ['captureClockOperation', 'getServerClockBounds', 'cleanupClockIsTrustworthy', 'resetServerClock'] },
         'src/core/session-verification.ts',

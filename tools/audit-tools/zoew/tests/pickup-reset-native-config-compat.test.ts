@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { normalizeFirebaseConfig, decodeSetupPayload } from '../../../../ZoeW/src/features/config';
@@ -50,6 +51,7 @@ beforeEach(() => {
     dataState.dailyPickupData = { [DAY]: copy(BEFORE) }; dataState.pickupResetInFlight = false;
     dataState.dailyRevenueData = { [DAY]: { codDollar: 37, dodDollar: 5, totalCount: 11 } };
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify(app.options));
+    acceptFixtureSession();
     fetches = vi.fn(async (input: any) => {
         expect(new globalThis.URL(String(input)).origin).toBe(URL);
         return new Response(JSON.stringify(server), { status: 200 });
@@ -226,6 +228,9 @@ it('Supabase owned proxy រក្សា tenant ដើម និង operation re
         executePickupReset: execute, pickupResetStatus: status });
     sbSdk.getAuth(sbApp); sbSdk.getDatabase(sbApp); const sbRef = sbSdk.ref(sbDb, 'zoew_daily_pickup_cod_dod/' + DAY);
     firebaseState.auth = sbAuth as any; firebaseState.db = sbDb as any; firebaseState.fb = sbSdk;
+    firebaseState.firebaseConfig = sbApp.options;
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(sbApp.options));
+    acceptFixtureSession();
     expect(await sbSdk.executePickupReset(sbRef, req, () => true)).toEqual({ committed: true, pickupReset: proof });
     expect(await sbSdk.pickupResetStatus(sbRef, req, () => true)).toEqual({ outcome: 'applied', pickupReset: proof });
     expect(execute).toHaveBeenCalledTimes(1); expect(status).toHaveBeenCalledTimes(1); expect(nativeToken).not.toHaveBeenCalled();

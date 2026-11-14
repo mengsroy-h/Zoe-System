@@ -322,3 +322,68 @@ it.each(['source', 'measure'])('react-view ប្រើ Acorn របស់ root 
         expect(result.stdout).toContain('owned-parser:' + expected);
     } finally { fs.rmSync(isolated, { recursive: true, force: true }); }
 });
+
+function declaredLocalAuthFixture(target = fixtureRoot) {
+    const source = fs.readFileSync(path.join(target, 'ZoeW/app.js'), 'utf8');
+    const { localAuthRuntime } = require(root + '/tools/audit-tools/local-auth-runtime.cjs');
+    const { memoryStorage } = require(root + '/tools/audit-tools/react-view');
+    const config = { databaseURL: 'https://declared-local-auth-fixture.invalid' };
+    const context: any = vm.createContext({ auth: { currentUser: { uid: 'declared-user' } },
+        appLocalStore: memoryStorage(), appSessionStore: memoryStorage() });
+    context.window = context;
+    const runtime = localAuthRuntime(target, source);
+    return { context, config, runtime };
+}
+
+it('local auth VM runtime requires an explicit backend and preserves UID/config negatives', () => {
+    const { context, config, runtime } = declaredLocalAuthFixture();
+    expect(() => runtime.install(context, null)).toThrow(/declared backend Config/);
+    runtime.install(context, config);
+    const current = () => vm.runInContext('localAuthSessionCurrent(auth, loginBackendScope(), auth.currentUser)', context);
+    expect(current()).toBe(true);
+    context.auth.currentUser = { uid: 'foreign-user' };
+    expect(current()).toBe(false);
+    context.auth.currentUser = { uid: 'declared-user' };
+    context.appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://foreign.invalid' }));
+    expect(current()).toBe(false);
+});
+
+it('local auth VM runtime retains the original accepted witness after foreign logout and acknowledgement', () => {
+    const { context, config, runtime } = declaredLocalAuthFixture();
+    runtime.install(context, config);
+    const result = vm.runInContext(`(() => {
+        const other = createLocalLogoutIntentStore(appLocalStore, appSessionStore);
+        const scope = loginBackendScope(), uid = auth.currentUser.uid;
+        if (!other.note(scope, uid)) throw new Error('fixture failed to persist logout');
+        const captured = other.capture(scope);
+        return { acknowledged: other.acknowledge(scope, uid, captured),
+            blocked: localLogoutIntent.blocked(scope, uid),
+            accepted: localAuthSessionCurrent(auth, scope, auth.currentUser) };
+    })()`, context);
+    expect(result.acknowledged).toBe(true);
+    expect(result.blocked).toBe(false);
+    expect(result.accepted).toBe(false);
+});
+
+it('local auth VM runtime rejects a target aggregate that differs from its module view', () => {
+    const { localAuthRuntime } = require(root + '/tools/audit-tools/local-auth-runtime.cjs');
+    const source = fs.readFileSync(path.join(fixtureRoot, 'ZoeW/app.js'), 'utf8');
+    const changed = source.replace('function localAuthSessionCurrent(auth, scope, user)', 'function localAuthSessionCurrent(auth, scope, changedUser)');
+    expect(changed).not.toBe(source);
+    expect(() => localAuthRuntime(fixtureRoot, changed)).toThrow(/mismatched actual module/);
+});
+
+it('local auth VM runtime executes a consistently mutated target instead of a different source tree', () => {
+    const target = fs.mkdtempSync(path.join(temporaryRoot, 'mutated-local-auth-'));
+    fs.mkdirSync(path.join(target, 'ZoeW'));
+    const views = JSON.parse(fs.readFileSync(path.join(fixtureRoot, 'ZoeW/audit-module-views.json'), 'utf8'));
+    const name = 'src/services/local-logout-intent.ts', original = views[name];
+    views[name] = original.replace('return !!accepted && accepted.scope === scope', 'return false && accepted.scope === scope');
+    expect(views[name]).not.toBe(original);
+    const source = fs.readFileSync(path.join(fixtureRoot, 'ZoeW/app.js'), 'utf8');
+    expect(source.includes(original)).toBe(true);
+    fs.writeFileSync(path.join(target, 'ZoeW/app.js'), source.replace(original, views[name]));
+    fs.writeFileSync(path.join(target, 'ZoeW/audit-module-views.json'), JSON.stringify(views));
+    const { context, config, runtime } = declaredLocalAuthFixture(target);
+    expect(() => runtime.install(context, config)).toThrow(/did not establish an accepted SDK actor/);
+});

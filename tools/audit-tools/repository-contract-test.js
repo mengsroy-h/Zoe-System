@@ -719,11 +719,24 @@ function auditWorkflowJobs(workflow) {
     return { jobs, valid: valid && names.filter(name => name === 'audit-shard').length === 1 && new Set(names).size === names.length };
 }
 
+function approvedFirebaseAuditCandidate(workflow) {
+    try {
+        const source = read('tools/audit-tools/checker-coverage.js');
+        const declarations = nodes(source).filter(node => node.type === 'FunctionDeclaration' && node.id.name === 'firebaseAuditCandidateContract');
+        if (declarations.length !== 1) return false;
+        const guard = vm.runInNewContext('(' + source.slice(declarations[0].start, declarations[0].end) + ')', { JSON }, { timeout: 3000 });
+        return guard(workflow, json('tools/firebase-provision/business-audit-functions/package.json'),
+            json('tools/firebase-provision/business-audit-functions/package-lock.json')) === true;
+    } catch (_) { return false; }
+}
+
 function auditShardRuntimeContract(workflow, image, apk) {
     const { jobs, valid } = auditWorkflowJobs(workflow);
     // `ci-config` ជា preflight ស្រាល (ubuntu-latest · គ្មាន checkout/dependency/Chromium)
     // ➜ មិនត្រូវរំពឹង cache/runtime/Chromium ដូច audit shard ទេ។
+    const candidateApproved = approvedFirebaseAuditCandidate(workflow);
     const contracts = jobs.filter(({ name }) => name !== 'ci-config').map(({ name, text }) => {
+        if (name === 'firebase-audit-candidate') return { cache: candidateApproved, offline: candidateApproved, runtime: candidateApproved, chromium: candidateApproved };
         const shard = name === 'audit-shard';
         const steps = text.match(/^      -[^\n]*(?:\n(?!      -)[^\n]*)*/gm) || [];
         const privileged = steps.filter((step) => /\bsudo\b|--with-deps/.test(step));
@@ -890,9 +903,19 @@ scenario('runner ៖ Linux audit និង Windows APK មាន mode ទាំ�
         && !/network_mode\s*:|\bports\s*:|docker\.sock|privileged\s*:\s*true/.test(compose));
     const contract = auditShardRuntimeContract(audit, image, apk);
     check('GitHub npm cache យោង lockfiles ដែល audit ដំឡើងពិតទាំងអស់', contract.cache);
-    check('Audit និង APK ប្រើ npm ci + prefer-offline ដោយរក្សា lockfile validation', contract.offline);
-    check('self-hosted ប្រើ Node/Java ក្នុង image; setup downloads សម្រាប់ GitHub តែប៉ុណ្ណោះ', contract.runtime);
+    check('Canonical Audit និង APK ប្រើ npm ci + prefer-offline; candidate SDK តាមកិច្ចសន្យាដាច់ដោយឡែក', contract.offline);
+    check('Canonical self-hosted ប្រើ Node/Java ក្នុង image; candidate SDK ប្រើ runtime តាមកិច្ចសន្យាជាក់លាក់', contract.runtime);
     check('Chromium ៖ system dependencies ក្នុង image ឬ GitHub step តែប៉ុណ្ណោះ', contract.chromium);
+    check('candidate SDK job ត្រូវតាម contract ពិតជាមួយ pinned package/lock ដាច់ដោយឡែក', approvedFirebaseAuditCandidate(audit));
+    for (const [name, altered] of [
+        ['wrong Node', audit.replace("node-version: '22'", "node-version: '24'")],
+        ['missing install', audit.replace('npm ci --prefix tools/firebase-provision/business-audit-functions --ignore-scripts --no-fund', 'echo install')],
+        ['missing dependency audit', audit.replace('npm audit --prefix tools/firebase-provision/business-audit-functions --omit=dev --audit-level=high', 'echo audit')],
+        ['swallowed runtime failure', audit.replace('node tools/audit-tools/firebase-business-audit-runtime-test.cjs', 'node tools/audit-tools/firebase-business-audit-runtime-test.cjs || true')],
+        ['continued failure', audit.replace('name: Firebase audit candidate SDK', 'name: Firebase audit candidate SDK\n    continue-on-error: true')],
+        ['unknown sibling', audit.replace('  firebase-audit-candidate:', '  future-candidate-sdk:')]
+    ]) check('candidate SDK contract ៖ ' + name + ' មិនអាចទទួលលើកលែង runtime/cache',
+        altered !== audit && Object.values(auditShardRuntimeContract(altered, image, apk)).every(value => !value));
     // job ផ្សេងមិនត្រូវបាំង shard ខូច ឬធ្វើឲ្យ shard ត្រឹមត្រូវធ្លាក់ទេ។
     const shard = auditWorkflowJobs(audit).jobs.find(job => job.name === 'audit-shard')?.text || '';
     const sibling = audit.replace(shard, '');

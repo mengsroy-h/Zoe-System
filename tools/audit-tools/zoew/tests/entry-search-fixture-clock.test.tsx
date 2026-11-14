@@ -11,6 +11,7 @@ import { sessionUserActionAllowed } from '../../../../ZoeW/src/core/session-veri
 import { renderEntryList } from '../../../../ZoeW/src/ui/entry-list';
 import { getFormattedDate } from '../../../../ZoeW/src/core/timezone';
 import { mount, step, unmount } from './native/react-harness';
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 
 const ROOT = path.resolve(import.meta.dirname, '../../../..');
 const require = createRequire(import.meta.url);
@@ -51,6 +52,7 @@ function panelClock(freeze = false) {
 }
 
 async function prepare() {
+    configureFixtureBackend('entry-search-clock');
     resetServerClock();
     firebaseState.db = {} as any;
     firebaseState.auth = null;
@@ -60,6 +62,7 @@ async function prepare() {
     const sample = (window as any).ZoeLicense.getServerTimeSample();
     expect(acceptServerClockOffset(0, sample, false)).toBe(true);
     firebaseState.auth = { currentUser: { uid: 'entry-search-clock' } } as any;
+    acceptFixtureSession();
     firebaseState.sessionExpiryCheck = 'live';
     uiState.currentAppPage = 'entry';
     uiState.entryPanelCollapsed = false;

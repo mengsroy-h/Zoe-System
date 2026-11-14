@@ -24,6 +24,7 @@ process.exitCode = 1;
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { localAuthRuntime } = require('./local-auth-runtime.cjs');
 const { moduleRuntime, memoryStorage } = require('./react-view');
 
 const ROOT = process.env.LEDGERCOUNT_APP_DIR ? path.resolve(process.env.LEDGERCOUNT_APP_DIR) : path.resolve(__dirname, '../..');
@@ -150,10 +151,14 @@ async function runCleanup(reason, barcodes, opts) {
     };
     box.authGeneration = 0;
     const ctx = vm.createContext(box);
+    const declaredConfig = { databaseURL: 'https://fixture-ledger-count-integrity-test.invalid' };
+    const authRuntime = localAuthRuntime(ROOT, SRC);
+    ctx.__storage = memoryStorage({ zoew_firebase_config: JSON.stringify(declaredConfig) });
+    ctx.appLocalStore = ctx.__storage;
+    authRuntime.prepare(ctx, declaredConfig);
     const parts = CONSTS.map((c) => sliceConst(SRC, c)).filter(Boolean);
     parts.push('let serverClockTrusted = true, isDatabaseConnected = true;');
     parts.push('const cleanupInFlight = new Set(); const liveTrashClaims = new Set(); const trashClaimPage = Math.random().toString(36).slice(2); const cleanupOperationOwners = new Map();', 'const activeRestoreClaims = new Map();');
-    parts.push('const appLocalStore = __storage;');
     Object.keys(OPTIONAL_FNS).forEach((fn) => {
         const body = sliceFrom(SRC, fn);
         parts.push(body || OPTIONAL_FNS[fn]);
@@ -165,12 +170,12 @@ async function runCleanup(reason, barcodes, opts) {
         parts.push(body);
     });
     const protocol = moduleRuntime(ROOT, SRC, [{ path: 'src/core/session-verification.ts', expose: ['sessionVerificationRequired'] }, { path: 'src/core/clock.ts', expose: ['captureClockOperation', 'serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'getServerClockBounds'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations', 'clearRestoreFinalization'] }]);
-    ctx.__storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://fixture-ledger-count-integrity-test.invalid' }) });
     ctx.auth = { currentUser: { uid: 'fixture-user' } };
     ctx.dataState = { pickupPendingVersion: 0 };
     ctx.pickupPendingVersion = 0;
     ctx.navigator = { onLine: true };
-    vm.runInContext(protocol.code + '\n' + protocol.withoutBindings(parts.join('\n\n')), ctx);
+    vm.runInContext(authRuntime.code + '\n' + authRuntime.withoutBindings(protocol.code + '\n' + protocol.withoutBindings(parts.join('\n\n'))), ctx);
+    authRuntime.seed(ctx, declaredConfig);
 
     const prior = await vm.runInContext('cleanupLedgerPrior(' + JSON.stringify(DAY) + ')', ctx);
     const item = {

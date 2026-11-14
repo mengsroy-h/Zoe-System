@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../../../../ZoeW/src/core/state';
@@ -138,6 +139,7 @@ function install(reason: 'abandon' | 'close', occupant: 'delete' | 'returned' | 
     firebaseState.fb = makeFb() as any;
     firebaseState.firebaseConfig = { databaseURL: FIREBASE_HOST } as any;
     firebaseState.auth = { currentUser: { uid: 'u1', getIdToken: async () => 'tok' } } as any;
+    acceptFixtureSession();
     firebaseState.isDatabaseInitialized = true;
     firebaseState.isDatabaseConnected = true;
     firebaseState.sessionExpiryCheck = 'live'; firebaseState.serverClockTrusted = true;

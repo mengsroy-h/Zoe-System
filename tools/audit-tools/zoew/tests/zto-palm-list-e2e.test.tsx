@@ -1,3 +1,4 @@
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 import { acceptServerClockOffset, resetServerClock } from '../../../../ZoeW/src/core/clock';
 /**
  * App និង Function ពិត ជាមួយ upstream សាកល្បង៖ SSO scan03 + native signed companion + own-site track។
@@ -266,6 +267,8 @@ beforeEach(async () => {
     firebaseState.db = { audit: true } as any;
     const token = fx.tokenForSite('001');
     firebaseState.fb = { getIdTokenResult: async () => ({ token }), ref: (_db: unknown, path: string) => ({ path }) } as any;
+    configureFixtureBackend('zto-palm-list-e2e');
+    acceptFixtureSession();
     for (const name of ['ztoListSyncFrom', 'ztoListSyncTo'] as const) {
         const input = document.createElement('input');
         input.value = name === 'ztoListSyncFrom' ? '2026-10-03' : '2026-10-06';

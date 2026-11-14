@@ -454,19 +454,26 @@ const FAKE_SDK = function () {
     const noop = () => {};
     const authTime = new Date().toISOString();
     window.__signOutCalls = 0;
+    window.__credentialLoginCalls = 0;
+    const app = { options: null };
+    const makeUser = (email = 'a@b.c') => ({ uid: 'u1', email, getIdToken: async () => 'synthetic-fixture-token' });
+    const auth = { app, currentUser: makeUser() };
+    const database = { app };
+    const authListeners = new Set();
+    const emitAuth = () => { for (const callback of authListeners) Promise.resolve().then(() => { if (authListeners.has(callback)) callback(auth.currentUser); }); };
     window.firebaseSDK = {
-        initializeApp: () => ({}),
+        initializeApp: options => { app.options = options; return app; },
         getApps: () => [],
         deleteApp: () => Promise.resolve(),
-        getAuth: () => ({ currentUser: { uid: 'u1', email: 'a@b.c' } }),
+        getAuth: () => auth,
         getIdTokenResult: () => Promise.resolve({ authTime, claims: {} }),
-        onAuthStateChanged: (a, cb) => { setTimeout(() => cb(a.currentUser), 10); return noop; },
-        signInWithEmailAndPassword: () => Promise.resolve({ user: { uid: 'u1' } }),
-        signOut: () => { window.__signOutCalls++; return Promise.resolve(); },
+        onAuthStateChanged: (a, cb) => { authListeners.add(cb); setTimeout(() => { if (authListeners.has(cb)) cb(a.currentUser); }, 10); return () => authListeners.delete(cb); },
+        signInWithEmailAndPassword: async (a, email) => { window.__credentialLoginCalls++; a.currentUser = makeUser(email); emitAuth(); return { user: a.currentUser }; },
+        signOut: async a => { window.__signOutCalls++; a.currentUser = null; emitAuth(); },
         setPersistence: () => Promise.resolve(),
         browserLocalPersistence: {}, browserSessionPersistence: {},
-        getDatabase: () => ({}),
-        ref: (db, p) => ({ path: p }),
+        getDatabase: () => database,
+        ref: (db, p = '') => ({ path: p, toString: () => db.app.options.databaseURL + '/' + p }),
         onValue: (r, cb) => { setTimeout(() => cb({ val: () => (String(r.path) === '.info/connected' ? true : null), exists: () => false }), 20); return noop; },
         off: noop,
         set: () => Promise.resolve(),
@@ -798,6 +805,13 @@ async function withTimeout(promise, ms, label) {
         });
 
         await group('១១. ប៊ូតុងជីវមាត្រ ៖ លាក់ពេលមិនទាន់ចង · លេចពេលចងរួច', async () => {
+            await page.evaluate(async () => {
+                if (typeof window.performLogin !== 'function') throw new Error('Production credential login boundary unavailable');
+                await window.performLogin('a@b.c', 'synthetic-fixture-password', true, false);
+                if (window.__credentialLoginCalls !== 1 || !window.auth?.currentUser || window.sessionExpiryCheck === 'signed-out') {
+                    throw new Error('Fresh fixture credential login was not admitted');
+                }
+            });
             await page.evaluate(() => { sessionStorage.clear(); localStorage.removeItem('zoew_biometric_unlock_v1'); });
             await withTimeout(load(), 30000, 'reload-bio-off');
             await settle();

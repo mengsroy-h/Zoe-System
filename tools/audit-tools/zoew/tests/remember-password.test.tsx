@@ -21,6 +21,7 @@ import {
 import { clearRememberedSession, showLoginModalWithPrefill } from '../../../../ZoeW/src/features/session';
 import { byId, mount, step, unmount } from './native/react-harness';
 import { beginAsync, settleAsync, trackCryptoSubtle } from './async-settle';
+import { acceptServerClockOffset, resetServerClock } from '../../../../ZoeW/src/core/clock';
 
 const FB = { apiKey: 'A', databaseURL: 'https://shop-a.firebaseio.com', projectId: 'p' };
 const FB_OTHER = { apiKey: 'A', databaseURL: 'https://shop-b.firebaseio.com', projectId: 'q' };
@@ -85,11 +86,14 @@ function fakeFb(outcome: 'ok' | 'reject' = 'ok') {
         browserLocalPersistence: { type: 'LOCAL' },
         browserSessionPersistence: { type: 'SESSION' },
         setPersistence: vi.fn(async () => {}),
-        signInWithEmailAndPassword: vi.fn(async (_a: unknown, email: string, password: string) => {
+        signInWithEmailAndPassword: vi.fn(async (auth: any, email: string, password: string) => {
             signIns.push([email, password]);
             if (outcome === 'reject') throw new Error('auth/invalid-credential');
-            return { user: null };
-        })
+            const user = { uid: 'remembered:' + email };
+            auth.currentUser = user;
+            return { user };
+        }),
+        getIdTokenResult: vi.fn(async () => ({ authTime: new Date().toISOString() }))
     };
     return { fb, signIns };
 }
@@ -100,8 +104,12 @@ async function settle() {
 
 function useBackend(cfg: Rec, fb: any, kind: 'firebase' | 'supabase' = 'firebase') {
     firebaseState.firebaseConfig = Object.assign({}, cfg);
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(firebaseState.firebaseConfig));
     firebaseState.fb = fb;
-    firebaseState.auth = { app: { name: 'x' }, currentUser: null } as any;
+    firebaseState.auth = { app: { name: 'x', options: firebaseState.firebaseConfig }, currentUser: null } as any;
+    firebaseState.db = {}; firebaseState.isDatabaseConnected = true;
+    resetServerClock();
+    acceptServerClockOffset(0, { epochMs: Date.now(), wallMs: Date.now(), monotonicMs: performance.now() }, false);
     step(() => { viewState.backendKind = kind; });
 }
 

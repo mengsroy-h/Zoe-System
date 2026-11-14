@@ -22,6 +22,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { moduleRuntime } = require('./react-view');
+const { localAuthRuntime } = require('./local-auth-runtime.cjs');
 const { performance } = require('perf_hooks');
 
 const ROOT = process.env.TXOUTCOME_APP_DIR ? path.resolve(process.env.TXOUTCOME_APP_DIR) : path.resolve(__dirname, '../..');
@@ -40,6 +41,7 @@ if (!fs.existsSync(FILE)) {
     return;
 }
 const SRC = fs.readFileSync(FILE, 'utf8');
+const authRuntime = localAuthRuntime(ROOT, SRC);
 const protocolRuntime = moduleRuntime(ROOT, SRC, [{ path: 'src/core/session-verification.ts', expose: ['sessionVerificationRequired'] }, { path: 'src/core/clock.ts', expose: ['captureClockOperation', 'serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'getServerClockBounds'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations', 'clearRestoreFinalization'] }]);
 
 function sliceFrom(src, name) {
@@ -248,6 +250,7 @@ function makeRun(opts) {
     box.window = box;
     box.authGeneration = 0;
     const ctx = vm.createContext(box);
+    authRuntime.prepare(ctx, box.db.app.options);
     const parts = [require('./react-view.js').reactRuntime(SRC, { exclude: TX_FNS.concat(APP_FNS, TX_CONSTS, APP_CONSTS), context: box })];
     TX_CONSTS.concat(APP_CONSTS).forEach((c) => { const s = sliceConst(SRC, c); if (s) parts.push(s); });
     parts.push('const txOutcomeUnknownReported = new Set();');
@@ -263,7 +266,8 @@ function makeRun(opts) {
         parts.push(body);
     });
     parts.push('var fb = withTransactionOutcomeResolution(rawFb);');
-    vm.runInContext(protocolRuntime.code + '\n' + protocolRuntime.withoutBindings(parts.join('\n\n')), ctx);
+    vm.runInContext(authRuntime.code + '\n' + protocolRuntime.code + '\n' + authRuntime.withoutBindings(protocolRuntime.withoutBindings(parts.join('\n\n'))), ctx);
+    authRuntime.seed(ctx, box.db.app.options);
     return { ctx, box, server, log, storage, toasts, raw };
 }
 

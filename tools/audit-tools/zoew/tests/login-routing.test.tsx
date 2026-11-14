@@ -23,6 +23,7 @@ import { performLogin } from '../../../../ZoeW/src/features/auth';
 import { SB_ACCOUNT_STORAGE_KEY, SB_AUTH_OWNER_KEY, SB_AUTH_STORAGE_KEY, claimSessionStorageFor, createModeStorage } from '../../../../ZoeW/src/services/supabase-transport';
 import { mount, step, unmount } from './native/react-harness';
 import { settleAsync, trackCryptoSubtle } from './async-settle';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 const SB_URL = 'https://abcd1234.supabase.co';
 const SB = { supabaseUrl: SB_URL, supabaseKey: 'sb_publishable_' + 'k'.repeat(24) };
@@ -45,7 +46,12 @@ function fakeSupabaseFb(checkCode: string | (() => Promise<any>)) {
             return { status: 200, body: { ok: true, code: 'registered' } };
         }),
         setPersistence: vi.fn(async () => {}),
-        signInWithEmailAndPassword: vi.fn(async (_a: any, email: string) => { calls.push(['signIn', email]); return { user: null }; })
+        signInWithEmailAndPassword: vi.fn(async (auth: any, email: string) => {
+            calls.push(['signIn', email]);
+            const user = { uid: 'routing:' + email };
+            auth.currentUser = user;
+            return { user };
+        })
     };
     return { fb, calls };
 }
@@ -58,8 +64,9 @@ async function settle() {
 
 function useBackend(kind: 'supabase' | 'firebase', fb?: any) {
     firebaseState.firebaseConfig = kind === 'supabase' ? Object.assign({}, SB) : Object.assign({}, FB);
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(firebaseState.firebaseConfig));
     firebaseState.fb = fb || null;
-    firebaseState.auth = { app: { name: 'x' }, currentUser: null } as any;
+    firebaseState.auth = { app: { name: 'x', options: firebaseState.firebaseConfig }, currentUser: null } as any;
     step(() => { viewState.backendKind = kind; });
 }
 
@@ -162,6 +169,7 @@ describe('កូដអញ្ជើញ ➜ ចូលប្រព័ន្ធ ឬ 
         await settle();
         (firebaseState.auth as any).currentUser = { uid: 'u1' };
         firebaseState.authGeneration++;
+        acceptFixtureSession();
         release({ status: 200, body: { ok: true, code: 'invite-usable' } });
         await settle();
         expect(viewState.loginMode).toBe('login');

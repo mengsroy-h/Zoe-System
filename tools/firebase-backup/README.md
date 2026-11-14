@@ -32,14 +32,18 @@ HTTPS/OAuth REST ➜ **គ្មាន third-party dependency**។
 | ប្រភេទ | អ្វីដែលត្រូវ backup | ឯកសារលទ្ធផល |
 |---|---|---|
 | Firebase (លំនាំដើម) | Realtime Database ទាំងមូលនៃ Project មួយ (ជំនួញមួយ ឬ Project License) | `<name>/<ពេល>-<ចៃដន្យ>.json.gz` |
-| Supabase (`"type": "supabase"`) | **ហាងនីមួយៗ** ក្នុង Project ដាច់ពីគ្នា (តាម RPC `zoe_admin_tenants` · `zoe_admin_export` របស់ migration) | `<name>/<tenant-id>/<ពេល>-<ចៃដន្យ>.json.gz` |
+| Supabase (`"type": "supabase"`) | **ហាងនីមួយៗ** និងម្ចាស់ audit ដែលហាងត្រូវបានលុបរួច ក្នុង Project ដាច់ពីគ្នា | `<name>/<tenant-id>/<ពេល>-<ចៃដន្យ>.json.gz` |
 
-ឯកសារហាង Supabase មួយ = JSON ៖ `{"format": "zoe-supabase-tenant", "version": 1, "manifest": {…}, "data": {…}}` ៖
+ឯកសារហាង Supabase ថ្មី = JSON ៖ `{"format": "zoe-supabase-tenant", "version": 2, "manifest": {…}, "data": {…}, "audit": {…}}` ៖
 
 - `data` ៖ មែកធាងរូបរាងដូច **Firebase RTDB export របស់ហាងមួយ** (`{"<root>": {"<key>": <តម្លៃ>}}`) — record ដែលលុបរួចមិនរួម។
 - `manifest` ៖ `tenant` (id · ឈ្មោះ · លេខសាខា · ថ្ងៃផុត · បិទ/បើក) · `seq` (ចំណុច snapshot) · `docs` · `roots` (ចំនួនតាម root) · `exported_at` · `source`។
+- `audit` ៖ ប្រវត្តិ `zoe_business_audit` ទាំងមូលដល់ cursor `through` ដែលកំណត់នៅទំព័រដំបូង។ រក្សា event ID, operation, actor, ពេលដើមដល់ microsecond និង `origin_tenant_id`; `seq` និង cursor ជា decimal string ដើម្បីរក្សា bigint។ `manifest.audit` មាន version, ចំនួន event និង SHA-256 សម្រាប់ផ្ទៀងភាពពេញលេញ។
+- ម្ចាស់ audit ដែលហាងត្រូវបានលុប ឬហាងដែលគ្មាន document តែមានប្រវត្តិ៖ archive មាន `audit_only: true` ក្នុង manifest។ មិនប្រឌិតឈ្មោះ/សាខារបស់ហាងដែលបាត់ទេ; ស្តារតែប្រវត្តិដោយមិនលុប document របស់គោលដៅ។
 - ⛔ គ្មានគណនី · ពាក្យសម្ងាត់ · hash កូដអញ្ជើញ/កូដប្តូរពាក្យសម្ងាត់ · secret key។
-- ការ export តាមទំព័រមានព្រំដែន (ជួរ · byte) ហើយត្រឹមត្រូវទោះហាងកំពុងប្រើ ៖ ទិន្នន័យស្មើស្ថានភាពហាងនៅទំព័រចុងក្រោយ។
+- ការ export តាមទំព័រមានព្រំដែន (ជួរ · byte)។ `manifest.seq` របស់ document និង `audit.through` ជា watermark ពីរផ្សេងគ្នា មិនមែន transaction snapshot តែមួយទេ; បញ្ឈប់ការសរសេរបើត្រូវការចំណុចពេលដូចគ្នា។
+- Audit មានពិដានសរុបក្នុង CLI **២០,០០០ event និង 32 MiB compact JSON ក្នុង tenant មួយ**។ ពិនិត្យទំហំសរុបមុនរក្សា event បន្ថែម និងមុន serialize/hash។ លើសពិដាន៖ backup បរាជ័យជាក់លាក់, មិនកាត់ប្រវត្តិ, មិនបោះពុម្ព archive មានតែ document និងមិនលុប backup មុន។ អត្រាប្រតិបត្តិការខ្ពស់អាចដល់ពិដាននេះលឿន; នេះមិនមែនភស្តុតាងសមត្ថភាពទ្រទ្រង់ទំហំធំទេ។ ប្រវត្តិធំជាងនេះត្រូវការ database backup ដោយម្ចាស់ប្រព័ន្ធ ឬការងារ export/restore តាមទំព័រដែលមានការគ្រប់គ្រងដាច់ដោយឡែក។ CLI full archive នេះមិនទាន់គាំទ្រការចែកផ្នែកស្វ័យប្រវត្តិទេ; ពិដាននេះមិនហាមសកម្មភាពអាជីវកម្ម ឬការរក្សា audit ក្នុង DB ទេ។
+- Archive v2 ត្រូវការ migrator ថ្មី; ឧបករណ៍ចាស់ដែលគាំទ្រតែ v1 បដិសេធ v2។ Migrator ថ្មីនៅតែអាន v1 ដែលគ្មាន audit ដោយមិនប្រឌិតប្រវត្តិចាស់។
 - ស្តារ/ផ្ទេរ ៖ CLI [`tools/supabase-migrate/`](../supabase-migrate/README.md) (ទទួលឯកសារ `.json.gz` និង `.enc` ផ្ទាល់)។
 
 ### ហេតុអ្វីត្រូវការ
@@ -60,8 +64,8 @@ HTTPS/OAuth REST ➜ **គ្មាន third-party dependency**។
 (`fetch`, `AbortController`, `crypto`) និង **គ្មាន third-party runtime dependency** ទេ —
 មិនចាំបាច់ `npm install`។
 
-**Supabase** ៖ Project ត្រូវមាន migration ទាំងអស់ក្នុង [`supabase/migrations/`](../../supabase/migrations) (RPC `zoe_admin_tenants` ·
-`zoe_admin_export`) ➜ [`supabase/README.md`](../../supabase/README.md) ជំហានទី ២។
+**Supabase** ៖ Project ត្រូវមាន migration ទាំងអស់ក្នុង [`supabase/migrations/`](../../supabase/migrations) រួម RPC `zoe_admin_tenants`,
+`zoe_admin_export`, `zoe_admin_audit_tenants` និង `zoe_admin_audit_export` ដែលអនុញ្ញាតតែ service role។ ខ្វះ audit RPC៖ backup បរាជ័យ មិនរំលងប្រវត្តិទេ ➜ [`supabase/README.md`](../../supabase/README.md)។
 
 ### ជំហានទី ២ — យក Service Account Key (សម្រាប់ជំនួញនីមួយៗ)
 
@@ -115,7 +119,7 @@ cp config.example.json config.json
   កំហុស 401/403 មិន retry ទេ។
 - `lockStaleMs` — ទប់ backup ពីររត់ជាន់គ្នា; lock ដែលសល់ពី process ដួលអាចសង្គ្រោះក្រោយ 12 ម៉ោង។
 
-Backup ត្រូវសរសេរចូល File បណ្ដោះអាសន្ន `.partial` សិន រួចទើប Rename — ដូច្នេះបើដាច់ចរន្ត ឬបញ្ឈប់កណ្ដាលទី នឹងគ្មាន File Backup ខូចទុកសល់ (ហើយវាក៏មិនរាប់ចូល `keepCount` ដែលអាចរុញ Backup ល្អចេញនោះដែរ)។
+Backup សរសេរចូល File បណ្ដោះអាសន្ន `.partial` សិន រួចទើប Rename; ការបញ្ឈប់ process កណ្ដាល write មិនផ្សាយ file មិនទាន់ពេញ ហើយ `.partial` មិនរាប់ចូល `keepCount` ទេ។ វាមិនធានា durability ពេលដាច់ចរន្តនៅគ្រប់ filesystem/hardware ទេ; រក្សា backup មុន និងសាក restore ដាច់ដោយឡែក។
 OAuth access token មានអាយុខ្លីត្រូវបានបង្កើតពី service-account key ក្នុង memory ហើយបញ្ជូនទៅ
 Firebase តាម `Authorization: Bearer` — token/private key មិនត្រូវដាក់ក្នុង URL ឬ output log ទេ។
 
@@ -262,7 +266,7 @@ paste Firebase Config **របស់ខ្លួន** ➜ ទិន្នន័�
 
 ### ការស្តារទិន្នន័យមកវិញ (Restore) — ធ្វើដោយដៃ
 
-⛔ Archive ហាង Supabase គ្របតែ record ក្នុង `zoe_docs`; វាមិនរក្សា `zoe_ops` ឬស្តារ operation receipt ទាំងនោះទេ។ `VERIFIED` មានន័យថា record ក្នុងវិសាលភាពនាំចូលស្មើ input មិនមែន Database និងភស្តុតាង recovery ទាំងមូលស្មើ backup ទេ។ រក្សា journal **pending/unknown** និងផ្ទៀង authoritative outcome ដាច់ដោយឡែក; កុំចាត់ receipt ដែលបាត់ជា NOT_APPLIED ឬ replay លុយស្វ័យប្រវត្តិ។ ផែនការ rollout/Reset និងព្រំដែន recovery នៅ [Supabase README](../../supabase/README.md)។
+⛔ ផ្នែក data របស់ archive ហាង Supabase គ្រប record ក្នុង `zoe_docs`; format v2 រក្សា និងស្តារ business audit ដាច់ដោយឡែកផង។ វាមិនរក្សា `zoe_ops` ឬស្តារ operation receipt ទាំងនោះទេ។ `VERIFIED` បញ្ជាក់ record ក្នុងវិសាលភាពនាំចូលស្មើ input; `AUDIT VERIFIED` បញ្ជាក់ប្រវត្តិដើមដែលបានរក្សា មិនមែន Database និងភស្តុតាង recovery ទាំងមូលស្មើ backup ទេ។ រក្សា journal **pending/unknown** និងផ្ទៀង authoritative outcome ដាច់ដោយឡែក; កុំចាត់ receipt ដែលបាត់ជា NOT_APPLIED ឬ replay លុយស្វ័យប្រវត្តិ។ ផែនការ rollout/Reset និងព្រំដែន recovery នៅ [Supabase README](../../supabase/README.md)។
 
 Script នេះមិនរួមបញ្ចូល Auto-restore ទេ ដោយចេតនា (Restore គឺជាសកម្មភាពគ្រោះថ្នាក់ — អាចសរសេរជាន់ពីលើ
 ទិន្នន័យផ្ទាល់ដែលកំពុងប្រើ) ។ បើត្រូវការស្តារជាក់ស្តែង៖

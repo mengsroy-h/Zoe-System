@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { allocateTrashGeneration, captureTrashGenerationOwner } from '../../../../ZoeW/src/services/trash-generation';
 import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -145,6 +146,8 @@ async function install(stage: string, trashPresent: boolean, extra: any = {}, mo
     firebaseState.serverClockTrusted = true;
     firebaseState.hasEverConnectedToDatabase = true;
     attachShop(DB_A, URL_A);
+    firebaseState.sessionExpiryCheck = 'live';
+    acceptFixtureSession();
     if (modern) {
         const generation = await allocateTrashGeneration(ID, captureTrashGenerationOwner()!);
         expect(generation, 'new fixture intent captures the actual next generation before its journal').toBe(1);
@@ -211,6 +214,7 @@ describe('resume ការសម្អាតដែលត្រូវរំខា
             await vi.waitFor(() => expect(entered.has('A')).toBe(true));
             expect(dataState.cleanupResumeInFlight).toBe(true);
             switchToShopB();
+            acceptFixtureSession();
             noteCleanupJournalEntry({ ...oldEntry, id: nextId, scope: URL_B, trashItem: { ...oldEntry.trashItem, id: nextId } });
             second = resumeInterruptedCleanups();
             await vi.waitFor(() => expect(entered.has('B')).toBe(true));

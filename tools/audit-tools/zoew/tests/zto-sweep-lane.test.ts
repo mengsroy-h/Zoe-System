@@ -149,6 +149,9 @@ async function boot(name: string, opts: { email?: string; palmSite?: string; act
     fs.auth = { currentUser: { uid: 'u-' + name, email: opts.email || 'staff@zoew123.com' }, app: { options: { databaseURL: SHOP } } };
     fs.isDatabaseInitialized = true; fs.isDatabaseConnected = true; fs.hasEverConnectedToDatabase = true;
     fs.serverClockTrusted = true; fs.sessionExpiryCheck = 'live'; fs.isInitializingFirebase = false; fs.firebaseSdkUnavailable = false;
+    fs.firebaseConfig = { databaseURL: SHOP };
+    const { acceptFixtureSession } = await import('./helpers/accepted-session');
+    acceptFixtureSession();
     fs.dbRefZtoSweepLane = fb.ref(db, LANES);
     state.dataState.scanHistory = clone(world.history);
     state.dataState.deletedItems = [];

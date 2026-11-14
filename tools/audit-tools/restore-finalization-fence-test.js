@@ -91,11 +91,17 @@ ok('witness schema តម្រូវ token/targetId/finalizedAt',
     witnessRules['.validate'].includes("['token','targetId','finalizedAt']") && witnessRules.$other['.validate'] === false);
 
 console.log('-- terminal policy and provenance use actual shipped rule expressions --');
-for (const policy of [{ restoreBlocked: true }, { trashMode: 'palm' }]) {
+for (const policy of [{ restoreBlocked: true }, { trashMode: 'palm', trashReason: 'pickup' }]) {
     const blocked = clone(base);
     Object.assign(blocked.zoew_recently_deleted_cod_dod[sourceId], policy);
     ok('terminal trash rejects finalization: ' + JSON.stringify(policy),
         !finalizationWriteAllowed(blocked, finalFanout(blocked, sourceId, 'claim-A', targetId), sourceId));
+}
+for (const trashReason of ['delete', 'remove', 'returned']) {
+    const unsigned = clone(base);
+    Object.assign(unsigned.zoew_recently_deleted_cod_dod[sourceId], { trashMode: 'palm', trashReason });
+    ok('Palm មិនទាន់ Sign អនុញ្ញាត finalization ៖ ' + trashReason,
+        finalizationWriteAllowed(unsigned, finalFanout(unsigned, sourceId, 'claim-A', targetId), sourceId));
 }
 const lingeringProvenance = finalFanout(base, sourceId, 'claim-A', targetId);
 lingeringProvenance.zoew_scan_history_cod_dod[targetId].restoreAddedCodes = '["C"]';

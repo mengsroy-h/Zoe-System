@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 import { appLocalStore } from '../../../../ZoeW/src/core/storage';
 import { dataState, firebaseState, securityState, uiState, ztoState } from '../../../../ZoeW/src/core/state';
 import { sealLookupHeader } from './helpers/sealed-lookup';
@@ -23,10 +24,12 @@ const call = async (restore = false) => {
 
 beforeEach(async () => {
     appLocalStore.clear();
+    configureFixtureBackend('zto-restore-verification');
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(await sealLookupHeader({ enabled: true, url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}', headerName: 'X-Zoe-Proxy-Key' }, key)));
     firebaseState.auth = { currentUser: { uid: 'restore-user' } } as any;
     firebaseState.fb = { getIdTokenResult: async () => ({ token: 'restore-id-token' }) } as any;
     firebaseState.authGeneration++;
+    acceptFixtureSession();
     ztoPickupStatus.clear();
     ztoState.ztoStatusLoaded = true;
     vi.stubEnv('ZTO_PROXY_KEY', key);
@@ -81,11 +84,11 @@ it.each([
     expect(ztoPickupStatus.size).toBe(0);
 });
 
-it('កញ្ចប់ដែល ZTO ឆ្លើយថ្មីៗថា «រកមិនឃើញ» (មិនមែនកញ្ចប់ ZTO) មិនអាច Sign ➜ ស្តារបាន · cache ឬ barcode ខុស ➜ មិនទុកចិត្ត', async () => {
+it('ZTO_NOT_FOUND ថ្មីមិនបញ្ជាក់ unsigned ហើយ cache ឬ barcode ខុសមិនអាចផ្តល់ភស្តុតាង', async () => {
     const notFound = (patch = {}) => ({ success: false, found: false, barcode: code, code: 'ZTO_NOT_FOUND', cached: false, ...patch });
     const fetcher = vi.fn(async () => new Response(JSON.stringify(notFound())));
     vi.stubGlobal('fetch', fetcher);
-    await verifyZtoRestoreStatus(source());
+    await expect(verifyZtoRestoreStatus(source())).rejects.toThrow('RESTORE_ZTO_UNCONFIRMED');
     expect(ztoPickupStatus.size).toBe(0);
     expect((fetcher.mock.calls[0] as any)[1]?.cache, 'Function request keeps the CORS preflight cache (no no-store)').toBeUndefined();
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(notFound({ cached: true })))));
@@ -94,6 +97,20 @@ it('កញ្ចប់ដែល ZTO ឆ្លើយថ្មីៗថា «រ�
     await expect(verifyZtoRestoreStatus(source())).rejects.toThrow('RESTORE_ZTO_UNVERIFIED');
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(notFound()), { status: 503 })));
     await expect(verifyZtoRestoreStatus(source())).rejects.toThrow('RESTORE_ZTO_UNVERIFIED');
+});
+
+it.each([null, {}, { signed: '1' }])('Function ពិត ៖ upstream data %j ដែលគ្មានអត្តសញ្ញាណ barcode មិនបញ្ជាក់ថាមិនមែន ZTO ឬមិនទាន់ Sign', async data => {
+    vi.stubGlobal('fetch', vi.fn(async (input: any, options: any) => {
+        const url = new URL(String(input));
+        if (url.pathname === '/.netlify/functions/zto-order-detail') {
+            const result = await proxy.handler({ httpMethod: 'GET', headers: Object.fromEntries(new Headers(options.headers)), queryStringParameters: Object.fromEntries(url.searchParams) });
+            return new Response(result.body, { status: result.statusCode });
+        }
+        return new Response(JSON.stringify({ success: true, data }), { status: 200 });
+    }));
+    expect((await call(true)).body).toMatchObject({ found: false, code: 'ZTO_NOT_FOUND', cached: false });
+    await expect(verifyZtoRestoreStatus(source())).rejects.toThrow('RESTORE_ZTO_UNCONFIRMED');
+    expect(ztoPickupStatus.size).toBe(0);
 });
 
 it('ស្តារ Cookie ក្រៅបណ្ដាញ និងបិទការភ្ជាប់ ZTO មិនរំលងការផ្ទៀង', async () => {

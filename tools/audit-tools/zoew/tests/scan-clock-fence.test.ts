@@ -13,6 +13,7 @@ import { createScanEvidenceJournal } from '../../../../ZoeW/src/services/scan-ev
 import { pendingScanScope, preparePendingScan } from '../../../../ZoeW/src/services/scan-pending';
 import { claimScanOperation, resumePendingScanOperations, saveScanOperation } from '../../../../ZoeW/src/services/scan-operation';
 import { txResolvingPaths, withTransactionOutcomeResolution } from '../../../../ZoeW/src/services/tx-outcome';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 const clock = vi.hoisted(() => ({ generation: 0, trusted: true }));
 vi.mock('../../../../ZoeW/src/core/clock', async load => ({ ...await load<any>(),
@@ -149,6 +150,7 @@ function makeNative() {
     Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db, isDatabaseInitialized: true,
         isInitializingFirebase: false, firebaseSdkUnavailable: false, isDatabaseConnected: true,
         sessionExpiryCheck: 'live', authLoginOperation: null, dbLivenessProbe: Promise.resolve(null) });
+    acceptFixtureSession();
     firebaseState.dbRefHistory = sdk.ref(db, H);
     firebaseState.dbRefDailyRevenue = sdk.ref(db, D);
     firebaseState.dbRefMonthlyRevenue = sdk.ref(db, M);

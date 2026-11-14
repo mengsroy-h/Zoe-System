@@ -106,7 +106,7 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
         return 'missing';
     }
 
-    if (!confirmedByScan && !confirm(`តើអ្នកពិតជាចង់ដកកញ្ចប់អីវ៉ាន់ (${barcodeCode}) នេះចេញពីការគ្រប់គ្រងមែនទេ? (ZTO Login ឬកញ្ចប់ Sign រួច៖ មិនអាចស្តារបាន។ កញ្ចប់ផ្សេងស្តារតាមគោលការណ៍ធុងសំរាម។)`)) return 'cancelled';
+    if (!confirmedByScan && !confirm(`តើអ្នកពិតជាចង់ដកកញ្ចប់អីវ៉ាន់ (${barcodeCode}) នេះចេញពីការគ្រប់គ្រងមែនទេ? (កញ្ចប់ Sign រួច៖ មិនអាចស្តារបាន។ កញ្ចប់ផ្សេងស្តារតាមគោលការណ៍ធុងសំរាម។)`)) return 'cancelled';
 
     const removeClock = captureClockOperation();
     if (!removeClock.current()) {

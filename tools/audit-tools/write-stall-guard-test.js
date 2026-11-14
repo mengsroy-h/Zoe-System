@@ -30,6 +30,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { localAuthRuntime } = require('./local-auth-runtime.cjs');
 const { auditModuleSourceRanges, memoryStorage, moduleRuntime } = require('./react-view.js');
 const { cleanupPurgeOwnerContract } = require('./cleanup-purge-checker-contract.cjs');
 
@@ -75,6 +76,7 @@ function extractConst(src, name) {
 }
 
 const src = fs.existsSync(APP) ? fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, '\n') : '';
+const authRuntime = localAuthRuntime(ROOT, src);
 
 // ── ១. ជាន់អប្បបរមា ៖ ការស្កេនទទេមិនត្រូវបៃតង ──────────────────────────────
 console.log('== ១. ជាន់អប្បបរមា ==');
@@ -186,7 +188,10 @@ globalThis.__notifyIfSlow = notifyIfSlow;
         return 'Object.assign(globalThis, (() => {' + view + '; return {' + exported.join(',') + '}; })());';
     }).join('\n');
     const clock = moduleRuntime(ROOT, src, [{ path: 'src/core/clock.ts', expose: ['serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'captureClockOperation', 'getServerClockBounds', 'acceptServerClockOffset', 'resetServerClock'] }, 'src/core/session-verification.ts']);
-    vm.runInContext(clock.withoutBindings(code) + '\n' + modules + '\n' + clock.code, ctx);
+    const authConfig = { databaseURL: 'https://fixture.invalid' };
+    authRuntime.prepare(ctx, authConfig);
+    vm.runInContext(authRuntime.withoutBindings(clock.withoutBindings(code)) + '\n' + modules + '\n' + clock.code + '\n' + authRuntime.code, ctx);
+    authRuntime.seed(ctx, authConfig);
     ctx.acceptServerClockOffset(0, Object.freeze({ epochMs: Date.now(), wallMs: Date.now(), monotonicMs: performance.now(), uncertaintyMs: 0 }));
     vm.runInContext("sessionExpiryCheck = 'live';", ctx);
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»

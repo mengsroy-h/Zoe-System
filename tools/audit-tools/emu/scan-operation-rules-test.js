@@ -75,6 +75,9 @@ function isPostgresRulesDenial(result) {
 function assertRestoreGuardRuleScope(compiled) {
     const beforeSql = fs.readFileSync(path.join(ROOT, 'supabase', 'migrations', '20261105010507_zoe_rules.sql'), 'utf8');
     const before = JSON.parse(beforeSql.split('$zoe_rules_json$')[1]);
+    const policySql = fs.readFileSync(path.join(ROOT, 'supabase', 'migrations', '20261109122019_zoe_rules.sql'), 'utf8');
+    const { palmRestorePolicyProjection } = require('../palm-restore-policy-scope.cjs');
+    const projected = palmRestorePolicyProjection(compiled, JSON.parse(policySql.split('$zoe_rules_json$')[1]));
     const changed = new Set(['c/zoew_daily_pickup_cod_dod/x/r/v', 'c/zoew_daily_pickup_cod_dod/x/r/c/pickedUpBarcodes/x/r/v']);
     const added = 'c/zoew_daily_pickup_cod_dod/x/r/c/restoreGuard';
     let writes = 0, validates = 0;
@@ -87,7 +90,7 @@ function assertRestoreGuardRuleScope(compiled) {
             walk(old[key], next[key], location ? location + '/' + key : key);
         }
     };
-    walk(before, compiled);
+    walk(before, projected);
     const count = node => { if (Object.prototype.hasOwnProperty.call(node, 'w')) writes++; if (Object.prototype.hasOwnProperty.call(node, 'v')) validates++; for (const child of Object.values(node.c || {})) count(child); if (node.x) count(node.x.r); };
     count(before);
     const guard = compiled.c.zoew_daily_pickup_cod_dod.x.r.c.restoreGuard;
@@ -156,6 +159,8 @@ async function setupPostgres() {
     const user = await pgHarness.makeAuthUser(pgConnection, 'scan_rules@u.zoe.test');
     const foreignUser = await pgHarness.makeAuthUser(pgConnection, 'scan_foreign@u.zoe.test');
     for (const [who, name] of [[user, 'scan_rules'], [foreignUser, 'scan_foreign']]) await pgConnection.query("insert into public.tenant_members (user_id, tenant_id, username, role) values ($1, $2, $3, 'owner')", [who, tenant, name]);
+    const userSession = await pgHarness.sessionClaims(pgConnection, { role: 'authenticated', sub: user });
+    const foreignSession = await pgHarness.sessionClaims(pgConnection, { role: 'authenticated', sub: foreignUser });
     let sequence = 0;
     const operationId = () => 'scanrules_' + (++sequence).toString(36).padStart(16, '0');
     const mapped = value => value === undefined ? undefined : JSON.parse(JSON.stringify(value, (_key, v) => v === uid ? user : v === 'foreign' ? foreignUser : v));
@@ -185,7 +190,7 @@ async function setupPostgres() {
         assert.notEqual(actor, undefined, 'សំណើ fixture មិនស្គាល់');
         const basePath = parts(location.replace(/\.json$/, ''));
         const operations = method === 'PATCH' ? Object.entries(value).map(([key, entry]) => operation([...basePath, ...parts(key)], entry)) : [operation(basePath, value)];
-        const result = await pgHarness.as(pgConnection, { role: 'authenticated', sub: actor === uid ? user : foreignUser }, 'select public.zoe_write($1, $2::jsonb) as r', [operationId(), JSON.stringify(operations)]);
+        const result = await pgHarness.as(pgConnection, actor === uid ? userSession : foreignSession, 'select public.zoe_write($1, $2::jsonb) as r', [operationId(), JSON.stringify(operations)]);
         if (result.error) {
             if (!isPostgresRulesDenial(result)) throw new Error('Postgres មិនមែន rules denial: ' + JSON.stringify(result.error));
             return { status: 401, text: 'Permission denied: ' + result.error.message };

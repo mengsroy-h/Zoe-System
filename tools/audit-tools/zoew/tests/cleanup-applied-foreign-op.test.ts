@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 // Two devices move the same barcode out of history (Remove · Delete · 8-day abandon · 2h pickup cleanup) while replies get
 // lost and caches are stale. Every move first claims its barcodes inside the history item (`trashClaim` = a token unique to
 // the operation, `claimTrashBarcodes()`), then moves only the barcodes carrying its own token. Both steps are transactions on
@@ -139,6 +140,7 @@ beforeEach(() => {
     firebaseState.dbRefHistory = ref(H) as any; firebaseState.dbRefDeleted = ref(T) as any; firebaseState.dbRefDailyRevenue = ref(D) as any; firebaseState.dbRefMonthlyRevenue = ref(M) as any;
     firebaseState.dbRefDailyPickup = ref('zoew_daily_pickup_cod_dod') as any; firebaseState.dbRefDailyCollected = ref('zoew_daily_collected_cod_dod') as any;
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: HOST }));
+    acceptFixtureSession();
     resetZtoTrashMode(); noteZtoTrashMode(null);
     uiState.toasts = [];
     vi.stubGlobal('fetch', vi.fn(async (input: any) => {

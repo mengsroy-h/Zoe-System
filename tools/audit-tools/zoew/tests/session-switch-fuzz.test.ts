@@ -27,6 +27,7 @@ import { ABANDON_AGE_MS, TWO_HOURS_MS } from '../../../../ZoeW/src/features/sess
 import { activeClearHistoryClaims } from '../../../../ZoeW/src/ui/history-render';
 import { ZTO_TRASH_MODE_ACTIVE_MS, ZTO_TRASH_MODE_PATH, markZtoTrashMode, noteZtoTrashMode, pruneZtoTrashMode, resetZtoTrashMode, withdrawLeftZtoTrashModes, withdrawZtoTrashMode, ztoTrashModeDeviceKey } from '../../../../ZoeW/src/services/zto-trash-mode';
 import { ZTO_SWEEP_LANE_PATH, claimZtoSweepLane, noteZtoSweepLane, resetZtoSweepLane, ztoSweepLaneTurn } from '../../../../ZoeW/src/services/zto-sweep-lane';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 // ⛔ fuzz ប្តូរ session ៖ ប្រតិបត្តិការសរសេរពិតនីមួយៗចាប់ផ្តើមក្នុងហាង A ➜ ចម្លើយនៃការហៅ Firebase ទី k មកដល់ក្រោយ macrotask ដែលប្តូរទៅហាង B
 //    (Database ថ្មី + authGeneration ថ្មី · k = ១ … N ៖ គ្រប់ចំណុច await · ការប្តូរកើតតែពេល event loop ទំនេរ ដូចសកម្មភាពអ្នកប្រើពិត) ➜ ដំណើរការ timer រហូត retry · ពិដាន dbOp · late commit អស់ ➜ **គ្មានការសរសេរណាមួយចេញក្រោយការប្តូរ**
@@ -256,6 +257,7 @@ function seedShopA() {
     firebaseState.serverClockTrusted = true;
     firebaseState.hasEverConnectedToDatabase = true;
     attachShop(DB_A, URL_A);
+    acceptFixtureSession();
     dataState.scanHistory = [clone(item1), clone(item2), clone(item3)];
     dataState.deletedItems = [clone(trash)];
     dataState.dailyRevenueData = clone(lab.store[DAILY]);

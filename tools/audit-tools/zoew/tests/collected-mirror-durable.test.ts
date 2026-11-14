@@ -12,6 +12,7 @@ import vm from 'node:vm';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../../../../ZoeW/src/core/state';
 import { appLocalStore } from '../../../../ZoeW/src/core/storage';
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../../../../ZoeW/src/core/text';
 import { getZoneDateKey } from '../../../../ZoeW/src/core/timezone';
 import { barcodeRegistryKey } from '../../../../ZoeW/src/domain/registry';
@@ -305,6 +306,7 @@ beforeEach(() => {
     cleanup.cleanupInFlight.clear();
     firebaseState.authGeneration++;
     firebaseState.auth = { currentUser: { uid: 'mx1-durable' } } as any;
+    firebaseState.firebaseConfig = JSON.parse(SHOP_CONFIG);
     firebaseState.db = { mx1: true } as any;
     firebaseState.isDatabaseInitialized = true;
     firebaseState.dbListenersFailed = false;
@@ -313,6 +315,7 @@ beforeEach(() => {
     firebaseState.sessionExpiryCheck = 'live';
     firebaseState.serverTimeOffsetMs = 0;
     firebaseState.fb = makeFb() as any;
+    acceptFixtureSession();
     for (const [name, path] of [['dbRefHistory', HISTORY], ['dbRefDeleted', TRASH],
         ['dbRefDailyRevenue', 'zoew_daily_revenue_cod_dod'], ['dbRefMonthlyRevenue', 'zoew_monthly_revenue_cod_dod'],
         ['dbRefDailyCollected', MIRROR], ['dbRefDailyPickup', PICKUP],

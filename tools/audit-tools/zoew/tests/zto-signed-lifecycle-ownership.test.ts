@@ -1,3 +1,4 @@
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 // សាកល្បង read-only លើ source ពិត៖ បញ្ជី Sign មុនស្តារ មិនត្រូវជាន់ភស្តុតាងផ្ទៀងស្តារថ្មី។
 // ក្លែងតែ upstream និង SDK data semantics; Delete និង Restore ប្រើផ្លូវពិត។
 import { it, expect, vi, afterEach } from 'vitest';
@@ -43,6 +44,8 @@ it.each(['firebase', 'supabase'].flatMap((provider) => ['unchanged', 'open-resto
     const mem = createScanMemorySdk();
     if (provider === 'supabase') (mem.sdk as any).tenantScope = () => 'tenant-a';
     firebaseState.auth = { currentUser: { uid: 'test' }, app: { options } } as any;
+    firebaseState.firebaseConfig = options;
+    acceptFixtureSession();
     firebaseState.db = { name: 'test', app: { options } } as any;
     firebaseState.fb = mem.sdk as any;
     firebaseState.serverTimeOffsetMs = 0;
@@ -178,6 +181,8 @@ it('បញ្ជីទទេពិតលើក្រុមធំ មិនបង
     clearCustomerDataTableCache();
     firebaseState.fb = createScanMemorySdk().sdk as any;
     firebaseState.auth = { currentUser: { uid: 'fixture' } } as any;
+    configureFixtureBackend('zto-signed-lifecycle');
+    acceptFixtureSession();
     firebaseState.db = {} as any;
     firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live';
     firebaseState.serverTimeOffsetMs = 0;
@@ -215,6 +220,8 @@ it.each([['firebase', 'unchanged'], ['firebase', 'open-restored'], ['supabase', 
     const mem = createScanMemorySdk();
     if (provider === 'supabase') (mem.sdk as any).tenantScope = () => 'tenant-a';
     firebaseState.auth = { currentUser: { uid: 'test' }, app: { options } } as any;
+    firebaseState.firebaseConfig = options;
+    acceptFixtureSession();
     firebaseState.db = { name: 'test', app: { options } } as any;
     firebaseState.fb = mem.sdk as any;
     firebaseState.serverTimeOffsetMs = 0;

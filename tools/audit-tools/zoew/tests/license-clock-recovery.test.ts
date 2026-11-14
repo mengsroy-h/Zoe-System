@@ -6,12 +6,16 @@ import { firebaseState, uiState } from '../../../../ZoeW/src/core/state';
 import { viewState } from '../../../../ZoeW/src/core/view-state';
 import { modalIsOpen } from '../../../../ZoeW/src/core/modals';
 import * as license from '../../../../ZoeW/src/features/license';
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 const effects = vi.hoisted(() => ({ init: vi.fn(), signed: vi.fn(), arm: vi.fn() }));
 vi.mock('../../../../ZoeW/src/features/exchange-rate', async () => {
     const { readFileSync } = await import('node:fs'); const { firebaseState } = await import('../../../../ZoeW/src/core/state');
+    const { loginBackendScope } = await import('../../../../ZoeW/src/features/login-memory');
+    const { localAuthSessionCurrent, localLogoutIntent } = await import('../../../../ZoeW/src/services/local-logout-intent');
     const src = readFileSync('src/features/exchange-rate.ts', 'utf8');
     const body = src.slice(src.indexOf('export function captureAuthDatabaseGuard('), src.indexOf('export async function saveExchangeRate(')).replace('export ', '');
-    return { captureAuthDatabaseGuard: new Function('firebaseState', body + '; return captureAuthDatabaseGuard;')(firebaseState) };
+    return { captureAuthDatabaseGuard: new Function('firebaseState', 'loginBackendScope', 'localAuthSessionCurrent', 'localLogoutIntent',
+        body + '; return captureAuthDatabaseGuard;')(firebaseState, loginBackendScope, localAuthSessionCurrent, localLogoutIntent) };
 });
 vi.mock('../../../../ZoeW/src/services/network', async () => {
     const { readFileSync } = await import('node:fs'); const src = readFileSync('src/services/network.ts', 'utf8');
@@ -43,6 +47,7 @@ function recover() { return (license as any).retryPendingActivation?.() ?? Promi
 beforeEach(() => {
     vi.useFakeTimers(); vi.setSystemTime(T); vi.clearAllMocks();
     Object.assign(firebaseState, { authGeneration: 71, auth: { currentUser: user }, db: {}, isDatabaseInitialized: false, licenseRecheckInFlight: false });
+    configureFixtureBackend('license-clock-recovery'); acceptFixtureSession();
     uiState.modalDisplay = {}; uiState.isModalOpen = false; viewState.backendKind = 'firebase'; viewState.activationBusy = false;
     effects.init.mockImplementation(() => { firebaseState.isDatabaseInitialized = true; return true; });
     net = { clockReady: false, revoked: false, calls: 0, gate: null }; store = new Map();

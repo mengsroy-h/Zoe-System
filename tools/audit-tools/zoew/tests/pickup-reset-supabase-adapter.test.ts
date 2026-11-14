@@ -3,6 +3,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { pickupResetAttemptId, pickupResetBoundReceipt, pickupResetCasOf, pickupResetReceiptMatches } from '../../../../ZoeW/src/domain/pickup-reset-proof';
 import { createSupabaseDatabase, SbNetworkError, SbRpcError } from '../../../../ZoeW/src/services/supabase-rtdb';
 import { createSupabaseSdk } from '../../../../ZoeW/src/services/supabase-sdk';
+import { firebaseState } from '../../../../ZoeW/src/core/state';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 const url = 'https://reset-adapter.supabase.co';
 const authScope = url + '|user';
@@ -305,13 +307,18 @@ it('SDK getDatabase បញ្ជូន codec ពិត ដល់ fixed-attempt a
     } };
     const sdk = createSupabaseSdk(() => transport, { pickupReset: helpers, docsCache: null, writeJournal: null,
         onListenerError: vi.fn(), onWriteRecovery: vi.fn(), dbOptions: { pollFallbackMs: 600000 } });
-    const app = sdk.initializeApp({ supabaseUrl: url });
-    app._auth = { currentUser: { uid: 'user' }, _account: { tenant_id: 'A' }, _close: vi.fn() }; app._tenantTopic = 'zoe:A';
+    const config = { supabaseUrl: url }, app = sdk.initializeApp(config);
+    const previous = { auth: firebaseState.auth, fb: firebaseState.fb, db: firebaseState.db, firebaseConfig: firebaseState.firebaseConfig };
+    app._auth = { app, currentUser: { uid: 'user' }, _account: { tenant_id: 'A' }, _close: vi.fn() }; app._tenantTopic = 'zoe:A';
     try {
-        const db = sdk.getDatabase(app); await turn();
+        const db = sdk.getDatabase(app);
+        Object.assign(firebaseState, { auth: app._auth, fb: sdk, db, firebaseConfig: config });
+        localStorage.setItem('zoew_firebase_config', JSON.stringify(config));
+        acceptFixtureSession(); sdk.resumeAcceptedSession(app._auth);
+        await turn();
         expect(await sdk.pickupResetStatus(sdk.ref(db, path.join('/')), req)).toEqual({ outcome: 'applied', pickupReset: await receipt(req) });
         expect(calls.filter(fn => fn.startsWith('zoe_pickup_reset_'))).toEqual(['zoe_pickup_reset_status_v1']);
-    } finally { await sdk.deleteApp(app); }
+    } finally { await sdk.deleteApp(app); Object.assign(firebaseState, previous); }
 });
 
 it.each(['tenant', 'owner', 'missing-codec', 'day', 'ref', 'cas'])('status preflight %s មិនអាចបដិសេធ original commit ដែលបាត់ ACK', async fault => {

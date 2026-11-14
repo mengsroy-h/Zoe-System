@@ -1,3 +1,4 @@
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 /**
  * Deep audit ៩ (owner request · locked `zto-status.ts`) ៖ «🔄 ពិនិត្យម្តងទៀត» on the not-closed bar asks the bar's own parcels first.
  *    A forced round asked only `ZTO_STATUS_SWEEP_BATCH` entries from the session cursor over every closed `null` verdict and every open
@@ -72,6 +73,12 @@ beforeEach(() => {
     uiState.toasts = [];
     firebaseState.authGeneration++;
     firebaseState.auth = { currentUser: { uid: 'audit' } } as any;
+    configureFixtureBackend('zto-recheck-bar');
+    acceptFixtureSession();
+    firebaseState.serverClockTrusted = true;
+    firebaseState.serverTimeOffsetMs = 0;
+    firebaseState.sessionExpiryCheck = 'live';
+    firebaseState.isDatabaseConnected = true;
     firebaseState.db = { name: 'audit-db' } as any;
     firebaseState.fb = { getIdTokenResult: async () => ({ token: 't' }) } as any;
     vi.spyOn(console, 'warn').mockImplementation(() => {});

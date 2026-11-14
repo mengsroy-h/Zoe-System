@@ -14,6 +14,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const nodeCrypto = require('crypto');
+const { keygenLogoutRuntime } = require('./keygen-logout-runtime.cjs');
 
 const root = path.resolve(__dirname, '../..');
 const appRoot = process.env.KEYGEN_APP_DIR ? path.resolve(process.env.KEYGEN_APP_DIR) : root;
@@ -55,7 +56,7 @@ const FNS = ['safeStoreGet', 'safeStoreSet', 'safeStoreRemove', 'requestPinBefor
     'readBiometricRecord', 'clearBiometricRecord', 'isBiometricEnabled', 'biometricPlatformAvailable', 'wrapPinWithRawKey',
     'unwrapPinWithRawKey', 'biometricPrfFirst', 'biometricPrfEval', 'biometricPrfBytes', 'enrollBiometricRecord', 'biometricUnlockPin', 'setBiometricBusy',
     'refreshBiometricUi', 'runBiometricUnlock', 'startBiometricEnrollment', 'toggleBiometricUnlock', 'completePinUnlock',
-    'isPinFlowPending', 'invalidateSensitiveSession', ...(src.indexOf('function lookupSetupScrubUrl(') !== -1 ? ['lookupSetupScrubUrl', 'lookupSetupSecretName'] : []), 'captureSensitiveSession', 'isSensitiveSessionCurrent'];
+    'isPinFlowPending', 'adminOwnerIsCurrent', 'adminOperationIsCurrent', 'invalidateSensitiveSession', ...(src.indexOf('function lookupSetupScrubUrl(') !== -1 ? ['lookupSetupScrubUrl', 'lookupSetupSecretName'] : []), 'captureSensitiveSession', 'isSensitiveSessionCurrent'];
 const sliced = slice(FNS);
 ok('រាល់ function ជីវមាត្រមានក្នុង ZoeKeyGen/app.js (' + FNS.length + ')', sliced.missing.length === 0, sliced.missing);
 
@@ -64,7 +65,9 @@ const prfSecret = nodeCrypto.randomBytes(32);
 
 function build(opts) {
     const o = Object.assign({ prf: true, platform: true }, opts || {});
+    const config = { apiKey: 'fixture-public-key', projectId: 'keygen-biometric-fixture', databaseURL: 'https://keygen-biometric-fixture-default-rtdb.firebaseio.com' };
     const store = new Map(Object.entries(o.storage || {}));
+    store.set('zoew_firebase_config', JSON.stringify(config));
     const els = {};
     const getEl = (id) => {
         if (!els[id]) {
@@ -125,15 +128,25 @@ function build(opts) {
         deriveSigningKeySessionKey: async (pin) => ({ derivedFrom: pin }),
         hashPin: async (pin) => 'pbkdf2:' + nodeCrypto.createHash('sha256').update('zoekeygen_pin_verify_v1|' + pin).digest('hex'),
         verifyStoredPin: async (pin, saved) => saved === 'pbkdf2:' + nodeCrypto.createHash('sha256').update('zoekeygen_pin_verify_v1|' + pin).digest('hex'),
-        auth: { currentUser: { uid: 'admin' } },
+        auth: { currentUser: { uid: 'admin' }, app: { options: config } },
         __log: log, __store: store, __el: getEl
     };
     const ctx = vm.createContext(sandbox);
-    vm.runInContext(`var appLocalStore = { getItem: (k) => __store.has(k) ? __store.get(k) : null, setItem: (k, v) => { __store.set(k, String(v)); }, removeItem: (k) => { __store.delete(k); } };
+    vm.runInContext(`var __sessionStore = new Map();
+        var appSessionStore = { getItem: k => __sessionStore.has(k) ? __sessionStore.get(k) : null,
+            setItem: (k,v) => __sessionStore.set(k,String(v)), removeItem: k => __sessionStore.delete(k),
+            get length() { return __sessionStore.size; }, key: i => [...__sessionStore.keys()][i] ?? null };
+        var appLocalStore = { getItem: (k) => __store.has(k) ? __store.get(k) : null, setItem: (k, v) => { __store.set(k, String(v)); }, removeItem: (k) => { __store.delete(k); }, get length() { return __store.size; }, key: i => [...__store.keys()][i] ?? null };
         var sensitiveSessionGeneration = 0; var authGeneration = 1; var isSignedInUiActive = true; var isVerifyingPin = false;
         var pinTargetAction = null; var signingKeySessionKey = null;`, ctx);
     vm.runInContext([realDecl('BIOMETRIC_STORAGE_KEY'), realDecl('BIOMETRIC_PRF_SALT'), 'var biometricUnlockInFlight = false;'].join('\n'), ctx);
+    vm.runInContext(keygenLogoutRuntime(src), ctx);
     vm.runInContext(sliced.code, ctx);
+    // The fixture starts after the SDK's authenticated callback accepted this actor.
+    vm.runInContext(`{ const scope = keygenAuthScope();
+        acceptedLogoutIntents.set(auth, { user: auth.currentUser, scope,
+            config: safeStoreGet(appLocalStore, 'zoew_firebase_config'),
+            current: localLogoutIntent.witness(scope, auth.currentUser.uid) }); }`, ctx);
     return { ctx, log, store, el: getEl };
 }
 const PIN = '482913';

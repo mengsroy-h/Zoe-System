@@ -26,6 +26,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { reactRuntime, renderedElement } = require('./react-view');
+const { localAuthRuntime } = require('./local-auth-runtime.cjs');
 
 const ROOT = process.env.LOOKUPFAILURE_APP_DIR ? path.resolve(process.env.LOOKUPFAILURE_APP_DIR) : path.resolve(__dirname, '../..');
 const APP_JS = path.join(ROOT, 'ZoeW', 'app.js');
@@ -38,6 +39,7 @@ function ok(label, cond, detail) {
 
 let SRC = '';
 try { SRC = fs.readFileSync(APP_JS, 'utf8'); } catch (e) { SRC = ''; }
+const lookupAuthRuntime = localAuthRuntime(ROOT, SRC);
 // ⛔ ពិដាន Lookup ដេរីវេពីកូដ ship ៖ តម្លៃសរសេរដៃក្នុងឧបករណ៍ធ្វើឲ្យការប្តូរពិដានក្នុង App (ឬការរសាត់ ZTO 20000 ↔ 13000) នៅតែបៃតង
 function srcNum(name) {
     const m = new RegExp('const ' + name + ' = ([0-9 *+]+);').exec(SRC);
@@ -91,6 +93,8 @@ function stringConst(text, name) {
 // បង្កើតបរិស្ថានរត់កូដពិត។ `plan` ជាបញ្ជីលទ្ធផលក្នុងមួយការហៅ៖
 //   { status, code, reason }  ឬ  { reject: 'timeout' | 'network' }
 function buildRuntime(plan) {
+    const backendConfig = { databaseURL: 'https://lookup-failure-fixture.firebaseio.com', apiKey: 'synthetic-public-key' };
+    const fixtureApp = { options: backendConfig };
     const calls = [];
     const statusEl = { className: 'lookup-status', textContent: '', hidden: true };
     const ctx = {
@@ -98,6 +102,10 @@ function buildRuntime(plan) {
         Object, Array, Promise, JSON, String, Number, Math, Date, Error, TypeError, Set, Map,
         parseFloat, isNaN, encodeURIComponent, setTimeout, clearTimeout,
         navigator: { onLine: true },
+        firebaseConfig: backendConfig,
+        auth: { app: fixtureApp, currentUser: { uid: 'lookup-failure-fixture' } },
+        db: { app: fixtureApp }, fb: {}, authGeneration: 1, sessionExpiryCheck: 'live',
+        isDatabaseInitialized: true, isDatabaseConnected: true,
         AUTO_LOOKUP_FAIL_COOLDOWN_MS: srcNum('AUTO_LOOKUP_FAIL_COOLDOWN_MS'),
         AUTO_LOOKUP_TRANSIENT_COOLDOWN_MS: srcNum('AUTO_LOOKUP_TRANSIENT_COOLDOWN_MS'),
         AUTO_LOOKUP_FAILURE_MAX: srcNum('AUTO_LOOKUP_FAILURE_MAX'),
@@ -162,9 +170,12 @@ function buildRuntime(plan) {
     ctx.window = ctx;
     ctx.queueMicrotask = queueMicrotask;
     vm.createContext(ctx);
+    // Install physical stores before React captures its actual const storage bindings.
+    lookupAuthRuntime.prepare(ctx, backendConfig);
     // ⛔ ZoeW ជា React ៖ ស្ថានភាព Lookup ជា `viewState.lookupStatus` ដែល `PhoneModal.tsx` គូរជា `#lookupStatus` ➜
     //    ស្រទាប់ React ពិតចូល sandbox ហើយ `__status` អានអត្ថបទពី **JSX ពិត**
     vm.runInContext(reactRuntime(SRC, { context: ctx }), ctx);
+    lookupAuthRuntime.install(ctx, backendConfig);
     ['ZTO_BARCODE_RE'].forEach((n) => {
         const literal = regexConst(SRC, n);
         if (literal) vm.runInContext('var ' + n + ' = ' + literal + ';', ctx);
@@ -184,8 +195,8 @@ function buildRuntime(plan) {
      'ztoIdentityRefusalIsTransient', 'lookupSecretLocked', 'lookupKeyedUrl', 'lookupUrlWithKey'].forEach((n) => {
         if (src[n]) vm.runInContext(src[n].replace(/^\s{4}/gm, ''), ctx);
     });
-    // ⛔ `attemptAutoLookup()` ពិតហៅ `addZtoIdentityHeader()` (ID token ទៅ Function ZTO) ➜ helper ពិតចូល sandbox ៖ គ្មាន `fb`/`auth` ➜
-    //    `ztoIdToken()` ពិតឆ្លើយ '' ➜ សំណើចេញគ្មាន token (ការវាស់ token ៖ `tools/audit-tools/zoew/tests/zto-detail-identity.test.ts`)
+    // ⛔ The declared SDK actor is accepted through the target's actual session runtime. This fixture supplies no token SDK method,
+    //    so real ztoIdToken() still answers ''; token authorization remains covered by zto-detail-identity.test.ts.
     ['ZTO_ID_TOKEN_TIMEOUT_MS', 'ZTO_ID_TOKEN_LOOKUP_TIMEOUT_MS', 'ZTO_IDENTITY_RETRY_REASONS'].forEach((n) => {
         const m = SRC.match(new RegExp('^ *const ' + n + ' = .*$', 'm'));
         if (m) vm.runInContext(m[0].trim(), ctx);

@@ -9,7 +9,6 @@ import { pickupBarcodeKey } from '../domain/pickup';
 import { dbOp, dbOpStalled } from '../services/network';
 import { showToast } from '../ui/toast';
 import { captureZtoSession, loadZtoPickupStatusOnce, getZtoPickupVerdict, ztoVerdictCandidate } from './zto-status';
-import { getShopZtoTrashMode } from './lookup-config';
 
 export const ZTO_FINAL_SCHEDULE_MS = 2000;
 
@@ -26,7 +25,7 @@ export const ZTO_FINAL_RETURNED_MAX = 2000;
 export const ZTO_SIGNED_REOPEN_PART_TEXT = ' បើក barcode ដែលមិនទាន់ Sign តាម «កញ្ចប់សរុប»។';
 
 export const ZTO_RESTORE_BLOCK_TEXT = {
-    palm: '🔒 កញ្ចប់ដែលចូលធុងសំរាមក្នុងរបៀប ZTO Login មិនអាចស្តារបានទេ។',
+    palm: '🔒 កញ្ចប់ដែលសម្អាតក្រោយ Sign ក្នុង ZTO Login មិនអាចស្តារបានទេ។',
     returned: '🔒 កញ្ចប់នេះ ZTO ស្កេនត្រឡប់រួច ហើយត្រូវត្រឡប់ទៅសាខាកណ្តាល — មិនអាចស្តារបានទេ។',
     signed: '🔒 កញ្ចប់នេះ Sign ក្នុង ZTO រួច — មិនអាចស្តារបានទេ។'
 };
@@ -63,7 +62,6 @@ export function explainZtoReopenLock(itemId?) {
 }
 
 export function trashRestoreBlockOf(item, evidenceOnly?) {
-    if (item && !evidenceOnly && getShopZtoTrashMode() === 'palm') return 'palm';
     const stamped = trashZtoFinalBlock(item);
     if (stamped && (stamped !== 'returned' || item.restoreBlocked === true)) return stamped;
     const barcodes = item && Array.isArray(item.barcodes) ? item.barcodes.filter(Boolean) : [];
@@ -71,7 +69,7 @@ export function trashRestoreBlockOf(item, evidenceOnly?) {
     if (trashItemLeftBranch(item)) return '';
     if (stamped) return stamped;
     if (!barcodes.length) return '';
-    if (item.trashReason === 'returned' && barcodes.some((b) => {
+    if (barcodes.some((b) => {
         const evidence = barcodeReturnedEvidence(b, item);
         return !!evidence && evidence.kind === 'returned';
     })) return 'returned';
@@ -87,6 +85,7 @@ export function barcodeZtoLeftKind(barcode, item?) {
     if (!barcode) return '';
     const evidence = barcodeReturnedEvidence(barcode, item);
     if (evidence && evidence.kind !== 'returned') return evidence.kind;
+    if (evidence && evidence.at >= Math.max(Number(barcode.ztoSentOutAt) || 0, Number(barcode.ztoMisplacedAt) || 0)) return '';
     if (barcodeZtoSentOut(barcode)) return 'sent';
     return barcodeZtoMisplaced(barcode) ? 'misplaced' : '';
 }
@@ -183,7 +182,7 @@ export function applyZtoFinalMarks(current, wanted, trash) {
             changed = true;
         }
     });
-    if (trash && (current.trashMode === 'palm' || current.barcodes.some(barcodeZtoSigned)) && current.restoreBlocked !== true) {
+    if (trash && (current.trashMode === 'palm' && current.trashReason === 'pickup' || current.barcodes.some(barcodeZtoSigned)) && current.restoreBlocked !== true) {
         stampTrashPolicy(current, current.trashMode || 'local');
         changed = true;
     }
@@ -203,7 +202,7 @@ export function collectZtoFinalTargets() {
             const path = (trash ? 'zoew_recently_deleted_cod_dod/' : 'zoew_scan_history_cod_dod/') + item.id;
             if (elapsedSince(ztoFinalFailedAt.get(path)) < ZTO_FINAL_FAIL_RETRY_MS) return;
             const wanted = {};
-            let any = trash && item.restoreBlocked !== true && (item.trashMode === 'palm' || item.barcodes.some(barcodeZtoSigned));
+            let any = trash && item.restoreBlocked !== true && (item.trashMode === 'palm' && item.trashReason === 'pickup' || item.barcodes.some(barcodeZtoSigned));
             item.barcodes.forEach((b) => {
                 const key = b && b.code ? pickupBarcodeKey(b.code) : '';
                 if (!key) return;

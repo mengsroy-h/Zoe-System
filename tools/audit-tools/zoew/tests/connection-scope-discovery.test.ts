@@ -3,6 +3,7 @@ import { withConnectionOwnership, captureConnectionOperation } from '../../../..
 import { createSupabaseSdk } from '../../../../ZoeW/src/services/supabase-sdk';
 import { firebaseState } from '../../../../ZoeW/src/core/state';
 import { fetchWithTimeout } from '../../../../ZoeW/src/services/network';
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 const turn = async () => { for (let i = 0; i < 60; i++) await Promise.resolve(); };
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
@@ -24,7 +25,12 @@ for (const cached of [false, true]) {
   it((cached ? 'control: with a cached shop' : 'without a cached shop') + ' a data listener attached at sign-in keeps delivering after the shop is discovered', async () => {
     const l = shopLab(cached ? { uid: 'same-user', row: { tenant_id: 'A', status: 'active' } } : null);
     const seen: number[] = [];
-    l.sdk.onAuthStateChanged(l.auth, (user: any) => { if (user) l.sdk.onValue(l.sdk.ref(l.db, 'zoew_scan_history_cod_dod'), (snap: any) => seen.push(Object.keys(snap.val() || {}).length)); });
+    localStorage.setItem('zoew_firebase_config', JSON.stringify(l.app.options));
+    Object.assign(firebaseState, { firebaseConfig: l.app.options, fb: l.sdk, auth: l.auth, db: l.db });
+    l.sdk.onAuthStateChanged(l.auth, (user: any) => { if (user) {
+      acceptFixtureSession(); l.sdk.resumeAcceptedSession(l.auth);
+      l.sdk.onValue(l.sdk.ref(l.db, 'zoew_scan_history_cod_dod'), (snap: any) => seen.push(Object.keys(snap.val() || {}).length));
+    } });
     await turn(); await turn();
     l.account([{ tenant_id: 'A', status: 'active' }]); await turn(); await turn();
     await l.sdk.set(l.sdk.ref(l.db, 'zoew_scan_history_cod_dod/i2'), { phone: '012000222' }); await turn(); await turn();
@@ -33,8 +39,11 @@ for (const cached of [false, true]) {
   });
 }
 it('shop discovery ends no lease, a shop change still does', () => {
-  const auth: any = { currentUser: { uid: 'A' }, _account: null };
-  Object.assign(firebaseState, { auth, db: {}, fb: {} });
+  const config = configureFixtureBackend('scope-discovery');
+  const app = { options: config };
+  const auth: any = { app, currentUser: { uid: 'A' }, _account: null };
+  Object.assign(firebaseState, { auth, db: { app }, fb: {} });
+  acceptFixtureSession();
   const lease = captureConnectionOperation();
   auth._account = { tenant_id: 'A' };
   const afterDiscovery = lease.current();

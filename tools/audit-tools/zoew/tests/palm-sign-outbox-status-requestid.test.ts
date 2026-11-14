@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { createRequire } from 'node:module';
 import { webcrypto } from 'node:crypto';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
@@ -34,6 +35,8 @@ beforeEach(async()=>{
     firebaseState.fb={tenantScope:()=> 'tenant-a',getIdTokenResult:async()=>({token:'synthetic-supabase-token'})} as any;
     firebaseState.isDatabaseConnected=true;firebaseState.serverClockTrusted=true;firebaseState.serverTimeOffsetMs=0;
     appLocalStore.clear();appLocalStore.setItem('zoew_firebase_config',JSON.stringify(options));
+    firebaseState.firebaseConfig = options;
+    acceptFixtureSession();
     for(const [name,value] of Object.entries({ZTO_PROXY_KEY:KEY,ZTO_PROXY_KEYS:'',ZTO_PALM_SESSION_SECRET:'synthetic-session-secret-longer-than32characters',ZTO_PALM_SIGN_KEY:'synthetic-protocol',ZTO_PALM_PASSWORD_KEY:'zoew-test-aes-16',ZTO_DETAIL_IDENTITY:'off',ZTO_DETAIL_BRANCH_PATHS:''}))vi.stubEnv(name,value);
     fn.resetCachesForTests();
     const blobs=new Map<string,any>();let revision=0;

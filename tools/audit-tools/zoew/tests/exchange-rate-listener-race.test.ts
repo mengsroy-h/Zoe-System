@@ -6,6 +6,7 @@ import { saveExchangeRate } from '../../../../ZoeW/src/features/exchange-rate';
 import { monthlyReportRiel } from '../../../../ZoeW/src/features/monthly-report';
 import { detachDatabaseListeners, initDatabaseListeners } from '../../../../ZoeW/src/services/db-listeners';
 import { DB_OP_TIMEOUT_MS } from '../../../../ZoeW/src/services/network';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 const PATH = 'zoew_settings/exchange_rate';
 let listener: (snapshot: { val: () => unknown }) => void;
@@ -20,6 +21,8 @@ beforeEach(() => {
     firebaseState.auth = { currentUser: { uid: 'rate-view-user' } } as any;
     firebaseState.db = { id: 'rate-view-shop' } as any;
     firebaseState.firebaseConfig = { databaseURL: 'https://rate-view.invalid' };
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(firebaseState.firebaseConfig));
+    acceptFixtureSession();
     firebaseState.dbListenersFailed = false;
     dataState.exchangeRateSaveInFlight = false;
     dataState.exchangeRateSaveOperation = null;

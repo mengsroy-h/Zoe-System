@@ -3,12 +3,16 @@ import { firebaseState } from '../../../../ZoeW/src/core/state';
 import { appLocalStore } from '../../../../ZoeW/src/core/storage';
 import { captureConnectionOperation } from '../../../../ZoeW/src/services/connection-flow';
 import { retryAsync } from '../../../../ZoeW/src/services/network';
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 
 beforeEach(() => {
     vi.useFakeTimers();
-    firebaseState.auth = { currentUser: { uid: 'retry-owner' }, _account: { tenant_id: 'original' } } as any;
+    const app = { options: configureFixtureBackend('retry-owner') };
+    firebaseState.auth = { app, currentUser: { uid: 'retry-owner' }, _account: { tenant_id: 'original' } } as any;
+    firebaseState.db = { app } as any;
+    firebaseState.fb = {} as any;
     firebaseState.authGeneration++;
-    appLocalStore.removeItem('zoew_firebase_config');
+    acceptFixtureSession();
 });
 afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); appLocalStore.removeItem('zoew_firebase_config'); });
 

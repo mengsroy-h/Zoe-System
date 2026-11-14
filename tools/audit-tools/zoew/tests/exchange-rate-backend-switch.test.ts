@@ -9,6 +9,7 @@ import { appLocalStore } from '../../../../ZoeW/src/core/storage';
 import { saveExchangeRate } from '../../../../ZoeW/src/features/exchange-rate';
 import { initFirebase } from '../../../../ZoeW/src/services/firebase-init';
 import { DB_OP_TIMEOUT_MS } from '../../../../ZoeW/src/services/network';
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 
 vi.mock('../../../../ZoeW/src/services/supabase-backend', () => ({ createZoeSupabaseSdk: () => null }));
 
@@ -49,9 +50,12 @@ afterEach(() => {
 });
 
 async function stallFirstSave(old: ReturnType<typeof fakeSdk>) {
+    const app = { name: 'old', options: configureFixtureBackend('exchange-rate-old') };
     firebaseState.fb = old.sdk;
-    firebaseState.db = { name: 'old' } as any;
-    firebaseState.dbRefExchangeRate = { owner: 'old', path: 'zoew_exchange_rate' } as any;
+    firebaseState.auth = old.sdk.getAuth(app);
+    firebaseState.db = old.sdk.getDatabase(app);
+    firebaseState.dbRefExchangeRate = old.sdk.ref(firebaseState.db, 'zoew_exchange_rate');
+    acceptFixtureSession();
     const first = saveExchangeRate();
     await vi.advanceTimersByTimeAsync(DB_OP_TIMEOUT_MS + 50);
     expect(await first).toBe('pending');
@@ -68,6 +72,7 @@ describe('exchange-rate mutex ↔ backend teardown', () => {
         const generationBefore = firebaseState.authGeneration;
         expect(await initFirebase()).toBe(true);
         expect(firebaseState.authGeneration).toBeGreaterThan(generationBefore);
+        acceptFixtureSession();
         firebaseState.dbRefExchangeRate = firebaseState.fb.ref(firebaseState.db, 'zoew_exchange_rate');
         const second = saveExchangeRate();
         await vi.advanceTimersByTimeAsync(10);

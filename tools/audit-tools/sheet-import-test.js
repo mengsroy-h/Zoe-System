@@ -287,8 +287,14 @@ async function withTimeout(promise, ms, label) {
     const page = await ctx.newPage();
 
     const sent = [];
-    let reply = { ok: true, data: { spreadsheetName: 'ZTO', sheetName: 'Data', rowCount: 128 } };
-    let replyFor = null;
+    const createProtocolFixture = require(path.join(ROOT, 'tools/audit-tools/zoew/tests/helpers/sheet-import-fixture.cjs'));
+    const protocol = createProtocolFixture(fs.readFileSync(path.join(ROOT, 'tools/zto-import/Code.gs'), 'utf8'));
+    protocol.store.props.IMPORT_PASSWORD = FAKE_PASSWORD;
+    protocol.store.props.SHEET_NAME = 'Data';
+    protocol.store.capacity = 512;
+    protocol.store.rows = [['Barcode', 'DOD', 'COD', 'Phone'], ...Array.from({ length: 128 }, (_, index) =>
+        ['SEED0000' + index, 0, 0, '097000' + String(index).padStart(4, '0')])];
+    protocol.ctx.SpreadsheetApp.openById(protocol.store.props.SHEET_ID).getSheetByName('Data').getParent = () => ({ getName: () => 'ZTO' });
     page.on('dialog', (d) => d.accept().catch(() => {}));
     await page.route('**', (route) => {
         const req = route.request();
@@ -298,7 +304,7 @@ async function withTimeout(promise, ms, label) {
             let body = {};
             try { body = JSON.parse(req.postData() || '{}'); } catch (e) { body = {}; }
             sent.push({ action: body.action, method: req.method(), headers: req.headers(), password: body.password, rows: body.payload && body.payload.rows });
-            const out = (replyFor && replyFor[body.action]) || reply;
+            const out = protocol.post(body);
             return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(out) });
         }
         if (u.startsWith('http://127.0.0.1:' + port)) return route.continue();
@@ -417,11 +423,6 @@ async function withTimeout(promise, ms, label) {
     });
 
     await group('១០. អានឯកសារ ➜ ផ្គូផ្គង ➜ មើលជាមុន', async () => {
-            replyFor = {
-                status: reply,
-                prepare: { ok: true, data: { signature: 'sig-1', source: 'auto', mapping: { barcode: 0, dod: 1, cod: 2, phone: 3 } } },
-                import: { ok: true, data: { added: 3, updated: 1, unchanged: 0, skippedNoBarcode: 1, duplicatesInFile: 1, rowsAfter: 131, sheetName: 'Data' } }
-            };
             await page.setInputFiles('#siFileInput', samplePath, { timeout: 6000 });
             await page.waitForTimeout(2000);
             check(await shown('siMapCard'), 'អានឯកសាររួច ➜ បើកជំហានផ្គូផ្គង');
@@ -448,6 +449,7 @@ async function withTimeout(promise, ms, label) {
     });
 
     await group('១២. នាំចូល ➜ សំណើត្រឹមត្រូវ និងលទ្ធផលពិត', async () => {
+            await page.selectOption('#siModeSel', 'upsert');
             const before = sent.length;
             await page.click('#siImportBtn', { timeout: 6000 });
             await page.waitForTimeout(1500);
@@ -464,7 +466,7 @@ async function withTimeout(promise, ms, label) {
     });
 
     await group('១៣. server បដិសេធ ➜ សារបរាជ័យ មិនមែន ✅', async () => {
-            replyFor.import = { ok: false, error: 'ពាក្យសម្ងាត់មិនត្រឹមត្រូវ' };
+            protocol.store.props.IMPORT_PASSWORD = 'synthetic-rotated-password';
             await page.click('#siImportBtn', { timeout: 6000 });
             await page.waitForTimeout(1500);
             const failMsg = await text('siActionMsg');
@@ -479,12 +481,18 @@ async function withTimeout(promise, ms, label) {
     });
 
     await group('១៤. ក្រៅបណ្ដាញ ➜ បដិសេធ ហើយ **មិនបាញ់សំណើ**', async () => {
-            replyFor.import = { ok: true, data: { added: 0, updated: 0, unchanged: 0, rowsAfter: 9, sheetName: 'Data' } };
+            protocol.store.props.IMPORT_PASSWORD = FAKE_PASSWORD;
+            const doneProof = await page.evaluate(() => Object.keys(localStorage).filter(key => key.startsWith('zoe_sheet_pending_v1_'))
+                .map(key => [key, localStorage.getItem(key)]));
+            check(doneProof.some(([, raw]) => JSON.parse(raw).state === 'done'), 'ក្រៅបណ្ដាញ ៖ ប្រតិបត្តិការមុនមាន DONE proof ពិត មិនមែន pending មិនច្បាស់');
             await page.evaluate(() => Object.defineProperty(navigator, 'onLine', { get: () => false, configurable: true }));
             const beforeOffline = sent.length;
             await page.click('#siImportBtn', { timeout: 6000 });
             await page.waitForTimeout(1200);
             check(sent.length === beforeOffline, '⛔ ក្រៅបណ្ដាញ ➜ គ្មានសំណើចេញសោះ', sent.length - beforeOffline);
+            const proofAfterOffline = await page.evaluate(() => Object.keys(localStorage).filter(key => key.startsWith('zoe_sheet_pending_v1_'))
+                .map(key => [key, localStorage.getItem(key)]));
+            check(JSON.stringify(proofAfterOffline) === JSON.stringify(doneProof), 'ក្រៅបណ្ដាញ ៖ proof ដើមនៅដដែល មិនលុបដើម្បីបង្កើត fresh attempt');
             const offMsg = await text('siActionMsg');
             check(!!offMsg && offMsg.indexOf('✅') === -1 && offMsg.indexOf('ក្រៅបណ្ដាញ') !== -1,
                 'ក្រៅបណ្ដាញ ➜ សារប្រាប់ការពិត', offMsg);
@@ -516,11 +524,6 @@ async function withTimeout(promise, ms, label) {
             await withTimeout(boot(), 30000, 'reboot-csv');
             await page.evaluate(() => window.openSheetImportModal('123456'));
             await page.waitForTimeout(1200);
-            replyFor = {
-                status: reply,
-                prepare: { ok: true, data: { signature: 'sig-csv', source: 'auto', mapping: { barcode: 0, dod: 1, cod: 2, phone: 3 } } },
-                import: { ok: true, data: { added: 0, updated: 0, unchanged: 4, skippedNoBarcode: 1, duplicatesInFile: 1, rowsAfter: 131, sheetName: 'Data' } }
-            };
             await page.setInputFiles('#siFileInput', csvSamplePath, { timeout: 6000 });
             await page.waitForTimeout(2000);
             check(await shown('siMapCard'), 'CSV ➜ បើកជំហានផ្គូផ្គង');

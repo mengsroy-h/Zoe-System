@@ -28,6 +28,7 @@ process.exitCode = 1;
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { localAuthRuntime } = require('./local-auth-runtime.cjs');
 const { moduleRuntime } = require('./react-view');
 
 const ROOT = process.env.CLEANUPATOMIC_APP_DIR ? path.resolve(process.env.CLEANUPATOMIC_APP_DIR) : path.resolve(__dirname, '../..');
@@ -47,6 +48,7 @@ if (!fs.existsSync(FILE)) {
     return;
 }
 const SRC = fs.readFileSync(FILE, 'utf8');
+const authRuntime = localAuthRuntime(ROOT, SRC);
 const protocolRuntime = moduleRuntime(ROOT, SRC, [{ path: 'src/core/session-verification.ts', expose: ['sessionVerificationRequired'] }, { path: 'src/core/clock.ts', expose: ['captureClockOperation', 'serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'getServerClockBounds'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations', 'clearRestoreFinalization'] }]);
 
 function sliceFrom(src, name) {
@@ -118,6 +120,7 @@ function makeRun(opts) {
         monthly: { [MONTH]: { codDollar: START_COD, dodDollar: 3, totalCount: START_COUNT } }
     };
     const storage = opts.storage || {};
+    if (!storage.zoew_firebase_config) storage.zoew_firebase_config = JSON.stringify({ databaseURL: 'https://cleanup-fixture.invalid' });
     const timers = [];
     const liveTimers = new Set();
     let writes = 0;
@@ -261,6 +264,8 @@ function makeRun(opts) {
     box.window.navigator = box.navigator;
     box.authGeneration = 0;
     const ctx = vm.createContext(box);
+    const declaredConfig = box.db.app.options;
+    authRuntime.prepare(ctx, declaredConfig);
     const parts = CONSTS.map((c) => sliceConst(SRC, c)).filter(Boolean);
     parts.push("let serverClockTrusted = true, cleanupResumeInFlight = false, restoreRecoveryHoldScope = '', ztoStatusLoaded = true; const ztoPickupStatus = new Map(), ztoReturnedEvidence = new Map();");
     parts.push('const cleanupInFlight = new Set(); const liveTrashClaims = new Set(); const trashClaimPage = Math.random().toString(36).slice(2); const cleanupOperationOwners = new Map();', 'const activeRestoreClaims = new Map();');
@@ -277,7 +282,8 @@ function makeRun(opts) {
     Object.keys(OPTIONAL_CORE_FNS).forEach((fn) => parts.push(sliceFrom(SRC, fn) || OPTIONAL_CORE_FNS[fn]));
     // ការអាន ownership លើ server (REST) មិនមាននៅទីនេះ ➜ ឥរិយាបថ «គ្មាន REST» (ដូច Supabase) · ownership វាស់ក្នុង tools/audit-tools/zoew/tests/cleanup-applied-foreign-op.test.ts
     parts.push('function abandonZtoSignedHolds() { return new Set(); }');
-    vm.runInContext(protocolRuntime.code + '\n' + protocolRuntime.withoutBindings(parts.join('\n\n')), ctx);
+    vm.runInContext(authRuntime.code + '\n' + authRuntime.withoutBindings(protocolRuntime.code + '\n' + protocolRuntime.withoutBindings(parts.join('\n\n'))), ctx);
+    if (authRuntime.names.has('acceptLocalAuthSession')) vm.runInContext("if (!acceptLocalAuthSession(auth, loginBackendScope(), auth.currentUser)) throw new Error('Cleanup fixture SDK actor was not accepted');", ctx);
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
     vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', ctx);
     return { ctx, box, server, storage, toasts, timers, writeCount: () => writes, liveTimers: () => liveTimers.size };
@@ -711,11 +717,12 @@ function packagePlaces(server) {
     {
         const run = makeRun({});
         seedItem(run, BARCODES);
+        const initialStorage = JSON.stringify(run.storage);
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", run.ctx);
         await settleRun(run, 700);
         run.timers.forEach(clearTimeout);
         ok('⛔ ទិសផ្ទុយ ៖ ការសម្អាតដែលចប់ស្រួល មិនបន្សល់ journal',
-            Object.keys(run.storage).length === 0, run.storage);
+            JSON.stringify(run.storage) === initialStorage, run.storage);
     }
 
     // ── ៥គ. ⛔ ទិសផ្ទុយ ៖ «យករួច» (២ ម៉ោង) ៖ មិនបាត់ ហើយលុយមិនប៉ះ ────────
@@ -807,7 +814,7 @@ function packagePlaces(server) {
     //    វាជាស្ថានភាពថ្មីដែលរស់នៅ `localStorage` ➜ វារស់រាន Reconfig។ ការ
     //    សរសេរធាតុរបស់អាជីវកម្ម ក ចូល Project របស់អាជីវកម្ម ខ = ការលេចទិន្នន័យ។
     {
-        const run = makeRun({ stopBeforePathPrefix: 'zoew_recently_deleted_cod_dod/' });
+        const run = makeRun({ stopBeforePathPrefix: 'zoew_recently_deleted_cod_dod/', storage: { zoew_firebase_config: '{ "apiKey": "k", "databaseURL": "https://old-project.firebaseio.com" }' } });
         run.storage['zoew_firebase_config'] = '{ "apiKey": "k", "databaseURL": "https://old-project.firebaseio.com" }';
         run.box.db.app.options.databaseURL = 'https://old-project.firebaseio.com';
         seedItem(run, BARCODES);
@@ -840,7 +847,7 @@ function packagePlaces(server) {
 
         // ⛔ ទិសផ្ទុយ ៖ Project **ដដែល** ➜ ការស្តារត្រូវដើរដូចធម្មតា
         const same = makeRun({ storage: { 'zoew_firebase_config': run.storage['zoew_firebase_config'] } });
-        const fresh = makeRun({ stopBeforePathPrefix: 'zoew_recently_deleted_cod_dod/' });
+        const fresh = makeRun({ stopBeforePathPrefix: 'zoew_recently_deleted_cod_dod/', storage: { zoew_firebase_config: '{ "databaseURL": "https://old-project.firebaseio.com" }' } });
         fresh.storage['zoew_firebase_config'] = '{ "databaseURL": "https://old-project.firebaseio.com" }';
         fresh.box.db.app.options.databaseURL = 'https://old-project.firebaseio.com';
         seedItem(fresh, BARCODES);

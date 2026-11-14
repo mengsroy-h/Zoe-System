@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { createRequire } from 'node:module';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { appLocalStore } from '../../../../ZoeW/src/core/storage';
@@ -57,6 +58,8 @@ async function fixture(mode: Mode, pageOf: (request: Request) => Page, provider 
     const options = provider === 'firebase' ? { databaseURL: 'https://audit.firebaseio.com' } : { supabaseUrl: 'https://audit.invalid' };
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
     firebaseState.auth = { currentUser: { uid: 'synthetic-user' }, app: { options } } as any;
+    firebaseState.firebaseConfig = options;
+    acceptFixtureSession();
     firebaseState.db = { app: { options } } as any;
     firebaseState.fb = { getIdTokenResult: async () => ({ token }), tenantScope: provider === 'supabase' ? () => 'tenant-a' : undefined } as any;
     let session = '';

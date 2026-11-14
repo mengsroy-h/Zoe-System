@@ -553,7 +553,7 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
         return answer;
     }, code);
     // លំដាប់លើ barcode ដដែល៖ Lookup/Scan ➜ Remove ➜ Restore ➜ Delete ➜ Restore។
-    // ទ្វារស្តារពិតនៅដដែល៖ Palm/Sign បដិសេធ; Sheet ត្រូវមាន shop mode local ពិត។
+    // Palm/Cookie unsigned ស្តារបានក្រោយផ្ទៀងថ្មី; Sign និង Palm pickup នៅតែបដិសេធ; Sheet ប្រើ shop mode local។
     const lookupConfigs = await Promise.all(devices.map((d) => d.page.evaluate(() => {
         const cfg = JSON.parse(localStorage.getItem('zoew_lookup_api_config'));
         localStorage.setItem('zoew_lookup_api_config', JSON.stringify({ ...cfg, autoSubmit: false, fastMode: false }));
@@ -561,10 +561,10 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
     })));
     const sequences = [{ signed: false, first: 'removeBarcode' }];
     if (authMode === 'palm') sequences.push({ signed: false, first: 'deleteItem' });
-    if (authMode === 'cookie') sequences.push({ signed: true, first: 'removeBarcode' }, { signed: true, first: 'deleteItem' });
+    if (authMode !== 'sheet') sequences.push({ signed: true, first: 'removeBarcode' }, { signed: true, first: 'deleteItem' });
     for (let s = 0; s < sequences.length; s++) {
         const scenario = sequences[s];
-        const blocked = authMode === 'palm' || scenario.signed;
+        const blocked = scenario.signed;
         const code = String(910000000000000 + Number(site) * 1000 + ['sheet', 'cookie', 'palm'].indexOf(authMode) * 100 + s);
         const label = 'sequence/' + (scenario.signed ? 'signed/' : 'unsigned/') + scenario.first;
         fixture.world.parcels.set(code, { site, phone: '0977' + String(10000 + ['sheet', 'cookie', 'palm'].indexOf(authMode) * 100 + s),
@@ -650,7 +650,7 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
         const flow = runFlowNames[f];
         const movement = flow.replace('-signed', '');
         const signedTrash = flow.endsWith('-signed');
-        const finalTrash = authMode === 'palm' || signedTrash;
+        const finalTrash = signedTrash || authMode === 'palm' && movement === 'pickup2h';
         for (let m = 0; m < modes.length; m++) {
             const mode = modes[m];
             const id = authMode + '_flow_' + tag + '_' + f + '_' + m;
@@ -838,6 +838,19 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
                 if (removed && !blocked) { const sign = stage === 'move' ? -1 : 1; revenue.adjust(dateKey, sign * 10, sign * 2, sign); }
                 await verify(flow + '/' + mode + '/' + (blocked ? 'restore-blocked' : stage), code, stage === 'move' || blocked ? 'trash' : 'history', deducted,
                     stage === 'restore' && !blocked ? (movement === 'pickup2h' || signedTrash ? { closedClock: actionClock } : { restoredClock: actionClock }) : {});
+                if (stage === 'restore' && !blocked) {
+                    const source = Object.values(beforeStage.zoew_recently_deleted_cod_dod || {}).find(item => Object.values(item.barcodes || {}).some(barcode => barcode.code === code));
+                    const after = await read();
+                    const receipt = after.zoew_trash_consumptions?.[source?.id];
+                    assert.ok(source && receipt && receipt.v === 1 && receipt.kind === 'restore' && receipt.sourceId === source.id
+                        && receipt.generation === (source.trashGeneration || 0) && receipt.deletedAt === source.deletedAt,
+                    'restore ត្រូវមាន consumption receipt តាមជំនាន់ និង source ពិត');
+                    assert.ok(typeof receipt.actorUid === 'string' && receipt.actorUid && typeof receipt.token === 'string' && receipt.token,
+                        'restore receipt ត្រូវមាន actor និង operation token');
+                    assert.equal(receipt.scope, await dev.page.evaluate(() => window.liveShopScope()), 'restore receipt ត្រូវស្ថិតក្នុងសាខាដើម');
+                    assert.ok(Object.values(after.zoew_scan_history_cod_dod?.[receipt.targetId]?.barcodes || {}).some(barcode => barcode.code === code),
+                        'restore receipt ត្រូវចង្អុលជួរដែលមាន barcode ពិត');
+                }
                 if (blocked) {
                     const after = await read();
                     assert.deepEqual(after.zoew_restore_finalizations || {}, beforeStage.zoew_restore_finalizations || {}, 'restore បដិសេធមិនសរសេរ finalization');
@@ -858,7 +871,7 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
         assert.ok(fixture.world.calls.slice(firstCall).some((q) => q.palm === '1' && q.list === '1' && q.signed === '1' && q.exact === '1'), 'ត្រូវអាន Palm signed list ពេញលេញ');
     }
     assert.equal(interruptions, expectedInterruptions);
-    assert.equal(deniedRestores, runFlowNames.filter((name) => authMode === 'palm' || name.endsWith('-signed')).length * modes.length);
+    assert.equal(deniedRestores, runFlowNames.filter((name) => name.endsWith('-signed') || authMode === 'palm' && name === 'pickup2h').length * modes.length);
     if (authMode === 'sheet') {
         assert.equal(interruptions, runFlowNames.length * 4, 'Sheet ៖ ការបិទទំព័រពាក់កណ្តាលសរសេរត្រូវបាញ់ពិតគ្រប់លំហូរ (ផ្លាស់ទី + ស្តារ × មុន/ក្រោយ commit)');
         await leaveRestoreDialogs();
@@ -868,14 +881,14 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
             + ' page closes mid-write · Remove→Restore→Delete→Restore · ' + runFlowNames.join('/') + ' ➜ restore');
         return { steps, duplicateCalls, interruptions, expectation: revenue };
     }
-    if (authMode === 'cookie') {
+    if (authMode !== 'sheet') {
         for (const [index, phase] of ['claim', 'prepared'].entries()) {
-            const sourceId = 'sign_race_' + tag + '_' + phase;
+            const sourceId = 'sign_race_' + authMode + '_' + tag + '_' + phase;
             const targetId = sourceId + '_neighbor';
-            const code = String(900000000000000 + Number(site) * 1000 + 900 + index * 10);
+            const code = String(900000000000000 + Number(site) * 1000 + 900 + index * 10 + (authMode === 'palm' ? 50 : 0));
             const neighborCode = String(Number(code) + 1);
             const now = Date.now();
-            const phone = '097700061' + index;
+            const phone = (authMode === 'palm' ? '097700071' : '097700061') + index;
             const makeItem = (id, parcel, amount, fee) => ({ id, phone, scanDate: dateKey, createdAt: now, isClosed: false, isCalled: false,
                 time: '09:00:00 (' + dateKey + ')', count: 1, barcode: parcel, cod: amount, dod: fee, price: amount + fee,
                 barcodes: [{ code: parcel, cod: amount, dod: fee, locker: 'A1', createdAt: now, isClosed: false, isDeducted: false }] });
@@ -928,6 +941,7 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
             assert.ok(!frozen.restoreClaim, 'ការបដិសេធ Sign មិនត្រូវសល់ claim');
             assert.deepEqual(cancelled.zoew_scan_history_cod_dod[targetId], originalNeighbor, 'cancel មិនត្រូវប៉ះ barcode ដើមក្នុង target');
             assert.deepEqual(cancelled.zoew_restore_finalizations || {}, before.zoew_restore_finalizations || {}, 'cancel មិនត្រូវ finalize');
+            assert.deepEqual(cancelled.zoew_trash_consumptions || {}, before.zoew_trash_consumptions || {}, 'Sign cancel មិនត្រូវ consume source generation');
             for (const d of devices.slice(1)) {
                 assert.equal(await d.page.evaluate((code) => window.ztoPickupStatus.get(code)?.closed === true, code), false, 'ឧបករណ៍សាកឡើងវិញត្រូវគ្មាន verdict Sign');
                 await d.page.evaluate((args) => { window.__startOp(args); window.__startOp(args); }, args);
@@ -938,11 +952,12 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
             assert.ok(!retried.zoew_recently_deleted_cod_dod[trashId].restoreClaim);
             assert.deepEqual(retried.zoew_scan_history_cod_dod[targetId], originalNeighbor);
             assert.deepEqual(retried.zoew_restore_finalizations || {}, before.zoew_restore_finalizations || {});
+            assert.deepEqual(retried.zoew_trash_consumptions || {}, before.zoew_trash_consumptions || {}, 'stale retry មិនត្រូវ consume source generation');
             deniedRestores++;
         }
     }
     await lookupOff(devices, read);
-    const lockedFlow = authMode === 'palm' ? 0 : 4;
+    const lockedFlow = 4;
     const lockedCode = String(900000000000000 + Number(site) * 1000 + codeBase + lockedFlow * 10);
     await Promise.all(devices.map((d) => d.page.evaluate((code) => {
         const args = { wanted: 'restore', pick: 0, target: { code } };

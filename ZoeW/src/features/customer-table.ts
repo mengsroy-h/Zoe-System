@@ -71,6 +71,7 @@ export async function fetchCustomerDataTableRows(force?, wantFresh?) {
             if (data && data.error) throw new Error(data.error);
             if (myGeneration !== lookupState.customerDataTableFetchGeneration) return;
             const rows = Array.isArray(data && data.rows) ? data.rows : [];
+            lookupState.customerDataTableFetchGeneration++;
             lookupState.customerDataTableRows = rows;
             lookupState.customerDataTableFetchedAt = startedAt;
             lookupState.customerDataTableLastFailedAt = 0;
@@ -92,7 +93,14 @@ export async function fetchCustomerDataTableRows(force?, wantFresh?) {
             viewState.customerTableStatus = "❌ ទាញយកទិន្នន័យបរាជ័យ៖ " + (e && e.message === 'Customer table fetch timed out' ? "អស់ពេល (Timeout)" : (e && e.message ? e.message : ''));
             if (lookupState.customerDataTableRows) filterCustomerDataTable();
         } finally {
-            if (lookupState.customerDataTableFetchPromise === running) lookupState.customerDataTableFetchPromise = null;
+            if (lookupState.customerDataTableFetchPromise === running) {
+                lookupState.customerDataTableFetchPromise = null;
+                if (myGeneration !== lookupState.customerDataTableFetchGeneration && operation.current()
+                    && viewState.customerTableStatus === loadingStatus && Array.isArray(lookupState.customerDataTableRows)) {
+                    renderCustomerDataTableStatus(lookupState.customerDataTableRows);
+                    filterCustomerDataTable();
+                }
+            }
         }
     });
 
@@ -288,10 +296,12 @@ export function rememberCustomerTableRow(barcode, phone, cod, dod) {
     for (let i = 0; i < lookupState.customerDataTableRows.length; i++) {
         const current = lookupState.customerDataTableRows[i];
         if (String((current && current.barcode) || '').trim().toUpperCase() === key) {
+            lookupState.customerDataTableFetchGeneration++;
             lookupState.customerDataTableRows[i] = row;
             return;
         }
     }
+    lookupState.customerDataTableFetchGeneration++;
     lookupState.customerDataTableRows.push(row);
 }
 

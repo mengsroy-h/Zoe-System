@@ -8,6 +8,7 @@ import { purgeTrashWithRegistry } from '../../../../ZoeW/src/services/registry-p
 import { runAutomaticDeletedCleanup } from '../../../../ZoeW/src/domain/cleanup';
 import { liveShopScope } from '../../../../ZoeW/src/core/shop-scope';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { dataState, firebaseState, uiState, ztoState } from '../../../../ZoeW/src/core/state';
 import { pendingRegistryReleases } from '../../../../ZoeW/src/core/clock';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../../../../ZoeW/src/core/text';
@@ -87,6 +88,7 @@ beforeEach(() => {
             afterWrite?.(target, patch);
         }, onValue: () => () => {}, off: () => {}
     } as any;
+    acceptFixtureSession();
     for (const [field, path] of Object.entries({ dbRefHistory: H, dbRefDeleted: T, dbRefDailyRevenue: D, dbRefMonthlyRevenue: M,
         dbRefDailyPickup: 'zoew_daily_pickup_cod_dod', dbRefDailyCollected: 'zoew_daily_collected_cod_dod' })) (firebaseState as any)[field] = ref(firebaseState.db, path);
     dataState.scanHistory = []; dataState.deletedItems = [clone(source)]; dataState.dailyRevenueData = clone(store[D]); dataState.monthlyRevenueData = clone(store[M]);
@@ -607,8 +609,10 @@ it.each(['generation', 'db', 'sdk', 'uid', 'scope'])('auto purge៖ cursor ម�
     if (change === 'scope') {
         const other = 'https://other-purge-restore.firebaseio.com';
         (firebaseState.db as any).app.options.databaseURL = other;
+        firebaseState.firebaseConfig = { databaseURL: other };
         localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: other }));
     }
+    acceptFixtureSession();
     sweep = runAutomaticDeletedCleanup(); await vi.advanceTimersByTimeAsync(DB_OP_TIMEOUT_MS + 1); await sweep;
     expect(batches).toHaveLength(2); expect(batches.every(patch => purgesSource(patch, 'source'))).toBe(true);
     expect(at(T + '/second')).not.toBeNull(); expect(receipts()).toHaveLength(0);

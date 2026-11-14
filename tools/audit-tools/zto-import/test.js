@@ -1,6 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const crypto = require('node:crypto');
+const { memoryStorage } = require('../react-view');
 
 const root = process.env.ZTO_IMPORT_APP_DIR ? path.resolve(process.env.ZTO_IMPORT_APP_DIR) : path.resolve(__dirname, '../../zto-import');
 // Baseline ចាស់អាចនៅតែដាក់ zto-import ផ្ទាល់ក្នុង root របស់ repo។
@@ -24,16 +26,9 @@ const sandbox = {
     Utilities: {
         DigestAlgorithm: { SHA_256: 'SHA_256' },
         Charset: { UTF_8: 'UTF_8' },
+        getUuid: () => crypto.randomUUID(),
         computeDigest(_algo, value) {
-            const bytes = [];
-            let h = 5381;
-            for (let i = 0; i < value.length; i++) {
-                h = ((h * 33) ^ value.charCodeAt(i)) | 0;
-            }
-            for (let i = 0; i < 8; i++) {
-                bytes.push(((h >> (i * 4)) & 0xff) - 128);
-            }
-            return bytes;
+            return Array.from(crypto.createHash('sha256').update(value).digest(), byte => byte > 127 ? byte - 256 : byte);
         }
     },
     PropertiesService: {
@@ -41,6 +36,7 @@ const sandbox = {
             return {
                 store: scriptPropertyStore,
                 getProperty(key) { return this.store[key] || null; },
+                getProperties() { return { ...this.store }; },
                 setProperty(key, value) { this.store[key] = String(value); },
                 deleteProperty(key) { delete this.store[key]; }
             };
@@ -49,7 +45,7 @@ const sandbox = {
     SpreadsheetApp: {},
     HtmlService: {},
     LockService: {},
-    ScriptApp: {},
+    ScriptApp: { getScriptId: () => 'synthetic-import-script' },
     DriveApp: {},
     Drive: {},
     MailApp: {},
@@ -271,6 +267,8 @@ function importFixture(initial, capacity, options) {
     const state = { rows: JSON.parse(JSON.stringify(initial)), capacity, releases: 0, clears: 0 };
     const sheet = {
         getName: () => 'Customers',
+        getSheetId: () => 123,
+        getParent: () => ({ getName: () => 'Synthetic target' }),
         getMaxRows: () => state.capacity,
         getLastRow: () => {
             let length = state.rows.length;
@@ -287,6 +285,7 @@ function importFixture(initial, capacity, options) {
             return {
                 getValues: () => Array.from({ length: count }, (_, i) =>
                     (state.rows[start - 1 + i] || ['', '', '', '']).slice(col - 1, col - 1 + width)),
+                getFormulas: () => Array.from({ length: count }, () => Array(width).fill('')),
                 setNumberFormat() {},
                 clearContent() {
                     if (settings.failClear) throw new Error('synthetic-clear-rejected');
@@ -300,10 +299,18 @@ function importFixture(initial, capacity, options) {
             };
         }
     };
+    const properties = { IMPORT_PASSWORD: 'synthetic-password', SHEET_ID: 'synthetic-sheet', SHEET_NAME: 'Customers' };
     const context = vm.createContext({
+        Utilities: sandbox.Utilities,
+        ScriptApp: { getScriptId: () => 'synthetic-import-script' },
         PropertiesService: { getScriptProperties: () => ({
-            getProperty: (key) => ({ IMPORT_PASSWORD: 'synthetic-password', SHEET_ID: 'synthetic-sheet' })[key],
-            setProperty() { if (settings.failMappingStore) throw new Error('synthetic-properties-quota'); }
+            getProperty: (key) => properties[key] ?? null,
+            getProperties: () => ({ ...properties }),
+            setProperty(key, value) {
+                if (settings.failMappingStore && key === 'COLUMN_MAPPING') throw new Error('synthetic-properties-quota');
+                properties[key] = String(value);
+            },
+            deleteProperty(key) { delete properties[key]; }
         }) },
         SpreadsheetApp: { openById: () => ({ getSheetByName: () => sheet }), flush() { if (settings.failFlush) throw new Error('synthetic-flush-rejected'); } },
         LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock() { state.releases++; } }) },
@@ -311,8 +318,22 @@ function importFixture(initial, capacity, options) {
     });
     vm.runInContext(fs.readFileSync(path.join(root, 'Code.gs'), 'utf8'), context);
     const postRaw = (contents) => JSON.parse(context.doPost({ postData: { contents } }).text);
-    const post = (body) => postRaw(JSON.stringify(body));
-    return { state, run: (rows) => context.importRows('synthetic-password', { rows, mode: 'replace' }), post, postRaw };
+    const post = (body) => {
+        const next = JSON.parse(JSON.stringify(body));
+        if (next.action === 'import' || next.action === 'clear') {
+            const prepared = postRaw(JSON.stringify({ action: 'prepareWrite', password: next.password,
+                request: { kind: next.action === 'import' ? 'import' : 'clear', payload: next.payload || {}, confirm: next.confirm } }));
+            if (!prepared.ok) return prepared;
+            if (next.action === 'import') next.payload.intent = prepared.data.intent;
+            else next.intent = prepared.data.intent;
+        }
+        return postRaw(JSON.stringify(next));
+    };
+    return { state, run: (rows) => {
+        const payload = { rows, mode: 'replace' };
+        const prepared = context.prepareWrite('synthetic-password', { kind: 'import', payload });
+        return context.importRows('synthetic-password', { ...payload, intent: prepared.intent });
+    }, post, postRaw };
 }
 
 const originalRows = [['barcode', 'dod', 'cod', 'phone'], ['OLD001', 1, 2, '012345678']];
@@ -332,7 +353,7 @@ for (const rows of [[], [['', 0, 0, '']]]) {
     check('replace ធំជាង grid ➜ ពង្រីកជាមុន ហើយសរសេរពេញលេញ',
         result && result.rowsAfter === 2 && fixture.state.capacity >= 3);
     equal('replace ធំជាង grid ➜ ទិន្នន័យត្រូវគ្នាពិត', fixture.state.rows.slice(1), incomingRows);
-    check('replace ធំជាង grid ➜ ដោះសោវិញ', fixture.state.releases === 1);
+    check('replace ធំជាង grid ➜ ដោះសោ prepare និង execute វិញ', fixture.state.releases === 2);
 }
 for (const failure of ['failWrite', 'failResize']) {
     const fixture = importFixture(originalRows, failure === 'failWrite' ? 5 : 2, { [failure]: true });
@@ -341,7 +362,7 @@ for (const failure of ['failWrite', 'failResize']) {
     check('replace ' + failure + ' ➜ ប្រាប់ការបរាជ័យ', rejected);
     equal('replace ' + failure + ' ➜ ទិន្នន័យដើមមិនបាត់', fixture.state.rows, originalRows);
     check('replace ' + failure + ' ➜ មិនលុបមុនសរសេរជោគជ័យ', fixture.state.clears === 0);
-    check('replace ' + failure + ' ➜ ដោះសោវិញ', fixture.state.releases === 1);
+    check('replace ' + failure + ' ➜ ដោះសោ prepare និង execute វិញ', fixture.state.releases === 2);
 }
 {
     const fixture = importFixture([originalRows[0], ...incomingRows], 5);
@@ -398,7 +419,7 @@ function zoewSheetImportConst(name) {
     check('upsert ៖ សរសេររួច flush បរាជ័យ ➜ written:true', flushed.ok === false && flushed.written === true, JSON.stringify(flushed));
     const replaceResize = importFixture([header, ['OLD1', 0, 1, '012']], 2, { failResize: true });
     const refusedResize = replaceResize.post({ action: 'import', password: 'synthetic-password', payload: { rows: [['N1', 0, 1, '1'], ['N2', 0, 2, '2']], mode: 'replace' } });
-    check('replace ៖ ពង្រីក grid បរាជ័យមុនសរសេរ ➜ written:false (ZoeW បង្ហាញ ❌ ច្បាស់)', refusedResize.ok === false && refusedResize.written === false, JSON.stringify(refusedResize));
+    check('replace ៖ ពង្រីក grid បរាជ័យក្រោយ pending ➜ written:true · គ្មានទិន្នន័យបាត់', refusedResize.ok === false && refusedResize.written === true && JSON.stringify(replaceResize.state.rows) === JSON.stringify([header, ['OLD1', 0, 1, '012']]), JSON.stringify(refusedResize));
     const wrongPassword = importFixture([header, ['BC1', 0, 1, '012']], 5).post(Object.assign(upsert([['BC1', 0, 3, '012']]), { password: 'wrong' }));
     check('ពាក្យសម្ងាត់ខុស ➜ written:false', wrongPassword.ok === false && wrongPassword.written === false, JSON.stringify(wrongPassword));
     const unreadable = importFixture([header], 5).postRaw('{not json');
@@ -412,7 +433,7 @@ function zoewSheetImportConst(name) {
     check('clear ៖ លុបរួច flush បរាជ័យ ➜ written:true', cleared.ok === false && cleared.written === true, JSON.stringify(cleared));
     const clearRefused = importFixture([header, ['BC1', 0, 1, '012']], 5, { failClear: true });
     const notCleared = clearRefused.post({ action: 'clear', password: 'synthetic-password', confirm: 'CLEAR' });
-    check('clear ៖ clearContent បរាជ័យ ➜ written:false · ជួរនៅដដែល', notCleared.ok === false && notCleared.written === false && clearRefused.state.rows[1][0] === 'BC1', JSON.stringify(notCleared));
+    check('clear ៖ clearContent បរាជ័យក្រោយ pending ➜ written:true · ជួរនៅដដែល', notCleared.ok === false && notCleared.written === true && clearRefused.state.rows[1][0] === 'BC1', JSON.stringify(notCleared));
     const ok = importFixture([header, ['BC1', 0, 1, '012']], 5).post(upsert([['BC1', 0, 3, '012']]));
     check('ចម្លើយជោគជ័យមាន scriptVersion ជាលេខ (ZoeW អានកំណែអ្នកសរសេរ)', ok.ok === true && Number.isFinite(ok.scriptVersion), JSON.stringify(ok));
 }
@@ -521,11 +542,13 @@ function watcherAccessFixture(handlers, options) {
     }
     const sheet = {
         getName: () => 'Customers', getParent: () => ({ getName: () => 'Synthetic target' }),
+        getSheetId: () => 123,
         getLastRow: () => state.rows.length, getMaxRows: () => 20,
         getRange(start, col, count, width) {
             service('sheet-range');
             return {
                 getValues: () => Array.from({ length: count }, (_, index) => (state.rows[start - 1 + index] || ['', '', '', '']).slice(col - 1, col - 1 + width)),
+                getFormulas: () => Array.from({ length: count }, () => Array(width).fill('')),
                 setNumberFormat() {},
                 setValues(values) {
                     state.effects.push('write');
@@ -542,12 +565,14 @@ function watcherAccessFixture(handlers, options) {
         Logger: { log() { service('log'); } },
         Utilities: {
             DigestAlgorithm: { SHA_256: 'SHA_256' }, Charset: { UTF_8: 'UTF_8' },
+            getUuid: () => crypto.randomUUID(),
             computeDigest(_algorithm, value) { service('digest'); return Array.from(require('crypto').createHash('sha256').update(value).digest(), (byte) => byte > 127 ? byte - 256 : byte); }
         },
         PropertiesService: { getScriptProperties() {
             service('properties');
             return {
                 getProperty: (key) => properties[key] || null,
+                getProperties: () => ({ ...properties }),
                 setProperty(key, value) { state.effects.push('property'); properties[key] = String(value); },
                 deleteProperty(key) { state.effects.push('property-delete'); delete properties[key]; }
             };
@@ -575,6 +600,7 @@ function watcherAccessFixture(handlers, options) {
         MailApp: { sendEmail(_to, _subject, body) { service('mail'); state.effects.push('mail'); state.mail = String(body); } },
         MimeType: { GOOGLE_SHEETS: 'application/vnd.google-apps.spreadsheet' },
         ScriptApp: {
+            getScriptId: () => 'synthetic-import-script',
             getProjectTriggers() { service('list-triggers'); return state.triggers.slice(); },
             deleteTrigger(trigger) { service('delete-trigger'); state.effects.push('delete-trigger'); state.triggers = state.triggers.filter((item) => item !== trigger); },
             newTrigger(name) {
@@ -626,7 +652,16 @@ function watcherAccessFixture(handlers, options) {
         const outcome = {};
         const runner = google.script.run.withSuccessHandler((value) => { outcome.value = value; outcome.ok = true; })
             .withFailureHandler((error) => { outcome.error = error; outcome.ok = false; });
-        try { runner[name](...(args || [])); } catch (error) { outcome.error = error; outcome.ok = false; }
+        try {
+            const values = (args || []).slice();
+            if (name === 'importRows' || name === 'clearRows') {
+                const kind = name === 'importRows' ? 'import' : 'clear';
+                const prepared = context.prepareWrite(values[0], { kind, payload: kind === 'import' ? values[1] : {}, confirm: kind === 'clear' ? values[1] : undefined });
+                if (kind === 'import') values[1] = { ...values[1], intent: prepared.intent };
+                else values[2] = prepared.intent;
+            }
+            runner[name](...values);
+        } catch (error) { outcome.error = error; outcome.ok = false; }
         return outcome;
     }
     return { context, state, watchFunctions, publicFunctions, google, browser };
@@ -634,7 +669,7 @@ function watcherAccessFixture(handlers, options) {
 
 {
     const fixture = watcherAccessFixture();
-    equal('Watch ៖ ផ្ទៃ function សាធារណៈមានតែច្រក Web និង API ដែលបានកំណត់', fixture.publicFunctions.sort(), ['clearRows', 'doGet', 'doPost', 'getStatus', 'importRows', 'prepare']);
+    equal('Watch ៖ ផ្ទៃ function សាធារណៈមានតែច្រក Web និង API ដែលបានកំណត់', fixture.publicFunctions.sort(), ['clearRows', 'doGet', 'doPost', 'getStatus', 'importRows', 'prepare', 'prepareWrite']);
     check('Watch ៖ វាស់ helper ពិតគ្រប់គ្រាន់ ហើយទាំងអស់ជាឯកជន', fixture.watchFunctions.length >= 12 && fixture.watchFunctions.every((name) => name.endsWith('_')), fixture.watchFunctions.join(', '));
     equal('Watch ៖ google.script.run បង្ហាញតែ function សាធារណៈដូចឯកសារ Google', Object.keys(fixture.google.script.run).filter((name) => !name.startsWith('with')).sort(), fixture.publicFunctions.sort());
     const names = new Set([...fixture.watchFunctions, 'setupInboxWatch', 'removeInboxWatch', 'watchInboxFolder', 'setupInboxWatch_', 'removeInboxWatch_', 'watchInboxFolder_']);
@@ -734,9 +769,12 @@ function watcherAccessFixture(handlers, options) {
 }
 {
     for (const password of [undefined, '', 'wrong']) {
-        for (const name of ['getStatus', 'prepare', 'importRows', 'clearRows']) {
+        for (const name of ['getStatus', 'prepare', 'prepareWrite', 'importRows', 'clearRows']) {
             const fixture = watcherAccessFixture();
-            const result = fixture.browser(name, [password, name === 'prepare' ? ['Barcode'] : name === 'clearRows' ? 'CLEAR' : { rows: [['SYNTHETIC-NEW', 2, 3, '001']] }]);
+            const argument = name === 'prepare' ? ['Barcode'] : name === 'clearRows' ? 'CLEAR'
+                : name === 'prepareWrite' ? { kind: 'import', payload: { rows: [['SYNTHETIC-NEW', 2, 3, '001']] } }
+                    : { rows: [['SYNTHETIC-NEW', 2, 3, '001']] };
+            const result = fixture.browser(name, [password, argument]);
             check('Web password ៖ ' + name + ' បដិសេធ ' + String(password), result.ok === false);
             equal('Web password ៖ ' + name + ' មិនសរសេរពេលពាក្យសម្ងាត់ខុស/បាត់ ' + String(password), fixture.state.effects, []);
         }
@@ -789,12 +827,21 @@ function webPageFixture(XLSX) {
     class Reader {
         readAsArrayBuffer(file) { Promise.resolve().then(() => this.onload({ target: { result: Uint8Array.from(file.bytes).buffer } })); }
     }
-    const context = vm.createContext({ console, Promise, Uint8Array, FileReader: Reader, XLSX, window: { confirm: () => true },
-        localStorage: { removeItem() {} }, document: { getElementById: el, createElement: () => node() }, google: { script: { run } } });
+    const localStorage = memoryStorage();
+    const context = vm.createContext({ console, Promise, TextEncoder, Uint8Array, FileReader: Reader, XLSX,
+        window: { confirm: () => true, localStorage, crypto: crypto.webcrypto },
+        localStorage, document: { getElementById: el, createElement: () => node() }, google: { script: { run } } });
     vm.runInContext(script, context, { filename: 'Index.html' });
     context.state.password = 'synthetic-password';
+    context.state.writeScope = fixture.context.getStatus('synthetic-password').writeScope;
+    let pendingWrite;
+    const actualWrite = context.runPreparedWebWrite_;
+    context.runPreparedWebWrite_ = function (...args) {
+        pendingWrite = actualWrite.apply(this, args);
+        return pendingWrite;
+    };
     const texts = (id) => el(id).children.map((child) => child.textContent).join(' | ');
-    return { fixture, context, el, calls, texts };
+    return { fixture, context, el, calls, texts, settleWrite: async () => { if (pendingWrite) await pendingWrite; await settle(); } };
 }
 
 async function settle() {
@@ -807,10 +854,10 @@ async function webMoneyTests() {
     if (!lib.XLSX) return;
     for (const [label, name, text, expected] of MONEY_CSV_CASES) {
         const web = webPageFixture(lib.XLSX);
-        web.context.handleFile({ name, bytes: Buffer.from(text) });
+        await web.context.handleFile({ name, bytes: Buffer.from(text) });
         await settle();
         web.context.runImport();
-        await settle();
+        await web.settleWrite();
         const imports = web.calls.filter((call) => call.name === 'importRows');
         const added = web.fixture.state.rows.slice(2).map((row) => row.slice());
         if (expected) {
@@ -847,6 +894,7 @@ function watcherReceiptFixture(mode, options) {
             if (settings.failRead && key.startsWith('ZTO_WATCH_RECEIPT_')) throw new Error('synthetic-property-read');
             return props[key] === undefined ? null : props[key];
         },
+        getProperties: () => ({ ...props }),
         setProperty(key, value) {
             const receipt = key.startsWith('ZTO_WATCH_RECEIPT_') ? JSON.parse(value) : null;
             if (receipt && settings.failState === receipt.state) throw new Error('synthetic-property-quota');
@@ -868,10 +916,12 @@ function watcherReceiptFixture(mode, options) {
     const lastRow = () => rowCount(state.rows);
     const sheetFor = (id, name) => ({
         getName: () => name, getLastRow: () => rowCount(id === 'target' ? state.rows : state.otherRows), getMaxRows: () => 100,
+        getSheetId: () => id === 'target' ? 123 : 456,
         getRange(start, col, count, width) {
             const rows = id === 'target' ? state.rows : state.otherRows;
             return {
                 getValues: () => Array.from({ length: count }, (_, i) => (rows[start - 1 + i] || ['', '', '', '']).slice(col - 1, col - 1 + width)),
+                getFormulas: () => Array.from({ length: count }, () => Array(width).fill('')),
                 setNumberFormat() {},
                 setValues(values) {
                     state.writes++;
@@ -909,7 +959,9 @@ function watcherReceiptFixture(mode, options) {
         LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock() { state.releases++; } }) },
         DriveApp: { getFolderById: id => folders[id] }, MimeType: { GOOGLE_SHEETS: 'application/vnd.google-apps.spreadsheet' },
         Utilities: { DigestAlgorithm: { SHA_256: 'SHA_256' }, Charset: { UTF_8: 'UTF_8' },
+            getUuid: () => crypto.randomUUID(),
             computeDigest(_a, text) { return Array.from(require('crypto').createHash('sha256').update(text).digest(), byte => byte > 127 ? byte - 256 : byte); } },
+        ScriptApp: { getScriptId: () => 'synthetic-import-script' },
         Logger: { log: value => state.logs.push(String(value)) },
         SpreadsheetApp: {
             openById(id) {

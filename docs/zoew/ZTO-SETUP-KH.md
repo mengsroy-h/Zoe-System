@@ -134,8 +134,7 @@ fingerprint ➜ `OK: stored cookie verified in the Function (source: blob, …)`
 នេះបញ្ជាក់ការផ្ទុក Cookie ត្រូវគ្នា។ សូម Lookup ក្នុង ZoeW ដើម្បីឲ្យ ZTO
 ផ្ទៀងផ្ទាត់ការប្រើ Cookie ពី Netlify; អាយុ session ពិតសម្រេចដោយ ZTO។
 
-Cookie **បង្ហាញក្នុង console ដោយចេតនា** (ងាយស្រួល paste ចូល `ZTO_COOKIE`
-ជាផ្លូវបម្រុង) តែវាមិនសរសេរចូល file/config និងមិនចូល shell history ទេ។ ⛔ **PAT និង `ZTO_PROXY_KEY` មិនបង្ហាញសោះ។**
+Cookie **លាក់តម្លៃក្នុង console ជាលំនាំដើម** រួមទាំងការរត់ស្វ័យប្រវត្តិ។ ផ្លូវបង្ហាញតម្លៃសម្រាប់ចម្លងទៅ `ZTO_COOKIE` តម្រូវឱ្យចុចរត់ដោយដៃជាមួយ `--show-cookie` ក្នុង terminal ដែល stdin និង stdout ជា TTY ទាំងពីរ; វាបដិសេធជាមួយ `--auto`, `--check`, `--auto-ready` ឬ `--verify-setup` មុនអាន credential ឬបើក browser។ កុំ redirect ឬថតតម្លៃនោះចូល log។ Cookie មិនសរសេរចូល file/config; ⛔ **PAT និង `ZTO_PROXY_KEY` មិនបង្ហាញសោះ។**
 PAT ត្រូវអ៊ិនគ្រីបដោយ **Windows DPAPI / CurrentUser** ក្នុង
 `%LOCALAPPDATA%` — មិនដាក់ក្នុង command line, repo, extension ឬ Netlify
 Function។ សេចក្តីណែនាំពេញ និងព្រំដែនសិទ្ធិរបស់ PAT៖
@@ -569,8 +568,8 @@ Site `zoew` ➜ **Site configuration ➜ Environment variables** ៖
 
 - ក្នុង Function deployment មួយ `FIREBASE_PROJECT_IDS` ទទួលអតិបរមា **១០២៤ គម្រោង** និង **១៦ សាខាក្នុងគម្រោងនីមួយៗ**។
   នេះជាពិដាន allowlist របស់ proxy; ហាង Supabase យក tenant ពី `my_account()` ហើយមិនប្រើពិដានគម្រោង Firebase នេះទេ។
-- ZTO proxy cache អត្តសញ្ញាណ Supabase តាម token អតិបរមា **៥ នាទី** ឬដល់ token ផុតសុពលភាព។
-  ការដកសិទ្ធិហាង/គណនីអាចរង់ចាំ cache នេះនៅ proxy; database ពិនិត្យសិទ្ធិហាងរាល់ request។
+- ZTO proxy ផ្ទៀងអត្តសញ្ញាណ Supabase តាម `my_account()` ថ្មីសម្រាប់សំណើដែលមកក្រោយការអានមុនចប់។
+  សំណើត្រួតពេលគ្នាលើ token ដដែលអាចចែកការអានដែលកំពុងដំណើរការ; គ្មាន positive authorization cache ៥ នាទីទេ។ Database ផ្ទៀង session និងហាងក្នុងការផ្ទៀងសិទ្ធិថ្មីនីមួយៗ; ការងារដែលទទួលសិទ្ធិរួចមិនត្រូវបាន cancel តាមការដក session ទេ។
 - ការសាកច្រើនហាង និងព្រំដែននៃភស្តុតាងសមត្ថភាព ➜ [`tools/audit-tools/README.md`](../../tools/audit-tools/README.md)។
   ចំនួន concurrency/cache ក្នុងកូដមិនមែនការធានាល្បឿន ឬចំនួនហាងដែលប្រើបានលើ server ជាក់ស្តែងទេ។
 

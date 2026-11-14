@@ -99,7 +99,7 @@ export function acceptServerClockOffset(offsetMs, sample, initial) {
     if (priorInterval && firebaseState.serverClockTrusted
         && (epochMs > priorInterval.upperMs + SERVER_CLOCK_DIVERGENCE_MS || epochMs + uncertaintyMs < priorInterval.lowerMs - SERVER_CLOCK_DIVERGENCE_MS)) invalidateServerClock();
     if (!firebaseState.serverClockTrusted && firebaseState.auth?.currentUser
-        && firebaseState.sessionExpiryCheck !== 'expired' && firebaseState.sessionExpiryCheck !== 'pending') firebaseState.sessionExpiryCheck = 'unverified';
+        && firebaseState.sessionExpiryCheck !== 'expired' && firebaseState.sessionExpiryCheck !== 'pending' && firebaseState.sessionExpiryCheck !== 'signed-out') firebaseState.sessionExpiryCheck = 'unverified';
     serverClockSample = { database: firebaseState.db, epochMs, estimateEpochMs, monotonicMs, wallMs, uncertaintyMs, providerGeneration, source: sample };
     serverClockRefreshAt = -Infinity;
     firebaseState.serverTimeOffsetMs = offsetMs;

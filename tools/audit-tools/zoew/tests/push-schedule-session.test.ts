@@ -7,6 +7,7 @@ import { dbListenerFailedPaths, dbListenerPendingPaths } from '../../../../ZoeW/
 import { ABANDON_AGE_MS, clearSensitiveModalFields } from '../../../../ZoeW/src/features/session';
 import { expiryScheduleTimes, nearExpiryView, NOTIFY_SCHEDULE_MAX } from '../../../../ZoeW/src/features/notifications';
 import { PUSH_SCHEDULE_MIN_GAP_MS, PUSH_STATE_KEY, pushRuntime, scheduleSignature, syncExpirySchedule } from '../../../../ZoeW/src/features/push';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 const BASE = 'https://audit.supabase.co';
 const saved = () => JSON.parse(appLocalStore.getItem(PUSH_STATE_KEY) || '{}');
@@ -21,6 +22,7 @@ function deferred<T>() {
 function shop(tenant: string, token: () => Promise<string> = async () => 'token-' + tenant) {
     firebaseState.authGeneration++;
     firebaseState.auth = { currentUser: { uid: tenant, getIdToken: token }, _account: { tenant_id: tenant } } as any;
+    acceptFixtureSession();
     appLocalStore.setItem(PUSH_STATE_KEY, JSON.stringify({ on: true, shop: BASE + '#' + tenant, schedSig: '', schedAt: 0 }));
     dataState.scanHistory = [{ id: tenant, phone: '081000001', createdAt: Date.now() - ABANDON_AGE_MS + 3600000,
         barcodes: [{ code: 'KH-' + tenant, isClosed: false }] }] as any;
@@ -31,6 +33,8 @@ beforeEach(() => {
     vi.setSystemTime(new Date('2026-10-26T03:00:00Z'));
     appLocalStore.clear();
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ supabaseUrl: BASE }));
+    firebaseState.firebaseConfig = { supabaseUrl: BASE };
+    firebaseState.sessionExpiryCheck = 'live';
     viewState.backendKind = 'supabase';
     firebaseState.isDatabaseInitialized = true;
     firebaseState.serverClockTrusted = true;

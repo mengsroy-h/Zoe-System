@@ -497,8 +497,13 @@ export async function finalizeClaimedRestore(sourceId, token, targetId, revenueD
         if (firebaseState.db !== finalizeDb || firebaseState.authGeneration !== finalizeGeneration || !trashGenerationOwnerCurrent(owner)) throw new Error('RESTORE_SESSION_SWITCHED');
     };
     let lastError = null;
+    let retrySource = null;
     for (let attempt = 0; attempt < 3; attempt++) {
         stopIfSwitched();
+        if (retrySource) {
+            await rejectBlockedRestore(retrySource, token);
+            stopIfSwitched();
+        }
         if (!clockOperation.current()) throw new Error('RESTORE_CLOCK_UNTRUSTED');
         try {
             await dbOp(firebaseState.fb.update(firebaseState.fb.ref(finalizeDb), updates));
@@ -529,6 +534,7 @@ export async function finalizeClaimedRestore(sourceId, token, targetId, revenueD
             const currentTrash = trashSnapshot.val();
             const currentClaim = currentTrash && currentTrash.restoreClaim;
             if (!currentClaim || currentClaim.token !== token || currentClaim.targetId !== targetId) throw new Error('RESTORE_CLAIM_LOST');
+            retrySource = { ...currentTrash, id: sourceId };
             if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 1500 * (attempt + 1)));
         }
     }

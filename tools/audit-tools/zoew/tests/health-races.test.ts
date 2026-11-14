@@ -5,6 +5,7 @@ import { registerModalMeta, setModalDisplay, unregisterModalMeta } from '../../.
 import { firebaseState, uiState } from '../../../../ZoeW/src/core/state';
 import { viewState } from '../../../../ZoeW/src/core/view-state';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../../../../ZoeW/src/core/text';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 function deferred<T>() {
     let resolve!: (value: T) => void;
@@ -45,6 +46,7 @@ beforeEach(() => {
     vi.spyOn(document, 'hidden', 'get').mockImplementation(() => hidden);
     Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: workers });
     vi.stubGlobal('fetch', vi.fn((url: string) => new Promise<Response>(resolve => requests.push({ url, resolve }))));
+    acceptFixtureSession();
 });
 afterEach(async () => {
     stops.forEach(stop => stop()); uiState.modalDisplay = {};
@@ -312,7 +314,7 @@ it('event ថ្មីក្រោយ manual ចាប់ផ្តើម មិ�
     expect(requests).toHaveLength(2);
 });
 
-it.each(['db', 'fb', 'auth', 'config'])('ownership %s ប្ដូរទោះ uid/status ដដែល ដកបៃតងភ្លាមមិនចាំ 30s', async change => {
+it.each(['db', 'fb', 'auth', 'config'])('ownership %s ប្ដូរទោះ uid/status ដដែល ដកបៃតងភ្លាម ហើយវគ្គថ្មីអាចផ្ទៀងផ្ទាត់ម្ដងទៀត', async change => {
     watch(); const initial = start(); answer(0); await initial;
     await vi.advanceTimersByTimeAsync(1);
     expect(uiState.healthRows[0].state).toBe('ok');
@@ -328,6 +330,17 @@ it.each(['db', 'fb', 'auth', 'config'])('ownership %s ប្ដូរទោះ u
     expect(uiState.healthRows[0].state).not.toBe('ok');
     await vi.advanceTimersByTimeAsync(251);
     expect(requests).toHaveLength(1);
+    if (change === 'config') {
+        const config = JSON.parse(localStorage.getItem('zoew_firebase_config')!);
+        const app = { options: config };
+        firebaseState.firebaseConfig = config;
+        firebaseState.db = { app } as any;
+        firebaseState.auth = { app, currentUser: { uid: 'race-user' } } as any;
+    }
+    if (change === 'auth' || change === 'config') {
+        acceptFixtureSession();
+        firebaseState.touch(); firebaseState.flush();
+    }
     await vi.advanceTimersByTimeAsync(29749);
     expect(requests).toHaveLength(2);
     answer(1); await vi.advanceTimersByTimeAsync(1);

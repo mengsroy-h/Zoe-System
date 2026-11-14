@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { firebaseState, uiState } from '../../../../ZoeW/src/core/state';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../../../../ZoeW/src/core/text';
 import { healthDatabaseLiveRow, healthNetworkRow, healthServiceWorkerRow, healthStorageRow, runHealthCheck } from '../../../../ZoeW/src/features/health-check';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 const localSetItem = localStorage.setItem;
 const sessionSetItem = sessionStorage.setItem;
@@ -24,6 +25,7 @@ beforeEach(() => {
     dbListenerPendingPaths.clear();
     dbListenerFailedPaths.clear();
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
+    acceptFixtureSession();
 });
 
 afterEach(() => {

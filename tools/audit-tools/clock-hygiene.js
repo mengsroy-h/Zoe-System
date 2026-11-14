@@ -218,6 +218,20 @@ function isRawClock(node) {
         node.callee.name === 'Date' && node.arguments.length === 0;
 }
 
+// The wall-clock fragment is an opaque logout-intent nonce fallback, never a time verdict.
+// Match only the exact token assignment inside note()'s randomUUID failure handler.
+const LOCAL_LOGOUT_NONCE_REASON = 'ត្រានាឡិកាក្នុង nonce local បម្រុងពេល randomUUID បរាជ័យ; គ្រាន់តែ identity សម្រាប់ logout/ACK មិនមែន timestamp, expiry, retention ឬលុយ។';
+function localLogoutNonceSite(rel, fn, ancestors, code, node) {
+    if (!['ZoeW/app.js', 'ZoeKeyGen/app.js'].includes(rel) || fn !== 'createLocalLogoutIntentStore') return false;
+    const assignment = ancestors.find(a => a.type === 'AssignmentExpression' && a.operator === '='
+        && a.left.type === 'Identifier' && a.left.name === 'token' && a.right.start <= node.start && a.right.end >= node.end
+        && code.slice(a.right.start, a.right.end).replace(/\s+/g, '') === "Date.now().toString(36)+':'+Math.random().toString(36).slice(2)");
+    return !!(LOCAL_LOGOUT_NONCE_REASON && assignment
+        && ancestors.some(a => a.type === 'CatchClause' && a.body.start <= assignment.start && a.body.end >= assignment.end)
+        && ancestors.some(a => a.type === 'Property' && !a.computed && fieldNameOf(a) === 'note'
+            && a.value.type === 'FunctionExpression' && a.value.body.start <= assignment.start && a.value.body.end >= assignment.end));
+}
+
 function containsRawClock(node) {
     let found = false;
     (function scan(n) {
@@ -249,6 +263,32 @@ function memberFieldOf(node) {
     return null;
 }
 
+function nonceClassification(code, rel = 'ZoeW/app.js') {
+    const ancestors = [];
+    const decisions = [];
+    (function walk(node) {
+        if (!node || typeof node.type !== 'string') return;
+        ancestors.push(node);
+        if (isRawClock(node)) decisions.push(localLogoutNonceSite(rel, 'createLocalLogoutIntentStore', ancestors, code, node));
+        for (const [key, value] of Object.entries(node)) {
+            if (['loc', 'start', 'end'].includes(key)) continue;
+            if (Array.isArray(value)) value.forEach(walk);
+            else if (value && typeof value.type === 'string') walk(value);
+        }
+        ancestors.pop();
+    })(acorn.parse(code, { ecmaVersion: 'latest' }));
+    return decisions;
+}
+const nonceControl = "function createLocalLogoutIntentStore(){ return { note(){ let token; try { token=crypto.randomUUID(); } catch(e){ token=Date.now().toString(36)+':'+Math.random().toString(36).slice(2); } } }; }";
+check(nonceClassification(nonceControl).join() === 'true' && nonceClassification(nonceControl, 'ZoeKeyGen/app.js').join() === 'true',
+    'nonce classifier: opaque fallback token នៅក្នុង catch របស់ note() ទទួលបានទាំងពីរ App');
+check(nonceClassification(nonceControl.replace('token=Date.now()', 'createdAt=Date.now()')).join() === 'false',
+    'nonce classifier: timestamp assignment ក្នុង method ដដែលនៅតែបដិសេធ');
+check(nonceClassification(nonceControl.replace('note(){', 'restore(){')).join() === 'false',
+    'nonce classifier: method ផ្សេងក្នុង factory ដដែលនៅតែបដិសេធ');
+check(nonceClassification(nonceControl.replace("try { token=crypto.randomUUID(); } catch(e){", '{')).join() === 'false',
+    'nonce classifier: token assignment ក្រៅ catch នៅតែបដិសេធ');
+
 for (const rel of FILES) {
     const file = path.join(ROOT, rel);
     if (!fs.existsSync(file)) { bad(rel + ': រកឯកសារមិនឃើញ'); continue; }
@@ -261,6 +301,7 @@ for (const rel of FILES) {
     const stack = [];
     const ancestors = [];
     const seenSites = new Set();
+    let seenLogoutNonce = 0;
     const offenders = [];
     const seenFns = new Set();
     const fieldViolations = [];
@@ -279,6 +320,8 @@ for (const rel of FILES) {
             const named = stack.filter((n) => n !== '<anon>');
             const fn = named.length ? named[named.length - 1] : '<top>';
             seenFns.add(fn);
+            const nonceSite = localLogoutNonceSite(rel, fn, ancestors, code, node);
+            if (nonceSite) seenLogoutNonce++;
             const site = rel === 'ZoeW/app.js' && LOCAL_CLOCK_SITES.find((entry) => entry.fn === fn && ancestors.some((ancestor) => {
                 let expression = ancestor;
                 if (entry.call) {
@@ -295,7 +338,7 @@ for (const rel of FILES) {
                     && code.slice(expression.start, expression.end).replace(/\s+/g, '') === entry.expression;
             }));
             if (site) seenSites.add(site);
-            if (!site && !Object.prototype.hasOwnProperty.call(allow, fn)) {
+            if (!nonceSite && !site && !Object.prototype.hasOwnProperty.call(allow, fn)) {
                 offenders.push(rel + ':' + node.loc.start.line + '  ក្នុង `' + fn + '()`');
             }
         }
@@ -346,6 +389,9 @@ for (const rel of FILES) {
     // ២ ខាង៖ ធាតុ allowlist ដែលលែងប្រើ ត្រូវដកចេញ បើមិនដូច្នេះវាលាក់កំហុសបន្ទាប់
     if (rel === 'ZoeW/app.js') check(LOCAL_CLOCK_SITES.every((site) => site.reason && seenSites.has(site)),
         'ZoeW/app.js: local scheduling sites មានហេតុផល និងមិនមានធាតុងាប់', LOCAL_CLOCK_SITES.filter((site) => !seenSites.has(site)).map((site) => site.fn + ': ' + site.expression));
+
+    if (rel === 'ZoeW/app.js' || rel === 'ZoeKeyGen/app.js') check(seenLogoutNonce === 1,
+        rel + ': nonce fallback មានហេតុផល និងមានតែកន្លែងចាត់តាំង token ត្រឹមត្រូវក្នុង catch នៃ note()', seenLogoutNonce);
 
     const dead = Object.keys(allow).filter((fn) => !seenFns.has(fn));
     check(dead.length === 0, rel + ': បញ្ជីអនុញ្ញាតគ្មានធាតុងាប់ (សិទ្ធិតូចបំផុត)', dead);

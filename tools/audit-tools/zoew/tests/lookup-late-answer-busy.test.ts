@@ -64,6 +64,7 @@ import { autoLookupFailureAt, autoLookupInFlight, lookupAnswersHeldWhileSaving, 
 import { clearCustomerDataTableCache } from '../../../../ZoeW/src/features/customer-table';
 import { clearSensitiveModalFields } from '../../../../ZoeW/src/features/session';
 import { closeModal } from '../../../../ZoeW/src/ui/modal';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 function deferred<T>() {
     let resolve!: (v: T) => void;
@@ -117,6 +118,8 @@ beforeEach(() => {
     firebaseState.isInitializingFirebase = false;
     firebaseState.fb = { ref: (db: any, p: string) => ({ db, p }) } as any;
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
+    firebaseState.firebaseConfig = options;
+    acceptFixtureSession();
     clearCustomerDataTableCache();
     autoLookupInFlight.clear(); autoLookupFailureAt.clear(); lookupFastCache.clear();
     fetchGate = deferred<any>();

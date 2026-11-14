@@ -32,6 +32,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { localAuthRuntime } = require('./local-auth-runtime.cjs');
 const { moduleRuntime, memoryStorage } = require('./react-view');
 
 const ROOT = process.env.STALLLOCK_APP_DIR
@@ -70,6 +71,7 @@ function extractConst(src, name) {
 }
 
 const src = fs.existsSync(APP) ? fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, '\n') : '';
+const authRuntime = localAuthRuntime(ROOT, src);
 
 // ── ១. ជាន់អប្បបរមា ៖ ថតទទេ / ការស្រង់ដែលធ្លាក់ មិនត្រូវបៃតង ────────────────
 console.log('== ១. ជាន់អប្បបរមា ==');
@@ -210,7 +212,11 @@ globalThis.__confirmRemove = confirmScannedRemoval;
     ctx.isInitializingFirebase = false;
     ctx.cleanupResumeInFlight = false;
     ctx.navigator = { onLine: true };
-    vm.runInContext(protocol.code + '\n' + protocol.withoutBindings(code), ctx);
+    const authConfig = { databaseURL: 'https://fixture-stall-lock-release-test.invalid' };
+    ctx.appLocalStore = ctx.__storage;
+    authRuntime.prepare(ctx, authConfig);
+    vm.runInContext(authRuntime.withoutBindings(protocol.code + '\n' + protocol.withoutBindings(code)) + '\n' + authRuntime.code, ctx);
+    authRuntime.seed(ctx, authConfig);
 
     let CURRENT = null;
     const later = [];

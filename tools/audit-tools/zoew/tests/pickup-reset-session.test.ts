@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../../../../ZoeW/src/core/state';
@@ -14,6 +15,7 @@ const copy = (value: any) => value === undefined ? undefined : structuredClone(v
 const record = (code: string, phone = '012345678') => ({ packagesPickedUp: 1, pickedUpPhones: { [phone]: 1 }, pickedUpBarcodes: { [code]: phone } });
 const resetRecord = (db: any, day: string) => ({ packagesPickedUp: 0, pickupRevision: 1, pickupResetEpoch: 1, pickupResetApplied: requests.find(entry => entry.db === db && entry.day === day)!.receipt });
 const ledgers = { '2026-10-22': { codDollar: 10, dodDollar: 2, totalCount: 1 }, '2026-10-23': { codDollar: 7, dodDollar: 1, totalCount: 1 } };
+let fixtureBackend = 0;
 let stores: Map<any, Record<string, any>>;
 let calls: { db: any; day: string }[];
 let pending: { db: any; day: string; change: (value: any) => any; resolve: (value: any) => void; reject: (error: Error) => void }[];
@@ -35,6 +37,9 @@ function startB(sameDb = false, sameGeneration = false) {
     uiState.toasts = [];
 }
 beforeEach(() => {
+    const fixtureId = ++fixtureBackend;
+    A.app.options.databaseURL = 'https://reset-a-' + fixtureId + '.invalid';
+    B.app.options.databaseURL = 'https://reset-b-' + fixtureId + '.invalid';
     appLocalStore.clear(); appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: A.app.options.databaseURL }));
     paused = false; calls = []; pending = []; requests = [];
     vi.stubGlobal('crypto', { subtle: { digest: async (_algorithm: string, bytes: Uint8Array) => new Uint8Array(createHash('sha256').update(bytes).digest()).buffer } });
@@ -43,6 +48,8 @@ beforeEach(() => {
     stores = new Map([A, B].map((db) => [db, Object.fromEntries(DAYS.map((day) => [day, record(db.name + '_' + day)]))]));
     firebaseState.authGeneration++; firebaseState.db = A;
     firebaseState.auth = { currentUser: { uid: 'A' } };
+    firebaseState.firebaseConfig = { databaseURL: A.app.options.databaseURL };
+    acceptFixtureSession();
     firebaseState.dbRefDailyPickup = { path: PATH } as any;
     firebaseState.fb = {
         ref: (db: any, path: string) => ({ db, path }),
@@ -97,15 +104,19 @@ describe('Reset ច្រើនថ្ងៃ៖ រក្សាម្ចាស់
         let finishLogout!: () => void, failLogout!: (error: Error) => void;
         const logoutReply = new Promise<void>((resolve, reject) => { finishLogout = resolve; failLogout = reject; });
         firebaseState.auth = { currentUser: { uid: 'A' } } as any;
+        acceptFixtureSession();
         firebaseState.fb.signOut = () => logoutReply;
         paused = true; const running = resetPickupStats(); await flush(); const old = pending.shift()!;
-        const before = copy(stores.get(A)), viewBefore = copy(dataState.dailyPickupData), generation = firebaseState.authGeneration;
+        const before = copy(stores.get(A)), generation = firebaseState.authGeneration;
+        expect(dataState.dailyRevenueData).toEqual(ledgers);
         const logout = logoutApp();
+        const viewBefore = copy(dataState.dailyPickupData), revenueAfterLogout = copy(dataState.dailyRevenueData);
+        expect(viewBefore).toEqual({}); expect(revenueAfterLogout).toEqual({});
         expect(firebaseState.authGeneration).toBeGreaterThan(generation);
         paused = false; const proposed = commit(old); await running;
         expect(proposed).toBeUndefined(); expect(calls).toHaveLength(1);
         expect(stores.get(A)).toEqual(before); expect(dataState.dailyPickupData).toEqual(viewBefore);
-        expect(dataState.dailyRevenueData).toEqual(ledgers); expect(uiState.toasts).toEqual([]);
+        expect(dataState.dailyRevenueData).toEqual(revenueAfterLogout); expect(uiState.toasts).toEqual([]);
         if (outcome === 'success') finishLogout(); else failLogout(new Error('logout delayed failure'));
         await logout;
         expect(dataState.pickupResetInFlight).toBe(false);
@@ -113,7 +124,11 @@ describe('Reset ច្រើនថ្ងៃ៖ រក្សាម្ចាស់
 
     it.each(['success', 'failure'] as const)('ចម្លើយចាស់ %s មិនដោះ busy flag របស់ Reset ថ្មី', async (outcome) => {
         paused = true; const oldRun = resetPickupStats(); await flush(); const old = pending.shift()!;
-        startB(); const newRun = resetPickupStats(); await flush(); const fresh = pending.shift()!;
+        startB();
+        firebaseState.firebaseConfig = B.app.options;
+        firebaseState.auth = { currentUser: { uid: 'A' } };
+        acceptFixtureSession();
+        const newRun = resetPickupStats(); await flush(); const fresh = pending.shift()!;
         expect(fresh.db).toBe(B); expect(dataState.pickupResetInFlight).toBe(true);
         paused = false;
         if (outcome === 'failure') old.reject(new Error('permission_denied')); else commit(old);

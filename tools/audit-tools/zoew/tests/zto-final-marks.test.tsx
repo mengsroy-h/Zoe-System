@@ -40,8 +40,8 @@ describe('ច្បាប់ cleanup និងស្តារ តាមរបៀ
         expect(barcodeCloseIsRipe({ isClosed: true, closedAt: now - 3 * hour, ztoSignedAt: now - hour }, now, 'palm')).toBe(false);
         expect(barcodeCloseIsRipe({ isClosed: true, closedAt: now, ztoSignedAt: now - 2 * hour }, now, 'palm')).toBe(true);
     });
-    it.each(['delete', 'remove', 'returned', 'pickup'])('ធុងសំរាម %s ក្នុង ZTO Login មិនអាចស្តារបាន', (trashReason) => {
-        expect(trashZtoFinalBlock({ trashMode: 'palm', trashReason, barcodes: [bc('UNSIGNED')] })).toBe('palm');
+    it.each(['delete', 'remove', 'returned', 'pickup'])('ធុងសំរាម %s ក្នុង ZTO Login ហាមតែ cleanup ឬភស្តុតាងបញ្ចប់', (trashReason) => {
+        expect(trashZtoFinalBlock({ trashMode: 'palm', trashReason, barcodes: [bc('UNSIGNED')] })).toBe(trashReason === 'pickup' ? 'palm' : '');
     });
     it.each(['delete', 'remove', 'returned', 'pickup'])('Cookie %s មាន Sign ពិតមួយក្នុងកញ្ចប់រួម ក៏មិនអាចស្តារបាន', (trashReason) => {
         expect(trashZtoFinalBlock({ trashMode: 'cookie', trashReason, barcodes: [bc('SIGNED', { ztoSignedAt: now }), bc('UNSIGNED')] })).toBe('signed');
@@ -63,6 +63,14 @@ describe('ច្បាប់ cleanup និងស្តារ តាមរបៀ
         expect(trashRestoreBlockOf(open), 'មិនទាន់ហាម ➜ ស្តារបានតាមភស្តុតាងឧបករណ៍').toBe('');
         expect(trashRestoreBlockOf(blocked), 'server ហាមរួច ➜ មិនបង្ហាញ 🔄').toBe('returned');
         expect(trashRestoreBlockOf(blocked, true)).toBe('returned');
+    });
+    it.each(['ztoSentOutAt', 'ztoMisplacedAt'])('ត្រា %s ចាស់មិនអាចលាក់ការត្រឡប់ថ្មី ហើយ event ត្រឡប់ចាស់មិនឈ្នះត្រាថ្មី', field => {
+        const at = Date.now() - 60000;
+        const older = { trashReason: 'returned', barcodes: [bc('EXIT1', { [field]: at - 1 })] };
+        const newer = { trashReason: 'returned', barcodes: [bc('EXIT1', { [field]: at + 1 })] };
+        noteZtoReturnedEvidence('EXIT1', at, 'returned');
+        expect(trashRestoreBlockOf(older)).toBe('returned');
+        expect(trashRestoreBlockOf(newer)).toBe('');
     });
     it('រក្សាច្បាប់ធម្មតាសម្រាប់ Lookup មិនមែន ZTO ហើយបដិសេធពេលវេលាមិនត្រឹមត្រូវ', () => {
         expect(barcodeCloseIsRipe({ isClosed: true, closedAt: now - 3 * hour }, now, 'local')).toBe(true);
@@ -479,7 +487,7 @@ describe('ស្តារពីធុងសំរាម', () => {
     });
 
     it.each(['palm', 'cookie'])('transaction ការពារស្តារទោះឧបករណ៍មាន view ចាស់ (%s)', async (mode) => {
-        const original = item('blocked', [bc('SIGNED', mode === 'cookie' ? { ztoSignedAt: 5 } : {})], { trashReason: 'remove' });
+        const original = item('blocked', [bc('SIGNED', { ztoSignedAt: 5 })], { trashReason: 'remove' });
         seedTrash([original]);
         stampTrashPolicy(server[T + 'blocked'], mode);
         const before = JSON.stringify(server);
@@ -491,7 +499,7 @@ describe('ស្តារពីធុងសំរាម', () => {
 
     it('ត្រាមិនអាចស្តារបាននៅជាប់ទោះប្តូររបៀប ឬបិទ Lookup', () => {
         const signed = stampTrashPolicy(item('signed', [bc('S', { ztoSignedAt: 5 })]), 'cookie');
-        const palm = stampTrashPolicy(item('palm', [bc('P')]), 'palm');
+        const palm = stampTrashPolicy(item('palm', [bc('P')], { trashReason: 'pickup' }), 'palm');
         for (const mode of ['cookie', 'local']) {
             expect(trashRestoreBlockOf(stampTrashPolicy(palm, mode))).toBe('palm');
             expect(trashRestoreBlockOf(stampTrashPolicy(signed, mode))).toBe('signed');

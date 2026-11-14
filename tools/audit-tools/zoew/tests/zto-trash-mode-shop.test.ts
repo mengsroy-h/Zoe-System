@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { dataState, firebaseState, uiState, ztoState } from '../../../../ZoeW/src/core/state';
@@ -63,6 +64,8 @@ function install() {
     firebaseState.db = db as any; firebaseState.fb = fb() as any;
     firebaseState.firebaseConfig = { databaseURL: 'https://shop.firebaseio.com' } as any;
     firebaseState.auth = { app: { options: { databaseURL: 'https://shop.firebaseio.com' } }, currentUser: { uid: 'u1', getIdToken: async () => 'tok' } } as any;
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(firebaseState.firebaseConfig));
+    acceptFixtureSession();
     firebaseState.isDatabaseInitialized = true; firebaseState.isDatabaseConnected = true; firebaseState.serverClockTrusted = true;
     firebaseState.hasEverConnectedToDatabase = true;
     firebaseState.dbRefHistory = ref(db, H) as any; firebaseState.dbRefDeleted = ref(db, T) as any;
@@ -263,7 +266,8 @@ describe('a device without ZTO Lookup in a ZTO shop', () => {
         await claimAndCleanupItem('legacy', 'close');
         expect(store).toEqual(before);
         expect(await deleteSingleItem('legacy', { confirmed: true, quiet: true })).toBe('deleted');
-        expect(at(`${T}/legacy`)).toMatchObject({ trashReason: 'delete', trashMode: 'palm', restoreBlocked: true });
+        expect(at(`${T}/legacy`)).toMatchObject({ trashReason: 'delete', trashMode: 'palm' });
+        expect(at(`${T}/legacy`).restoreBlocked).toBeUndefined();
         expect(store[D]).toEqual(before[D]); expect(store[M]).toEqual(before[M]);
     });
 
@@ -335,16 +339,18 @@ describe('a device without ZTO Lookup in a ZTO shop', () => {
         runAutomaticCleanupRules();
         await settle(); await claimAndCleanupItem('noop', 'abandon'); await settle();
         expect(at(`${H}/open9`), 'reverse ៖ the marker arrived ➜ the 8-day rule runs').toBeNull();
-        expect(at(`${T}/open9`)).toMatchObject({ trashReason: 'returned', trashMode: 'palm', restoreBlocked: true });
+        expect(at(`${T}/open9`)).toMatchObject({ trashReason: 'returned', trashMode: 'palm' });
+        expect(at(`${T}/open9`).restoreBlocked).toBeUndefined();
     });
 
-    it('Palm shop: Delete stamps the trash as non-restorable and the trash shows 🔒 on this device', async () => {
+    it('Palm ៖ លុបរក្សា mode ហើយមិនចាក់សោធាតុមិនទាន់ Sign', async () => {
         deviceLookup(null);
         shopMarker({ palm: getServerNow() - HOUR });
         seedHistory({ ...closedItem('del', 'C9'), isClosed: false, barcodes: [{ ...closedItem('del', 'C9').barcodes[0], isClosed: false }] });
         expect(await deleteSingleItem('del', { confirmed: true, quiet: true })).toBe('deleted');
-        expect(at(`${T}/del`)).toMatchObject({ trashReason: 'delete', trashMode: 'palm', restoreBlocked: true });
-        expect(trashRestoreBlockOf({ ...at(`${T}/del`), trashMode: 'local', restoreBlocked: false })).toBe('palm');
+        expect(at(`${T}/del`)).toMatchObject({ trashReason: 'delete', trashMode: 'palm' });
+        expect(at(`${T}/del`).restoreBlocked).toBeUndefined();
+        expect(trashRestoreBlockOf(at(`${T}/del`))).toBe('');
     });
 
     it('Cookie shop: restore of unsigned trash needs a device with ZTO Lookup; unsynced shop mode waits', async () => {
@@ -384,7 +390,7 @@ describe('a device without ZTO Lookup in a ZTO shop', () => {
         shopMarker({ palm: getServerNow() - HOUR, cookie: getServerNow() - HOUR });
         const { trash, target } = abandonedPreparedRestore(getServerNow() - RESTORE_CLAIM_LEASE_MS - 1000);
         const money = clone(store[D]);
-        expect(trashRestoreBlockOf(at(`${T}/t1`)), 'the Palm view still shows the item as locked').toBe('palm');
+        expect(trashRestoreBlockOf(at(`${T}/t1`)), 'របៀប device មិនមែនភស្តុតាង Sign').toBe('');
         await resumeInterruptedCleanups(); await settle();
         expect(at(`${T}/t1`), 'not frozen · claim kept').toEqual(trash);
         expect(at(`${H}/h1`), 'prepared row kept for the claimant').toEqual(target);
@@ -584,8 +590,21 @@ describe('a device without ZTO Lookup in a ZTO shop', () => {
         expect(getShopZtoTrashMode()).toBe('');
         seedHistory({ ...closedItem('del', 'C9'), isClosed: false, barcodes: [{ ...closedItem('del', 'C9').barcodes[0], isClosed: false }] });
         expect(await deleteSingleItem('del', { confirmed: true, quiet: true })).toBe('deleted');
-        expect(at(`${T}/del`)).toMatchObject({ trashMode: 'palm', restoreBlocked: true });
-        appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://other.firebaseio.com' }));
+        expect(at(`${T}/del`)).toMatchObject({ trashMode: 'palm' });
+        expect(at(`${T}/del`).restoreBlocked).toBeUndefined();
+        const otherConfig = { databaseURL: 'https://other.firebaseio.com' };
+        const otherDb = { name: 'other-shop', app: { options: otherConfig } };
+        appLocalStore.setItem('zoew_firebase_config', JSON.stringify(otherConfig));
+        firebaseState.firebaseConfig = otherConfig;
+        firebaseState.db = otherDb as any;
+        firebaseState.auth = { app: { options: otherConfig }, currentUser: { uid: 'other-user', getIdToken: async () => 'other-token' } } as any;
+        firebaseState.authGeneration++;
+        firebaseState.dbRefHistory = ref(otherDb, H) as any; firebaseState.dbRefDeleted = ref(otherDb, T) as any;
+        firebaseState.dbRefDailyRevenue = ref(otherDb, D) as any; firebaseState.dbRefMonthlyRevenue = ref(otherDb, M) as any;
+        firebaseState.dbRefDailyPickup = ref(otherDb, 'zoew_daily_pickup_cod_dod') as any;
+        firebaseState.dbRefDailyCollected = ref(otherDb, 'zoew_daily_collected_cod_dod') as any;
+        firebaseState.dbRefZtoTrashMode = ref(otherDb, ZTO_TRASH_MODE_PATH) as any;
+        acceptFixtureSession();
         seedHistory({ ...closedItem('del2', 'C8'), isClosed: false, barcodes: [{ ...closedItem('del2', 'C8').barcodes[0], isClosed: false }] });
         expect(await deleteSingleItem('del2', { confirmed: true, quiet: true })).toBe('deleted');
         expect(at(`${T}/del2`).trashMode, 'another shop never inherits the remembered mode').toBe('local');

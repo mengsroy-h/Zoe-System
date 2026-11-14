@@ -141,6 +141,9 @@ async function runRestoreIntentTests(root, rec) {
                 assert.equal(body.p_tenant, tenant);
                 result = { head: seq, tombstones_after: body.p_tombstones_after ?? seq, more: false,
                     rows: [...rows.values()].filter((r) => r.s > body.p_after_seq && (r.v !== null || r.s > (body.p_tombstones_after ?? seq))).sort((a, b) => a.s - b.s || a.r.localeCompare(b.r) || a.k.localeCompare(b.k)) };
+            } else if (req.url.endsWith('/zoe_admin_audit_export')) {
+                assert.equal(body.p_tenant, tenant);
+                result = { v: 1, tenant, through: '0', rows: [], more: false, next: null };
             } else if (req.url.endsWith('/zoe_admin_write')) {
                 assert.equal(body.p_tenant, tenant);
                 writes.push(body);
@@ -242,6 +245,9 @@ async function runSkipInvalidKeepTests(root, rec) {
                 assert.equal(body.p_tenant, tenant);
                 result = { head: seq, tombstones_after: body.p_tombstones_after ?? seq, more: false,
                     rows: [...rows.values()].filter((r) => r.s > body.p_after_seq && (r.v !== null || r.s > (body.p_tombstones_after ?? seq))).sort((a, b) => a.s - b.s || a.r.localeCompare(b.r) || a.k.localeCompare(b.k)) };
+            } else if (req.url.endsWith('/zoe_admin_audit_export')) {
+                assert.equal(body.p_tenant, tenant);
+                result = { v: 1, tenant, through: '0', rows: [], more: false, next: null };
             } else if (req.url.endsWith('/zoe_admin_write')) {
                 assert.equal(body.p_tenant, tenant);
                 writes.push(body);
@@ -532,7 +538,7 @@ function dbApi(c) {
                 const uid = await H.makeAuthUser(c, username + '@u.zoe.test');
                 const reg = await H.as(c, SERVICE, 'select * from public.finish_registration($1, $2, $3)', [uid, hash, username]);
                 if (!reg.rows) throw new Error('finish_registration ' + JSON.stringify(reg.error));
-                out.who = { role: 'authenticated', sub: uid };
+                out.who = await H.sessionClaims(c, { role: 'authenticated', sub: uid });
                 out.username = username;
             }
             return out;
@@ -777,8 +783,8 @@ async function backupChain(rec, ctx, toolRoot) {
             && tenantDirs.every((d) => fs.readdirSync(path.join(runDir, 'backups', 'sb-main', d)).filter((f) => /\.json\.gz$/.test(f)).length === 1), tenantDirs);
         const fileA = walkFiles(path.join(runDir, 'backups', 'sb-main', A.id)).find((f) => /\.json\.gz$/.test(f));
         const archive = fileA ? readArchive(fileA) : null;
-        rec('archive ៖ format zoe-supabase-tenant v1 · manifest (tenant · ឈ្មោះ · សាខា · seq · exported_at)', !!archive && archive.format === 'zoe-supabase-tenant'
-            && archive.version === 1 && archive.manifest && archive.manifest.tenant && archive.manifest.tenant.id === A.id
+        rec('archive ៖ format zoe-supabase-tenant v2 · manifest (tenant · ឈ្មោះ · សាខា · seq · exported_at)', !!archive && archive.format === 'zoe-supabase-tenant'
+            && archive.version === 2 && archive.manifest && archive.manifest.tenant && archive.manifest.tenant.id === A.id
             && archive.manifest.tenant.branch_code === A.branch && archive.manifest.tenant.name === A.name
             && Number(archive.manifest.seq) === await D.seq(A.id) && !Number.isNaN(Date.parse(archive.manifest.exported_at)), archive && archive.manifest);
         rec('archive ៖ data (រូបរាង RTDB {root: {key: value}}) ស្មើស្ថានភាពចុងក្រោយរបស់ហាង A ពេលកំពុងសរសេរ (' + docCount(truthA) + ' doc · ' + exportPages + ' ទំព័រ)',
@@ -1156,7 +1162,7 @@ const JS_MUTATIONS = [
     { name: 'CLI រក្សាកូនសោ registry ទោះ record ដែលរក្សាមិនមែនប្រវត្តិ/ធុងសំរាម', file: 'tools/supabase-migrate/migrate.js',
         from: 'const keptOwners = leftAsIs.some((d) => BARCODE_OWNER_ROOTS.includes(d.root));', to: 'const keptOwners = leftAsIs.length > 0;', run: 'keep' },
     { name: 'CLI រំលង input គ្មាន record ➜ --replace លុបហាងទាំងមូល', file: 'tools/supabase-migrate/migrate.js',
-        from: 'if (!kept.length) {', to: 'if (false) {', run: 'keep' },
+        from: 'if (!kept.length && !auditOnly) {', to: 'if (false) {', run: 'keep' },
     { name: 'CLI បោះពុម្ព secret', file: 'tools/supabase-migrate/migrate.js', from: "say('Target : ' + target.url", to: "say('Target : ' + target.url + ' ' + target.key", run: 'auth' },
     { name: 'RPC មិន abort សំណើដែលផុតពិដាន', file: 'tools/firebase-backup/supabase.js', from: 'clearTimeout(timer);\n            controller.abort();', to: 'clearTimeout(timer);', run: 'hang' },
     { name: 'retry លើ 401', file: 'tools/firebase-backup/supabase.js', from: 'const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);',

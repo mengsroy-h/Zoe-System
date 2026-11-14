@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { prunedPut } from './helpers/purge-slot-model';
@@ -138,6 +139,8 @@ beforeEach(() => {
     firebaseState.db = { purge: true, app: { options } } as any;
     firebaseState.isInitializingFirebase = false;
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
+    firebaseState.firebaseConfig = options;
+    acceptFixtureSession();
     firebaseState.isDatabaseConnected = true;
     firebaseState.serverClockTrusted = true;
     firebaseState.serverTimeOffsetMs = 0;

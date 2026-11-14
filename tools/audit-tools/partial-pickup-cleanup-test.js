@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { localAuthRuntime } = require('./local-auth-runtime.cjs');
 const { moduleRuntime, memoryStorage } = require('./react-view');
 
 // ⛔ **stub ledger ត្រូវស៊ីនឹងកិច្ចសន្យាពិត។** `addRevenueToDailyAndMonthlyRecord()`
@@ -237,6 +238,11 @@ function buildWorld(historySeed, startNow) {
     });
     world.toasts = [];
 
+    const declaredConfig = { databaseURL: 'https://fixture-partial-pickup-cleanup-test.invalid' };
+    const authRuntime = localAuthRuntime(ROOT, src);
+    context.__storage = memoryStorage({ zoew_firebase_config: JSON.stringify(declaredConfig) });
+    context.appLocalStore = context.__storage;
+    authRuntime.prepare(context, declaredConfig);
     const code = [
         extractConst(src, 'TWO_HOURS_MS'),
         extractConst(src, 'ABANDON_AGE_MS'),
@@ -275,7 +281,6 @@ function buildWorld(historySeed, startNow) {
         optionalPart(() => extractConst(src, 'CLEANUP_LEDGER_RETRY_MAX'), 'const CLEANUP_LEDGER_RETRY_MAX = 10;'),
         optionalPart(() => extractConst(src, 'CLEANUP_NO_PRIOR'), 'const CLEANUP_NO_PRIOR = { d: [], m: [] };'),
         optionalPart(() => extractConst(src, 'LEDGER_OP_RING_MAX'), 'const LEDGER_OP_RING_MAX = 12;'),
-        'const appLocalStore = __storage;',
         optionalPart(() => extractFn(src, 'safeStoreGet'), 'function safeStoreGet(store, key) { try { return store ? store.getItem(key) : null; } catch (e) { return null; } }'),
         optionalPart(() => extractFn(src, 'safeStoreSet'), 'function safeStoreSet(store, key, value) { try { return store ? (store.setItem(key, String(value)), true) : false; } catch (e) { return false; } }'),
         optionalPart(() => extractFn(src, 'safeStoreRemove'), 'function safeStoreRemove(store, key) { try { return store ? (store.removeItem(key), true) : false; } catch (e) { return false; } }'),
@@ -306,7 +311,6 @@ function buildWorld(historySeed, startNow) {
     ].join('\n\n');
 
     const protocol = moduleRuntime(ROOT, src, [{ path: 'src/core/session-verification.ts', expose: ['sessionVerificationRequired'] }, { path: 'src/core/clock.ts', expose: ['captureClockOperation', 'serverClockIsTrustworthy', 'cleanupClockIsTrustworthy', 'getServerClockBounds'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }, { path: 'src/features/restore.ts', expose: ['resumeBlockedRestoreCancellations', 'clearRestoreFinalization'] }]);
-    context.__storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://fixture-partial-pickup-cleanup-test.invalid' }) });
     context.auth = { currentUser: { uid: 'fixture-user' } };
     context.dataState = { pickupPendingVersion: 0 };
     context.pickupPendingVersion = 0;
@@ -314,7 +318,8 @@ function buildWorld(historySeed, startNow) {
     context.ztoPickupStatus = new Map();
     context.navigator = { onLine: true };
     Object.defineProperty(context, 'serverTimeOffsetMs', { get: () => world.now - Date.now() });
-    vm.runInContext(protocol.code + '\n' + protocol.withoutBindings(code), context);
+    vm.runInContext(authRuntime.code + '\n' + authRuntime.withoutBindings(protocol.code + '\n' + protocol.withoutBindings(code)), context);
+    authRuntime.seed(context, declaredConfig);
 
     world.context = context;
     world.getPath = getPath;

@@ -7,6 +7,7 @@ const assert = require('assert/strict');
 const path = require('path');
 const root = process.env.AUTH_FIX_SOURCE_ROOT || path.resolve(__dirname, '../../../..');
 const acorn = require('acorn');
+const { keygenLogoutRuntime } = require('../../keygen-logout-runtime.cjs');
 const src = fs.readFileSync(path.join(root, 'ZoeKeyGen/app.js'), 'utf8');
 const ast = acorn.parse(src, {ecmaVersion: 'latest'});
 const decl = new Map();
@@ -16,7 +17,7 @@ for (const n of ast.body) {
     if (d.id.type === 'Identifier') decl.set(d.id.name, 'var ' + src.slice(d.start, d.end) + ';');
   }
 }
-const fns = ['keygenIdleStamp', 'captureSensitiveSession', 'isSensitiveSessionCurrent', 'adminOwnerIsCurrent',
+const fns = ['keygenIdleStamp', 'captureSensitiveSession', 'isSensitiveSessionCurrent', 'adminOwnerIsCurrent', 'adminOperationIsCurrent',
   'invalidateSensitiveSession', 'clearSecureKeySetup', 'clearSigningKey', 'lockKeygenSession', 'sbAdminLogin',
   'sbAdminLogout', 'sbAdminReset', 'sbAdminConfigProblem', 'sbAdminJwtRole',
   'sbAdminRequest', 'setSbAdminBusy', 'sbInputValue'];
@@ -53,11 +54,12 @@ async function scenario(action, stage) {
     }
   });
   vm.runInContext(code, ctx);
-  vm.runInContext(`var auth = {currentUser: {uid: 'fixture-admin'}};
+  vm.runInContext(`var auth = {currentUser: {uid: 'fixture-admin'}, app: {options: {databaseURL: 'https://fixture-keygen.firebaseio.com'}}};
     var isSignedInUiActive = true, authGeneration = 1, sensitiveSessionGeneration = 1;
-    var appLocalStore = {}, appSessionStore = {}, SIGNING_KEY_SESSION_STORAGE_KEY = 'fixture';
+    var appLocalStore = { getItem: () => null }, appSessionStore = { getItem: () => null }, SIGNING_KEY_SESSION_STORAGE_KEY = 'fixture';
     var signingPrivateKeyJwk = null, signingKeySessionKey = null, signingKeyLastUseAt = 0;
     var isGeneratingKey = false, generateKeyOwner = null, lookupSetupGeneration = 0, lastGeneratedSetupLink = '';`, ctx);
+  vm.runInContext(keygenLogoutRuntime(src), ctx);
   const invitationRow = {textContent: 'សំណើសាកល្បង'};
   const invitationQueue = el('licenseInvitationQueue');
   invitationQueue.replaceChildren(invitationRow);

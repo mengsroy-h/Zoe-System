@@ -206,8 +206,7 @@ $HOME/.local/state/Zoe-System/ZTO-Cookie-Sync/proxy-key.secret
   permission ធូរជាងនោះ។
 - ⛔ **កុំផ្លាស់ទី secret file ទៅ `/storage/emulated/0` ឬ Downloads** — ថត
   ទាំងនោះអានបានដោយ app ដទៃ។
-- Cookie បង្ហាញលើអេក្រង់ដោយចេតនា (ងាយ paste ជាផ្លូវបម្រុង) ⛔ តែ **PAT និង
-  `ZTO_PROXY_KEY` មិនបង្ហាញសោះ**។
+- Cookie មិនបង្ហាញតម្លៃក្នុង console ជាលំនាំដើម ឬក្នុង `--auto`។ បើត្រូវការ copy ជាផ្លូវបម្រុង សូមរត់ `./sync-zto-cookie-termux.sh --show-cookie` ដោយដៃក្នុង terminal ផ្ទាល់ទាំង input/output; មិនអនុញ្ញាត file/pipe ឬប្រើជាមួយ `--auto`, `--check`, `--auto-ready`, `--verify-setup`។ `--help` បង្ហាញជម្រើសដោយមិនត្រូវការ ADB ឬចាប់ Cookie។ **PAT និង `ZTO_PROXY_KEY` មិនបង្ហាញសោះ**។
 - ការចាប់ទទួលយក Cookie **តែពេល ZTO ឆ្លើយដោយជោគជ័យលើ host ពិត** ៖ ចម្លើយ
   401/403 · redirect ទៅ IdP · JSON ខូច **មិនរាប់ជាជោគជ័យ** ហើយ jar ដែលមាន
   CR/LF/NUL ឬគ្មាន `BOS-MAN-SESSION` ត្រូវបដិសេធទាំងស្រុង។

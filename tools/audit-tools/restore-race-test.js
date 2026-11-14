@@ -274,14 +274,18 @@ async function expectError(work) {
         const tabB = tabFor(app, shared, 'B');
 
         for (const [i, policy] of [
-            { trashMode: 'palm' },
-            { trashMode: 'cookie', signed: true },
-            { restoreBlocked: true },
-            { activePalm: true }
+            // Palm manual unsigned rows may restore after fresh verification; cleanup pickup rows remain terminal.
+            { name: 'Palm pickup cleanup', trashMode: 'palm', trashReason: 'pickup' },
+            { name: 'Cookie stored Sign', trashMode: 'cookie', signed: true },
+            { name: 'Explicit permanent restore block', restoreBlocked: true },
+            // Active Palm configuration alone does not prove Sign; this negative carries stored Sign evidence.
+            { name: 'Active Palm with stored Sign', activePalm: true, signed: true }
         ].entries()) {
+            console.log('  policy ' + i + ': ' + policy.name);
             const id = 'blocked_policy_' + i;
             const item = trashItem(id);
             if (policy.trashMode) item.trashMode = policy.trashMode;
+            if (policy.trashReason) item.trashReason = policy.trashReason;
             if (policy.restoreBlocked) item.restoreBlocked = true;
             if (policy.signed) item.barcodes[0].ztoSignedAt = shared.now - 1;
             shared.lookupConfig = policy.activePalm ? { enabled: true, url: 'https://example.invalid/.netlify/functions/zto-order-detail?palm=1' } : null;

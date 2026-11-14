@@ -639,6 +639,8 @@ async function bootstrap(base) {
         "export { withTransactionOutcomeResolution } from './ZoeW/src/services/tx-outcome';",
         "export { nativeWriteRecoveryState } from './ZoeW/src/services/native-write-recovery';",
         "export { createSupabaseSdk } from './ZoeW/src/services/supabase-sdk';",
+        "export { acceptLocalAuthSession } from './ZoeW/src/services/local-logout-intent';",
+        "export { loginBackendScope } from './ZoeW/src/features/login-memory';",
         "export { createSupabaseTransport } from './ZoeW/src/services/supabase-transport';",
         "export { SB_OPS_PER_WRITE } from './ZoeW/src/services/supabase-rtdb';",
         "export { boundedRegistryPurgeIntent, registryPurgeIntent, registryPurgeBindingHash, registryPurgeReceiptMatches } from './ZoeW/src/domain/registry-purge-proof';",
@@ -662,6 +664,8 @@ function activate(api, client) {
     Object.assign(api.dataState, { scanHistory: [], deletedItems: [], dailyRevenueData: {}, monthlyRevenueData: {},
         dailyPickupData: {}, dailyCollectedData: {} });
     window.localStorage.setItem('zoew_firebase_config', JSON.stringify(client.app.options));
+    if (!api.acceptLocalAuthSession(client.auth, api.loginBackendScope(client.app.options), client.auth.currentUser)) throw new Error('Synthetic SDK actor was not locally accepted');
+    if (typeof client.sdk.resumeAcceptedSession === 'function' && !client.sdk.resumeAcceptedSession(client.auth)) throw new Error('Synthetic SDK accepted actor did not resume');
 }
 function stats() {
     return { executeRequests: 0, commits: 0, backendAttempts: 0, dropped: 0, deniedReads: 0, storageFailures: 0, captures: [] };

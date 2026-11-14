@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { acceptServerClockOffset, resetServerClock } from '../../../../ZoeW/src/core/clock';
 import { createScanMemorySdk } from './helpers/scan-memory-sdk';
 /**
@@ -69,6 +70,8 @@ beforeEach(() => {
     firebaseState.db = { audit: true, app: { options } } as any;
     firebaseState.isInitializingFirebase = false;
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
+    firebaseState.firebaseConfig = options;
+    acceptFixtureSession();
     const native = createScanMemorySdk('audit-token').sdk;
     firebaseState.fb = {
         ...native,

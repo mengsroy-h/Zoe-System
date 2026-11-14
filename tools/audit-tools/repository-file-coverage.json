@@ -323,7 +323,8 @@
       "category": "behavior",
       "guards": [
         "tools/audit-tools/firebase-backup-test.js",
-        "tools/audit-tools/supabase-data-tools-test.js"
+        "tools/audit-tools/supabase-data-tools-test.js",
+        "tools/audit-tools/supabase-audit-archive-test.js"
       ],
       "evidence": "tools/audit-tools/firebase-backup-test.js រត់ backup/config/crypt module ពិតលើ fixture និង mock network · target Supabase (ci-config · backup · crypt) វាស់ដោយ supabase-data-tools-test ទល់ Postgres ពិត",
       "limitation": "តេស្តកូដ និង fixture។ មិនបញ្ជាក់ service account, secret, schedule ឬ restore លើ production ពិត។"
@@ -564,7 +565,8 @@
       "category": "behavior",
       "guards": [
         "tools/audit-tools/supabase-data-tools-test.js",
-        "tools/audit-tools/supabase-rls-test.js"
+        "tools/audit-tools/supabase-rls-test.js",
+        "tools/audit-tools/supabase-audit-archive-test.js"
       ],
       "evidence": "supabase-data-tools-test រត់ ci-config.js · backup.js · crypt.js · migrate.js ពិតជា child process ទល់ម៉ាស៊ីនមេ PostgREST ក្លែងលើ Postgres ពិត + migration ពិត ៖ RPC export (service_role · ព្រំដែនជួរ/byte · keyset ពេលហាងកំពុងសរសេរ · tombstone · មិនឆ្លង tenant) · ខ្សែ CI ពេញ (seal + ជំហានស្កេន plaintext ពិតរបស់ backup.yml) · នាំចូលហាងទី ២ ➜ export ម្តងទៀតដូចគ្នាបេះបិទ · ចម្លើយបាត់/ព្យួរ/503/401 · REFUSED · --replace · ឧបករណ៍ផ្សេងសរសេរ · record ខូច · secret មិនលេច · mutation លើ migration និង tool ត្រូវក្រហម · supabase-rls-test ផ្ទៀង EXECUTE (service_role តែប៉ុណ្ណោះ)។",
       "limitation": "PostgREST · gateway API key និង GitHub Actions ពិតមិនបានរត់នៅទីនេះ ➜ backup/ការផ្ទេរលើ Project ពិតត្រូវសាកដោយដៃ (dry-run មុន · ស្តារ archive មួយមកហាងសាកល្បង)។"
@@ -629,14 +631,6 @@
       ],
       "evidence": "រត់កូដលក់ពិត និង decrypt ពិត រួមការពារ URL កែ · កូដខុស · logout · កូនសោក្នុង storage។",
       "limitation": "សាក Web Crypto ក្នុង Node និង UI harness; មិនជំនួសការសាកលើទូរស័ព្ទពិត។"
-    },
-    "braces-backport": {
-      "category": "behavior",
-      "guards": [
-        "tools/audit-tools/firebase-provision-test.js"
-      ],
-      "evidence": "ផ្ទៀង bytes upstream 3.0.3 និង backport ដែល chokidar/CLI ផ្ទុកពិត; corpus glob 38 ករណី · depth cap/bypass AST/cycle · quoted/escaped/class · mutation 4 ទ្វារ · watcher brace glob ពិត។",
-      "limitation": "ការកែចង recursive AST depth សម្រាប់ GHSA-vfj7-8cjw-p6xm; មិនអះអាងគ្របគ្រងភាពស្មុគស្មាញរបស់ regex/glob គ្រប់ប្រភេទ ឬ upstream បានចេញកំណែ patched ទេ។"
     },
     "money-multidevice-harness": {
       "category": "behavior",
@@ -863,6 +857,82 @@
       ],
       "evidence": "Vitest ប្រតិបត្តិ URL expression របស់ redaction fixtures និងប្លុក mkdir ពិតរបស់ hang-guard លើថតទទេ; មុនកែផ្លូវត្រូវបរាជ័យ។",
       "limitation": "មិនប្រតិបត្តិ telemetry/security ឬ backend scenarios; វាស់តែ path resolution និងការបង្កើតថត fixture។"
+    },
+    "keygen-logout-runtime": {
+      "category": "behavior",
+      "guards": [
+        "tools/audit-tools/auth-recovery-test.js",
+        "tools/audit-tools/connection-recovery-test.js",
+        "tools/audit-tools/keygen-session-security-test.js",
+        "tools/audit-tools/zoew-suite-test.js"
+      ],
+      "evidence": "ស្រង់ declaration ពិតពី ZoeKeyGen/app.js ដោយ Acorn ហើយអ្នកយាម auth/recovery/session រត់ intent-store និង owner fence ដើមក្នុង VM; Vitest ផ្ទៀង factory parity និង SDK reload។",
+      "limitation": "ការស្រង់ source និង VM មិនជំនួស backend ឬឧបករណ៍ពិតទេ; ភស្តុតាងរត់ត្រូវអានលទ្ធផលអ្នកយាមនីមួយៗ។"
+    },
+    "local-auth-runtime": {
+      "category": "behavior",
+      "guards": [
+        "tools/audit-tools/cleanup-interrupt-atomicity-test.js",
+        "tools/audit-tools/connection-recovery-test.js",
+        "tools/audit-tools/daily-collected-test.js",
+        "tools/audit-tools/db-stall-guard-test.js",
+        "tools/audit-tools/emu/crud-rules-flow.js",
+        "tools/audit-tools/emu/restore-mutation-emu-test.js",
+        "tools/audit-tools/late-commit-test.js",
+        "tools/audit-tools/ledger-count-integrity-test.js",
+        "tools/audit-tools/partial-pickup-cleanup-test.js",
+        "tools/audit-tools/restore-marker-hygiene-test.js",
+        "tools/audit-tools/returned-trash-retention-test.js",
+        "tools/audit-tools/stall-lock-release-test.js",
+        "tools/audit-tools/tx-outcome-test.js",
+        "tools/audit-tools/write-stall-guard-test.js",
+        "tools/audit-tools/zto-list-sync-test.js",
+        "tools/audit-tools/zoew-suite-test.js",
+        "tools/audit-tools/emu/tx-disconnect-emu-test.js",
+        "tools/audit-tools/health-check-test.js",
+        "tools/audit-tools/history-patch-retry-test.js",
+        "tools/audit-tools/lookup-burst-test.js",
+        "tools/audit-tools/lookup-failure-identity-test.js",
+        "tools/audit-tools/lookup-freshness-test.js",
+        "tools/audit-tools/lookup-prefetch-test.js",
+        "tools/audit-tools/network-timeout-test.js",
+        "tools/audit-tools/periodic-network-guard-test.js",
+        "tools/audit-tools/registry-release-test.js",
+        "tools/audit-tools/toast-action-truth-test.js",
+        "tools/audit-tools/toast-truth-test.js"
+      ],
+      "evidence": "VM fixtures load the actual target module views for logout intent and accepted authentication. Vitest verifies UID/config negatives, original-witness invalidation, mismatched views and consistently mutated target behavior.",
+      "limitation": "Synthetic VM storage and SDK actors do not replace browser persistence, backend authorization or real devices."
+    },
+    "sdk-session-fixture": {
+      "category": "behavior",
+      "guards": [
+        "tools/audit-tools/emu/scan-operation-sdk-test.js",
+        "tools/audit-tools/emu/scan-month-coordination-sdk-test.js",
+        "tools/audit-tools/zoew-suite-test.js",
+        "tools/audit-tools/emu/cleanup-consumed-sdk-test.js",
+        "tools/audit-tools/emu/empty-delete-sdk-test.js",
+        "tools/audit-tools/emu/pickup-reset-applied-sdk-test.js",
+        "tools/audit-tools/emu/trash-generation-sdk-test.js"
+      ],
+      "evidence": "Actual scan SDK source bundles export the selected production accepted-session policy; their declared SDK actor and saved backend are admitted before clock/scan operations. The source-contract test runs the same extracted bootstrap and denies missing or changed saved Config.",
+      "limitation": "The helper is positive fixture setup, not authentication itself. Real RTDB command results are separate from the synthetic fixture contract."
+    },
+    "firebase-business-audit-ci-only": {
+      "category": "integrity",
+      "guards": [
+        "tools/audit-tools/repository-file-coverage.js"
+      ],
+      "evidence": "Reviewed immutable candidate runtime/CI-checker inputs are pinned by SHA-256. The dedicated firebase-audit-candidate CI job installs its separate package and runs real SDK definition/negative checks; actual local Node22/24 results are separate evidence.",
+      "limitation": "Normal run-all does not install or execute this opt-in Cloud Functions runtime. Integrity is not behavioral coverage or deployed event-delivery proof; the Spark target is blocked."
+    },
+    "firebase-business-audit-local-proof": {
+      "category": "integrity",
+      "guards": [
+        "tools/audit-tools/repository-file-coverage.js"
+      ],
+      "evidence": "Reviewed candidate-only manual proof is pinned by SHA-256; it executes actual Admin SDK handler and canonical RTDB rules under an owned local scope, with synthetic provider context. Results are separate from the canonical suite.",
+      "limitation": "Normal run-all and the registration-only CI job do not execute this optional SDK/JVM proof. It does not verify Cloud Functions trigger delivery or hosted deployment."
     }
   },
   "files": {
@@ -3884,7 +3954,7 @@
     },
     "tools/audit-tools/emu/import-paired-sdk-test.js": {
       "policy": "import-paired-harness-integrity",
-      "sha256": "c478200c053babfdfc1cf11402ae9a1add135ea7d4557df98108d5b7eaf8fff7"
+      "sha256": "778055a4272bea92649598fad95abb56cd92ecda700a3dcacd674d1def008cd5"
     },
     "tools/audit-tools/emu/ledger-revert-emu-test.js": {
       "policy": "guard-1"
@@ -3931,7 +4001,7 @@
     },
     "tools/audit-tools/emu/supabase-fake-server.js": {
       "policy": "import-paired-harness-integrity",
-      "sha256": "b00a87067f41d5411ae5cb509e2087713b5eec906182b5202d649134d1cfb187"
+      "sha256": "bfe104989c95e7feb221a2c73c5879f66df297ba6f055515e672505090d5ee41"
     },
     "tools/audit-tools/emu/supabase-pg-owned.js": {
       "policy": "import-paired-harness-integrity",
@@ -3967,9 +4037,6 @@
     },
     "tools/audit-tools/firebase-provision-test.js": {
       "policy": "guard-1"
-    },
-    "tools/audit-tools/fixtures/braces-compat.json": {
-      "policy": "braces-backport"
     },
     "tools/audit-tools/fixtures/f09-web-locks.cjs": {
       "policy": "pickup-reset-applied"
@@ -4802,9 +4869,6 @@
     "tools/actions-runners/register.sh": {
       "policy": "self-hosted-register"
     },
-    "tools/firebase-provision/.npmrc": {
-      "policy": "braces-backport"
-    },
     "tools/firebase-provision/README-KH.md": {
       "policy": "guard-13"
     },
@@ -4828,39 +4892,6 @@
     },
     "tools/firebase-provision/setup.cmd": {
       "policy": "guard-firebase-provision-contract"
-    },
-    "tools/firebase-provision/vendor/braces/LICENSE": {
-      "policy": "braces-backport"
-    },
-    "tools/firebase-provision/vendor/braces/UPSTREAM.json": {
-      "policy": "braces-backport"
-    },
-    "tools/firebase-provision/vendor/braces/index.js": {
-      "policy": "braces-backport"
-    },
-    "tools/firebase-provision/vendor/braces/lib/compile.js": {
-      "policy": "braces-backport"
-    },
-    "tools/firebase-provision/vendor/braces/lib/constants.js": {
-      "policy": "braces-backport"
-    },
-    "tools/firebase-provision/vendor/braces/lib/depth.js": {
-      "policy": "braces-backport"
-    },
-    "tools/firebase-provision/vendor/braces/lib/expand.js": {
-      "policy": "braces-backport"
-    },
-    "tools/firebase-provision/vendor/braces/lib/parse.js": {
-      "policy": "braces-backport"
-    },
-    "tools/firebase-provision/vendor/braces/lib/stringify.js": {
-      "policy": "braces-backport"
-    },
-    "tools/firebase-provision/vendor/braces/lib/utils.js": {
-      "policy": "braces-backport"
-    },
-    "tools/firebase-provision/vendor/braces/package.json": {
-      "policy": "braces-backport"
     },
     "tools/money-check-windows/README-KH.md": {
       "policy": "guard-13"
@@ -5235,6 +5266,141 @@
       "policy": "license-seat-protocol"
     },
     "tools/audit-tools/zoew/tests/import-instrumentation-identifiers.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "supabase/migrations/20261114010845_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "tools/audit-tools/zoew/tests/keygen-admin-transport.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/logout-ceiling.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/palm-restore-policy.pg.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/palm-restore-policy.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/supabase-redirect-security.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "supabase/migrations/20261114011437_zoe_data_active_session.sql": {
+      "policy": "supabase-db"
+    },
+    "tools/audit-tools/zoew/tests/firebase-provision-runtime.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/money-restore-policy.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/supabase-data-session.pg.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/palm-restore-policy-scope.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/supabase-fake-session.pg.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/palm-restore-policy-scope.cjs": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/keygen-logout-reload.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/local-logout-intent.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/local-logout-intent.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/logout-intent-independent-review.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/logout-reload-probe.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/logout-supabase-reload.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/keygen-logout-runtime.cjs": {
+      "policy": "keygen-logout-runtime"
+    },
+    "tools/audit-tools/zoew/tests/helpers/accepted-session.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/local-auth-runtime.cjs": {
+      "policy": "local-auth-runtime"
+    },
+    "tools/audit-tools/zoew/tests/supabase-local-session-recovery.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/native-local-session-recovery.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/emu/sdk-session-fixture.cjs": {
+      "policy": "sdk-session-fixture"
+    },
+    "tools/audit-tools/firebase-business-audit-runtime-test.cjs": {
+      "policy": "firebase-business-audit-ci-only",
+      "sha256": "ac19aab5fc4c4111b575684f646510d29dae21d783b726f8956458536e81dab4"
+    },
+    "tools/firebase-provision/business-audit-functions/index.cjs": {
+      "policy": "firebase-business-audit-ci-only",
+      "sha256": "ff18044b55b573f11a3c661f94bc47d2c1f4a5b58c1a9502ed48c76330d8bc11"
+    },
+    "tools/firebase-provision/business-audit-functions/package.json": {
+      "policy": "firebase-business-audit-ci-only",
+      "sha256": "b3b53da68796e1d02bf1ae958adbaca370213c1676494bd6979afc99d9f4f4c5"
+    },
+    "tools/firebase-provision/business-audit-functions/package-lock.json": {
+      "policy": "firebase-business-audit-ci-only",
+      "sha256": "a87da1bf70ab6a05a588722d97460261a530ab52708a38c3bf1c49b56dafea22"
+    },
+    "tools/firebase-provision/business-audit-functions/firebase.json": {
+      "policy": "firebase-business-audit-ci-only",
+      "sha256": "b8306f0162383354c5338338f218d73eb7f5ecd1ff7ceaf201dab13a26a65fd2"
+    },
+    "tools/firebase-provision/business-audit-functions/business-audit.cjs": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/firebase-provision/stage-business-audit.js": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/firebase-business-audit-stage.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/firebase-business-audit.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/supabase-business-audit.pg.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "supabase/migrations/20261114042758_zoe_business_audit.sql": {
+      "policy": "supabase-db"
+    },
+    "tools/audit-tools/emu/firebase-business-audit-rules-test.cjs": {
+      "policy": "firebase-business-audit-local-proof",
+      "sha256": "5a7526ae945eae26b504b2bcc2a4c89fde50d11769367d1246d866271783858b"
+    },
+    "tools/audit-tools/supabase-audit-archive-test.js": {
+      "policy": "guard-1"
+    },
+    "tools/audit-tools/zoew/tests/firebase-business-audit-ci.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/reviewed-business-audit-schema.cjs": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/helpers/sheet-import-fixture.cjs": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/helpers/sheet-import-protocol.cjs": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/sheet-import-protocol.test.ts": {
       "policy": "zoew-self-verification"
     }
   }

@@ -51,7 +51,7 @@ function lab() {
     const helpers = new Map();
     const loadHelper = (id: string) => {
         if (helpers.has(id)) return helpers.get(id);
-        const file = path.join(sourceRoot, 'tools/audit-tools', id + '.js');
+        const file = path.join(sourceRoot, 'tools/audit-tools', id.endsWith('.cjs') ? id : id + '.js');
         const helperRequire: any = (target: string) => target === './react-view' ? loadHelper('react-view') : depRequire(target);
         helperRequire.resolve = (target: string) => depRequire.resolve(target);
         const exports = new Function('require', 'module', '__dirname', readFileSync(file, 'utf8') + '\nreturn module.exports;')(
@@ -59,7 +59,7 @@ function lab() {
         helpers.set(id, exports); return exports;
     };
     const context: any = vm.createContext({ console, setTimeout, clearTimeout, queueMicrotask, Buffer, __dirname: path.dirname(filename),
-        require: (id: string) => { if (id === '../react-view' || id === '../audit-module-ast') return loadHelper(id.slice(3)); try { return localRequire(id); } catch (error: any) { if (error.code !== 'MODULE_NOT_FOUND' || id.startsWith('.')) throw error; return depRequire(id); } },
+        require: (id: string) => { if (id === '../react-view' || id === '../audit-module-ast' || id === '../local-auth-runtime.cjs') return loadHelper(id.slice(3)); try { return localRequire(id); } catch (error: any) { if (error.code !== 'MODULE_NOT_FOUND' || id.startsWith('.')) throw error; return depRequire(id); } },
         process: { env: { RESTOREMUTATION_APP_DIR: appRoot }, pid: process.pid, exitCode: 0 } });
     vm.runInContext(source.slice(0, main.start), context, { filename });
     context.check = (pass: boolean, label: string, detail: any) => checks.push({ pass, label, detail });

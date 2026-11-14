@@ -10,6 +10,7 @@ import { dataState, firebaseState } from '../../../../ZoeW/src/core/state';
 import { preparePendingScan } from '../../../../ZoeW/src/services/scan-pending';
 import { claimScanOperation, saveScanOperation } from '../../../../ZoeW/src/services/scan-operation';
 import { purgeTrashWithRegistry } from '../../../../ZoeW/src/services/registry-purge';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 const H = 'zoew_scan_history_cod_dod', D = 'zoew_daily_revenue_cod_dod', M = 'zoew_monthly_revenue_cod_dod', R = 'zoew_barcode_registry';
 const HOST = 'https://fake-default-rtdb.firebaseio.com', NOW = Date.UTC(2026, 9, 30, 9);
@@ -210,6 +211,7 @@ it('multidevice pickup aging ៖ closedAt ប្រែបាន តែ immutable
 it('historical v2 admission → abandon → Restore ៖ birth/receipt/registry ថេរ និង strict oracle ចាប់ wrong-birth', async () => {
     const fixture = duplicateFixture('money'), sdk = fixture.firebaseSDK, db = sdk.getDatabase();
     Object.assign(firebaseState, { fb: sdk, db, auth: sdk.getAuth(), hasEverConnectedToDatabase: true, dbListenersFailed: false });
+    acceptFixtureSession();
     for (const [key, path] of Object.entries({ dbRefHistory: H, dbRefDeleted: 'zoew_recently_deleted_cod_dod', dbRefDailyRevenue: D, dbRefMonthlyRevenue: M,
         dbRefDailyPickup: 'zoew_daily_pickup_cod_dod', dbRefDailyCollected: 'zoew_daily_collected_cod_dod' })) firebaseState[key] = sdk.ref(db, path);
     vi.stubGlobal('confirm', () => true);

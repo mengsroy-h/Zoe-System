@@ -22,6 +22,7 @@ const net = require('net');
 const path = require('path');
 const vm = require('vm');
 const { emuNamespace } = require('./ns.js');
+const { localAuthRuntime } = require('../local-auth-runtime.cjs');
 
 const ROOT = process.env.TXEMU_APP_DIR ? path.resolve(process.env.TXEMU_APP_DIR) : path.join(__dirname, '../../..');
 const PORT = parseInt(process.env.TXEMU_PORT || '9000', 10);
@@ -246,14 +247,17 @@ const settle = (ms) => new Promise((r) => setTimeout(r, ms));
         nativeFunctionRequest: (u, o) => ({ url: u, options: o }),
         lookupState: {},
         ZoeErrors: { capture: () => {} },
-        firebaseConfig: { databaseURL: DB_URL },
-        auth: { currentUser: { getIdToken: () => Promise.resolve('owner') } }
+        firebaseConfig: app.options,
+        fb: sdkDb,
+        auth: { app, currentUser: { uid: 'txdisc-emulator-owner', getIdToken: () => Promise.resolve('owner') } }
     };
     box.window = box;
     box.authGeneration = 0;
     // wrapper ឈប់ដោះស្រាយពេលប្តូរ auth **ឬ database** (`firebaseState.db` ➜ `db` ក្នុង text view)
-    box.db = {};
+    box.db = db;
     const ctx = vm.createContext(box);
+    const authRuntime = localAuthRuntime(ROOT, SRC);
+    authRuntime.prepare(ctx, app.options);
     const parts = [require('../react-view.js').reactRuntime(SRC, { context: box }), 'const txOutcomeUnknownReported = new Set();'];
     ['TX_OUTCOME_READ_TIMEOUT_MS', 'TX_OUTCOME_RETRY_GAP_MS', 'TX_OUTCOME_MAX_GAP_MS', 'TX_OUTCOME_MAX_REFUSALS', 'TX_OUTCOME_GATE_RELEASE_FAILS', 'txResolvingPaths', 'txDisconnectResolving', 'LEDGER_OP_RING_MAX'].forEach((c) => { const s = sliceConst(SRC, c); if (s) parts.push(s); });
     const FNS = ['elapsedSince', 'withTimeout', 'fetchWithTimeout', 'transactionOutcomeUnknown', 'txCloneJson', 'txCanonical', 'txSameValue', 'txRestUrl',
@@ -264,7 +268,10 @@ const settle = (ms) => new Promise((r) => setTimeout(r, ms));
     check(missing.length === 0, 'wrapper ពិតរបស់ App មានក្នុងកូដ ship', missing);
     FNS.forEach((n) => { const s = sliceFrom(SRC, n); if (s) parts.push(s); });
     if (missing.indexOf('runTransactionResolved') !== -1) parts.push('function runTransactionResolved(sdk, ref, fn) { return sdk.runTransaction(ref, fn); }');
-    vm.runInContext(parts.join('\n\n'), ctx);
+    vm.runInContext(authRuntime.code + '\n' + authRuntime.withoutBindings(parts.join('\n\n')), ctx);
+    authRuntime.seed(ctx, app.options);
+    check(vm.runInContext('localAuthSessionCurrent(auth, loginBackendScope(), auth.currentUser)', ctx)
+        && box.db === db && box.auth.app === app, 'លក្ខខណ្ឌចាំបាច់ ៖ wrapper auth actor និង backend ជារបស់ SDK ដែលកំពុងសាក');
     const resolved = (ref, fn) => ctx.runTransactionResolved(sdkDb, ref, fn);
 
     let connected = false;

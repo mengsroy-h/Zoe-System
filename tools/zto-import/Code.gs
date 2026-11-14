@@ -1,8 +1,10 @@
-var SCRIPT_VERSION = 6;
+var SCRIPT_VERSION = 7;
 var DEFAULT_SHEET_NAME = 'Customers';
 var MAX_IMPORT_ROWS = 20000;
 var MAX_SAVED_MAPPINGS = 12;
 var LOCK_WAIT_MS = 20000;
+var MAX_IMPORT_RECEIPTS = 200;
+var MAX_IMPORT_RECORD_BYTES = 8192;
 
 var PROP_SHEET_ID = 'SHEET_ID';
 var PROP_PASSWORD = 'IMPORT_PASSWORD';
@@ -421,34 +423,7 @@ function applyColumnFormats_(sheet, startRow, rowCount) {
     sheet.getRange(startRow, 4, rowCount, 1).setNumberFormat('@');
 }
 
-function importRows(password, payload) {
-    requirePassword_(password);
-    var data = payload || {};
-    var rows = data.rows || [];
-    if (!rows.length) {
-        throw new Error('គ្មានជួរដេកត្រូវនាំចូលទេ');
-    }
-    if (rows.length > MAX_IMPORT_ROWS) {
-        throw new Error('ឯកសារនេះមាន ' + rows.length + ' ជួរដេក ច្រើនជាងកម្រិត ' + MAX_IMPORT_ROWS + ' — សូមបំបែកជាឯកសារតូចៗ');
-    }
-    var lock = LockService.getScriptLock();
-    if (!lock.tryLock(LOCK_WAIT_MS)) {
-        throw new Error('មានការនាំចូលមួយផ្សេងកំពុងដំណើរការ — សូមព្យាយាមម្តងទៀតក្នុងមួយភ្លែត');
-    }
-    try {
-        var result = writeToSheet_(rows, data.mode, data.mapping);
-        if (data.signature) {
-            try {
-                rememberMapping_(data.signature, data.mapping, data.mode);
-            } catch (err) {
-                result.mappingSaved = false;
-            }
-        }
-        return result;
-    } finally {
-        lock.releaseLock();
-    }
-}
+
 
 function writtenError_(err) {
     var out = new Error(err && err.message ? err.message : String(err));
@@ -456,7 +431,7 @@ function writtenError_(err) {
     return out;
 }
 
-function writeToSheet_(rows, mode, mapping, owner) {
+function writeToSheetRaw_(rows, mode, mapping, owner) {
     var sheet = targetSheet_(owner);
     var normalized = normalizeRecords_(rows);
     if (!normalized.records.length) {
@@ -518,39 +493,7 @@ function writeToSheet_(rows, mode, mapping, owner) {
     }
 }
 
-function clearRows(password, confirmToken) {
-    requirePassword_(password);
-    if (confirmToken !== 'CLEAR') {
-        throw new Error('ការសម្អាតត្រូវការការបញ្ជាក់ — គ្មាន token បញ្ជាក់ទេ');
-    }
-    var lock = LockService.getScriptLock();
-    if (!lock.tryLock(LOCK_WAIT_MS)) {
-        throw new Error('មានប្រតិបត្តិការមួយផ្សេងកំពុងដំណើរការ — សូមព្យាយាមម្តងទៀតក្នុងមួយភ្លែត');
-    }
-    try {
-        var sheet = targetSheet_();
-        var lastRow = sheet.getLastRow();
-        var removed = Math.max(0, lastRow - 1);
-        var cleared = false;
-        try {
-            if (removed > 0) {
-                sheet.getRange(2, 1, removed, 4).clearContent();
-                cleared = true;
-                SpreadsheetApp.flush();
-            }
-            return {
-                ok: true,
-                sheetName: sheet.getName(),
-                removed: removed,
-                rowsAfter: Math.max(0, sheet.getLastRow() - 1)
-            };
-        } catch (err) {
-            throw cleared ? writtenError_(err) : err;
-        }
-    } finally {
-        lock.releaseLock();
-    }
-}
+
 
 function doPost(e) {
     var body;
@@ -572,7 +515,8 @@ function runApiAction_(body) {
     if (action === 'status') return getStatus(password);
     if (action === 'prepare') return prepare(password, body.headers);
     if (action === 'import') return importRows(password, body.payload);
-    if (action === 'clear') return clearRows(password, body.confirm);
+    if (action === 'clear') return clearRows(password, body.confirm, body.intent);
+    if (action === 'prepareWrite') return prepareWrite(password, body.request);
     throw new Error('សកម្មភាពមិនស្គាល់');
 }
 
@@ -591,6 +535,209 @@ function getStatus(password) {
         sheetName: sheet.getName(),
         rowCount: Math.max(0, sheet.getLastRow() - 1),
         watchEnabled: !!readProp_(PROP_INBOX),
-        savedMappings: Object.keys(readSavedMappings_()).length
+        savedMappings: Object.keys(readSavedMappings_()).length,
+        writeProtocol: 1,
+        writeScope: importHash_({ script: ScriptApp.getScriptId() })
     };
+}
+
+function importRows(password, payload) {
+    requirePassword_(password);
+    var lock = LockService.getScriptLock();
+    if (!lock.tryLock(LOCK_WAIT_MS)) throw new Error('IMPORT_BUSY');
+    try { return executePreparedWrite_('import', payload || {}, payload && payload.intent); }
+    finally { lock.releaseLock(); }
+}
+
+function clearRows(password, confirmToken, intent) {
+    requirePassword_(password);
+    if (confirmToken !== 'CLEAR') throw new Error('CLEAR_CONFIRM_REQUIRED');
+    var lock = LockService.getScriptLock();
+    if (!lock.tryLock(LOCK_WAIT_MS)) throw new Error('IMPORT_BUSY');
+    try { return executePreparedWrite_('clear', {}, intent); }
+    finally { lock.releaseLock(); }
+}
+
+function prepareWrite(password, request) {
+    requirePassword_(password);
+    var lock = LockService.getScriptLock();
+    if (!lock.tryLock(LOCK_WAIT_MS)) throw new Error('IMPORT_BUSY');
+    try {
+        if (!request || ['import', 'clear'].indexOf(request.kind) < 0) throw new Error('IMPORT_KIND_INVALID');
+        if (request.kind === 'clear' && request.confirm !== 'CLEAR') throw new Error('CLEAR_CONFIRM_REQUIRED');
+        return prepareWrite_(request.kind, request.payload || {});
+    } finally { lock.releaseLock(); }
+}
+
+function importCanonical_(value) {
+    if (Object.prototype.toString.call(value) === '[object Date]') return JSON.stringify(value.toISOString());
+    if (Array.isArray(value)) return '[' + value.map(importCanonical_).join(',') + ']';
+    if (value && typeof value === 'object') return '{' + Object.keys(value).sort().map(function (key) { return JSON.stringify(key) + ':' + importCanonical_(value[key]); }).join(',') + '}';
+    return JSON.stringify(value);
+}
+
+function importHash_(value) {
+    return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, importCanonical_(value), Utilities.Charset.UTF_8).map(function (b) { return ('0' + ((b + 256) % 256).toString(16)).slice(-2); }).join('');
+}
+
+function importTarget_(owner) {
+    var capture = { sheetId: owner ? owner.sheetId : readProp_(PROP_SHEET_ID), sheetName: owner ? owner.sheetName : readProp_(PROP_SHEET_NAME) || DEFAULT_SHEET_NAME };
+    var sheet = targetSheet_(capture);
+    capture.tabId = sheet.getSheetId();
+    return { owner: capture, sheet: sheet, hash: importHash_(capture) };
+}
+
+function importSnapshot_(target) {
+    var count = Math.max(1, target.sheet.getLastRow());
+    var range = target.sheet.getRange(1, 1, count, 4);
+    return { values: range.getValues(), formulas: range.getFormulas() };
+}
+
+function importTrimRows_(rows) {
+    var copy = rows.slice();
+    while (copy.length && copy[copy.length - 1].every(function (cell) { return cell === ''; })) copy.pop();
+    return copy;
+}
+
+function importPostHash_(target, values) {
+    return importHash_({ target: target.owner, values: importTrimRows_(values) });
+}
+
+function importReceiptKey_(id) {
+    if (typeof id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) throw new Error('IMPORT_INTENT_REQUIRED');
+    return 'ZTO_IMPORT_RECEIPT_V1_' + id;
+}
+
+function importRead_(key) {
+    var raw = scriptProps_().getProperty(key);
+    if (raw === null) return null;
+    var parsed;
+    try { parsed = JSON.parse(raw); } catch (err) { throw new Error('IMPORT_RECEIPT_HOLD'); }
+    if (!parsed || parsed.v !== 1 || typeof parsed !== 'object') throw new Error('IMPORT_RECEIPT_HOLD');
+    return parsed;
+}
+
+function importStore_(key, value) {
+    var raw = JSON.stringify(value);
+    if (encodeURIComponent(raw).replace(/%[0-9a-f]{2}|./gi, 'x').length > MAX_IMPORT_RECORD_BYTES) throw new Error('IMPORT_RECORD_SIZE_HOLD');
+    scriptProps_().setProperty(key, raw);
+    if (scriptProps_().getProperty(key) !== raw) throw new Error('IMPORT_STORAGE_HOLD');
+}
+
+function importFence_(target) {
+    var value = importRead_('ZTO_IMPORT_FENCE_V1_' + target.hash);
+    if (value && (value.targetHash !== target.hash || typeof value.revision !== 'string' || typeof value.requestId !== 'string')) throw new Error('IMPORT_FENCE_HOLD');
+    return value;
+}
+
+function importUnknown_() {
+    return writtenError_(new Error('IMPORT_OUTCOME_UNKNOWN_HOLD'));
+}
+
+function recoverPreparedWrite_(target, record, fence) {
+    if (!fence || fence.requestId !== record.intent.id || fence.revision !== record.revision || record.state !== 'pending') throw importUnknown_();
+    if (importPostHash_(target, importSnapshot_(target).values) !== record.expectedPostHash) throw importUnknown_();
+    record.state = 'done';
+    record.result = Object.assign({}, record.result, { reconciled: true, mappingSaved: false });
+    importStore_(importReceiptKey_(record.intent.id), record);
+    return record;
+}
+
+function settleImportFence_(target) {
+    var fence = importFence_(target);
+    if (!fence) return null;
+    var record = importRead_(importReceiptKey_(fence.requestId));
+    if (!record || !record.intent || record.intent.targetHash !== target.hash || record.revision !== fence.revision) throw new Error('IMPORT_FENCE_HOLD');
+    if (record.state === 'pending') recoverPreparedWrite_(target, record, fence);
+    else if (record.state !== 'done') throw new Error('IMPORT_FENCE_HOLD');
+    return fence;
+}
+
+function pruneImportReceipts_() {
+    var props = scriptProps_(), all = props.getProperties();
+    var saved = Object.keys(all).filter(function (key) { return key.indexOf('ZTO_IMPORT_RECEIPT_V1_') === 0; }).map(function (key) {
+        var record = importRead_(key);
+        return { key: key, record: record };
+    });
+    if (saved.length < MAX_IMPORT_RECEIPTS) return;
+    var protectedIds = Object.keys(all).filter(function (key) { return key.indexOf('ZTO_IMPORT_FENCE_V1_') === 0; }).map(function (key) { var fence = importRead_(key); return fence && fence.requestId; });
+    var removable = saved.filter(function (entry) { return ['prepared', 'done'].indexOf(entry.record.state) >= 0 && protectedIds.indexOf(entry.record.intent.id) < 0; }).sort(function (a, b) { return a.record.intent.preparedAt - b.record.intent.preparedAt; });
+    while (saved.length >= MAX_IMPORT_RECEIPTS && removable.length) {
+        var next = removable.shift();
+        props.deleteProperty(next.key);
+        if (props.getProperty(next.key) !== null) throw new Error('IMPORT_STORAGE_HOLD');
+        saved.pop();
+    }
+    if (saved.length >= MAX_IMPORT_RECEIPTS) throw new Error('IMPORT_RECEIPT_CAPACITY_HOLD');
+}
+
+function importPlan_(kind, data, target, snapshot) {
+    if (kind === 'clear') return { sourceHash: importHash_({ kind: kind }), rows: [], result: { ok: true, sheetName: target.owner.sheetName, removed: Math.max(0, snapshot.values.length - 1), rowsAfter: 0 } };
+    if (!Array.isArray(data.rows) || !data.rows.length || data.rows.length > MAX_IMPORT_ROWS) throw new Error('IMPORT_ROWS_INVALID');
+    var normalized = normalizeRecords_(data.rows);
+    if (!normalized.records.length) throw new Error('IMPORT_ROWS_INVALID');
+    var mode = IMPORT_MODE_OR_DEFAULT_(data.mode), keep = keptFields_(data.mapping);
+    var plan = planImport_(snapshot.values.slice(1), normalized.records, mode, keep);
+    var rows = plan.rows.concat(plan.appended);
+    return { sourceHash: importHash_({ kind: kind, records: normalized.records, mode: mode, keep: keep, fileRows: data.rows.length, skippedNoBarcode: normalized.skippedNoBarcode, duplicatesInFile: normalized.duplicatesInFile, signature: data.signature || '' }), rows: rows,
+        result: { ok: true, mode: mode, sheetName: target.owner.sheetName, fileRows: data.rows.length, usableRows: normalized.records.length, added: plan.stats.added, updated: plan.stats.updated, unchanged: plan.stats.unchanged, skippedNoBarcode: normalized.skippedNoBarcode, duplicatesInFile: normalized.duplicatesInFile, rowsAfter: importTrimRows_(rows).length } };
+}
+
+function prepareWrite_(kind, data, owner) {
+    var target = importTarget_(owner), fence = settleImportFence_(target), snapshot = importSnapshot_(target), plan = importPlan_(kind, data, target, snapshot);
+    pruneImportReceipts_();
+    var intent = { v: 1, id: Utilities.getUuid(), kind: kind, target: target.owner, targetHash: target.hash, sourceHash: plan.sourceHash, beforeHash: importHash_({ target: target.owner, snapshot: snapshot }), baseRevision: fence ? fence.revision : 'initial', preparedAt: Date.now() };
+    importStore_(importReceiptKey_(intent.id), { v: 1, state: 'prepared', intent: intent });
+    return { intent: intent, protocol: 1 };
+}
+
+function executePreparedWrite_(kind, data, intent) {
+    if (!intent || intent.v !== 1 || intent.kind !== kind) throw new Error('IMPORT_INTENT_REQUIRED');
+    var record = importRead_(importReceiptKey_(intent.id));
+    if (!record || !record.intent) throw importUnknown_();
+    if (importCanonical_(record.intent) !== importCanonical_(intent)) throw new Error('IMPORT_INTENT_CHANGED');
+    var target = importTarget_();
+    if (target.hash !== intent.targetHash || importCanonical_(target.owner) !== importCanonical_(intent.target)) throw new Error('IMPORT_TARGET_CHANGED');
+    var snapshot = importSnapshot_(target), plan = importPlan_(kind, data, target, snapshot);
+    if (plan.sourceHash !== intent.sourceHash) throw new Error('IMPORT_SOURCE_CHANGED');
+    var fence = importFence_(target);
+    if (record.state === 'pending') record = recoverPreparedWrite_(target, record, fence);
+    if (record.state === 'done') return importResult_(record, !!fence && fence.revision === record.revision && importPostHash_(target, snapshot.values) === record.expectedPostHash, true);
+    if (record.state !== 'prepared') throw new Error('IMPORT_RECEIPT_HOLD');
+    fence = settleImportFence_(target);
+    if (intent.baseRevision !== (fence ? fence.revision : 'initial')) throw new Error('IMPORT_STALE_REVISION');
+    if (importHash_({ target: target.owner, snapshot: snapshot }) !== intent.beforeHash) throw new Error('IMPORT_SHEET_CHANGED');
+    record.state = 'pending';
+    record.revision = Utilities.getUuid();
+    record.expectedPostHash = importPostHash_(target, [snapshot.values[0]].concat(plan.rows));
+    record.result = plan.result;
+    importStore_(importReceiptKey_(intent.id), record);
+    importStore_('ZTO_IMPORT_FENCE_V1_' + target.hash, { v: 1, targetHash: target.hash, requestId: intent.id, revision: record.revision });
+    var result;
+    try {
+        if (kind === 'clear') {
+            if (snapshot.values.length > 1) target.sheet.getRange(2, 1, snapshot.values.length - 1, 4).clearContent();
+            SpreadsheetApp.flush();
+            result = plan.result;
+        } else {
+            result = writeToSheetRaw_(data.rows, data.mode, data.mapping, target.owner);
+            if (data.signature) {
+                try { rememberMapping_(data.signature, data.mapping, data.mode); } catch (err) { result.mappingSaved = false; }
+            }
+        }
+        if (importPostHash_(target, importSnapshot_(target).values) !== record.expectedPostHash) throw importUnknown_();
+        record.state = 'done'; record.result = result;
+        importStore_(importReceiptKey_(intent.id), record);
+    } catch (err) { throw importUnknown_(); }
+    return importResult_(record, true, false);
+}
+
+function writeToSheet_(rows, mode, mapping, owner) {
+    var payload = { rows: rows, mode: mode, mapping: mapping };
+    var prepared = prepareWrite_('import', payload, owner);
+    return executePreparedWrite_('import', payload, prepared.intent);
+}
+
+function importResult_(record, current, replayed) {
+    return Object.assign({}, record.result, { replayed: replayed, importCurrent: current, importRevision: record.revision, importReceipt: { v: 1, id: record.intent.id, sourceHash: record.intent.sourceHash, baseRevision: record.intent.baseRevision, revision: record.revision, current: current } });
 }

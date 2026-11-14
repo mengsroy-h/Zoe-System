@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { initializeApp, deleteApp } from 'firebase/app';
@@ -45,6 +46,7 @@ beforeEach(() => {
     firebaseState.serverTimeOffsetMs = 321; firebaseState.serverClockTrusted = false;
     dataState.dailyPickupData = { [DAY]: clone(server) };
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify(app.options));
+    acceptFixtureSession();
     fetches = vi.fn(async () => new Response(JSON.stringify(server), { status: 200, headers: { Date: 'Sun, 01 Nov 2037 00:00:00 GMT' } }));
     vi.stubGlobal('fetch', fetches);
 });
@@ -66,6 +68,7 @@ it.each(['signed-out', 'deleted-app'])('owned real FirebaseApp %s ends before op
         raw.deleteApp.mockImplementation(async owned => deleteApp(owned));
         sdk = withTransactionOutcomeResolution(raw); sdk.getAuth(app); sdk.getDatabase(app); ref = sdk.ref(db, PATH);
         firebaseState.fb = sdk; firebaseState.db = db; firebaseState.auth = auth; firebaseState.firebaseConfig = realApp.options;
+        acceptFixtureSession();
         const original = await request();
         const applied = await sdk.executePickupReset(ref, original, () => true);
         expect(applied.committed).toBe(true); expect(raw.runTransaction).toHaveBeenCalledTimes(1);

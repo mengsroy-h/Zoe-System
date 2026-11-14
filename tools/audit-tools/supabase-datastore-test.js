@@ -74,7 +74,7 @@ async function setupTenants(c) {
         const uid = await makeAuthUser(c, user + '@u.zoe.test');
         const reg = await as(c, SERVICE, 'select * from public.finish_registration($1, $2, $3)', [uid, hash, user]);
         if (!reg.rows) throw new Error('setup registration failed ' + JSON.stringify(reg.error));
-        tenants[name] = { id: t.rows[0].id, who: { role: 'authenticated', sub: uid } };
+        tenants[name] = { id: t.rows[0].id, who: await H.sessionClaims(c, { role: 'authenticated', sub: uid }) };
     }
     return { ADMIN, SERVICE, tenants };
 }
@@ -123,7 +123,7 @@ async function body(c, rec, extra) {
     rec('A ៖ SELECT zoe_docs ផ្ទាល់ (RLS) ➜ ១', !!selA.rows && selA.rows[0].n === 1, selA);
     const stB = await as(c, B.who, 'select count(*)::int as n from public.zoe_tenant_state');
     rec('B ៖ SELECT zoe_tenant_state ➜ មិនឃើញរបស់ A', !!stB.rows && stB.rows[0].n === 0, stB);
-    const NOMEM = { role: 'authenticated', sub: await makeAuthUser(c, 'squatter@u.zoe.test') };
+    const NOMEM = await H.sessionClaims(c, { role: 'authenticated', sub: await makeAuthUser(c, 'squatter@u.zoe.test') });
     const forbiddenErr = (r) => !!r.error && r.error.message === 'forbidden';
     rec('គណនីគ្មានហាង (បង្កើតតាម GoTrue sign-up ផ្ទាល់ · គ្មាន tenant_members) ៖ zoe_write ➜ forbidden',
         forbiddenErr(await as(c, NOMEM, 'select public.zoe_write($1, $2::jsonb)', [newOp(), JSON.stringify([{ k: 'set', p: [REG, 'SQ1'], v: true }])])));
@@ -141,7 +141,7 @@ async function body(c, rec, extra) {
     rec('authenticated ៖ INSERT zoe_docs ផ្ទាល់ ➜ permission denied', denied(await as(c, A.who,
         "insert into public.zoe_docs (tenant_id, root, key, value, seq) values ($1, 'zoew_barcode_registry', 'X', 'true', 99)", [B.id])));
 
-    const forged = { role: 'authenticated', sub: A.who.sub, extra: { tenant_id: B.id, app_metadata: { tenant_id: B.id } } };
+    const forged = { ...A.who, extra: { ...A.who.extra, tenant_id: B.id, app_metadata: { tenant_id: B.id } } };
     rec('claim ក្លែង tenant_id របស់ B ➜ ការសរសេរនៅចុះលើ A', ((r) => !!r && r.ok)(await write(forged, [{ k: 'set', p: [REG, 'FORGED1'], v: true }]))
         && ((await read(B.who, REG, 'FORGED1')).docs || [1]).length === 0 && ((await read(A.who, REG, 'FORGED1')).docs || []).length === 1);
 
@@ -488,7 +488,7 @@ async function body(c, rec, extra) {
     extra.push(c1, c2);
     const headBefore = (await pull(A.who, 0)).seq;
     await c1.query('begin');
-    await c1.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ role: 'authenticated', sub: A.who.sub })]);
+    await c1.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ role: A.who.role, sub: A.who.sub, ...A.who.extra })]);
     await c1.query('set local role authenticated');
     const first = await c1.query('select public.zoe_write($1, $2::jsonb) as r', [newOp(), JSON.stringify([{ k: 'set', p: [REG, 'C1'], v: true }])]);
     const c2pid = (await c2.query('select pg_backend_pid() as p')).rows[0].p;
@@ -524,7 +524,7 @@ async function body(c, rec, extra) {
         lateWaited = !!w.rows[0] && w.rows[0].wait_event_type === 'Lock';
         if (!lateWaited) await new Promise((r) => setTimeout(r, 50));
     }
-    await c3.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ role: 'authenticated', sub: A.who.sub })]);
+    await c3.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ role: A.who.role, sub: A.who.sub, ...A.who.extra })]);
     await c3.query('set local role authenticated');
     const early = await c3.query('select public.zoe_write($1, $2::jsonb) as r', [newOp(), JSON.stringify([{ k: 'set', p: [REG, 'L1'], v: true }])]);
     await c3.query('commit');
@@ -594,7 +594,7 @@ async function quotaCleanupCases(c, rec, extra) {
         const uid = await H.makeAuthUser(c, 'quota' + n + '@u.zoe.test');
         const tid = (await c.query("insert into public.tenants (name, branch_code, expires_at) values ($1, $1, now() + interval '1 day') returning id", ['quota' + n])).rows[0].id;
         await c.query('insert into public.tenant_members (user_id, tenant_id, username) values ($1, $2, $3)', [uid, tid, 'quota' + n]);
-        const who = { role: 'authenticated', sub: uid };
+        const who = await H.sessionClaims(c, { role: 'authenticated', sub: uid });
         const write = (id, ops, client = c) => as(client, who, 'select public.zoe_write($1, $2::jsonb) as r', [id, JSON.stringify(ops)]);
         const seed = await write('seed_quota_000001', seedOps);
         rec('quota ៖ រៀបចំ registry ពិត ' + n, !!seed.rows && seed.rows[0].r.ok === true, seed);
@@ -649,7 +649,7 @@ async function quotaCleanupCases(c, rec, extra) {
     let boundaryError;
     try {
         await c.query("update public.zoe_ops set created_at = now() - interval '2 days' where tenant_id = $1 and op_id = 'filler_quota_001'", [D.tid]);
-        await c.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify(D.who)]);
+        await c.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ role: D.who.role, sub: D.who.sub, ...D.who.extra })]);
         await c.query('set local role authenticated');
         await c.query('select public.zoe_write($1, $2::jsonb)', ['delete_quota_001', JSON.stringify(remove)]);
     } catch (e) { boundaryError = e; }
@@ -720,7 +720,7 @@ async function externalEditCases(c, rec) {
     const uid = await H.makeAuthUser(c, 'console@u.zoe.test');
     const tid = (await c.query("insert into public.tenants (name, branch_code, expires_at) values ('console', 'console', now() + interval '1 day') returning id")).rows[0].id;
     await c.query('insert into public.tenant_members (user_id, tenant_id, username) values ($1, $2, $3)', [uid, tid, 'console']);
-    const who = { role: 'authenticated', sub: uid };
+    const who = await H.sessionClaims(c, { role: 'authenticated', sub: uid });
     let serial = 0;
     const write = async (ops) => {
         const r = await as(c, who, 'select public.zoe_write($1, $2::jsonb) as r', ['console_op_' + String(++serial).padStart(8, '0'), JSON.stringify(ops)]);
@@ -750,7 +750,7 @@ async function externalEditCases(c, rec) {
         await c.query('begin');
         try {
             await c.query("select set_config('request.jwt.claims', $1, true), set_config('zoe.internal_write', 'outside', true)",
-                [JSON.stringify({ role: 'authenticated', sub: uid })]);
+                [JSON.stringify({ role: who.role, sub: who.sub, ...who.extra })]);
             await c.query('set local role authenticated');
             const out = (await c.query('select public.zoe_write($1, $2::jsonb) as r', [id, JSON.stringify(ops)])).rows[0].r;
             const value = (await c.query("select current_setting('zoe.internal_write', true) as v")).rows[0].v;
@@ -952,7 +952,7 @@ async function quotaUpgradeGuard() {
         const uid = await H.makeAuthUser(c, 'quota-upgrade@u.zoe.test');
         const tid = (await c.query("insert into public.tenants (name, branch_code, expires_at) values ('quota-upgrade', 'quota-upgrade', now() + interval '1 day') returning id")).rows[0].id;
         await c.query("insert into public.tenant_members (user_id, tenant_id, username) values ($1, $2, 'quotaupgrade')", [uid, tid]);
-        const who = { role: 'authenticated', sub: uid };
+        const who = await H.sessionClaims(c, { role: 'authenticated', sub: uid });
         const write = (id, value) => as(c, who, 'select public.zoe_write($1, $2::jsonb) as r', [id, JSON.stringify([{ k: 'set', p: ['zoew_barcode_registry', 'ABC'], v: value }])]);
         const seed = await write('seed_quota_000001', true);
         await c.query('update public.zoe_tenant_state set quota_bytes = bytes where tenant_id = $1', [tid]);
@@ -1023,12 +1023,12 @@ const MUTATIONS = [
     ['Table Editor ➜ bytes មិនតាម', 'bytes = greatest(s.bytes + delta, 0)', 'bytes = s.bytes'],
     ['trigger restamp ការសរសេរខាងក្នុង', "        or current_setting('zoe.internal_write', true) = 'on' then", '        then'],
     ['zoe_apply គ្មាន marker ខាងក្នុង', "    perform set_config('zoe.internal_write', 'on', true);", ''],
-    ['zoe_apply success បន្សល់ marker លើ transaction', "    perform set_config('zoe.internal_write', coalesce(prior_origin, ''), true);\n    return jsonb_build_object('ok', true, 'seq'",
-        "    return jsonb_build_object('ok', true, 'seq'"],
-    ['zoe_apply CAS conflict បន្សល់ marker លើ transaction', "                perform set_config('zoe.internal_write', coalesce(prior_origin, ''), true);\n                return jsonb_build_object('ok', false, 'conflict'",
-        "                return jsonb_build_object('ok', false, 'conflict'"],
-    ['zoe_apply root CAS conflict បន្សល់ marker លើ transaction', "                    perform set_config('zoe.internal_write', coalesce(prior_origin, ''), true);\n                    return jsonb_build_object('ok', false, 'conflict'",
-        "                    return jsonb_build_object('ok', false, 'conflict'"],
+    ['zoe_apply success បន្សល់ marker លើ transaction', "    perform set_config('zoe.internal_write', coalesce(prior_origin, ''), true);\n    perform set_config('zoe.audit_context', coalesce(prior_audit_context, ''), true);\n    return jsonb_build_object('ok', true, 'seq'",
+        "    perform set_config('zoe.audit_context', coalesce(prior_audit_context, ''), true);\n    return jsonb_build_object('ok', true, 'seq'", 'zoe_apply ៖ success · replay · CAS conflict កូន/root ➜ marker ដើមនៅក្នុង transaction ដដែល'],
+    ['zoe_apply CAS conflict បន្សល់ marker លើ transaction', "                perform set_config('zoe.internal_write', coalesce(prior_origin, ''), true);\n    perform set_config('zoe.audit_context', coalesce(prior_audit_context, ''), true);\n                return jsonb_build_object('ok', false, 'conflict'",
+        "    perform set_config('zoe.audit_context', coalesce(prior_audit_context, ''), true);\n                return jsonb_build_object('ok', false, 'conflict'", 'zoe_apply ៖ success · replay · CAS conflict កូន/root ➜ marker ដើមនៅក្នុង transaction ដដែល'],
+    ['zoe_apply root CAS conflict បន្សល់ marker លើ transaction', "                    perform set_config('zoe.internal_write', coalesce(prior_origin, ''), true);\n    perform set_config('zoe.audit_context', coalesce(prior_audit_context, ''), true);\n                    return jsonb_build_object('ok', false, 'conflict'",
+        "    perform set_config('zoe.audit_context', coalesce(prior_audit_context, ''), true);\n                    return jsonb_build_object('ok', false, 'conflict'", 'zoe_apply ៖ success · replay · CAS conflict កូន/root ➜ marker ដើមនៅក្នុង transaction ដដែល'],
     ['Table Editor ជឿ seq = head + 1 ជំនួសប្រភព write', "        or current_setting('zoe.internal_write', true) = 'on' then",
         "        or new.seq = coalesce((select s.seq from public.zoe_tenant_state s where s.tenant_id = new.tenant_id), 0) + 1 then"],
     ['Table Editor គិត candidate INSERT មុន ON CONFLICT', "        if found then\n            new.seq := next_seq;\n            return new;\n        end if;", ''],
@@ -1607,7 +1607,17 @@ async function main() {
         const label = entry[0];
         const pairs = Array.isArray(entry[1]) ? entry[1] : [[entry[1], entry[2]]];
         const equivalent = entry[2] === 'equivalent';
-        const spots = pairs.map(([from, to]) => Object.assign({ from, to }, effectiveAnchor(migrationSql, from)));
+        const intendedFailure = entry[3];
+        const spots = pairs.map(([from, to]) => {
+            const spot = Object.assign({ from, to }, effectiveAnchor(migrationSql, from));
+            if (intendedFailure && !spot.problem) {
+                const liveStart = migrationSql.lastIndexOf('create or replace function private.zoe_apply_engine_v1(');
+                const liveEnd = migrationSql.indexOf('\n$$;', liveStart);
+                if (migrationSql.split(from).length - 1 !== 1 || liveStart < 0 || liveEnd < 0 || spot.at < liveStart || spot.at + from.length > liveEnd)
+                    spot.problem = 'anchor មិនមែនតែមួយក្នុង live zoe_apply_engine_v1';
+            }
+            return spot;
+        });
         const bad = spots.find((x) => x.problem);
         if (bad) {
             ok('mutation «' + label + '» ៖ anchor ត្រូវលេចម្តងគត់ក្នុងនិយមន័យដែលរស់ (' + bad.problem + ')', false);
@@ -1626,7 +1636,8 @@ async function main() {
             continue;
         }
         ok('mutation «' + label + '» ➜ ' + (r.applied ? 'ចាប់ដោយ «' + (caught[0] ? caught[0].label : '—') + '»' : 'SQL អនុវត្តមិនបាន (មិនរាប់)'),
-            r.applied && caught.length > 0);
+            r.applied && (intendedFailure ? caught.length === 1 && caught[0].label === intendedFailure : caught.length > 0),
+            intendedFailure ? { expectedAssertion: intendedFailure, actualFailures: caught.map(x => x.label) } : undefined);
     }
     await quotaUpgradeGuard();
     await foldHintEquivalence();

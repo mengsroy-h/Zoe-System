@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { parse } from 'acorn';
@@ -71,6 +72,7 @@ function install(codes: string[]) {
     firebaseState.db = db as any; firebaseState.fb = fb() as any;
     firebaseState.firebaseConfig = { databaseURL: 'https://race.firebaseio.com' } as any;
     firebaseState.auth = { currentUser: { uid: 'u1', getIdToken: async () => 'tok' } } as any;
+    acceptFixtureSession();
     firebaseState.isDatabaseInitialized = true; firebaseState.isDatabaseConnected = true; firebaseState.serverClockTrusted = true;
     firebaseState.hasEverConnectedToDatabase = true;
     firebaseState.dbRefHistory = ref(db, H) as any; firebaseState.dbRefDeleted = ref(db, T) as any;

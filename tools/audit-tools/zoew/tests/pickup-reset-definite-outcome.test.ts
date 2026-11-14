@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../../../../ZoeW/src/core/state';
@@ -26,6 +27,7 @@ beforeEach(() => {
     firebaseState.authGeneration++;
     firebaseState.firebaseConfig = { databaseURL: SCOPE } as any;
     firebaseState.auth = { currentUser: { uid: UID, getIdToken: async () => 'synthetic-token' } } as any;
+    acceptFixtureSession();
     firebaseState.db = { app: { options: { databaseURL: SCOPE, projectId: TENANT } } } as any;
     firebaseState.isInitializingFirebase = false;
     vi.stubGlobal('fetch', async (url: any) => {

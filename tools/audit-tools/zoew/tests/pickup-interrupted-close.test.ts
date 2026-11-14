@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 /**
  * ⛔ A225 ៖ ការបិទ/បើកមួយសរសេរ ២ ដងដាច់ពីគ្នា — ស្ថិតិយក (`zoew_daily_pickup_cod_dod/<ថ្ងៃ>`, មុន) និងកញ្ចប់ (`zoew_scan_history_cod_dod/<id>`) —
  *    ហើយការត្រឡប់វិញ (`revertPickupMarks` · `reapplyPickupMarks`) រស់តែក្នុងទំព័រ។ ទំព័រស្លាប់ (reload · បិទ App · ថ្មអស់) ចន្លោះការសរសេរទាំង ២
@@ -175,6 +176,8 @@ beforeEach(() => {
     cleanup.cleanupJournalLive.clear();
     firebaseState.authGeneration++;
     firebaseState.auth = { currentUser: { uid: 'pickup-a225' } } as any;
+    firebaseState.firebaseConfig = JSON.parse(SHOP_CONFIG);
+    acceptFixtureSession();
     firebaseState.db = { a225: true } as any;
     firebaseState.isDatabaseInitialized = true;
     firebaseState.dbListenersFailed = false;

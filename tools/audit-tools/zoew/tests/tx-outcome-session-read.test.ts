@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { firebaseState } from '../../../../ZoeW/src/core/state';
 import { txResolveOutcome } from '../../../../ZoeW/src/services/tx-outcome';
+import { appLocalStore } from '../../../../ZoeW/src/core/storage';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 // The REST read that resolves a lost reply belongs to the session that sent the transaction: when the account or the
 // database changes while that read answers, its value is never a verdict (`unknown`), even when it equals the sent or
@@ -11,9 +13,14 @@ let answer: () => unknown = () => null;
 
 beforeEach(() => {
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
-    firebaseState.db = { name: 'session-a' } as any;
-    firebaseState.auth = { currentUser: { uid: 'u1', getIdToken: async () => 'token-a' } } as any;
+    const config = { databaseURL: 'https://shop-a.firebaseio.com' };
+    const app = { options: config };
+    firebaseState.firebaseConfig = config;
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(config));
+    firebaseState.db = { name: 'session-a', app } as any;
+    firebaseState.auth = { app, currentUser: { uid: 'u1', getIdToken: async () => 'token-a' } } as any;
     firebaseState.authGeneration++;
+    acceptFixtureSession();
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(answer()), { status: 200, headers: { 'Content-Type': 'application/json' } })));
 });
 

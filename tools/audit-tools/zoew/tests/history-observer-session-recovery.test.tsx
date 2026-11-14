@@ -1,3 +1,4 @@
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 /**
  * គូរ HistoryTableBody ពិត ហើយប្រើ act/session guard/clock ពិត។
  * ក្លែងតែ IntersectionObserver ព្រោះ happy-dom មិនមាន layout របស់ browser។
@@ -49,11 +50,14 @@ beforeEach(() => {
     vi.stubGlobal('IntersectionObserver', Observer);
     Observer.active.clear(); Observer.initial.clear();
     resetServerClock();
+    configureFixtureBackend('history-observer-recovery');
+    firebaseState.fb = {};
     firebaseState.auth = null;
     firebaseState.db = {} as any;
     expect(acceptServerClockOffset(0, Object.freeze({ epochMs: Date.now(), wallMs: Date.now(),
         monotonicMs: performance.now(), uncertaintyMs: 0, source: 'nonce', generation: 0 }), false)).toBe(true);
     firebaseState.auth = { currentUser: { uid: 'observer-test' } } as any;
+    acceptFixtureSession();
     firebaseState.sessionExpiryCheck = 'unverified';
     uiState.historyView = null; uiState.historyViewKey = ''; uiState.historyRenderLimit = HISTORY_PAGE_ROWS;
 });

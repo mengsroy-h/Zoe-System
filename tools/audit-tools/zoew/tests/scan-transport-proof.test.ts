@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { scanTransportIntent, scanTransportReceipt } from '../../../../ZoeW/src/domain/scan-transport-proof';
@@ -93,6 +94,8 @@ for (const mode of ['receipt', 'absent', 'foreign', 'extra']) it('native restart
     const sdk = withTransactionOutcomeResolution(raw); sdk.getAuth(app); sdk.getDatabase(app);
     Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db, isDatabaseInitialized: true,
         isInitializingFirebase: false, firebaseSdkUnavailable: false, isDatabaseConnected: true, serverClockTrusted: true, sessionExpiryCheck: 'live', authLoginOperation: null });
+    localStorage.setItem('zoew_firebase_config', JSON.stringify(app.options));
+    acceptFixtureSession();
     try {
         const verdict = await sdk.set(sdk.ref(db, 'zoew_settings/exchange_rate'), 4200).then(() => 'sent', (error: any) => error.code);
         const proven = mode === 'receipt';

@@ -14,6 +14,7 @@ import { createScanEvidenceJournal } from '../../../../ZoeW/src/services/scan-ev
 import { pendingScanScope, preparePendingScan } from '../../../../ZoeW/src/services/scan-pending';
 import { claimScanOperation, resumePendingScanOperations, saveScanOperation } from '../../../../ZoeW/src/services/scan-operation';
 import { txResolvingPaths, withTransactionOutcomeResolution } from '../../../../ZoeW/src/services/tx-outcome';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 const H = 'zoew_scan_history_cod_dod';
 const D = 'zoew_daily_revenue_cod_dod';
@@ -138,6 +139,7 @@ function makeNative() {
     Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db, isDatabaseInitialized: true,
         isInitializingFirebase: false, firebaseSdkUnavailable: false, isDatabaseConnected: true,
         sessionExpiryCheck: 'live', authLoginOperation: null, dbLivenessProbe: Promise.resolve(null) });
+    acceptFixtureSession();
     resetServerClock(); acceptServerClockOffset(1, null, false);
     firebaseState.dbRefHistory = sdk.ref(db, H);
     firebaseState.dbRefDailyRevenue = sdk.ref(db, D);

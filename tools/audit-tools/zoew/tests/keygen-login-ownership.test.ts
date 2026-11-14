@@ -48,8 +48,11 @@ function fixture(stage = 'persistence') {
       return { user };
     }
   };
+  const intentValues = new Map<string, string>();
+  const sessionValues = new Map<string, string>();
   const ctx = vm.createContext({
-    console, Promise,
+    console, Promise, crypto: require('node:crypto').webcrypto,
+    appSessionStore: { get length() { return sessionValues.size; }, key: i => [...sessionValues.keys()][i] ?? null, getItem: key => sessionValues.get(key) ?? null, setItem: (key, value) => sessionValues.set(key, value) },
     document: { getElementById: id => elements[id] },
     fb: stage === 'sdk' ? null : sdk, auth: authA, authGeneration: 7,
     isInitializingFirebase: false, firebaseSdkUnavailable: false,
@@ -57,8 +60,9 @@ function fixture(stage = 'persistence') {
     waitForFirebaseSDK: async () => { entered = true; await gate.promise; return sdk; },
     withTimeout: promise => promise,
     appLocalStore: {
-      getItem: key => key === 'zoew_firebase_config' ? config : null,
-      setItem: (key, value) => calls.storage.push(['set', key, value]),
+      get length() { return intentValues.size + 1; }, key: i => i === 0 ? 'zoew_firebase_config' : [...intentValues.keys()][i - 1] ?? null,
+      getItem: key => key === 'zoew_firebase_config' ? config : intentValues.get(key) ?? null,
+      setItem: (key, value) => { intentValues.set(key, value); calls.storage.push(['set', key, value]); },
       removeItem: key => calls.storage.push(['remove', key])
     },
     safeStoreGet: (store, key) => store.getItem(key),
@@ -66,7 +70,7 @@ function fixture(stage = 'persistence') {
     showToast: message => calls.toasts.push(message),
     alert: message => calls.alerts.push(message), window: {}
   });
-  vm.runInContext(['FIREBASE_CONFIG_KEYS', 'keygenLoginBackendIsReady', 'enforceSessionOnlyAuthPersistence', 'doLogin']
+  vm.runInContext(['LOCAL_LOGOUT_INTENT_PREFIX', 'createLocalLogoutIntentStore', 'localLogoutIntent', 'acceptedLogoutIntents', 'keygenLogoutOwner', 'FIREBASE_CONFIG_KEYS', 'keygenAuthScope', 'keygenLoginBackendIsReady', 'enforceSessionOnlyAuthPersistence', 'doLogin']
     .filter(name => declarations.has(name)).map(name => declarations.get(name)).join('\n'), ctx);
   return {
     ctx, sdk, authA, authB, elements, calls, gate, user,

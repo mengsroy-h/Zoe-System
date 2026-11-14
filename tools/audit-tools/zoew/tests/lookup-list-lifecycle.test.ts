@@ -29,6 +29,7 @@ import { encryptLookupSecret } from '../../../../ZoeW/src/services/crypto';
 import { noteZtoTrashMode, resetZtoTrashMode } from '../../../../ZoeW/src/services/zto-trash-mode';
 import { closeModal } from '../../../../ZoeW/src/ui/modal';
 import { buildMonthlyReport, monthlyReportRows } from '../../../../ZoeW/src/features/monthly-report';
+import { acceptFixtureSession } from './helpers/accepted-session';
 const H = 'zoew_scan_history_cod_dod';
 const T = 'zoew_recently_deleted_cod_dod';
 const D = 'zoew_daily_revenue_cod_dod';
@@ -130,6 +131,7 @@ async function configure(backend: 'firebase' | 'supabase', mode: Mode) {
     (firebaseState.db as any).app = { options }; (firebaseState.auth as any).app = { options };
     if (backend === 'supabase') (firebaseState.fb as any).tenantScope = () => 'synthetic-shop';
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
+    acceptFixtureSession();
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true, autoSubmit: false,
         phoneField: 'phone', codField: 'cod', dodField: 'dod', shop: shopScope(),
         url: window.location.origin + '/.netlify/functions/zto-order-detail?' + (mode === 'palm' ? 'palm=1&' : '') + 'barcode={barcode}',

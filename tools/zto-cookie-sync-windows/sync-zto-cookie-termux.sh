@@ -2,6 +2,10 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+first_arg="${1:-}"
+if [ "${first_arg,,}" = "--help" ]; then exec node sync-zto-cookie.js "$@"; fi
+node -e "const s=require('./sync-zto-cookie.js');try{s.capturedCookieDisplayOptions(process.argv.slice(1),process.stdin.isTTY===true&&process.stdout.isTTY===true)}catch(e){console.error('ERROR: '+s.safeFailureMessage(e.code));process.exitCode=1}" -- "$@"
+
 STATE_BASE="${XDG_STATE_HOME:-$HOME/.local/state}"
 STATE_ROOT="$STATE_BASE/Zoe-System/ZTO-Cookie-Sync"
 
@@ -27,7 +31,7 @@ fi
 needs_adb=1
 adb_optional=0
 for arg in "$@"; do
-  case "$arg" in
+  case "${arg,,}" in
     --check|--verify-setup|--auto-ready) needs_adb=0 ;;
     --auto) adb_optional=1 ;;
   esac

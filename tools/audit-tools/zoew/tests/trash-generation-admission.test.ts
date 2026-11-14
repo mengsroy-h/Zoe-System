@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { dataState, firebaseState, uiState, ztoState } from '../../../../ZoeW/src/core/state';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../../../../ZoeW/src/core/text';
 import { activeClearHistoryClaims } from '../../../../ZoeW/src/ui/history-render';
@@ -47,6 +48,7 @@ beforeEach(() => {
             effects.push([target.path, copy(value)]); put(target.path, value); const acknowledged = snap(at(target.path)); afterTransaction?.(target.path, value); return { committed: true, snapshot: acknowledged };
         }, update: async (target: any, updates: any) => { for (const [key, value] of Object.entries(updates)) { const path = [target.path, key].filter(Boolean).join('/'); effects.push([path, copy(value)]); put(path, (value as any)?.inc !== undefined ? Number(at(path) || 0) + (value as any).inc : value); } await afterUpdate?.(updates); }, onValue: () => () => {}, off: () => {} } as any;
     firebaseState.isDatabaseInitialized = true; firebaseState.isDatabaseConnected = true; firebaseState.isInitializingFirebase = false; firebaseState.sessionExpiryCheck = 'live'; firebaseState.serverClockTrusted = true; firebaseState.serverTimeOffsetMs = 0; firebaseState.hasEverConnectedToDatabase = true;
+    acceptFixtureSession();
     for (const [field, path] of Object.entries({ dbRefHistory: H, dbRefDeleted: T, dbRefDailyRevenue: D, dbRefMonthlyRevenue: M, dbRefDailyPickup: 'zoew_daily_pickup_cod_dod', dbRefDailyCollected: 'zoew_daily_collected_cod_dod' })) (firebaseState as any)[field] = ref(firebaseState.db, path);
     dataState.scanHistory = [copy(item)]; dataState.deletedItems = []; dataState.dailyRevenueData = copy(store[D]); dataState.monthlyRevenueData = copy(store[M]); dataState.dailyPickupData = {}; dataState.dailyCollectedData = {}; dataState.clearHistoryInFlight = false; dataState.cleanupResumeInFlight = false;
     uiState.currentFilterMode = 'all'; uiState.toasts = []; ztoState.ztoTrashMode = { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0, stamps: {}, shop: HOST }; ztoState.ztoStatusLoaded = true;

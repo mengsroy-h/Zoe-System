@@ -9,6 +9,7 @@ import { getFirebaseSessionVerdict } from '../../../../ZoeW/src/features/session
 import * as licenseRecovery from '../../../../ZoeW/src/features/license';
 import { scanOperationValid } from '../../../../ZoeW/src/domain/scan-protocol';
 import { canonicalBarcodeRegistryKey } from '../../../../ZoeW/src/domain/barcode-key';
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 
 const START = Date.UTC(2026, 10, 8);
 const HOUR = 3600000;
@@ -40,6 +41,7 @@ beforeEach(() => {
     new Function(verifierSource)();
     api = window.ZoeLicense;
     resetServerClock();
+    configureFixtureBackend('native-server-clock');
     Object.assign(firebaseState, { db: {}, auth: null, isDatabaseConnected: false, hasEverConnectedToDatabase: false,
         infoListenersFailed: false, infoListenerRecoveryTimer: null, reconnectWatchdogTimer: null,
         sessionExpiryCheck: 'live', sessionExpiryCheckInFlight: false,
@@ -54,6 +56,13 @@ afterEach(() => {
     detachInfoListeners(); resetServerClock(); delete window.ZoeLicense;
     vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals();
 });
+
+function installUser(uid = 'fixture') {
+    const user = { uid };
+    firebaseState.auth = { app: { options: firebaseState.firebaseConfig }, currentUser: user } as any;
+    acceptFixtureSession();
+    return user;
+}
 
 function reply(index = requests.length - 1, now = Date.now(), extra = {}) {
     const request = requests[index];
@@ -130,7 +139,7 @@ it.each([false, true])('SDK handshake ចាស់ក្រោយផ្អាក
     if (checked) expect(cleanupClockIsTrustworthy()).toBe(false);
     sdkReady(START);
     expect(offset).toBe(-3 * HOUR);
-    const user = { uid: 'fixture' }; firebaseState.auth = { currentUser: user } as any;
+    const user = installUser();
     expect(await getFirebaseSessionVerdict(user)).toBe('unverified');
     expect(lease.current()).toBe(false);
     expect(cleanupClockIsTrustworthy()).toBe(false);
@@ -145,7 +154,7 @@ it.each([false, true])('bootstrap និង listener ថ្មីមិនជឿ
     sdkReady(START);
     reply(0, START); await turn();
     expect(cleanupClockIsTrustworthy()).toBe(false);
-    const user = { uid: 'fixture' }; firebaseState.auth = { currentUser: user } as any;
+    const user = installUser();
     expect(await getFirebaseSessionVerdict(user)).toBe('unverified');
 });
 
@@ -158,7 +167,7 @@ it('SDK handshake ស្រស់តែមួយក៏មិនមែន time au
     reply(); await turn();
     expect(cleanupClockIsTrustworthy()).toBe(true);
     expect(getServerNow()).toBe(START + 3 * HOUR);
-    const user = { uid: 'fixture' }; firebaseState.auth = { currentUser: user } as any;
+    const user = installUser();
     expect(await getFirebaseSessionVerdict(user)).toBe('expired');
 });
 
@@ -214,7 +223,7 @@ it('ម៉ោងនៅក្រៅបណ្តាញត្រឹមត្រូ�
     elapsed += 3 * HOUR; vi.setSystemTime(START + 3 * HOUR);
     expect(serverClockIsTrustworthy()).toBe(true);
     expect(cleanupClockIsTrustworthy()).toBe(false);
-    const user = { uid: 'fixture' }; firebaseState.auth = { currentUser: user } as any;
+    const user = installUser();
     expect(await getFirebaseSessionVerdict(user)).toBe('expired');
     await turn(); expect(requests).toHaveLength(1);
 });
@@ -240,7 +249,7 @@ it('nonce ស្រស់ offset សូន្យផ្ទៀងផ្ទាត�
     attachInfoListeners(); await turn(); reply(); await turn();
     expect(serverClockIsTrustworthy()).toBe(true);
     expect(cleanupClockIsTrustworthy()).toBe(false);
-    const user = { uid: 'fixture' }; firebaseState.auth = { currentUser: user } as any;
+    const user = installUser();
     expect(await getFirebaseSessionVerdict(user)).toBe('live');
 });
 
@@ -258,7 +267,7 @@ it.each([null, undefined, Object.freeze({}), Object.freeze([]), Object.freeze({ 
 });
 
 it('nonce ស្រស់បើក session ដែល unverified ដោយមិន sign out', async () => {
-    const user = { uid: 'fixture' }; firebaseState.auth = { currentUser: user } as any;
+    installUser();
     firebaseState.sessionExpiryCheck = 'unverified';
     attachInfoListeners(); await turn();
     expect(firebaseState.sessionExpiryCheck).toBe('unverified');
@@ -283,7 +292,7 @@ it('ព្រំដែនលើឆ្លងពេលផុតវគ្គ មិ
  reply(0, START); await turn();
  expect(api.getServerTimeSample().uncertaintyMs).toBe(9000);
  expect(serverClockIsTrustworthy()).toBe(true);
- const user = { uid:'synthetic' }; firebaseState.auth = { currentUser:user } as any;
+ const user = installUser('synthetic');
  firebaseState.fb.getIdTokenResult.mockResolvedValue({authTime:new Date(START - 4*HOUR + 5000).toISOString()});
  expect(Date.now() - (START - 4*HOUR + 5000)).toBeGreaterThan(4*HOUR);
  expect(await getFirebaseSessionVerdict(user)).toBe('unverified');

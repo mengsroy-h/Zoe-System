@@ -1,3 +1,4 @@
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 /**
  * ⛔ ZTO-E4 ៖ ជួរ «ចុះហត្ថលេខា» ដែលអត្ថបទប្រភេទស្កេនផ្ទុយ មិនត្រូវបាត់ស្ងាត់។
  *
@@ -71,6 +72,8 @@ beforeEach(() => {
     firebaseState.auth = { currentUser: { uid: 'audit-user' } } as any;
     firebaseState.db = { audit: true } as any;
     firebaseState.fb = { getIdTokenResult: async () => ({ token: 'audit-token' }) } as any;
+    configureFixtureBackend('zto-signed-mismatch');
+    acceptFixtureSession();
     for (const name of ['ztoListSyncFrom', 'ztoListSyncTo'] as const) {
         const input = document.createElement('input');
         input.value = name === 'ztoListSyncFrom' ? '2026-10-03' : '2026-10-06';

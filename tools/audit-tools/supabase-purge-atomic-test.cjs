@@ -78,7 +78,7 @@ async function main() {
         const tenants = (await c.query("insert into public.tenants(name,branch_code,expires_at) values ('purge A','purge_a',now()+interval '30 days'),('purge B','purge_b',now()+interval '30 days') returning id")).rows;
         const A = tenants[0].id, B = tenants[1].id;
         await c.query("insert into public.tenant_members(user_id,tenant_id,username) values ($1,$2,'purge_a'),($3,$4,'purge_b')", [uid, A, otherUid, B]);
-        const who = { role: 'authenticated', sub: uid };
+        const who = await H.sessionClaims(c, { role: 'authenticated', sub: uid });
         const call = async (kind, f, id, actor, expected) => {
             const result = await H.as(c, actor || who, 'select public.zoe_purge_' + kind + '_v1($1,$2,$3::jsonb) as r', [expected || f.tenant, id, JSON.stringify(f.ops)]);
             return result.rows ? result.rows[0].r : result;
@@ -356,7 +356,7 @@ async function main() {
         let waitingStatus, memberUpdate;
         try {
             await committing.query('begin');
-            await committing.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role: 'authenticated', sub: uid })]);
+            await committing.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ role: 'authenticated', sub: uid, ...who.extra })]);
             await committing.query('set local role authenticated');
             const id = opId();
             const applied = (await committing.query('select public.zoe_purge_execute_v1($1,$2,$3::jsonb) as r', [A, id, JSON.stringify(serialF.ops)])).rows[0].r;

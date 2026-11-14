@@ -1,3 +1,4 @@
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, ztoState } from '../../../../ZoeW/src/core/state';
 import { acceptServerClockOffset, getServerNow, resetServerClock, serverClockIsTrustworthy, setServerClockRefresh } from '../../../../ZoeW/src/core/clock';
@@ -37,6 +38,8 @@ beforeEach(() => {
             afterWrite?.(); return { committed: next !== undefined, snapshot: { val: () => next } };
         })
     } as any;
+    configureFixtureBackend('zto-sign-clock');
+    acceptFixtureSession();
     seed();
 });
 afterEach(() => { resetZtoFinalMarks(); resetServerClock(); vi.useRealTimers(); vi.unstubAllGlobals(); });

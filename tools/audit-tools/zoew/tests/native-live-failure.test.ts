@@ -1,3 +1,4 @@
+import { acceptFixtureSession } from './helpers/accepted-session';
 // N2 (deep audit 8): a journaled Firebase transaction (ledger op token or intent) that failed in session added `blocked`
 // for every error but a few, so one `maxretry` (the SDK's own «not applied» verdict) refused every later write of the shop
 // until a reload or the PIN discard — and the refusal carried `CONNECTION_SCOPE_CHANGED`, the code callers read as a silent
@@ -27,6 +28,8 @@ function lab(transaction: any, update?: any) {
   const sdk = withTransactionOutcomeResolution(raw); sdk.getAuth(app); sdk.getDatabase(app);
   Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db, isDatabaseInitialized: true,
     isInitializingFirebase: false, firebaseSdkUnavailable: false, isDatabaseConnected: true, sessionExpiryCheck: 'live', authLoginOperation: null });
+  localStorage.setItem('zoew_firebase_config', JSON.stringify(app.options));
+  acceptFixtureSession();
   resetServerClock(); acceptServerClockOffset(0, null, false);
   return { sdk, db, app, sets };
 }

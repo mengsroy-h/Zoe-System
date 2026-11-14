@@ -2,6 +2,8 @@ import { afterAll, beforeAll, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { firebaseState } from '../../../../ZoeW/src/core/state';
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { createSupabaseSdk } from '../../../../ZoeW/src/services/supabase-sdk';
 import { createSupabaseTransport, SB_AUTH_STORAGE_KEY, SB_AUTH_OWNER_KEY } from '../../../../ZoeW/src/services/supabase-transport';
 import { createLocalWriteJournal } from '../../../../ZoeW/src/services/write-journal';
@@ -9,13 +11,14 @@ import { createLocalWriteJournal } from '../../../../ZoeW/src/services/write-jou
 const ROOT = path.resolve(__dirname, '../../../..');
 const require = createRequire(import.meta.url);
 const { createPgHarness } = require(ROOT + '/tools/audit-tools/supabase-pg.js');
+const { reviewedAuditRelations, projectAuditEngine, projectReviewedBusinessAudit, definesRulesFunction } = require(ROOT + '/tools/audit-tools/reviewed-business-audit-schema.cjs');
 const PG = createPgHarness({ depsDirs: [ROOT + '/supabase/node_modules'], shimDir: ROOT + '/tools/audit-tools/supabase-shim', wantMajor: 17 });
 const URL = 'https://abcdefghijklmnopqrst.supabase.co';
 const evidence: any[] = [];
 let admin: any;
 let dbName: string;
 let serial = 0;
-let contractBefore: any = null, contractAfter: any = null, contractRuntime: any = null;
+let contractBefore: any = null, contractAfter: any = null, contractRuntime: any = null, auditEngineBefore: string | null = null;
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 const deferred = () => { let resolve: (value?: any) => void; const promise = new Promise(r => { resolve = r; }); return { promise, resolve: resolve! }; };
 function startC04SlowDiagnostic(trace: any[], state: () => any, readWaits: () => Promise<any[]>) {
@@ -79,6 +82,7 @@ beforeAll(async () => {
     admin = db.c; dbName = db.name;
     for (const file of fs.readdirSync(ROOT + '/supabase/migrations').filter(n => n.endsWith('.sql')).sort()) {
         if (file === '20261101071233_zoe_write_original_tenant.sql') contractBefore = await persistenceContract();
+        if (file === '20261114042758_zoe_business_audit.sql') auditEngineBefore = (await admin.query("select pg_get_functiondef('private.zoe_apply_engine_v1(uuid,text,jsonb,boolean,boolean,jsonb)'::regprocedure) as definition")).rows[0].definition;
         await admin.query(fs.readFileSync(ROOT + '/supabase/migrations/' + file, 'utf8'));
         if (file === '20261101071233_zoe_write_original_tenant.sql') contractAfter = await persistenceContract();
     }
@@ -181,9 +185,13 @@ async function openClient(f: Awaited<ReturnType<typeof fixture>>, options: any =
         { onListenerError: () => {}, onAccountBlocked: () => {}, onSessionEnded: () => {}, onTenantChanged: () => {},
             onTxOutcomeUnknown: (...args: any[]) => outcomes.push(args), docsCache: null, writeJournal: journal,
             dbOptions: { pollFallbackMs: 600000, retryStepsMs: [10], rpcTimeoutMs: 5000 } });
-    const app = sdk.initializeApp({ supabaseUrl: URL, supabaseKey: 'sb_publishable_fixture' });
+    const config = { supabaseUrl: URL, supabaseKey: 'sb_publishable_fixture' };
+    localStorage.setItem('zoew_firebase_config', JSON.stringify(config));
+    const app = sdk.initializeApp(config);
     currentApp = app;
     const auth: any = sdk.getAuth(app), db: any = sdk.getDatabase(app);
+    Object.assign(firebaseState, { firebaseConfig: config, fb: sdk, auth, db });
+    sdk.onAuthStateChanged(auth, (user: any) => { if (user) { acceptFixtureSession(); sdk.resumeAcceptedSession(auth); } });
     options.onClientCreated?.({ sdk, app, auth, db });
     await until(() => db.isReady() && sdk.tenantScope(auth) === (options.expectedTenant || f.A));
     trace('sdk-ready', { tenant: sdk.tenantScope(auth), recovery: db.recoveryState() });
@@ -715,13 +723,14 @@ it('C04 SQL៖ v2 RPC ACL បិទ anon និង service_role ហើយ public
     expect(flags).toEqual([{ nspname: 'private', prosecdef: true }, { nspname: 'public', prosecdef: false }]);
 });
 
-it('C04 minimum៖ schema និង receipt/quota/retention contract ដដែល គ្មាន persistence table ថ្មី (registration protocol reviewed)', async () => {
+it('C04 minimum៖ schema និង receipt/quota/retention contract ដដែល ក្រៅពី reviewed registration និង business audit', async () => {
     expect(contractBefore).not.toBeNull(); expect(contractAfter).toEqual(contractBefore);
     const deltaRelations = new Set(['zoe_daily_delta_heads', 'zoe_daily_delta_heads_pkey', 'zoe_daily_deltas', 'zoe_daily_deltas_pkey']);
     const registrationRelations = new Set(['registration_protocol', 'registration_protocol_pkey']);
     const isDailyDelta = (row: any) => row.schema === 'private' && deltaRelations.has(row.name);
     const isRegistration = (row: any) => row.schema === 'private' && registrationRelations.has(row.name);
-    const runtimeC04Relations = contractRuntime.relations.filter((row: any) => !isDailyDelta(row) && !isRegistration(row));
+    const reviewedRuntime = projectReviewedBusinessAudit(contractRuntime, 'force_rls');
+    const runtimeC04Relations = reviewedRuntime.relations.filter((row: any) => !isDailyDelta(row) && !isRegistration(row));
     expect(runtimeC04Relations).toEqual(contractAfter.relations);
     expect(contractRuntime.relations.filter(isDailyDelta).map((row: any) => row.name)).toEqual([...deltaRelations]);
     expect(contractRuntime.relations.filter(isRegistration).map((row: any) => row.schema + '.' + row.name + ':' + row.kind).sort())
@@ -736,6 +745,28 @@ it('C04 minimum៖ schema និង receipt/quota/retention contract ដដែ�
     for (const name of ['public.tenants', 'public.tenant_members', 'public.zoe_docs', 'public.zoe_ops', 'public.zoe_tenant_state']) expect(names).toContain(name);
     expect(contractAfter.receiptConstraints).toContainEqual({ definition: 'PRIMARY KEY (tenant_id, op_id)' });
     expect((await admin.query("select to_regclass('private.zoe_write_tenants') as binding")).rows[0].binding).toBeNull();
+});
+
+it('C04 reviewed audit schema allowance rejects ACL, RLS, column, index, sequence and namespace mutations', async () => {
+    const reviewed = { relations: reviewedAuditRelations('force_rls') };
+    expect(projectReviewedBusinessAudit(reviewed, 'force_rls')).toEqual({ relations: [] });
+    const mutated = (change: (rows: any[]) => void) => { const rows = structuredClone(reviewed.relations); change(rows); return { relations: rows }; };
+    for (const changed of [
+        mutated(rows => { rows[0].acl += ',authenticated=a/postgres'; }),
+        mutated(rows => { rows[0].rls = false; }),
+        mutated(rows => { rows[0].columns[0][1] = 'text'; }),
+        mutated(rows => { rows[1].index_definition = rows[1].index_definition.replace('UNIQUE ', ''); }),
+        mutated(rows => { rows[2].acl += ',authenticated=U/postgres'; }),
+        mutated(rows => { rows.push({ ...rows[0], name: 'zoe_business_audit_unreviewed' }); })
+    ]) expect(() => projectReviewedBusinessAudit(changed, 'force_rls')).toThrow('Reviewed audit table/index/sequence shape or ACL changed');
+    const engine = (await admin.query("select pg_get_functiondef('private.zoe_apply_engine_v1(uuid,text,jsonb,boolean,boolean,jsonb)'::regprocedure) as definition")).rows[0].definition;
+    expect(auditEngineBefore).not.toBeNull();
+    expect(projectAuditEngine(engine)).toBe(auditEngineBefore);
+    expect(() => projectAuditEngine(engine.replace("    perform set_config('zoe.audit_context', coalesce(prior_audit_context, ''), true);\n", ''))).toThrow('Reviewed audit engine context changed');
+    expect(projectAuditEngine(engine.replace("'quota_exceeded'", "'mutated_quota_check'"))).not.toBe(auditEngineBefore);
+    expect(definesRulesFunction('select private.zoe_rules();')).toBe(false);
+    for (const source of ['create function private.zoe_rules() returns jsonb', 'CREATE OR REPLACE FUNCTION "private"."zoe_rules"() returns jsonb', 'create function zoe_rules() returns jsonb'])
+        expect(definesRulesFunction(source)).toBe(true);
 });
 
 it('C04 minimum៖ CAS conflicts គ្មាន metadata ថ្មី ហើយ no-op ប្រើ receipt/quota ដើមតែប៉ុណ្ណោះ', async () => {

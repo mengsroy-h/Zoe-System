@@ -24,7 +24,7 @@ it('Supabase ៖ Reset រក្សា original CAS និង proof ដោយ at
         first62Hash: createHash('sha256').update(JSON.stringify(entries.slice(0, 62).map(entry => [entry.name, entry.sha256]))).digest('hex'), files: entries };
     expect(manifest.first62Hash).toBe('c4f2eb06b4d6b0f43e9a23ae5d955445b7b01eca8d1838ed2ecf89a85c9a3aa2');
     expect(migrations).toContain('20261109122019_zoe_rules.sql');
-    const sourceFiles = [driver, codec, ...migrations.map(name => path.join(root, 'supabase/migrations', name)),
+    const sourceFiles = [driver, codec, path.join(root, 'tools/audit-tools/reviewed-business-audit-schema.cjs'), ...migrations.map(name => path.join(root, 'supabase/migrations', name)),
         path.join(root, 'firebase-database.rules.json'), path.join(root, 'supabase/scripts/rtdb-rules.mjs'),
         path.join(root, 'supabase/scripts/rtdb-expression.cjs'), path.join(root, 'supabase/scripts/rtdb-canonical-key.cjs')];
     const before = sourceFiles.map(file => [file, hash(file)]);

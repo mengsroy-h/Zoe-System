@@ -334,12 +334,12 @@ async function backupSupabase(business, context, dependencies) {
         fetchImpl: deps.fetchImpl,
         sleepImpl: deps.sleepImpl
     });
-    const tenants = await supabase.listTenants(client);
+    const tenants = await supabase.listTenants(client, { includeAudit: true });
     const files = [];
     const failed = [];
     for (const tenant of tenants) {
         try {
-            const exported = await supabase.exportTenant(client, tenant.id);
+            const exported = await supabase.exportTenant(client, tenant.id, { auditOnly: tenant.audit_only === true });
             files.push(writeBackup(path.join(outDir, tenant.id), supabase.buildArchive(tenant, exported, client.host), context.keepCount));
         } catch (e) {
             failed.push(`${tenant.id}: ${e && e.message ? e.message : 'Unknown error'}`);

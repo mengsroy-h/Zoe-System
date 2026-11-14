@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { acceptFixtureSession } from './helpers/accepted-session';
 import { dataState, firebaseState, uiState, ztoState } from '../../../../ZoeW/src/core/state';
 import { appLocalStore } from '../../../../ZoeW/src/core/storage';
 import { getZoneDateKey } from '../../../../ZoeW/src/core/timezone';
@@ -84,6 +85,7 @@ beforeEach(() => {
     firebaseState.serverClockTrusted = true;
     firebaseState.isDatabaseConnected = true;
     const options = { databaseURL: 'https://signed-open-fixture.firebaseio.com' };
+    firebaseState.firebaseConfig = options;
     firebaseState.auth = { currentUser: { uid: 'guard-user' }, app: { options } } as any;
     firebaseState.db = { name: 'guard-db', app: { options } } as any;
     firebaseState.isInitializingFirebase = false;
@@ -100,6 +102,7 @@ beforeEach(() => {
         },
         getIdTokenResult: async () => ({ token: 'guard-token' })
     } as any;
+    acceptFixtureSession();
     vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 

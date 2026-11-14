@@ -28,6 +28,7 @@
 const path = require('path');
 const vm = require('vm');
 const { moduleRuntime, memoryStorage } = require('./react-view');
+const { localAuthRuntime } = require('./local-auth-runtime.cjs');
 
 const ROOT = process.env.REGISTRY_APP_DIR || path.join(__dirname, '../..');
 
@@ -45,6 +46,8 @@ try {
     console.log('\n❌ ធ្លាក់ — មិនអាចអានកូដសម្រាប់ checker ពី tree ដែលបានជ្រើស');
     process.exit(1);
 }
+
+const registryAuthRuntime = localAuthRuntime(ROOT, SRC);
 
 function sliceFn(name) {
     const at = SRC.search(new RegExp('(?:async\\s+)?function\\s+' + name + '\\s*\\('));
@@ -89,11 +92,14 @@ ok('ការដោះឆ្លងកាត់ `dbOp(` ➜ ការព្យួ
 
 // ── ២. ឥរិយាបថ ៖ ការដោះដែលធ្លាក់ ត្រូវចូលជួរ រួចរត់ឡើងវិញ ─────────────
 function makeCtx(behaviour) {
+    const backendConfig = { databaseURL: 'https://registry-release-fixture.firebaseio.com', apiKey: 'synthetic-public-key' };
+    const fixtureApp = { options: backendConfig };
     const calls = [];
     const ctx = {
         console, Math, JSON, Promise, setTimeout, clearTimeout, Object, Array, String, Number,
         parseFloat, parseInt, isNaN, isFinite, Date, Error, Map, Set, window: {},
-        db: {}, auth: null, fb: {
+        firebaseConfig: backendConfig,
+        db: { app: fixtureApp }, auth: { app: fixtureApp, currentUser: { uid: 'registry-release-fixture' } }, fb: {
             ref: (_d, p) => ({ path: p }),
             update: (r, updates) => {
                 calls.push(Object.keys(updates));
@@ -113,8 +119,13 @@ function makeCtx(behaviour) {
     ctx.window = ctx;
     ctx.authGeneration = 0;
     ctx.localStorage = memoryStorage();
+    ctx.appLocalStore = ctx.localStorage;
     vm.createContext(ctx);
-    const ownership = moduleRuntime(ROOT, SRC, ['src/core/storage.ts', { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] }]);
+    registryAuthRuntime.install(ctx, backendConfig);
+    const ownership = moduleRuntime(ROOT, SRC, ['src/core/storage.ts',
+        { path: 'src/core/shop-scope.ts', expose: ['liveShopScope'] },
+        { path: 'src/services/connection-flow.ts', expose: ['captureConnectionOperation'] },
+        { path: 'src/services/pickup-reset.ts', expose: ['resumePickupResetOutcomes'] }]);
     vm.runInContext(ownership.code, ctx);
     // `dbOp` ពិតរុំដោយ withTimeout; ទីនេះយើងគ្រាន់តែបញ្ជូនបន្ត
     vm.runInContext('function dbOp(p) { return Promise.resolve(p); }', ctx);

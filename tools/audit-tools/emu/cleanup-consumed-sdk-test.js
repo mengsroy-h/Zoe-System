@@ -5,6 +5,7 @@ let failed = 0;
 // Both warm-listener and cold-cache finalization paths must settle actual server receipts.
 const fs = require('fs'), path = require('path'), os = require('os'), http = require('http'), assert = require('assert/strict');
 const { pathToFileURL } = require('url');
+const { initializeSdkSession } = require('./sdk-session-fixture.cjs');
 const ROOT = path.resolve(process.env.SCANSDK_APP_DIR || process.env.ZOE_REPO_ROOT || path.join(__dirname, '../../..'));
 const deps = path.join(ROOT, 'ZoeW/node_modules');
 const port = Number(process.env.SCANRULES_EMU_PORT || 9000);
@@ -67,6 +68,9 @@ export { readCleanupJournal, resumeCleanupJournalEntry, cleanupJournalLive, clea
 export { CLEANUP_JOURNAL_KEY } from './ZoeW/src/core/storage-keys';
 export { withTransactionOutcomeResolution } from './ZoeW/src/services/tx-outcome';
 export { liveShopScope } from './ZoeW/src/core/shop-scope';
+export { appLocalStore } from './ZoeW/src/core/storage';
+export { acceptLocalAuthSession } from './ZoeW/src/services/local-logout-intent';
+export { loginBackendScope } from './ZoeW/src/features/login-memory';
 export { firebaseState, dataState, uiState, ztoState } from './ZoeW/src/core/state';`, resolveDir: ROOT }, bundle: true, platform: 'node', format: 'cjs', outfile: built, logLevel: 'error', define: { 'import.meta.env': '{}' } });
     const api = require(built);
     const bundleHash = require('crypto').createHash('sha256').update(fs.readFileSync(built)).digest('hex');
@@ -111,6 +115,7 @@ export { firebaseState, dataState, uiState, ztoState } from './ZoeW/src/core/sta
             firebaseSdkUnavailable: false, isDatabaseConnected: true, hasEverConnectedToDatabase: true, serverClockTrusted: true, serverTimeOffsetMs: 0,
             sessionExpiryCheck: 'live', authLoginOperation: null });
         localStorage.setItem('zoew_firebase_config', JSON.stringify(app.options));
+        initializeSdkSession(api);
         Object.assign(api.dataState, { scanHistory: [], deletedItems: [], dailyRevenueData: {}, monthlyRevenueData: {}, dailyPickupData: {}, dailyCollectedData: {}, pickupResumeInFlight: false, cleanupResumeInFlight: false, deletedCleanupInFlight: false });
         api.uiState.toasts = []; api.cleanupJournalLive.clear(); api.cleanupInFlight.clear();
         api.ztoState.ztoStatusLoaded = true; api.ztoState.ztoTrashMode = { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0, stamps: {}, shop: api.liveShopScope() };

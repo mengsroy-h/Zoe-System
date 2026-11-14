@@ -194,13 +194,7 @@ environment variable, Netlify Function, browser extension ឬ repo ឡើយ។
 ក្រោយ Cookie មួយត្រូវ ZTO បដិសេធ ជួរដដែលបង្ហាញ «អាយុ Cookie ក្រោយ Sync ៖ ប្រើបាន … ➜ បដិសេធនៅ … (ទំនេរ … មុនបដិសេធ)» ៖
 ពេលទំនេរនេះជាភស្តុតាងសម្រាប់ប្រៀបធៀបការប្រើប្រាស់ ប៉ុន្តែមិនបញ្ជាក់មូលហេតុដែល ZTO បដិសេធ session ដោយខ្លួនឯងទេ។
 
-⛔ **Cookie ដែលចាប់បាន ត្រូវបង្ហាញលើអេក្រង់** ៖
-
-```text
---- Cookie captured from Argus (paste into ZTO_COOKIE if you ever need a fallback) ---
-BOS-MAN-SESSION=...; sidebarStatus=0
---- end of cookie ---
-```
+Cookie មិនបង្ហាញតម្លៃក្នុង console ដោយលំនាំដើម ឬក្នុង `--auto` ទេ។ បើត្រូវការ copy ជាផ្លូវបម្រុង សូមរត់ `sync-zto-cookie.cmd --show-cookie` ដោយដៃក្នុង terminal ដែលបញ្ចូល និងបង្ហាញផ្ទាល់។ ជម្រើសនេះមិនទទួលការបញ្ជូន output ទៅ file/pipe និងមិនអាចប្រើជាមួយ `--auto`, `--check`, `--auto-ready` ឬ `--verify-setup`។ `sync-zto-cookie.cmd --help` បង្ហាញជម្រើសដោយមិនចាប់ Cookie ឬ upload។
 
 វាមានប្រយោជន៍ពេលចង់ paste ចូល `ZTO_COOKIE` ជាផ្លូវបម្រុង។ ⛔ **Netlify PAT
 និង `ZTO_PROXY_KEY` នៅតែមិនបង្ហាញដាច់ខាត** — កុំចែករំលែករូបថតអេក្រង់នេះ។
@@ -231,8 +225,7 @@ ERROR: --auto mode needs these missing values:
 ដំណោះស្រាយ ៖ រត់ `setup.cmd` ម្តងទៀត ចុច Enter កាត់ prompt ដែលមានតម្លៃរួច
 រួចបំពេញតែ ២ នោះ។
 
-Cookie ត្រូវបានបង្ហាញក្នុង console **ដោយចេតនា** តែវា
-**មិនសរសេរចូល config/file** និងមិនចូល shell history ទេ។ Netlify API response ដែលអាចពាក់ព័ន្ធនឹង secret ត្រូវបោះចោល
+Cookie មិនបង្ហាញតម្លៃក្នុង console ដោយលំនាំដើម។ `--show-cookie` បង្ហាញតែពេលរត់ដោយដៃក្នុង terminal ផ្ទាល់; tool មិនសរសេរតម្លៃទៅ config/file ឬ shell history ទេ។ Netlify API response ដែលអាចពាក់ព័ន្ធនឹង secret ត្រូវបោះចោល
 ដោយមិនបង្ហាញ body។ Chrome/Edge profile ពិសេសនៅតែផ្ទុក session ដោយការអ៊ិនគ្រីប
 របស់ browser ដូច profile ធម្មតា — កុំចែករំលែកថត
 `%LOCALAPPDATA%\Zoe-System`។
@@ -281,7 +274,7 @@ sync-zto-cookie.cmd
 
 | អ្វី | របៀបការពារ |
 |---|---|
-| **Cookie ZTO** | រស់ក្នុងសតិ ហើយ **បង្ហាញលើអេក្រង់ដោយចេតនា** — តែ **មិនសរសេរចូល file/config** និងមិនចូល shell history |
+| **Cookie ZTO** | រស់ក្នុងសតិ; លាក់តម្លៃក្នុង console ជាលំនាំដើម និងក្នុង `--auto`; បង្ហាញតែ `--show-cookie` ដោយដៃក្នុង terminal ផ្ទាល់; មិនសរសេរចូល file/config ឬ shell history |
 | **Netlify Personal Access Token** | អ៊ិនគ្រីបដោយ **Windows DPAPI / CurrentUser** ក្នុង `%LOCALAPPDATA%` — Windows user ផ្សេង ឬកុំព្យូទ័រផ្សេងដោះសោមិនបាន |
 | **`ZTO_PROXY_KEY`** (ស្រេចចិត្ត) | អ៊ិនគ្រីបដោយ **DPAPI ដដែល** ក្នុង `proxy-key.dpapi`; មិនចូល URL · មិនចូល command line · មិនបោះពុម្ព |
 | **ការហៅ Netlify API** | HTTPS origin ថេរ · `redirect: 'error'` · timeout គ្របដល់ body ចប់ · JSON មានពិដាន 1 MB · response body មិនបង្ហាញ |

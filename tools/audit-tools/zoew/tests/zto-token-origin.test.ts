@@ -1,3 +1,4 @@
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 /**
  * ⛔ audit សុវត្ថិភាព (សំណើម្ចាស់គម្រោង ៖ «audit ... ពិនិត្យ ក្រែងមានលេចធ្លាយ secret និងការវាយប្រហារផ្សេង» · ម្ចាស់គម្រោងអនុញ្ញាតកែតំបន់ចាក់សោ ZTO) ៖
  *    `X-Zoe-Id-Token` (Firebase ID token / JWT Supabase របស់គណនីហាង) ផ្តល់សិទ្ធិអាន/សរសេរទិន្នន័យហាងទាំងមូល។ មុនកែ App ផ្ញើវាទៅ URL Lookup
@@ -25,6 +26,8 @@ function cfg(url: string) {
 beforeEach(() => {
     firebaseState.auth = { currentUser: { uid: 'u1' } };
     firebaseState.fb = { getIdTokenResult: async () => ({ token: ID_TOKEN }) };
+    configureFixtureBackend('zto-token-origin');
+    acceptFixtureSession();
 });
 
 afterEach(() => {

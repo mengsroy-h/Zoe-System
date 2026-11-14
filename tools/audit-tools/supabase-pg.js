@@ -250,8 +250,14 @@ function createPgHarness(opts) {
         return r.rows[0].id;
     }
 
+    async function sessionClaims(c, who) {
+        if (who.role !== 'authenticated' || !who.sub) throw new Error('sessionClaims ត្រូវការ authenticated UID');
+        const session = await c.query('insert into auth.sessions(id,user_id,created_at) values(gen_random_uuid(),$1,now()) returning id', [who.sub]);
+        return { ...who, extra: { ...who.extra, session_id: session.rows[0].id } };
+    }
+
     return {
-        PG, pgBin, bins, unavailableReason, start, stop, stopForEvidence, connect, freshDb, as, makeAuthUser,
+        PG, pgBin, bins, unavailableReason, start, stop, stopForEvidence, connect, freshDb, as, makeAuthUser, sessionClaims,
         shimFiles: [].concat(SHIM_FILES.asPostgres, SHIM_FILES.asAdmin, SHIM_FILES.asAuthAdmin),
         denied: (r) => !!r.error && r.error.code === '42501' && /^permission denied/.test(r.error.message),
         raised: (r, token) => !!r.error && r.error.message === token

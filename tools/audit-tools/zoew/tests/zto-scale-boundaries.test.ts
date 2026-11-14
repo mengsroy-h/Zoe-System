@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { firebaseState } from '../../../../ZoeW/src/core/state';
 import { fetchZtoSignedPages, fetchZtoListAllPages } from '../../../../ZoeW/src/features/zto-list-sync';
 import { ztoSweepLaneOf } from '../../../../ZoeW/src/services/zto-sweep-lane';
+import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 
 const require = createRequire(import.meta.url);
 const acorn = require('acorn');
@@ -15,7 +16,12 @@ const names = new Set(['readProjectEntries', 'PROJECT_ID_RE', 'PROJECT_ID_MAX', 
 const code = ast.body.filter((n: any) => names.has(n.id?.name || n.declarations?.[0]?.id?.name)).map((n: any) => source.slice(n.start, n.end)).join('\n');
 const entries = runInNewContext(code + '\nreadProjectEntries') as (env: any) => { ids: string[]; branches: Record<string, string[]> };
 
-beforeEach(() => { firebaseState.auth = { currentUser: { uid: 'test' } } as any; firebaseState.fb = { getIdTokenResult: async () => ({ token: 'test-token' }) } as any; });
+beforeEach(() => {
+    configureFixtureBackend('zto-scale-boundaries');
+    firebaseState.auth = { currentUser: { uid: 'test' } } as any;
+    firebaseState.fb = { getIdTokenResult: async () => ({ token: 'test-token' }) } as any;
+    acceptFixtureSession();
+});
 afterEach(() => { vi.unstubAllGlobals(); firebaseState.auth = null as any; firebaseState.fb = null as any; firebaseState.firebaseConfig = null as any; });
 
 it('គម្រោងទី១៧ និងទី១០០០ នៅផ្ទៀងបាន · ពិដាននៅមាន', () => {

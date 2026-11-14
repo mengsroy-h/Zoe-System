@@ -4,6 +4,7 @@ import { acceptFixtureSession } from './helpers/accepted-session';
 import { it, expect, vi, afterEach } from 'vitest';
 import { webcrypto } from 'node:crypto';
 import { createScanMemorySdk } from './helpers/scan-memory-sdk';
+import { createRestoreAttestationFixture } from './helpers/restore-attestation';
 import { dataState, firebaseState, uiState, ztoState } from '../../../../ZoeW/src/core/state';
 import { appLocalStore } from '../../../../ZoeW/src/core/storage';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../../../../ZoeW/src/core/text';
@@ -66,10 +67,19 @@ it.each([['restored', true], ['restored', false], ['unchanged', true], ['unchang
     let answer: any;
     let started: any;
     const ready = new Promise(r => started = r);
-    let restoreChecks = 0;
-    vi.stubGlobal('fetch', async (target) => { const url = new URL(String(target)); if (url.searchParams.has('restore')) {
-        restoreChecks++;
-        return new Response(JSON.stringify({ barcode: code, cached: false, found: true, success: true, verifiedForRestore: true, ztoClosed: false }), { status: 200 });
+    let restoreChecks = 0, refreshChecks = 0;
+    // Exercise the actual issuer; only its backend/auth CAS and complete upstream
+    // unsigned verdict are controlled. The old sweep response stays pending.
+    const restoreFixture = createRestoreAttestationFixture({ get: mem.get, set: mem.put,
+        scope: options.databaseURL, actorUid: 'test',
+        policy: { v: 1, mode: 'cookie', scope: options.databaseURL, branch: '881859', epoch: 1 },
+        lookup: async () => Response.json({ barcode: code, cached: false, found: true, success: true,
+            verifiedForRestore: true, restoreTransitionsVerified: true, ztoClosed: false }) });
+    vi.stubGlobal('fetch', async (target, init) => { const url = new URL(String(target)); if (url.pathname.endsWith('/zto-restore-proof')) {
+        const action = JSON.parse(String(init?.body)).action;
+        if (action === 'authorize') restoreChecks++;
+        if (action === 'refresh') refreshChecks++;
+        return restoreFixture.route(target, init);
     } if (url.searchParams.has('status')) {
         started();
         return await new Promise(r => answer = r);
@@ -89,6 +99,8 @@ it.each([['restored', true], ['restored', false], ['unchanged', true], ['unchang
         await executeRestoreItem();
         sync();
         expect(restoreChecks).toBe(1);
+        expect(refreshChecks).toBe(1);
+        expect(restoreFixture.requests.map(request => request.action)).toEqual(['authorize', 'refresh']);
         expect(dataState.deletedItems).toHaveLength(0);
         expect(dataState.scanHistory).toHaveLength(1);
         const item = dataState.scanHistory[0];

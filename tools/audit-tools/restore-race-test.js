@@ -157,7 +157,7 @@ function tabFor(app, shared, suffix) {
         extractFn(source, 'dbOpStalled')
     ].filter(Boolean).join('\n');
     const policyHelpers = ['getZtoPickupVerdict', 'ztoVerdictCandidate', 'ztoImportLegacyValid', 'readDurableZtoImportLegacy', 'getZtoTrashMode', 'ztoTrashModeOf', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'lookupApiIsZto', 'lookupApiIsPalm', 'trashRestoreBlockOf',
-        'trashZtoFinalBlock', 'barcodeZtoSigned', 'barcodeZtoReturned', 'barcodeZtoMisplaced', 'barcodeZtoSentOut',
+        'trashZtoFinalBlock', 'trashZtoTerminalDecision', 'barcodeZtoSigned', 'barcodeZtoReturned', 'barcodeZtoMisplaced', 'barcodeZtoSentOut',
         'trashItemLeftBranch', 'trashReturnedEvery', 'barcodeZtoLeftKind', 'barcodeReturnedEvidence', 'barcodeReturnBasis', 'barcodeVerdictSigned',
         'pickupBarcodeKey', 'barcodeRegistryKey', 'loadZtoPickupStatusOnce', 'safeStoreGet', 'safeStoreSet', 'shopScope', 'recalcItemMoneyFromBarcodes',
         // helper ក្រៅប្លុកស្តារ ដែលមុខងារស្តារហៅ (ខ្វះ = ReferenceError ដែល catch លេបទៅជា 'pending')
@@ -279,7 +279,9 @@ async function expectError(work) {
             { name: 'Cookie stored Sign', trashMode: 'cookie', signed: true },
             { name: 'Explicit permanent restore block', restoreBlocked: true },
             // Active Palm configuration alone does not prove Sign; this negative carries stored Sign evidence.
-            { name: 'Active Palm with stored Sign', activePalm: true, signed: true }
+            { name: 'Active Palm with stored Sign', activePalm: true, signed: true },
+            { name: 'Palm terminal decision Signed', trashMode: 'palm', terminalDecision: 'signed' },
+            { name: 'Cookie terminal decision Returned', trashMode: 'cookie', terminalDecision: 'returned' }
         ].entries()) {
             console.log('  policy ' + i + ': ' + policy.name);
             const id = 'blocked_policy_' + i;
@@ -287,6 +289,7 @@ async function expectError(work) {
             if (policy.trashMode) item.trashMode = policy.trashMode;
             if (policy.trashReason) item.trashReason = policy.trashReason;
             if (policy.restoreBlocked) item.restoreBlocked = true;
+            if (policy.terminalDecision) item.ztoTerminalDecision = policy.terminalDecision;
             if (policy.signed) item.barcodes[0].ztoSignedAt = shared.now - 1;
             shared.lookupConfig = policy.activePalm ? { enabled: true, url: 'https://example.invalid/.netlify/functions/zto-order-detail?palm=1' } : null;
             shared.store.zoew_recently_deleted_cod_dod[id] = item;

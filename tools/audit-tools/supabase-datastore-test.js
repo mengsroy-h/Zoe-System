@@ -456,6 +456,8 @@ async function body(c, rec, extra) {
     const seeAnon = await as(c, Object.assign({ topic: topicA }, ANON), "select count(*)::int as n from realtime.messages");
     rec('broadcast ៖ anon ➜ មិនឃើញ', !!seeAnon.error || (seeAnon.rows && seeAnon.rows[0].n === 0), seeAnon);
 
+    const { seedPgRestorePolicy } = require('./fixtures/pg-restore-issuer.cjs');
+    for (const shop of [A, B]) await seedPgRestorePolicy({ H, c, tenant: shop.id, policy: { v: 1, mode: 'local', scope: 'datastore-local-' + shop.id, branch: '', epoch: 1 } });
     await admin(B.id, [{ k: 'set', p: [TRASH, 'src1'], v: Object.assign(item('src1'), { deletedAt: 1790000000000, trashReason: 'delete', isFromDeletion: true,
         restoreClaim: { token: 'tokB', claimedAt: Date.now(), targetId: 'tgt1' } }) }]);
     const crossFence = await as(c, A.who, 'select public.zoe_write($1, $2::jsonb)', [newOp(), JSON.stringify([
@@ -1230,7 +1232,11 @@ async function rulesCompilerGuardRegression() {
                 return Array.isArray(value) ? value.map(strip) : Object.fromEntries(Object.entries(value).map(([key, child]) => [key, strip(child)]));
             };
             const current = generator.compileRules(rules), unguarded = JSON.parse(JSON.stringify(rules));
-            unguarded.rules.zoew_registry_releases.$releaseId['.validate'] = node['.validate'].replace(' && ' + guard, '');
+            const at = node['.validate'].indexOf(guard);
+            const prefix = node['.validate'].slice(0, at);
+            assert.match(prefix, /&&\s*$/);
+            unguarded.rules.zoew_registry_releases.$releaseId['.validate'] = prefix.replace(/&&\s*$/, '')
+                + node['.validate'].slice(at + guard.length);
             assert.notEqual(unguarded.rules.zoew_registry_releases.$releaseId['.validate'], node['.validate']);
             assert.deepEqual(strip(current), generator.compileRules(unguarded));
             assert.equal(count, 1);
@@ -1613,7 +1619,8 @@ async function main() {
             if (intendedFailure && !spot.problem) {
                 const liveStart = migrationSql.lastIndexOf('create or replace function private.zoe_apply_engine_v1(');
                 const liveEnd = migrationSql.indexOf('\n$$;', liveStart);
-                if (migrationSql.split(from).length - 1 !== 1 || liveStart < 0 || liveEnd < 0 || spot.at < liveStart || spot.at + from.length > liveEnd)
+                const liveBody = liveStart < 0 || liveEnd < 0 ? '' : migrationSql.slice(liveStart, liveEnd);
+                if (liveBody.split(from).length - 1 !== 1 || spot.at < liveStart || spot.at + from.length > liveEnd)
                     spot.problem = 'anchor មិនមែនតែមួយក្នុង live zoe_apply_engine_v1';
             }
             return spot;

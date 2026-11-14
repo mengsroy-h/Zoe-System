@@ -934,7 +934,7 @@ scenario('runner ៖ Linux audit និង Windows APK មាន mode ទាំ�
             Object.values(auditShardRuntimeContract(audit + '\n' + shard.replace('  audit-shard:', header), image, apk)).every(value => !value));
     }
     for (const [name, key, mutated] of [
-        ['cache lock', 'cache', sibling.replace('cache-dependency-path: ZoeW/package-lock.json', 'cache-dependency-path: supabase/package-lock.json')],
+        ['cache lock', 'cache', sibling.replace(/(cache-dependency-path:\s*(?:\|\r?\n[ \t]*)?)ZoeW\/package-lock\.json/, '$1supabase/package-lock.json')],
         ['Node gate', 'runtime', sibling.replace("      - uses: actions/setup-node@v7\n        if: vars.ZOE_RUNNER_MODE == 'github'", "      - uses: actions/setup-node@v7\n        if: always()")],
         ['Java gate', 'runtime', sibling.replace("      - uses: actions/setup-java@v6\n        if: vars.ZOE_RUNNER_MODE == 'github'", "      - uses: actions/setup-java@v6\n        if: always()")],
         ['Chromium gate', 'chromium', sibling.replace("      - name: ត្រៀម Chromium លើម៉ាស៊ីន GitHub\n        if: vars.ZOE_RUNNER_MODE == 'github'", "      - name: ត្រៀម Chromium លើម៉ាស៊ីន GitHub\n        if: always()")],

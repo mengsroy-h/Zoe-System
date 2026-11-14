@@ -12,7 +12,7 @@ const AUDIT_EVENT_KEYS = ['event_id', 'schema_version', 'tenant_id', 'origin_ten
     'changed_fields', 'changed_fields_truncated', 'summary_unchanged', 'projection_scope', 'committed_at'].sort();
 const AUDIT_ROOTS = new Set(['zoew_scan_history_cod_dod', 'zoew_recently_deleted_cod_dod', 'zoew_daily_revenue_cod_dod', 'zoew_monthly_revenue_cod_dod',
     'zoew_daily_pickup_cod_dod', 'zoew_daily_collected_cod_dod', 'zoew_scan_operations', 'zoew_trash_consumptions', 'zoew_restore_finalizations', 'zoew_registry_releases']);
-const AUDIT_SUMMARY_KEYS = new Set(('id sourceId targetId restoreClaimId restoreSourceId restorePendingClaimId restoreSourceGeneration code barcode cod dod price count codDollar dodDollar totalCount packagesPickedUp pickupRevision pickupResetEpoch trashGeneration generation birth rowBirth createdAt deletedAt claimedAt finalizedAt closedAt restoredAt ztoSignedAt ztoSignedExact ztoReturnedAt ztoSentOutAt ztoMisplacedAt isClosed isDeducted restoreBlocked isFromDeletion isCalled trashReason trashMode phase kind c d exists location barcodes collected pickedUpPhoneCount pickedUpBarcodes opsCount dedCount backCount undoCount restoreClaim claimCorrelationHash restoreAddedCodes total sampleLimit truncated sample sha256 closed deducted signed returnEvidence returned entryKey entryKeyTruncated length malformed zoewClosed barcodeCount closedCount deductedCount observedSignedCount effectiveReturnedCount observedReturnEvidenceCount').split(' '));
+const AUDIT_SUMMARY_KEYS = new Set(('id sourceId targetId restoreClaimId restoreSourceId restorePendingClaimId restoreSourceGeneration code barcode cod dod price count codDollar dodDollar totalCount packagesPickedUp pickupRevision pickupResetEpoch trashGeneration generation birth rowBirth createdAt deletedAt claimedAt finalizedAt closedAt restoredAt ztoSignedAt ztoSignedExact ztoReturnedAt ztoSentOutAt ztoMisplacedAt isClosed isDeducted restoreBlocked isFromDeletion isCalled trashReason trashMode ztoTerminalDecision phase kind c d exists location barcodes collected pickedUpPhoneCount pickedUpBarcodes opsCount dedCount backCount undoCount restoreClaim claimCorrelationHash restoreAddedCodes total sampleLimit truncated sample sha256 closed deducted signed returnEvidence returned entryKey entryKeyTruncated length malformed zoewClosed barcodeCount closedCount deductedCount observedSignedCount effectiveReturnedCount observedReturnEvidenceCount').split(' '));
 const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
 const TENANT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_RESPONSE_BYTES = 64 * 1024 * 1024;
@@ -166,6 +166,31 @@ function object(value) {
     return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
+function hasPendingSeal(data) {
+    const trash = data && typeof data === 'object' ? data.zoew_recently_deleted_cod_dod : null;
+    if (!trash || typeof trash !== 'object') return false;
+    const authorities = data.zoew_restore_attestations;
+    return Object.keys(trash).some(key => {
+        const row = trash[key];
+        if (!row || typeof row !== 'object') return false;
+        if (Object.prototype.hasOwnProperty.call(row, 'restoreAttestationId')
+            && row.restoreAttestationId !== null && row.restoreAttestationId !== undefined) return true;
+        if (Object.prototype.hasOwnProperty.call(row, 'restorePublication')
+            && row.restorePublication !== null && row.restorePublication !== undefined) return true;
+        if (Object.prototype.hasOwnProperty.call(row, 'ztoTerminalDecision')
+            && row.ztoTerminalDecision !== null && row.ztoTerminalDecision !== undefined) return true;
+        const authority = authorities && typeof authorities === 'object' && Object.prototype.hasOwnProperty.call(authorities, key)
+            ? authorities[key] : null;
+        return !!(authority && typeof authority === 'object' && authority.generation === (row.trashGeneration ?? 0));
+    });
+}
+
+function assertNoPendingSeal(data) {
+    if (hasPendingSeal(data)) {
+        throw new Error('Pending server restore authority requires a database-level backup/recovery that preserves private restore grants. Ordinary archives cannot preserve that state; keep the original seal and journals.');
+    }
+}
+
 function stableJson(value) {
     return JSON.stringify(value, (_key, found) => {
         if (!object(found)) return found;
@@ -271,6 +296,7 @@ function auditSummary(value) {
         if (!object(node)) continue;
         for (const [key, child] of Object.entries(node)) {
             if (!AUDIT_SUMMARY_KEYS.has(key) && !(key.endsWith('Bounds') && AUDIT_SUMMARY_KEYS.has(key.slice(0, -6)))) return false;
+            if (key === 'ztoTerminalDecision' && !['signed', 'returned'].includes(child)) return false;
             pending.push(child);
         }
     }
@@ -467,6 +493,7 @@ function rootCounts(data) {
 }
 
 function buildArchive(tenant, exported, host) {
+    assertNoPendingSeal(exported.data);
     const counts = rootCounts(exported.data);
     const audit = validateAuditEnvelope(exported.audit, tenant.id);
     return {
@@ -500,6 +527,7 @@ function isArchive(value) {
 
 function validateArchive(value) {
     if (!isArchive(value)) throw new Error('Unsupported or malformed Supabase archive (supported versions: 1 and 2).');
+    assertNoPendingSeal(value.data);
     if (value.version === 1) {
         if (Object.prototype.hasOwnProperty.call(value, 'audit') || Object.prototype.hasOwnProperty.call(value.manifest, 'audit')) {
             throw new Error('Audit history requires a version 2 archive; legacy audit fields cannot be ignored.');
@@ -524,6 +552,8 @@ module.exports = {
     MAX_AUDIT_ARCHIVE_EVENTS,
     MAX_AUDIT_ARCHIVE_BYTES,
     auditDigest,
+    hasPendingSeal,
+    assertNoPendingSeal,
     assertAuditMergeBudget,
     buildArchive,
     createClient,

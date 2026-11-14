@@ -289,6 +289,10 @@ Firebase project បណ្ដោះអាសន្នសិន ហើយបិ�
 
 ## ប្រព័ន្ធសុវត្ថិភាព
 
+Supabase app archive ទប់ការបោះពុម្ព backup ពេលមាន pending sealed source ឬ private restore authority ដែលនៅចងនឹងវដ្តធុងសំរាមបច្ចុប្បន្ន។ ទិន្នន័យ private grant/key មិនមានក្នុង ordinary app archive ទេ; ប្រើ backup កម្រិត DB ដែលសាក restore បានសម្រាប់ស្ថានភាពនេះ។ Firebase whole-database backup រក្សា private authority roots ដដែល; កុំលុប marker ដើម្បីបង្ខំ export/import។
+
+ការផ្ទេរ business data ត្រូវធ្វើក្នុង maintenance window ផ្ដាច់មុខ ដោយបញ្ឈប់ និង drain client/issuer writes ជាមុន តាម [ការកំណត់ ZTO](../../docs/zoew/ZTO-SETUP-KH.md)។ Preflight ជាការត្រួតពិនិត្យ snapshot; វាមិនមែនជា lock ទប់ការសរសេរឆ្លងបាច់ទេ។
+
 - សំណើ Firebase/OAuth និង Supabase មិនតាម HTTP redirect ទេ ដើម្បីមិនផ្ញើសោ ឬ request body ទៅគោលដៅផ្សេង។ ប្រើ URL គោលដៅត្រឹមត្រូវដោយផ្ទាល់។
 
 - **Service-account key ជា credential ពិត** — `config.json` · `secrets/` និង
@@ -316,6 +320,8 @@ Firebase project បណ្ដោះអាសន្នសិន ហើយបិ�
 - **សិទ្ធិ Token របស់ workflow ត្រឹម `contents: read`**។
 - **សូមប្រើសោអានតែម្យ៉ាង** (`Firebase Realtime Database Viewer`) សម្រាប់ backup —
   សោដែលសរសេរបាន គឺជាហានិភ័យដែលមិនចាំបាច់។
+
+ត្រា server `restorePublication` និង `ztoTerminalDecision` ត្រូវរក្សាទុកទោះបាន release claim រួច។ Ordinary archive/import បដិសេធ source ដែលមានត្រាទាំងនេះ; ប្រើ DB-level recovery ដែលរក្សា private authority និង drain ប្រតិបត្តិការមុន rollback។ Decision ជាការហាមស្តារ មិនមែនត្រាម៉ោង Sign/Return ថ្មីទេ។
 
 ---
 

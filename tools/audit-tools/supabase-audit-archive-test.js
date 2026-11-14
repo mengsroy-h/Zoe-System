@@ -336,13 +336,13 @@ async function integrationScenarios() {
             assert.equal(after.audit.events.length, before.audit.events.length + orphanArchive.audit.events.length);
         });
         await scenario('legacy archive restores documents without invented historical audit events', async () => {
-            const before = fake.requests.filter(request => request.fn === 'zoe_admin_audit_restore').length;
+            const before = fake.requests.filter(request => request.path === '/rest/v1/rpc/zoe_admin_audit_restore').length;
             const result = await importFile(writeInput({ format: 'zoe-supabase-tenant', version: 1, manifest: {}, data: DOCS }), LEGACY);
             assert.equal(result.code, 0, result.stderr);
             const after = await supabase.exportTenant(client, LEGACY);
             assert.deepEqual(JSON.parse(JSON.stringify(after.data)), DOCS);
             assert.deepEqual(after.audit.events, []);
-            assert.equal(fake.requests.filter(request => request.fn === 'zoe_admin_audit_restore').length, before);
+            assert.equal(fake.requests.filter(request => request.path === '/rest/v1/rpc/zoe_admin_audit_restore').length, before);
         });
         await scenario('missing audit RPC fails the backup explicitly instead of writing a document-only archive', async () => {
             const unsupported = { ...client, rpc: async (fn, args) => {
@@ -350,6 +350,33 @@ async function integrationScenarios() {
                 return client.rpc(fn, args);
             } };
             await assert.rejects(supabase.exportTenant(unsupported, SOURCE), /audit.*unavailable/i);
+        });
+        await scenario('audit-only CLI appends without document export while current private Returned authority and all documents remain exact', async () => {
+            const sourceId = 'audit_pending_fixture';
+            const source = { id: sourceId, phone: '010000001', createdAt: 1763000000000, deletedAt: 1763000001000,
+                trashGeneration: 0, trashMode: 'palm', trashReason: 'remove', scanDate: '2026-11-14',
+                barcodes: [{ code: 'ARCHIVE_PENDING_A', cod: 7, dod: 2, createdAt: 1763000000000, isDeducted: true }] };
+            const seeded = await H.as(c, { role: 'service_role' }, 'select public.zoe_admin_write($1,$2,$3::jsonb,false) as r',
+                [TARGET, 'archive_pending_seed', JSON.stringify([{ k: 'set', p: ['zoew_recently_deleted_cod_dod', sourceId], v: source }])]);
+            assert.equal(seeded.rows?.[0]?.r?.ok, true, JSON.stringify(seeded.error));
+            // Privileged local setup represents a retained server-private fact;
+            // it does not mint a client grant or exercise upstream verification.
+            const authority = { v: 1, id: 'archive_returned_deny', sourceId, generation: 0, status: 'deny', verdict: 'returned' };
+            await c.query('insert into private.zoe_restore_attestations(tenant_id,source_id,revision,body,snapshot,payload_hash) values($1,$2,1,$3::jsonb,$4::jsonb,$5)',
+                [TARGET, sourceId, JSON.stringify(authority), JSON.stringify(source), '0'.repeat(64)]);
+            await assert.rejects(supabase.exportTenant(client, TARGET), error => error.pgCode === '55000');
+            const physical = async () => ({
+                documents: (await c.query('select root,key,value,seq,updated_at from public.zoe_docs where tenant_id=$1 order by root,key', [TARGET])).rows,
+                privateAuthorities: (await c.query('select source_id,revision,body,snapshot,payload_hash,updated_at from private.zoe_restore_attestations where tenant_id=$1 order by source_id', [TARGET])).rows
+            });
+            const before = await physical(), requestStart = fake.requests.length;
+            const result = await importFile(writeInput(orphanArchive), TARGET, ['--replace']);
+            assert.equal(result.code, 0, result.stderr);
+            assert.match(result.stdout, /no document-write request made/);
+            assert.deepEqual(await physical(), before);
+            const requests = fake.requests.slice(requestStart);
+            assert.equal(requests.some(request => ['/rest/v1/rpc/zoe_admin_export', '/rest/v1/rpc/zoe_admin_write'].includes(request.path)), false);
+            assert.ok(requests.some(request => request.path === '/rest/v1/rpc/zoe_admin_audit_restore'));
         });
         await scenario('service credential never appears in CLI output or generated archives', () => {
             assert.ok(transcripts.length >= 4);
@@ -395,7 +422,7 @@ async function main() {
     await unitScenarios();
     const unitOnly = process.argv.includes('--unit');
     if (!unitOnly) { await integrationScenarios(); await mutationScenarios(); }
-    const minimum = unitOnly ? 26 : 39;
+    const minimum = unitOnly ? 26 : 40;
     if (passed + failed < minimum) throw new Error('Archive assertion scenarios did not reach their required coverage floor.');
     console.log((unitOnly ? failed ? 'FAIL UNIT DIAGNOSTIC; PostgreSQL not run: ' : 'PARTIAL PASS (unit diagnostic only; PostgreSQL not run): ' : 'FULL ARCHIVE VERIFICATION: ') + passed + ' pass, ' + failed + ' fail.');
     console.log('ARCHIVE ELAPSED: ' + ((Date.now() - STARTED) / 1000).toFixed(1) + ' seconds.');

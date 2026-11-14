@@ -22,6 +22,7 @@ const BROKEN_UNICODE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(^|[^\uD800-\uDBFF])[
 const INPUT_FILE_RE = /\.json(\.gz)?(\.enc)?$/i;
 const REGISTRY_ROOT = 'zoew_barcode_registry';
 const BARCODE_OWNER_ROOTS = ['zoew_scan_history_cod_dod', 'zoew_recently_deleted_cod_dod'];
+const RESTORE_CONFIGURATION_ROOTS = new Set(['zoew_restore_policy', 'zoew_restore_attestations']);
 
 class UsageError extends Error {}
 
@@ -347,6 +348,7 @@ function readInput(input, env) {
     }
     if (isObject(parsed) && parsed.format === supabase.FORMAT) throw new Error('Unsupported archive version ' + JSON.stringify(parsed.version) + ' (expected ' + supabase.FORMAT_VERSION + ').');
     rejectUnsupportedFirebaseAudit(parsed);
+    supabase.assertNoPendingSeal(parsed);
     return { file, kind: 'firebase-export', data: parsed, manifest: null, audit: null };
 }
 
@@ -429,6 +431,13 @@ function treeOf(docs) {
         putOwn(tree[d.root], d.key, d.value);
     }
     return tree;
+}
+
+function selectRestoreConfiguration(data, protectedOnly) {
+    if (!isObject(data)) return protectedOnly ? Object.create(null) : data;
+    const selected = Object.create(null);
+    for (const root of Object.keys(data)) if (RESTORE_CONFIGURATION_ROOTS.has(root) === protectedOnly) putOwn(selected, root, data[root]);
+    return selected;
 }
 
 function diffTrees(want, have) {
@@ -540,6 +549,8 @@ async function run(argv, env) {
     }
     const input = readInput(opts.input, env);
     const auditOnly = !!input.audit && input.manifest.audit_only === true && input.audit.events.length > 0;
+    const sourceConfigurationRoots = Object.keys(selectRestoreConfiguration(input.data, true));
+    const businessData = selectRestoreConfiguration(input.data, false);
     const rules = loadRules(opts.rules ? path.resolve(opts.rules) : DEFAULT_RULES);
     if (input.kind === 'supabase-archive') {
         const t = input.manifest.tenant || {};
@@ -549,9 +560,11 @@ async function run(argv, env) {
         say('Input  : ' + input.file + ' (Firebase export)');
     }
     if (input.audit) say('Audit  : ' + input.audit.events.length + ' historical event(s), original IDs/actor/time/origin preserved'
-        + (auditOnly ? '; audit-only archive leaves document data unchanged.' : '.'));
+        + (auditOnly ? '; audit-only import sends no document-write request.' : '.'));
+    if (sourceConfigurationRoots.length) say('Config : source server configuration excluded from business import: '
+        + sourceConfigurationRoots.join(', ') + '. Target configuration is retained; missing policy needs separate trusted provisioning.');
 
-    const problems = validateTree(input.data, rules);
+    const problems = validateTree(businessData, rules);
     const byRoot = new Map();
     for (const d of problems.docs) {
         const r = byRoot.get(d.root) || { docs: 0, bytes: 0 };
@@ -617,8 +630,18 @@ async function run(argv, env) {
     if (input.kind === 'supabase-archive' && input.manifest.tenant && input.manifest.tenant.id !== meta.id) {
         say('Note   : the archive comes from another tenant (' + input.manifest.tenant.id + ').');
     }
-    const current = await supabase.exportTenant(client, meta.id);
-    const plan = diffTrees(auditOnly ? current.data : want, current.data);
+    const current = await supabase.exportTenant(client, meta.id, { auditOnly });
+    if (!auditOnly && supabase.hasPendingSeal(current.data)) {
+        say('REFUSED' + (opts.apply ? '' : ' (on --apply)') + ': target has a pending server restore seal. Use a database-level backup/recovery that preserves private restore grants; keep the original seal and journals.');
+        return EXIT.FAIL;
+    }
+    const targetConfiguration = selectRestoreConfiguration(current.data, true);
+    const protectedTargetDocs = Object.keys(targetConfiguration).flatMap(root => Object.keys(targetConfiguration[root] || {})
+        .map(key => ({ root, key, value: targetConfiguration[root][key] })));
+    if (!auditOnly && (sourceConfigurationRoots.length || protectedTargetDocs.length)) say('Config : target server configuration retained ('
+        + protectedTargetDocs.length + ' existing record(s)); this import does not provision or replace policy/private grants.');
+    const currentBusiness = selectRestoreConfiguration(current.data, false);
+    const plan = diffTrees(auditOnly ? currentBusiness : want, currentBusiness);
     const leftAsIs = plan.extra.filter(inputCopySkipped);
     const keptOwners = leftAsIs.some((d) => BARCODE_OWNER_ROOTS.includes(d.root));
     const keepsRegistry = (d) => keptOwners && d.root === REGISTRY_ROOT && !inputCopySkipped(d);
@@ -694,9 +717,10 @@ async function run(argv, env) {
         }
     }
 
-    const after = await supabase.exportTenant(client, meta.id);
-    const changes = current.seq < after.seq ? (await supabase.exportTenant(client, meta.id, { since: current.seq, includeAudit: false })).changes : [];
-    const expected = auditOnly ? current.data : treeOf(kept.concat(leftAsIs.concat(registryKept).map((d) => ({ root: d.root, key: d.key, value: current.data[d.root][d.key] }))));
+    const after = await supabase.exportTenant(client, meta.id, { auditOnly });
+    const changes = !auditOnly && current.seq < after.seq ? (await supabase.exportTenant(client, meta.id, { since: current.seq, includeAudit: false })).changes : [];
+    const expected = auditOnly ? current.data : treeOf(kept.concat(protectedTargetDocs,
+        leftAsIs.concat(registryKept).map((d) => ({ root: d.root, key: d.key, value: current.data[d.root][d.key] }))));
     const verdict = verifyTenant(expected, after.data);
     for (const r of verdict.roots) {
         say('Verify : ' + r.root.padEnd(34) + ' expected ' + String(r.expected).padStart(6) + '  found ' + String(r.found).padStart(6) + '  '
@@ -705,7 +729,10 @@ async function run(argv, env) {
     const foreign = foreignWrites(current.seq, after.seq, results, changes);
     let code = EXIT.OK;
     if (verdict.equal && auditOnly) {
-        say('VERIFIED: audit-only archive restored; existing document data remains unchanged.');
+        say('VERIFIED: audit-only archive restored; no document-write request made.');
+    } else if (verdict.equal && (sourceConfigurationRoots.length || protectedTargetDocs.length)) {
+        say('VERIFIED: business import plan confirmed (' + kept.length + ' input business record(s)); target server configuration retained ('
+            + protectedTargetDocs.length + ' record(s), seq ' + after.seq + ').');
     } else if (verdict.equal && !skippedDocs.size && !skippedRoots.size) {
         say('VERIFIED: tenant ' + meta.id + ' equals the input (' + kept.length + ' record(s), seq ' + after.seq + ').');
     } else if (verdict.equal) {

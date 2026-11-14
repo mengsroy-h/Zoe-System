@@ -34,6 +34,8 @@ const { createPgHarness } = require('./supabase-pg.js');
 const { startFakeSupabase } = require('./supabase-fake-server.js');
 const { r2, rng, LICENSE_STUB, invariant, invariantBroken, collectedFixtureAgeOps, openBarcodeTargets, PAGE_OPS, recoveryEvidence, devicesSettled } = require('./money-multidevice-core.js');
 const { cookieFixture, networkGate, restoreFlows } = require('./money-cookie-blob.js');
+const { localRestorePolicy } = require('./fixtures/trusted-restore-policy.cjs');
+const { ATTESTOR_KID, ATTESTOR_SECRET } = require('./fixtures/money-restore-issuer.cjs');
 
 const ROOT = process.env.SBMONEY_APP_DIR ? path.resolve(process.env.SBMONEY_APP_DIR) : path.join(__dirname, '../..');
 const REPO = process.env.ZOE_REPO_ROOT ? path.resolve(process.env.ZOE_REPO_ROOT) : ROOT;
@@ -93,6 +95,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         await c.query(fs.readdirSync(migDir).filter((f) => /^\d{14}_[a-z0-9_]+\.sql$/.test(f)).sort().map((f) => fs.readFileSync(path.join(migDir, f), 'utf8')).join('\n;\n'));
         pool = new H.PG.Pool({ host: '127.0.0.1', port: c.connectionParameters.port, user: 'postgres', database: name, max: 16 });
         pool.on('error', () => {});
+        await pool.query('insert into private.zoe_restore_attestor_keys(kid,secret) values($1,decode($2,\'hex\'))', [ATTESTOR_KID, ATTESTOR_SECRET]);
         fake = await startFakeSupabase({ pool, jwtIssuer: true });
         cookie = cookieFixture(ROOT, { supabaseUrl: fake.url, supabaseKey: 'sb_publishable_' + 'mms'.repeat(10) });
 
@@ -138,6 +141,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
             Object.keys(items).forEach((id) => ops.push({ k: 'set', p: ['zoew_scan_history_cod_dod', id], v: items[id] }));
             Object.keys(registry).forEach((code) => ops.push({ k: 'set', p: ['zoew_barcode_registry', code], v: true }));
             ops.push({ k: 'set', p: ['zoew_settings', 'exchange_rate'], v: 4100 });
+            ops.push({ k: 'set', p: ['zoew_restore_policy', 'shop'], v: localRestorePolicy(fake.url + '#' + tenant) });
             ops.push({ k: 'set', p: ['zoew_daily_revenue_cod_dod', dateKey], v: { codDollar: r2(cod), dodDollar: r2(dod), totalCount: cnt } });
             ops.push({ k: 'set', p: ['zoew_monthly_revenue_cod_dod', monthKey], v: { codDollar: r2(cod), dodDollar: r2(dod), totalCount: cnt } });
             await serverWrite(tenant, ops);
@@ -157,7 +161,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
         staticServer = await new Promise((res) => {
             const srv = http.createServer((req, rsp) => {
-                if (req.url.startsWith('/.netlify/functions/zto-order-detail')) { void cookie.serve(req, rsp); return; }
+                if (/^\/\.netlify\/functions\/zto-(?:order-detail|restore-proof)(?:\?|$)/.test(req.url)) { void cookie.serve(req, rsp); return; }
                 let p = decodeURIComponent(req.url.split('?')[0]);
                 if (p === '/') p = '/index.html';
                 let f = path.join(DIR, p);
@@ -174,7 +178,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         const makeDevice = async (shop, user) => {
             const ctx = await browser.newContext({ viewport: { width: 412, height: 780 }, serviceWorkers: 'block' });
             contexts.push(ctx);
-            const gate = await networkGate(ctx, 'supabase', shop.tenant);
+            const gate = await networkGate(ctx, 'supabase', shop.tenant, { restoreProof: true });
             await ctx.route(/\/license-verify\.js(\?|$)/, (route) => route.fulfill({ status: 200, contentType: 'application/javascript', body: LICENSE_STUB }));
             await ctx.addInitScript((cfg) => {
                 try { if (!localStorage.getItem('zoew_firebase_config')) localStorage.setItem('zoew_firebase_config', cfg); } catch (e) {}

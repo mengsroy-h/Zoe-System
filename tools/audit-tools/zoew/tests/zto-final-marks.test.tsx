@@ -1,5 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createRestoreAttestationFixture } from './helpers/restore-attestation';
+import { acceptFixtureSession } from './helpers/accepted-session';
 
 import { dataState, firebaseState, uiState, ztoState } from '../../../../ZoeW/src/core/state';
 import { appLocalStore } from '../../../../ZoeW/src/core/storage';
@@ -22,6 +24,7 @@ import { renderHistory } from '../../../../ZoeW/src/ui/history-render';
 const toasts = () => (uiState.toasts || []).map((t: any) => String(t.msg || ''));
 const H = 'zoew_scan_history_cod_dod/';
 const T = 'zoew_recently_deleted_cod_dod/';
+const RESTORE_SCOPE = 'https://zto-final-fixture.firebaseio.com';
 
 describe('ច្បាប់ cleanup និងស្តារ តាមរបៀប Lookup', () => {
     const now = 1800000000000;
@@ -93,17 +96,44 @@ function item(id: string, barcodes: any[], extra: any = {}) {
 
 let server: Record<string, any> = {};
 let txPaths: string[] = [];
+let committedTxPaths: string[] = [];
+let writtenFinalizations: Record<string, any> = {};
 let reject: (path: string) => any = () => null;
 
+function serverValue(path: string) {
+    if (Object.hasOwn(server, path)) return server[path];
+    const fields = path.split('/'), parent = fields.slice(0, 2).join('/');
+    return fields.slice(2).reduce((value, field) => value?.[field], server[parent]) ?? null;
+}
+
+function setServerValue(path: string, value: any) {
+    const fields = path.split('/'), parent = fields.slice(0, 2).join('/');
+    if (fields.length <= 2) { server[path] = value; return; }
+    let current = server[parent] ||= {};
+    for (const field of fields.slice(2, -1)) current = current[field] ||= {};
+    if (value === null) delete current[fields.at(-1)!]; else current[fields.at(-1)!] = value;
+}
+
 function installFb() {
-    const options = { databaseURL: 'https://zto-final-fixture.firebaseio.com' };
+    const options = { databaseURL: RESTORE_SCOPE };
     const db = { name: 'db-final', app: { options } };
     firebaseState.db = db as any;
-    firebaseState.auth = { currentUser: { uid: 'zto-final-owner' }, app: { options } } as any;
+    firebaseState.auth = { currentUser: { uid: 'zto-final-owner', getIdToken: async () => 'synthetic-final-identity' }, app: { options } } as any;
+    firebaseState.firebaseConfig = options as any;
     firebaseState.isInitializingFirebase = false;
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
     firebaseState.fb = {
+        getIdTokenResult: async () => ({ token: 'synthetic-final-identity' }),
+        increment: (value: number) => ({ increment: value }),
         ref: (_db: unknown, path: string) => ({ path }),
+        update: async (ref: any, patch: Record<string, any>) => {
+            for (const [key, value] of Object.entries(patch)) {
+                const path = [ref.path, key].filter(Boolean).join('/');
+                if (path.startsWith('zoew_restore_finalizations/') && value) writtenFinalizations[path] = structuredClone(value);
+                setServerValue(path, value && typeof value === 'object' && Object.hasOwn(value, 'increment')
+                    ? Number(serverValue(path) || 0) + value.increment : value);
+            }
+        },
         get: async (ref: any) => {
             const v = server[ref.path];
             return { exists: () => v !== undefined && v !== null, val: () => (v === undefined ? null : JSON.parse(JSON.stringify(v))) };
@@ -115,12 +145,30 @@ function installFb() {
             const cur = server[ref.path] === undefined ? null : JSON.parse(JSON.stringify(server[ref.path]));
             const next = fn(cur);
             if (next === undefined) return { committed: false, snapshot: { val: () => cur } };
+            committedTxPaths.push(ref.path);
             server[ref.path] = next;
             return { committed: true, snapshot: { val: () => next } };
         }
     } as any;
     firebaseState.dbRefDeleted = { path: 'zoew_recently_deleted_cod_dod' } as any;
+    firebaseState.sessionExpiryCheck = 'live';
+    acceptFixtureSession();
     return db;
+}
+
+function installCookieRestoreFixture() {
+    appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true,
+        url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' }));
+    const fixture = createRestoreAttestationFixture({
+        get: path => server[path] ?? null,
+        set: (path, value) => { server[path] = value; },
+        policy: { v: 1, mode: 'cookie', scope: RESTORE_SCOPE, branch: 'fixture', epoch: 1 },
+        lookup: async event => ({ statusCode: 200, body: JSON.stringify({ success: true, found: true,
+            barcode: event.queryStringParameters.barcode, cached: false, verifiedForRestore: true,
+            restoreTransitionsVerified: true, ztoClosed: false }) })
+    });
+    vi.stubGlobal('fetch', vi.fn((url, init) => fixture.route(url, init)));
+    return fixture;
 }
 
 function seedHistory(items: any[]) {
@@ -139,6 +187,8 @@ beforeEach(() => {
     appLocalStore.clear();
     server = {};
     txPaths = [];
+    committedTxPaths = [];
+    writtenFinalizations = {};
     reject = () => null;
     resetZtoFinalMarks();
     ztoState.ztoFinalInFlight = false;
@@ -151,7 +201,10 @@ beforeEach(() => {
     uiState.toasts = [];
     vi.stubGlobal('confirm', () => true);
     installFb();
+    server['zoew_restore_policy/shop'] = { v: 1, mode: 'local', scope: RESTORE_SCOPE, branch: '', epoch: 1 };
 });
+
+afterEach(() => { vi.unstubAllGlobals(); });
 
 describe('ធុងសំរាម ៖ ធាតុចូលក្រោយគេនៅលើគេ', () => {
     it('ក្រុមតម្រៀបតាម deletedAt ថ្មីបំផុតមុន · ធាតុក្នុងក្រុមក៏ដូច្នោះ · គ្មាន deletedAt ➜ ចុងក្រោយ', () => {
@@ -528,19 +581,65 @@ describe('ស្តារពីធុងសំរាម', () => {
         for (const [id, extra, evidence] of [['tm1', { ztoReturnedAt: 5, ztoMisplacedAt: 5 }, false], ['tm2', { ztoReturnedAt: 5 }, true]] as const) {
             txPaths = [];
             uiState.toasts = [];
-            seedTrash([item(id, [bc('M' + id, extra)], { trashReason: 'returned', deletedAt: 9 })]);
+            seedTrash([item(id, [bc('MISPLACED_' + id, extra)], { trashReason: 'returned', trashMode: 'cookie', deletedAt: 9 })]);
             for (const bucket of ['daily', 'monthly']) {
                 const date = bucket === 'daily' ? '2026-10-06' : '2026-10';
                 server[`zoew_${bucket}_revenue_cod_dod/${date}`] = { ded: { [id]: { at: 9, cod: 1, dod: 0, count: 1 } } };
             }
-            if (evidence) noteZtoReturnedEvidence('M' + id, Date.now() - 60000, 'misplaced');
+            if (evidence) {
+                noteZtoReturnedEvidence('MISPLACED_' + id, extra.ztoReturnedAt, 'misplaced');
+                // Publish the observed exit before asking the trusted issuer;
+                // an unpersisted client hint cannot override a server terminal row.
+                await syncZtoFinalMarks();
+            }
+            txPaths = [];
+            const fixture = installCookieRestoreFixture();
             expect(trashRestoreBlockOf(dataState.deletedItems[0])).toBe('');
             uiState.pendingRestoreId = id;
             await executeRestoreItem();
+            expect(fixture.answers[0]).toMatchObject({ status: 200, body: { kind: 'allow' } });
             expect(toasts()).not.toContain(ZTO_RESTORE_FINAL_TEXT);
             expect(txPaths.length, id + ' ៖ ការស្តារចាប់ផ្តើម').toBeGreaterThan(0);
+            expect(fixture.requests.map(request => request.action)).toEqual(['authorize', 'refresh']);
+            expect(fixture.lookups).toHaveLength(2);
+            expect(server[T + id]).toBeNull();
+            expect(server[H + id].barcodes[0].code).toBe('MISPLACED_' + id);
+            expect(server['zoew_trash_consumptions/' + id]).toMatchObject({ kind: 'restore', actorUid: 'zto-final-owner' });
+            expect(server['zoew_daily_revenue_cod_dod/2026-10-06']).toMatchObject({ codDollar: 1, totalCount: 1 });
+            expect(server['zoew_monthly_revenue_cod_dod/2026-10']).toMatchObject({ codDollar: 1, totalCount: 1 });
+            expect(writtenFinalizations['zoew_restore_finalizations/' + id]).toMatchObject({ token: fixture.requests[0].token, targetId: id });
+            expect(server['zoew_restore_finalizations/' + id]).toBeNull();
         }
     }, 30000);
+
+    it('different return and misplaced events retain the terminal source and never credit a restore', async () => {
+        // Preserve the former mixed-timestamp input as a negative: a client exit
+        // hint cannot equate two distinct events or clear trusted terminal proof.
+        const code = 'MISPLACED_DIFFERENT';
+        seedTrash([item('different_event', [bc(code, { ztoReturnedAt: 5 })],
+            { trashReason: 'returned', trashMode: 'cookie', deletedAt: 9 })]);
+        for (const bucket of ['daily', 'monthly']) {
+            const date = bucket === 'daily' ? '2026-10-06' : '2026-10';
+            server[`zoew_${bucket}_revenue_cod_dod/${date}`] = { ded: { different_event: { at: 9, cod: 1, dod: 0, count: 1 } } };
+        }
+        const newer = Date.now() - 60000;
+        noteZtoReturnedEvidence(code, newer, 'misplaced');
+        await syncZtoFinalMarks();
+        txPaths = [];
+        const fixture = installCookieRestoreFixture();
+        const beforeMoney = [server['zoew_daily_revenue_cod_dod/2026-10-06'], server['zoew_monthly_revenue_cod_dod/2026-10']];
+        uiState.pendingRestoreId = 'different_event';
+        await executeRestoreItem();
+        expect(fixture.answers[0]).toMatchObject({ status: 200, body: { kind: 'deny', code: 'ZTO_RESTORE_TERMINAL_RETURNED' } });
+        expect(fixture.lookups).toHaveLength(0);
+        expect(server[T + 'different_event'].barcodes[0]).toMatchObject({ ztoReturnedAt: 5, ztoMisplacedAt: newer });
+        expect(server[H + 'different_event']).toBeUndefined();
+        expect(server['zoew_trash_consumptions/different_event']).toBeUndefined();
+        expect(server['zoew_restore_finalizations/different_event']).toBeUndefined();
+        expect([server['zoew_daily_revenue_cod_dod/2026-10-06'], server['zoew_monthly_revenue_cod_dod/2026-10']]).toEqual(beforeMoney);
+        expect(committedTxPaths.filter(path => path.startsWith(H))).toEqual([]);
+        expect(toasts()).toContain(ZTO_RESTORE_FINAL_TEXT);
+    });
 
     it('executeRestoreItem ៖ server មាន ztoReturnedAt ➜ មិនប្រកាសការស្តារ (គ្មាន transaction) · សារ 🔒', async () => {
         seedTrash([item('t10', [bc('Z2')], { trashReason: 'returned', deletedAt: 9 })]);

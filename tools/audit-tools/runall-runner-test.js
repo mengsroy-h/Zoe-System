@@ -140,7 +140,21 @@ function runHarness(dir, body, extraEnv, timeoutSecs, limitMs) {
     // limitMs ➜ SIGKILL ៖ shell ដែលជាប់ក្នុង expansion មិនរត់ trap TERM ទេ ➜ ពិដានត្រូវបញ្ចប់វាពិតប្រាកដ
     const r = cp.spawnSync('bash', [h], { cwd: dir, env: harnessEnv(dir, extraEnv), encoding: 'utf8', timeout: limitMs || 90000,
         killSignal: limitMs ? 'SIGKILL' : 'SIGTERM', maxBuffer: 64 * 1024 * 1024 });
+    if (r.error || r.signal || !Number.isInteger(r.status) || [126, 127, 137, 143].includes(r.status)) throw new Error('ម៉ាស៊ីនរត់ក្លែងមិនបានបញ្ចប់ដោយ exit code ដែលអាចវាស់បាន');
     return { rc: r.status, out: String(r.stdout || '') + String(r.stderr || ''), ms: Date.now() - t0, events: readLog(dir) };
+}
+
+
+{
+    const invoke=result=>vm.runInNewContext('('+runHarness.toString()+')',{
+        fs:{rmSync(){}},path,writeHarness:()=>'/synthetic/harness.sh',harnessEnv:()=>({}),Date,
+        cp:{spawnSync:()=>result},readLog:()=>[]
+    })('/synthetic','');
+    const failures=[{status:null,error:{code:'EAGAIN'}},{status:null,error:{code:'ETIMEDOUT'}},{status:null,signal:'SIGKILL'},
+        {status:1,error:{code:'ENOBUFS'}},...[126,127,137,143].map(status=>({status}))];
+    ok('ម៉ាស៊ីនរត់ក្លែងបដិសេធ spawn/timeout/signal/overflow និង shell crash ប៉ុន្តែរក្សា exit code ពិត',
+        failures.every(result=>{try{invoke(result);return false;}catch(_){return true;}})
+        && [0,1,2,5].every(status=>invoke({status}).rc===status));
 }
 
 function readLog(dir) {
@@ -1003,7 +1017,8 @@ async function sectionSix() {
     const requiredBase = entry => entry[3].startsWith(EMU) || ['money-guardian-test.js', 'money-checker-truthfulness-test.js', 'exit-code-integrity.js', 'supabase-scan-rules-test.js'].some(name => entry[3] === 'tools/audit-tools/' + name);
     const missingOwned = text => [...text.matchAll(/^\s*([A-Z0-9_]+_APP_DIR)="\$BASE" (runall_owned )?node (tools\/audit-tools\/[A-Za-z0-9_/-]+\.js)/gm)].filter(entry => requiredBase(entry) && !entry[2]);
     ok('BASE RTDB consumers ប្រើ owned API ដូច normal ដោយរក្សា source overrides ទាំងអស់',
-        baseCommands.filter(requiredBase).length === 18 && missingOwned(base).length === 0
+        baseCommands.filter(requiredBase).length === 19 && missingOwned(base).length === 0
+        && baseCommands.some(entry => entry[1] === 'ZTOATTEST_APP_DIR' && entry[2] && entry[3] === EMU + 'zto-restore-attestation-emu-test.js')
         && /runall_prepare_command "\$@"/.test(runall));
     const pairedJobs = jobs.filter(internalOwnedRunner);
     const pairedContractJobs = jobs.filter(job => job.id === 'import-paired-ci-runner-test');
@@ -1041,7 +1056,20 @@ async function sectionSix() {
     const summaryPrefix='IMPORT_PAIRED_CI_RESULT ';
     function summaryFixture(lines,code=0,id=summaryId){
         const d=newCase([[EMU+'import-paired-ci-runner.js',{out:lines,code}]]);
-        return runHarness(d,actualPrep+'\nrun "emu/import-native-'+id+'" node tools/audit-tools/emu/import-paired-ci-runner.js --case='+id+' --provider=native',{RUNALL_JOBS:'2',TMPDIR:d});
+        const result=runHarness(d,actualPrep+'\nrun "emu/import-native-'+id+'" node tools/audit-tools/emu/import-paired-ci-runner.js --case='+id+' --provider=native',{RUNALL_JOBS:'2',TMPDIR:d});
+        const events=result.events,name=EMU+'import-paired-ci-runner.js';
+        if(events.length!==2||events[0].kind!=='start'||events[1].kind!=='end'||events.some(event=>event.name!==name)||!Number.isSafeInteger(events[0].pid)||events[0].pid<=0||events[0].pid!==events[1].pid||events[1].at<events[0].at)throw new Error('សេចក្តីសង្ខេបក្លែងខ្វះភស្តុតាងចាប់ផ្តើម និងបញ្ចប់របស់កូនដដែល');
+        return result;
+    }
+    {
+        const invoke=events=>vm.runInNewContext('('+summaryFixture.toString()+')',{
+            newCase:()=>'/synthetic',EMU,actualPrep,summaryId,Number,Error,
+            runHarness:()=>({rc:1,out:'',events})
+        })([]);
+        const started={kind:'start',name:EMU+'import-paired-ci-runner.js',pid:123,at:1},ended={...started,kind:'end',at:2};
+        ok('សេចក្តីសង្ខេបអវិជ្ជមានទាមទារកូនដដែលចាប់ផ្តើម និងបញ្ចប់ពិត',
+            [[],[started],[started,{...ended,pid:456}]].every(events=>{try{invoke(events);return false;}catch(_){return true;}})
+            && invoke([started,ended]).rc===1);
     }
     const summaryOkay=summaryFixture([summaryPrefix+JSON.stringify(validSummary)]);
     const summaryHostile=summaryFixture([summaryPrefix+JSON.stringify({...validSummary,hostile:'SYNTHETIC_SECRET_CANARY'}),'SYNTHETIC_EXTRA_CANARY']);

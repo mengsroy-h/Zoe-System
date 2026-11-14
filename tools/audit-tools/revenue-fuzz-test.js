@@ -566,6 +566,7 @@ function seedData() {
     Object.values(items).forEach((it) => it.barcodes.forEach((b) => { cod += b.cod; dod += b.dod; cnt++; }));
     return {
         user_roles: { 'admin-uid': 'admin' },
+        zoew_restore_policy: { shop: { v: 1, mode: 'local', scope: 'https://fake-default-rtdb.firebaseio.com', branch: '', epoch: 1 } },
         zoew_scan_history_cod_dod: items,
         zoew_recently_deleted_cod_dod: {},
         zoew_daily_revenue_cod_dod: { [d]: { codDollar: Math.round(cod * 100) / 100, dodDollar: Math.round(dod * 100) / 100, totalCount: cnt } },

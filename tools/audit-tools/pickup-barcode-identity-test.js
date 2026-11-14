@@ -158,13 +158,38 @@ const settle = async (n) => { for (let i = 0; i < (n || 6); i++) await new Promi
 
 function pickupRuleSnapshot(value) {
     const exists = value !== null && value !== undefined && (typeof value !== 'object' || Object.values(value).some((v) => pickupRuleSnapshot(v).exists()));
+    const child = (key) => {
+        if (typeof key !== 'string') throw new TypeError('RuleDataSnapshot child path must be a string');
+        let found = value;
+        for (const part of key.split('/').filter(Boolean)) {
+            found = found && typeof found === 'object' && Object.prototype.hasOwnProperty.call(found, part) ? found[part] : null;
+        }
+        return pickupRuleSnapshot(found);
+    };
     return {
         exists: () => exists,
         val: () => exists ? clone(value) : null,
-        child: (key) => pickupRuleSnapshot(value && typeof value === 'object' ? value[key] : null),
+        child,
+        hasChild: (key) => child(key).exists(),
+        hasChildren: (keys) => exists && typeof value === 'object' && (keys === undefined
+            ? Object.keys(value).some((key) => child(key).exists()) : keys.every((key) => child(key).exists())),
         isNumber: () => typeof value === 'number' && Number.isFinite(value),
-        isString: () => typeof value === 'string'
+        isString: () => typeof value === 'string',
+        isBoolean: () => typeof value === 'boolean'
     };
+}
+
+{
+    const snapshot = pickupRuleSnapshot({ nested: { zero: 0, no: false, empty: '', absent: null } });
+    ok('model ៖ child path រួម/ដាច់ និង slash ខាងចុងត្រូវគ្នា', snapshot.child('/nested/zero/').val() === snapshot.child('nested').child('zero').val());
+    ok('model ៖ hasChild រក្សា presence របស់ false/zero/empty', ['zero', 'no', 'empty'].every((key) => snapshot.hasChild('nested/' + key)) && !snapshot.hasChild('nested/absent') && !snapshot.hasChild('nested/missing'));
+    let rejected = 0;
+    for (const bad of [null, undefined, 0, false, {}]) {
+        for (const method of ['child', 'hasChild']) {
+            try { snapshot[method](bad); } catch (error) { if (error instanceof TypeError) rejected++; }
+        }
+    }
+    ok('model ៖ argument ខុសប្រភេទត្រូវបដិសេធ មិនបម្លែងទៅ string', rejected === 10);
 }
 
 function validatePickupWrite(value, current) {

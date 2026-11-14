@@ -1,10 +1,31 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { stampTrashPolicy, trashEntryIsFinal, trashZtoFinalBlock } from '../../../../ZoeW/src/domain/barcode';
 import { resetZtoFinalMarks, trashRestoreBlockOf } from '../../../../ZoeW/src/features/zto-final-marks';
-import { verifyZtoRestoreStatus } from '../../../../ZoeW/src/features/zto-restore-status';
+import { verifyZtoRestoreStatus as actualVerifyZtoRestoreStatus } from '../../../../ZoeW/src/features/zto-restore-status';
+import { createRequire } from 'node:module';
+import { createRestoreAttestationFixture } from './helpers/restore-attestation';
+import { liveShopScope } from '../../../../ZoeW/src/core/shop-scope';
 import { appLocalStore } from '../../../../ZoeW/src/core/storage';
 import { firebaseState } from '../../../../ZoeW/src/core/state';
 import { setupWorld, teardownWorld, world, type Backend } from './zto-palm-harness';
+
+const require = createRequire(import.meta.url);
+const core = require('../../../../ZoeW/netlify/functions/_shared/zto-order-detail-core.cjs');
+let fixture: ReturnType<typeof createRestoreAttestationFixture>;
+async function setup(backend: Backend) {
+    await setupWorld(backend, 'require');
+    const nodes: Record<string, any> = {};
+    firebaseState.fb = { ...firebaseState.fb,
+        get: async (ref: any) => ({ val: () => structuredClone(nodes[ref.path] ?? null) }) } as any;
+    const lookup = core.createTrustedRestoreHandler({ getStore: () => null });
+    fixture = createRestoreAttestationFixture({ get: path => nodes[path] ?? null, set: (path, value) => { nodes[path] = value; },
+        policy: { v: 1, mode: 'palm', scope: liveShopScope(), branch: '881859', epoch: 1 },
+        lookup: (event, identity) => { world.functionQueries.push(event.queryStringParameters); return lookup(event, identity); } });
+    const transport = fetch;
+    vi.stubGlobal('fetch', (input: any, init: any) => new URL(String(input)).pathname.endsWith('/zto-restore-proof')
+        ? fixture.route(input, init) : transport(input, init));
+}
+const verify = (item: any) => actualVerifyZtoRestoreStatus(fixture.source({ createdAt: Date.UTC(2026, 9, 1), ...item }, 'policy_' + item.trashMode), fixture.operation());
 
 beforeEach(() => resetZtoFinalMarks());
 afterEach(() => { resetZtoFinalMarks(); teardownWorld(); });
@@ -32,44 +53,44 @@ describe('Palm ស្តារ ៖ មិនយក Sign ទៅហាមការ
 
     for (const backend of ['firebase', 'supabase'] as Backend[]) {
         it(`${backend} ៖ App + Function ពិតផ្ទៀង Palm ថ្មីមុនស្តារ ហើយចាប់ Sign ថ្មី`, async () => {
-            await setupWorld(backend, 'require');
+            await setup(backend);
             const item = { trashMode: 'palm', trashReason: 'remove', barcodes: [{ code: 'KH1000000001' }] };
             expect(trashRestoreBlockOf(item)).toBe('');
-            await verifyZtoRestoreStatus(item);
+            await verify(item);
             expect(world.functionQueries.at(-1)).toMatchObject({ restore: '1', palm: '1', barcode: 'KH1000000001' });
             expect(world.zto.filter(value => value.startsWith('track:')).length).toBeGreaterThan(0);
             world.parcels.KH1000000001.isSign = 1;
             world.parcels.KH1000000001.scans.push({ action: '5', siteCode: '881859', time: '2026-10-05 16:00:00' });
-            await expect(verifyZtoRestoreStatus(item)).rejects.toThrow('RESTORE_ZTO_FINAL');
+            await expect(verify(item)).rejects.toThrow('RESTORE_ZTO_FINAL');
         });
 
         it(`${backend} ៖ Palm unknown/ត្រឡប់ថ្មី/offline មិនសន្មតថាមិនទាន់ Sign`, async () => {
-            await setupWorld(backend, 'require');
+            await setup(backend);
             const item = { trashMode: 'palm', trashReason: 'delete', barcodes: [{ code: 'KH1000000001' }] };
             world.parcels.KH1000000001.isSign = null;
-            await expect(verifyZtoRestoreStatus(item)).rejects.toThrow('RESTORE_ZTO_UNCONFIRMED');
+            await expect(verify(item)).rejects.toThrow('RESTORE_ZTO_UNCONFIRMED');
             world.parcels.KH1000000001.isSign = 0;
             world.parcels.KH1000000001.scans.push({ action: '-710', siteCode: '881859', time: '2026-10-05 16:00:00' });
-            await expect(verifyZtoRestoreStatus(item)).rejects.toThrow('RESTORE_ZTO_FINAL');
+            await expect(verify(item)).rejects.toThrow('RESTORE_ZTO_FINAL');
             vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
-            await expect(verifyZtoRestoreStatus(item)).rejects.toThrow('RESTORE_ZTO_UNVERIFIED');
+            await expect(verify(item)).rejects.toThrow('RESTORE_ZTO_UNVERIFIED');
         });
     }
 
     it('Palm provenance លើ device គ្មាន Palm Lookup ត្រូវសុំភ្ជាប់ មិនបង្កើត claim', async () => {
-        await setupWorld('firebase', 'require');
+        await setup('firebase');
         appLocalStore.removeItem('zoew_lookup_api_config');
-        await expect(verifyZtoRestoreStatus({ trashMode: 'palm', trashReason: 'remove', barcodes: [{ code: 'KH1000000001' }] }))
+        await expect(verify({ trashMode: 'palm', trashReason: 'remove', barcodes: [{ code: 'KH1000000001' }] }))
             .rejects.toThrow('RESTORE_ZTO_NEEDS_LOOKUP');
         expect(firebaseState.auth?.currentUser).toBeTruthy();
     });
 
     it('Palm device ៖ Cookie provenance ត្រូវការរបៀបដើម · local provenance ផ្ទៀង Palm ដែលកំពុងប្រើ', async () => {
-        await setupWorld('firebase', 'require');
+        await setup('firebase');
         const barcodes = [{ code: 'KH1000000001' }];
-        await expect(verifyZtoRestoreStatus({ trashMode: 'cookie', trashReason: 'remove', barcodes }))
+        await expect(verify({ trashMode: 'cookie', trashReason: 'remove', barcodes }))
             .rejects.toThrow('RESTORE_ZTO_NEEDS_LOOKUP');
-        await verifyZtoRestoreStatus({ trashMode: 'local', trashReason: 'remove', barcodes });
+        await verify({ trashMode: 'local', trashReason: 'remove', barcodes });
         expect(world.functionQueries).toHaveLength(1);
         expect(world.functionQueries[0]).toMatchObject({ palm: '1', restore: '1' });
     });

@@ -47,6 +47,8 @@ tools/firebase-provision/state/
 # លទ្ធផល TypeScript និងភស្តុតាងរបស់ឧបករណ៍ audit
 tools/audit-tools/zoew/*.tsbuildinfo
 tools/audit-tools/zoew/test-results/
+ZoeW/.vitest/
+/supabase-datastore-daily-bytes.json
 
 # តំណ dependency និងថតដំឡើងជាទិន្នន័យមូលដ្ឋាន មិនចូល repo
 node_modules

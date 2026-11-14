@@ -25,7 +25,7 @@ import { requestPinBeforeConfig } from './pin';
 import { trashReasonOf } from './trash';
 import { ZTO_FAST_MODE_HINT, ZTO_LIST_CLIENT_MAX_PAGES, fetchZtoReturnedPages, fetchZtoSignedCodes, ztoListPositiveCount, ztoListReasonIsDefinitive, ztoListSignedEvidence, ztoListSignedProbe } from './zto-list-sync';
 import { removeReturnedZtoBarcodes } from './zto-returned';
-import { scheduleZtoFinalMarks, trashRestoreBlockOf } from './zto-final-marks';
+import { scheduleZtoFinalMarks, trashRestoreBlockOf, trashZtoTerminalDecision } from './zto-final-marks';
 import { anyDbListenerViewIsStale, emptyViewMessage } from '../services/db-listeners';
 import { fetchWithTimeout, linkIsFrugal } from '../services/network';
 import { markZtoShopSweep, ztoShopSweepHolds } from '../services/zto-shop-sweep';
@@ -345,7 +345,7 @@ export function collectClosedBarcodesForZtoStatus(dataToScan = dataState.scanHis
         if (!Array.isArray(list)) return;
         for (let i = 0; i < list.length; i++) {
             const item = list[i];
-            if (trashSide && !ztoStatusTrashItemCounts(item)) continue;
+            if (trashSide && (trashZtoTerminalDecision(item) || !ztoStatusTrashItemCounts(item))) continue;
             const codes = item && Array.isArray(item.barcodes) ? item.barcodes : null;
             if (!codes) continue;
             for (let j = 0; j < codes.length; j++) {
@@ -368,6 +368,32 @@ export function collectClosedBarcodesForZtoStatus(dataToScan = dataState.scanHis
     };
     addFrom(dataToScan, false);
     addFrom(trashToScan, true);
+    return out;
+}
+
+export function collectTerminalTrashBarcodesForZtoStatus(trashToScan = dataState.deletedItems) {
+    if (!cleanupClockIsTrustworthy() || shopScopePending()) return [];
+    const now = getServerNow(), floor = getZoneDateKey(now, -ZTO_SIGNED_SWEEP_MAX_DAYS);
+    const list = Array.isArray(trashToScan) ? trashToScan : [];
+    const occurrences = new Map();
+    for (const item of list) for (const barcode of Array.isArray(item?.barcodes) ? item.barcodes : []) {
+        const key = pickupBarcodeKey(barcode?.code);
+        if (key) occurrences.set(key, (occurrences.get(key) || 0) + 1);
+    }
+    const out = [];
+    for (const item of list) {
+        if (!trashZtoTerminalDecision(item) || typeof item.id !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(item.id)
+            || item.clearClaim || item.restoreClaim || itemHasRestoreMarkers(item) || rowOperationActive(item)) continue;
+        const deletedAt = Number(item.deletedAt);
+        if (!Number.isFinite(deletedAt) || deletedAt <= 0 || deletedAt > now || now - deletedAt > trashRetentionMs(item)) continue;
+        for (const barcode of Array.isArray(item.barcodes) ? item.barcodes : []) {
+            const key = pickupBarcodeKey(barcode?.code), basis = barcodeReturnBasis(barcode, item.createdAt);
+            if (!key || occurrences.get(key) !== 1 || !Number.isFinite(basis) || basis <= 0 || basis > now || getZoneDateKey(basis, 0) < floor) continue;
+            out.push({ candidate: ztoVerdictCandidate(item, barcode), key, code: String(barcode.code),
+                phone: String(item.phone || ''), locker: String(barcode.locker || item.locker || ''),
+                signed: barcodeZtoSigned(barcode), since: Math.max(basis, barcodeSignBasis(barcode, item)), terminalDecision: true });
+        }
+    }
     return out;
 }
 
@@ -482,12 +508,13 @@ export function ztoReturnedTrashCandidates(trashToScan = dataState.deletedItems)
         }
     }
     for (const item of Array.isArray(trashToScan) ? trashToScan : []) {
-        if (!item?.id || item.trashReason !== 'returned' || item.clearClaim || item.restoreClaim || itemHasRestoreMarkers(item)
-            || rowOperationActive(item) || trashRestoreBlockOf(item, true) || !Array.isArray(item.barcodes)) continue;
+        const terminalReturn = trashZtoTerminalDecision(item) === 'returned';
+        if (!item?.id || !terminalReturn && item.trashReason !== 'returned' || item.clearClaim || item.restoreClaim || itemHasRestoreMarkers(item)
+            || rowOperationActive(item) || !terminalReturn && trashRestoreBlockOf(item, true) || !Array.isArray(item.barcodes)) continue;
         const deletedAt = Number(item.deletedAt);
         if (!Number.isFinite(deletedAt) || deletedAt <= 0 || deletedAt > now || now - deletedAt > trashRetentionMs(item)) continue;
         for (const barcode of item.barcodes) {
-            if (!barcode || barcode.isClosed || barcodeZtoSigned(barcode) || barcodeZtoReturned(barcode)
+            if (!barcode || !terminalReturn && barcode.isClosed || barcodeZtoSigned(barcode) || barcodeZtoReturned(barcode)
                 || barcodeZtoMisplaced(barcode) || barcodeZtoSentOut(barcode)) continue;
             const key = pickupBarcodeKey(barcode.code);
             const since = barcodeReturnBasis(barcode, item.createdAt);
@@ -501,6 +528,7 @@ export function ztoReturnedTrashCandidates(trashToScan = dataState.deletedItems)
 export function ztoSignedLivePollWanted(dataToScan, trashToScan) {
     if (documentIsHidden() || !ztoAutoCloseEnabled() || ztoState.ztoSignedOff || !ztoSignedSweepWaitIsNormal()) return false;
     return collectOpenBarcodesForZtoStatus(dataToScan).length > 0 || ztoStatusPendingList(dataToScan, trashToScan).length > 0
+        || collectTerminalTrashBarcodesForZtoStatus(trashToScan).some((entry) => !entry.signed)
         || elapsedSince(ztoState.ztoReturnedSweepAt) >= ZTO_OPEN_RECHECK_MS && ztoReturnedTrashCandidates(trashToScan).length > 0;
 }
 
@@ -696,7 +724,7 @@ export async function closeZtoSignedBarcodes(cfg, entries, dataToScan, force?, p
         if (!signedFor(stale[i])) continue;
         if (!owners.current(stale[i].key)) { finished = false; continue; }
         const at = signedTimes.get(stale[i].key);
-        if (!at && getZtoPickupVerdict(stale[i].code, stale[i].candidate)?.closed !== false) continue;
+        if (!at && (stale[i].terminalDecision || getZtoPickupVerdict(stale[i].code, stale[i].candidate)?.closed !== false)) continue;
         setZtoPickupVerdict(stale[i].code, true, signedRawTimes.get(stale[i].key), true);
         out.keys.add(stale[i].key);
         out.flipped++;
@@ -972,7 +1000,7 @@ function ztoStatusLastAskedAt(entry) {
     return Math.max(getZtoPickupVerdict(entry.code, entry.candidate)?.at || 0, ztoStatusAskedAt.get(entry.key) || 0);
 }
 
-function captureZtoStatusAnswerOwner(key, history, trash) {
+function captureZtoStatusAnswerOwner(key, history, trash, terminalDecision = false) {
     const liveHistory = history === dataState.scanHistory;
     const liveTrash = trash === dataState.deletedItems;
     const identity = () => {
@@ -982,7 +1010,9 @@ function captureZtoStatusAnswerOwner(key, history, trash) {
             for (const item of Array.isArray(list) ? list : []) {
                 for (const barcode of Array.isArray(item?.barcodes) ? item.barcodes : []) {
                     if (pickupBarcodeKey(barcode?.code) !== key) continue;
-                    identities.add(JSON.stringify([side, item.id ?? null, barcodeSignIdentity(item, barcode), barcode.scanIntent ?? null]));
+                    const released = !terminalDecision || side === 1 && !!trashZtoTerminalDecision(item)
+                        && !item.restoreClaim && !item.clearClaim && !itemHasRestoreMarkers(item) && !rowOperationActive(item);
+                    identities.add(JSON.stringify([side, item.id ?? null, barcodeSignIdentity(item, barcode), barcode.scanIntent ?? null, released]));
                 }
             }
         });
@@ -994,6 +1024,7 @@ function captureZtoStatusAnswerOwner(key, history, trash) {
 }
 
 function captureZtoSignedAnswerOwners(entries, history, trash) {
+    const terminalKeys = new Set(entries.filter((entry) => entry.terminalDecision).map((entry) => entry.key));
     const liveHistory = history === dataState.scanHistory;
     const liveTrash = trash === dataState.deletedItems;
     const identities = () => {
@@ -1005,7 +1036,9 @@ function captureZtoSignedAnswerOwners(entries, history, trash) {
                     const key = pickupBarcodeKey(barcode?.code);
                     if (!key) continue;
                     const signIdentity = barcodeSignIdentity(item, barcode);
-                    const signature = JSON.stringify([side, item.id ?? null, signIdentity, barcode.scanIntent ?? null]);
+                    const released = !terminalKeys.has(key) || side === 1 && !!trashZtoTerminalDecision(item)
+                        && !item.restoreClaim && !item.clearClaim && !itemHasRestoreMarkers(item) && !rowOperationActive(item);
+                    const signature = JSON.stringify([side, item.id ?? null, signIdentity, barcode.scanIntent ?? null, released]);
                     if (!index.has(key)) index.set(key, { signatures: [], open: [] });
                     const owner = index.get(key);
                     owner.signatures.push(signature);
@@ -1023,7 +1056,8 @@ function captureZtoSignedAnswerOwners(entries, history, trash) {
         refresh: () => { latest = identities(); },
         current: (key) => {
             const owner = captured.get(key), live = latest.get(key);
-            return !!owner && owner.open.length <= 1 && owner.open.every((entry) => entry.side === 0) && live?.signature === owner.signature
+            const terminalOwner = terminalKeys.has(key) && owner?.signatures.length === 1;
+            return !!owner && owner.open.length <= 1 && (terminalOwner || owner.open.every((entry) => entry.side === 0)) && live?.signature === owner.signature
                 && live.open.length <= owner.open.length
                 && live.open.every((entry) => entry.signature === owner.open[0]?.signature)
                 && ztoPickupStatus.get(key) === measured.get(key);
@@ -1053,7 +1087,8 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
     if (detailDue) ztoState.ztoStatusLastSweepAt = Date.now();
     const closedAll = collectClosedBarcodesForZtoStatus(dataToScan, trashToScan);
     const openAll = ztoAutoCloseEnabled() ? collectOpenBarcodesForZtoStatus(dataToScan) : [];
-    pruneZtoPickupVerdictSeen(closedAll, openAll);
+    const terminalAll = ztoAutoCloseEnabled() ? collectTerminalTrashBarcodesForZtoStatus(trashToScan) : [];
+    pruneZtoPickupVerdictSeen(closedAll.concat(terminalAll), openAll);
     const signTimeKeys = lookupApiIsPalm(cfg)
         ? new Set(collectClosedBarcodesForZtoStatus(dataToScan, []).map((entry) => entry.key)) : null;
     const closedWork = closedAll
@@ -1067,19 +1102,24 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
     const openWork = openAll
         .filter((entry) => force || ztoOpenRecheckIsDue(getZtoPickupVerdict(entry.code, entry.candidate)
             || (ztoPickupVerdictSeenAt.has(entry.key) ? { at: ztoPickupVerdictSeenAt.get(entry.key) } : null)));
+    const terminalWork = terminalAll.filter((entry) => {
+        const verdict = getZtoPickupVerdict(entry.code, entry.candidate);
+        if (entry.signed && verdict?.signedAtExact === true) return false;
+        return force || ztoOpenRecheckIsDue(verdict || (ztoPickupVerdictSeenAt.has(entry.key) ? { at: ztoPickupVerdictSeenAt.get(entry.key) } : null));
+    });
     const barKeys = force && detailDue ? new Set(ztoStatusPendingList(dataToScan, trashToScan).map((entry) => entry.key)) : null;
-    const queue = detailDue ? closedWork.filter((entry) => !barKeys || !barKeys.has(entry.key)).concat(openWork) : [];
+    const queue = detailDue ? closedWork.filter((entry) => !barKeys || !barKeys.has(entry.key)).concat(openWork, terminalWork) : [];
     const barWork = barKeys ? closedWork.filter((entry) => barKeys.has(entry.key))
         .sort((a, b) => ztoStatusLastAskedAt(a) - ztoStatusLastAskedAt(b))
         .slice(0, queue.length ? ZTO_STATUS_SWEEP_BATCH - 1 : ZTO_STATUS_SWEEP_BATCH) : [];
     const barCount = barWork.length;
     const work = barWork.concat(rotateZtoSweepQueue(queue, ztoState.ztoStatusSweepCursor)).slice(0, ZTO_STATUS_SWEEP_BATCH);
-    const answerOwners = new Map(work.map((entry) => [entry.key, captureZtoStatusAnswerOwner(entry.key, dataToScan, trashToScan)]));
+    const answerOwners = new Map(work.map((entry) => [entry.key, captureZtoStatusAnswerOwner(entry.key, dataToScan, trashToScan, entry.terminalDecision)]));
     let signedEntries = signedDue ? collectOpenBarcodesForZtoStatus(dataToScan) : [];
-    let signedPending = signedDue ? ztoStatusPendingList(dataToScan, trashToScan) : [];
+    let signedPending = signedDue ? ztoStatusPendingList(dataToScan, trashToScan).concat(terminalAll.filter((entry) => !entry.signed)) : [];
     let returnedCandidates = signedDue && !signedEntries.length && detailAllowed && elapsedSince(ztoState.ztoReturnedSweepAt) >= ZTO_OPEN_RECHECK_MS
         ? ztoReturnedTrashCandidates(trashToScan) : [];
-    const signedAnswerOwners = signedDue ? captureZtoSignedAnswerOwners(closedAll.concat(openAll), dataToScan, trashToScan) : null;
+    const signedAnswerOwners = signedDue ? captureZtoSignedAnswerOwners(closedAll.concat(openAll, terminalAll), dataToScan, trashToScan) : null;
     if (!work.length && !signedEntries.length && !signedPending.length && !returnedCandidates.length) return 0;
     ztoState.ztoStatusInFlight = true;
     let measured = 0;
@@ -1103,8 +1143,10 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
             }
         }
         if (signedEntries.length || signedPending.length || returnedCandidates.length) {
-            const signedStale = closedAll.filter((entry) => !entry.signed && getZtoPickupVerdict(entry.code, entry.candidate)?.closed !== true);
-            const returnedSince = returnedCandidates.reduce((oldest, entry) => !oldest || entry.since < oldest ? entry.since : oldest, 0);
+            const signedStale = closedAll.filter((entry) => !entry.signed && getZtoPickupVerdict(entry.code, entry.candidate)?.closed !== true)
+                .concat(signedPending.filter((entry) => entry.terminalDecision));
+            const returnedSince = returnedCandidates.concat(signedPending.filter((entry) => entry.terminalDecision))
+                .reduce((oldest, entry) => !oldest || entry.since < oldest ? entry.since : oldest, 0);
             if (!session.current() || !ztoSignedNetworkAllowed(force)) return 0;
             const signed = await closeZtoSignedBarcodes(cfg, signedEntries, dataToScan, force, signedStale, returnedSince, signedAnswerOwners);
             if (!session.current()) return 0;
@@ -1175,8 +1217,8 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
                     continue;
                 }
                 setZtoPickupVerdict(work[i].code, answer.closed, answer.signedAt);
-                if (work[i].open && answer.returnedAt && answer.closed !== true) removeReturnedZtoBarcodes([{ barcode: work[i].code, at: answer.returnedAt, misplaced: answer.misplaced === true,
-                    sentOut: answer.sentOut === true }], dataToScan);
+                if (answer.returnedAt && answer.closed !== true) removeReturnedZtoBarcodes([{ barcode: work[i].code, at: answer.returnedAt, misplaced: answer.misplaced === true,
+                    sentOut: answer.sentOut === true }], work[i].open ? dataToScan : []);
                 if (typeof answer.closed === 'boolean') {
                     measured++;
                     if (work[i].open && answer.closed === true) {

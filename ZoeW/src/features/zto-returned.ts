@@ -1,11 +1,11 @@
 import { dataState, firebaseState } from '../core/state';
-import { cleanupClockIsTrustworthy } from '../core/clock';
+import { cleanupClockIsTrustworthy, getServerNow } from '../core/clock';
 import { shopScopePending } from '../core/shop-scope';
 import { ztoScanStampMillis } from '../core/timezone';
-import { barcodeReturnCounts, itemHasRestoreMarkers } from '../domain/barcode';
+import { barcodeReturnBasis, barcodeReturnCounts, itemHasRestoreMarkers } from '../domain/barcode';
 import { claimAndCleanupItem } from '../domain/cleanup';
 import { pickupBarcodeKey } from '../domain/pickup';
-import { noteZtoReturnedEvidence, scheduleZtoFinalMarks } from './zto-final-marks';
+import { noteZtoReturnedEvidence, scheduleZtoFinalMarks, trashZtoTerminalDecision, trashZtoStatusEnrichment } from './zto-final-marks';
 import { ztoAutoCloseEnabled, ztoStatusFeatureConfig } from './zto-status';
 
 export function ztoReturnedKindOf(entry) {
@@ -14,7 +14,7 @@ export function ztoReturnedKindOf(entry) {
     return entry.sentUnverified === true ? 'left' : 'sent';
 }
 
-export function ztoReturnedTargets(returned, dataToScan = dataState.scanHistory, signedCodes?) {
+export function ztoReturnedTargets(returned, dataToScan = dataState.scanHistory, signedCodes?, terminalTrash = false) {
     const signed = new Set((Array.isArray(signedCodes) ? signedCodes : []).map((code) => pickupBarcodeKey(code)));
     const backAt = new Map();
     const kindOf = new Map();
@@ -43,15 +43,17 @@ export function ztoReturnedTargets(returned, dataToScan = dataState.scanHistory,
         const kinds = new Map();
         for (let j = 0; j < item.barcodes.length; j++) {
             const b = item.barcodes[j];
-            if (!b || b.isClosed) continue;
+            const decisionRow = terminalTrash && (!!trashZtoTerminalDecision(item) || trashZtoStatusEnrichment(item));
+            if (!b || !decisionRow && b.isClosed) continue;
             const at = backAt.get(pickupBarcodeKey(b.code));
-            if (!barcodeReturnCounts(b, item.createdAt, at)) continue;
+            const counts = (stamp) => decisionRow ? Number.isSafeInteger(stamp) && stamp > 0 && stamp <= getServerNow() && stamp <= 9007199254740990 && stamp >= barcodeReturnBasis(b, item.createdAt) : barcodeReturnCounts(b, item.createdAt, stamp);
+            if (!counts(at)) continue;
             codes.push(b.code);
             returnedAt.set(b.code, at);
             const key = pickupBarcodeKey(b.code);
             const kind = kindOf.get(key);
             const wrongPlace = problemAt.get(key);
-            const earlier = kind === 'misplaced' && wrongPlace && !barcodeReturnCounts(b, item.createdAt, wrongPlace);
+            const earlier = kind === 'misplaced' && wrongPlace && !counts(wrongPlace);
             kinds.set(b.code, earlier ? (unverified.has(key) ? 'left' : 'sent') : kind);
         }
         if (codes.length) out.push({ itemId: String(item.id), codes, returnedAt, kinds });
@@ -71,7 +73,7 @@ export function removeReturnedZtoBarcodes(returned, dataToScan = dataState.scanH
         queued += targets[i].codes.length;
     }
     const removedEarlier = ztoReturnedTargets(returned, (Array.isArray(dataState.deletedItems) ? dataState.deletedItems : [])
-        .filter((item) => item && item.trashReason === 'returned' && !item.restoreClaim), signedCodes);
+        .filter((item) => item && (item.trashReason === 'returned' || trashZtoTerminalDecision(item) || trashZtoStatusEnrichment(item)) && !item.restoreClaim), signedCodes, true);
     removedEarlier.forEach((target) => target.returnedAt.forEach((at, code) => noteZtoReturnedEvidence(code, at, target.kinds.get(code))));
     if (removedEarlier.length) scheduleZtoFinalMarks();
     return queued;

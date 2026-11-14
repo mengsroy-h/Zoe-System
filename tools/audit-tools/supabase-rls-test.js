@@ -71,6 +71,8 @@ const EXPECT_PUBLIC_EXEC = {
     settle_reset_code: ['service_role'],
     zoe_write: ['authenticated'],
     zoe_write_v2: ['authenticated'],
+    zoe_restore_context_v1: ['authenticated'],
+    zoe_restore_attest_v1: ['authenticated'],
     zoe_purge_execute_v1: ['authenticated'],
     zoe_purge_status_v1: ['authenticated'],
     zoe_pickup_reset_execute_v1: ['authenticated'],
@@ -100,6 +102,15 @@ const EXPECT_PRIVATE_EXEC = {
     reset_code_hash: [],
     new_invite_code: [],
     zoe_rules: [],
+    zoe_restore_policy_ok_v1: [],
+    zoe_restore_entries_v1: [],
+    zoe_restore_code_maps_v1: [],
+    zoe_restore_generation_v1: [],
+    zoe_restore_terminal_business_v1: [],
+    zoe_restore_signature_v1: [],
+    zoe_restore_reply_v1: [],
+    zoe_restore_rules_cache_v1: [],
+    zoe_restore_first_commit_v1: [],
     zoe_now_ms: ['authenticated'],
     zoe_key_ok: [],
     zoe_canon: [],
@@ -156,6 +167,8 @@ const EXPECT_PRIVATE_EXEC = {
     admin_issue_reset_code: ['authenticated'],
     zoe_write: ['authenticated'],
     zoe_write_v2: ['authenticated'],
+    zoe_restore_context_v1: ['authenticated'],
+    zoe_restore_attest_v1: ['authenticated'],
     zoe_purge_execute_v1: ['authenticated'],
     zoe_purge_status_v1: ['authenticated'],
     zoe_pickup_reset_execute_v1: ['authenticated'],
@@ -219,8 +232,34 @@ function sessionJwtReadsOnly(sql) {
         return /^\s*->>\s*'session_id'(?=\s|[,;)])/.test(tail);
     });
 }
-ok('migration មិនសម្រេចសិទ្ធិពី claim របស់ JWT (auth.jwt()) ➜ តែ auth.uid() + តារាងសមាជិក · លើកលែងតែ `session_id` ដើម្បីបដិសេធ session ដែលដក',
-    migrationSql.length > 0 && trustedRegistrationMetadataOnly(migrationSources) && sessionJwtReadsOnly(migrationSql), jwtReads);
+const restoreExpiryRead = "    if auth.jwt()->>'exp' ~ '^[0-9]+$' then expires_ms:=least(coalesce(expires_ms,(auth.jwt()->>'exp')::bigint*1000),(auth.jwt()->>'exp')::bigint*1000);end if;";
+const restoreClaimRead = "    when 'auth_claim' then\n        if p_expr->>'n' not in ('session_id','auth_time') then return 'null'::jsonb;end if;\n        return coalesce(auth.jwt()->(p_expr->>'n'),'null'::jsonb);\n";
+function trustedRestoreJwtReadsOnly(sources) {
+    const name = '20261114145911_zoe_restore_attestation.sql';
+    const target = sources.filter(source => source.name === name);
+    if (target.length !== 1) return false;
+    const definition = (sql, functionName) => {
+        const header = new RegExp('create (?:or replace )?function private\\.' + functionName + '\\(').exec(sql);
+        if (!header) return '';
+        const body = sql.indexOf('as $$', header.index), end = sql.indexOf('$$;', body + 5);
+        return body < 0 || end < 0 ? '' : sql.slice(header.index, end + 3);
+    };
+    const sql = target[0].sql;
+    if (sql.split(restoreExpiryRead).length !== 2 || sql.split(restoreClaimRead).length !== 2
+        || !definition(sql, 'zoe_restore_context_v1').includes(restoreExpiryRead)
+        || !definition(sql, 'zoe_eval').includes(restoreClaimRead)) return false;
+    const projected = sources.map(source => source.name === name
+        ? source.sql.replace(restoreExpiryRead, '').replace(restoreClaimRead, '') : source.sql).join('\n');
+    return sessionJwtReadsOnly(projected);
+}
+ok('JWT ៖ tenant/branch ពីតារាង · session_id ពិនិត្យម្ចាស់ · exp សម្រាប់កាត់ deadline · auth_time តែ Rules witness ដែលបានកំណត់',
+    migrationSql.length > 0 && trustedRegistrationMetadataOnly(migrationSources) && trustedRestoreJwtReadsOnly(migrationSources), jwtReads);
+for (const [label, mutate] of [
+    ['expiry claim', sql => sql.replace(restoreExpiryRead, restoreExpiryRead.replaceAll("'exp'", "'role'"))],
+    ['claim whitelist', sql => sql.replace("('session_id','auth_time')", "('session_id','role')")],
+    ['expiry outside context', sql => sql.replace(restoreExpiryRead, '') + '\n' + restoreExpiryRead],
+    ['dynamic claim outside evaluator', sql => sql.replace(restoreClaimRead, '') + '\n' + restoreClaimRead]
+]) ok('probe restore JWT ៖ ' + label + ' ត្រូវបដិសេធ', !trustedRestoreJwtReadsOnly(migrationSources.map(source => source.name === '20261114145911_zoe_restore_attestation.sql' ? { ...source, sql: mutate(source.sql) } : source)));
 for (const read of ["auth.jwt() ->> 'session_id', '');", "auth.jwt() ->> 'session_id';"]) {
     ok('probe JWT ៖ ទម្រង់ session_id ដែលមានស្រាប់អានបាន (' + read + ')', sessionJwtReadsOnly(read));
     for (const claim of ['role', 'user_metadata', 'app_metadata', 'SESSION_ID']) {
@@ -1099,6 +1138,9 @@ const DATA_SESSION_LOOKUP = `    if not exists (
         select m.tenant_id`;
 
 const MUTATIONS = [
+    ['restore terminal predicate ឲ្យ authenticated ហៅបាន',
+        'revoke all on function private.zoe_restore_terminal_business_v1(jsonb,jsonb,text) from public,anon,authenticated,service_role;',
+        'revoke all on function private.zoe_restore_terminal_business_v1(jsonb,jsonb,text) from public,anon,authenticated,service_role; grant execute on function private.zoe_restore_terminal_business_v1(jsonb,jsonb,text) to authenticated;'],
     ['protocol ACL column-only grant', 'revoke all on private.registration_protocol from public, anon, authenticated, service_role;',
         'revoke all on private.registration_protocol from public, anon, authenticated, service_role; grant update (accepting) on private.registration_protocol to authenticated;'],
     ['protocol ACL service-role grant', 'revoke all on private.registration_protocol from public, anon, authenticated, service_role;',

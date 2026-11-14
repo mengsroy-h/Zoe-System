@@ -20,11 +20,12 @@ function canonical(value: any): any {
 function at(tree: any, parts: string[]): any { return parts.reduce((v, k) => v?.[k], tree) ?? null; }
 function snap(tree: any, parts: string[]): any {
     const value = at(tree, parts);
+    const child = (name: string) => snap(tree, [...parts, ...name.split('/').filter(Boolean)]);
     return { val: () => value && typeof value === 'object' ? OBJECT_SENTINEL : value,
         exists: () => value !== null, isString: () => typeof value === 'string', isBoolean: () => typeof value === 'boolean',
         isNumber: () => typeof value === 'number' && Number.isFinite(value),
         hasChildren: (names?: string[]) => value !== null && typeof value === 'object' && (names ? names.every(n => value[n] != null) : Object.keys(value).length > 0),
-        child: (name: string) => snap(tree, [...parts, ...name.split('/')]), parent: () => snap(tree, parts.slice(0, -1)) };
+        hasChild: (name: string) => child(name).exists(), child, parent: () => snap(tree, parts.slice(0, -1)) };
 }
 function allowed(previous: any, proposed: any, uid: string | null = 'actor-A') {
     const pre = canonical({ zoew_daily_pickup_cod_dod: { [day]: previous } }), post = canonical({ zoew_daily_pickup_cod_dod: { [day]: proposed } });
@@ -39,6 +40,18 @@ function allowed(previous: any, proposed: any, uid: string | null = 'actor-A') {
     };
     return walk(node, location);
 }
+
+it('RuleDataSnapshot model ៖ path aliases រក្សា false/zero/empty និងមិនបម្លែង argument ខុស type', () => {
+    const root = snap(canonical({ nested: { zero: 0, no: false, empty: '', absent: null } }), []);
+    for (const key of ['zero', 'no', 'empty']) {
+        expect(root.hasChild(`nested/${key}`)).toBe(true);
+        expect(root.child(`/nested/${key}/`).val()).toBe(root.child('nested').child(key).val());
+    }
+    expect(root.hasChild('nested/absent')).toBe(false);
+    expect(root.hasChild('nested/missing')).toBe(false);
+    expect(() => root.child(0)).toThrow();
+    expect(() => root.hasChild(null)).toThrow();
+});
 
 describe('F09 native same-commit expressions (model; actual engine separate)', () => {
     it('accepts exact Reset and APPLIED proof in the same day transition', () => expect(allowed(baseline(), reset())).toBe(true));

@@ -306,7 +306,11 @@ async function replay(cap, rules, tag) {
     check(returnedTrash >= 1, 'ជាន់អប្បបរមា ៖ ការ replay មានការសរសេរធុងសំរាម «ត្រឡប់» ≥ ១ (sweep · op `returned`)', 'returnedTrash=' + returnedTrash);
     const oldReasonRules = JSON.parse(JSON.stringify(rules));
     const reasonRule = oldReasonRules.rules.zoew_recently_deleted_cod_dod.$itemId.trashReason;
-    reasonRule['.validate'] = String(reasonRule['.validate']).replace("newData.val() === 'returned'", "newData.val() === 'expired'");
+    const currentReason = String(reasonRule['.validate']);
+    const returnedPredicate = /\bnewData\.val\(\)\s*===\s*'returned'/g;
+    if ([...currentReason.matchAll(returnedPredicate)].length !== 1) throw new Error('Expected one returned trash predicate for the controlled old-rule mutation');
+    reasonRule['.validate'] = currentReason.replace(returnedPredicate, "newData.val()==='expired'");
+    if (reasonRule['.validate'] === currentReason || reasonRule['.validate'].includes("'returned'")) throw new Error('Controlled returned trash mutation did not change the live rule');
     const oldReason = await replay(cap.data, oldReasonRules, 'old-reason-rules');
     check(reasonRule['.validate'].indexOf("'returned'") === -1 && oldReason.denied.length >= returnedTrash,
         'probe ទិសផ្ទុយ ៖ rules ចាស់ (`expired` · គ្មាន `returned`) បដិសេធធុងសំរាម «ត្រឡប់» ➜ ត្រូវ Publish rules ថ្មី (ការវាស់រសើប)',

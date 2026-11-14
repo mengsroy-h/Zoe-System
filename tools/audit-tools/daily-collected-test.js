@@ -37,6 +37,8 @@ const path = require('path');
 const vm = require('vm');
 const { reactRuntime, renderedContainer, moduleRuntime } = require('./react-view');
 const { localAuthRuntime } = require('./local-auth-runtime.cjs');
+const { assertBooleanGroupingEquivalent } = require('./zoew/tests/helpers/rules-boolean-grouping.cjs');
+const { localRestorePolicy } = require('./fixtures/trusted-restore-policy.cjs');
 
 const ROOT = process.env.COLLECTED_APP_DIR
     ? path.resolve(process.env.COLLECTED_APP_DIR)
@@ -55,6 +57,9 @@ function scenario(name, fn) {
     try { fn(); } catch (e) { ok(name + ' រត់ដល់ចប់', false, (e && e.stack) || String(e)); }
 }
 function readOr(file) { try { return fs.readFileSync(file, 'utf8'); } catch (_) { return ''; } }
+function ruleEquivalent(actual, expected) {
+    try { assertBooleanGroupingEquivalent(actual, expected, []); return true; } catch (_) { return false; }
+}
 
 const SRC = readOr(APP_JS);
 const authRuntime = localAuthRuntime(ROOT, SRC);
@@ -329,13 +334,12 @@ scenario('១១. ⛔ ស្នាមភ្ជាប់ ៖ ឈ្មោះ node
     ok('⛔ rules ពិតស្គាល់ node នោះ', RULES.indexOf('"' + NODE + '"') !== -1, NODE);
     let parsed = null;
     try { parsed = JSON.parse(RULES).rules[NODE]; } catch (_) { parsed = null; }
-    ok('⛔ rules អនុញ្ញាតឲ្យអានបាន', !!parsed && parsed['.read'] === 'auth != null', parsed && parsed['.read']);
-    ok('⛔ rules អនុញ្ញាតឲ្យសរសេរបាន', !!parsed && parsed['.write'] === 'auth != null', parsed && parsed['.write']);
+    ok('⛔ rules អនុញ្ញាតឲ្យអានបាន', !!parsed && ruleEquivalent(parsed['.read'], 'auth != null'), parsed && parsed['.read']);
+    ok('⛔ rules អនុញ្ញាតឲ្យសរសេរបាន', !!parsed && ruleEquivalent(parsed['.write'], 'auth != null'), parsed && parsed['.write']);
     const shape = parsed && parsed['$date'] && parsed['$date']['$barcodeKey'];
     ok('⛔ វាល `c` និង `d` ត្រូវជាលេខ >= 0',
-        !!shape && /newData.isNumber\(\)/.test(shape.c['.validate'])
-        && /newData.isNumber\(\)/.test(shape.d['.validate'])
-        && shape.c['.validate'].indexOf('>= 0') !== -1, shape);
+        !!shape && ruleEquivalent(shape.c['.validate'], 'newData.isNumber() && newData.val() >= 0')
+        && ruleEquivalent(shape.d['.validate'], 'newData.isNumber() && newData.val() >= 0'), shape);
     ok('⛔ វាលចម្លែកត្រូវបដិសេធ (`$other`)',
         !!shape && shape['$other'] && shape['$other']['.validate'] === false, shape && shape['$other']);
     ok('⛔ listener ត្រូវចុះឈ្មោះក្នុង `DB_LISTENER_KEYS`',
@@ -480,7 +484,7 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
     for (const name of ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'PICKUP_PHONE_KEY_MAX',
         'RESTORE_INTENTS_KEY', 'CLEANUP_LIVE_LOCK_PREFIX', 'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX',
         'CLEANUP_STAGE_SLOT', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_UNDO',
-        'RESTORE_CLAIM_LEASE_MS', 'DB_OP_TIMEOUT_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'DAILY_COLLECTED_KEEP_DAYS',
+        'RESTORE_CLAIM_LEASE_MS', 'RESTORE_SHOP_MODE_UNSYNCED_TEXT', 'RESTORE_ZTO_NEEDS_LOOKUP_TEXT', 'RESTORE_ZTO_UNCONFIRMED_TEXT', 'DB_OP_TIMEOUT_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'DAILY_COLLECTED_KEEP_DAYS',
         'ABANDON_AGE_MS', 'TWO_HOURS_MS', 'TRASH_RETENTION_MS', 'RETURNED_TRASH_RETENTION_MS', 'LEDGER_OP_RING_MAX', 'ZTO_TRASH_MODE_ACTIVE_MS', 'TRASH_FINAL_CONFIRM_NOTE', 'RESTORE_IN_PROGRESS_CLOSE_TEXT', 'COLLECTED_SETTLE_HOLD_MS', 'TRASH_REASON_META',
         'PICKUP_KEY_ADD_MAX', 'pickupAddClock', 'pickupKeyLastAdd', 'monthlyQueues', 'livePriceTokens', 'priceOperationSeen', 'PRICE_HISTORY_ROOT', 'PRICE_LIVE_LOCK_PREFIX']) {
         const declaration = operationDeclarations.filter(node => node.type === 'VariableDeclaration').flatMap(node => node.declarations).find(node => node.id.name === name);
@@ -661,6 +665,12 @@ async function testCollectedClockFixture() {
             await s.box.deleteSingleItem('fixture_item');
             ok('លុបផ្លាស់ទៅធុងសំរាម ហើយមិនដកលុយ — ' + method,
                 !s.read(HISTORY + '/fixture_item') && !!s.read(TRASH + '/fixture_item') && collectedTotal(s.server) === 13.25);
+            const beforePolicy = JSON.stringify(s.server);
+            s.box.pendingRestoreId = 'fixture_item';
+            await s.box.executeRestoreItem();
+            ok('គ្មាន protected policy ➜ រង់ចាំដោយមិនកែធុងសំរាម/ចំណូល/ledger — ' + method,
+                JSON.stringify(s.server) === beforePolicy && s.messages.includes(s.box.RESTORE_SHOP_MODE_UNSYNCED_TEXT), s.messages);
+            s.write('zoew_restore_policy/shop', localRestorePolicy('https://collected-fixture.invalid'));
             s.box.pendingRestoreId = 'fixture_item';
             await s.box.executeRestoreItem();
             ok('ស្តារពិត reset ត្រាទៅថ្ងៃក្រោយ តែមិនបូកចំណូលម្តងទៀត — ' + method,

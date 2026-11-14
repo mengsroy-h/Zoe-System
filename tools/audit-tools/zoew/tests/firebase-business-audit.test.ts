@@ -80,6 +80,66 @@ describe('trusted Firebase business audit projection', () => {
         expect(event.after.ztoStatus).toBe('unknown'); expect(event.after.barcodes.signed).toBe(0);
         expect(event.action).not.toBe('zto.sign.observed');
     });
+    it.each(['delete', 'remove', 'pickup'].flatMap(reason => ['signed', 'returned'].map(decision => ({ reason, decision }))))(
+        'projects the $decision restore denial on $reason trash without inventing an upstream observation', ({ reason, decision }) => {
+        const before = row({ trashReason: reason, trashMode: 'cookie', restoreBlocked: decision === 'signed' });
+        const after = { ...before, ztoTerminalDecision: decision };
+        const event = audit.buildEvent(T, 'row1', before, after, context(T), config);
+        expect(event.before.trash.ztoTerminalDecision).toBeUndefined();
+        expect(event.after.trash.ztoTerminalDecision).toBe(decision);
+        expect(event.changedFields).toContain('trash.ztoTerminalDecision');
+        expect(event.previousStatus).toBe('trash'); expect(event.newStatus).toBe('trash');
+        expect(event.before.ztoStatus).toBe('unknown'); expect(event.after.ztoStatus).toBe('unknown');
+        expect(event.after.barcodes).toEqual(event.before.barcodes);
+        expect(event.after.barcodes.signed).toBe(0); expect(event.after.barcodes.returned).toBe(0);
+        expect(event.after.barcodes.samples[0]).not.toHaveProperty('ztoSignedAt');
+        expect(event.after.barcodes.samples[0]).not.toHaveProperty('ztoReturnedAt');
+        expect(event.after.money).toEqual(event.before.money);
+        expect(event.after.trash.reason).toBe(reason); expect(event.reason).toBe(reason);
+        expect(event.action).toBe('trash.update');
+        expect(event.statusProvenance).toBe('stored_business_state');
+    });
+    it('records old and new denial decisions while actual barcode evidence remains independent', () => {
+        const before = row({ trashReason: 'remove', ztoTerminalDecision: 'returned' });
+        const after = { ...before, ztoTerminalDecision: 'signed' };
+        const event = audit.buildEvent(T, 'row1', before, after, context(T), config);
+        expect(event.before.trash.ztoTerminalDecision).toBe('returned');
+        expect(event.after.trash.ztoTerminalDecision).toBe('signed');
+        expect(event.changedFields).toEqual(['trash.ztoTerminalDecision']);
+        expect(event.after.ztoStatus).toBe('unknown'); expect(event.action).toBe('trash.update');
+        const observed = audit.buildEvent(T, 'row1', after,
+            { ...after, barcodes: [barcode('QA000001', { ztoSignedAt: 1234 })] }, context(T), config);
+        expect(observed.before.trash.ztoTerminalDecision).toBe('signed');
+        expect(observed.after.trash.ztoTerminalDecision).toBe('signed');
+        expect(observed.after.ztoStatus).toBe('signed'); expect(observed.action).toBe('zto.sign.observed');
+        expect(observed.after.barcodes.samples[0].ztoSignedAt).toBe(1234);
+    });
+    it.each(['signed', 'returned'])('a released source retains the %s decision without a claim or fake timestamps', decision => {
+        const before = row({ trashReason: 'remove', ztoTerminalDecision: decision,
+            restoreClaim: { token: 'private-release-attempt', targetId: 'target' } });
+        const after = { ...before }; delete (after as any).restoreClaim;
+        const event = audit.buildEvent(T, 'row1', before, after, context(T), config);
+        expect(event.before.trash.ztoTerminalDecision).toBe(decision);
+        expect(event.after.trash.ztoTerminalDecision).toBe(decision);
+        expect(event.before.restore).toBeDefined(); expect(event.after.restore).toBeUndefined();
+        expect(event.before.barcodes).toEqual(event.after.barcodes);
+        expect(event.after.ztoStatus).toBe('unknown'); expect(event.action).toBe('trash.update');
+        expect(JSON.stringify(event)).not.toContain('private-release-attempt');
+    });
+    it.each([null, false, 0, 'unknown', 'Signed', {}, []])('does not project malformed terminal decision %j as status or event evidence', decision => {
+        const event = audit.buildEvent(T, 'row1', row({ trashReason: 'remove' }),
+            row({ trashReason: 'remove', ztoTerminalDecision: decision }), context(T), config);
+        expect(event.after.trash.ztoTerminalDecision).toBeUndefined();
+        expect(event.after.ztoStatus).toBe('unknown'); expect(event.after.barcodes.signed).toBe(0);
+        expect(event.after.barcodes.returned).toBe(0); expect(event.action).toBe('trash.update');
+        expect(event.unrepresentedChange).toBe(true);
+    });
+    it.each(['signed', 'returned'])('source-only %s decision on a history-shaped input is not an upstream observation', decision => {
+        const event = audit.buildEvent(H, 'row1', row(), row({ ztoTerminalDecision: decision }), context(H), config);
+        expect(event.after.trash.ztoTerminalDecision).toBeUndefined();
+        expect(event.after.ztoStatus).toBe('unknown'); expect(event.action).toBe('history.update');
+        expect(event.unrepresentedChange).toBe(true);
+    });
     it.each(['sent', 'misplaced'])('return-compatible %s stamp is not a genuine return event', kind => {
         const marked = barcode('QA000001', { ztoReturnedAt: 200, [kind === 'sent' ? 'ztoSentOutAt' : 'ztoMisplacedAt']: 200 });
         const event = audit.buildEvent(T, 'row1', row({ trashReason: 'returned' }), row({ trashReason: 'returned', barcodes: [marked] }), context(T), config);

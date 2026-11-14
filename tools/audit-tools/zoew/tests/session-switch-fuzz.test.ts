@@ -236,6 +236,7 @@ function seedShopA() {
     const trash = { id: TID, phone: '0960004444', scanDate: lab.day, time: '08:00:00 (' + lab.day + ')', createdAt: recent, count: 1, cod: 6, dod: 0, price: 6,
         isClosed: false, barcode: 'G', barcodes: [barcodeOf('G', 6, recent, { isDeducted: true })], deletedAt: now - 60000, isFromDeletion: false, trashReason: 'remove' };
     lab.store = {
+        zoew_restore_policy: { shop: { v: 1, mode: 'local', scope: URL_A, branch: '', epoch: 1 } },
         [HISTORY]: { [ID1]: clone(item1), [ID2]: clone(item2), [ID3]: clone(item3) },
         [TRASH]: { [TID]: clone(trash) },
         [DAILY]: { [lab.day]: { codDollar: 100, dodDollar: 0, totalCount: 10 } },

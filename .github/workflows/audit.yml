@@ -62,7 +62,9 @@ jobs:
           node-version: '24'
           package-manager-cache: false
           cache: npm
-          cache-dependency-path: ZoeW/package-lock.json
+          cache-dependency-path: |
+            ZoeW/package-lock.json
+            supabase/package-lock.json
       - uses: actions/setup-java@v6
         if: vars.ZOE_RUNNER_MODE == 'github'
         with:
@@ -109,6 +111,8 @@ jobs:
 
       - name: ដំឡើង dependency របស់ ZoeW
         run: npm ci --prefix ZoeW --prefer-offline --no-audit --no-fund
+      - name: ដំឡើង PostgreSQL និង dependency របស់ Supabase
+        run: npm ci --prefix supabase --prefer-offline --no-audit --no-fund
       - name: ផ្ទៀងការទទួល និងបដិសេធរបាយការណ៍
         run: node --test tools/audit-tools/zoew/scripts/tests/zto-ci-evidence.test.mjs
       - name: វាស់ ZTO/native ដោយមិនប៉ះសោ

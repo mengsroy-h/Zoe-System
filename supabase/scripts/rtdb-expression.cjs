@@ -110,6 +110,8 @@ function parseExpression(src, scope) {
                 node = { t: 'm', n: name, o: node, a: args };
             } else {
                 if (name === 'uid' && node.t === 'auth') { node = { t: 'auth_uid' }; continue; }
+                if (name === 'token' && node.t === 'auth') { node = { t: 'auth_token' }; continue; }
+                if (node.t === 'auth_token' && ['session_id', 'auth_time'].includes(name)) { node = { t: 'auth_claim', n: name }; continue; }
                 if (!PROPERTIES.has(name)) throw new Error('unsupported property ' + name + ' in ' + src);
                 node = { t: 'p', n: name, o: node };
             }
@@ -153,6 +155,16 @@ function parseExpression(src, scope) {
     }
     const ast = level(0);
     if (peek().k !== 'end') throw new Error('trailing tokens in ' + src);
+    function rejectIncompleteAuthToken(node) {
+        if (node && typeof node === 'object') {
+            if (node.t === 'auth_token') throw new Error('auth.token requires a supported claim in ' + src);
+            for (const value of Object.values(node)) {
+                if (Array.isArray(value)) value.forEach(rejectIncompleteAuthToken);
+                else rejectIncompleteAuthToken(value);
+            }
+        }
+    }
+    rejectIncompleteAuthToken(ast);
     return ast;
 }
 

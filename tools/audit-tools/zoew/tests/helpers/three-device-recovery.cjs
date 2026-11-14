@@ -176,6 +176,7 @@ function seedStore(seed) {
   const b = { code: "C", time: "08:00:00 (" + day + ")", cod, dod, locker: "N/A", isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: Date.now() - 36e5 };
   const item = { id: "id_1758000000000_aaaa1", phone: "012", scanDate: day, time: b.time, createdAt: b.createdAt, count: 1, cod, dod, price: cod + dod, isClosed: false, isCalled: false, barcode: "C", barcodes: [b] };
   store = { [H]: { [item.id]: item, neighbor: { ...clone(item), id: "neighbor", phone: "099", barcode: "N", barcodes: [{ ...clone(b), code: "N" }] } }, [T]: {}, [D]: { [day]: { codDollar: 1e4, dodDollar: 9e3, totalCount: 100 }, "2025-12-31": { codDollar: 71, dodDollar: 19, totalCount: 8 } }, [M]: { [month]: { codDollar: 1e4, dodDollar: 9e3, totalCount: 100 }, "2025-12": { codDollar: 71, dodDollar: 19, totalCount: 8 } } };
+  set('zoew_restore_policy/shop', { v: 1, mode: 'local', scope: 'https://shop.firebaseio.com', branch: '', epoch: 1 });
   return { day, month, cod, dod, id: item.id, neighbor: clone(store[H].neighbor) };
 }
 function money(f, removed) {

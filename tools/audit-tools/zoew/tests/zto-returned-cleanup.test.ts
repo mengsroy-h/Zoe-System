@@ -1,3 +1,5 @@
+import { createRestoreAttestationFixture } from './helpers/restore-attestation';
+import { liveShopScope } from '../../../../ZoeW/src/core/shop-scope';
 import { acceptFixtureSession } from './helpers/accepted-session';
 /**
  * ↩️ ម្ចាស់គម្រោង ៖ «អីវ៉ាន់ដែល ត្រលប់ អោយដកចេញពី ZoeW អោយដូច ផុតកំណត់ដែរទៅ … មិនបាច់មានច្បាប់ដក ថ្ងៃទី8 ក៏បាន … ដកលុយដូចគ្នា» ·
@@ -747,8 +749,15 @@ describe('ច្បាប់ ៨ ថ្ងៃដកមុន ➜ បុគ្គ
         const after = getAt(TRASH + '/' + trash[0].id);
         console.info('F2 trash barcode after sweep', JSON.stringify(after.barcodes[0]), 'block', JSON.stringify(trashRestoreBlockOf(after)),
             'targets', JSON.stringify(collectZtoFinalTargets()));
+        const attestation = createRestoreAttestationFixture({ get: getAt, set: setAt,
+            policy: { v: 1, mode: 'cookie', scope: liveShopScope(), branch: '12345', epoch: 1 } });
+        const transport = fetch;
+        vi.stubGlobal('fetch', (input: any, init: any) => new URL(String(input)).pathname.endsWith('/zto-restore-proof')
+            ? attestation.route(input, init) : transport(input, init));
         let restoreVerdict = 'allowed';
-        try { await verifyZtoRestoreStatus(after); } catch (e: any) { restoreVerdict = String(e && e.message); }
+        try { await verifyZtoRestoreStatus(after, attestation.operation(after.id)); } catch (e: any) { restoreVerdict = String(e && e.message); }
+        expect(restoreVerdict).toBe('RESTORE_ZTO_FINAL');
+        expect(attestation.answers.at(-1)?.body).toMatchObject({ kind: 'deny' });
         console.info('F2 Cookie restore verification', restoreVerdict);
         dataState.deletedItems = Object.values(getAt(TRASH) || {}).map((v: any) => clone(v));
         dataState.scanHistory = Object.values(getAt(HISTORY) || {}).map((v: any) => clone(v));

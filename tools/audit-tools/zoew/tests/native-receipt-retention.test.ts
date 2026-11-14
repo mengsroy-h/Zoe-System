@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { parseExpression } from '../../../../supabase/scripts/rtdb-rules.mjs';
 import { firebaseState } from '../../../../ZoeW/src/core/state';
 import { acceptServerClockOffset, resetServerClock } from '../../../../ZoeW/src/core/clock';
 import { withTransactionOutcomeResolution } from '../../../../ZoeW/src/services/tx-outcome';
@@ -34,8 +35,14 @@ it('the rules let a device delete only its own receipts older than the retention
   const rules = JSON.parse(readFileSync(path.join(dir, 'firebase-database.rules.json'), 'utf8'));
   const write = rules.rules[NATIVE_WRITE_RECEIPTS].$operation['.write'];
   expect(rules.rules[NATIVE_WRITE_RECEIPTS]['.indexOn']).toEqual(expect.arrayContaining(['uid', 'at']));
-  expect(write).toContain("data.exists() && !newData.exists() && data.child('uid').val() === auth.uid && data.child('at').val() < now - " + NATIVE_RECEIPT_RETENTION_MS);
-  expect(write).toContain("!data.exists() && newData.exists() && newData.child('uid').val() === auth.uid");
+  const terms = (node: any, operator: '&&' | '||'): any[] => node?.t === operator
+    ? [...terms(node.l, operator), ...terms(node.r, operator)] : [node];
+  const gates = terms(parseExpression(write, ['$operation']), '&&');
+  const branches = terms(gates.find(node => node?.t === '||'), '||').map(node => terms(node, '&&'));
+  expect(gates).toContainEqual(parseExpression('auth != null', []));
+  expect(branches).toHaveLength(2);
+  expect(branches).toContainEqual(terms(parseExpression("data.exists() && !newData.exists() && data.child('uid').val() === auth.uid && data.child('at').val() < now - " + NATIVE_RECEIPT_RETENTION_MS, []), '&&'));
+  expect(branches).toContainEqual(terms(parseExpression("!data.exists() && newData.exists() && newData.child('uid').val() === auth.uid", []), '&&'));
 });
 
 it('after a clean recovery the device purges its own expired receipts once, never young ones or another device\'s', async () => {

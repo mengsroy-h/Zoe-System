@@ -5,6 +5,45 @@ const path = require('path');
 // `checker-coverage.js` បញ្ជាក់បានថា checker នេះពិតជាអានកូដមែន។
 const root = process.env.CLEARFENCE_APP_DIR ? path.resolve(process.env.CLEARFENCE_APP_DIR) : path.resolve(__dirname, '../..');
 const rules = JSON.parse(fs.readFileSync(path.join(root, 'firebase-database.rules.json'), 'utf8'));
+// Match rule ASTs after equivalent child-path/hasChild and Boolean grouping
+// normalization, without depending on whitespace or compressed path spelling.
+const { parseExpression } = require(path.join(root, 'supabase/scripts/rtdb-expression.cjs'));
+function ruleGuard(expression, fragment) {
+    const normalize = node => {
+        if (!node || typeof node !== 'object') return node;
+        if (Array.isArray(node)) return node.map(normalize);
+        if (node.t === 'm' && node.n === 'hasChild') return normalize({ t: 'm', n: 'exists',
+            o: { t: 'm', n: 'child', o: node.o, a: node.a }, a: [] });
+        if (node.t === 'm' && node.n === 'child') {
+            const parts = n => n.t === 'l' && typeof n.v === 'string' ? n.v : n.t === 'v' ? '\u0001' + n.n + '\u0001'
+                : n.t === 'b' && n.o === '+' && parts(n.l) !== null && parts(n.r) !== null ? parts(n.l) + parts(n.r) : null;
+            const joined = parts(node.a[0]);
+            if (joined !== null) {
+                const segments = joined.split('/').filter(Boolean);
+                if (segments.every(p => !p.includes('\u0001') || /^\u0001\$[A-Za-z0-9_]+\u0001$/.test(p))) {
+                    return segments.reduce((out, p) => ({ t: 'm', n: 'child', o: out,
+                        a: [p.startsWith('\u0001') ? { t: 'v', n: p.slice(1, -1) } : { t: 'l', v: p }] }), normalize(node.o));
+                }
+            }
+        }
+        if (node.t === '&&' || node.t === '||') {
+            const ordered = n => n.t === node.t ? [...ordered(n.l), ...ordered(n.r)] : [normalize(n)];
+            return { t: node.t, ordered: ordered(node) };
+        }
+        return Object.fromEntries(Object.entries(node).map(([k, v]) => [k, normalize(v)]));
+    };
+    const scope = ['$itemId', '$sourceId', '$idx'];
+    const wanted = normalize(parseExpression(fragment, scope)), needle = JSON.stringify(wanted);
+    const visit = node => {
+        if (!node || typeof node !== 'object') return false;
+        if (JSON.stringify(node) === needle) return true;
+        if (wanted.ordered && node.t === wanted.t && node.ordered?.some((_, i) =>
+            JSON.stringify(node.ordered.slice(i, i + wanted.ordered.length)) === JSON.stringify(wanted.ordered))) return true;
+        return Object.values(node).some(value => Array.isArray(value) ? value.some(visit) : visit(value));
+    };
+    return visit(normalize(parseExpression(expression, scope)));
+}
+
 let pass = 0;
 let fail = 0;
 
@@ -87,25 +126,30 @@ const witnessWrite = witnessRules['.write'];
 const trashItemRules = rules.rules.zoew_recently_deleted_cod_dod.$itemId;
 const trashBarcodeRules = rules.rules.zoew_recently_deleted_cod_dod.$itemId.barcodes.$idx;
 ok('history parent delete ចង post-write witness',
-    historyRules['.write'].includes("data.child('clearClaim')") && historyRules['.write'].includes("newData.parent().parent().child('zoew_clear_history_finalizations')"));
+    ruleGuard(historyRules['.write'], "data.child('clearClaim')") && ruleGuard(historyRules['.write'], "newData.parent().parent().child('zoew_clear_history_finalizations')"));
 ok('clearClaim មាន token និង claimedAt ប៉ុណ្ណោះ',
     claimRules['.validate'].includes("['token','claimedAt']") && claimRules.$other['.validate'] === false);
 ok('Clear និង Restore claim មិនអាចនៅ history ដូចគ្នា',
-    claimRules['.validate'].includes("!newData.parent().child('restoreClaimId').exists()") &&
-    claimRules['.validate'].includes("!newData.parent().child('restoreClaimToken').exists()") &&
-    restoreClaimIdRules['.validate'].includes("!newData.parent().child('clearClaim').exists()") &&
-    restoreClaimTokenRules['.validate'].includes("!newData.parent().child('clearClaim').exists()"));
+    ruleGuard(claimRules['.validate'], "!newData.parent().child('restoreClaimId').exists()") &&
+    ruleGuard(claimRules['.validate'], "!newData.parent().child('restoreClaimToken').exists()") &&
+    ruleGuard(restoreClaimIdRules['.validate'], "!newData.parent().child('clearClaim').exists()") &&
+    ruleGuard(restoreClaimTokenRules['.validate'], "!newData.parent().child('clearClaim').exists()"));
 ok('trash barcode រក្សា scanner locker metadata',
     trashBarcodeRules.lockerUpdatedBy['.validate'].includes('newData.isString()') && trashBarcodeRules.lockerRevision['.validate'].includes('newData.isNumber()'));
 ok('trash រក្សា legacy lockerRevision សម្រាប់ Restore/Clear',
     trashItemRules.lockerRevision['.validate'].includes('newData.isNumber()') &&
     trashItemRules.lockerRevision['.validate'].includes('9007199254740990'));
 ok('witness bind prewrite live claim និង post-write move',
-    witnessWrite.includes("root.child('zoew_scan_history_cod_dod')") && witnessWrite.includes("child('clearClaim')") && witnessWrite.includes("!root.child('zoew_recently_deleted_cod_dod')") && witnessWrite.includes("!newData.parent().parent().child('zoew_scan_history_cod_dod')") && witnessWrite.includes("child('deletedAt').isNumber()") && witnessWrite.includes("child('isFromDeletion').val() === true") && witnessWrite.includes("newData.parent().parent().child('zoew_recently_deleted_cod_dod')"));
+    ruleGuard(witnessWrite, "root.child('zoew_scan_history_cod_dod').child($itemId).child('clearClaim').child('token').val() === newData.child('token').val()")
+    && ruleGuard(witnessWrite, "!root.child('zoew_recently_deleted_cod_dod').child($itemId).exists()")
+    && ruleGuard(witnessWrite, "!newData.parent().parent().child('zoew_scan_history_cod_dod').child($itemId).exists()")
+    && ruleGuard(witnessWrite, "newData.parent().parent().child('zoew_recently_deleted_cod_dod').child($itemId).child('deletedAt').isNumber()")
+    && ruleGuard(witnessWrite, "newData.parent().parent().child('zoew_recently_deleted_cod_dod').child($itemId).child('isFromDeletion').val() === true")
+    && ruleGuard(witnessWrite, "newData.parent().parent().child('zoew_recently_deleted_cod_dod').child($itemId).exists()"));
 ok('witness មិនអនុញ្ញាត overwrite និង cleanup ត្រូវ history អវត្តមាន',
-    witnessWrite.includes("data.exists() && !newData.exists() && !root.child('zoew_scan_history_cod_dod')"));
+    ruleGuard(witnessWrite, "data.exists() && !newData.exists() && !root.child('zoew_scan_history_cod_dod').child($itemId).exists()"));
 ok('⛔ witness ចាស់ដែលបន្សល់ មិនត្រូវចាក់សោ id ជារៀងរហូត (deadlock ៣ ខាង)',
-    !witnessWrite.includes("!data.exists() && newData.exists()"));
+    !ruleGuard(witnessWrite, "!data.exists() && newData.exists()"));
 
 console.log('-- crash មុន final: claim នៅ live និងមិនបង្កើត trash --');
 ok('claim មួយគត់ មិនផ្លាស់ទី data មុន final',

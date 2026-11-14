@@ -65,7 +65,21 @@ describe('ការចុះឈ្មោះ License ជាដំណាក់ក�
     it('ពិដានឧបករណ៍ និងការដោះឧបករណ៍ សម្រេចតែម្តងនៅ Server', async () => {
         const f = await fixture(); await f.configure(); await f.enroll();
         expect((await f.request(f.seller, 'enroll', 2, { slot: 'd2', publicKey: f.impostor.publicKey, releaseEpoch: 0 })).status).toBe(409);
-        const race = await Promise.all([f.request(f.device, 'prove', 2, { slot: 'd1', releaseEpoch: 0 }), f.request(f.seller, 'release', 2)]);
+        const read = f.store.getWithMetadata;
+        const snapshots: Awaited<ReturnType<typeof read>>[] = [];
+        let releaseReads!: () => void;
+        const bothRead = new Promise<void>(resolve => { releaseReads = resolve; });
+        f.store.getWithMetadata = async () => {
+            const snapshot = await read();
+            snapshots.push(snapshot);
+            if (snapshots.length === 2) releaseReads();
+            await bothRead;
+            return snapshot;
+        };
+        const race = await Promise.all([f.request(f.device, 'prove', 2, { slot: 'd1', releaseEpoch: 0 }), f.request(f.seller, 'release', 2)])
+            .finally(() => { f.store.getWithMetadata = read; });
+        expect(snapshots.map(snapshot => ({ revision: snapshot?.data.revision, etag: snapshot?.etag })))
+            .toEqual([{ revision: 2, etag: '2' }, { revision: 2, etag: '2' }]);
         expect(race.map(r => r.status).sort()).toEqual([200, 409]);
         const revision = f.row().revision; expect((await f.request(f.seller, 'release', revision)).status).toBe(200);
         expect((await f.request(f.device, 'prove', revision + 1, { slot: 'd1', releaseEpoch: 0 })).status).toBe(403);

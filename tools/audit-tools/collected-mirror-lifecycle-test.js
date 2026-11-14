@@ -32,6 +32,7 @@ try { chromium = require('playwright-core').chromium; } catch (e) { console.log(
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
+const { localRestorePolicy } = require('./fixtures/trusted-restore-policy.cjs');
 const CHROME = process.env.COLLECTEDMIRROR_CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 if (!fs.existsSync(CHROME)) { console.log('SKIP — រកមិនឃើញ Chromium នៅ ' + CHROME); process.exitCode = 0; process.exit(0); }
 const ROOT = process.env.COLLECTEDMIRROR_APP_DIR || path.join(__dirname, '../..');
@@ -147,6 +148,7 @@ function seedData() {
     const dOld = zoneDateKey(Date.now(), -3);
     const now = Date.now();
     const seed = {
+        zoew_restore_policy: { shop: localRestorePolicy('https://fake-default-rtdb.firebaseio.com') },
         user_roles: { 'admin-uid': 'admin' },
         zoew_scan_history_cod_dod: {
             id_a: { id: 'id_a', phone: '0960000421', scanDate: d, createdAt: now - 1000, cod: 30, dod: 5, price: 35, count: 2, barcode: 'B2', time: '10:00', isClosed: false,

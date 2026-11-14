@@ -25,6 +25,7 @@ const { execFile } = require('child_process');
 const { pathToFileURL } = require('url');
 const { emuNamespace } = require('./ns.js');
 const { createPgHarness } = require('../supabase-pg.js');
+const { authorizePgRestore } = require('../fixtures/pg-restore-issuer.cjs');
 
 const ROOT = process.env.SBPARITY_APP_DIR ? path.resolve(process.env.SBPARITY_APP_DIR) : path.join(__dirname, '../../..');
 const REPO = process.env.ZOE_REPO_ROOT ? path.resolve(process.env.ZOE_REPO_ROOT) : ROOT;
@@ -127,7 +128,7 @@ async function pgSetupTenant(transform) {
     pg = c;
     tenant = t.rows[0].id;
     member = await H.sessionClaims(c, { role: 'authenticated', sub: uid });
-    AUTH = 'auth_variable_override=' + encodeURIComponent(JSON.stringify({ uid }));
+    AUTH = 'auth_variable_override=' + encodeURIComponent(JSON.stringify({ uid, token: { session_id: member.extra.session_id } }));
 }
 
 async function pgSetRules(rulesJson, compileRules, rulesSql) {
@@ -173,8 +174,18 @@ async function pgOwnerOps(ops, replace) {
 }
 
 async function pgOwnerSnapshot(tree) {
+    const authorities = tree?.zoew_restore_attestations;
+    if (!authorities) {
+        await pg.query('delete from private.zoe_restore_attestations where tenant_id=$1', [tenant]);
+        await pg.query('delete from private.zoe_restore_attestation_events where tenant_id=$1', [tenant]);
+    }
+    else for (const [id, body] of Object.entries(authorities)) {
+        const existing = (await pg.query('select body from private.zoe_restore_attestations where tenant_id=$1 and source_id=$2', [tenant, id])).rows[0]?.body;
+        assert.deepEqual(canon(existing), canon(body), 'owner snapshot cannot invent a private signed authority');
+    }
     const ops = [];
     for (const root of Object.keys(tree || {})) {
+        if (root === 'zoew_restore_attestations') continue;
         const node = tree[root];
         if (node === null || typeof node !== 'object') continue;
         const keys = Array.isArray(node) ? node.map((_, i) => String(i)) : Object.keys(node);
@@ -205,6 +216,9 @@ async function pgTree() {
     const rows = (await pg.query('select root, key, value from public.zoe_docs where tenant_id = $1 and value is not null', [tenant])).rows;
     const tree = {};
     for (const r of rows) (tree[r.root] = tree[r.root] || {})[r.key] = r.value;
+    for (const row of (await pg.query('select source_id,body from private.zoe_restore_attestations where tenant_id=$1', [tenant])).rows) {
+        (tree.zoew_restore_attestations ||= {})[row.source_id] = row.body;
+    }
     return canon(tree);
 }
 
@@ -512,7 +526,7 @@ async function evidenceRetentionCases(realRules, compileRules, rulesSql) {
 }
 
 function generationConsumption(source, kind, token, targetId) {
-    return { v: 1, sourceId: source.id, generation: source.trashGeneration ?? 0, kind, actorUid: member.sub, scope: 'audit-scope', deletedAt: source.deletedAt, rowBirth: source.createdAt ?? 0,
+    return { v: 1, sourceId: source.id, generation: source.trashGeneration ?? 0, kind, actorUid: member.sub, scope: kind === 'restore' ? 'https://parity.invalid#' + tenant : 'audit-scope', deletedAt: source.deletedAt, rowBirth: source.createdAt ?? 0,
         ...(kind === 'restore' ? { token, targetId } : {}) };
 }
 function slotPurgeVectors(uid) {
@@ -747,12 +761,20 @@ async function trashPolicyCases(realRules, compileRules, rulesSql) {
         trashReason: 'remove', isFromDeletion: false, isClosed: false,
         barcodes: [{ code: 'POLICY_PARCEL', cod: 3, dod: 1, isClosed: false, isDeducted: true }] }, extra);
     const seed = async (source, live) => {
-        const tree = { [trash]: source ? { policy_source: source } : {},
+        const tree = { zoew_restore_policy: { shop: { v: 1, mode: 'local', scope: 'https://parity.invalid#' + tenant, branch: '100001', epoch: 1 } }, [trash]: source ? { policy_source: source } : {},
             [history]: live ? { policy_target: live } : {},
             zoew_daily_revenue_cod_dod: { '2026-01-01': { codDollar: 0, dodDollar: 0, totalCount: 0 } } };
         await both(sc, 'owner', 'SNAP', '', tree);
     };
     const write = policyWriter(sc, 'trash-policy', 'គោលការណ៍ធុងសំរាម', 'ការបដិសេធរក្សា barcode និងប្រាក់គ្រប់ផ្លូវដដែល');
+    const authorize = async (action = 'authorize') => {
+        const answer = await authorizePgRestore({ H, c: pg, tenant, actor: member, sourceId: 'policy_source', token: claim.token, targetId: claim.targetId, action });
+        const body = (await pg.query('select body from private.zoe_restore_attestations where tenant_id=$1 and source_id=$2', [tenant, 'policy_source'])).rows[0].body;
+        await sc.owner('PUT', 'zoew_restore_attestations/policy_source', body);
+        await sc.owner('PUT', trash + '/policy_source', answer.source);
+        check(answer.kind === (action === 'release' ? 'released' : 'allow'), 'trusted signed ' + action + ' applies through actual PG protocol');
+        await compareState(sc, 'signed-' + action);
+    };
     await seed(null);
     await write('PUT', trash + '/policy_source', item({ trashMode: 'palm', restoreBlocked: true }), false, 'បង្កើត Palm ដែលបិទស្ដារ');
     await seed(item({ trashMode: 'palm', restoreBlocked: true }));
@@ -771,8 +793,12 @@ async function trashPolicyCases(realRules, compileRules, rulesSql) {
     for (const mode of ['palm', 'cookie', 'local']) {
         await seed(null);
         await write('PUT', trash + '/policy_source', item({ trashMode: mode }), false, mode + ' មិនទាន់ Sign បង្កើតបាន');
-        await write('PUT', trash + '/policy_source/restoreClaim', claim, false, mode + ' មិនទាន់ Sign អនុញ្ញាត claim');
-        await write('PUT', trash + '/policy_source/restoreClaim', null, false, mode + ' អនុញ្ញាត release claim');
+        await write('PUT', trash + '/policy_source/restoreClaim', claim, mode !== 'local', mode + ' claim requires declared local policy or trusted authority');
+        if (mode !== 'local') {
+            await authorize();
+            await write('PUT', trash + '/policy_source/restoreClaim', null, true, mode + ' frozen claim cannot be released directly');
+            await authorize('release');
+        } else await write('PUT', trash + '/policy_source/restoreClaim', null, false, mode + ' អនុញ្ញាត release claim');
     }
     const signed = item({ trashMode: 'cookie', restoreBlocked: true });
     signed.barcodes[0].ztoSignedAt = at;
@@ -825,7 +851,8 @@ async function trashPolicyCases(realRules, compileRules, rulesSql) {
         const unsigned = item({ trashMode: 'palm', trashReason: reason, isFromDeletion: reason === 'delete' });
         await seed(null);
         await write('PUT', trash + '/policy_source', unsigned, false, 'Palm មិនទាន់ Sign បង្កើតធុងសំរាម ៖ ' + reason);
-        await write('PUT', trash + '/policy_source/restoreClaim', claim, false, 'Palm មិនទាន់ Sign claim ៖ ' + reason);
+        await write('PUT', trash + '/policy_source/restoreClaim', claim, true, 'Palm unsigned direct claim requires trusted authority: ' + reason);
+        await authorize();
         await write('PUT', history + '/policy_target', prepared, false, 'Palm មិនទាន់ Sign prepare ៖ ' + reason);
         const packet = { [trash + '/policy_source']: null, [history + '/policy_target']: restored,
             [finals + '/policy_source']: { token: claim.token, targetId: claim.targetId, finalizedAt: at },
@@ -986,7 +1013,7 @@ async function oldAppTrashCases(realRules, compileRules, rulesSql) {
         cod: 7, dod: 2, count: 1, price: 9, isClosed: false, isCalled: false, barcode: neighbor.code, barcodes: [neighbor] };
     const ledger = { codDollar: 7, dodDollar: 2, totalCount: 1, ded: { oldapp_source: { at: deletedAt, cod: 3, dod: 1, count: 1 } } };
     const seed = async (src, live) => {
-        await both(sc, 'owner', 'SNAP', '', { [trash]: src ? { oldapp_source: src } : {}, [history]: live ? { [live.id]: live } : {},
+        await both(sc, 'owner', 'SNAP', '', { zoew_restore_policy: { shop: { v: 1, mode: 'local', scope: 'https://parity.invalid#' + tenant, branch: '', epoch: 1 } }, [trash]: src ? { oldapp_source: src } : {}, [history]: live ? { [live.id]: live } : {},
             zoew_daily_revenue_cod_dod: { '2026-01-01': ledger }, zoew_monthly_revenue_cod_dod: { '2026-01': { codDollar: 7, dodDollar: 2, totalCount: 1 } } });
     };
     const claimed = (targetId) => source({ restoreClaim: { token, claimedAt: at, targetId } });

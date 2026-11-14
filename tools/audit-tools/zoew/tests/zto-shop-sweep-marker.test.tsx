@@ -13,7 +13,10 @@ import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepte
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
+
+const { assertBooleanGroupingEquivalent } = createRequire(import.meta.url)('./helpers/rules-boolean-grouping.cjs');
 import { dataState, firebaseState, uiState, ztoState } from '../../../../ZoeW/src/core/state';
 import { appLocalStore } from '../../../../ZoeW/src/core/storage';
 import { getZoneDateKey } from '../../../../ZoeW/src/core/timezone';
@@ -424,8 +427,8 @@ describe('ការពិនិត្យប្រឆាំង (backend) ៖ rule
     it('rules ៖ ត្រាពេល activeAt/completeAt មិនលើស now + ១០ នាទី', () => {
         const rules = JSON.parse(readFileSync(path.resolve(__dirname, '../../../../firebase-database.rules.json'), 'utf8'));
         const node = rules.rules.zoew_settings.zto_signed_sweep;
-        expect(node.activeAt['.validate']).toContain('newData.val() <= now + 600000');
-        expect(node.completeAt['.validate']).toContain('newData.val() <= now + 600000');
+        expect(() => assertBooleanGroupingEquivalent(node.activeAt['.validate'], 'newData.isNumber() && newData.val() >= 0 && newData.val() <= now + 600000', [])).not.toThrow();
+        expect(() => assertBooleanGroupingEquivalent(node.completeAt['.validate'], 'newData.isNumber() && newData.val() >= 0 && newData.val() <= now + 600000', [])).not.toThrow();
     });
 });
 

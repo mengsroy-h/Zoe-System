@@ -171,8 +171,10 @@ async function artifactCheck() {
         }
         const { NATIVE_F03_CANONICAL_GUARD: guard } = require(path.join(root, 'supabase/scripts/rtdb-canonical-key.cjs'));
         const firstRule = artifact.indexOf('newData.');
+        const staleSource = sourceText.replace(/\bauth\s*!=\s*null\b/, 'auth === null');
+        if (staleSource === sourceText) throw new Error('stale-artifact control did not change the source');
         const probes = [
-            ['artifact ចាស់ (ប្រភពប្តូរ token មួយ)', rulesArtifactProblems(sourceText.replace("auth != null", "auth !== null"), artifact)],
+            ['artifact ចាស់ (ប្រភពប្តូរ token មួយ)', rulesArtifactProblems(staleSource, artifact)],
             ['artifact ប្តូរ token មួយ', rulesArtifactProblems(sourceText, artifact.slice(0, firstRule) + 'data.' + artifact.slice(firstRule + 'newData.'.length))],
             ['artifact ប្តូរ guard canonical', rulesArtifactProblems(sourceText, JSON.stringify(JSON.parse(artifact), (key, value) =>
                 typeof value === 'string' && value.includes(guard) ? value.replace(guard, guard.replace('length > 0', 'length > 1')) : value))],

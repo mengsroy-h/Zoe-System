@@ -26,6 +26,7 @@ const path = require('path');
 const { emuNamespace } = require('./ns.js');
 const { r2, rng, LICENSE_STUB, invariant, invariantBroken, collectedFixtureAgeOps, openBarcodeTargets, PAGE_OPS, recoveryEvidence, devicesSettled } = require('../money-multidevice-core.js');
 const { cookieFixture, networkGate, restoreFlows } = require('../money-cookie-blob.js');
+const { localRestorePolicy } = require('../fixtures/trusted-restore-policy.cjs');
 const fx = require('../idtoken-fixture.js');
 
 const ROOT = process.env.MONEYMD_APP_DIR ? path.resolve(process.env.MONEYMD_APP_DIR) : path.join(__dirname, '../../..');
@@ -99,10 +100,10 @@ async function waitForHistoricalSettlement(devices, read, accepts, limitMs = 450
     if (fail) { console.log('\n❌ ធ្លាក់ ' + fail + ' / ok ' + pass); return; }
 
     const PROJECT = 'demo-zoe-moneymd';
-    const cookie = cookieFixture(ROOT, { project: PROJECT });
+    const cookie = cookieFixture(ROOT, { project: PROJECT, firebasePort: EMU_PORT });
     const staticServer = await new Promise((res) => {
         const s = http.createServer((req, rsp) => {
-            if (req.url.startsWith('/.netlify/functions/zto-order-detail')) { void cookie.serve(req, rsp); return; }
+            if (/^\/\.netlify\/functions\/zto-(?:order-detail|restore-proof)(?:\?|$)/.test(req.url)) { void cookie.serve(req, rsp); return; }
             let p = decodeURIComponent(req.url.split('?')[0]);
             if (p === '/') p = '/index.html';
             let f = path.join(DIR, p);
@@ -125,7 +126,7 @@ async function waitForHistoricalSettlement(devices, read, accepts, limitMs = 450
 
     const makeDevice = async (ns, uid, email) => {
         const ctx = await browser.newContext({ viewport: { width: 412, height: 780 }, serviceWorkers: 'block' });
-        const gate = await networkGate(ctx, 'firebase');
+        const gate = await networkGate(ctx, 'firebase', undefined, { restoreProof: true });
         await ctx.route('https://www.gstatic.com/firebasejs/**', (route) => {
             const file = route.request().url().split('/').pop().split('?')[0];
             const src = path.join(sdkDir, file);
@@ -147,6 +148,7 @@ async function waitForHistoricalSettlement(devices, read, accepts, limitMs = 450
         });
         await ctx.route(/\/license-verify\.js(\?|$)/, (route) => route.fulfill({ status: 200, contentType: 'application/javascript', body: LICENSE_STUB }));
         const config = { apiKey: 'fake-api-key', authDomain: PROJECT + '.firebaseapp.com', projectId: PROJECT, appId: '1:1:web:1', databaseURL: 'http://127.0.0.1:' + EMU_PORT + '?ns=' + ns };
+        cookie.registerFirebaseActor({ uid, email, databaseURL: config.databaseURL });
         await ctx.addInitScript((cfg) => {
             try { if (!localStorage.getItem('zoew_firebase_config')) localStorage.setItem('zoew_firebase_config', cfg); } catch (e) {}
             const realSetInterval = window.setInterval.bind(window);
@@ -217,6 +219,7 @@ async function waitForHistoricalSettlement(devices, read, accepts, limitMs = 450
             bcs.forEach((b) => { cod += b.cod; dod += b.dod; cnt++; });
         }
         await owner('.json', 'PUT', {
+            zoew_restore_policy: { shop: localRestorePolicy('http://127.0.0.1:' + EMU_PORT + '?ns=' + NS) },
             zoew_scan_history_cod_dod: items, zoew_recently_deleted_cod_dod: {}, zoew_barcode_registry: registry, zoew_settings: { exchange_rate: 4100 },
             zoew_daily_revenue_cod_dod: { [dateKey]: { codDollar: r2(cod), dodDollar: r2(dod), totalCount: cnt } },
             zoew_monthly_revenue_cod_dod: { [monthKey]: { codDollar: r2(cod), dodDollar: r2(dod), totalCount: cnt } }

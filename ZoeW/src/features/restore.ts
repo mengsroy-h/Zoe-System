@@ -22,7 +22,7 @@ import { closeModal, openModalHelper } from '../ui/modal';
 import { rawSnapshotToItemList, recalcItemMoneyFromBarcodes } from '../ui/modal-stack';
 import { showToast } from '../ui/toast';
 import { trashRestoreBlockOf } from './zto-final-marks';
-import { verifyZtoRestoreStatus } from './zto-restore-status';
+import { requestRestoreAuthorization, verifyZtoRestoreStatus } from './zto-restore-status';
 import { txReadServerValue, txRestUrl } from '../services/tx-outcome';
 
 export const RESTORE_CLAIM_LEASE_MS = 2 * 60 * 1000;
@@ -115,7 +115,21 @@ export async function cancelBlockedRestore(id, expectedToken?, opts?: { evidence
     let frozen = null, alreadyFrozen = false, rowWritten = false;
     restoreCancellationInFlight.add(id);
     try {
-        const freeze = await dbOp(api.runTransaction(api.ref(cancelDb, `zoew_recently_deleted_cod_dod/${id}`), (item) => {
+        const observed = (await dbOp(api.get(api.ref(cancelDb, `zoew_recently_deleted_cod_dod/${id}`)))).val();
+        if (!current()) return 'pending';
+        let freeze;
+        if (observed?.restoreAttestationId) {
+            const claim = observed.restoreClaim;
+            if (!claim || expectedToken && claim.token !== expectedToken) return 'pending';
+            try {
+                await requestRestoreAuthorization({ ...observed, id }, { token: claim.token, targetId: claim.targetId, current, action: 'refresh' });
+                return 'pending';
+            } catch (error) {
+                if (error?.message !== 'RESTORE_ZTO_FINAL' || !error.source || !error.attestedTerminal) return 'pending';
+                frozen = cloneRestoreItem(error.source);
+                alreadyFrozen = true;
+            }
+        } else freeze = await dbOp(api.runTransaction(api.ref(cancelDb, `zoew_recently_deleted_cod_dod/${id}`), (item) => {
             frozen = null; alreadyFrozen = false;
             if (!current() || !item || expectedToken && item.restoreClaim?.token !== expectedToken) return;
             if (item.restoreBlocked !== true && !trashRestoreBlockOf(item, !!opts?.evidenceOnly)) return;
@@ -146,8 +160,12 @@ export async function cancelBlockedRestore(id, expectedToken?, opts?: { evidence
             if (!current()) return 'pending';
             if (unproven) return 'recovery-required';
             if (!settled || !cancelled?.committed && !untouched) return 'pending';
-            let released = false;
-            const release = await dbOp(api.runTransaction(api.ref(cancelDb, `zoew_recently_deleted_cod_dod/${id}`), (item) => {
+            let released = false, release;
+            if (frozen.restoreAttestationId) {
+                const result = await requestRestoreAuthorization(frozen, { token: claim.token, targetId: claim.targetId, current, action: 'release' });
+                released = result.kind === 'released';
+                release = { committed: released };
+            } else release = await dbOp(api.runTransaction(api.ref(cancelDb, `zoew_recently_deleted_cod_dod/${id}`), (item) => {
                 released = false;
                 if (!current() || !item || item.restoreBlocked !== true) return;
                 if (!item.restoreClaim) { released = true; return item; }
@@ -203,7 +221,7 @@ export function restoreAwaitsCancellation(item) {
     if (!item?.restoreClaim) return false;
     if (item.restoreBlocked === true) return true;
     return cleanupClockIsTrustworthy() && !dbListenerViewIsStale(DB_LISTENER_KEY_DELETED) && !activeRestoreClaims.has(item.id)
-        && !isActiveRestoreClaim(item.restoreClaim, RESTORE_CLAIM_FUTURE_MS) && !!trashRestoreBlockOf(item, true);
+        && !isActiveRestoreClaim(item.restoreClaim, RESTORE_CLAIM_FUTURE_MS) && (!!item.restoreAttestationId || !!trashRestoreBlockOf(item, true));
 }
 
 export async function resumeBlockedRestoreCancellations() {
@@ -229,9 +247,9 @@ export async function resumeBlockedRestoreCancellations() {
     }
 }
 
-export async function rejectBlockedRestore(item, expectedToken?) {
+export async function rejectBlockedRestore(item, expectedToken?, attestedTerminal = false) {
     const block = trashRestoreBlockOf(item);
-    if (!block) return;
+    if (!block && !attestedTerminal) return;
     if (block === 'returned' && !expectedToken && !item.restoreClaim && item.restoreBlocked !== true) throw new Error('RESTORE_ZTO_FINAL');
     const outcome = await cancelBlockedRestore(item.id, expectedToken);
     if (outcome === 'recovery-required') throw new Error('RESTORE_RECOVERY_REQUIRED');
@@ -468,7 +486,7 @@ export async function restoreLedgerKeyFor(item, trashId, revenueDeltas) {
     return keys;
 }
 
-export async function finalizeClaimedRestore(sourceId, token, targetId, revenueDeltas, ledgerKey?, callPatch?, dropTarget?, consumption?: TrashConsumption, finalization?) {
+export async function finalizeClaimedRestore(sourceId, token, targetId, revenueDeltas, ledgerKey?, callPatch?, dropTarget?, consumption?: TrashConsumption, finalization?, attestedSource?) {
     const owner = captureTrashGenerationOwner();
     if (!owner || !trashConsumptionValid(consumption) || consumption.kind !== 'restore' || consumption.sourceId !== sourceId
         || consumption.token !== token || consumption.targetId !== targetId || consumption.actorUid !== owner.uid || consumption.scope !== owner.scope) throw new Error('RESTORE_GENERATION_HOLD');
@@ -502,6 +520,19 @@ export async function finalizeClaimedRestore(sourceId, token, targetId, revenueD
         stopIfSwitched();
         if (retrySource) {
             await rejectBlockedRestore(retrySource, token);
+            stopIfSwitched();
+        }
+        const proofSource = retrySource || attestedSource;
+        if (proofSource?.restoreAttestationId) {
+            try {
+                const proof = await requestRestoreAuthorization(proofSource, { token, targetId, current: () => {
+                    stopIfSwitched(); return true;
+                }, action: 'refresh' });
+                if (proof.kind !== 'allow') throw new Error('RESTORE_FINAL_UNKNOWN');
+            } catch (error) {
+                if (error?.message === 'RESTORE_ZTO_FINAL' && error.source) await rejectBlockedRestore(error.source, token, error.attestedTerminal);
+                throw error;
+            }
             stopIfSwitched();
         }
         if (!clockOperation.current()) throw new Error('RESTORE_CLOCK_UNTRUSTED');
@@ -567,13 +598,19 @@ export async function executeRestoreItem() {
         const stored = storedRestoreClaims()[restoredId];
         const savedClaim = stored && stored.scope === liveShopScope() && typeof stored.token === 'string' && typeof stored.targetId === 'string' && safeIdPattern.test(stored.targetId) ? stored : null;
         const existingClaim = activeRestoreClaims.get(restoredId) || savedClaim;
-        const token = existingClaim ? existingClaim.token : generateRestoreClaimToken();
+        let token = existingClaim ? existingClaim.token : generateRestoreClaimToken();
         let targetId = existingClaim ? existingClaim.targetId : null;
         const previewSnap = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(firebaseState.db, `zoew_recently_deleted_cod_dod/${restoredId}`)));
         if (!previewSnap.exists()) throw new Error('ALREADY_RESTORED');
         const previewItem = cloneRestoreItem(previewSnap.val());
         if (!previewItem) throw new Error('ALREADY_RESTORED');
         previewItem.id = restoredId;
+        if (!existingClaim && previewItem.restoreClaim && !isActiveRestoreClaim(previewItem.restoreClaim)
+            && typeof previewItem.restoreClaim.token === 'string' && previewItem.restoreClaim.token
+            && typeof previewItem.restoreClaim.targetId === 'string' && safeIdPattern.test(previewItem.restoreClaim.targetId)) {
+            token = previewItem.restoreClaim.token;
+            targetId = previewItem.restoreClaim.targetId;
+        }
         stopIfSwitched();
         const consumed = await readTrashConsumption(restoredId, restoreOwner);
         if (!consumed.ok || !trashSourceUnconsumed(previewItem, consumed.value)
@@ -581,21 +618,38 @@ export async function executeRestoreItem() {
         stopIfSwitched();
         if (restoreAwaitsLedgerView(previewItem)) throw new Error('RESTORE_LEDGER_UNSYNCED');
         await rejectBlockedRestore(previewItem);
+        if (!targetId) {
+            targetId = await findRestoreTargetId(previewItem);
+            stopIfSwitched();
+        }
+        saveRestoreClaim(restoredId, { token, targetId });
+        if (Array.isArray(previewItem.barcodes)) {
+            await restoreLedgerKeyFor(previewItem, restoredId, []);
+            stopIfSwitched();
+        }
+        let authorization;
         try {
-            await verifyZtoRestoreStatus(previewItem);
+            authorization = await verifyZtoRestoreStatus(previewItem, { token, targetId, current: restoreIsCurrent });
         } catch (error) {
             stopIfSwitched();
-            if (error?.message === 'RESTORE_ZTO_FINAL') await rejectBlockedRestore(previewItem);
+            if (error?.message === 'RESTORE_ZTO_FINAL') {
+                const source = error.source || previewItem;
+                await rejectBlockedRestore(source, source.restoreClaim ? token : undefined, error.attestedTerminal);
+            }
             throw error;
+        }
+        if (authorization.kind === 'already_applied') {
+            const settled = await readTrashConsumption(restoredId, restoreOwner);
+            stopIfSwitched();
+            if (!settled.ok || !trashConsumptionSame(trashConsumptionOf(previewItem, 'restore', restoreOwner, token, targetId), settled.value)) {
+                throw new Error('RESTORE_GENERATION_HOLD');
+            }
+            throw new Error('ALREADY_RESTORED');
         }
         stopIfSwitched();
         await rejectBlockedRestore(previewItem);
         if (Array.isArray(previewItem.barcodes)) {
             await restoreLedgerKeyFor(previewItem, restoredId, []);
-            stopIfSwitched();
-        }
-        if (!targetId) {
-            targetId = await findRestoreTargetId(previewItem);
             stopIfSwitched();
         }
         const previewPickupKeys = trashReasonDeducted(previewItem) ? barcodeEntriesOf(previewItem.barcodes)
@@ -609,7 +663,9 @@ export async function executeRestoreItem() {
         const restoreClock = captureClockOperation();
         if (!restoreClock.current()) throw new Error('RESTORE_CLOCK_UNTRUSTED');
         saveRestoreClaim(restoredId, { token, targetId });
-        const claimed = await claimDeletedItemForRestore(restoredId, token, targetId, previewItem, restoreIsCurrent);
+        const claimed = authorization.kind === 'allow'
+            ? { item: cloneRestoreItem(authorization.source), targetId }
+            : await claimDeletedItemForRestore(restoredId, token, targetId, previewItem, restoreIsCurrent);
         stopIfSwitched();
         targetId = claimed.targetId;
         saveRestoreClaim(restoredId, { token, targetId });
@@ -631,6 +687,9 @@ export async function executeRestoreItem() {
         delete itemToRestore.restoreClaimId;
         delete itemToRestore.restoreClaimToken;
         delete itemToRestore.restoreAddedCodes;
+        delete itemToRestore.restoreAttestationId;
+        delete itemToRestore.restorePublication;
+        delete itemToRestore.ztoTerminalDecision;
         if (!restoreClock.current()) throw new Error('RESTORE_CLOCK_UNTRUSTED');
         if (itemToRestore.isClosed) {
             itemToRestore.closedAt = getServerNow();
@@ -682,7 +741,11 @@ export async function executeRestoreItem() {
         if (prepared.targetChanged) {
             targetId = generateUniqueId();
             saveRestoreClaim(restoredId, { token, targetId });
-            await bindRestoreClaimTarget(restoredId, token, targetId, restoreIsCurrent);
+            if (claimedSource.restoreAttestationId) {
+                const rebound = await requestRestoreAuthorization(claimedSource, { token, targetId, current: restoreIsCurrent, action: 'rebind' });
+                if (rebound.kind !== 'allow') throw new Error('RESTORE_GENERATION_HOLD');
+                Object.assign(claimedSource, rebound.source);
+            } else await bindRestoreClaimTarget(restoredId, token, targetId, restoreIsCurrent);
             stopIfSwitched();
             activeRestoreClaims.set(restoredId, { token, targetId });
             prepared = await applyClaimedRestoreToHistory(targetId, restoredId, token, itemToRestore, applyRestoreMergeInto, restoreIsCurrent, restoreClock);
@@ -706,7 +769,7 @@ export async function executeRestoreItem() {
         const finalization = { token, targetId, finalizedAt: getServerNow() };
         if (pickupJournal && !pickupJournal.bindRestore(consumption, finalization, prepared.item, pickupMarks.map(mark => mark.key))) throw new Error('PICKUP_ADMISSION_FAILED');
         await finalizeClaimedRestore(restoredId, token, targetId, appliedRevenueDeltas, restoredLedgerKey, callPatch, lostCodes.size > 0 && !barcodeEntriesOf(prepared.item.barcodes).length,
-            consumption, finalization);
+            consumption, finalization, claimedSource);
         stopIfSwitched();
         if (pickupJournal && !pickupJournal.confirm(pickupMarks.map((mark) => mark.key))) throw new Error('PICKUP_ADMISSION_FAILED');
         if (pickupMarks.length) pickupJournal.note(markPickupBarcodes(revenueScanDate, pickupMarks, false, pickupContext));

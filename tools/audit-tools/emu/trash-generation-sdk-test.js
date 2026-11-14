@@ -3,6 +3,7 @@ let failed = 0;
 const fs = require('fs'), path = require('path'), os = require('os'), http = require('http'), assert = require('assert/strict');
 const { pathToFileURL } = require('url');
 const { initializeSdkSession } = require('./sdk-session-fixture.cjs');
+const { localRestorePolicy } = require('../fixtures/trusted-restore-policy.cjs');
 const ROOT = path.resolve(process.env.SCANSDK_APP_DIR || process.env.ZOE_REPO_ROOT || path.join(__dirname, '../../..'));
 const deps = path.join(ROOT, 'ZoeW/node_modules');
 const port = Number(process.env.SCANRULES_EMU_PORT || 9000);
@@ -101,6 +102,7 @@ export { firebaseState, dataState, uiState, ztoState } from './ZoeW/src/core/sta
             sessionExpiryCheck: 'live', authLoginOperation: null });
         localStorage.setItem('zoew_firebase_config', JSON.stringify(app.options));
         initializeSdkSession(api);
+        await owner('zoew_restore_policy/shop', 'PUT', localRestorePolicy(api.liveShopScope()));
         Object.assign(api.dataState, { scanHistory: [], deletedItems: [], dailyRevenueData: {}, monthlyRevenueData: {}, dailyPickupData: {}, dailyCollectedData: {}, pickupResumeInFlight: false, cleanupResumeInFlight: false, deletedCleanupInFlight: false });
         api.uiState.toasts = []; api.cleanupJournalLive.clear(); api.cleanupInFlight.clear();
         api.ztoState.ztoStatusLoaded = true; api.ztoState.ztoTrashMode = { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0, stamps: {}, shop: api.liveShopScope() };

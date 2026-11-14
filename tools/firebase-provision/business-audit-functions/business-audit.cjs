@@ -124,6 +124,8 @@ function projectRecord(root, value, recordId) {
         const ztoStates = ['signed', 'returned', 'sent', 'misplaced', 'unknown'].filter(state => out.barcodes[state] > 0);
         out.ztoStatus = ztoStates.length > 1 ? 'mixed' : ztoStates[0] || 'unknown';
         out.trash = compact({ reason: REASONS.has(value.trashReason) ? value.trashReason : undefined,
+            ztoTerminalDecision: root === 'zoew_recently_deleted_cod_dod' && ['signed', 'returned'].includes(value.ztoTerminalDecision)
+                ? value.ztoTerminalDecision : undefined,
             mode: MODES.has(value.trashMode) ? value.trashMode : undefined, generation: integer(value.trashGeneration),
             deletedAt: number(value.deletedAt), restoreBlocked: value.restoreBlocked === true });
         const token = businessId(value.restoreClaim?.token) || businessId(value.restoreClaimToken);

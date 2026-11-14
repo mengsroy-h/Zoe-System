@@ -77,7 +77,10 @@ function assertRestoreGuardRuleScope(compiled) {
     const before = JSON.parse(beforeSql.split('$zoe_rules_json$')[1]);
     const policySql = fs.readFileSync(path.join(ROOT, 'supabase', 'migrations', '20261109122019_zoe_rules.sql'), 'utf8');
     const { palmRestorePolicyProjection } = require('../palm-restore-policy-scope.cjs');
-    const projected = palmRestorePolicyProjection(compiled, JSON.parse(policySql.split('$zoe_rules_json$')[1]));
+    const { restoreAttestationRulesProjection } = require('../restore-attestation-rules-scope.cjs');
+    const priorSql = fs.readFileSync(path.join(ROOT, 'supabase', 'migrations', '20261114010845_zoe_rules.sql'), 'utf8');
+    const priorAttestation = restoreAttestationRulesProjection(compiled, JSON.parse(priorSql.split('$zoe_rules_json$')[1]));
+    const projected = palmRestorePolicyProjection(priorAttestation, JSON.parse(policySql.split('$zoe_rules_json$')[1]));
     const changed = new Set(['c/zoew_daily_pickup_cod_dod/x/r/v', 'c/zoew_daily_pickup_cod_dod/x/r/c/pickedUpBarcodes/x/r/v']);
     const added = 'c/zoew_daily_pickup_cod_dod/x/r/c/restoreGuard';
     let writes = 0, validates = 0;
@@ -589,7 +592,7 @@ async function run() {
     const restoreSource = { ...copy(source), restoreClaim: { token: restoreToken, targetId: target, claimedAt: 2001 } };
     const restoreTarget = { ...copy(ordinary), restoreClaimId: trashId, restoreClaimToken: restoreToken, restoreAddedCodes: JSON.stringify([base.code]) };
     const restoreConsumption = { ...consumption(receipt), kind: 'restore', token: restoreToken, targetId: target };
-    const restoreTree = () => ({ [T]: { [trashId]: copy(restoreSource) }, [H]: { [target]: copy(restoreTarget) } });
+    const restoreTree = () => ({ zoew_restore_policy: { shop: { v: 1, mode: 'local', scope: 'audit-scope', branch: '', epoch: 1 } }, [T]: { [trashId]: copy(restoreSource) }, [H]: { [target]: copy(restoreTarget) } });
     const restorePatch = () => ({ [T + '/' + trashId]: null, [G + '/' + trashId]: copy(restoreConsumption),
         [F + '/' + trashId]: { token: restoreToken, targetId: target, finalizedAt: 2002 },
         [H + '/' + target + '/restoreClaimId']: null, [H + '/' + target + '/restoreClaimToken']: null, [H + '/' + target + '/restoreAddedCodes']: null });

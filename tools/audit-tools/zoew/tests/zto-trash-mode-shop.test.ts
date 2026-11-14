@@ -1,6 +1,7 @@
 import { acceptFixtureSession } from './helpers/accepted-session';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanupServerRead } from './helpers/cleanup-server-read';
+import { createRestoreAttestationFixture } from './helpers/restore-attestation';
 import { dataState, firebaseState, uiState, ztoState } from '../../../../ZoeW/src/core/state';
 import { collectedDayOfStamp } from '../../../../ZoeW/src/domain/collected';
 import { getServerNow } from '../../../../ZoeW/src/core/clock';
@@ -353,16 +354,20 @@ describe('a device without ZTO Lookup in a ZTO shop', () => {
         expect(trashRestoreBlockOf(at(`${T}/del`))).toBe('');
     });
 
-    it('Cookie shop: restore of unsigned trash needs a device with ZTO Lookup; unsynced shop mode waits', async () => {
+    it('Cookie shop: restore of unsigned trash needs a device with ZTO Lookup; missing protected policy waits', async () => {
         deviceLookup(null);
         const item = { ...closedItem('t1', 'C5'), isClosed: false, deletedAt: getServerNow() - HOUR, trashReason: 'delete', trashMode: 'local', isFromDeletion: true };
         item.barcodes[0].isClosed = false;
         store[T].t1 = clone(item); dataState.deletedItems = [clone(item)];
+        put('zoew_restore_policy/shop', { v: 1, mode: 'cookie', scope: 'https://shop.firebaseio.com', branch: '881859', epoch: 1 });
+        const money = { daily: clone(store[D]), monthly: clone(store[M]) };
         shopMarker({ cookie: getServerNow() - HOUR });
         uiState.pendingRestoreId = 't1'; await executeRestoreItem();
         expect(toasts()).toContain(RESTORE_ZTO_NEEDS_LOOKUP_TEXT);
         expect(at(`${T}/t1`)).toEqual(item); expect(at(`${T}/t1`).restoreClaim).toBeUndefined();
+        expect(writes).toEqual([]); expect(store[H]).toEqual({});
         attachZtoTrashModeListener(firebaseState.dbListenerGeneration);
+        put('zoew_restore_policy/shop', null);
         uiState.toasts = [];
         uiState.pendingRestoreId = 't1'; await executeRestoreItem();
         expect(toasts()).toContain(RESTORE_SHOP_MODE_UNSYNCED_TEXT);
@@ -370,7 +375,59 @@ describe('a device without ZTO Lookup in a ZTO shop', () => {
         shopMarker(null);
         uiState.toasts = [];
         uiState.pendingRestoreId = 't1'; await executeRestoreItem();
-        expect(at(`${T}/t1`), 'shop without ZTO ➜ ordinary restore').toBeNull();
+        expect(toasts()).toContain(RESTORE_SHOP_MODE_UNSYNCED_TEXT);
+        expect(at(`${T}/t1`), 'presence stamps cannot replace protected policy').toEqual(item);
+        expect(writes).toEqual([]); expect(store[H]).toEqual({});
+        expect(at('zoew_trash_consumptions/t1')).toBeNull();
+        expect(at('zoew_restore_attestations/t1')).toBeNull();
+        expect({ daily: store[D], monthly: store[M] }).toEqual(money);
+        put('zoew_restore_policy/shop', { v: 1, mode: 'local', scope: 'https://shop.firebaseio.com', branch: '', epoch: 2 });
+        uiState.toasts = [];
+        uiState.pendingRestoreId = 't1'; await executeRestoreItem();
+        expect(at(`${T}/t1`), 'trusted local policy ➜ ordinary restore').toBeNull();
+        const receipt = at('zoew_trash_consumptions/t1');
+        expect(receipt).toMatchObject({ kind: 'restore', sourceId: 't1', generation: 0, actorUid: 'u1', scope: 'https://shop.firebaseio.com' });
+        expect(at(`${H}/${receipt.targetId}`).barcodes).toEqual([expect.objectContaining({ code: 'C5', isDeducted: false })]);
+        expect({ daily: store[D], monthly: store[M] }).toEqual(money);
+    });
+
+    it('Cookie device restores unsigned trash through the real issuer and refreshes proof before consuming it', async () => {
+        deviceLookup(COOKIE_URL);
+        firebaseState.fb.getIdTokenResult = vi.fn(async () => ({ token: 'tok' })) as any;
+        shopMarker({ cookie: getServerNow() - HOUR });
+        const code = 'COOKIE001';
+        const item = { ...closedItem('cookie_authorized', code), isClosed: false, deletedAt: getServerNow() - HOUR,
+            trashReason: 'delete', trashMode: 'cookie', isFromDeletion: true };
+        item.barcodes[0].isClosed = false;
+        store[T][item.id] = clone(item); dataState.deletedItems = [clone(item)];
+        const money = { daily: clone(store[D]), monthly: clone(store[M]) };
+        const lookup = vi.fn(async (event: any, context: any) => {
+            expect(event.queryStringParameters).toEqual({ barcode: code, restore: '1' });
+            expect(event.headers['x-zoe-id-token']).toBe('tok');
+            expect(context).toMatchObject({ uid: 'u1', scope: 'https://shop.firebaseio.com', branch: '881859', basis: item.createdAt });
+            return { statusCode: 200, body: JSON.stringify({ success: true, found: true, barcode: code, cached: false,
+                verifiedForRestore: true, restoreTransitionsVerified: true, ztoClosed: false }) };
+        });
+        const fixture = createRestoreAttestationFixture({ get: at, set: put, scope: 'https://shop.firebaseio.com', actorUid: 'u1',
+            policy: { v: 1, mode: 'cookie', scope: 'https://shop.firebaseio.com', branch: '881859', epoch: 1 }, lookup });
+        const read = cleanupServerRead(at);
+        vi.stubGlobal('fetch', vi.fn((url: any, options: any) => new URL(String(url)).pathname === '/.netlify/functions/zto-restore-proof'
+            ? fixture.route(url, options) : read(url, options)));
+        uiState.pendingRestoreId = item.id; await executeRestoreItem();
+        expect(fixture.requests.map(request => request.action)).toEqual(['authorize', 'refresh']);
+        expect(firebaseState.fb.getIdTokenResult).toHaveBeenCalledWith(firebaseState.auth.currentUser);
+        expect(lookup).toHaveBeenCalledTimes(2);
+        expect(fixture.answers.map(answer => answer.body.kind)).toEqual(['allow', 'allow']);
+        const receipt = at(`zoew_trash_consumptions/${item.id}`);
+        const request = fixture.requests[0];
+        expect(receipt).toMatchObject({ kind: 'restore', sourceId: item.id, generation: 0, actorUid: 'u1',
+            scope: 'https://shop.firebaseio.com', token: request.token, targetId: request.targetId });
+        expect(at(`zoew_restore_attestations/${item.id}`)).toMatchObject({ status: 'allow', revision: 2,
+            sourceId: item.id, actorUid: 'u1', token: request.token, targetId: request.targetId });
+        expect(at(`${T}/${item.id}`)).toBeNull();
+        expect(at(`${H}/${request.targetId}`).barcodes).toEqual([expect.objectContaining({ code, isDeducted: false })]);
+        expect(at(`${H}/${request.targetId}`).restoreAttestationId).toBeUndefined();
+        expect({ daily: store[D], monthly: store[M] }).toEqual(money);
     });
 
     function abandonedPreparedRestore(claimedAt: number) {

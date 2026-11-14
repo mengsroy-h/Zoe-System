@@ -20,7 +20,7 @@ const BASE = { host: '127.0.0.1', port: 9000 };
 const NS = 'ns=' + emuNamespace('demo-zoe-crud');
 const AUTH = 'auth_variable_override=' + encodeURIComponent(JSON.stringify({ uid: 'userA' }));
 
-let pass = 0, fail = 0;
+let pass = 0, fail = 0, unmodeledRestoreAuthorityCalls = 0;
 const check = (c, label, detail) => { if (c) { pass++; console.log('  ok    ' + label); } else { fail++; console.log('  FAIL  ' + label + (detail ? '\n        ' + detail : '')); } };
 const clone = (v) => v === undefined ? undefined : JSON.parse(JSON.stringify(v));
 
@@ -73,7 +73,7 @@ const FNS = ['resolveZtoPickupSignTime', 'trashClaimMayBeLive', 'getZtoPickupVer
     'resumeInterruptedCleanups', 'resumeCleanupJournalEntry', 'cleanupCollectedKept', 'cleanupDropsMirror', 'dropCleanupCollected', 'remarkCleanupCollectedKept', 'finishCleanupCollected', 'cleanupStoredOutcome', 'trashReasonOf', 'collectedRetentionCutoffKey', 'withCleanupEntryOwnership',
     'buildClearHistoryTrashItem', 'trashEntryIsFinal', 'serverClockOffsetIsFromServer', 'holdCollectedSettle', 'toggleIndividualBarcodeClose', 'applyBarcodeCloseChange', 'barcodeSignIdentity',
     'toggleCloseStatus', 'executePermanentDelete',
-    'restoreAwaitsCancellation', 'resumeBlockedRestoreCancellations', 'cancelBlockedRestore', 'readRestoreServerNode', 'restoreRowWithout', 'restoreAddedCodesOf', 'storedRestoreClaims', 'saveRestoreClaim', 'trashRestoreBlockOf', 'trashZtoFinalBlock', 'barcodeZtoReturned', 'barcodeZtoMisplaced', 'barcodeZtoSentOut', 'trashItemLeftBranch', 'trashReturnedEvery', 'barcodeZtoLeftKind', 'barcodeReturnedEvidence', 'barcodeVerdictSigned', 'loadZtoPickupStatusOnce', 'saveZtoPickupStatus', 'ztoSignedTimeMillis', 'ztoScanStampMillis', 'appZoneWallClockToMillis', 'elapsedSince', 'captureConnectionOperation'];
+    'restoreAwaitsCancellation', 'resumeBlockedRestoreCancellations', 'cancelBlockedRestore', 'readRestoreServerNode', 'restoreRowWithout', 'restoreAddedCodesOf', 'storedRestoreClaims', 'saveRestoreClaim', 'trashRestoreBlockOf', 'trashZtoFinalBlock', 'trashZtoTerminalDecision', 'barcodeZtoReturned', 'barcodeZtoMisplaced', 'barcodeZtoSentOut', 'trashItemLeftBranch', 'trashReturnedEvery', 'barcodeZtoLeftKind', 'barcodeReturnedEvidence', 'barcodeVerdictSigned', 'loadZtoPickupStatusOnce', 'saveZtoPickupStatus', 'ztoSignedTimeMillis', 'ztoScanStampMillis', 'appZoneWallClockToMillis', 'elapsedSince', 'captureConnectionOperation'];
 
 // ⛔ 2.50.49 ៖ ការដកប្រាក់កញ្ចប់ត្រឡប់ជាព្រឹត្តិការណ៍មានសោ (ខែ ➜ ថ្ងៃ · `ded/<trashId>` ក្នុង transaction ថ្ងៃ) ➜ ផ្ទុក function ពិត
 //    ដើម្បីឲ្យ payload `ded` ពិតទៅដល់ rules ពិត (ផ្នែក ៥)។ tree មុនកែ ➜ stub (ផ្លូវចាស់មិនហៅវា)។
@@ -230,7 +230,13 @@ function makeSandbox(store, now) {
         clearScannedRemovalInFlight: () => {},
         document: { getElementById: () => null },
         scanHistory: [], deletedItems: [], pendingPermanentDeleteId: null, activeParentItemId: null, scanRemoveInFlight: null,
-        uiState: {}
+        uiState: {},
+        // Fixture នេះវាស់ local cleanup/cancellation; authority ZTO ពិតមាន
+        // matrix ដាច់ដោយឡែក។ ច្រកមិនបានគំរូត្រូវបរាជ័យ ហើយរាប់នៅចុង suite។
+        requestRestoreAuthorization: async () => {
+            unmodeledRestoreAuthorityCalls++;
+            throw new Error('crud-rules-flow: trusted ZTO authority មិនត្រូវបានគំរូ');
+        }
     });
     const assembled = [
         ...['TX_ROOT_READ_TIMEOUT_MS', 'RETURNED_TRASH_RETENTION_MS', 'TRASH_RETENTION_MS', 'DB_LISTENER_KEY_DAILY_REVENUE', 'DB_LISTENER_KEY_DAILY_COLLECTED', 'REGISTRY_RELEASE_RETRY_MAX', 'REGISTRY_RELEASE_QUEUE_MAX', 'DAILY_COLLECTED_DAY_PATTERN'].map(name => extractConst(src, name)),
@@ -466,6 +472,13 @@ async function clearOrphanBeforeRetry(w, label) {
         check(!finalizationWorld.store.zoew_restore_finalizations && finalizationWorld.writes.some(write => write.path === 'zoew_restore_finalizations/source' && write.value === null),
             'sandbox៖ clearRestoreFinalization ពិតដកតែភស្តុតាង token ដែលបានបញ្ជាក់');
         const clockWorld = makeSandbox({}, 1700000000000);
+        check(clockWorld.ctx.api.trashZtoTerminalDecision({ ztoTerminalDecision: 'returned', barcodes: [] }) === 'returned'
+            && clockWorld.ctx.api.trashZtoTerminalDecision({ ztoTerminalDecision: 'signed', barcodes: [] }) === 'signed'
+            && clockWorld.ctx.api.trashZtoTerminalDecision({ ztoTerminalDecision: 'unknown', barcodes: [] }) === '',
+            'sandbox៖ helper ពិតបែងចែក terminal decision និងមិនបង្កើតពីតម្លៃមិនស្គាល់');
+        check(clockWorld.ctx.api.trashZtoTerminalDecision({ ztoTerminalDecision: 'returned', restoreBlocked: true, barcodes: [] }) === 'signed'
+            && clockWorld.ctx.api.trashZtoTerminalDecision({ ztoTerminalDecision: 'returned', barcodes: [{ code: 'SIGNED_DECISION', ztoSignedAt: 1699999999000 }] }) === 'signed',
+            'sandbox៖ helper ពិតរក្សាអាទិភាព Signed លើ Returned តាម root និង barcode evidence');
         vm.runInContext("ztoPickupStatus.set('SMOKE_SIGN', { closed: true, signedAtPending: 1699999999000 });", clockWorld.ctx);
         const signed = clockWorld.ctx.api.getZtoPickupVerdict('SMOKE_SIGN');
         check(signed && signed.signedAt === 1699999999000 && signed.signedAtExact === true && !('signedAtPending' in signed),
@@ -879,6 +892,8 @@ async function clearOrphanBeforeRetry(w, label) {
             'rules ពិត ៖ ជួរគ្មាន provenance ➜ ការដក markers (ទោះដោះ claim T ក្នុងការសរសេរដដែល) បដិសេធ · server មិនប្តូរ',
             atomic.status + ' · ' + single.status);
     }
+
+    check(unmodeledRestoreAuthorityCalls === 0, 'local cleanup/cancellation មិនហៅ trusted ZTO authority ដែលមិនបានគំរូ', unmodeledRestoreAuthorityCalls);
 
     console.log('\n' + pass + ' ok, ' + fail + ' fail');
 

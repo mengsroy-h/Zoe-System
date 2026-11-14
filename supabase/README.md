@@ -39,6 +39,7 @@ ZoeKeyGen (គ្មាន SMS · គ្មានការបង់ប្រា�
 |---|---|---|
 | `my_account()` | authenticated | គណនីខ្លួនឯង ៖ username · role · ហាង · `branch_code` · `status` (`active`/`expired`/`revoked`) |
 | `zoe_write_v2(expected_tenant, op_id, ops)` | authenticated (សមាជិកហាងសកម្ម) | set · update · increment · transaction (CAS) ផ្ញើហាងពី original topic និង lock/ផ្ទៀង membership ក្នុង transaction ជាមួយ effects។ Server dedup ប្រើ `(tenant_id, op_id)` និង receipt retention ដើម; unknown រក្សា journal។ Wire ID ដូចគ្នាក្នុង tenant ផ្សេងមិនមែន global identity ដូចគ្នាទេ។ |
+| `zoe_restore_context_v1(source_id, token, target_id, expected_generation)` · `zoe_restore_attest_v1(envelope, signature)` | trusted Function តាម session របស់សមាជិក | Context របស់ប្រតិបត្តិការខ្លួនឯង និង signed server authority សម្រាប់ ZTO Restore; DB ផ្ទៀង HMAC, source/claim/session/revision និងម៉ោងនៅពេលសរសេរ។ ការហៅដោយ client គ្មាន signature ត្រឹមត្រូវមិនផ្ដល់សិទ្ធិ។ |
 | `zoe_write(op_id, ops)` | authenticated (client ចាស់) | Contract ចាស់ដែលមិនមាន expected tenant; មិនការពារការផ្ទេរ UID ចាស់ទៅហាងថ្មី។ កុំផ្ទេរ membership ខណៈនៅមាន client ចាស់។ |
 | `zoe_read(root, key?)` · `zoe_pull(since, limit, full_head?)` · `zoe_now()` | authenticated (សមាជិកហាងសកម្ម) | អានទិន្នន័យហាង និងម៉ោង server; មិនប្ដូរ tenant របស់ operation ក្នុង journal។ |
 | `zoe_evidence_candidates(root, before, limit)` | authenticated (សមាជិកហាងសកម្ម) | រាយកំណត់ត្រាភស្តុតាងចាស់ (`zoew_scan_operations` · `zoew_registry_releases` · `zoew_trash_consumptions`) របស់ហាងខ្លួនឯង ≤ ២០០ តាមអាយុ (អានតែប៉ុណ្ណោះ) ➜ App លុបតាម rules |
@@ -258,6 +259,8 @@ Environment variables ៖ `SUPABASE_URL` · `SUPABASE_PUBLISHABLE_KEY` ➜ «ទ
 ព្រំដែន ZTO proxy, cache សិទ្ធិ និងការសាកច្រើនហាង ➜ [ការរៀបចំ ZTO](../docs/zoew/ZTO-SETUP-KH.md#ព្រំដែនពេលបន្ថែមហាង-និងឧបករណ៍)។
 
 ### ជំហានទី ៥ — ហាងដំបូង (ZoeKeyGen)
+
+ការបើកសិទ្ធិ Restore របស់ហាង និងកូនសោ attestor ត្រូវត្រៀមតាម [ការកំណត់ ZTO](../docs/zoew/ZTO-SETUP-KH.md) ផ្នែក «សិទ្ធិស្តារ Palm និង Cookie ដែល DB ផ្ទៀងបាន»។ Policy ជារបស់ backend; ការរក្សាទុក Device Config មិនបង្កើតសិទ្ធិនេះទេ។
 
 ត្រូវបញ្ចប់ជំហានទី៣ក និងឃើញ `ready=true` មុនចេញ Setup Link។
 

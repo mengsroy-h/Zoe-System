@@ -55,6 +55,42 @@ const LOCAL_RECORDS = {
     }
 };
 
+// Map នេះរក្សា runtime ZTO observations; `entry` ជា callback value មិនមែន
+// package payload។ លើកលែងតែ field ដែលបានតាមដាន និង binding ពិតខាងក្រោម។
+const RUNTIME_MAP_RECORDS = {
+    'pruneZtoReturnedEvidence:entry': { source: 'ztoReturnedEvidence', fields: ['noted'],
+        reason: 'clock observation ក្នុង runtime Map; pruning មិនសរសេរ Firebase' }
+};
+function runtimeMapValue(fnNode, name, parents, source) {
+    const bindings = node => !node ? [] : node.type === 'Identifier' ? [node.name]
+        : node.type === 'RestElement' ? bindings(node.argument)
+        : node.type === 'AssignmentPattern' ? bindings(node.left)
+        : node.type === 'ArrayPattern' ? node.elements.flatMap(bindings)
+        : node.type === 'ObjectPattern' ? node.properties.flatMap(property => bindings(property.type === 'RestElement' ? property.argument : property.value)) : [];
+    const shadows = node => bindings(node).some(value => [name, source].includes(value));
+    let rebound = false;
+    (function scan(node) {
+        if (!node || typeof node !== 'object') return;
+        if (node.type === 'VariableDeclarator' && shadows(node.id)
+            || node.type === 'AssignmentExpression' && shadows(node.left)
+            || node.type === 'UpdateExpression' && shadows(node.argument)
+            || node.type === 'CatchClause' && shadows(node.param)
+            || node.type === 'FunctionDeclaration' && [name, source].includes(node.id?.name)
+            || /Function/.test(node.type) && node.params.some(param => bindings(param).includes(source))) rebound = true;
+        for (const value of Object.values(node)) {
+            if (Array.isArray(value)) value.forEach(scan);
+            else if (value && typeof value === 'object' && value.type) scan(value);
+        }
+    })(fnNode);
+    if (rebound || fnNode.params.some(shadows)) return false;
+    const index = parents.findLastIndex(node => /Function/.test(node.type));
+    const callback = parents[index], call = parents[index - 1];
+    return callback?.type === 'ArrowFunctionExpression' && callback.params[0]?.name === name
+        && call?.type === 'CallExpression' && call.arguments[0] === callback
+        && call.callee.type === 'MemberExpression' && !call.callee.computed
+        && call.callee.object.name === source && call.callee.property.name === 'forEach';
+}
+
 function sliceLimitFor(src, at) {
     let depth = 0;
     for (let i = src.indexOf('{', at); i < src.length; i++) {
@@ -77,6 +113,44 @@ for (const app of ['ZoeW']) {
     const localHits = new Map();
     const localFieldHits = new Set();
     const localProblems = [];
+    const runtimeHits = new Set();
+    const mapDeclarations = new WeakMap();
+    for (const ast of programs) {
+        const names = new Set();
+        for (const node of ast.body) if (node.type === 'VariableDeclaration' && node.kind === 'const') {
+            for (const declaration of node.declarations) if (declaration.id.type === 'Identifier'
+                && declaration.init?.type === 'NewExpression' && declaration.init.callee.name === 'Map'
+                && declaration.init.arguments.length === 0) names.add(declaration.id.name);
+        }
+        mapDeclarations.set(ast, names);
+    }
+    for (const [body, expected] of [
+        ['ztoReturnedEvidence.forEach(entry => { entry.noted = now; });', true],
+        ['scanHistory.forEach(entry => { entry.noted = now; });', false],
+        ['ztoReturnedEvidence.forEach(entry => { entry = barcode; entry.noted = now; });', false],
+        ['((ztoReturnedEvidence) => { ztoReturnedEvidence.forEach(entry => { entry.noted = now; }); })(scanHistory);', false],
+        ['const ztoReturnedEvidence = scanHistory; ztoReturnedEvidence.forEach(entry => { entry.noted = now; });', false],
+        ['const {ztoReturnedEvidence} = holder; ztoReturnedEvidence.forEach(entry => { entry.noted = now; });', false],
+        ['ztoReturnedEvidence.forEach(entry => { ({entry} = holder); entry.noted = now; });', false],
+        ['ztoReturnedEvidence.forEach(entry => { (() => { entry.noted = now; })(); });', false],
+        ['ztoReturnedEvidence.map(entry => { entry.noted = now; });', false],
+        ['ztoReturnedEvidence.forEach(other => { entry.noted = now; });', false]
+    ]) {
+        const fn = acorn.parse('function sample() {' + body + '}', { ecmaVersion: 2022 }).body[0], parents = [];
+        let actual;
+        (function visit(node) {
+            if (!node || typeof node !== 'object') return;
+            if (node.type === 'AssignmentExpression' && node.left.type === 'MemberExpression' && node.left.object.name === 'entry')
+                actual = runtimeMapValue(fn, 'entry', parents, 'ztoReturnedEvidence');
+            parents.push(node);
+            for (const value of Object.values(node)) {
+                if (Array.isArray(value)) value.forEach(visit);
+                else if (value && typeof value === 'object' && value.type) visit(value);
+            }
+            parents.pop();
+        })(fn);
+        if (actual !== expected) { console.log('   FAIL  runtime Map lineage probe: ' + body); problems++; }
+    }
     const localRecordIsLiteral = (fnNode, name) => {
         let literal = 0;
         let other = 0;
@@ -201,6 +275,14 @@ for (const app of ['ZoeW']) {
                 obj = null;
             }
             const localKey = fnNode && fnNode.id ? fnNode.id.name + ':' + obj : '';
+            const runtime = RUNTIME_MAP_RECORDS[localKey];
+            if (runtime && ast.body.includes(fnNode) && mapDeclarations.get(ast).has(runtime.source) && runtimeMapValue(fnNode, obj, parents, runtime.source)) {
+                if (/\bfirebaseState\.fb\b|\bfb\.[A-Za-z]+\(/.test(src.slice(fnNode.start, fnNode.end)))
+                    localProblems.push(`${localKey}: runtime collection reader ហៅ Firebase`);
+                else if (!runtime.fields.includes(prop)) localProblems.push(`${localKey}: runtime field '${prop}' មិនបាន review`);
+                else runtimeHits.add(localKey + '.' + prop);
+                obj = null;
+            }
             const local = obj && Object.prototype.hasOwnProperty.call(LOCAL_RECORDS, localKey) ? LOCAL_RECORDS[localKey] : null;
             if (local && (localRecordIsLiteral(fnNode, obj) || localRecordFromCollection(fnNode, obj, parents, local))) {
                 localHits.set(localKey, (localHits.get(localKey) || 0) + 1);
@@ -252,6 +334,11 @@ for (const app of ['ZoeW']) {
             localProblems.push(`LOCAL_RECORDS '${key}' field ងាប់ ៖ ${deadFields.join(' · ')}`);
         } else if (!src.includes("'" + record.store + "'")) {
             localProblems.push(`LOCAL_RECORDS '${key}' ឃ្លាំង ${record.store} មិនមានក្នុងកូដ`);
+        }
+    }
+    for (const [key, record] of Object.entries(RUNTIME_MAP_RECORDS)) {
+        if (!record.reason || record.fields.some(field => !runtimeHits.has(key + '.' + field))) {
+            localProblems.push(`RUNTIME_MAP_RECORDS '${key}' មានធាតុងាប់ ឬខ្វះហេតុផល`);
         }
     }
     localProblems.forEach((line) => { console.log('   FAIL  ' + line); problems++; });

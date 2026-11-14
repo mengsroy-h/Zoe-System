@@ -2,6 +2,7 @@
 
 const crypto = require('crypto');
 const modernBlobsEvents = new WeakMap();
+const trustedRestoreIdentities = new WeakMap();
 
 const DEFAULT_API_URL = 'https://aargus-api.ztoglobal.com/scan/get/order/detail';
 const DEFAULT_BROWSER_ORIGIN = 'https://argus.ztoglobal.com';
@@ -1150,7 +1151,7 @@ async function firebaseCerts(timeoutMs) {
     return certsState.inFlight;
 }
 
-async function verifyIdToken(token, projectIds, timeoutMs) {
+async function verifyIdToken(token, projectIds, timeoutMs, readCerts) {
     if (!token) return { ok: false, reason: 'idtoken:missing' };
     if (!projectIds.length) return { ok: false, reason: 'idtoken:project-unset' };
     const parsed = decodeIdToken(token);
@@ -1170,7 +1171,7 @@ async function verifyIdToken(token, projectIds, timeoutMs) {
     if (!Number.isFinite(iat) || iat - ID_TOKEN_SKEW_MS > now) return { ok: false, reason: 'idtoken:future' };
     if (typeof parsed.payload.sub !== 'string' || !parsed.payload.sub) return { ok: false, reason: 'idtoken:sub' };
 
-    const keys = await firebaseCerts(timeoutMs);
+    const keys = await (readCerts ? readCerts(timeoutMs) : firebaseCerts(timeoutMs));
     if (!keys) return { ok: false, reason: 'idtoken:certs' };
     const pem = keys[kid];
     if (!pem) return { ok: false, reason: 'idtoken:kid-unknown' };
@@ -1182,7 +1183,8 @@ async function verifyIdToken(token, projectIds, timeoutMs) {
     if (!good) return { ok: false, reason: 'idtoken:signature' };
 
     const email = typeof parsed.payload.email === 'string' ? parsed.payload.email : '';
-    return { ok: true, email: email, aud: aud, reason: '' };
+    return { ok: true, email: email, aud: aud, uid: parsed.payload.sub,
+        expiresAt: exp, authTime: Number(parsed.payload.auth_time) * 1000, reason: '' };
 }
 
 function listSiteCodeOf(raw) {
@@ -1275,6 +1277,77 @@ function listContainerOf(upstream) {
         if (Array.isArray(roots[i])) return { rows: roots[i], meta: {} };
     }
     return null;
+}
+
+async function cookieRestoreTransitions(config, headers, barcode, session, startedAt) {
+    if (config.trustedRestoreSignal?.aborted) return null;
+    const basis = config.trustedRestoreBasis, site = config.trustedRestoreSite, now = Date.now();
+    const kinds = ['arrival', 'signed', 'returned', 'sent', 'problem'];
+    if (!Number.isSafeInteger(basis) || basis <= 0 || basis > now || !LIST_SITE_CODE_RE.test(site || '')
+        || !config.list.enabled || !config.list.signedType || !config.list.returnType || !config.list.sendType || !config.list.problemType) return null;
+    const dayOf = value => new Date(value + LIST_ZONE_OFFSET_MS).toISOString().slice(0, 10);
+    const first = Date.parse(dayOf(basis) + 'T00:00:00Z'), last = Date.parse(dayOf(now) + 'T00:00:00Z');
+    const windows = [];
+    for (let start = first; start <= last; start += LIST_RANGE_MAX_DAYS * DAY_MS) {
+        if (windows.length >= 4) return null;
+        const from = new Date(start).toISOString().slice(0, 10), to = new Date(Math.min(last, start + (LIST_RANGE_MAX_DAYS - 1) * DAY_MS)).toISOString().slice(0, 10);
+        windows.push({ from, to, start: from + ' 00:00:00', end: to + ' 23:59:59' });
+    }
+    const stamps = { arrival: 0, signed: 0, returned: 0, sent: 0, problem: 0 };
+    const stamp = value => {
+        if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}$/.test(value)) return 0;
+        const parsed = Date.parse(value.replace(' ', 'T') + '+07:00');
+        return Number.isFinite(parsed) && new Date(parsed + LIST_ZONE_OFFSET_MS).toISOString().slice(0, 19) === value.replace(' ', 'T') ? parsed : 0;
+    };
+    const scanHeaders = Object.assign({}, headers, { 'Content-Type': 'application/json;charset=UTF-8' });
+    for (const range of windows) for (const kind of kinds) {
+        let expectedTotal = null, expectedPages = null, seen = 0;
+        for (let page = 1; page <= config.list.maxPages; page++) {
+            if (config.trustedRestoreSignal?.aborted || budgetLeftMs(config, startedAt) < 1000) return null;
+            const plan = listPlan(config, site, range, page, kind);
+            plan.body.condition.mailNos = [barcode];
+            plan.extract = upstream => listContainerOf(upstream);
+            const outcome = await fetchOrder(config, scanHeaders, barcode, startedAt, session, plan);
+            if (config.trustedRestoreSignal?.aborted) return null;
+            if (outcome.kind !== 'ok') {
+                if (outcome.kind === 'authRejected') { invalidateCookieCache(session); noteCookieRejected(session); }
+                return null;
+            }
+            const container = outcome.body, meta = container?.meta, rows = container?.rows;
+            const total = listCount(meta?.total), pages = listCount(meta?.pages), size = listServedSize(meta, config.list.pageSize);
+            if (!Array.isArray(rows) || rows.length > size || total === null || pages === null
+                || (total === 0 ? pages > 1 : pages !== Math.ceil(total / size)) || pages > config.list.maxPages
+                || page > Math.max(1, pages) || meta.pageNum !== undefined && listCount(meta.pageNum) !== page
+                || expectedTotal !== null && (expectedTotal !== total || expectedPages !== pages)) return null;
+            expectedTotal = total; expectedPages = pages;
+            for (const row of rows) {
+                if (!row || typeof row !== 'object' || Array.isArray(row)) return null;
+                const code = pickText([row], LIST_BARCODE_PATHS), type = pickText([row], LIST_SCAN_CODE_PATHS);
+                const branch = pickText([row], ['scanSiteCode', 'siteCode']), rawTime = pickText([row], LIST_TIME_PATHS), at = stamp(rawTime);
+                if (code.toUpperCase() !== barcode.toUpperCase() || type !== plan.body.condition.scanTypeCode || branch !== site
+                    || !at || at > now || rawTime.slice(0, 10) < range.from || rawTime.slice(0, 10) > range.to) return null;
+                if (kind !== 'problem') stamps[kind] = Math.max(stamps[kind], at);
+                else {
+                    const reason = pickText([row], LIST_PROBLEM_REASON_PATHS);
+                    if (!reason) return null;
+                    if (config.list.misplacedReasons.includes(scanDescKey(reason))) stamps.problem = Math.max(stamps.problem, at);
+                }
+            }
+            seen += rows.length;
+            if (page === Math.max(1, pages)) {
+                if (seen !== total) return null;
+                break;
+            }
+            if (!rows.length || seen >= total) return null;
+        }
+    }
+    const floor = Math.max(basis, stamps.arrival);
+    const out = { restoreTransitionsVerified: true, ztoClosed: stamps.signed >= floor && stamps.signed > 0 };
+    if (out.ztoClosed) return Object.assign(out, { ztoSignedAt: stamps.signed });
+    if (stamps.returned >= floor && stamps.returned > stamps.sent) return Object.assign(out, { ztoReturnedAt: stamps.returned });
+    if (stamps.sent >= floor && stamps.sent > 0) return Object.assign(out, { ztoReturnedAt: stamps.sent,
+        ...(stamps.problem >= floor && stamps.problem <= stamps.sent ? { ztoMisplacedAt: stamps.sent } : { ztoSentOutAt: stamps.sent }) });
+    return out;
 }
 
 function phoneIsPlaceholder(text) {
@@ -2172,7 +2245,9 @@ async function requestOnce(config, headers, barcode, timeoutMs, session, plan) {
 
         let upstream;
         try {
-            upstream = await response.json();
+            upstream = config.trustedRestore
+                ? await require('./zto-restore-http.cjs').readBoundedJson(response, 4 * 1024 * 1024, controller)
+                : await response.json();
         } catch (_) {
             return {
                 kind: 'fatal',
@@ -2395,6 +2470,8 @@ function detailIdentityOf(event) {
 }
 
 async function resolveDetailAccess(event, config, startedAt, readIdentity) {
+    const trusted = trustedRestoreIdentities.get(event);
+    if (trusted) return { verified: true, site: trusted.branch, binding: 'server' };
     const mode = config.detailIdentity;
     if (mode === 'off') return { verified: false, site: '' };
     const signal = detailAccessSignal;
@@ -2441,6 +2518,9 @@ function palmDeps(event, config, startedAt, keyLabel) {
     let idPromise = null;
     let accessPromise = null;
     const getIdentity = (token) => {
+        const trusted = trustedRestoreIdentities.get(event);
+        if (trusted) return Promise.resolve({ auth: { ok: true, uid: trusted.uid },
+            site: { code: trusted.branch, reason: '' }, binding: 'server' });
         if (!idPromise) idPromise = resolveListIdentity(token, config, startedAt, process.env);
         return idPromise;
     };
@@ -2451,6 +2531,7 @@ function palmDeps(event, config, startedAt, keyLabel) {
     return {
         headerOf,
         keyLabel,
+        trustedRestore: config.trustedRestore === true,
         blobStore: () => openCookieStore(event),
         upstreamMs: () => Math.max(1000, Math.min(config.upstreamTimeoutMs, budgetLeftMs(config, startedAt) - 200)),
         loginAccess: () => (config.detailIdentity === 'require' ? getAccess() : null),
@@ -2734,6 +2815,37 @@ exports.createModernHandler = function createModernHandler(blobs) {
     };
 };
 
+exports.createTrustedRestoreHandler = function createTrustedRestoreHandler(blobs) {
+    const run = exports.createModernHandler(blobs);
+    return async function trustedRestoreHandler(event, identity) {
+        if (!identity || typeof identity.uid !== 'string' || !identity.uid
+            || typeof identity.scope !== 'string' || !identity.scope
+            || typeof identity.branch !== 'string' || !LIST_SITE_CODE_RE.test(identity.branch)
+            || !Number.isFinite(identity.expiresAt) || identity.expiresAt <= Date.now()
+            || !Number.isFinite(identity.basis) || identity.basis <= 0 || identity.basis > Date.now()) {
+            return json(401, { code: 'ZTO_RESTORE_IDENTITY_REQUIRED' });
+        }
+        trustedRestoreIdentities.set(event, Object.freeze({ ...identity }));
+        try { return await run(event); }
+        finally { trustedRestoreIdentities.delete(event); }
+    };
+};
+
+exports.verifyRestoreFirebaseActor = async function verifyRestoreFirebaseActor(token, env, readCerts, timeoutMs) {
+    if (typeof readCerts !== 'function') return { ok: false, reason: 'idtoken:certs' };
+    const projects = readProjectEntries(env);
+    const actor = await verifyIdToken(token, projects.ids, timeoutMs, readCerts);
+    if (!actor.ok) return actor;
+    const branch = siteCodeFromEmail(actor.email, siteEmailPrefix(env));
+    const branches = projects.branches[actor.aud];
+    if (!branch || !branches || !branches.includes(branch.toLowerCase())) return { ok: false, reason: 'site:project-branch' };
+    const now = Date.now();
+    if (!Number.isFinite(actor.authTime) || actor.authTime <= 0 || actor.authTime > now
+        || now - actor.authTime >= 4 * 60 * 60 * 1000 || actor.expiresAt <= now) return { ok: false, reason: 'idtoken:session-expired' };
+    return { ...actor, branch, backend: 'firebase', scope: actor.aud,
+        expiresAt: Math.min(actor.expiresAt, actor.authTime + 4 * 60 * 60 * 1000) };
+};
+
 async function handleRequest(event) {
     const startedAt = Date.now();
     if (event.httpMethod === 'OPTIONS') {
@@ -2764,6 +2876,18 @@ async function handleRequest(event) {
         config = readConfig(process.env);
     } catch (error) {
         return configErrorResponse(error);
+    }
+
+    const trustedRestore = trustedRestoreIdentities.get(event);
+    if (trustedRestore) {
+        config.detailIdentity = 'require';
+        config.trustedRestore = true;
+        config.trustedRestoreBasis = trustedRestore.basis;
+        config.trustedRestoreSite = trustedRestore.branch;
+        config.trustedRestoreSignal = trustedRestore.signal;
+        if (!palmQuery.palm && !config.detailBranchPaths.length) return json(503, { code: 'ZTO_RESTORE_UNCONFIRMED' });
+        config.budgetMs = Math.min(config.budgetMs, Math.max(0, trustedRestore.expiresAt - Date.now()));
+        if (config.budgetMs < 500) return json(401, { code: 'ZTO_RESTORE_IDENTITY_REQUIRED' });
     }
 
     if (palmQuery.palm && require('./zto-palm').isPalmQuery(palmQuery)) {
@@ -2987,6 +3111,15 @@ async function handleRequest(event) {
         let body = outcome.body;
         if (companion) body = mergeSignedCompanion(body, companionOutcome);
         if (branchOutcomes.length) body = mergeSignedBranches(body, branchOutcomes.map((extra) => extra.body));
+        if (verifyRestore && config.trustedRestore) {
+            if (outcome.barcodeConfirmed !== true || typeof body.ztoClosed !== 'boolean') {
+                return json(503, { success: false, code: 'ZTO_RESTORE_UNCONFIRMED' });
+            }
+            const transitions = body.ztoClosed ? { restoreTransitionsVerified: true } : await cookieRestoreTransitions(config, headers, barcode, session, startedAt);
+            if (!transitions) return json(503, { success: false, code: 'ZTO_RESTORE_UNCONFIRMED' });
+            body = Object.assign({}, body, transitions);
+            await flushCookieRenewal(session, cookieRenewTimeoutMs(config, startedAt));
+        }
         const ttlMs = plan ? plan.cacheTtlMs : config.cacheTtlMs;
         if (ttlMs > 0 && (!companion || body.signedOk)) storeCachedBody(cacheKey, body);
         const response = plan ? Object.assign({}, body, { cached: false }) : detailResponseBody(config, access, body, barcode, false);
@@ -2999,6 +3132,14 @@ async function handleRequest(event) {
         if ((verifyRestore || wantsStatus) && outcome.recordHeld) {
             const refusal = detailBranchRefusal(config, access, { found: true, branches: outcome.recordBranches });
             if (refusal) return json(200, { success: false, found: false, barcode, code: 'ZTO_OTHER_BRANCH', reason: refusal, cached: false });
+            if (verifyRestore && config.trustedRestore) {
+                if (typeof outcome.recordSigned !== 'boolean') return json(503, { success: false, code: 'ZTO_RESTORE_UNCONFIRMED' });
+                const transitions = outcome.recordSigned ? { restoreTransitionsVerified: true } : await cookieRestoreTransitions(config, headers, barcode, session, startedAt);
+                if (!transitions) return json(503, { success: false, code: 'ZTO_RESTORE_UNCONFIRMED' });
+                await flushCookieRenewal(session, cookieRenewTimeoutMs(config, startedAt));
+                return json(200, Object.assign({ success: false, found: false, barcode, code: 'ZTO_NO_CUSTOMER_DATA',
+                    ztoClosed: outcome.recordSigned, cached: false, verifiedForRestore: true }, transitions));
+            }
             return json(200, { success: false, found: false, barcode, code: 'ZTO_NO_CUSTOMER_DATA', ztoClosed: outcome.recordSigned, cached: false });
         }
         return json(200, Object.assign({}, notFoundBody, { cached: false }));

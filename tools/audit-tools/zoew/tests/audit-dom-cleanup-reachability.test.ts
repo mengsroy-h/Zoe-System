@@ -50,9 +50,18 @@ describe('DOM checker៖ ផ្លូវសម្អាតផ្ទាំង Key
             });
         }
     }
-    for (const [property, id] of [['value', 'secureKeySetupKey'], ['textContent', 'secureKeyFingerprint']]) {
-        it(`${property}៖ ខ្វះការសម្អាតនៅតែធ្លាក់ ទោះ helper នៅត្រូវហៅ`, () => {
-            const result = check(replaceFunction(source, 'clearSecureKeySetup', body => body.replace(`el.${property} = '';`, `el.${property} = 'នៅសល់';`)));
+    for (const [property, id] of [['value', 'secureKeySetupKey'], ['textContent', 'secureKeyFingerprint'], ['textContent', 'secureSeatInventoryId']]) {
+        it(`${id} (${property})៖ ខ្វះការសម្អាតនៅតែធ្លាក់ ទោះ helper នៅត្រូវហៅ`, () => {
+            const result = check(replaceFunction(source, 'clearSecureKeySetup', body => {
+                const field = body.indexOf(`'${id}'`);
+                expect(field).toBeGreaterThan(-1);
+                const loopEnd = body.indexOf('});', field);
+                expect(loopEnd).toBeGreaterThan(field);
+                const group = body.slice(field, loopEnd);
+                const changed = group.replace(`el.${property} = '';`, `el.${property} = 'នៅសល់';`);
+                expect(changed).not.toBe(group);
+                return body.slice(0, field) + changed + body.slice(loopEnd);
+            }));
             expect(result.status).toBe(1);
             expect(result.output).toContain(`⚠ ${id}`);
         });

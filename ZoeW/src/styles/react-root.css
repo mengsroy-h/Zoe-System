@@ -937,3 +937,46 @@ html.ios-standalone body.modal-keyboard .modal-content { overscroll-behavior-y: 
     outline: 2px solid var(--action-warning);
     outline-offset: 1px;
 }
+
+#activationModal .activation-options {
+    margin: 20px 0 12px;
+    border: 1px solid #bfdbfe;
+    border-radius: var(--radius-md);
+    background: var(--card-bg);
+    text-align: left;
+}
+#activationModal .activation-options > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 56px;
+    padding: 14px 16px;
+    border-radius: var(--radius-md);
+    background: #f5f9ff;
+    color: var(--action-primary);
+    font-size: calc(12.5 * var(--fs-unit));
+    line-height: 1.65;
+    cursor: pointer;
+    list-style: none;
+}
+#activationModal .activation-options > summary::-webkit-details-marker { display: none; }
+#activationModal .activation-options > summary::marker { content: ''; }
+#activationModal .activation-options-copy { display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
+#activationModal .activation-options-hint { color: var(--text-main); font-size: calc(11.5 * var(--fs-unit)); font-weight: 500; }
+#activationModal .activation-options-chevron { flex: none; font-size: calc(20 * var(--fs-unit)); line-height: 1; }
+#activationModal .activation-options[open] > summary { border-radius: var(--radius-md) var(--radius-md) 0 0; }
+#activationModal .activation-options[open] .activation-options-chevron { transform: rotate(180deg); }
+#activationModal .activation-options-body { display: grid; gap: 12px; padding: 16px; border-top: 1px solid #bfdbfe; }
+#activationModal .activation-options-body p { margin: 0; line-height: 1.65; overflow-wrap: anywhere; }
+#activationModal .activation-options-body label { margin: 0; line-height: 1.65; }
+#activationModal .activation-options-body input { margin-bottom: 0; min-width: 0; }
+#activationModal .activation-options-body [role="status"]:empty { display: none; }
+#activationModal .modal-btns .activation-primary { background: var(--action-primary); color: #fff; border: 1px solid var(--action-primary); }
+#activationModal .modal-btns .activation-confirm { background: var(--action-success); color: #fff; border: 1px solid var(--action-success); box-shadow: none; }
+#activationModal .modal-btns .activation-warning { background: #fffbeb; color: var(--action-warning); border: 1px solid var(--action-warning); }
+#activationModal .modal-btns .activation-cancel { background: var(--card-bg); color: var(--action-danger); border: 1px solid var(--action-danger); }
+#activationModal .modal-btns button { overflow-wrap: anywhere; }
+#activationModal .modal-btns button:disabled { background: var(--body-bg); color: var(--text-muted); border: 1px solid var(--border-color); box-shadow: none; opacity: 1; }
+#activationModal button:focus-visible,
+#activationModal summary:focus-visible { outline: 2px solid var(--action-primary); outline-offset: 3px; }

@@ -107,7 +107,7 @@ function client(db: any = database(), cryptoProvider: any = webcrypto) {
         btoa: (s: string) => Buffer.from(s, 'binary').toString('base64'), atob: (s: string) => Buffer.from(s, 'base64').toString('binary') };
     ctx.window = ctx;
     vm.runInNewContext(readFileSync('public/license-seat-client.js', 'utf8'), ctx);
-    return { api: ctx.ZoeSeatClient, ...db };
+    return { api: ctx.ZoeSeatClient, ctx, ...db };
 }
 const app = 'ZOE', keyId = 'SYNTHETICKEY123456789';
 
@@ -325,4 +325,22 @@ describe('ការចុះហត្ថលេខាសំណើអញ្ជើ�
         await expect(c.api.signInvitationCommand(app, keyId, { ...command, action: 'approve' })).rejects.toThrow();
         await expect(c.api.invitationEnrollmentRequest(app, keyId, inviteId, 'browser')).rejects.toThrow();
     });
+});
+
+it('ព័ត៌មានបង្ហាញមានតែក្នុងសារចុះហត្ថលេខាដែលត្រូវការ', async () => {
+    const c = client(); await c.api.createIdentity(app, keyId);
+    vm.runInNewContext(readFileSync('public/license-verify.js', 'utf8'), c.ctx);
+    c.ctx.ZoeLicense.setDeviceMeta({ model: ' Pixel 9 ', platform: 'Android 16', serial: 'private-id' });
+    const base = { domain: 'zoe-license-seat-stage-v1', audience: 'https://zoew.netlify.app', app, keyId, revision: 2 };
+    const envelopes = [await c.api.enrollmentRequest(app, keyId), await c.api.invitationEnrollmentRequest(app, keyId, keyId + '.0123456789ABCDEF', 'pwa'), await c.api.signCommand(app, keyId, { ...base, action: 'prove' })];
+    const identity = await c.api.loadIdentity(app, keyId);
+    const key = await webcrypto.subtle.importKey('jwk', identity.publicKey, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
+    for (const envelope of envelopes) {
+        const decoded = Buffer.from(envelope.payload, 'base64url').toString();
+        expect(JSON.parse(decoded).display).toEqual({ model: 'Pixel 9', platform: 'Android 16' });
+        expect(decoded).not.toContain('private-id');
+        expect(await webcrypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key, Buffer.from(envelope.signature, 'base64url'), Buffer.from(envelope.payload))).toBe(true);
+    }
+    const state = await c.api.signCommand(app, keyId, { ...base, action: 'device-state' });
+    expect(JSON.parse(Buffer.from(state.payload, 'base64url').toString()).display).toBeUndefined();
 });

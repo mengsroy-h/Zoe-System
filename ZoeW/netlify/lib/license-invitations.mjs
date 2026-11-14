@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { LICENSE_PUBLIC_KEYS_JWK, parseLicenseKey, licenseSignatureValid } from './push-core.mjs';
-import { SEAT_AUDIENCE, publicKey, verifies, decode, validState, receiptSigner, enrollmentMatches, seatKeyFingerprint, boundedBody } from './license-seat-stage.mjs';
+import { SEAT_AUDIENCE, publicKey, verifies, decode, validState, receiptSigner, enrollmentMatches, seatKeyFingerprint, seatDisplay, boundedBody } from './license-seat-stage.mjs';
 export const INVITATION_DOMAIN = 'zoe-license-invitation-v1';
 const locator = /^[A-Z0-9]{16,40}\.[0-9A-HJKMNP-TV-Z]{16}$/;
 const out = (status, reason, extra = {}) => ({ status, body: { reason, ...extra } });
@@ -147,7 +147,9 @@ export function createInvitationService({ store, enabled = false, encryptionKey,
                 const slot = slots.find(s => state.seats[s] && seatKeyFingerprint(state.seats[s].publicKey) === r.fingerprint) || slots.find(s => !state.seats[s]);
                 if (!slot)
                     return out(409, 'seat-limit');
+                const display = seatDisplay(JSON.parse(decode(r.enrollment.payload).toString('utf8')).display) || seatDisplay(next.seats[slot]?.display);
                 next.seats[slot] = { publicKey: r.publicKey };
+                if (display) next.seats[slot].display = display;
                 next.mode = 'active';
                 r.status = 'approved';
                 inv.status = 'approved';

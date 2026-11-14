@@ -227,12 +227,24 @@
         return { payload: payload, signature: encode(signature) };
     }
 
+    function addDeviceDisplay(command) {
+        try {
+            const license = global.ZoeLicense;
+            const value = license && typeof license.getDeviceDisplay === 'function' ? license.getDeviceDisplay() : null;
+            if (!value || typeof value !== 'object') return;
+            const clean = (text, max) => typeof text === 'string' ? text.replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u2069\ufeff]/g, '').replace(/\s+/g, ' ').trim().slice(0, max).trim() : '';
+            const model = clean(value.model, 80), platform = clean(value.platform, 40);
+            if (model || platform) command.display = { model: model, platform: platform };
+        } catch (e) {}
+    }
+
     async function signCommand(app, keyId, command) {
         scope(app, keyId);
         const snapshot = JSON.parse(JSON.stringify(command));
         if (!snapshot || snapshot.domain !== DOMAIN || snapshot.audience !== AUDIENCE || snapshot.app !== app || snapshot.keyId !== keyId) throw new Error('identity-scope');
         const identity = await loadIdentity(app, keyId);
         if (!identity) throw new Error('identity-missing');
+        if (snapshot.action === 'prove') addDeviceDisplay(snapshot);
         return signed(identity, snapshot);
     }
 
@@ -240,6 +252,7 @@
         const identity = await loadIdentity(app, keyId);
         if (!identity) throw new Error('identity-missing');
         const command = { domain: 'zoe-license-enrollment-v1', audience: AUDIENCE, app: app, keyId: keyId, publicKey: identity.publicKey, nonce: encode(crypto.getRandomValues(new Uint8Array(24))) };
+        addDeviceDisplay(command);
         const envelope = await signed(identity, command);
         envelope.fingerprint = await fingerprint(identity.publicKey);
         return envelope;
@@ -251,6 +264,7 @@
         const identity = await loadIdentity(app, keyId);
         if (!identity) throw new Error('identity-missing');
         const command = { domain: 'zoe-license-enrollment-v1', audience: AUDIENCE, app: app, keyId: keyId, publicKey: identity.publicKey, nonce: encode(crypto.getRandomValues(new Uint8Array(24))), inviteId: inviteId, target: target };
+        addDeviceDisplay(command);
         const envelope = await signed(identity, command);
         envelope.fingerprint = await fingerprint(identity.publicKey);
         return envelope;

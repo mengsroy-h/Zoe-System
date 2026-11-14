@@ -83,8 +83,49 @@ async function run() {
         }
         check(buttons[0].classList.contains('btn-confirm') && buttons.slice(1).every(button => button.classList.contains('btn-cancel')),
             busy + '៖ ស្នើសុំជាប៊ូតុងចម្បង បោះបង់និងចាកចេញជាប៊ូតុងបន្ទាប់');
-        check(buttons[0].disabled === !!busy && (!busy || getStyle(buttons[0]).opacity === '0.6') && buttons.slice(1).every(button => !button.disabled),
+        check(buttons[0].disabled === !!busy && (!busy || (getStyle(buttons[0]).opacity === '1' && getStyle(buttons[0]).boxShadow === 'none')) && buttons.slice(1).every(button => !button.disabled),
             busy + '៖ ពេលកំពុងធ្វើការ បិទស្នើសុំតែរក្សាបោះបង់និងចាកចេញ');
+    }
+    const document = customer({ invitationCode: 'A'.repeat(24) + '.' + 'B'.repeat(16) });
+    const style = document.createElement('style'); style.textContent = css; document.head.append(style);
+    const getStyle = node => document.defaultView.getComputedStyle(node);
+    const details = document.querySelector('#activationModal details'), summary = details.querySelector('summary');
+    const title = summary.querySelector('strong'), hint = summary.querySelector('.activation-options-hint');
+    check(parseFloat(getStyle(details).marginTop) >= 16 && parseFloat(getStyle(summary).minHeight) >= 56 && parseFloat(getStyle(summary).paddingTop) >= 12,
+        'ជម្រើសបន្ថែមមានចន្លោះពីប៊ូតុងខាងលើ និងទំហំចុចងាយ');
+    check(title?.textContent === 'ជម្រើសបន្ថែម' && hint?.textContent === 'មានលេខកូដអញ្ជើញពីអ្នកលក់' && getStyle(title?.parentElement || summary).display === 'grid',
+        'ចំណងជើង និងពាក្យពន្យល់នៅជួរដាច់ដោយឡែក');
+    const content = details.querySelector('.activation-options-body');
+    check(!!content && getStyle(content).display === 'grid' && parseFloat(getStyle(content).gap) >= 12 && parseFloat(getStyle(content).paddingTop) >= 12,
+        'ខ្លឹមសារជម្រើសមានចន្លោះរវាងស្លាក វាលបញ្ចូល និងប៊ូតុង');
+    const luminance = color => {
+        const hex = color.replace('#', '');
+        const channels = color.startsWith('#') ? (hex.length === 3 ? [...hex].map(c => c + c).join('') : hex).match(/../g).map(c => parseInt(c, 16)) : color.match(/[\d.]+/g)?.slice(0, 3).map(Number);
+        if (!channels || channels.length !== 3) return NaN;
+        return channels.map(channel => { const c = channel / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; })
+            .reduce((sum, c, i) => sum + c * [0.2126, 0.7152, 0.0722][i], 0);
+    };
+    check([summary, hint].every(node => {
+        if (!node) return false;
+        const a = luminance(getStyle(node).color), b = luminance(getStyle(summary).backgroundColor);
+        return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05) >= 4.5;
+    }), 'ចំណងជើង និងពាក្យពន្យល់មានកម្រិតពណ៌ខុសគ្នាយ៉ាងហោចណាស់ 4.5:1');
+    const buttons = [...document.querySelectorAll('#activationModal button')];
+    const colors = buttons.map(button => {
+        const actual = getStyle(button), a = luminance(actual.color), b = luminance(actual.backgroundColor);
+        return { contrast: (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05), combination: actual.color + actual.backgroundColor };
+    });
+    check(buttons.length === 6 && colors.every(color => color.contrast >= 4.5), 'អក្សរប៊ូតុងមានកម្រិតពណ៌ខុសគ្នាយ៉ាងហោចណាស់ 4.5:1');
+    check(new Set(colors.map(color => color.combination)).size === 4, 'ពណ៌បែងចែកបញ្ជាក់ ចុះឈ្មោះ ជួសជុល និងបោះបង់');
+    check(getStyle(document.getElementById('activationSubmitBtn')).backgroundColor === getStyle(document.documentElement).getPropertyValue('--action-success').trim() && getStyle(document.getElementById('seatEnrollmentPrepareBtn')).backgroundColor === getStyle(document.documentElement).getPropertyValue('--action-primary').trim(),
+        'បញ្ជាក់ប្រើពណ៌ជោគជ័យ ហើយចុះឈ្មោះប្រើពណ៌ចម្បង');
+    for (const state of [{ activationBusy: true }, { invitationBusy: true }, { seatEnrollmentBusy: true, seatEnrollmentOnly: true }]) {
+        const busyDocument = customer(state);
+        const busyStyle = busyDocument.createElement('style'); busyStyle.textContent = css; busyDocument.head.append(busyStyle);
+        const disabled = [...busyDocument.querySelectorAll('button:disabled')];
+        const computed = disabled.map(button => busyDocument.defaultView.getComputedStyle(button));
+        check(disabled.length === 4 && computed.every(actual => actual.opacity === '1' && actual.boxShadow === 'none' && actual.backgroundColor === busyDocument.defaultView.getComputedStyle(busyDocument.documentElement).getPropertyValue('--body-bg').trim()),
+            'ស្ថានភាពមិនអាចចុចប្រើពណ៌ស្ងប់ រក្សាអក្សរច្បាស់ និងលុបស្រមោល');
     }
     console.log(`${passed} PASS, ${failed} FAIL`);
     process.exitCode = failed ? 1 : 0;

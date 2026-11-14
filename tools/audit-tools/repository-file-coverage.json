@@ -933,6 +933,15 @@
       ],
       "evidence": "Reviewed candidate-only manual proof is pinned by SHA-256; it executes actual Admin SDK handler and canonical RTDB rules under an owned local scope, with synthetic provider context. Results are separate from the canonical suite.",
       "limitation": "Normal run-all and the registration-only CI job do not execute this optional SDK/JVM proof. It does not verify Cloud Functions trigger delivery or hosted deployment."
+    },
+    "restore-trusted-authority": {
+      "category": "behavior",
+      "guards": [
+        "tools/audit-tools/zoew-suite-test.js",
+        "tools/audit-tools/emu/zto-restore-attestation-emu-test.js"
+      ],
+      "evidence": "Suite រត់ trusted issuer និង HMAC/RPC លើ PostgreSQL ពិត; emulator guard ផ្ទៀង source freeze, actor/lifecycle/expiry, target projection និង financial/replay assertions ដោយប្រើ actual adapter និង RTDB។",
+      "limitation": "Provider/Auth transport ក្នុង local fixtures មានការធ្វើត្រាប់ច្បាស់លាស់; ភស្តុតាងនេះមិនជំនួស live target configuration/deploy ឬ atomic transaction ជាមួយ ZTO ទេ។"
     }
   },
   "files": {
@@ -5402,6 +5411,87 @@
     },
     "tools/audit-tools/zoew/tests/sheet-import-protocol.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/netlify/functions/_shared/zto-restore-firebase.cjs": {
+      "policy": "restore-trusted-authority"
+    },
+    "ZoeW/netlify/functions/_shared/zto-restore-http.cjs": {
+      "policy": "restore-trusted-authority"
+    },
+    "ZoeW/netlify/functions/_shared/zto-restore-proof.cjs": {
+      "policy": "restore-trusted-authority"
+    },
+    "ZoeW/netlify/functions/zto-restore-proof.mjs": {
+      "policy": "restore-trusted-authority"
+    },
+    "supabase/migrations/20261114145911_zoe_restore_attestation.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261114161533_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "tools/audit-tools/emu/zto-restore-attestation-emu-test.js": {
+      "policy": "guard-1"
+    },
+    "tools/audit-tools/fixtures/money-restore-issuer.cjs": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/fixtures/pg-restore-issuer.cjs": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/fixtures/trusted-restore-policy.cjs": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/restore-attestation-rules-scope.cjs": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/helpers/restore-attestation.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/helpers/rules-boolean-grouping.cjs": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/money-restore-issuer-fixture.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/restore-attestation-rules-scope.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/rtdb-auth-claims.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/rules-boolean-grouping.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/rules-wildcard-child-paths.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/supabase-pending-archive.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/zto-restore-attestation.pg.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/zto-restore-cookie-transitions.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/zto-restore-firebase.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/zto-restore-issuer.pg.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/zto-restore-network.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/zto-restore-proof.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/zto-restore-protocol.pg.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zto-restore-attestation-cases.cjs": {
+      "policy": "restore-trusted-authority"
     }
   }
 }

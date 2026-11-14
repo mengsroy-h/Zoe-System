@@ -156,6 +156,10 @@ node tools/supabase-migrate/migrate.js backups/<target>/<tenant-id>/ --branch <�
 
 ## ប្រព័ន្ធសុវត្ថិភាព
 
+Ordinary import បដិសេធ input ដែលមាន sealed restore source ឬ private authority ចងនឹងវដ្តបច្ចុប្បន្ន រួមទាំង raw Firebase input និង `--skip-invalid`។ Business import រក្សា trusted policy របស់ target និងមិនចម្លង private grant ពី source; ការដក configuration ពីផែនការត្រូវបានរាយច្បាស់។ វាក៏ទប់ target ដែលកំពុងមាន private restore state; វាមិនដោះ seal, claim ឬ browser journal ឡើយ។ សង្គ្រោះប្រតិបត្តិការ ឬប្រើផ្លូវ DB របស់អ្នកគ្រប់គ្រងជាមុន។
+
+ត្រូវបញ្ឈប់ការសរសេររបស់ devices/issuer និង drain សំណើដែលកំពុងដំណើរការ ក្នុង maintenance window ផ្ដាច់មុខ មុន business import។ Snapshot preflight និង atomic batch មិនធានា atomicity របស់ import ទាំងមូលទេ។ Strict audit-only archive ប្រើតែ audit RPC និងមិនផ្ញើ document-write request; លទ្ធផលនោះមិនអះអាងថាបានអាន/ផ្ទៀង business snapshot ទាំងមូលឡើយ។
+
 - **Secret key = សិទ្ធិពេញលើគ្រប់ហាង** ៖ អានពី env (ឬ `--secret-key`) តែប៉ុណ្ណោះ · **មិនដែលបោះពុម្ព** · មិនសរសេរចូលឯកសារណាមួយ · ផ្ញើតែក្នុង header
   `apikey` ទៅ URL របស់ Project លើ **HTTPS** (HTTP តែ `127.0.0.1`/`localhost`) · Publishable key ត្រូវបដិសេធមុនបណ្តាញ ➜ ប្រើសោដាច់ដោយឡែក
   ហើយលុបវាក្រោយប្រើ។

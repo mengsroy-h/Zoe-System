@@ -8,6 +8,7 @@ const { localAuthRuntime } = require('../local-auth-runtime.cjs');
 const acorn = require('acorn');
 const { isDeepStrictEqual } = require('util');
 const { emuNamespace } = require('./ns.js');
+const { localRestorePolicy } = require('../fixtures/trusted-restore-policy.cjs');
 process.exitCode = 1;
 
 // សាកចន្លោះ prepare → finalize ជាមួយកូដ App និង Firebase rules ពិត។
@@ -18,6 +19,7 @@ const NS = emuNamespace('demo-zoe-restore-mutation');
 const DATE = '2026-09-08';
 const MONTH = DATE.slice(0, 7);
 const NOW = Date.now();
+const RESTORE_SCOPE = 'https://restore-emulator-fixture.invalid';
 let pass = 0, fail = 0;
 function ledgerMoney(record) {
     const r = record || {};
@@ -53,6 +55,9 @@ function request(method, node, body, owner, extraHeaders, unauthenticated) {
 function accepted(result) {
     if (result.status !== 200) throw new Error('Firebase rules rejected: ' + result.status + ' ' + JSON.stringify(result.value));
     return result.value;
+}
+async function seedLocalRestore(tree) {
+    return accepted(await request('PUT', '/', { ...tree, zoew_restore_policy: { shop: localRestorePolicy(RESTORE_SCOPE) } }, true));
 }
 const snapshot = (value) => ({ exists: () => value !== null, val: () => clone(value) });
 function adapter(pending, hooks = {}) {
@@ -132,7 +137,7 @@ function tab(suffix, hooks, fixedTime = false) {
         setTimeout: (fn, ms) => setTimeout(fn, ms < 10000 ? 0 : ms), clearTimeout,
         Date: scenarioClock ? scenarioClock.Date : Date, Math, JSON, Promise, WeakMap, queueMicrotask, performance: scenarioClock ? scenarioClock.performance : require('node:perf_hooks').performance, crypto: require('node:crypto').webcrypto, window: {}, navigator: {},
         document: { getElementById: (id) => id === 'editBcCodInput' ? { value: '4' } : id === 'editBcDodInput' ? { value: '2' } : null },
-        db: { app: { options: { databaseURL: 'https://restore-emulator-fixture.invalid' } } },
+        db: { app: { options: { databaseURL: RESTORE_SCOPE } } },
         auth: { currentUser: { uid: 'audit-user' } }, sessionExpiryCheck: 'live', serverClockTrusted: false, isInitializingFirebase: false, dataState: { pickupPendingVersion: 0 }, dailyPickupData: {},
         authGeneration: 0, fb, dbRefHistory: fb.ref(null, 'zoew_scan_history_cod_dod'), dbRefDeleted: fb.ref(null, 'zoew_recently_deleted_cod_dod'),
         dbRefDailyRevenue: fb.ref(null, 'zoew_daily_revenue_cod_dod'), dbRefMonthlyRevenue: fb.ref(null, 'zoew_monthly_revenue_cod_dod'),
@@ -206,11 +211,11 @@ async function missingProofScenario(mode) {
     if (mode === 'none' || mode === 'monthly only') delete daily.ded;
     if (mode === 'none' || mode === 'daily only') delete monthly.ded;
     if (mode === 'stale') monthly.ded[item.id].at--;
-    accepted(await request('PUT', '/', {
+    await seedLocalRestore({
         zoew_recently_deleted_cod_dod: { [item.id]: item },
         zoew_daily_revenue_cod_dod: { [DATE]: daily },
         zoew_monthly_revenue_cod_dod: { [MONTH]: monthly }
-    }, true));
+    });
     const client = tab('missing-proof');
     client.context.pendingRestoreId = item.id;
     await client.context.executeRestoreItem();
@@ -234,7 +239,7 @@ async function runScenario(action) {
         zoew_daily_revenue_cod_dod: { [DATE]: deductedLedger(seedItem()) },
         zoew_monthly_revenue_cod_dod: { [MONTH]: deductedLedger(seedItem()) }
     };
-    accepted(await request('PUT', '/', initial, true));
+    await seedLocalRestore(initial);
     const restoring = tab('restoring');
     const other = tab('other');
     const realFinalize = restoring.context.finalizeClaimedRestore;
@@ -301,7 +306,7 @@ async function runScenario(action) {
             check(priced?.pricePending?.phase === 'settled' && priced.pricePending.outcome === 'committed',
                 'Price៖ ភស្តុតាងកែតម្លៃ committed នៅក្នុង history មុនការលុប');
             for (const mode of ['Delete', 'Remove']) {
-                accepted(await request('PUT', '/', clone(normal), true));
+                await seedLocalRestore(clone(normal));
                 await other.sync();
                 if (mode === 'Delete') await other.context.deleteSingleItem('id_restore');
                 else await other.context.removeSingleBarcode('id_restore', 'RESTORE_BC');
@@ -332,10 +337,10 @@ async function markerRecoveryScenario(mode) {
     live.barcodes[0].isDeducted = false;
     const stale = seedItem();
     stale.restoreClaim = { token: 'expired_token', targetId: 'id_restore', claimedAt: NOW - 3 * 60 * 1000 };
-    accepted(await request('PUT', '/', {
+    await seedLocalRestore({
         zoew_scan_history_cod_dod: { id_restore: live },
         zoew_recently_deleted_cod_dod: mode === 'missing' ? {} : { id_restore: stale }
-    }, true));
+    });
     const client = tab('cleanup');
     await client.sync();
     if (mode === 'unavailable' || mode === 'replaced') client.context.deletedItems = [];
@@ -384,18 +389,18 @@ async function retentionScenario(mode) {
     delete parent.trashReason;
     parent.barcodes = [{ ...trash.barcodes[0], code: 'PARENT_BC', cod: 10, dod: 0, isDeducted: false, isClosed: parent.isClosed }];
     if (parent.isClosed) { parent.closedAt = NOW; parent.barcodes[0].closedAt = NOW; }
-    accepted(await request('PUT', '/', {
+    await seedLocalRestore({
         zoew_scan_history_cod_dod: { [parentId]: parent },
         zoew_recently_deleted_cod_dod: { id_restore: trash },
         zoew_daily_revenue_cod_dod: { [DATE]: deductedLedger(trash, 10, 0, 1) },
         zoew_monthly_revenue_cod_dod: { [MONTH]: deductedLedger(trash, 10, 0, 1) }
-    }, true));
+    });
     const client = tab('retention', undefined, true);
     client.context.pendingRestoreId = 'id_restore';
     await client.context.executeRestoreItem();
     await client.settle();
     await client.sync();
-    check(client.toasts.some((message) => message.startsWith('✅')), mode + '៖ restore commit បានជោគជ័យ');
+    check(client.toasts.some((message) => message.startsWith('✅')), mode + '៖ restore commit បានជោគជ័យ', client.toasts);
     const before = accepted(await request('GET', '/zoew_scan_history_cod_dod'));
     const restored = Object.values(before || {}).find((item) => item.barcodes.some((b) => b.code === 'RESTORE_BC'));
     check(!!restored && restored.barcodes.find((barcode) => barcode.code === 'RESTORE_BC').restoredAt === NOW,
@@ -443,12 +448,12 @@ async function preparedRetryScenario(mode) {
     parent.barcodes = [{ ...trash.barcodes[0], code: 'PARENT_BC', cod: 10, dod: 0, isDeducted: false },
         { ...trash.barcodes[0], isDeducted: false }];
     parent.restoreAddedCodes = JSON.stringify([trash.barcodes[0].code]);
-    accepted(await request('PUT', '/', {
+    await seedLocalRestore({
         zoew_scan_history_cod_dod: { id_parent: parent },
         zoew_recently_deleted_cod_dod: { id_restore: trash },
         zoew_daily_revenue_cod_dod: { [DATE]: deductedLedger(trash, 10, 0, 1) },
         zoew_monthly_revenue_cod_dod: { [MONTH]: deductedLedger(trash, 10, 0, 1) }
-    }, true));
+    });
     const client = tab('retry');
     if (mode === 'same token') client.context.activeRestoreClaims.set('id_restore', { token: 'prepared_token', targetId: 'id_parent' });
     if (mode.startsWith('cached')) {
@@ -525,12 +530,12 @@ async function lostCodeScenario(mode) {
             Object.assign(parent, { cod: 0, dod: 0, price: 0, count: 0 });
         }
     }
-    accepted(await request('PUT', '/', {
+    await seedLocalRestore({
         zoew_scan_history_cod_dod: { id_parent: parent },
         zoew_recently_deleted_cod_dod: { id_restore: trash, ...moved },
         zoew_daily_revenue_cod_dod: { [DATE]: day },
         zoew_monthly_revenue_cod_dod: { [MONTH]: clone(day) }
-    }, true));
+    });
     const refused = [];
     const client = tab('lost_' + mode.replace(/W+/g, '_'), { afterWrite: (write) => { if (write.status === 401 || write.status === 403) refused.push(write.path); } });
     await client.sync();
@@ -611,12 +616,12 @@ async function collectedCleanupScenario(mode) {
     Object.assign(unrelated.barcodes[0], { code: 'KEEP_HISTORY', cod: 7.75, dod: 0.5 });
     const collected = { [currentDay]: { [keepKey]: { c: 7.75, d: 0.5 } } };
     collected[markerDay] = { ...collected[markerDay], [key]: { c: 10.25, d: 2.5 }, [oldSiblingKey]: { c: 3.75, d: 0.25 } };
-    accepted(await request('PUT', '/', {
+    await seedLocalRestore({
         zoew_scan_history_cod_dod: { id_restore: live, id_unrelated: unrelated },
         zoew_daily_revenue_cod_dod: { [currentDay]: { codDollar: 18, dodDollar: 3, totalCount: 2 } },
         zoew_monthly_revenue_cod_dod: { [currentDay.slice(0, 7)]: { codDollar: 18, dodDollar: 3, totalCount: 2 } },
         zoew_daily_collected_cod_dod: collected
-    }, true));
+    });
     writer.context.getServerNow = () => beforeMidnight;
     writer.context.getFormattedDate = () => currentDay;
     writer.context.document.getElementById = (id) => id === 'editBcCodInput' ? { value: '24.50' } : id === 'editBcDodInput' ? { value: '1.75' } : null;
@@ -698,10 +703,10 @@ async function serverFenceScenario(mode) {
     live.barcodes[0].isDeducted = false;
     const trash = seedItem();
     trash.restoreClaim = { token: 'fence_token', targetId: 'id_parent', claimedAt: mode === 'cached' || mode === 'control' ? serverNow : oldLease };
-    accepted(await request('PUT', '/', {
+    await seedLocalRestore({
         zoew_scan_history_cod_dod: { id_parent: live },
         zoew_recently_deleted_cod_dod: mode === 'missing' ? {} : { id_restore: trash }
-    }, true));
+    });
     if (mode === 'control') {
         const deleted = await request('DELETE', historyPath);
         check(deleted.status === 401, 'server fence៖ active marker រារាំងការលុប row ទាំងមូល', deleted.status);

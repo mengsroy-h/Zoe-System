@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 const ROOT = path.resolve(__dirname, '../../../..');
 const require = createRequire(import.meta.url);
 const { createPgHarness } = require(ROOT + '/tools/audit-tools/supabase-pg.js');
+const { seedPgRestorePolicy, authorizePgRestore } = require(ROOT + '/tools/audit-tools/fixtures/pg-restore-issuer.cjs');
 const PG = createPgHarness({ depsDirs: [ROOT + '/supabase/node_modules'], shimDir: ROOT + '/tools/audit-tools/supabase-shim', wantMajor: 17 });
 const HIST = 'zoew_scan_history_cod_dod', TRASH = 'zoew_recently_deleted_cod_dod', DAILY = 'zoew_daily_revenue_cod_dod';
 const FINAL = 'zoew_restore_finalizations', CONSUMED = 'zoew_trash_consumptions';
@@ -24,6 +25,7 @@ beforeAll(async () => {
     await c.query("insert into public.tenant_members(user_id,tenant_id,username) values($1,$2,'palm_policy')", [uid, tenant]);
     const sid = (await c.query('insert into auth.sessions(id,user_id,created_at) values(gen_random_uuid(),$1,now()) returning id', [uid])).rows[0].id;
     who = { role: 'authenticated', sub: uid, extra: { session_id: sid } };
+    await seedPgRestorePolicy({ H: PG, c, tenant, policy: { v: 1, mode: 'palm', scope: 'https://palm-policy.invalid#' + tenant, branch: '000001', epoch: 1 } });
 }, 30000);
 
 afterAll(async () => { if (c) await c.end(); PG.stop(); });
@@ -56,7 +58,7 @@ const finalPacket = (source: any, claim: any) => {
     return { [TRASH + '/' + source.id]: null, [HIST + '/' + claim.targetId]: live,
         [FINAL + '/' + source.id]: { token: claim.token, targetId: claim.targetId, finalizedAt: AT + 3000 },
         [CONSUMED + '/' + source.id]: { v: 1, sourceId: source.id, generation: 0, kind: 'restore', actorUid: who.sub,
-            scope: 'palm-policy-synthetic', deletedAt: source.deletedAt, rowBirth: source.createdAt, token: claim.token, targetId: claim.targetId },
+            scope: 'https://palm-policy.invalid#' + tenant, deletedAt: source.deletedAt, rowBirth: source.createdAt, token: claim.token, targetId: claim.targetId },
         [DAILY + '/' + DATE]: { codDollar: 3, dodDollar: 1, totalCount: 1 } };
 };
 
@@ -65,7 +67,8 @@ for (const reason of ['delete', 'remove', 'returned']) {
         const source = row(reason, reason), claim = claimFor(reason);
         await seed({ [DAILY + '/' + DATE]: { codDollar: reason === 'delete' ? 3 : 0, dodDollar: reason === 'delete' ? 1 : 0, totalCount: reason === 'delete' ? 1 : 0 } });
         expect((await write({ [TRASH + '/' + source.id]: source })).error).toBeUndefined();
-        expect((await write({ [TRASH + '/' + source.id + '/restoreClaim']: claim })).error).toBeUndefined();
+        expect((await write({ [TRASH + '/' + source.id + '/restoreClaim']: claim })).error?.code).toBe('42501');
+        expect((await authorizePgRestore({ H: PG, c, tenant, actor: who, sourceId: source.id, token: claim.token, targetId: claim.targetId })).kind).toBe('allow');
         expect((await write({ [HIST + '/' + claim.targetId]: preparedFor(source, claim) })).error).toBeUndefined();
         const packet = finalPacket(source, claim), operation = 'palm_finalize_' + reason;
         expect((await write(packet, operation)).rows?.[0]?.r?.ok).toBe(true);

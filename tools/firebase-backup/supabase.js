@@ -166,6 +166,27 @@ function object(value) {
     return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
+function hasPendingSeal(data) {
+    const trash = data && typeof data === 'object' ? data.zoew_recently_deleted_cod_dod : null;
+    if (!trash || typeof trash !== 'object') return false;
+    const authorities = data.zoew_restore_attestations;
+    return Object.keys(trash).some(key => {
+        const row = trash[key];
+        if (!row || typeof row !== 'object') return false;
+        if (Object.prototype.hasOwnProperty.call(row, 'restoreAttestationId')
+            && row.restoreAttestationId !== null && row.restoreAttestationId !== undefined) return true;
+        const authority = authorities && typeof authorities === 'object' && Object.prototype.hasOwnProperty.call(authorities, key)
+            ? authorities[key] : null;
+        return !!(authority && typeof authority === 'object' && authority.generation === (row.trashGeneration ?? 0));
+    });
+}
+
+function assertNoPendingSeal(data) {
+    if (hasPendingSeal(data)) {
+        throw new Error('Pending server restore authority requires a database-level backup/recovery that preserves private restore grants. Ordinary archives cannot preserve that state; keep the original seal and journals.');
+    }
+}
+
 function stableJson(value) {
     return JSON.stringify(value, (_key, found) => {
         if (!object(found)) return found;
@@ -467,6 +488,7 @@ function rootCounts(data) {
 }
 
 function buildArchive(tenant, exported, host) {
+    assertNoPendingSeal(exported.data);
     const counts = rootCounts(exported.data);
     const audit = validateAuditEnvelope(exported.audit, tenant.id);
     return {
@@ -500,6 +522,7 @@ function isArchive(value) {
 
 function validateArchive(value) {
     if (!isArchive(value)) throw new Error('Unsupported or malformed Supabase archive (supported versions: 1 and 2).');
+    assertNoPendingSeal(value.data);
     if (value.version === 1) {
         if (Object.prototype.hasOwnProperty.call(value, 'audit') || Object.prototype.hasOwnProperty.call(value.manifest, 'audit')) {
             throw new Error('Audit history requires a version 2 archive; legacy audit fields cannot be ignored.');
@@ -524,6 +547,8 @@ module.exports = {
     MAX_AUDIT_ARCHIVE_EVENTS,
     MAX_AUDIT_ARCHIVE_BYTES,
     auditDigest,
+    hasPendingSeal,
+    assertNoPendingSeal,
     assertAuditMergeBudget,
     buildArchive,
     createClient,

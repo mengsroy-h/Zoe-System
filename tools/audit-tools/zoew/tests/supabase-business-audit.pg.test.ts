@@ -9,6 +9,7 @@ import { pickupResetAttemptId } from '../../../../ZoeW/src/domain/pickup-reset-p
 const ROOT = path.resolve(__dirname, '../../../..');
 const require = createRequire(import.meta.url);
 const { createPgHarness } = require(ROOT + '/tools/audit-tools/supabase-pg.js');
+const { seedPgRestorePolicy, authorizePgRestore } = require(ROOT + '/tools/audit-tools/fixtures/pg-restore-issuer.cjs');
 const PG = createPgHarness({ depsDirs: [ROOT + '/supabase/node_modules'], shimDir: ROOT + '/tools/audit-tools/supabase-shim', wantMajor: 17 });
 const HIST = 'zoew_scan_history_cod_dod', TRASH = 'zoew_recently_deleted_cod_dod';
 let engineBefore:any,engineAfter:any,hostedBaseline:any=null;
@@ -45,6 +46,7 @@ beforeAll(async () => {
         const actor = await PG.sessionClaims(c, { role: 'authenticated', sub: uid });
         if (name === 'one') who = actor; else other = actor;
     }
+    await seedPgRestorePolicy({ H: PG, c, tenant, policy: { v: 1, mode: 'cookie', scope: 'https://audit.invalid#' + tenant, branch: 'AUDIT01', epoch: 1 } });
 }, 30000);
 afterAll(async () => { if(process.env.SB_AUDIT_EVIDENCE_FILE)fs.writeFileSync(process.env.SB_AUDIT_EVIDENCE_FILE,JSON.stringify({postgres:PG.pgBin?.version,performance:performanceEvidence,limits:['Local actual PostgreSQL; JWT/Auth claims simulated, no hosted or ZTO calls.','Projection is bounded selected business state, not a full payload archive or independent upstream attestation.']},null,2)+'\n');if (c) await c.end(); PG.stop(); });
 
@@ -92,13 +94,14 @@ it('real restore finalization keeps the original trash reason and explicit absen
     source.barcodes[0].isDeducted = true;
     const claim = { token: 'token_business_audit_restore', targetId: 'restore_target', claimedAt: 1790000002000 };
     expect((await write({ [TRASH + '/' + source.id]: source })).error).toBeUndefined();
-    expect((await write({ [TRASH + '/' + source.id + '/restoreClaim']: claim })).error).toBeUndefined();
+    expect((await write({ [TRASH + '/' + source.id + '/restoreClaim']: claim })).error?.code).toBe('42501');
+    expect((await authorizePgRestore({ H: PG, c, tenant, actor: who, sourceId: source.id, token: claim.token, targetId: claim.targetId })).kind).toBe('allow');
     const prepared: any = { ...item(claim.targetId), barcodes: [{ ...source.barcodes[0], isDeducted: false }], restoreClaimId: source.id, restoreClaimToken: claim.token };
     expect((await write({ [HIST + '/' + claim.targetId]: prepared })).error).toBeUndefined();
     const live = { ...prepared }; delete live.restoreClaimId; delete live.restoreClaimToken;
     const updates = { [TRASH + '/' + source.id]: null, [HIST + '/' + claim.targetId]: live,
         ['zoew_restore_finalizations/' + source.id]: { token: claim.token, targetId: claim.targetId, finalizedAt: 1790000003000 },
-        ['zoew_trash_consumptions/' + source.id]: { v: 1, sourceId: source.id, generation: 0, kind: 'restore', actorUid: who.sub, scope: 'audit-test', deletedAt: source.deletedAt, rowBirth: source.createdAt, token: claim.token, targetId: claim.targetId },
+        ['zoew_trash_consumptions/' + source.id]: { v: 1, sourceId: source.id, generation: 0, kind: 'restore', actorUid: who.sub, scope: 'https://audit.invalid#' + tenant, deletedAt: source.deletedAt, rowBirth: source.createdAt, token: claim.token, targetId: claim.targetId },
         'zoew_daily_revenue_cod_dod/2026-11-14': { codDollar: 3, dodDollar: 1, totalCount: 1 } };
     expect((await write(updates, 'business_audit_restore_final')).error).toBeUndefined();
     const rows = await events('business_audit_restore_final');
@@ -268,28 +271,29 @@ it('engine metadata/ACL are preserved and its business code differs only by exac
 });
 
 it('rollback rehearsals restore the exact old engine metadata and keep the audit archive; reactivation resumes capture',async()=>{
+    const currentEngine=await engineMetadata();
     const beforeCount=(await c.query('select count(*)::int as n from public.zoe_business_audit')).rows[0].n;
     await c.query('begin');try{
         await c.query('drop trigger zoe_business_audit_capture on public.zoe_docs');await c.query(hostedBaseline?.definition||engineBefore.definition);
         expect(await engineMetadata()).toEqual(engineBefore);
     }finally{await c.query('rollback');}
-    expect(await engineMetadata()).toEqual(engineAfter);
+    expect(await engineMetadata()).toEqual(currentEngine);
     try{
         await c.query('begin');await c.query('drop trigger zoe_business_audit_capture on public.zoe_docs');await c.query(hostedBaseline?.definition||engineBefore.definition);await c.query('commit');
         expect(await engineMetadata()).toEqual(engineBefore);expect((await c.query('select count(*)::int as n from public.zoe_business_audit')).rows[0].n).toBe(beforeCount);
     }finally{
-        await c.query('rollback');await c.query(engineAfter.definition);await c.query('drop trigger if exists zoe_business_audit_capture on public.zoe_docs');
+        await c.query('rollback');await c.query(currentEngine.definition);await c.query('drop trigger if exists zoe_business_audit_capture on public.zoe_docs');
         await c.query('create trigger zoe_business_audit_capture after insert or update or delete on public.zoe_docs for each row execute function private.zoe_business_audit_capture_v1()');
     }
     if(hostedBaseline){
         const dir=path.join(ROOT,'tools/audit-tools/zoew/test-results/final-audit/hosted');
         const digest=(text:string)=>createHash('sha256').update(text).digest('hex');
         const guard=(expected:string)=>"do $guard$ begin if encode(sha256(convert_to(pg_get_functiondef('private.zoe_apply_engine_v1(uuid,text,jsonb,boolean,boolean,jsonb)'::regprocedure),'UTF8')),'hex') <> '"+expected+"' then raise exception 'audit-engine-baseline-mismatch';end if;end $guard$;\n";
-        fs.writeFileSync(path.join(dir,'business-audit-rollback.sql'),'begin;\n'+guard(digest(engineAfter.definition))+'drop trigger zoe_business_audit_capture on public.zoe_docs;\n'+hostedBaseline.definition+'\ncommit;\n',{mode:0o600});
-        fs.writeFileSync(path.join(dir,'business-audit-reactivate.sql'),'begin;\n'+guard(digest(hostedBaseline.definition))+engineAfter.definition+'\ncreate trigger zoe_business_audit_capture after insert or update or delete on public.zoe_docs for each row execute function private.zoe_business_audit_capture_v1();\ncommit;\n',{mode:0o600});
-        fs.writeFileSync(path.join(dir,'business-audit-rollback-rehearsal.json'),JSON.stringify({status:'PASS',environment:PG.pgBin.version,source:'actual saved hosted old engine definition/owner/ACL/config/volatility/security-definer',oldDefinitionSha256:digest(hostedBaseline.definition),candidateDefinitionSha256:digest(engineAfter.definition),transactionRollbackRestoresCandidate:true,transactionCommitRestoresExactBaseline:true,reactivationRestoresCandidate:true,archiveRowsPreserved:beforeCount,archiveTablePreserved:true,limits:['No hosted mutation; actual saved hosted engine replayed in isolated local PG.','Rollback deliberately leaves immutable archive/table/functions available; it pauses future capture and requires explicit root decision, never automatic fallback.','Backup audit archive using the service-only export API or pg_dump before any privileged fixture cleanup.']},null,2)+'\n',{mode:0o600});
+        fs.writeFileSync(path.join(dir,'business-audit-rollback.sql'),'begin;\n'+guard(digest(currentEngine.definition))+'drop trigger zoe_business_audit_capture on public.zoe_docs;\n'+hostedBaseline.definition+'\ncommit;\n',{mode:0o600});
+        fs.writeFileSync(path.join(dir,'business-audit-reactivate.sql'),'begin;\n'+guard(digest(hostedBaseline.definition))+currentEngine.definition+'\ncreate trigger zoe_business_audit_capture after insert or update or delete on public.zoe_docs for each row execute function private.zoe_business_audit_capture_v1();\ncommit;\n',{mode:0o600});
+        fs.writeFileSync(path.join(dir,'business-audit-rollback-rehearsal.json'),JSON.stringify({status:'PASS',environment:PG.pgBin.version,source:'actual saved hosted old engine definition/owner/ACL/config/volatility/security-definer',oldDefinitionSha256:digest(hostedBaseline.definition),candidateDefinitionSha256:digest(currentEngine.definition),transactionRollbackRestoresCandidate:true,transactionCommitRestoresExactBaseline:true,reactivationRestoresCandidate:true,archiveRowsPreserved:beforeCount,archiveTablePreserved:true,limits:['No hosted mutation; actual saved hosted engine replayed in isolated local PG.','Rollback deliberately leaves immutable archive/table/functions available; it pauses future capture and requires explicit root decision, never automatic fallback.','Backup audit archive using the service-only export API or pg_dump before any privileged fixture cleanup.']},null,2)+'\n',{mode:0o600});
     }
-    expect(await engineMetadata()).toEqual(engineAfter);
+    expect(await engineMetadata()).toEqual(currentEngine);
     expect((await write({[HIST+'/reactivated']:item('reactivated')},'business_audit_reactivated')).error).toBeUndefined();expect(await events('business_audit_reactivated')).toHaveLength(1);
 });
 

@@ -174,7 +174,7 @@ function meterFor(deps, kind) {
     };
 }
 
-async function requestPalm(path, payload, token, keys, timeoutMs, meter, retryStale) {
+async function requestPalm(path, payload, token, keys, timeoutMs, meter, retryStale, maximumBytes = 0) {
     const body = JSON.stringify(payload);
     const headers = {
         'Content-Type': 'application/json; charset=utf-8', Accept: 'application/json',
@@ -200,7 +200,11 @@ async function requestPalm(path, payload, token, keys, timeoutMs, meter, retrySt
         if (response.status >= 500) throw new Error('upstream:unavailable');
         if (!response.ok) throw new Error('upstream:http');
         let result;
-        try { result = await response.json(); } catch (_) { throw new Error('upstream:json'); }
+        try {
+            result = maximumBytes
+                ? await require('./zto-restore-http.cjs').readBoundedJson(response, maximumBytes, controller)
+                : await response.json();
+        } catch (_) { throw new Error('upstream:json'); }
         if (!result || typeof result !== 'object' || Array.isArray(result)) throw new Error('upstream:json');
         return result;
     })();
@@ -297,7 +301,8 @@ function trackingVerdict(upstream, barcode, site) {
 }
 
 async function palmTracking(barcode, session, keys, deps) {
-    const upstream = await requestPalm(TRACK_INFO_PATH, { mailType: 1, mailNos: barcode }, session.token, keys, deps.upstreamMs(), null, true);
+    const upstream = await requestPalm(TRACK_INFO_PATH, { mailType: 1, mailNos: barcode }, session.token, keys, deps.upstreamMs(), null, true,
+        deps.trustedRestore ? 4 * 1024 * 1024 : 0);
     if (upstream.authRejected || AUTH_EXPIRED_RE.test(String(upstream.statusCode || ''))) {
         return { response: json(401, { code: 'ZTO_AUTH_EXPIRED', provider: 'zto-palm' }) };
     }
@@ -752,7 +757,8 @@ async function palmGet(query, session, keys, deps) {
         const tracking = await palmTracking(barcode, session, keys, deps);
         if (tracking.response) return tracking.response;
         return json(200, { success: true, found: true, barcode, provider: 'zto-palm', ...tracking.verdict,
-            ...(verifyRestore ? { cached: false, verifiedForRestore: true } : {}) });
+            ...(verifyRestore ? { cached: false, verifiedForRestore: true,
+                ...(deps.trustedRestore ? { restoreTransitionsVerified: typeof tracking.verdict.ztoClosed === 'boolean' } : {}) } : {}) });
     }
     const upstream = await requestPalm(BILL_INFO_PATH, { billCode: barcode }, session.token, keys, deps.upstreamMs(),
         meterFor(deps, 'palmDetail'), true);
@@ -896,7 +902,7 @@ async function palmGetShared(query, resolved, proxyKey, keys, rawDeps, env) {
     const expired = authExpired(response);
     if (!expired && !tokenSuspected(response, session)) {
         const age = Date.now() - session.loginAt;
-        if (age >= SHARED_RENEW_AGE_MS || age < 0) renewShared(label, session.token, proxyKey, keys, env, deps, true).catch(() => {});
+        if (!deps.trustedRestore && (age >= SHARED_RENEW_AGE_MS || age < 0)) renewShared(label, session.token, proxyKey, keys, env, deps, true).catch(() => {});
         return response;
     }
     const waited = await renewalWithinBudget(deps, () => renewShared(label, session.token, proxyKey, keys, env, deps));

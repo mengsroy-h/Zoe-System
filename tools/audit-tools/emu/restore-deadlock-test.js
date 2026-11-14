@@ -101,6 +101,7 @@ const clearFinalizeUpdate = (token) => ({
 
 async function seedRestoreStuck(withStaleFinalization) {
     await asOwner('PUT', '/.json', null);
+    await asOwner('PUT', '/zoew_restore_policy/shop.json', { v: 1, mode: 'local', scope: 'audit-scope', branch: '', epoch: 1 });
     if (withStaleFinalization) {
         await asOwner('PUT', `/zoew_restore_finalizations/${SRC}.json`, { token: 'stale_token', targetId: SRC, finalizedAt: T0 });
     }
@@ -111,6 +112,7 @@ async function seedRestoreStuck(withStaleFinalization) {
 }
 async function seedClearStuck(withStaleFinalization) {
     await asOwner('PUT', '/.json', null);
+    await asOwner('PUT', '/zoew_restore_policy/shop.json', { v: 1, mode: 'local', scope: 'audit-scope', branch: '', epoch: 1 });
     if (withStaleFinalization) {
         await asOwner('PUT', `/zoew_clear_history_finalizations/${CID}.json`, { token: 'stale_c', finalizedAt: T0 });
     }
@@ -194,6 +196,7 @@ async function seedClearStuck(withStaleFinalization) {
     console.log('-- ៤. purge ធាតុធុងសំរាមដែល restoreClaim ងាប់ --');
     const PID = 'id_1750000000000_ccc';
     await asOwner('PUT', '/.json', null);
+    await asOwner('PUT', '/zoew_restore_policy/shop.json', { v: 1, mode: 'local', scope: 'audit-scope', branch: '', epoch: 1 });
     await asOwner('PUT', `/zoew_recently_deleted_cod_dod/${PID}.json`,
         trashItem(PID, { restoreClaim: { token: 'dead', claimedAt: T0, targetId: PID } }));
     check(denied(await asUser('PATCH', '/.json', { [`zoew_recently_deleted_cod_dod/${PID}`]: null })),
@@ -210,6 +213,7 @@ async function seedClearStuck(withStaleFinalization) {
     const SID = 'id_1750000000000_sig';
     const signedCodes = [{ code: 'SIG1', cod: 5, dod: 0, time: 't', locker: 'N/A', createdAt: T0, isClosed: true, closedAt: T0, isFromDeletion: true, isDeducted: false, ztoSignedAt: T0 }];
     await asOwner('PUT', '/.json', null);
+    await asOwner('PUT', '/zoew_restore_policy/shop.json', { v: 1, mode: 'local', scope: 'audit-scope', branch: '', epoch: 1 });
     await asOwner('PUT', `/zoew_recently_deleted_cod_dod/${SID}.json`,
         trashItem(SID, { barcodes: signedCodes, restoreClaim: { token: 'dead', claimedAt: T0, targetId: SID } }));
     check(denied(await asUser('PUT', `/zoew_recently_deleted_cod_dod/${SID}.json`, trashItem(SID, { barcodes: signedCodes, trashMode: 'local' }))),
@@ -222,6 +226,7 @@ async function seedClearStuck(withStaleFinalization) {
         'ធុងសំរាមចាស់ដែល Sign រួច ៖ ក្រោយដោះ claim ➜ purge បាន');
 
     await asOwner('PUT', '/.json', null);
+    await asOwner('PUT', '/zoew_restore_policy/shop.json', { v: 1, mode: 'local', scope: 'audit-scope', branch: '', epoch: 1 });
     const cleanId = 'id_1750000000000_ok', claimedId = 'id_1750000000000_bad';
     const cleanItem = trashItem(cleanId, { barcodes: [{ code: 'CLEAN_CODE', createdAt: T0, cod: 5, dod: 0 }] });
     const heldItem = trashItem(claimedId, { barcodes: [{ code: 'HELD_CODE', createdAt: T0, cod: 5, dod: 0 }], restoreClaim: { token: 'dead', claimedAt: T0, targetId: claimedId } });
@@ -262,6 +267,7 @@ async function seedClearStuck(withStaleFinalization) {
     const keptRow = historyItem(HTGT, { barcode: 'NBR1', barcodes: [neighborCode, insertedCode], cod: 12, dod: 2, price: 14, count: 2, isClosed: false });
     const seedHeld = async (trashExtra, hToken, rowExtra, rowOverride) => {
         await asOwner('PUT', '/.json', null);
+    await asOwner('PUT', '/zoew_restore_policy/shop.json', { v: 1, mode: 'local', scope: 'audit-scope', branch: '', epoch: 1 });
         await asOwner('PUT', `/zoew_recently_deleted_cod_dod/${HSRC}.json`, heldTrash(trashExtra));
         await asOwner('PUT', `/zoew_scan_history_cod_dod/${HTGT}.json`, rowOverride || heldRow(hToken || 'held_tok', rowExtra));
     };

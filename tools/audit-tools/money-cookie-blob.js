@@ -8,9 +8,11 @@ const crypto = require('node:crypto');
 const { invariant, invariantBroken, r2, devicesSettled, collectedMirror, collectedFixtureAgeOps } = require('./money-multidevice-core.js');
 const fx = require('./idtoken-fixture.js');
 const { installMoneyTransportTrace } = require('./money-operation-trace.js');
+const { localRestorePolicy } = require('./fixtures/trusted-restore-policy.cjs');
+const { createMoneyRestoreIssuer } = require('./fixtures/money-restore-issuer.cjs');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-function cookieFixture(root, { project, supabaseUrl, supabaseKey } = {}) {
+function cookieFixture(root, { project, firebasePort, supabaseUrl, supabaseKey } = {}) {
     const fn = require(path.join(root, 'ZoeW/netlify/functions/_shared/zto-order-detail-core.cjs'));
     const key = 'synthetic-cookie-money-proxy-key';
     const cookie = 'BOS-MAN-SESSION=synthetic-cookie-money-session; sidebarStatus=1';
@@ -24,7 +26,7 @@ function cookieFixture(root, { project, supabaseUrl, supabaseKey } = {}) {
     for (const [k, v] of Object.entries(env)) { saved[k] = process.env[k]; process.env[k] = v; }
     const values = new Map([['cookie', cookie]]);
     const etag = (v) => '"' + crypto.createHash('sha256').update(String(v)).digest('hex') + '"';
-    const world = { blobReads: 0, lists: 0, details: 0, palmLists: 0, palmDetails: 0, palmTracks: 0, sheetReads: 0, logins: 0, loginSites: new Map(), palmBlobReads: 0, tokenSites: new Map(), calls: [], parcels: new Map() };
+    const world = { blobReads: 0, lists: 0, details: 0, palmLists: 0, palmDetails: 0, palmTracks: 0, sheetReads: 0, logins: 0, loginSites: new Map(), palmBlobReads: 0, tokenSites: new Map(), calls: [], proofCalls: [], parcels: new Map() };
     const store = {
         async get(k) { if (k === 'cookie') world.blobReads++; else if (k.startsWith('palm-session/')) world.palmBlobReads++; return values.get(k) ?? null; },
         async getWithMetadata(k) { const data = await store.get(k); return data === null ? null : { data, etag: etag(data), metadata: { syncedAt: Date.now() } }; },
@@ -34,9 +36,12 @@ function cookieFixture(root, { project, supabaseUrl, supabaseKey } = {}) {
             values.set(k, v); return { modified: true, etag: etag(v) };
         }
     };
-    fn.setBlobsModuleForTests({ connectLambda(event) { assert.ok(event.blobs); }, getStore(name) { assert.equal(name, 'zto-auth'); return store; } });
+    const blobs = { connectLambda(event) { assert.ok(event.blobs); }, getStore(name) { assert.equal(name, 'zto-auth'); return store; } };
+    fn.setBlobsModuleForTests(blobs);
     fn.resetCachesForTests();
     const originalFetch = global.fetch;
+    const issuer = createMoneyRestoreIssuer({ root, env, project, firebasePort, supabaseUrl,
+        lookup: fn.createTrustedRestoreHandler(blobs), fetchImpl: originalFetch });
     global.fetch = async (url, init) => {
         const href = String(url);
         if (href.includes('www.googleapis.com/robot/v1/metadata/x509/')) return new Response(JSON.stringify({ [fx.TEST_KID]: fx.TEST_CERT_PEM }));
@@ -115,27 +120,38 @@ function cookieFixture(root, { project, supabaseUrl, supabaseKey } = {}) {
         }
         assert.ok(body.condition, 'ការហៅ Cookie list ត្រូវប្រើ condition');
         world.lists++;
-        const signed = body.condition.scanTypeCode === '05' ? [...world.parcels].filter(([, p]) => p.signedAt
-            && p.signedAt >= body.condition.scanStartTime && p.signedAt <= body.condition.scanEndTime
-            && p.site === String(body.condition.scanSiteCode)).map(([code, p]) => ({ scanBillCode: code, scanTypeCode: '05',
-            scanSiteCode: p.site, scanSite: p.site, scanTime: p.signedAt, consigneeMobile: '855977000111', agentAmount: 10, fcAmount: 2 })) : [];
+        const scanType = body.condition.scanTypeCode;
+        const stampOf = p => scanType === '05' ? p.signedAt : scanType === '03' ? p.arrivedAt : null;
+        const rows = [...world.parcels].filter(([code, p]) => stampOf(p)
+            && stampOf(p) >= body.condition.scanStartTime && stampOf(p) <= body.condition.scanEndTime
+            && p.site === String(body.condition.scanSiteCode) && (!body.condition.mailNos || body.condition.mailNos.includes(code))).map(([code, p]) => ({ scanBillCode: code, scanTypeCode: scanType,
+            scanSiteCode: p.site, scanSite: p.site, scanTime: stampOf(p), consigneeMobile: p.phone || '855977000111', agentAmount: 10, fcAmount: 2 }));
         const pageSize = Number(body.pageSize) || 100;
-        return Response.json({ success: true, data: { pageNum: body.pageNum, pages: Math.ceil(signed.length / pageSize), total: signed.length,
-            result: signed.slice((body.pageNum - 1) * pageSize, body.pageNum * pageSize) } });
+        return Response.json({ success: true, data: { pageNum: body.pageNum, pageSize, pages: Math.ceil(rows.length / pageSize), total: rows.length,
+            result: rows.slice((body.pageNum - 1) * pageSize, body.pageNum * pageSize) } });
     };
     return {
         world,
+        registerFirebaseActor: issuer.registerFirebaseActor,
         proxyKey: key,
         config(origin) { return { enabled: true, fastMode: true, headerName: 'X-Zoe-Proxy-Key',
             phoneField: 'phone', codField: 'cod', dodField: 'dod',
             url: origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' }; },
         async serve(req, rsp) {
             try {
-                const url = new URL(req.url, 'http://127.0.0.1');
-                world.calls.push(Object.fromEntries(url.searchParams));
+                const url = new URL(req.url, 'http://' + req.headers.host);
                 const chunks = [];
                 for await (const chunk of req) chunks.push(chunk);
-                const out = await fn.handler({ body: Buffer.concat(chunks).toString('utf8'), httpMethod: req.method, headers: req.headers, queryStringParameters: Object.fromEntries(url.searchParams),
+                const body = Buffer.concat(chunks).toString('utf8');
+                if (url.pathname === '/.netlify/functions/zto-restore-proof') {
+                    const out = await issuer.handle(new Request(url, { method: req.method, headers: req.headers, ...(body ? { body } : {}) }));
+                    const result = await out.text();
+                    let input; try { input = JSON.parse(body); } catch (_) { input = {}; }
+                    world.proofCalls.push({ sourceId: input.sourceId, action: input.action, status: out.status, result: result ? JSON.parse(result) : null });
+                    rsp.writeHead(out.status, Object.fromEntries(out.headers)); rsp.end(result); return;
+                }
+                world.calls.push(Object.fromEntries(url.searchParams));
+                const out = await fn.handler({ body, httpMethod: req.method, headers: req.headers, queryStringParameters: Object.fromEntries(url.searchParams),
                     blobs: Buffer.from(JSON.stringify({ url: 'https://blobs.netlify.test', token: 'synthetic-blob-token' })).toString('base64') });
                 rsp.writeHead(out.statusCode, { ...out.headers, 'Content-Type': 'application/json' }); rsp.end(out.body);
             } catch (e) { rsp.writeHead(500); rsp.end(JSON.stringify({ error: String(e.message) })); }
@@ -149,7 +165,7 @@ function cookieFixture(root, { project, supabaseUrl, supabaseKey } = {}) {
 }
 
 // បង្អាក់ write មុនទៅដល់ server ឬបង្អាក់ ACK ក្រោយ server commit។ មិនជំនួស DB/transaction/លុយឡើយ។
-async function networkGate(ctx, backend, expectedTenant) {
+async function networkGate(ctx, backend, expectedTenant, { restoreProof = false } = {}) {
     const transport = installMoneyTransportTrace(ctx);
     const state = { mode: '', hits: 0, releases: [], responseIds: new Map(), closed: false, match: null, boundaries: [] };
     const record = (stage, operations) => state.boundaries.push({ stage, operations: JSON.parse(JSON.stringify(operations)) });
@@ -161,6 +177,25 @@ async function networkGate(ctx, backend, expectedTenant) {
         if (state.mode === 'before') { record('before', operations); state.hits++; return await hold(); }
         if (state.mode === 'slow') { record('slow', operations); state.hits++; await sleep(500); }
     };
+    if (restoreProof) await ctx.route(/\/\.netlify\/functions\/zto-restore-proof(?:\?|$)/, async (route) => {
+        const input = route.request().postDataJSON();
+        if (!input || !['authorize', 'refresh', 'rebind'].includes(input.action)) return route.continue();
+        const requested = [{ path: 'zoew_recently_deleted_cod_dod/' + input.sourceId,
+            value: { restoreClaim: { token: input.token, targetId: input.targetId } } }];
+        if (!matches(requested)) return route.continue();
+        const closedBeforeWrite = await before(requested);
+        if (closedBeforeWrite || state.closed) return route.abort().catch(() => {});
+        if (state.mode === 'after') {
+            const out = await route.fetch();
+            const result = await out.json();
+            if (result.success === true && result.kind === 'allow' && result.source?.restoreClaim) {
+                record('after', [{ path: 'zoew_recently_deleted_cod_dod/' + input.sourceId, value: result.source }]);
+                state.hits++; if (await hold()) return route.abort().catch(() => {});
+            }
+            return route.fulfill({ response: out }).catch(() => {});
+        }
+        return route.continue().catch(() => {});
+    });
     if (backend === 'supabase') {
         assert.match(String(expectedTenant || ''), /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
         await ctx.route(/\/rest\/v1\/rpc\/zoe_write(?:_v2)?$/, async (route) => {
@@ -375,6 +410,13 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
     const labelMode = authMode === 'sheet' ? 'Sheet' : authMode === 'palm' ? 'Palm' : 'Cookie';
     const gates = devices.map((d) => d.gate);
     const initial = await read();
+    const scopes = await Promise.all(devices.map(d => d.page.evaluate(() => window.liveShopScope())));
+    assert.ok(scopes[0] && scopes.every(scope => scope === scopes[0]), 'restore fixture ត្រូវស្ថិតក្នុង scope ដូចគ្នា');
+    const previousEpoch = initial.zoew_restore_policy?.shop?.epoch;
+    assert.ok(Number.isSafeInteger(previousEpoch) && previousEpoch > 0);
+    const policy = { ...(authMode === 'sheet' ? localRestorePolicy(scopes[0])
+        : { v: 1, mode: authMode, scope: scopes[0], branch: site }), epoch: previousEpoch + 1 };
+    await write([{ k: 'set', p: ['zoew_restore_policy', 'shop'], v: policy }]);
     const revenue = expectation || createRevenueExpectation(initial, { requireParcelIntents: true });
     const scanDays = new Map();
     const clockSeen = { min: Infinity, max: -Infinity };
@@ -545,6 +587,7 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
         assert.equal(fixture.world.loginSites.get(site) - loginsBefore, 1, 'ឧបករណ៍ ៣ ត្រូវ Login តែម្តង');
     }
     const firstCall = fixture.world.calls.length;
+    const firstProofCall = fixture.world.proofCalls.length;
     const upstreamStamp = (ms) => new Date(ms + 7 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
     const observeSign = (dev, code) => dev.page.evaluate(async (code) => {
         const answer = await window.checkZtoStatusForBarcode(window.getLookupApiConfig(), code);
@@ -873,6 +916,7 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
     assert.equal(interruptions, expectedInterruptions);
     assert.equal(deniedRestores, runFlowNames.filter((name) => name.endsWith('-signed') || authMode === 'palm' && name === 'pickup2h').length * modes.length);
     if (authMode === 'sheet') {
+        assert.equal(fixture.world.proofCalls.length, firstProofCall, 'Sheet/local ស្តារតាម client claim ដោយមិនហៅ issuer ZTO');
         assert.equal(interruptions, runFlowNames.length * 4, 'Sheet ៖ ការបិទទំព័រពាក់កណ្តាលសរសេរត្រូវបាញ់ពិតគ្រប់លំហូរ (ផ្លាស់ទី + ស្តារ × មុន/ក្រោយ commit)');
         await leaveRestoreDialogs();
         await lookupOff(devices, read);
@@ -967,6 +1011,10 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
     await verify('lookup-off/restore-blocked', lockedCode, 'trash', false);
     deniedRestores++;
     await leaveRestoreDialogs();
+    assert.ok(fixture.world.proofCalls.slice(firstProofCall).some(call => call.status === 200 && call.result?.kind === 'allow'
+        && call.result.source?.id === call.sourceId && call.result.source?.restoreAttestationId === call.result.attestationId),
+    labelMode + ' ត្រូវទទួល grant ពិតពី controller និង DB របស់ fixture');
+    await write([{ k: 'set', p: ['zoew_restore_policy', 'shop'], v: { ...localRestorePolicy(scopes[0]), epoch: policy.epoch + 1 } }]);
     console.log('  ok ' + labelMode + ' ' + backend + ' ' + tag + ': ' + steps + ' server checkpoints · ' + duplicateCalls + ' repeated calls · ' + interruptions + ' page closes mid-write · ' + deniedRestores + ' denied restores · ' + labelMode + ' Blob/list/detail verified');
     return { steps, duplicateCalls, interruptions, expectation: revenue };
 }

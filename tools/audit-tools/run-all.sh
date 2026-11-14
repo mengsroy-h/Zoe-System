@@ -1079,6 +1079,7 @@ run "netlify-config-scope" node tools/audit-tools/netlify-config-scope-test.js
 # SKIP នោះក្លាយជាការធ្លាក់ ➜ CI មិនបៃតងក្លែងក្លាយទេ)។
 run "emu/crud-rules-flow" node tools/audit-tools/emu/crud-rules-flow.js
 run "emu/restore-deadlock" node tools/audit-tools/emu/restore-deadlock-test.js
+run "emu/zto-restore-attestation" node tools/audit-tools/emu/zto-restore-attestation-emu-test.js
 run "emu/ledger-revert" node tools/audit-tools/emu/ledger-revert-emu-test.js
 run "emu/restore-mutation" node tools/audit-tools/emu/restore-mutation-emu-test.js
 run "emu/license-seat-rules" node tools/audit-tools/emu/license-seat-rules-test.js
@@ -1366,6 +1367,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     FBPROVISION_APP_DIR="$BASE" node tools/audit-tools/firebase-provision-test.js 2>&1 | tail -1 | sed 's/^/   fb-provision:    /'
     CRUDFLOW_APP_DIR="$BASE" runall_owned node tools/audit-tools/emu/crud-rules-flow.js 2>&1 | tail -1 | sed 's/^/   emu-crud-flow:   /'
     DEADLOCK_APP_DIR="$BASE" runall_owned node tools/audit-tools/emu/restore-deadlock-test.js 2>&1 | tail -1 | sed 's/^/   emu-deadlock:    /'
+    ZTOATTEST_APP_DIR="$BASE" runall_owned node tools/audit-tools/emu/zto-restore-attestation-emu-test.js 2>&1 | tail -1 | sed 's/^/   emu-restore-auth:/'
     LEDGEREMU_APP_DIR="$BASE" runall_owned node tools/audit-tools/emu/ledger-revert-emu-test.js 2>&1 | tail -1 | sed 's/^/   emu-ledger-rev:  /'
     RESTOREMUTATION_APP_DIR="$BASE" runall_owned node tools/audit-tools/emu/restore-mutation-emu-test.js 2>&1 | tail -1 | sed 's/^/   restore-mutation:/'
     MONEYGUARD_APP_DIR="$BASE" runall_owned node tools/audit-tools/money-guardian-test.js 2>&1 | tail -1 | sed 's/^/   money-guardian:  /'

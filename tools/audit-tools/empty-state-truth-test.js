@@ -89,7 +89,7 @@ const WANT = ['sanitizeInput', 'ledgerNumber', 'statsMonthOf', 'statsPositive', 
     // ⛔ ស្លាក «ខុសទីតាំង» ៖ `buildTrashGroups()` ដាក់ក្រុមតាម `trashDisplayReasonOf()` (ពិត · មិន stub)
     'trashDisplayReasonOf', 'trashItemMisplaced', 'barcodeMisplacedInZto', 'barcodeZtoMisplaced',
     'trashItemSentOut', 'barcodeSentOutInZto', 'barcodeZtoSentOut', 'barcodeZtoLeftKind', 'barcodeReturnedEvidence', 'barcodeReturnBasis', 'trashReturnedEvery',
-    'ztoStatusTrashItemCounts', 'barcodeZtoSigned', 'barcodeSignBasis', 'ztoVerdictCandidate', 'resolveZtoPickupSignTime', 'getZtoPickupVerdict', 'ztoImportLegacyValid', 'readDurableZtoImportLegacy', 'collectClosedBarcodesForZtoStatus',
+    'ztoStatusTrashItemCounts', 'trashZtoTerminalDecision', 'barcodeZtoSigned', 'barcodeSignBasis', 'ztoVerdictCandidate', 'resolveZtoPickupSignTime', 'getZtoPickupVerdict', 'ztoImportLegacyValid', 'readDurableZtoImportLegacy', 'collectClosedBarcodesForZtoStatus',
     'ztoStatusPendingList', 'ztoStatusPendingCodes', 'ztoStatusUnmeasuredCount',
     'ztoStatusFeatureConfig', 'ztoSyncModalIsOpen',
     'renderZtoSyncBanner', 'renderZtoSyncModalList'];
@@ -342,6 +342,19 @@ function ztoBannerText(state) {
     return textOf(sandbox.__containers.ztoSyncBanner.innerHTML);
 }
 const ZTO_BOTH_LIVE = { scanHistory: [ZTO_CLOSED_ITEM], deletedItems: [ZTO_TRASHED_ITEM] };
+
+scenario('⛔ server terminal decision មិនត្រូវក្លាយជាការរំលឹកមិនទាន់បិទ', () => {
+    for (const decision of ['signed', 'returned']) {
+        const sandbox = buildSandbox({ verdicts: ZTO_VERDICTS, pending: [], failed: [],
+            scanHistory: [ZTO_CLOSED_ITEM], deletedItems: [{ ...ZTO_TRASHED_ITEM, ztoTerminalDecision: decision }] });
+        const pending = sandbox.collectClosedBarcodesForZtoStatus();
+        sandbox.renderZtoSyncBanner();
+        const text = textOf(sandbox.__containers.ztoSyncBanner.innerHTML);
+        ok('terminal ' + decision + ' ➜ រំលឹកតែ barcode ដែលនៅមិនទាន់បិទពិត',
+            pending.length === 1 && pending[0].code === 'AAA111'
+            && text.includes('AAA111') && !text.includes('BBB222') && !text.includes(NOT_MEASURABLE), text);
+    }
+});
 
 scenario('⛔ របា ZTO ៖ លេខត្រូវនិយាយការពិត ពេលទិដ្ឋភាពមិនពេញ', () => {
     const live = ztoBannerText(Object.assign({ pending: [], failed: [] }, ZTO_BOTH_LIVE));

@@ -668,7 +668,26 @@ const PART = (() => {
     return { k: +m[1], n: +m[2] };
 })();
 ok('--part ត្រូវជា k/n (1 ≤ k ≤ n ≤ 8)', PART !== null, process.argv.slice(2).join(' '));
-const mine = PART ? runnable.filter((_, i) => i % PART.n === PART.k - 1) : [];
+// datastore រត់ម្នាក់ឯងមុនគេ; ប្តូរ runner ជាមួយ hang-guard ដើម្បីកុំឲ្យកូនយឺតទាំងពីរប្រជែង deadline របស់ផ្នែកដដែល។
+function poisonPartitionOrder(jobs) {
+    const order=jobs.slice(),runner=order.indexOf('runall-runner-test.js'),guard=order.indexOf('hang-guard.js');
+    const mapped=runner>=0&&guard>=0&&runner!==guard&&new Set(order).size===order.length;
+    if(mapped)[order[runner],order[guard]]=[order[guard],order[runner]];
+    return {order,mapped};
+}
+const partition=poisonPartitionOrder(runnable);
+ok('ការប្តូរផ្នែកមាន checker ពិតទាំងពីរ ហើយ mapping ដែលបាត់មិនអាចបៃតង',partition.mapped
+    && ['runall-runner-test.js','hang-guard.js'].every(name=>!poisonPartitionOrder(runnable.filter(rel=>rel!==name)).mapped));
+ok('runner នៅផ្នែក4/4 ដាច់ពី datastore ផ្នែក1/4 ដោយរក្សាថវិកាដើម',
+    partition.order.indexOf('runall-runner-test.js')%4===3&&partition.order.indexOf('supabase-datastore-test.js')%4===0);
+const partitionsValid=Array.from({length:8},(_,index)=>index+1).every(n=>{
+    const parts=Array.from({length:n},(_,k)=>partition.order.filter((_,i)=>i%n===k));
+    const flat=parts.flat();
+    return flat.length===runnable.length&&new Set(flat).size===runnable.length&&runnable.every(rel=>flat.includes(rel))
+        && parts.every((rows,k)=>rows.length===runnable.filter((_,i)=>i%n===k).length);
+});
+ok('ផ្នែក1..8 រក្សា checker គ្រប់មួយម្តងគត់ និងចំនួនក្នុងផ្នែកនីមួយៗដដែល',partitionsValid);
+const mine = PART ? partition.order.filter((_, i) => i % PART.n === PART.k - 1) : [];
 if (PART && PART.n > 1) {
     console.log('   ផ្នែក ' + PART.k + '/' + PART.n + ' ៖ ពុល checker ' + mine.length + ' ក្នុង ' + runnable.length);
     const listedText = fs.existsSync(RUNALL) ? fs.readFileSync(RUNALL, 'utf8').replace(/^\s*#.*$/gm, '') : '';

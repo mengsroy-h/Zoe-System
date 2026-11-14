@@ -106,6 +106,7 @@ const EXPECT_PRIVATE_EXEC = {
     zoe_restore_entries_v1: [],
     zoe_restore_code_maps_v1: [],
     zoe_restore_generation_v1: [],
+    zoe_restore_terminal_business_v1: [],
     zoe_restore_signature_v1: [],
     zoe_restore_reply_v1: [],
     zoe_restore_rules_cache_v1: [],
@@ -1137,6 +1138,9 @@ const DATA_SESSION_LOOKUP = `    if not exists (
         select m.tenant_id`;
 
 const MUTATIONS = [
+    ['restore terminal predicate ឲ្យ authenticated ហៅបាន',
+        'revoke all on function private.zoe_restore_terminal_business_v1(jsonb,jsonb,text) from public,anon,authenticated,service_role;',
+        'revoke all on function private.zoe_restore_terminal_business_v1(jsonb,jsonb,text) from public,anon,authenticated,service_role; grant execute on function private.zoe_restore_terminal_business_v1(jsonb,jsonb,text) to authenticated;'],
     ['protocol ACL column-only grant', 'revoke all on private.registration_protocol from public, anon, authenticated, service_role;',
         'revoke all on private.registration_protocol from public, anon, authenticated, service_role; grant update (accepting) on private.registration_protocol to authenticated;'],
     ['protocol ACL service-role grant', 'revoke all on private.registration_protocol from public, anon, authenticated, service_role;',

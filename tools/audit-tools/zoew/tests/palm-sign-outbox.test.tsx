@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { acceptFixtureSession } from './helpers/accepted-session';
 import * as serverClock from '../../../../ZoeW/src/core/clock';
 import { exportQueuedSignPhoto } from '../../../../ZoeW/src/features/queued-sign-photo';
@@ -22,7 +23,7 @@ import { resetZtoFinalMarks, syncZtoFinalMarks } from '../../../../ZoeW/src/feat
 import { runAutomaticCleanupRules, cleanupInFlight, cleanupPartialTrashId } from '../../../../ZoeW/src/domain/cleanup';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../../../../ZoeW/src/core/text';
 import { resetZtoTrashMode } from '../../../../ZoeW/src/services/zto-trash-mode';
-import { ztoPickupStatus } from '../../../../ZoeW/src/features/zto-status';
+import { setZtoPickupVerdict, ztoPickupStatus } from '../../../../ZoeW/src/features/zto-status';
 import { act } from 'react';
 import { mount, unmount } from './native/react-harness';
 import { LookupApiConfigModal } from '../../../../ZoeW/src/app/components/modals/LookupApiConfigModal';
@@ -105,8 +106,8 @@ beforeEach(async () => {
     vi.stubGlobal('crypto', webcrypto); vi.stubGlobal('indexedDB', {});
     vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
-    firebaseState.authGeneration++; firebaseState.db = {}; firebaseState.auth = { currentUser: { uid: 'audit-user' } };
-    firebaseState.fb = { getIdTokenResult: async () => ({ token: 'synthetic-id' }) };
+    firebaseState.authGeneration++; setPartialBackendFixtureValue(firebaseState, "db", {}); setPartialBackendFixtureValue(firebaseState, "auth", { currentUser: { uid: 'audit-user' } });
+    setPartialBackendFixtureValue(firebaseState, "fb", { getIdTokenResult: async () => ({ token: 'synthetic-id' }) });
     securityState.appIsLocked = false; securityState.appLockVeiled = false;
     key = await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']) as CryptoKey;
     securityState.lookupSecretKey = key;
@@ -331,7 +332,7 @@ async function autoTrashQueued(partial: boolean) {
         if (value == null) delete target[last]; else target[last] = clone(value);
     };
     const snapshot = (value: any) => ({ val: () => clone(value), exists: () => value != null });
-    firebaseState.fb = {
+    setPartialBackendFixtureValue(firebaseState, "fb", {
         getIdTokenResult: async () => ({ token: 'synthetic-id' }),
         ref: (_db: unknown, path = '') => ({ path }),
         get: async (ref: any) => { reads.push(ref.path); return snapshot(read(ref.path)); },
@@ -342,10 +343,10 @@ async function autoTrashQueued(partial: boolean) {
         },
         update: async (ref: any, updates: any) => { for (const [name, value] of Object.entries(updates)) write([ref.path, name].filter(Boolean).join('/'), value); },
         set: async (ref: any, value: any) => write(ref.path, value)
-    };
+    });
     firebaseState.isDatabaseConnected = true; firebaseState.serverClockTrusted = true; firebaseState.serverTimeOffsetMs = 0;
-    firebaseState.dbRefHistory = { path: 'zoew_scan_history_cod_dod' }; firebaseState.dbRefDeleted = { path: 'zoew_recently_deleted_cod_dod' };
-    firebaseState.dbRefDailyPickup = { path: 'zoew_daily_pickup_cod_dod' }; firebaseState.dbRefDailyCollected = { path: 'zoew_daily_collected_cod_dod' };
+    setPartialBackendFixtureValue(firebaseState, "dbRefHistory", { path: 'zoew_scan_history_cod_dod' }); setPartialBackendFixtureValue(firebaseState, "dbRefDeleted", { path: 'zoew_recently_deleted_cod_dod' });
+    setPartialBackendFixtureValue(firebaseState, "dbRefDailyPickup", { path: 'zoew_daily_pickup_cod_dod' }); setPartialBackendFixtureValue(firebaseState, "dbRefDailyCollected", { path: 'zoew_daily_collected_cod_dod' });
     dataState.dailyPickupData = {}; dataState.dailyCollectedData = {}; dataState.scanHistory = [clone(item)];
     vi.mocked(applyBarcodeCloseChange).mockImplementation(real.applyBarcodeCloseChange);
     reservationFixtures = false; network = async body => receipt(body, { photoProof: null });
@@ -354,6 +355,9 @@ async function autoTrashQueued(partial: boolean) {
         expect((await jobs())[0].job.scanCompleted).toBe(true); expect((await jobs())[0].row.leaseUntil).toBe(0);
     });
     expect(requests.map(body => body.stage)).toEqual(['receipt-status', 'status']);
+    expect(closes()).toEqual([]);
+    setZtoPickupVerdict(codes[0], true);
+    expect(await real.applyBarcodeCloseChange('item1', codes[0], true, { silent: true, showModal: false, expectedSignIdentity: original.job.parcelIdentity })).toBe(true);
     online.mockReturnValue(false); await runPalmSignOutbox(); await syncZtoFinalMarks();
     vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 3 * 60 * 60 * 1000);
     dataState.scanHistory = Object.values(clone(state.zoew_scan_history_cod_dod));
@@ -405,12 +409,12 @@ it.each(['photo', 'wrong-hash', 'wrong-request', 'unsigned', 'restore-claim', 'r
         fixture.state.zoew_scan_history_cod_dod.restored1 = { id: 'restored1', barcodes: [{ code: codes[0], restoredAt: Date.now() }] };
     }
     const get = firebaseState.fb.get; let protectedRow: any;
-    firebaseState.fb.get = async ref => {
+    setPartialBackendFixtureValue(firebaseState.fb, "get", async ref => {
         if (kind === 'database') throw new Error('synthetic-offline');
         if (kind === 'trash-vanished' && ref.path.startsWith('zoew_scan_history')) delete fixture.state.zoew_recently_deleted_cod_dod[fixture.trash.id];
         if (kind === 'auth') { protectedRow = { ...disk.rows.get(fixture.original.row.id) }; firebaseState.authGeneration++; }
         return get(ref);
-    };
+    });
     network = async body => {
         if (kind === 'cas') {
             const row = disk.rows.get(fixture.original.row.id); protectedRow = { ...row, revision: row.revision + 1 }; disk.rows.set(row.id, protectedRow);
@@ -596,12 +600,12 @@ it('បណ្ដាញដាច់ក្រោយ05៖ ស្តារដោយ 
     expect(bodies('receipt')).toHaveLength(1); expect(bodies('receipt-status')).toHaveLength(2);
     expect(bodies('receipt-status')[0].photo).toBeUndefined(); expect(closes()).toEqual([codes[0]]);
 });
-it.each(['photo', 'request'])('ACK ខ្វះ %s រក្សារូបដើម ហើយបិទតែ Sign ដែលបានបញ្ជាក់', async (kind) => {
+it.each(['photo', 'request'])('ACK ខ្វះ %s រក្សារូបដើម ហើយមិនបិទកញ្ចប់ដែលភស្តុតាងមិនពេញលេញ', async (kind) => {
     await ready(1); const normal = network;
     network = async (body) => body.stage === 'receipt' ? receipt(body, kind === 'photo' ? { photoAccepted: undefined, photoProof: undefined } : { requestId: 'other-request' }) : normal(body);
     await submitZtoPalmSign([codes[0]]);
-    await vi.waitFor(async () => expect((await jobs())[0]?.job.message).toContain(kind === 'photo' ? 'រង់ចាំផ្ទៀងរូបដើម' : 'មិនទាន់បញ្ជាក់'));
-    expect(closes()).toEqual(kind === 'photo' ? [codes[0]] : []); expect(disk.rows.size).toBe(1);
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.message).toContain(kind === 'photo' ? 'រូបដើមមិនទាន់ផ្ទៀងត្រូវ' : 'មិនទាន់បញ្ជាក់'));
+    expect(closes()).toEqual([]); expect(disk.rows.size).toBe(1);
 });
 it('ZTO ACK រួច · local DB ACK បាត់ ទោះ optimistic closed ក៏រក្សា queue ហើយ retry តែ local close', async () => {
     await ready(1);
@@ -646,7 +650,7 @@ it('DB មាន restore ថ្មីជាង local៖ transaction មិនប
     dataState.dailyPickupData = {}; dataState.dailyCollectedData = {};
     let mutation: any = 'not-called';
     const update = vi.fn(async () => {});
-    firebaseState.fb = {
+    setPartialBackendFixtureValue(firebaseState, "fb", {
         ref: (_db: unknown, path: string) => ({ path }), update,
         get: async (ref: any) => {
             expect(ref.path).toBe(pickupPath);
@@ -662,7 +666,7 @@ it('DB មាន restore ថ្មីជាង local៖ transaction មិនប
             mutation = change(structuredClone(server));
             return { committed: false, snapshot: { val: () => server } };
         }
-    };
+    });
     expect(await real.applyBarcodeCloseChange(item.id, codes[0], true, { silent: true, showModal: false, expectedSignIdentity: identity })).toBe(false);
     expect(mutation).toBeUndefined(); expect(server.barcodes[0].isClosed).toBe(false);
     expect(update).not.toHaveBeenCalled(); expect(item.barcodes[0].isClosed).toBe(false);
@@ -676,7 +680,7 @@ it.each(['auth', 'shop', 'database', 'lock', 'key'])('ចម្លើយមក�
     await submitZtoPalmSign([codes[0]]); await vi.waitFor(() => expect(bodies('receipt')).toHaveLength(1));
     if (kind === 'auth') firebaseState.authGeneration++;
     if (kind === 'shop') appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://other.firebaseio.com' }));
-    if (kind === 'database') firebaseState.db = {};
+    if (kind === 'database') setPartialBackendFixtureValue(firebaseState, "db", {});
     if (kind === 'lock') securityState.appIsLocked = true;
     if (kind === 'key') securityState.lookupSecretKey = null;
     ack.resolve(reply({})); await new Promise((resolve) => setTimeout(resolve, 30));
@@ -699,7 +703,7 @@ it.each<[number, boolean, boolean, boolean]>([[2, false, false, false], [3, fals
         for (const part of parts) target = target[part] ||= {};
         if (value == null) delete target[last]; else target[last] = clone(value);
     };
-    firebaseState.fb = {
+    setPartialBackendFixtureValue(firebaseState, "fb", {
         getIdTokenResult: async () => ({ token: 'synthetic-id' }),
         ref: (_db: unknown, path: string) => ({ path }),
         get: async (ref: any) => ({ val: () => read(ref.path), exists: () => read(ref.path) !== null }),
@@ -708,10 +712,10 @@ it.each<[number, boolean, boolean, boolean]>([[2, false, false, false], [3, fals
             write(ref.path, next); return { committed: true, snapshot: { val: () => read(ref.path) } };
         },
         update: async (ref: any, updates: any) => { for (const [key, value] of Object.entries(updates)) write(ref.path + '/' + key, value); }
-    };
+    });
     dataState.scanHistory = [clone(db.zoew_scan_history_cod_dod.item1)]; dataState.deletedItems = []; dataState.dailyCollectedData = {}; dataState.dailyPickupData = {};
     firebaseState.serverClockTrusted = true; firebaseState.serverTimeOffsetMs = 0;
-    firebaseState.dbRefDailyPickup = { path: 'zoew_daily_pickup_cod_dod' }; firebaseState.dbRefDailyCollected = { path: 'zoew_daily_collected_cod_dod' };
+    setPartialBackendFixtureValue(firebaseState, "dbRefDailyPickup", { path: 'zoew_daily_pickup_cod_dod' }); setPartialBackendFixtureValue(firebaseState, "dbRefDailyCollected", { path: 'zoew_daily_collected_cod_dod' });
     vi.mocked(applyBarcodeCloseChange).mockImplementation(real.applyBarcodeCloseChange);
     const journal = new Map<string, { data: string; etag: string }>(); let revision = 0;
     const session = { token: 'session', site: 'KH1', operator: 'operator' };
@@ -791,15 +795,16 @@ it.each<[number, boolean, boolean, boolean]>([[2, false, false, false], [3, fals
             await actOnQueuedSign(pending.row.id, 'approve');
         }
         expect(modalIsOpen('ztoPalmSignModal')).toBe(false);
-        if (statusAvailable && !exactPhoto) {
+        if (!exactPhoto) {
             for (const row of disk.rows.values()) row.due = 0;
             await runPalmSignOutbox();
-            await vi.waitFor(async () => expect((await jobs()).filter(value => value.job.signedCleanupConfirmed)).toHaveLength(count));
+            await vi.waitFor(async () => expect((await jobs()).filter(value => value.job.scanCompleted || value.job.signedCleanupConfirmed)).toHaveLength(count));
             const retained = await jobs();
             retained.forEach(value => {
                 const index = chosen.indexOf(value.job.code);
-                expect(value.job).toMatchObject({ requestId: originalRequestId, photo: photos[index], signedCleanupConfirmed: true,
-                    phase: 'action', readOnlyProbe: true, recovery: { dismissed: true }, recoveryCheck: { signed: true, signedStatusVerified: true, photoVerified: false } });
+                expect(value.job).toMatchObject({ requestId: originalRequestId, photo: photos[index] });
+                if (statusAvailable) expect(value.job).toMatchObject({ signedCleanupConfirmed: true,
+                    phase: 'action', readOnlyProbe: true, recovery: { dismissed: false }, recoveryCheck: { signed: true, signedStatusVerified: true, photoVerified: false } });
                 expect(value.job.photoVerified).not.toBe(true);
             });
             expect(read('zoew_scan_history_cod_dod/item1').barcodes.every((b: any) => b.isClosed === false)).toBe(true);
@@ -981,7 +986,9 @@ it.each(['absent', 'wrong', 'reversed'])('រូបដើមនៅរក្ស�
     network = async (body) => receipt(body, { photoProof: kind === 'absent' ? undefined : { protocol: 'original-sha256-v1', verified: true,
         barcode: kind === 'reversed' ? codes[1] : body.barcode, requestId: body.requestId, originalSHA256: kind === 'wrong' ? '0'.repeat(64) : body.originalSHA256 } });
     await submitZtoPalmSign([codes[0]]);
-    await vi.waitFor(() => expect(closes()).toEqual([codes[0]]));
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.scanCompleted).toBe(true));
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    expect(closes()).toEqual([]);
     expect(disk.rows.size).toBe(1);
     expect((await jobs())[0].job.photo).toBe(photos[0]);
 });
@@ -1037,7 +1044,7 @@ it('៣ កញ្ចប់ ACK បញ្ច្រាស លុបតែកញ្
     await submitZtoPalmSign(); await vi.waitFor(() => expect(bodies('receipt')).toHaveLength(2));
     pending[codes.indexOf(bodies('receipt')[1].barcode)].resolve(); await vi.waitFor(() => expect(bodies('receipt')).toHaveLength(3));
     pending.forEach(gate => gate.resolve());
-    await vi.waitFor(() => expect(new Set(closes())).toEqual(new Set(codes)));
+    await vi.waitFor(() => expect(new Set(closes())).toEqual(new Set([codes[0], codes[2]])));
     expect(disk.rows.size).toBe(3);
     const pendingPhoto = (await jobs()).find(value => value.job.code === codes[1])!;
     expect(pendingPhoto.job.photo).toBe(photos[1]);
@@ -1324,7 +1331,7 @@ it.each(['auth', 'key', 'restore'])('cancel ACK មកក្រោយ %s មិ�
 it('reservation headers រង់ចាំ ហើយកញ្ចប់ត្រូវដក មិនហៅ fetch និងរក្សារូប', async () => {
     await ready(1); const pending = gate<void>();
     const identity = vi.fn(async () => { await pending.promise; return { token: 'synthetic-id' }; });
-    firebaseState.fb.getIdTokenResult = identity;
+    setPartialBackendFixtureValue(firebaseState.fb, "getIdTokenResult", identity);
     await submitZtoPalmSign([codes[0]]); await vi.waitFor(() => expect(identity).toHaveBeenCalled());
     dataState.scanHistory[0].barcodes = dataState.scanHistory[0].barcodes.slice(1);
     pending.resolve(); await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
@@ -1809,7 +1816,7 @@ it.each(['lease', 'cas', 'active-list'])('ដកពីបញ្ជី៖ %s ម�
     expect([...disk.rows]).toEqual(before); expect(requests).toEqual([]); expect(closes()).toEqual([]);
 });
 
-it.each(['valid', 'wrong-barcode', 'generic-close', 'cached', 'returned', 'unsigned', 'failure'])('Sign ថ្មី %s៖ លាក់តែភស្តុតាង status ត្រឹមត្រូវ ហើយរូបមិនត្រូវលុប ឬសន្មត verified', async kind => {
+it.each(['valid', 'wrong-barcode', 'generic-close', 'cached', 'returned', 'unsigned', 'failure'])('Sign ថ្មី %s៖ រូបមិនទាន់ផ្ទៀងរក្សាការព្រមាន ហើយមិនលុប ឬសន្មត verified', async kind => {
     const online = await queuedWithPolicy(false); const old = (await jobs())[0];
     await actOnQueuedSign(old.row.id, 'archive'); reservationFixtures = false;
     const status = { success: true, stage: 'status', barcode: old.job.code, ztoClosed: true,
@@ -1818,9 +1825,9 @@ it.each(['valid', 'wrong-barcode', 'generic-close', 'cached', 'returned', 'unsig
     network = async body => body.stage === 'status' ? reply(status, kind === 'failure' ? 503 : 200)
         : reply({ code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED', manualReview: true, reason: 'missing_journal', stage: 'receipt', barcode: body.barcode, requestId: body.requestId, photoProtocol: body.photoProtocol, originalSHA256: body.originalSHA256, reservationProtocol: body.reservationProtocol, originalFingerprint: body.originalFingerprint }, 409);
     online.mockReturnValue(true); await actOnQueuedSign(old.row.id, 'recover');
-    const kept = (await jobs())[0]; expect(kept.job.recovery.dismissed === true).toBe(kind === 'valid');
+    const kept = (await jobs())[0]; expect(kept.job.recovery.dismissed).not.toBe(true);
     expect(kept.job.photo).toBe(old.job.photo); expect(kept.job.requestId).toBe(old.job.requestId); expect(kept.job.recoveryCheck.photoVerified).toBe(false);
-    expect(palmSignOutboxState.rows).toHaveLength(0); expect(palmSignOutboxState.recoveryRows.filter(row => !row.dismissed)).toHaveLength(kind === 'valid' ? 0 : 1);
+    expect(palmSignOutboxState.rows).toHaveLength(0); expect(palmSignOutboxState.recoveryRows.filter(row => !row.dismissed)).toHaveLength(1);
     expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]); expect(disk.rows.size).toBe(1);
 });
 
@@ -1833,14 +1840,136 @@ it('Sign local ចាស់ជាសញ្ញាឱ្យផ្ទៀងតែ�
     const reads = requests.length; await runPalmSignOutbox(); expect(requests).toHaveLength(reads); expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]);
 });
 
-it('Sign status ពិតលាក់ active task តែរក្សារូបដែលមិនទាន់ផ្ទៀង ក្នុង record ដើម', async () => {
+it('Sign status ពិតរក្សា active task ជាការព្រមានរហូតផ្ទៀងរូប ក្នុង record ដើម', async () => {
     const online = await queuedWithPolicy(false); const old = (await jobs())[0]; reservationFixtures = false;
     network = async body => body.stage === 'status' ? reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: true })
         : reply({ success: true, stage: 'receipt', barcode: body.barcode, requestId: body.requestId, ztoClosed: true, scanCompleted: true, photoAccepted: false });
-    online.mockReturnValue(true); await runPalmSignOutbox(); await vi.waitFor(async () => expect((await jobs())[0]?.job.recovery?.dismissed).toBe(true));
+    online.mockReturnValue(true); await runPalmSignOutbox(); await vi.waitFor(async () => expect((await jobs())[0]?.job.recovery?.dismissed).toBe(false));
     const kept = (await jobs())[0]; expect(kept.job.photo).toBe(old.job.photo); expect(kept.job.requestId).toBe(old.job.requestId);
     expect(kept.job.recoveryCheck).toMatchObject({ signed: true, photoVerified: false, signedStatusVerified: true });
+    expect(palmSignOutboxState.recoveryRows.filter(row => !row.dismissed)).toHaveLength(1);
     expect(palmSignOutboxState.rows).toHaveLength(0); expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]);
+});
+
+it.each(['signed', 'unavailable'] as const)('05 រួចរូបមិនត្រូវ៖ status %s រក្សាការព្រមាននិងសំណើដើម ដោយមិនបិទកញ្ចប់', async status => {
+    const online = await queuedWithPolicy(false); const old = (await jobs())[0]; reservationFixtures = false;
+    network = async body => {
+        if (body.stage === 'status') {
+            if (status === 'unavailable') throw new Error('status unavailable');
+            return reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: true });
+        }
+        return receipt(body, { photoProof: { protocol: 'original-sha256-v1', verified: true,
+            barcode: body.barcode, requestId: body.requestId, originalSHA256: 'f'.repeat(64) } });
+    };
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(async () => {
+        const saved = (await jobs())[0];
+        expect(saved.job.recoveryCheck?.signed).toBe(true);
+        expect(saved.row.leaseUntil).toBe(0);
+    });
+    await refreshPalmSignQueue();
+    expect(closes()).toEqual([]);
+    expect(dataState.scanHistory[0].barcodes[0].isClosed).toBe(false);
+    const attention = [...palmSignOutboxState.rows, ...palmSignOutboxState.recoveryRows.filter(row => !row.dismissed)];
+    expect(attention).toHaveLength(1);
+    expect(attention[0]).toMatchObject({ code: old.job.code, photoVerified: false });
+    expect(attention[0].message).toContain('រូប');
+    const saved = (await jobs())[0];
+    expect(saved.job).toMatchObject({ requestId: old.job.requestId, photo: old.job.photo, originalSHA256: old.job.originalSHA256,
+        originalFingerprint: old.job.originalFingerprint, parcelIdentity: old.job.parcelIdentity });
+    expect(bodies('receipt')).toEqual([]);
+});
+
+it.each(['same', 'closed', 'changed'] as const)('05 រួចរូបមិនត្រូវ៖ record ចាស់ %s បង្ហាញតាមកញ្ចប់ដើម ដោយមិនកែសំណើ', async parent => {
+    await queuedWithPolicy(false); const old = (await jobs())[0]; const now = Date.now();
+    const row = await sealSignJob(old.row.owner, key, { ...old.job,
+        recovery: { archivedAt: now, previousPhase: 'checking', previousMessage: 'ចាស់', dismissed: true },
+        phase: 'action', signedCleanupConfirmed: true, signedVerifiedAt: now, signedCleanupAt: now + 86400000,
+        recoveryCheck: { at: now, signed: true, photoVerified: false, statusChecked: true, signedStatusVerified: true }
+    });
+    disk.rows.set(row.id, row);
+    if (parent === 'closed') dataState.scanHistory[0].barcodes[0].isClosed = true;
+    if (parent === 'changed') dataState.scanHistory[0].barcodes[0].createdAt = now;
+    const before = structuredClone([...disk.rows]);
+    await refreshPalmSignQueue();
+    expect(palmSignOutboxState.recoveryRows[0].dismissed).toBe(parent !== 'same');
+    if (parent === 'same') {
+        const { renderToStaticMarkup } = await import('react-dom/server');
+        const { createElement } = await import('react');
+        const { PalmSignQueueModal, PalmSignQueueButton } = await import('../../../../ZoeW/src/app/components/modals/PalmSignQueueModal');
+        const html = renderToStaticMarkup(createElement(PalmSignQueueModal));
+        expect(html).toContain('role="alert"');
+        expect(html).toContain('កញ្ចប់ក្នុង ZoeW មិនទាន់បិទ');
+        expect(renderToStaticMarkup(createElement(PalmSignQueueButton))).toContain('nav-bell-badge');
+    }
+    expect([...disk.rows]).toEqual(before); expect(requests).toEqual([]); expect(closes()).toEqual([]);
+});
+
+it.each(['applied', 'failed', 'optimistic'] as const)('05 រួចរូបមិនត្រូវ៖ បើក App វិញ ហើយផ្ទៀងរូបក្រោយ · local ACK %s ដោយមិនផ្ញើ Sign', async localAck => {
+    const online = await queuedWithPolicy(false); const old = (await jobs())[0]; reservationFixtures = false;
+    let exactPhoto = false;
+    network = async body => body.stage === 'status'
+        ? reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: true })
+        : receipt(body, exactPhoto ? {} : { photoProof: undefined });
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.recovery?.dismissed).toBe(false));
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    expect(closes()).toEqual([]);
+    palmSignOutboxState.rows = []; palmSignOutboxState.recoveryRows = [];
+    await refreshPalmSignQueue();
+    expect(palmSignOutboxState.recoveryRows.filter(row => !row.dismissed)).toHaveLength(1);
+    exactPhoto = true;
+    const closeOriginal = async (_itemId, code) => {
+        dataState.scanHistory[0].barcodes.find(barcode => barcode.code === code)!.isClosed = true;
+        return true;
+    };
+    const firstCloseSucceeds = localAck === 'applied';
+    vi.mocked(applyBarcodeCloseChange).mockImplementation(firstCloseSucceeds ? closeOriginal : async (_itemId, code) => {
+        if (localAck === 'optimistic') await closeOriginal(_itemId, code);
+        return false;
+    });
+    await actOnQueuedSign(old.row.id, 'recover');
+    expect(closes()).toEqual([old.job.code]);
+    if (!firstCloseSucceeds) {
+        expect(dataState.scanHistory[0].barcodes[0].isClosed).toBe(localAck === 'optimistic');
+        expect((await jobs())[0].job.recovery.dismissed).toBe(false);
+        expect((await jobs())[0].job.signedCleanupAt).toBeUndefined();
+        expect(palmSignOutboxState.recoveryRows.filter(row => !row.dismissed)).toHaveLength(1);
+        vi.mocked(applyBarcodeCloseChange).mockImplementation(closeOriginal);
+        await actOnQueuedSign(old.row.id, 'recover');
+    }
+    expect(dataState.scanHistory[0].barcodes[0].isClosed).toBe(true);
+    const saved = (await jobs())[0];
+    expect(saved.job).toMatchObject({ requestId: old.job.requestId, photo: old.job.photo, photoVerified: true,
+        recoveryCheck: { signed: true, photoVerified: true }, recovery: { dismissed: true } });
+    await actOnQueuedSign(old.row.id, 'recover');
+    expect(closes()).toEqual(Array(firstCloseSucceeds ? 1 : 2).fill(old.job.code));
+    expect(bodies('receipt')).toEqual([]);
+    expect(requests.every(body => !body.photo && !body.signMan)).toBe(true);
+});
+
+it('05 រួចរូបមិនត្រូវ៖ lifecycle ប្រែពេលផ្ទៀងរូបក្រោយ មិនបិទកញ្ចប់ថ្មី', async () => {
+    const online = await queuedWithPolicy(false); const old = (await jobs())[0]; reservationFixtures = false;
+    let exactPhoto = false;
+    const statusGate = gate<Response>();
+    network = async body => body.stage === 'status'
+        ? exactPhoto ? statusGate.promise : reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: true })
+        : receipt(body, exactPhoto ? {} : { photoProof: undefined });
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.recovery?.dismissed).toBe(false));
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    exactPhoto = true;
+    const previousStatuses = bodies('status').length;
+    const checking = actOnQueuedSign(old.row.id, 'recover');
+    await vi.waitFor(() => expect(bodies('status')).toHaveLength(previousStatuses + 1));
+    dataState.scanHistory[0].barcodes[0].restoredAt = Date.now();
+    statusGate.resolve(reply({ success: true, stage: 'status', barcode: old.job.code, ztoClosed: true }));
+    await checking;
+    expect(closes()).toEqual([]); expect(dataState.scanHistory[0].barcodes[0].isClosed).toBe(false);
+    const saved = (await jobs())[0];
+    expect(saved.job).toMatchObject({ requestId: old.job.requestId, photo: old.job.photo,
+        originalSHA256: old.job.originalSHA256, originalFingerprint: old.job.originalFingerprint, parcelIdentity: old.job.parcelIdentity });
+    expect(bodies('receipt')).toEqual([]); expect(requests.every(body => !body.photo && !body.signMan)).toBe(true);
 });
 
 it.each([true, false, undefined])('ស្ថានភាពចាស់ %s មិនបាត់ពេល status ថ្មីអានមិនបាន ហើយមិនអនុញ្ញាត resume', async signed => {

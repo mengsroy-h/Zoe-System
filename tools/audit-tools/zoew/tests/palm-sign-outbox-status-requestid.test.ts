@@ -9,7 +9,7 @@ import { barcodeSignIdentity } from '../../../../ZoeW/src/domain/barcode';
 import { sealSignJob, openSignJob, type SignJob } from '../../../../ZoeW/src/services/palm-sign-outbox-store';
 import { palmOriginalFingerprint, palmOriginalPhotoHash, palmSignConfigKey } from '../../../../ZoeW/src/services/palm-sign-transport';
 import { encryptLookupSecret } from '../../../../ZoeW/src/services/crypto';
-import { actOnQueuedSign, runPalmSignOutbox } from '../../../../ZoeW/src/features/palm-sign-outbox';
+import { actOnQueuedSign, palmSignOutboxState, refreshPalmSignQueue, runPalmSignOutbox } from '../../../../ZoeW/src/features/palm-sign-outbox';
 const disk=vi.hoisted(()=>({rows:new Map<string,any>()}));
 vi.mock('../../../../ZoeW/src/services/palm-sign-outbox-store',async original=>({...await original<any>(),
     listSignJobs:async(owner:string)=>[...disk.rows.values()].filter(row=>row.owner===owner).map(row=>structuredClone(row)),
@@ -25,7 +25,7 @@ const localClose = vi.hoisted(() => vi.fn(async () => false));
 vi.mock('../../../../ZoeW/src/services/palm-sign-transport', async original => ({ ...await original<any>(), recordPalmSignResult: localClose }));
 let key:CryptoKey,job:SignJob,id:string;
 beforeEach(async()=>{
-    vi.stubGlobal('crypto',webcrypto);vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(NOW);disk.rows.clear();localClose.mockClear();
+    vi.stubGlobal('crypto',webcrypto);vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(NOW);disk.rows.clear();localClose.mockReset().mockResolvedValue(false);
     Object.defineProperty(navigator,'onLine',{configurable:true,value:true});
     securityState.appIsLocked=false;securityState.appLockVeiled=false;
     key=await webcrypto.subtle.generateKey({name:'AES-GCM',length:256},false,['encrypt','decrypt']) as CryptoKey;securityState.lookupSecretKey=key;
@@ -63,7 +63,7 @@ async function reseal(patch: Partial<SignJob> = {}) {
 async function keptJob() { return openSignJob(disk.rows.get(id), key); }
 
 type StatusKind = 'signed' | 'unsigned' | 'wrong-barcode' | 'cached' | 'returned' | 'failure';
-function serverNetwork(options: { kind?: StatusKind; addIdControl?: boolean; receiptSigned?: boolean } = {}) {
+function serverNetwork(options: { kind?: StatusKind; addIdControl?: boolean; receiptSigned?: boolean; photoProof?: 'exact' | 'wrong-hash' | 'wrong-request' } = {}) {
     const statusBodies: any[] = [];
     const stages: string[] = [];
     const responses: { status: number; stage: string }[] = [];
@@ -85,7 +85,10 @@ function serverNetwork(options: { kind?: StatusKind; addIdControl?: boolean; rec
         if (input.stage === 'status') statusBodies.push(input);
         if (options.receiptSigned && input.stage === 'receipt-status') {
             return new Response(JSON.stringify({ success: true, stage: 'receipt', barcode: CODE, requestId: job.requestId,
-                ztoClosed: true, scanCompleted: true, photoAccepted: false }));
+                ztoClosed: true, scanCompleted: true, photoAccepted: !!options.photoProof,
+                ...(options.photoProof ? { photoProof: { protocol: 'original-sha256-v1', verified: true, barcode: CODE,
+                    requestId: options.photoProof === 'wrong-request' ? 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' : job.requestId,
+                    originalSHA256: options.photoProof === 'wrong-hash' ? 'f'.repeat(64) : job.originalSHA256 } } : {}) }));
         }
         const wire = options.addIdControl && input.stage === 'status' ? { ...input, requestId: job.requestId } : input;
         const out = await fn.handler({ blobs: BLOBS, httpMethod: init.method, headers: Object.fromEntries(new Headers(init.headers)),
@@ -125,11 +128,29 @@ it.each(['recover', 'held', 'trash', 'confirmed'] as const)('C03 ផ្លូវ
     expect(net.upstreamReads()).toBe(1);
     expect(kept.recoveryCheck?.signedStatusVerified).toBe(true);
     expect(kept.signedCleanupConfirmed).toBe(true);
-    expect(kept.recovery?.dismissed).toBe(true);
+    expect(kept.recovery?.dismissed).toBe(route === 'trash');
     expect(kept.photo).toBe(photo);
     expect(kept.requestId).toBe(job.requestId);
     expect(kept.photoVerified).not.toBe(true);
     expect(localClose).not.toHaveBeenCalled();
+    expect(net.stages.every(stage => ['status', 'receipt-status'].includes(stage))).toBe(true);
+    await refreshPalmSignQueue();
+    if (route !== 'trash') expect(palmSignOutboxState.recoveryRows.find(row => row.id === id)).toMatchObject({ dismissed: false, photoVerified: false, warning: expect.stringContaining('រូប') });
+});
+
+it.each(['exact', 'wrong-hash', 'wrong-request'] as const)('C03 photo proof %s៖ status parser ពិតមិនជំនួសភស្តុតាងរូបដើម', async photoProof => {
+    localClose.mockResolvedValue(true);
+    const net = serverNetwork({ receiptSigned: true, photoProof });
+    await actOnQueuedSign(id, 'recover');
+    const kept = await keptJob();
+    expect(net.statusBodies).toEqual([{ stage: 'status', barcode: CODE, requestId: job.requestId }]);
+    expect(net.responses.find(response => response.stage === 'status')?.status).toBe(200);
+    expect(net.upstreamReads()).toBe(1);
+    expect(localClose).toHaveBeenCalledTimes(photoProof === 'exact' ? 1 : 0);
+    if (photoProof === 'exact') expect(localClose).toHaveBeenCalledWith(job.itemId, CODE, expect.any(Function), job.parcelIdentity);
+    expect(kept.recoveryCheck).toMatchObject({ signed: true, signedStatusVerified: true, photoVerified: photoProof === 'exact' });
+    expect(kept.recovery?.dismissed).toBe(photoProof === 'exact');
+    expect(kept.photo).toBe(photo); expect(kept.requestId).toBe(job.requestId);
     expect(net.stages.every(stage => ['status', 'receipt-status'].includes(stage))).toBe(true);
 });
 

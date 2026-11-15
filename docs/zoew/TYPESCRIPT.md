@@ -19,6 +19,33 @@
 
 ការពិនិត្យទាំងនេះមិនជំនួសតេស្តឥរិយាបថ ឬការផ្ទៀងទិន្នន័យពីបណ្ដាញទេ។
 
+`npm --prefix ZoeW run typecheck` ពិនិត្យ project ដាច់ដោយឡែក
+`tools/audit-tools/zoew/tsconfig.domain-strict.json` ផងដែរ។ វាបើក `strictNullChecks`,
+`noImplicitAny` និង `useUnknownInCatchVariables` សម្រាប់ `src/domain/parcel.ts`,
+`parcel-number.ts`, `barcode-key.ts`, `statistics.ts`, `pickup-reset-proof.ts` និង
+`src/services/backend-types.ts` ព្រមទាំងកិច្ចសន្យា type របស់វា។ វិសាលភាពនេះមិនបើក
+ការពិនិត្យ `null` សកលសម្រាប់ App ឬការចូលប្រើ DOM ទេ។
+
+`ParcelRow`, `DeletedParcelRow` និង `ParcelBarcode` ក្នុង `src/domain/parcel.ts` ជា interface
+របស់ `scanHistory` និង `deletedItems` ក្នុង `src/core/state.ts`។ Field ដែលទិន្នន័យចាស់អាចខ្វះ
+រក្សាជា optional; ចំនួនប្រាក់ និងត្រាពេលមាន type `number`។ Recovery marker ក្នុង view អាចនៅមិនពេញលេញ;
+interface របស់វាមិនជំនួសការផ្ទៀង Server ឬ validated marker មុនអនុវត្តការងារទេ។
+
+`statistics.ts` ផ្ដល់ models សម្រាប់ ledger, pickup និង collected។ Bucket ក្នុង state ជា
+`Partial<Record<string, ...>>`; ទិន្នន័យចាស់អាចខ្វះ field។ Deduction និង Reset/Restore proof
+ដែលមិនទាន់ផ្ទៀងនៅជា `unknown`; validators ទើបអាចផ្ដល់ validated receipt ឬ guard។
+
+`backend-types.ts` ពិពណ៌នា public SDK ports និង schema-aware reference/snapshot/transaction។
+Path ដែលស្គាល់ផ្ដល់ type នៃ row ឬ nested field; path ផ្សេងរក្សា payload ជា `unknown`។
+`supabase-types.ts` ពិពណ៌នា app/auth/user/database handles របស់ Supabase factory។
+Ports ទាំងនេះមិនបញ្ជាក់ថា reference របស់ provider មួយអាចប្រើជាមួយ SDK ផ្សេងបានទេ;
+អ្នកហៅត្រូវរក្សា original SDK, session និង generation តាម [Recovery rules](../../CLAUDE.md#start-here)។
+
+`src/ui/view-types.ts` ភ្ជាប់ `UiState` ទៅ interfaces របស់ consumers ដើម សម្រាប់ history,
+locker, trash, reports, labels និង dialogs។ Raw setup payload នៅជា `unknown` មុន validation។
+Hardware audio/scanner handles និង private RTDB cache/transport internals នៅត្រូវធ្វើតាម module
+ដាច់ដោយឡែក; public handle typing មិនមានន័យថា implementation ទាំងអស់ strict រួចទេ។
+
 ---
 
 ## ២. ផ្លូវតឹងបន្តិចម្តងៗ
@@ -35,8 +62,11 @@ TypeScript គ្មាន pragma `@ts-strict-check-null` សម្រាប់�
 ១. ជ្រើស module មួយ (ចាប់ផ្តើមពី `src/domain/*` — វាសុទ្ធសាធជាងគេ)
 ២. ការចូលប្រើ DOM មាន type រួចហើយ ៖ `elementOf<T>()` ក្នុង `src/app/refs.ts` ត្រឡប់ `T | null` ➜ កូដដែលប្រើវា
    ត្រូវពិនិត្យ `null` ពេលប្រើ (មើលផ្នែក ៣); `strictNullChecks: false` មិនធានាថាអ្នកហៅទាំងអស់បានពិនិត្យរួចទេ
-៣. បន្ថែម interface ពិតជំនួស `any` — ⛔ **មិនទាន់មាន** interface សម្រាប់កញ្ចប់ ឬ barcode ទេ (វាលឃ្លាំងក្នុង
-   `src/core/state.ts` ភាគច្រើនជា `any`) ➜ ចាប់ផ្តើមពីរូបរាងដែល Firebase rules ចាក់សោ (`firebase-database.rules.json`)
+៣. ប្រើ models និង public SDK/view contracts ដែលមានស្រាប់សម្រាប់ implementation ខាងក្នុង
+   private RTDB, transport/env, hardware handles និង domain/service parameters ដែលនៅសល់។
+   ផ្ទៀងរូបរាងជាមួយ Firebase rules (`firebase-database.rules.json`); ការដាក់ type លើ state
+   មិនធ្វើឱ្យ parameter ដែលនៅជា `any` ក្នុង producers តឹងដោយស្វ័យប្រវត្តិទេ។
+   តំបន់ LOCK ត្រូវគោរពលក្ខខណ្ឌវាស់ និងឧបករណ៍ពិតតាម [CLAUDE](../../CLAUDE.md)
 ៤. រត់ typecheck · lint និងតេស្តតាមសេណារីយ៉ូដែលកែក្នុង session ហើយរង់ចាំ suite ពេញក្នុង CI តាម [Runbook](../../CLAUDE.md#-runbook); បៃតងមិនធានាថាឥរិយាបថទាំងអស់ដូចដើមទេ
 ៥. ពេល module ទាំងអស់រឹងរួច ➜ បើក `strictNullChecks` សកល រួចលុបផ្នែកនេះចោល
 
@@ -61,3 +91,11 @@ App ជា React ១០០% ➜ ⛔ **គ្មាន `byId()`** ៖ កូដ�
 
 > **ការបន្ថែម type ត្រូវជាការពិពណ៌នាប៉ុណ្ណោះ** (cast · annotation · `?` · generic)។ បើការកែណាមួយប្តូរ
 > *ឥរិយាបថ* វាមិនមែនជាការបន្ថែម type ទេ — វាជាការកែកូដ ហើយត្រូវមានអ្នកវាស់ដាច់ដោយឡែក។
+
+## ៥. Partial provider fixtures
+
+Tests ដែលចង់សាក provider មិនពេញលេញអាចប្រើ
+`tools/audit-tools/zoew/tests/helpers/backend-fixture.ts` ដើម្បីដាក់ raw fixture ដោយរក្សា
+object identity និងរូបរាងដើម។ Helper នេះនៅតែសម្រាប់ tests; មិនបង្កើត default SDK methods
+ឬចាត់ partial fixture ថាជា complete provider ទេ។ Compile contracts របស់ production SDK
+និង factory ត្រូវពិនិត្យជាមួយ types ពិត ហើយមិនឆ្លងកាត់ fixture helper នេះ។

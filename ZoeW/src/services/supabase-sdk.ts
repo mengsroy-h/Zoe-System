@@ -4,6 +4,8 @@ import { createLocalWriteJournal } from './write-journal';
 import { SB_LOGIN_DOMAIN_DEFAULT, isSupabaseConfig } from './supabase-config';
 import { documentIsHidden, onDocumentVisibilityChange } from '../platform/document-io';
 import { localAuthSessionCurrent, localLogoutIntent } from './local-logout-intent';
+import type { BackendConfig } from './backend-types';
+import type { SupabaseApp, SupabaseAuth, SupabaseSdk, SupabaseSession, SupabaseUser } from './supabase-types';
 
 export { SB_LOGIN_DOMAIN_DEFAULT, isSupabaseConfig };
 
@@ -64,8 +66,8 @@ export function docsCacheScope(app, uid) {
     return url && uid ? url + '|' + uid : null;
 }
 
-function makeUser(auth, session) {
-    const user: any = {
+function makeUser(auth: SupabaseAuth, session: SupabaseSession) {
+    const user: SupabaseUser = {
         uid: session.user.id,
         email: session.user.email || '',
         emailVerified: true,
@@ -83,9 +85,9 @@ function makeUser(auth, session) {
     return user;
 }
 
-function createAuth(app, env) {
+function createAuth(app: SupabaseApp, env) {
     const transport = app._transport;
-    const auth: any = { app, currentUser: null, _transport: transport, _listeners: new Set(), _ready: false, _account: null, _accountUnverified: false };
+    const auth: SupabaseAuth = { app, currentUser: null, _transport: transport, _listeners: new Set(), _ready: false, _account: null, _accountUnverified: false };
     let closed = false;
     let generation = 0;
     const cleanups = [];
@@ -307,8 +309,8 @@ function availableWriteJournal() {
     return journal.available() ? journal : null;
 }
 
-export function createSupabaseSdk(makeTransport, env) {
-    const apps = [];
+export function createSupabaseSdk(makeTransport, env): SupabaseSdk {
+    const apps: SupabaseApp[] = [];
     const writeSessionWitness = (app) => {
         const auth = app?._auth, user = auth?.currentUser;
         const scope = 'sb:' + String(app?.options?.supabaseUrl || '').trim().replace(/\/+$/, '').toLowerCase();
@@ -316,12 +318,12 @@ export function createSupabaseSdk(makeTransport, env) {
         return () => apps.includes(app) && app._auth === auth && auth?.currentUser === user
             && localAuthSessionCurrent(auth, scope, user) && logoutCurrent();
     };
-    const sdk: any = {
+    const sdk = {
         __supabase: true,
         browserLocalPersistence: { type: 'LOCAL' },
         browserSessionPersistence: { type: 'SESSION' },
-        initializeApp(config) {
-            const app: any = { name: '[DEFAULT]', options: Object.assign({}, config), _transport: makeTransport(config), _db: null, _auth: null, _tenantTopic: null };
+        initializeApp(config: BackendConfig) {
+            const app: SupabaseApp = { name: '[DEFAULT]', options: Object.assign({}, config), _transport: makeTransport(config), _db: null, _auth: null, _tenantTopic: null };
             apps.push(app);
             return app;
         },

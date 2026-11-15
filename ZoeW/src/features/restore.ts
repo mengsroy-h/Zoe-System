@@ -1,6 +1,8 @@
 import { TRASH_CONSUMPTIONS_ROOT, trashConsumptionOf, trashConsumptionSame, trashConsumptionValid, trashGenerationOf, trashSourceUnconsumed, type TrashConsumption } from '../domain/trash-generation';
 import { captureTrashGenerationOwner, readTrashConsumption, trashGenerationOwnerCurrent } from '../services/trash-generation';
 import { rowOperationActive } from '../services/row-operation-lock';
+import type { DeletedParcelRow, ParcelRow } from '../domain/parcel';
+import type { BackendFinalization } from '../services/backend-types';
 import { setModalDisplay } from '../core/modals';
 import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
 import { liveShopScope, shopScope } from '../core/shop-scope';
@@ -98,7 +100,7 @@ export function restorePendingCode(item, code) {
 }
 
 export const restoreCancellationInFlight = new Set();
-export const restoreRecoveryHolds = new Set();
+export const restoreRecoveryHolds = new Set<string>();
 export const RESTORE_ZTO_NEEDS_LOOKUP_TEXT = '⚠️ ហាងនេះប្រើ ZTO ៖ ស្តារពីឧបករណ៍ដែលភ្ជាប់ ZTO Lookup ដើម្បីផ្ទៀងស្ថានភាព Sign មុន។';
 export const RESTORE_ZTO_UNCONFIRMED_TEXT = '⚠️ ZTO មិនអាចបញ្ជាក់ថាកញ្ចប់នេះមិនទាន់ Sign (ឧ. កញ្ចប់សាខាផ្សេង ឬ Function មិនទាន់កំណត់ស្ថានភាព Sign) — មិនស្តារដើម្បីការពារប្រាក់។';
 export const RESTORE_SHOP_MODE_UNSYNCED_TEXT = '⏳ ការកំណត់ ZTO របស់ហាងមិនទាន់ Sync — សូមរង់ចាំបន្តិច ហើយស្តារម្តងទៀត។';
@@ -129,7 +131,7 @@ export async function cancelBlockedRestore(id, expectedToken?, opts?: { evidence
                 frozen = cloneRestoreItem(error.source);
                 alreadyFrozen = true;
             }
-        } else freeze = await dbOp(api.runTransaction(api.ref(cancelDb, `zoew_recently_deleted_cod_dod/${id}`), (item) => {
+        } else freeze = await dbOp(api.runTransaction(api.ref<DeletedParcelRow>(cancelDb, `zoew_recently_deleted_cod_dod/${id}`), (item) => {
             frozen = null; alreadyFrozen = false;
             if (!current() || !item || expectedToken && item.restoreClaim?.token !== expectedToken) return;
             if (item.restoreBlocked !== true && !trashRestoreBlockOf(item, !!opts?.evidenceOnly)) return;
@@ -145,7 +147,7 @@ export async function cancelBlockedRestore(id, expectedToken?, opts?: { evidence
         if (claim) {
             if (typeof claim.token !== 'string' || typeof claim.targetId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(claim.targetId)) return 'recovery-required';
             let settled = false, unproven = false, untouched = false;
-            const cancelled = await dbOp(api.runTransaction(api.ref(cancelDb, `zoew_scan_history_cod_dod/${claim.targetId}`), (item) => {
+            const cancelled = await dbOp(api.runTransaction(api.ref<ParcelRow>(cancelDb, `zoew_scan_history_cod_dod/${claim.targetId}`), (item) => {
                 settled = false; unproven = false; untouched = false;
                 if (!current()) return;
                 if (rowOperationActive(item)) return;
@@ -165,7 +167,7 @@ export async function cancelBlockedRestore(id, expectedToken?, opts?: { evidence
                 const result = await requestRestoreAuthorization(frozen, { token: claim.token, targetId: claim.targetId, current, action: 'release' });
                 released = result.kind === 'released';
                 release = { committed: released };
-            } else release = await dbOp(api.runTransaction(api.ref(cancelDb, `zoew_recently_deleted_cod_dod/${id}`), (item) => {
+            } else release = await dbOp(api.runTransaction(api.ref<DeletedParcelRow>(cancelDb, `zoew_recently_deleted_cod_dod/${id}`), (item) => {
                 released = false;
                 if (!current() || !item || item.restoreBlocked !== true) return;
                 if (!item.restoreClaim) { released = true; return item; }
@@ -237,11 +239,11 @@ export async function resumeBlockedRestoreCancellations() {
     for (const item of rows) {
         if (!current()) return;
         if (!restoreAwaitsCancellation(dataState.deletedItems.find(entry => entry?.id === item.id))) continue;
-        const outcome = await cancelBlockedRestore(item.id, item.restoreClaim.token, { evidenceOnly: true });
+        const outcome = await cancelBlockedRestore(item.id, typeof item.restoreClaim === 'string' ? undefined : item.restoreClaim.token, { evidenceOnly: true });
         if (!current()) return;
         if (outcome === 'recovery-required' && !restoreRecoveryHolds.has(item.id)) {
             restoreRecoveryHolds.add(item.id);
-            if (window.ZoeErrors) ZoeErrors.capture(new Error('Restore held: prepared row cannot be cancelled'), { zone: 'money', context: 'resumeBlockedRestoreCancellations', itemId: item.id, targetId: item.restoreClaim.targetId || '' });
+            if (window.ZoeErrors) ZoeErrors.capture(new Error('Restore held: prepared row cannot be cancelled'), { zone: 'money', context: 'resumeBlockedRestoreCancellations', itemId: item.id, targetId: typeof item.restoreClaim === 'string' ? '' : item.restoreClaim.targetId || '' });
             showToast(RESTORE_RECOVERY_REQUIRED_TEXT);
         }
     }
@@ -279,7 +281,7 @@ export async function claimDeletedItemForRestore(id, token, targetId, expectedSo
     let replacedClaim = null;
     let claimStatus = 'ALREADY_RESTORED';
     let claimedTargetId = targetId;
-    const trashRef = firebaseState.fb.ref(firebaseState.db, `zoew_recently_deleted_cod_dod/${id}`);
+    const trashRef = firebaseState.fb.ref<DeletedParcelRow>(firebaseState.db, `zoew_recently_deleted_cod_dod/${id}`);
     const result = await dbOp(firebaseState.fb.runTransaction(trashRef, (currentItem) => {
         claimedItem = null;
         replacedClaim = null;
@@ -321,7 +323,7 @@ export async function bindRestoreClaimTarget(id, token, targetId, isCurrent?: ()
     const clockOperation = captureClockOperation();
     if (!clockOperation.current()) throw new Error('RESTORE_CLOCK_UNTRUSTED');
     let bound = false;
-    const result = await dbOp(firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_recently_deleted_cod_dod/${id}`), (currentItem) => {
+    const result = await dbOp(firebaseState.fb.runTransaction(firebaseState.fb.ref<DeletedParcelRow>(firebaseState.db, `zoew_recently_deleted_cod_dod/${id}`), (currentItem) => {
         bound = false;
         if (isCurrent && !isCurrent()) return;
         if (!clockOperation.current()) return;
@@ -338,7 +340,7 @@ export async function bindRestoreClaimTarget(id, token, targetId, isCurrent?: ()
 export async function clearRestoreFinalization(sourceId, token, isCurrent?: () => boolean) {
     if (isCurrent && !isCurrent()) throw new Error('RESTORE_SESSION_SWITCHED');
     if (!sourceId || !token) return;
-    await dbOp(firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_restore_finalizations/${sourceId}`), (currentFinalization) => {
+    await dbOp(firebaseState.fb.runTransaction(firebaseState.fb.ref<BackendFinalization>(firebaseState.db, `zoew_restore_finalizations/${sourceId}`), (currentFinalization) => {
         if (isCurrent && !isCurrent()) return;
         if (currentFinalization === null) return null;
         if (!currentFinalization || currentFinalization.token !== token) return;
@@ -354,7 +356,7 @@ export async function applyClaimedRestoreToHistory(targetId, sourceId, token, it
     let targetBusy = false;
     let committedItem = null;
     let lost = [];
-    const result = await dbOp(firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${targetId}`), (currentItem) => {
+    const result = await dbOp(firebaseState.fb.runTransaction(firebaseState.fb.ref<ParcelRow>(firebaseState.db, `zoew_scan_history_cod_dod/${targetId}`), (currentItem) => {
         targetChanged = false;
         if (!clockOperation.current()) return;
         if (isCurrent && !isCurrent()) return;
@@ -924,7 +926,7 @@ export async function releaseStaleRestoreClaimForPurge(id, isCurrent = () => tru
     const target = (await dbOp(api.get(api.ref(purgeDb, `zoew_scan_history_cod_dod/${claim.targetId}`)))).val();
     if (!current() || !clockOperation.current() || target?.restoreClaimId === id) return false;
     let released = false;
-    await dbOp(api.runTransaction(api.ref(purgeDb, `zoew_recently_deleted_cod_dod/${id}`), (currentItem) => {
+    await dbOp(api.runTransaction(api.ref<DeletedParcelRow>(purgeDb, `zoew_recently_deleted_cod_dod/${id}`), (currentItem) => {
         released = false;
         if (!current()) return;
         if (!clockOperation.current()) return;

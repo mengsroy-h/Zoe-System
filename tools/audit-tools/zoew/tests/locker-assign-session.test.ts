@@ -1,4 +1,5 @@
 import { acceptServerClockOffset, resetServerClock } from '../../../../ZoeW/src/core/clock';
+import { callPartialBackendFixtureMethod } from './helpers/backend-fixture';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../../../../ZoeW/src/core/state';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../../../../ZoeW/src/core/text';
@@ -101,7 +102,8 @@ describe('Locker ៖ ការកំណត់ទីតាំងចុះយឺ�
 
 it('uncertain clock refuses locker assignment before SDK mutation', async () => {
     seed(); resetServerClock();
-    const write = vi.spyOn(firebaseState.fb, 'runTransaction').mockResolvedValue({ committed: false });
+    const write = vi.spyOn(firebaseState.fb, 'runTransaction');
+    callPartialBackendFixtureMethod(write, 'mockResolvedValue', [{ committed: false }]);
     await assignLockerToEntry('ZTA001');
     expect(write).not.toHaveBeenCalled();
 });

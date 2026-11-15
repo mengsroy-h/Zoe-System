@@ -59,14 +59,16 @@ repo ជា Private) និង **repo Release public** `ZOE_RELEASES_REPO` (ក�
 **Repo Release (រៀបចំម្តង)** ៖ GitHub ➜ New repository ➜ ឈ្មោះដូច `ZOE_RELEASES_REPO` · **Public** · ធីក «Add a README file»
 (⛔ repo ទទេសោះគ្មាន commit ➜ `gh release create` បង្កើត tag មិនបាន) ➜ Settings ➜ Developer settings ➜ Fine-grained personal access
 tokens ➜ token ថ្មី ៖ Repository access = **តែ repo Release នោះ** · Permissions ➜ Contents = **Read and write** (គ្មានសិទ្ធិផ្សេង) ➜ ដាក់ជា
-secret `ZOE_RELEASES_TOKEN` ក្នុង repo source។ ⛔ គ្មាន secret ➜ workflow លើ `main` **ធ្លាក់មុន build** (Release ដែលទូរស័ព្ទទាញមិនបាន
+secret `ZOE_RELEASES_TOKEN` ក្នុង Environment **`android-signing`** របស់ repo source (មើលការរៀបចំខាងក្រោម)។ ⛔ គ្មាន secret ➜ workflow លើ `main` **ធ្លាក់មុន build** (Release ដែលទូរស័ព្ទទាញមិនបាន
 មិនត្រូវចេញ) · token ផុតកំណត់ ➜ ការបង្កើតឬចម្លង Release ទៅ repo Release បរាជ័យ ➜ បង្កើតថ្មីរួចដាក់ secret ឡើងវិញ។ Release ដែលមានរួចក្នុង repo source តែមិនទាន់មានក្នុង
 repo Release (ឧ. secret ដាក់ក្រោយ) ➜ **Actions ➜ Android APK ➜ Run workflow ➜ main** ➜ workflow ចម្លង APK + `.sha256` + កំណត់ចំណាំ
 ទៅ repo Release ដោយមិន build ម្តងទៀត។
 
 ### APK សាកពី branch (មុន merge)
 
-**Actions ➜ Android APK ➜ Run workflow** ➜ «Use workflow from» ជ្រើស **branch** (មិនមែន `main`) ➜ **Run workflow** ➜ workflow build APK
+Settings ➜ Environments ➜ **`android-signing-preview`** ➜ បន្ថែមឈ្មោះ branch សាកជាក់លាក់ក្នុង Deployment branches (គ្មាន wildcard)។
+**Actions ➜ Android APK ➜ Run workflow** ➜ «Use workflow from» ជ្រើស **branch** នោះ (មិនមែន `main`) ➜ **Run workflow** ➜
+ម្ចាស់ repo ពិនិត្យ commit និងចុច **Review deployments ➜ Approve and deploy** ➜ workflow ផ្ទៀង protection ហើយ build APK
 ដែល sign ដោយ keystore ដដែល ហើយបង្កើត **Pre-release** `zoew-android-v<កំណែ>-test.<commit ៧ តួ>` (ឯកសារ `ZoeW-<កំណែ>-test.<commit>.apk`)
 ➜ **Releases** របស់ repo source (⛔ APK សាកមិនចេញទៅ repo Release public) ➜ ទាញ APK ➜ ដំឡើងជាន់ App ដែលមានស្រាប់ (ទិន្នន័យ · PIN · Activation នៅដដែល)។ Pre-release មួយក្នុងមួយ commit ·
 push លើ branch មិន build ស្វ័យប្រវត្តិ · Release ផ្លូវការនៃកំណែដដែល (ពី `main`) ដំឡើងជាន់ APK សាកបាន។ ⛔ APK សាកសម្រាប់ម្ចាស់គម្រោងសាក
@@ -84,11 +86,23 @@ ZoeKeyGen មុន)។ ដូច្នេះ workflow **មិន build ទា�
 
 **ការរៀបចំ (ម្តង)** ៖
 
-1. GitHub ➜ Settings ➜ Secrets and variables ➜ Actions ➜ បន្ថែម secret ៥ ៖ `ZOEW_KEYSTORE_BASE64` (keystore ជា base64
+1. GitHub repo source ➜ **Settings ➜ Environments** ➜ បង្កើត **`android-signing`** និង **`android-signing-preview`** តាម
+   [configuration artifact](../../tools/audit-tools/android-signing-environments.json)។ ទាំងពីរប្រើ **Selected branches and tags** ហើយជ្រើសតែប្រភេទ **Branch**
+   ជាមួយឈ្មោះជាក់លាក់ គ្មាន wildcard; បិទការរំលង protection ដោយ admin។ `android-signing` អនុញ្ញាតតែ **`main`** ហើយមិនកំណត់ reviewer ដើម្បីរក្សា Release ស្វ័យប្រវត្តិ។
+   `android-signing-preview` ត្រូវការ reviewer ម្នាក់គឺម្ចាស់ repo **`mengsroy-h`** ហើយអនុញ្ញាតតែឈ្មោះ branch សាកដែលម្ចាស់ជ្រើស។ លុប branch policy សាកពេលលែងប្រើ។
+2. ក្នុង **Environment secrets** របស់ `android-signing` ដាក់ secret ៥ ៖ `ZOEW_KEYSTORE_BASE64` (keystore ជា base64
    បន្ទាត់តែមួយ) · `ZOEW_KEYSTORE_PASSWORD` · `ZOEW_KEY_ALIAS` (`zoew`) · `ZOEW_KEY_PASSWORD` (ស្មើ `ZOEW_KEYSTORE_PASSWORD` —
-   PKCS12 ប្រើពាក្យសម្ងាត់តែមួយ) · `ZOE_RELEASES_TOKEN` (PAT fine-grained របស់ repo Release public — មើល «APK ពី GitHub Releases»)។ base64 ពី `zoew-release.jks` ៖ `base64 -w0 zoew-release.jks` · Windows PowerShell ៖
+   PKCS12 ប្រើពាក្យសម្ងាត់តែមួយ) · `ZOE_RELEASES_TOKEN` (PAT fine-grained របស់ repo Release public — មើល «APK ពី GitHub Releases»)។
+   ក្នុង `android-signing-preview` ដាក់តែ secret keystore ៤ ដើមដដែល; វាមិនត្រូវការ `ZOE_RELEASES_TOKEN` ព្រោះ APK សាកមិនផ្សាយទៅ repo Release public។
+   base64 ពី `zoew-release.jks` ៖ `base64 -w0 zoew-release.jks` · Windows PowerShell ៖
    `[Convert]::ToBase64String([IO.File]::ReadAllBytes("zoew-release.jks"))`។
-2. ⛔ **រក្សា `zoew-release.jks` និងពាក្យសម្ងាត់ទុកក្រៅ repo** (ឧ. Password Manager + ច្បាប់ចម្លង ២ កន្លែង) — បាត់ keystore =
+3. ផ្ទៀងឈ្មោះ environment, branch/reviewer protection និងបញ្ជីឈ្មោះ secrets ពី GitHub ឡើងវិញ មុនលុប secret ដូចគ្នាចេញពី **Repository secrets**។
+   រក្សាតម្លៃ keystore ដើមដដែល។ ការទុក secret នៅ repository scope នៅតែអនុញ្ញាតឱ្យ workflow ផ្សេងយកវាដោយមិនឆ្លង environment protection។
+   កុំលុប repository secrets មុនផ្ទៀងថា environment ទទួលគ្រប់ឈ្មោះត្រឹមត្រូវរួច។
+4. Workflow ប្រើ [signing preflight](../../tools/audit-tools/android-signing-preflight.cjs) មុន step ដែលអាន signing/release secrets។ Environment បាត់ ឬបង្កើតទទេ,
+   protection មិនត្រឹមត្រូវ, branch មិនបានអនុញ្ញាត ឬអាន GitHub metadata មិនបាន ➜ **បញ្ឈប់ដោយកំហុស**។ កុំបិទ preflight ដើម្បីបន្ត build;
+   ផ្ទៀងការកំណត់ និងសិទ្ធិ `actions: read` របស់ `GITHUB_TOKEN` សិន។
+5. ⛔ **រក្សា `zoew-release.jks` និងពាក្យសម្ងាត់ទុកក្រៅ repo** (ឧ. Password Manager + ច្បាប់ចម្លង ២ កន្លែង) — បាត់ keystore =
    App ដំឡើងជាន់មិនបានទៀតទេ។ ⛔ កុំ commit វា (`.gitignore` ហាម `*.jks` · `*.keystore` ហើយ `npm run android:check` ពិនិត្យ)។
 
 `build.gradle` sign APK តែពេល env `ZOEW_KEYSTORE_FILE` មាន ➜ Android Studio (**Generate Signed App Bundle / APK** ដោយជ្រើស

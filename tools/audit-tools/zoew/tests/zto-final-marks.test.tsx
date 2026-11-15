@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRestoreAttestationFixture } from './helpers/restore-attestation';
@@ -473,11 +474,11 @@ describe('ភស្តុតាង ZTO ក្នុង DB ៖ ការសរស
         setZtoPickupVerdict('Q1', true);
         setZtoPickupVerdict('Q2', true);
         const run = firebaseState.fb.runTransaction;
-        firebaseState.fb.runTransaction = async (ref: any, fn: any) => {
+        setPartialBackendFixtureValue(firebaseState.fb, "runTransaction", async (ref: any, fn: any) => {
             const out = await run(ref, fn);
             firebaseState.authGeneration++;
             return out;
-        };
+        });
         expect(await syncZtoFinalMarks()).toBe(0);
         expect(txPaths.length).toBe(1);
     });

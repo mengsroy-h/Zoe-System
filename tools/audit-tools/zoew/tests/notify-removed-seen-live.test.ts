@@ -3,13 +3,14 @@
 // seen while the cap has room, so a cancelled restore or a shop switched back never shows «ថ្មី» again.
 import { beforeEach, describe, expect, it } from 'vitest';
 import { dataState, firebaseState, uiState } from '../../../../ZoeW/src/core/state';
+import type { DeletedParcelRow } from '../../../../ZoeW/src/domain/parcel';
 import { viewState } from '../../../../ZoeW/src/core/view-state';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../../../../ZoeW/src/core/text';
 import {
     NOTIFY_GROUP_REMOVED, NOTIFY_REMOVED_SEEN_MAX, markNotifyRemovedSeen, refreshNotifyRemovedView
 } from '../../../../ZoeW/src/features/notifications';
 
-function trashItem(i: number) {
+function trashItem(i: number): DeletedParcelRow {
     return { id: 'T' + i, phone: '0972' + String(100000 + i), deletedAt: Date.now() - (i + 1) * 1000,
         barcodes: [{ code: 'R' + i }], trashReason: 'returned', isFromDeletion: false };
 }

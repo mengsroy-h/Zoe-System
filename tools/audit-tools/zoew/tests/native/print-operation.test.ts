@@ -15,7 +15,7 @@ vi.mock('../../../../../ZoeW/src/platform/native', async (original) => ({ ...(aw
 
 const flush = async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); };
 function startPrint(name: string) {
-    const view = { title: name, headers: [], rows: [], footer: '' };
+    const view = { title: name, headers: [], rows: [], totalRow: { cells: [] }, footer: '' };
     uiState.pdfExportView = view;
     beginPdfPrint(name);
     return view;

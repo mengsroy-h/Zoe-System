@@ -5529,6 +5529,94 @@
     "tools/audit-tools/fixtures/supabase-backup-before-restore-guards.source": {
       "policy": "zoew-self-verification",
       "sha256": "e40e247f08afb75ff0ebec9ba17a4b62629287b31a9c6bafef8540e23e2bc208"
+    },
+    "ZoeW/src/domain/parcel-number.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/domain/parcel.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/android-signing-environments.json": {
+      "policy": "android-release"
+    },
+    "tools/audit-tools/android-signing-preflight.cjs": {
+      "policy": "android-release"
+    },
+    "tools/audit-tools/zoew/tests/android-signing-preflight.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/connection-browser-boundaries.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/parcel-domain-strict.typecheck.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/parcel-number.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/parcel-state.typecheck.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/pickup-reset-retention.pg.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tsconfig.domain-strict.json": {
+      "policy": "zoew-self-verification"
+    },
+    "supabase/pending-production-sql/20261115020214_zoe_pickup_reset_receipt_retention.sql": {
+      "policy": "supabase-db"
+    },
+    "ZoeW/src/domain/statistics.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/backend-types.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/supabase-types.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/ui/view-types.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/fixtures/pickup-reset-proof-979f5e3f.ts": {
+      "policy": "zoew-self-verification",
+      "sha256": "e1eece598dc41ee327b92f7a14c0a8b6316b79fb249f292317e7d70f8ba06ca0"
+    },
+    "tools/audit-tools/zoew/tests/backend-contracts-strict.typecheck.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/backend-factory.typecheck.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/backend-fixture.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/helpers/backend-fixture.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/pickup-owner-sdk.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/pickup-owner-supabase.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/pickup-prototype-owner.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/pickup-reset-proof-differential.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/pickup-reset-proof-strict.typecheck.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/statistics-domain-strict.typecheck.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/statistics-state.typecheck.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/ui-view-state.typecheck.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

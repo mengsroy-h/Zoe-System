@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../../../../ZoeW/src/core/state';
@@ -94,7 +95,7 @@ it('storage settlement denial មិនលុប HOLD ឬអះអាងបញ�
 it('partial batch ACK timeout មិនបន្តថ្ងៃដែលមិនទាន់ផ្ញើពេល ACK មកយឺត', async () => {
     const days = [DAY, '2026-10-31', '2026-11-01']; const records = Object.fromEntries(days.map(day => [day, clone(server)]));
     dataState.dailyPickupData = clone(records);
-    firebaseState.fb.get = async (ref: any) => ({ val: () => clone(records[ref.path.split('/').at(-1)]) });
+    setPartialBackendFixtureValue(firebaseState.fb, "get", async (ref: any) => ({ val: () => clone(records[ref.path.split('/').at(-1)]) }));
     firebaseState.fb.executePickupReset = ((ref: any, request: any, current: () => boolean) => {
         calls++; const day = ref.path.split('/').at(-1), cas = JSON.parse(request.casText);
         const proof = pickupResetAppliedReceipt(request.tenant, request.actorUid, request.context, request.attemptId, request.casText, 'native-day');

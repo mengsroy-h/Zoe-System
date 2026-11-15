@@ -3,7 +3,28 @@ import os from 'node:os';
 import vm from 'node:vm';
 import { execFileSync, spawnSync } from 'node:child_process';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import { expect, it } from 'vitest';
+
+it('runtime ផ្ទុក numeric helper ពិតពីប្រភពដែលបានជ្រើស និងគោរព fixture override', () => {
+    const require = createRequire(import.meta.url);
+    const ts: typeof import('typescript') = require('typescript');
+    const { reactRuntime } = require('../../react-view.js');
+    const typed = fs.readFileSync(path.resolve('src/domain/parcel-number.ts'), 'utf8');
+    const helper = ts.transpileModule(typed, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText.replace(/^export /gm, '');
+    const prelude = "function createStore(name, value) { return value; }\n" + ['firebaseState', 'dataState', 'scanState', 'uiState', 'viewState']
+        .map(name => "const " + name + " = createStore('" + name + "', {});").join('\n') + '\n';
+    const evaluate = (source: string, context: Record<string, unknown> = {}, exclude: string[] = []) => {
+        vm.createContext(context);
+        vm.runInContext(reactRuntime(prelude + source, { context, exclude }), context);
+        return vm.runInContext('parseParcelNumber("12.5")', context);
+    };
+    expect(evaluate(helper)).toBe(12.5);
+    expect(helper).toContain('return parseFloat(`${value}`);');
+    expect(evaluate(helper.replace('return parseFloat(`${value}`);', 'return 37;'))).toBe(37);
+    expect(evaluate(helper, { parseParcelNumber: () => 55 })).toBe(55);
+    expect(() => evaluate(helper, {}, ['parseParcelNumber'])).toThrow('parseParcelNumber is not defined');
+});
 
 it('actual module runtime preserves private scopes and rejects invalid public bindings', () => {
     const output = execFileSync(process.execPath, [path.resolve('../tools/audit-tools/module-runtime-scope-test.js')], {

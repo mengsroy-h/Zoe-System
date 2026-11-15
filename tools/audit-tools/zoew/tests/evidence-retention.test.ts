@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 // root ភស្តុតាង (`zoew_scan_operations` · `zoew_registry_releases` · `zoew_trash_consumptions`) ធ្លាប់កើនរហូត (rules ទទួលតែការសរសេរ
 // ដែលមានតម្លៃ) ➜ ការបោស `runEvidenceRetentionSweep()` លុបតែកំណត់ត្រាចាស់ជាង EVIDENCE_RETENTION_MS ដែលគ្មានទិន្នន័យរស់ណាយោង
 // (registry · scan_pending · ធុងសំរាម · history · restore finalization) តាម query REST មានព្រំដែន ហើយមិនសរសេរក្រោយ session ប្តូរ។
@@ -434,11 +435,11 @@ function switchOwner(change: typeof ownerChanges[number]) {
     if (change === 'sdk') firebaseState.fb = sdk() as any;
     if (change === 'auth') firebaseState.auth = { currentUser: { uid: 'audit-user', getIdToken: async () => 'synthetic-id' } } as any;
     if (change === 'generation') firebaseState.authGeneration++;
-    if (change === 'uid') firebaseState.auth.currentUser.uid = 'other-user';
+    if (change === 'uid') setPartialBackendFixtureValue(firebaseState.auth.currentUser, "uid", 'other-user');
     if (change === 'scope') localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: HOST + '/other' }));
     return () => {
         firebaseState.db = saved.db; firebaseState.fb = saved.fb; firebaseState.auth = saved.auth;
-        firebaseState.authGeneration = saved.generation; firebaseState.auth.currentUser.uid = saved.uid;
+        firebaseState.authGeneration = saved.generation; setPartialBackendFixtureValue(firebaseState.auth.currentUser, "uid", saved.uid);
         localStorage.setItem('zoew_firebase_config', saved.config);
     };
 }
@@ -502,7 +503,7 @@ it.each(['uid', 'scope'])('a persisted cursor never crosses another %s', async i
     const { root } = heldHead(true);
     expect(await runEvidenceRetentionSweep()).toBe(0);
     (evidenceSweep as any).owner = null; (evidenceSweep as any).cursors = {};
-    if (identity === 'uid') firebaseState.auth.currentUser.uid = 'other-user';
+    if (identity === 'uid') setPartialBackendFixtureValue(firebaseState.auth.currentUser, "uid", 'other-user');
     else localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: HOST + '/other' }));
     expect(await nextSweep()).toBe(0);
     expect(rootPages(root).at(-1)?.after).toBeNull();
@@ -670,11 +671,11 @@ it.each([NaN, Infinity, -Infinity])('clock becoming %s during a holder read cann
 it('alternating owners preserve their independent cursor progress', async () => {
     const { root, held, tail } = heldHead(true);
     expect(await runEvidenceRetentionSweep()).toBe(0);
-    firebaseState.auth.currentUser.uid = 'other-user';
+    setPartialBackendFixtureValue(firebaseState.auth.currentUser, "uid", 'other-user');
     acceptFixtureSession();
     expect(await runEvidenceRetentionSweep()).toBe(0);
     expect(rootPages(root).at(-1)?.after).toBeNull();
-    firebaseState.auth.currentUser.uid = 'audit-user';
+    setPartialBackendFixtureValue(firebaseState.auth.currentUser, "uid", 'audit-user');
     acceptFixtureSession();
     expect(await runEvidenceRetentionSweep()).toBe(1);
     expect(rootPages(root).at(-1)?.after).toBe(held.at(-1));

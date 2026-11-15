@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 // Deep audit ៩ (network N1) ៖ the ownership proxy binds every data-listener row to the session it was attached in (uid · auth
 // generation · backend). A session that changed without a detach + re-attach left every row dead while the app said «ready» ៖
 //  ① Firebase account A ➜ B without a signed-out snapshot (cross-tab persistence sync on a busy or hidden tab).
@@ -155,7 +156,7 @@ describe('data listeners follow the session they belong to', () => {
         const f = fakeFirebase();
         (window as any).firebaseSDK = f.raw; (window as any).loadFirebaseSDK = () => {};
         attach(f, SHOP_A);
-        firebaseState.auth.currentUser = { uid: 'A' };
+        setPartialBackendFixtureValue(firebaseState.auth, "currentUser", { uid: 'A' });
         acceptFixtureSession();
         initDatabaseListeners();
         const stop = setupConnectionRecovery();
@@ -183,7 +184,7 @@ describe('data listeners follow the session they belong to', () => {
     it('⑤ the SDK cannot load (phase unavailable) ➜ the navbar never says online, even beside a stale connected flag', async () => {
         const f = fakeFirebase();
         attach(f, SHOP_A);
-        firebaseState.auth.currentUser = { uid: 'A' };
+        setPartialBackendFixtureValue(firebaseState.auth, "currentUser", { uid: 'A' });
         acceptFixtureSession();
         firebaseState.isDatabaseInitialized = true;
         renderConnectionStatus();

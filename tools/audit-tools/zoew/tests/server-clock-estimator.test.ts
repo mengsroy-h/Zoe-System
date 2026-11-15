@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createSupabaseDatabase } from '../../../../ZoeW/src/services/supabase-rtdb';
@@ -43,7 +44,7 @@ function sampleWorld(authenticated = true) {
     { pollFallbackMs: DAY });
     databases.push(db);
     firebaseState.db = db;
-    firebaseState.fb = { __supabase: true, off: ref => db.off(ref), onValue: (ref, cb, err) => db.onValue(ref, cb, err) };
+    setPartialBackendFixtureValue(firebaseState, "fb", { __supabase: true, off: ref => db.off(ref), onValue: (ref, cb, err) => db.onValue(ref, cb, err) });
     firebaseState.dbRefConnected = db.ref('.info/connected');
     firebaseState.dbRefServerTimeOffset = db.ref('.info/serverTimeOffset');
     expect(attachInfoListeners()).toBe(true);

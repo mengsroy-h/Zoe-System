@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { acceptFixtureSession } from './helpers/accepted-session';
 import { dataState, firebaseState, uiState, ztoState } from '../../../../ZoeW/src/core/state';
@@ -215,7 +216,7 @@ it.each(['uid', 'sdk', 'scope'])('generation ៖ Clear loop មិនបន្�
     afterUpdate = updates => {
         if (switched || updates[H + '/' + ID] !== null) return;
         switched = true;
-        if (kind === 'uid') firebaseState.auth.currentUser.uid = 'other-member';
+        if (kind === 'uid') setPartialBackendFixtureValue(firebaseState.auth.currentUser, "uid", 'other-member');
         if (kind === 'sdk') firebaseState.fb = { ...firebaseState.fb };
         if (kind === 'scope') (firebaseState.db as any).app.options.databaseURL = HOST + '/other';
     };
@@ -250,7 +251,7 @@ it.each(['uid', 'sdk', 'scope'])('generation ៖ resume slot មិនយក own
     sdkReadHook = path => {
         if (switched || path !== T + '/' + ID) return;
         switched = true;
-        if (kind === 'uid') firebaseState.auth.currentUser.uid = 'other-member';
+        if (kind === 'uid') setPartialBackendFixtureValue(firebaseState.auth.currentUser, "uid", 'other-member');
         if (kind === 'sdk') firebaseState.fb = { ...firebaseState.fb };
         if (kind === 'scope') (firebaseState.db as any).app.options.databaseURL = HOST + '/other';
     };
@@ -270,7 +271,7 @@ it('generation ៖ Clear unknown token មិនឆ្លង owner ទោះ db 
     afterTransaction = (path, value) => { if (path === H + '/' + ID && value?.clearClaim) throw Object.assign(new Error('reply lost'), { txOutcome: 'unknown' }); };
     await clearHistory(); const original = at(H + '/' + ID)?.clearClaim;
     expect(activeClearHistoryClaims.get(ID)).toBe(original.token);
-    afterTransaction = null; firebaseState.auth.currentUser.uid = 'other-member'; const before = copy(store); effects = [];
+    afterTransaction = null; setPartialBackendFixtureValue(firebaseState.auth.currentUser, "uid", 'other-member'); const before = copy(store); effects = [];
     await clearHistory(); expect(store).toEqual(before); expect(effects).toEqual([]); expect(at(T)).toEqual({});
 });
 
@@ -279,7 +280,7 @@ it.each(['uid', 'scope'])('generation ៖ Delete មិនបញ្ជូន rel
     readHook = path => {
         if (switched || !path.startsWith(TRASH_CONSUMPTIONS_ROOT + '/')) return;
         switched = true; afterSwitch = effects.length;
-        if (kind === 'uid') firebaseState.auth.currentUser.uid = 'other-member';
+        if (kind === 'uid') setPartialBackendFixtureValue(firebaseState.auth.currentUser, "uid", 'other-member');
         else (firebaseState.db as any).app.options.databaseURL = HOST + '/other';
     };
     await deleteSingleItem(ID, { confirmed: true });

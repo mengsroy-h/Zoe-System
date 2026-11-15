@@ -34,6 +34,11 @@ const item = (id: string, phone: string, scanDate: string, codes: Array<{ code: 
 
 const field = (id: string) => document.getElementById(id) as HTMLInputElement;
 const labelsIn = (sel: string) => document.querySelectorAll(sel + ' .label');
+function printedLabelView() {
+    const view = uiState.pdfExportView;
+    if (!view || !('kind' in view) || view.kind !== 'labels') throw new Error('ត្រូវមានទិដ្ឋភាពបោះពុម្ពស្លាក');
+    return view;
+}
 
 beforeEach(() => {
     printed.length = 0;
@@ -146,7 +151,7 @@ describe('ស្លាកកញ្ចប់ ៖ modal ➜ preview ➜ បោះ�
         step(() => { expect(printLabelsFromModal()).toBe(true); });
         expect(modalIsOpen('labelPrintModal')).toBe(false);
         expect(printed[0]).toMatch(/^ZoeW_all_[\d-]+_labels$/);
-        const view = uiState.pdfExportView;
+        const view = printedLabelView();
         expect(view.kind).toBe('labels');
         expect(view.options).toEqual(DEFAULT_LABEL_OPTIONS);
         expect(view.labels.length).toBe(3);
@@ -168,7 +173,7 @@ describe('ស្លាកកញ្ចប់ ៖ modal ➜ preview ➜ បោះ�
         step(() => { field('labelOpenOnly').checked = false; updateLabelPrintPreview(); });
         expect(labelsIn('#labelPrintPreview').length).toBe(2);
         step(() => { printLabelsFromModal(); });
-        expect(uiState.pdfExportView.labels.map((l: any) => l.barcode)).toEqual(['77100000308751', '77100000841']);
+        expect(printedLabelView().labels.map(l => l.barcode)).toEqual(['77100000308751', '77100000841']);
         expect(printed[0]).toBe('ZoeW_label_I1');
         step(() => restoreAfterPdfExport());
         dataState.scanHistory = Array.from({ length: 10 }, (_, i) => item('M' + i, '09600000' + i, '2026-10-15', [{ code: 'MANY' + i }]));
@@ -176,7 +181,7 @@ describe('ស្លាកកញ្ចប់ ៖ modal ➜ preview ➜ បោះ�
         expect(labelsIn('#labelPrintPreview').length).toBe(LABEL_PREVIEW_MAX);
         expect(viewState.labelPrintSummary).toContain('ស្លាក 10');
         step(() => { printLabelsFromModal(); });
-        expect(uiState.pdfExportView.labels.length).toBe(10);
+        expect(printedLabelView().labels.length).toBe(10);
         step(() => restoreAfterPdfExport());
         expect(openLabelPrintModal({ kind: 'item', id: 'nope' })).toBe(false);
         expect(modalIsOpen('labelPrintModal')).toBe(false);

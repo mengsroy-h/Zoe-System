@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { acceptFixtureSession } from './helpers/accepted-session';
 import { createRequire } from 'node:module';
 import { cleanupServerRead } from './helpers/cleanup-server-read';
@@ -220,14 +221,14 @@ beforeEach(async () => {
     autoLookupFailureAt.clear(); autoLookupInFlight.clear(); lookupFastCache.clear(); clearAutoLookupQueueRetries();
     activeRestoreClaims.clear(); restoreInFlight.clear(); cleanupInFlight.clear(); cleanupJournalLive.clear();
     dbListenerPendingPaths.clear(); dbListenerFailedPaths.clear();
-    firebaseState.authGeneration++; firebaseState.db = { name: 'matrix-db' }; firebaseState.fb = sdk() as any;
+    firebaseState.authGeneration++; setPartialBackendFixtureValue(firebaseState, "db", { name: 'matrix-db' }); firebaseState.fb = sdk() as any;
     firebaseState.auth = { currentUser: { uid: 'money-user', getIdToken: async () => 'synthetic-id' } } as any;
     firebaseState.firebaseConfig = { databaseURL: HOST } as any;
     firebaseState.isDatabaseInitialized = true; firebaseState.isDatabaseConnected = true; firebaseState.hasEverConnectedToDatabase = true;
     firebaseState.sessionExpiryCheck = 'live';
     firebaseState.serverClockTrusted = true; firebaseState.serverTimeOffsetMs = 0;
-    firebaseState.dbRefHistory = ref(H); firebaseState.dbRefDeleted = ref(T); firebaseState.dbRefDailyRevenue = ref(D); firebaseState.dbRefMonthlyRevenue = ref(M);
-    firebaseState.dbRefDailyPickup = ref(P); firebaseState.dbRefDailyCollected = ref(C);
+    setPartialBackendFixtureValue(firebaseState, "dbRefHistory", ref(H)); setPartialBackendFixtureValue(firebaseState, "dbRefDeleted", ref(T)); setPartialBackendFixtureValue(firebaseState, "dbRefDailyRevenue", ref(D)); setPartialBackendFixtureValue(firebaseState, "dbRefMonthlyRevenue", ref(M));
+    setPartialBackendFixtureValue(firebaseState, "dbRefDailyPickup", ref(P)); setPartialBackendFixtureValue(firebaseState, "dbRefDailyCollected", ref(C));
     firebaseState.dbLivenessProbe = Promise.resolve(null);
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: HOST }));
     acceptFixtureSession();
@@ -235,7 +236,7 @@ beforeEach(async () => {
     key = await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']) as CryptoKey;
     securityState.lookupSecretKey = key; securityState.appIsLocked = false; securityState.appLockVeiled = false;
     resetZtoTrashMode(); noteZtoTrashMode(null); sync();
-    uiState.toasts = []; uiState.isModalOpen = false; uiState.entryScanMode = 'normal'; viewState.phoneModalBusy = false;
+    uiState.toasts = []; uiState.isModalOpen = false; uiState.entryScanMode = 'parcel'; viewState.phoneModalBusy = false;
     lookupState.customerDataTableSessionGeneration++;
     for (const field of fields) refTo(field)(document.createElement('input'));
     registerModalMeta('phoneModal', {});

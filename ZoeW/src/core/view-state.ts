@@ -1,4 +1,5 @@
 import { createStore, registerStore } from './store';
+import type { LabelPrintPreview } from '../ui/view-types';
 
 export type ScanRemoveTextId = 'scanRemoveBarcodeText' | 'scanRemovePhoneText' | 'scanRemoveLockerText'
     | 'scanRemoveStateText' | 'scanRemoveCodText' | 'scanRemoveDodText';
@@ -15,7 +16,7 @@ export interface ConfigLinkSummary {
     host: string;
     invite: boolean;
     official: boolean;
-    payload?: any;
+    payload?: unknown;
 }
 
 export interface ViewState {
@@ -94,7 +95,7 @@ export interface ViewState {
     batchScanCountText: string;
     labelPrintTitle: string;
     labelPrintSummary: string;
-    labelPrintPreview: any | null;
+    labelPrintPreview: LabelPrintPreview | null;
     editModalBarcodeText: string;
     locationWarningText: string;
 

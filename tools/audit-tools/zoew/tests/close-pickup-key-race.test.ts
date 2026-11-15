@@ -7,6 +7,7 @@
  */
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../../../../ZoeW/src/core/state';
+import { callPartialBackendFixtureMethod } from './helpers/backend-fixture';
 import { appLocalStore } from '../../../../ZoeW/src/core/storage';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../../../../ZoeW/src/core/text';
 import { getZoneDateKey } from '../../../../ZoeW/src/core/timezone';
@@ -261,7 +262,7 @@ it('control ៖ no foreign Remove ➜ the close keeps both keys', async () => {
 // Re-audit ៖ the heal of the close's re-write must neither hold back the `pickupDone` flag (a Reset made later came back on resume)
 // nor delete a key that a newer close wrote while the heal was reading (one device · close ➜ reopen ➜ close · or another device).
 async function resumeAfterReset(id: string) {
-    await firebaseState.fb.runTransaction(makeRef(DB, PICKUP + '/' + DAY), pickup.pickupResetRecord);
+    await callPartialBackendFixtureMethod(firebaseState.fb, 'runTransaction', [makeRef(DB, PICKUP + '/' + DAY), pickup.pickupResetRecord]);
     lab.getFail = false;
     lab.getHang = false;
     pickup.pickupIntentsLive.clear();

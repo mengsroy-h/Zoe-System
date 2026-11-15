@@ -5,6 +5,7 @@ import { getServerNow } from '../core/clock';
 import { sanitizePhoneNumber } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
 import { parseTimestampFromId } from '../domain/barcode';
+import { parseParcelNumber } from '../domain/parcel-number';
 import { ENTRY_LIST_MAX_ROWS, LOCKER_LIST_MAX_ROWS, buildLockerBarcodeIndex } from '../features/locker';
 import { normalizePhoneDigits } from '../features/phone-suggest';
 
@@ -52,7 +53,7 @@ export function renderEntryList() {
     uiState.entryListView = rows.slice(0, ENTRY_LIST_MAX_ROWS).map((it, i) => {
         const codes = (Array.isArray(it.barcodes) ? it.barcodes : []).map((b) => String((b && b.code) || ''));
         const shown = codes.filter(Boolean);
-        const total = Math.round(((parseFloat(it.cod) || 0) + (parseFloat(it.dod) || 0)) * 100) / 100;
+        const total = Math.round(((parseParcelNumber(it.cod) || 0) + (parseParcelNumber(it.dod) || 0)) * 100) / 100;
         return {
             n: i + 1,
             phone: sanitizePhoneNumber(it.phone || ''),

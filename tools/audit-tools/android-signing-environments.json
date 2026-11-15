@@ -1,0 +1,31 @@
+{
+  "repository": "mengsroy-h/Zoe-System",
+  "secretNames": ["ZOEW_KEYSTORE_BASE64", "ZOEW_KEYSTORE_PASSWORD", "ZOEW_KEY_ALIAS", "ZOEW_KEY_PASSWORD", "ZOE_RELEASES_TOKEN"],
+  "removeRepositorySecretsOnlyAfterEnvironmentReadback": true,
+  "environments": [
+    {
+      "name": "android-signing",
+      "secretNames": ["ZOEW_KEYSTORE_BASE64", "ZOEW_KEYSTORE_PASSWORD", "ZOEW_KEY_ALIAS", "ZOEW_KEY_PASSWORD", "ZOE_RELEASES_TOKEN"],
+      "configuration": {
+        "wait_timer": 0,
+        "prevent_self_review": false,
+        "can_admins_bypass": false,
+        "reviewers": [],
+        "deployment_branch_policy": { "protected_branches": false, "custom_branch_policies": true }
+      },
+      "deployment_branch_policies": [{ "name": "main", "type": "branch" }]
+    },
+    {
+      "name": "android-signing-preview",
+      "secretNames": ["ZOEW_KEYSTORE_BASE64", "ZOEW_KEYSTORE_PASSWORD", "ZOEW_KEY_ALIAS", "ZOEW_KEY_PASSWORD"],
+      "configuration": {
+        "wait_timer": 0,
+        "prevent_self_review": false,
+        "can_admins_bypass": false,
+        "reviewers": [{ "type": "User", "id": 313065015 }],
+        "deployment_branch_policy": { "protected_branches": false, "custom_branch_policies": true }
+      },
+      "deployment_branch_policies": []
+    }
+  ]
+}

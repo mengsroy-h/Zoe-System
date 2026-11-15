@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { parse } from 'acorn';
@@ -91,7 +92,7 @@ it('ផ្អាក monotonic មិនធ្វើឱ្យអាយុរី�
 });
 
 it('backend ថ្មីមិនយក anchor ចាស់', () => {
-    firebaseState.db = {};
+    setPartialBackendFixtureValue(firebaseState, "db", {});
     firebaseState.serverClockTrusted = false;
     firebaseState.serverTimeOffsetMs = 0;
     vi.setSystemTime(START + DAY);
@@ -204,7 +205,7 @@ it('sample ស្រស់មកមុនការអាន trust មិនស�
 
 
 it('Firebase SDK ពិតផ្តល់ timestamp មុន connected ប៉ុន្តែមិនបើក trust', async () => {
-    firebaseState.fb.__supabase = false;
+    setPartialBackendFixtureValue(firebaseState.fb, "__supabase", false);
     attachInfoListeners();
     const require = createRequire(import.meta.url);
     const source = readFileSync(require.resolve('@firebase/database'), 'utf8');

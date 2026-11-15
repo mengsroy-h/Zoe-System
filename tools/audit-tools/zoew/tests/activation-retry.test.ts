@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 /**
  * ⛔ «App ជាប់» ៖ ការផ្ទៀងផ្ទាត់ License ក្រោយចូលប្រព័ន្ធ (ឬស្តារវគ្គក្រោយ reload) អាចលើស ២០ វិ. លើបណ្តាញយឺត
  *    (`checkOnline()` = Key + កៅអី · សំណើនីមួយៗរហូតដល់ ១០ វិ.) ➜ ជំនាន់មុនចេញ toast «សូមសាកល្បងចូលម្តងទៀត» ហើយឈប់ ៖
@@ -26,7 +27,7 @@ beforeEach(() => {
     uiState.toasts = [];
     viewState.backendKind = 'firebase';
     firebaseState.auth = { currentUser: user } as any;
-    firebaseState.fb = {}; firebaseState.db = {};
+    setPartialBackendFixtureValue(firebaseState, "fb", {}); setPartialBackendFixtureValue(firebaseState, "db", {});
     firebaseState.authGeneration = 7;
     acceptFixtureSession();
     (window as any).ZoeErrors = { capture: vi.fn() };

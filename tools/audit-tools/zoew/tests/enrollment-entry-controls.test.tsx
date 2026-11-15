@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 vi.mock('../../../../ZoeW/src/services/crypto', async original => ({ ...(await original<any>()),
     verifyStoredPin: async (pin) => pin === '482915', hashPin: async () => 'test-pin-hash',
@@ -72,7 +73,7 @@ it.each(['generation', 'auth', 'user', 'database', 'backend', 'mandatory'])('PIN
     if (reason === 'generation') firebaseState.authGeneration++;
     if (reason === 'auth') firebaseState.auth = { currentUser: { uid: 'owner' } } as any;
     if (reason === 'user') firebaseState.auth.currentUser = { uid: 'other' } as any;
-    if (reason === 'database') firebaseState.db = {};
+    if (reason === 'database') setPartialBackendFixtureValue(firebaseState, "db", {});
     if (reason === 'backend') viewState.backendKind = 'supabase';
     if (reason === 'mandatory') uiState.modalDisplay.activationModal = 'flex';
     setFieldValue('securityPinInput', '482915'); await verifySecurityPin();

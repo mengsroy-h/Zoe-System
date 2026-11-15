@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { webcrypto } from 'node:crypto';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { firebaseState, securityState } from '../../../../ZoeW/src/core/state';
@@ -16,7 +17,7 @@ const photos = [btoa('\xff\xd8\xff\x00\x01\xff\xd9'), btoa('\xff\xd8\xff\x02\x03
 let key: CryptoKey;
 beforeEach(async () => {
     vi.stubGlobal('crypto', webcrypto); vi.stubGlobal('fetch', vi.fn(() => { throw new Error('network'); }));
-    firebaseState.authGeneration++; firebaseState.db = {}; firebaseState.auth = { currentUser: { uid: 'synthetic-user' } };
+    firebaseState.authGeneration++; setPartialBackendFixtureValue(firebaseState, "db", {}); setPartialBackendFixtureValue(firebaseState, "auth", { currentUser: { uid: 'synthetic-user' } });
     securityState.appIsLocked = false; securityState.appLockVeiled = false;
     key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
     securityState.lookupSecretKey = key;
@@ -38,7 +39,7 @@ it('PIN ខុស ម្ចាស់ខុស លេខខុស និងជួ
     await exportQueuedSignPhoto('missing', 'SYNTHETIC0');
     securityState.lookupSecretKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
     await exportQueuedSignPhoto(disk.rows[0].id, 'SYNTHETIC0');
-    securityState.lookupSecretKey = key; firebaseState.auth = { currentUser: { uid: 'other' } };
+    securityState.lookupSecretKey = key; setPartialBackendFixtureValue(firebaseState, "auth", { currentUser: { uid: 'other' } });
     await exportQueuedSignPhoto(disk.rows[0].id, 'SYNTHETIC0');
     expect(saveOriginalQueuedPhoto).not.toHaveBeenCalled(); expect(disk.rows).toHaveLength(2);
 });

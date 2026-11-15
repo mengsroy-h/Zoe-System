@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 /**
  * ⛔ Backend Supabase ក្នុង ZoeW ៖ Config · Setup Link · Modal ចូល/ចុះឈ្មោះ/ប្តូរពាក្យសម្ងាត់ · ការរំលង Activation Key · scope journal។
  * ⛔ Config ត្រូវ **fail closed** លើ Secret key (sb_secret_… · JWT service_role) — key នោះរំលង RLS ទាំងស្រុង ➜ ហាង ១ អានទិន្នន័យហាងទាំងអស់។
@@ -150,7 +151,7 @@ describe('Modal ចូល/ចុះឈ្មោះ/ប្តូរពាក្�
         const { fb, calls } = fakeSupabaseFb();
         fb.registerReply = { status: 403, body: { ok: false, code: 'invite-invalid' } };
         firebaseState.fb = fb;
-        firebaseState.auth = { app: { options: firebaseState.firebaseConfig }, currentUser: null };
+        setPartialBackendFixtureValue(firebaseState, "auth", { app: { options: firebaseState.firebaseConfig }, currentUser: null });
         mount(<LoginModal />);
         step(() => { viewState.backendKind = 'supabase'; openRegisterForm(); });
         setFieldValue('registerInviteInput', 'X');
@@ -176,7 +177,7 @@ describe('Modal ចូល/ចុះឈ្មោះ/ប្តូរពាក្�
         const hung = () => sbFetchWithTimeout(() => new Promise(() => {}), 'https://abcd1234.supabase.co/functions/v1/register', { method: 'POST' }, 5);
         fb.registerAccount.mockImplementationOnce(async () => { await hung(); });
         firebaseState.fb = fb;
-        firebaseState.auth = { app: { options: firebaseState.firebaseConfig }, currentUser: null };
+        setPartialBackendFixtureValue(firebaseState, "auth", { app: { options: firebaseState.firebaseConfig }, currentUser: null });
         mount(<LoginModal />);
         step(() => { viewState.backendKind = 'supabase'; openRegisterForm(); });
         rememberSetupInvite('abcd-efgh-jkmn-pqrs-tvwx');
@@ -206,7 +207,7 @@ describe('Modal ចូល/ចុះឈ្មោះ/ប្តូរពាក្�
         const { fb } = fakeSupabaseFb();
         fb.registerReply = { status: 502, body: { ok: false, code: 'registration-unknown' } };
         firebaseState.fb = fb;
-        firebaseState.auth = { app: { options: firebaseState.firebaseConfig }, currentUser: null };
+        setPartialBackendFixtureValue(firebaseState, "auth", { app: { options: firebaseState.firebaseConfig }, currentUser: null });
         mount(<LoginModal />);
         step(() => { viewState.backendKind = 'supabase'; openRegisterForm(); });
         setFieldValue('registerInviteInput', 'abcd-efgh-jkmn-pqrs-tvwx');
@@ -222,7 +223,7 @@ describe('Modal ចូល/ចុះឈ្មោះ/ប្តូរពាក្�
         const { fb, calls } = fakeSupabaseFb();
         fb.registerReply = { status: 409, body: { ok: false, code: 'username-taken' } };
         firebaseState.fb = fb;
-        firebaseState.auth = { app: { options: firebaseState.firebaseConfig }, currentUser: null };
+        setPartialBackendFixtureValue(firebaseState, "auth", { app: { options: firebaseState.firebaseConfig }, currentUser: null });
         mount(<LoginModal />);
         step(() => { viewState.backendKind = 'supabase'; openRegisterForm(); });
         setFieldValue('registerInviteInput', 'abcd-efgh-jkmn-pqrs-tvwx');
@@ -240,7 +241,7 @@ describe('Modal ចូល/ចុះឈ្មោះ/ប្តូរពាក្�
         const { fb, calls } = fakeSupabaseFb();
         fb.registerReply = { status: 403, body: { ok: false, code: 'invite-invalid' } };
         firebaseState.fb = fb;
-        firebaseState.auth = { app: { options: firebaseState.firebaseConfig }, currentUser: null };
+        setPartialBackendFixtureValue(firebaseState, "auth", { app: { options: firebaseState.firebaseConfig }, currentUser: null });
         mount(<LoginModal />);
         step(() => { viewState.backendKind = 'supabase'; openRegisterForm(); });
         setFieldValue('registerInviteInput', 'abcd-efgh-jkmn-pqrs-tvwx');
@@ -260,7 +261,7 @@ describe('Modal ចូល/ចុះឈ្មោះ/ប្តូរពាក្�
             await sbFetchWithTimeout(() => new Promise(() => {}), 'https://abcd1234.supabase.co/functions/v1/reset-password', { method: 'POST' }, 5);
         });
         firebaseState.fb = fb;
-        firebaseState.auth = { app: { options: firebaseState.firebaseConfig }, currentUser: null };
+        setPartialBackendFixtureValue(firebaseState, "auth", { app: { options: firebaseState.firebaseConfig }, currentUser: null });
         mount(<LoginModal />);
         step(() => { viewState.backendKind = 'supabase'; openResetPasswordForm(); });
         setFieldValue('resetUsernameInput', 'dara');
@@ -277,7 +278,7 @@ describe('Modal ចូល/ចុះឈ្មោះ/ប្តូរពាក្�
         const { fb, calls } = fakeSupabaseFb();
         fb.resetReply = { status: 502, body: { ok: false, code: 'password-reset-unknown' } };
         firebaseState.fb = fb;
-        firebaseState.auth = { app: { options: firebaseState.firebaseConfig }, currentUser: null };
+        setPartialBackendFixtureValue(firebaseState, "auth", { app: { options: firebaseState.firebaseConfig }, currentUser: null });
         mount(<LoginModal />);
         step(() => { viewState.backendKind = 'supabase'; openResetPasswordForm(); });
         setFieldValue('resetUsernameInput', 'dara');
@@ -295,7 +296,7 @@ describe('Modal ចូល/ចុះឈ្មោះ/ប្តូរពាក្�
     it('Supabase ៖ ប្តូរពាក្យសម្ងាត់ ➜ ផ្ញើ username + resetCode ➜ ត្រឡប់ទៅ Modal ចូល ជាមួយ username', async () => {
         const { fb, calls } = fakeSupabaseFb();
         firebaseState.fb = fb;
-        firebaseState.auth = { app: { options: firebaseState.firebaseConfig }, currentUser: null };
+        setPartialBackendFixtureValue(firebaseState, "auth", { app: { options: firebaseState.firebaseConfig }, currentUser: null });
         mount(<LoginModal />);
         step(() => { viewState.backendKind = 'supabase'; });
         setFieldValue('loginEmailInput', 'Dara');
@@ -335,9 +336,9 @@ describe('License · journal scope', () => {
         localStorage.setItem('zoew_firebase_config', JSON.stringify({ supabaseUrl: 'https://abcd.supabase.co', supabaseKey: 'sb_publishable_x' }));
         viewState.backendKind = 'supabase';
         const account: any = { tenant_id: 't1', tenant_name: 'ហាង A', branch_code: '881859', status: 'active', expires_at: new Date(Date.now() + 86400000 * 30).toISOString() };
-        firebaseState.fb = { accountOf: () => account };
+        setPartialBackendFixtureValue(firebaseState, "fb", { accountOf: () => account });
         const rpc = vi.fn(async () => [account]);
-        firebaseState.auth = { currentUser: { uid: 'health-test' }, _transport: { rpc } };
+        setPartialBackendFixtureValue(firebaseState, "auth", { currentUser: { uid: 'health-test' }, _transport: { rpc } });
         firebaseState.firebaseConfig = { supabaseUrl: 'https://abcd.supabase.co', supabaseKey: 'sb_publishable_x' };
         acceptFixtureSession();
         firebaseState.serverClockTrusted = true;
@@ -351,7 +352,7 @@ describe('License · journal scope', () => {
         account.status = 'revoked';
         const bad: any = await healthLicenseRow();
         expect(bad.state).toBe('bad');
-        firebaseState.fb = { accountOf: () => null };
+        setPartialBackendFixtureValue(firebaseState, "fb", { accountOf: () => null });
         rpc.mockResolvedValueOnce([]);
         const unknown: any = await healthLicenseRow();
         expect(unknown.state).toBe('warn');
@@ -368,11 +369,11 @@ describe('License · journal scope', () => {
         localStorage.setItem('zoew_firebase_config', JSON.stringify({ supabaseUrl: 'https://abcd.supabase.co', supabaseKey: 'sb_publishable_x' }));
         const { fb } = fakeSupabaseFb();
         firebaseState.fb = fb;
-        firebaseState.auth = { _tenant: 'tenant-a' };
+        setPartialBackendFixtureValue(firebaseState, "auth", { _tenant: 'tenant-a' });
         expect(cleanupJournalScope()).toBe('https://abcd.supabase.co#tenant-a');
-        firebaseState.auth = { _tenant: 'tenant-b' };
+        setPartialBackendFixtureValue(firebaseState, "auth", { _tenant: 'tenant-b' });
         expect(cleanupJournalScope()).toBe('https://abcd.supabase.co#tenant-b');
-        firebaseState.auth = {};
+        setPartialBackendFixtureValue(firebaseState, "auth", {});
         expect(cleanupJournalScope()).toBe('');
     });
 });

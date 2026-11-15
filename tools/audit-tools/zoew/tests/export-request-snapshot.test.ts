@@ -133,7 +133,9 @@ for (const [format, run] of [['PDF', exportDataAsPDF], ['CSV', exportDataAsCsvFo
         expect(output).toHaveBeenCalledTimes(1);
         if (format === 'PDF') {
             expect(toasts).not.toHaveBeenCalled();
-            expect(uiState.pdfExportView?.rows).toHaveLength(2);
+            const view = uiState.pdfExportView;
+            if (!view || !('rows' in view)) throw new Error('ត្រូវមានទិដ្ឋភាពបោះពុម្ពតារាង');
+            expect(view.rows).toHaveLength(2);
         } else {
             expect(toasts).toHaveBeenCalledExactlyOnceWith(expect.stringContaining('✅'));
             expect(String(textSaves.mock.calls[0][0])).toContain('PARCEL-0');

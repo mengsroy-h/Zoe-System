@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { performance as realPerformance } from 'node:perf_hooks';
 import { setTimeout as realDelay } from 'node:timers/promises';
 import { readFileSync } from 'node:fs';
@@ -170,7 +171,7 @@ beforeEach(() => {
     dataState.dailyCollectedData = {}; dataState.dailyPickupData = {};
     scanState.pendingBarcode = ''; scanState.pendingScanSession = null;
     viewState.phoneModalBusy = false; uiState.modalDisplay = {}; uiState.isModalOpen = false; uiState.toasts = [];
-    uiState.entryScanMode = 'add'; uiState.lastEnteredLocker = '';
+    uiState.entryScanMode = 'parcel'; uiState.lastEnteredLocker = '';
     ztoState.ztoListSyncInFlight = false; ztoState.ztoListSyncResult = null;
     firebaseState.authGeneration++;
     for (const field of fields) refTo(field)(document.createElement('input'));
@@ -293,7 +294,7 @@ it.each(['unauthenticated', 'pending-tenant', 'stale-config'])('recovery does no
     else {
         localStorage.setItem('zoew_firebase_config', JSON.stringify({ supabaseUrl: 'https://pending.supabase.co' }));
         firebaseState.db = { app: { options: { supabaseUrl: 'https://pending.supabase.co' } } } as any;
-        firebaseState.auth.app = firebaseState.db.app;
+        setPartialBackendFixtureValue(firebaseState.auth, "app", firebaseState.db.app);
         firebaseState.fb = { ...firebaseState.fb, tenantScope: () => '' };
     }
     await resumePendingScanOperations();

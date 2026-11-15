@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { acceptFixtureSession } from './helpers/accepted-session';
 /**
  * ✍️ ZTO Palm Sign ពីដើមដល់ចប់ ៖ App ពិត (`zto-palm-sign.ts`) ➜ Function ពិត (`zto-order-detail-core.cjs` ➜ `_shared/zto-palm-sign.js`) ➜ ZTO Palm ក្លែង។
@@ -36,10 +37,10 @@ const req = createRequire(import.meta.url);
 const fn = req('../../../../ZoeW/netlify/functions/_shared/zto-order-detail-core.cjs');
 const KEY = 'sign-e2e-proxy-key-0123456789';
 const CODE = '77130500000012';
-const PHOTO = '/9j/AAECAwQF/9k=';
 const READBACK = Buffer.from([255,216,255,192,0,11,8,0,1,0,1,1,1,17,0,255,218,0,8,1,1,0,0,63,0,1,255,217]);
+const PHOTO = READBACK.toString('base64');
 const PHOTO_URL = 'https://zto-haiwai2025.oss-cn-hongkong.aliyuncs.com/track/shortterm/bill/1/202610/' + CODE + '_123.jpg';
-let readback: 'none' | 'exact' | 'wrong' = 'none';
+let readback: 'none' | 'exact' | 'wrong' = 'exact';
 let remoteSigned = false;
 const SITE = 'KH001';
 const PROBLEM = 'ទំនិញនេះគឺជាទំនិញដែលមានបញ្ហា សូមបញ្ជាក់ថាបានដោះស្រាយបញ្ហាហើយឬនៅ';
@@ -146,7 +147,7 @@ beforeEach(async () => {
     };
     fn.setBlobsModuleForTests({ connectLambda() {}, getStore: () => store });
     for (const [key, value] of Object.entries({ ZTO_PROXY_KEY: KEY, ZTO_PROXY_KEYS_JSON: '', ZTO_PALM_SESSION_SECRET: 'synthetic-session-secret-at-least-32-characters', ZTO_PALM_SIGN_KEY: 'synthetic-sign-key', ZTO_PALM_PASSWORD_KEY: 'zoew-test-aes-16', ZTO_DETAIL_IDENTITY: 'off', ZTO_DETAIL_BRANCH_PATHS: '' })) vi.stubEnv(key, value);
-    disk.rows.clear(); readback = 'none'; remoteSigned = false;
+    disk.rows.clear(); readback = 'exact'; remoteSigned = false;
     vi.stubGlobal('indexedDB', {});
     vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
@@ -162,9 +163,9 @@ beforeEach(async () => {
     appLocalStore.clear();
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://sign-shop.firebaseio.com' }));
     firebaseState.authGeneration++;
-    firebaseState.db = {};
-    firebaseState.fb = { getIdTokenResult: async () => ({ token: 'synthetic-identity' }) };
-    firebaseState.auth = { currentUser: { uid: 'audit-user' } };
+    setPartialBackendFixtureValue(firebaseState, "db", {});
+    setPartialBackendFixtureValue(firebaseState, "fb", { getIdTokenResult: async () => ({ token: 'synthetic-identity' }) });
+    setPartialBackendFixtureValue(firebaseState, "auth", { currentUser: { uid: 'audit-user' } });
     firebaseState.firebaseConfig = { databaseURL: 'https://sign-shop.firebaseio.com' };
     acceptFixtureSession();
     securityState.appIsLocked = false; securityState.appLockVeiled = false;
@@ -207,7 +208,7 @@ it('ចែកចាយកញ្ចប់មានបញ្ហា ៖ បញ្�
     await submitZtoPalmSign();
     await vi.waitFor(() => expect(applyBarcodeCloseChange).toHaveBeenCalledOnce());
     expect(scans('05')).toHaveLength(1);
-    await vi.waitFor(async () => { const jobs = await Promise.all([...disk.rows.values()].map(row => openSignJob(row, securityState.lookupSecretKey!))); expect(jobs).toHaveLength(1); expect(jobs[0]).toMatchObject({ photo: PHOTO, scanCompleted: true, phase: 'checking' }); });
+    await vi.waitFor(async () => { const jobs = await Promise.all([...disk.rows.values()].map(row => openSignJob(row, securityState.lookupSecretKey!))); expect(jobs).toHaveLength(1); expect(jobs[0]).toMatchObject({ photo: PHOTO, scanCompleted: true, photoVerified: true, signedCleanupConfirmed: true }); });
     expect(scans('05')[0]).toMatchObject({ billCode: CODE, signMan: 'សុខា' });
     expect(zto.filter((c) => c.path.endsWith('saveBillPic')).map((c) => c.body)).toEqual([{ fileName: PHOTO, picType: 1, billCode: CODE }]);
 });
@@ -240,7 +241,7 @@ it('កញ្ចប់គ្មានបញ្ហា ➜ 04 ភ្លាម · �
     expect(palmSignState.confirmation).toBeNull();
     expect(scans('04')).toHaveLength(1);
     expect(scans('05')).toHaveLength(1);
-    await vi.waitFor(async () => { const jobs = await Promise.all([...disk.rows.values()].map(row => openSignJob(row, securityState.lookupSecretKey!))); expect(jobs).toHaveLength(1); expect(jobs[0]).toMatchObject({ photo: PHOTO, scanCompleted: true, phase: 'checking' }); });
+    await vi.waitFor(async () => { const jobs = await Promise.all([...disk.rows.values()].map(row => openSignJob(row, securityState.lookupSecretKey!))); expect(jobs).toHaveLength(1); expect(jobs[0]).toMatchObject({ photo: PHOTO, scanCompleted: true, photoVerified: true, signedCleanupConfirmed: true }); });
 });
 
 
@@ -252,13 +253,19 @@ it.each(['exact', 'wrong'] as const)('UI → handler → Palm → រូប %s�
     setPalmSignName('សុខា');
     await submitZtoPalmSign();
     await vi.waitFor(() => expect(scans('05')).toHaveLength(1));
-    await vi.waitFor(() => expect(applyBarcodeCloseChange).toHaveBeenCalled());
-    if (kind === 'exact') await expectQueueCompleted();
+    if (kind === 'exact') {
+        await vi.waitFor(() => expect(applyBarcodeCloseChange).toHaveBeenCalledOnce());
+        await expectQueueCompleted();
+    }
     else await vi.waitFor(async () => {
         expect(disk.rows.size).toBe(1);
-        const job = await openSignJob([...disk.rows.values()][0], securityState.lookupSecretKey!);
+        const row = [...disk.rows.values()][0];
+        expect(row.leaseUntil).toBe(0);
+        const job = await openSignJob(row, securityState.lookupSecretKey!);
         expect(job).toMatchObject({ photo: original, scanCompleted: true, phase: 'checking' });
         expect(job.photoVerified).not.toBe(true);
+        expect(applyBarcodeCloseChange).not.toHaveBeenCalled();
+        expect(dataState.scanHistory[0].barcodes[0].isClosed).toBe(false);
     });
     expect(scans('05')).toHaveLength(1);
     expect(zto.filter(call => call.path.endsWith('querySignPic'))).toHaveLength(1);
@@ -320,7 +327,7 @@ it.each([['during-grace', false], ['after-manual', false], ['fresh-status', true
             const retained = [...disk.rows.values()][0];
             expect(retained.leaseUntil).toBe(0);
             expect(await openSignJob(retained, securityState.lookupSecretKey!)).toMatchObject({ photo: original, signedCleanupConfirmed: true,
-                phase: 'action', readOnlyProbe: true, recovery: { dismissed: true }, recoveryCheck: { signed: true, signedStatusVerified: true, photoVerified: false } });
+                phase: 'action', readOnlyProbe: true, recovery: { dismissed: false }, recoveryCheck: { signed: true, signedStatusVerified: true, photoVerified: false } });
         });
         expect(applyBarcodeCloseChange).not.toHaveBeenCalled();
         expect(scans('04')).toHaveLength(1);
@@ -331,6 +338,18 @@ it.each([['during-grace', false], ['after-manual', false], ['fresh-status', true
         await runPalmSignOutbox();
         expect(zto).toHaveLength(before);
         expect(disk.rows.size).toBe(1);
+        await refreshPalmSignQueue();
+        expect(palmSignOutboxState.recoveryRows.filter(row => !row.dismissed)).toHaveLength(1);
+        const retained = [...disk.rows.values()][0];
+        const originalJob = await openSignJob(retained, securityState.lookupSecretKey!);
+        readback = 'exact';
+        await actOnQueuedSign(retained.id, 'recover');
+        expect(applyBarcodeCloseChange).toHaveBeenCalledOnce();
+        const verifiedJob = await openSignJob(disk.rows.get(retained.id), securityState.lookupSecretKey!);
+        expect(verifiedJob).toMatchObject({ requestId: originalJob.requestId, photo: original,
+            photoVerified: true, recoveryCheck: { photoVerified: true }, signedCleanupConfirmed: true });
+        expect(scans('05')).toHaveLength(0);
+        expect(zto.filter(call => call.path.endsWith('saveBillPic'))).toHaveLength(0);
         return;
     }
     const settled = async () => {
@@ -363,12 +382,12 @@ it.each([['during-grace', false], ['after-manual', false], ['fresh-status', true
         };
         await waitUntilIdle();
         expect(zto).toHaveLength(reads); expect(disk.rows.size).toBe(1);
-        expect(applyBarcodeCloseChange).toHaveBeenCalledTimes(5);
+        expect(applyBarcodeCloseChange).not.toHaveBeenCalled();
         await actOnQueuedSign(value.row.id, 'retry');
         await vi.waitFor(async () => expect((await openSignJob([...disk.rows.values()][0], securityState.lookupSecretKey!)).phase).toBe('action'));
         value = await settled();
         expect(value.job).toMatchObject({ photo: original, photoGraceChecks: 5, photoVerified: false, readOnlyProbe: true, phase: 'action', continuationAllowed: false });
-        expect(applyBarcodeCloseChange).toHaveBeenCalledTimes(6);
+        expect(applyBarcodeCloseChange).not.toHaveBeenCalled();
         await waitUntilIdle();
         readback = 'exact';
         await actOnQueuedSign(value.row.id, 'retry');
@@ -377,7 +396,7 @@ it.each([['during-grace', false], ['after-manual', false], ['fresh-status', true
         readback = 'exact'; now = value.row.due; await runPalmSignOutbox();
     }
     await expectQueueCompleted();
-    expect(applyBarcodeCloseChange).toHaveBeenCalledTimes(visibility === 'after-manual' ? 7 : 2);
+    expect(applyBarcodeCloseChange).toHaveBeenCalledOnce();
     for (const args of vi.mocked(applyBarcodeCloseChange).mock.calls) expect(args).toEqual(['item1', CODE, true, { silent: true, showModal: false, expectedSignIdentity: expect.any(String) }]);
     expect(scans('04')).toHaveLength(1); expect(scans('05')).toHaveLength(0);
     expect(zto.filter(call => call.path.endsWith('saveBillPic'))).toHaveLength(0);

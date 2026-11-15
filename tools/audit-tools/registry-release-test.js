@@ -394,7 +394,7 @@ const tick = (n) => new Promise((resolve) => setTimeout(resolve, n || 0));
             ctx.fb.off = () => {};
             ctx.fb.onValue = (ref, cb) => { callbacks.set(ref.path, cb); };
             const names = ['initDatabaseListeners', 'detachDatabaseListeners', 'noteDbListenerAlive',
-                'dbListenerViewIsStale', 'rawSnapshotToItemList', 'barcodeEntriesOf', 'normalizeBarcodesOf'];
+                'dbListenerViewIsStale', 'rawSnapshotToItemList', 'barcodeEntriesOf', 'normalizeBarcodesOf', 'parseParcelNumber'];
             const absent = names.filter((name) => !sliceFn(name));
             ok('callback ' + finalPath + ' ៖ ផ្ទុក listener និង helper ពិតគ្រប់', absent.length === 0, absent);
             vm.runInContext(names.map((name) => sliceFn(name) || 'function ' + name + '() {}').join('\n'), ctx);

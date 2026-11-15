@@ -4,6 +4,7 @@ import { trashConsumptionSame, trashConsumptionValid, trashGenerationOf, trashSo
 import { allocateTrashGeneration, captureTrashGenerationOwner, readTrashConsumption, trashGenerationOwnerCurrent } from '../services/trash-generation';
 import { purgeTrashWithRegistry } from '../services/registry-purge';
 import { rowOperationActive } from '../services/row-operation-lock';
+import type { DeletedParcelRow, ParcelRow } from './parcel';
 import { dataState, firebaseState } from '../core/state';
 import { captureClockOperation, cleanupClockIsTrustworthy, getServerClockBounds, getServerNow } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
@@ -13,7 +14,7 @@ import { DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY
 import { getFormattedDate } from '../core/timezone';
 import { stripTrashClaim, barcodeAbandonIsRipe, barcodeCloseIsRipe, barcodeReturnCounts, barcodeSignBasis, itemAbandonRipeAt, barcodeEntriesOf, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodesOf, parseTimestampFromId, stampTrashPolicy, stripHistoryOnlyMarkers } from './barcode';
 import { collectedDayOfStamp, collectedMarkValueOf, collectedMarksFor, collectedRetentionCutoffKey, collectedSettleHeld, markCollectedRevenue, reconcileCollectedHistory, runAutomaticCollectedCleanup } from './collected';
-import { commitLedgerEventStep, ledgerDedOf, ledgerEventToken, ledgerRecordTokens } from './ledger';
+import { commitLedgerEventStep, ledgerDedOf, ledgerEventToken, ledgerMonthTrimmed, ledgerRecordTokens } from './ledger';
 import { capturePickupContext, pickupContextIsCurrent, commitPickupMarks, getPickupPhoneKey, pickupBarcodeKey, pickupCopyMarks, resumePickupIntents } from './pickup';
 import { flushPendingRegistryReleases } from './registry';
 import { releaseStaleClearHistoryClaim } from '../features/clear-history';
@@ -81,7 +82,7 @@ export function clearStaleRestoreMarkers(item) {
         if (!markerCurrent()) return;
         const currentSource = snapshot && snapshot.val();
         if (currentSource && currentSource.restoreClaim) return;
-        return dbOp(markerApi.runTransaction(markerApi.ref(markerDb, `zoew_scan_history_cod_dod/${item.id}`), (currentItem) => {
+        return dbOp(markerApi.runTransaction(markerApi.ref<ParcelRow>(markerDb, `zoew_scan_history_cod_dod/${item.id}`), (currentItem) => {
             if (!markerCurrent() || rowOperationActive(currentItem)) return;
             if (!currentItem) return currentItem;
             if (!itemHasRestoreMarkers(currentItem)) return;
@@ -308,7 +309,7 @@ export function cleanupTrashCodes(trashItem) {
 export function markCleanupTrashDeducted(trashItem) {
     const codes = cleanupTrashCodes(trashItem);
     let claimed = false;
-    return firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_recently_deleted_cod_dod/${trashItem.id}`), (current) => {
+    return firebaseState.fb.runTransaction(firebaseState.fb.ref<DeletedParcelRow>(firebaseState.db, `zoew_recently_deleted_cod_dod/${trashItem.id}`), (current) => {
         claimed = false;
         if (current === null || current === undefined) return null;
         if (typeof current !== 'object' || !cleanupTrashLifecycleMatches(current, trashItem)) return;
@@ -765,7 +766,7 @@ export async function finishCleanupCollected(entry, outcome, isCurrent, db?, res
         clearCleanupJournalEntry(trashId, entry.trashItem, entry.scope);
         return outcome;
     }
-    patchCleanupJournalEntry(trashId, { stage: CLEANUP_STAGE_COLLECTED, outcome: outcome || '' }, entry.trashItem, entry.scope);
+    if (!restoreReceipt || entry.stage === CLEANUP_STAGE_COLLECTED) patchCleanupJournalEntry(trashId, { stage: CLEANUP_STAGE_COLLECTED, outcome: outcome || '' }, entry.trashItem, entry.scope);
     if (!isCurrent()) return '';
     const dropped = await dropCleanupCollected(entry, isCurrent, db, restoreReceipt);
     if (!isCurrent()) return '';
@@ -782,7 +783,7 @@ export async function finishCleanupCollected(entry, outcome, isCurrent, db?, res
     }
     if (restoreReceipt) {
         const owner = captureTrashGenerationOwner();
-        if (!owner || db && owner.db !== db || !await cleanupCollectedRestoreProven(entry.trashItem, owner, restoreReceipt) || !isCurrent()) return '';
+        if (!owner || db && owner.db !== db || !await cleanupCollectedRestoreProven(entry.trashItem, owner, restoreReceipt, entry) || !isCurrent()) return '';
     }
     const stored = readCleanupJournal().find(row => row.trashItem.id === trashId && cleanupJournalClaimMatches(row, entry.trashItem, entry.scope));
     if (outcome === 'unverified' && stored?.pickupOutcome === 'reset-cancelled') {
@@ -926,9 +927,10 @@ export async function resumeCleanupJournalEntry(trashId) {
     const generationOwner = captureTrashGenerationOwner();
     if (!generationOwner || !firebaseState.isDatabaseConnected || (navigator.onLine as boolean) === false) return '';
     const collected = entry.stage === CLEANUP_STAGE_COLLECTED;
+    const restoredStage = collected || entry.stage === CLEANUP_STAGE_FLIP || entry.stage === CLEANUP_STAGE_LEDGER;
     let restoreReceipt;
-    if (!await cleanupTrashUnconsumed(trashItem, generationOwner, collected)) {
-        const proof = collected && await cleanupCollectedRestoreProven(trashItem, generationOwner);
+    if (!await cleanupTrashUnconsumed(trashItem, generationOwner, restoredStage)) {
+        const proof = restoredStage && await cleanupCollectedRestoreProven(trashItem, generationOwner, undefined, entry);
         if (!proof) {
             if (!collected && entry.stage !== CLEANUP_STAGE_UNDO && await cleanupTrashPurged(trashItem, generationOwner)) {
                 clearCleanupJournalEntry(trashItem.id, trashItem, entry.scope);
@@ -949,7 +951,7 @@ export async function resumeCleanupJournalEntry(trashId) {
     let stage = entry.stage;
     const keyed = entry.ledger === CLEANUP_LEDGER_KEYED;
     if (stage === CLEANUP_STAGE_UNDO) return cleanupLedgerResult(trashItem.id, rev && keyed ? await undoCleanupRevenue(entry) : 'done', trashItem, entry.scope);
-    if (stage === CLEANUP_STAGE_COLLECTED) return finishCleanupCollected(entry, cleanupStoredOutcome(entry), resumeIsCurrent, resumeDb, restoreReceipt);
+    if (stage === CLEANUP_STAGE_COLLECTED || restoreReceipt) return finishCleanupCollected(entry, cleanupStoredOutcome(entry), resumeIsCurrent, resumeDb, restoreReceipt);
     if (stage === CLEANUP_STAGE_FLIP) {
         const settled = rev ? await settleCleanupDeduction(entry.id, trashItem, rev, true, entry) : true;
         if (typeof settled === 'string') return cleanupLedgerResult(trashItem.id, settled, trashItem, entry.scope);
@@ -1081,7 +1083,7 @@ export async function resumeInterruptedCleanups() {
 export async function restoreClaimedItemToScanHistory(id, claimedWhole, claimedPartial) {
     const restoreDb = firebaseState.db;
     const restoreGeneration = firebaseState.authGeneration;
-    const itemRef = firebaseState.fb.ref(restoreDb, `zoew_scan_history_cod_dod/${id}`);
+    const itemRef = firebaseState.fb.ref<ParcelRow>(restoreDb, `zoew_scan_history_cod_dod/${id}`);
     let clearClaimBlocked = false;
     return retryAsync(() => (firebaseState.db !== restoreDb || firebaseState.authGeneration !== restoreGeneration
         ? Promise.reject(Object.assign(new Error('Restore session changed'), { noRetry: true }))
@@ -1183,9 +1185,9 @@ export async function cleanupTrashPurged(trashItem, owner = captureTrashGenerati
         && receipt.generation === trashGenerationOf(trashItem) && receipt.deletedAt === trashItem.deletedAt;
 }
 
-async function cleanupCollectedRestoreProven(trashItem, owner, expectedReceipt?) {
+async function cleanupCollectedRestoreProven(trashItem, owner, expectedReceipt?, entry?) {
     const generation = trashGenerationOf(trashItem);
-    if (!owner || !generation || !trashGenerationOwnerCurrent(owner)) return false;
+    if (!owner || generation === null || !trashGenerationOwnerCurrent(owner)) return false;
     const result = await readTrashConsumption(trashItem.id, owner);
     const receipt = result.ok ? result.value : null;
     if (!receipt || receipt.kind !== 'restore' || receipt.generation !== generation
@@ -1200,13 +1202,29 @@ async function cleanupCollectedRestoreProven(trashItem, owner, expectedReceipt?)
             || itemHasRestoreMarkers(target)) return false;
         const expected = barcodeEntriesOf(trashItem.barcodes).map(({ barcode }) => barcode);
         const actual = barcodeEntriesOf(target.barcodes).map(({ barcode }) => barcode);
-        if (!expected.length || !expected.every(barcode => {
+        if (!expected.length || generation === 0 && expected.some(barcode => !Number.isSafeInteger(barcode.createdAt) || barcode.createdAt <= 0) || !expected.every(barcode => {
             const matches = actual.filter(candidate => candidate?.code === barcode?.code);
             const holders = Object.values(history).flatMap((item: any) => barcodeEntriesOf(item?.barcodes).map(({ barcode }) => barcode)).filter(candidate => candidate?.code === barcode?.code);
             return holders.length === 1 && matches.length === 1 && (matches[0].createdAt ?? 0) === (barcode.createdAt ?? 0)
                 && (matches[0].scanIntent ?? null) === (barcode.scanIntent ?? null)
                 && matches[0].isDeducted !== true && !['trashClaim', 'trashClaimAt'].some(key => Object.prototype.hasOwnProperty.call(matches[0], key));
         })) return false;
+        if (entry && (entry.stage === CLEANUP_STAGE_FLIP || entry.stage === CLEANUP_STAGE_LEDGER || generation === 0 && entry.revenue)) {
+            const day = trashItem.scanDate, month = typeof day === 'string' ? day.substring(0, 7) : '';
+            if (entry.ledger !== CLEANUP_LEDGER_KEYED || !entry.revenue || entry.revenue.scanDate !== day || !/^\d{4}-\d{2}-\d{2}$/.test(day)
+                || expected.some(barcode => !Number.isSafeInteger(barcode.createdAt) || barcode.createdAt <= 0)) return false;
+            const records = await Promise.all([
+                readRestoreServerNode(owner.sdk, owner.db, `zoew_daily_revenue_cod_dod/${day}`),
+                readRestoreServerNode(owner.sdk, owner.db, `zoew_monthly_revenue_cod_dod/${month}`)
+            ]);
+            const trimmed = records[1] === null && ledgerMonthTrimmed(await readRestoreServerNode(owner.sdk, owner.db, 'zoew_monthly_revenue_cod_dod'), month);
+            if (!trashGenerationOwnerCurrent(owner) || !records.every((record, index) => {
+                if (index === 1 && trimmed) return true;
+                const proof = record?.ded?.[trashItem.id];
+                return proof && typeof proof === 'object' && !Array.isArray(proof) && proof.at === trashItem.deletedAt && proof.back === true
+                    && ['cod', 'dod', 'count'].every(key => typeof proof[key] === 'number' && Number.isFinite(proof[key]) && proof[key] >= 0);
+            })) return false;
+        }
         const confirmed = await readTrashConsumption(trashItem.id, owner);
         return confirmed.ok && trashGenerationOwnerCurrent(owner) && trashConsumptionSame(receipt, confirmed.value) ? { receipt, history } : false;
     } catch (error) { return false; }

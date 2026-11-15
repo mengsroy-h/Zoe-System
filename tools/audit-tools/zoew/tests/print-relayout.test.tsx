@@ -19,7 +19,7 @@ import { dbListenerFailedPaths, dbListenerPendingPaths } from '../../../../ZoeW/
 import { LABEL_PRINT_OPTIONS_KEY } from '../../../../ZoeW/src/core/storage-keys';
 import { armPdfExportRestore, beginPdfPrint, exportDataAsPDF, restoreAfterPdfExport } from '../../../../ZoeW/src/features/export';
 import { PRINT_RETURNED_EVENT } from '../../../../ZoeW/src/platform/file-output';
-import { openLabelPrintModal, printLabelsFromModal, resetLabelPrint } from '../../../../ZoeW/src/features/label-print';
+import { DEFAULT_LABEL_OPTIONS, openLabelPrintModal, printLabelsFromModal, resetLabelPrint } from '../../../../ZoeW/src/features/label-print';
 import { closeModal } from '../../../../ZoeW/src/ui/modal';
 import { PdfExportPrintArea } from '../../../../ZoeW/src/app/components/PdfExportPrintArea';
 import { LabelPrintModal } from '../../../../ZoeW/src/app/components/modals/LabelPrintModal';
@@ -71,7 +71,8 @@ describe('បោះពុម្ព ៖ ប្តូរក្រដាស (គូ
         expect(labels()).toBe(3);
         relayout();
         relayout();
-        expect(uiState.pdfExportView && uiState.pdfExportView.kind).toBe('labels');
+        const view = uiState.pdfExportView;
+        expect(view && 'kind' in view && view.kind).toBe('labels');
         expect(labels()).toBe(3);
         userTouch();
         expect(uiState.pdfExportView).toBeNull();
@@ -100,7 +101,12 @@ describe('បោះពុម្ព ៖ ប្តូរក្រដាស (គូ
         expect(labels()).toBe(3);
         relayout();
         expect(labels()).toBe(3);
-        step(() => { uiState.pdfExportView = { kind: 'labels', title: 'B', labels: uiState.pdfExportView.labels.slice(0, 1), options: uiState.pdfExportView.options }; beginPdfPrint('B'); });
+        step(() => {
+            const view = uiState.pdfExportView;
+            if (!view || !('kind' in view) || view.kind !== 'labels') throw new Error('ត្រូវមានទិដ្ឋភាពបោះពុម្ពស្លាក');
+            uiState.pdfExportView = { kind: 'labels', title: 'B', labels: view.labels.slice(0, 1), options: view.options };
+            beginPdfPrint('B');
+        });
         expect(labels()).toBe(1);
         userTouch();
         expect(labels()).toBe(1);
@@ -128,7 +134,7 @@ describe('បោះពុម្ព ៖ ប្តូរក្រដាស (គូ
         relayout();
         step(() => restoreAfterPdfExport());
         expect(labels()).toBe(0);
-        step(() => { uiState.pdfExportView = { kind: 'labels', title: 'C', labels: [], options: {} }; });
+        step(() => { uiState.pdfExportView = { kind: 'labels', title: 'C', labels: [], options: { ...DEFAULT_LABEL_OPTIONS } }; });
         userTouch();
         expect(uiState.pdfExportView && uiState.pdfExportView.title).toBe('C');
     });

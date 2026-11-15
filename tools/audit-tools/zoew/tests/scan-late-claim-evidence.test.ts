@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { acceptFixtureSession } from './helpers/accepted-session';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { refTo, setFieldValue } from '../../../../ZoeW/src/app/refs';
@@ -70,7 +71,7 @@ beforeEach(() => {
     dataState.dailyCollectedData = {}; dataState.dailyPickupData = {};
     scanState.pendingBarcode = ''; scanState.pendingScanSession = null;
     viewState.phoneModalBusy = false; uiState.modalDisplay = {}; uiState.isModalOpen = false; uiState.toasts = [];
-    uiState.entryScanMode = 'add'; uiState.lastEnteredLocker = '';
+    uiState.entryScanMode = 'parcel'; uiState.lastEnteredLocker = '';
     ztoState.ztoListSyncInFlight = false; ztoState.ztoListSyncResult = null;
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
     vi.stubGlobal('confirm', () => true);
@@ -140,7 +141,7 @@ for (const route of ['legacy-v1']) describe(route + ' actual late-claim release 
         const original = await reachTimedOutClaim(route);
         if (changed === 'generation') firebaseState.authGeneration++;
         if (changed === 'db') firebaseState.db = { ...firebaseState.db } as any;
-        if (changed === 'uid') firebaseState.auth.currentUser.uid = 'next-user';
+        if (changed === 'uid') setPartialBackendFixtureValue(firebaseState.auth.currentUser, "uid", 'next-user');
         if (changed === 'scope') (firebaseState.db.app.options as any).databaseURL = 'https://next-shop.invalid';
         claim.resolve({ committed: true }); await flush();
         expect(updates).not.toHaveBeenCalled(); expect(rows()).toEqual([original]);
@@ -291,7 +292,7 @@ for (const route of ['confirmPhone', 'importZtoListRows']) describe('v2 public '
         const original = await timedOut();
         if (changed === 'generation') firebaseState.authGeneration++;
         if (changed === 'db') firebaseState.db = { ...firebaseState.db } as any;
-        if (changed === 'uid') firebaseState.auth.currentUser.uid = 'next-user';
+        if (changed === 'uid') setPartialBackendFixtureValue(firebaseState.auth.currentUser, "uid", 'next-user');
         if (changed === 'scope') (firebaseState.db.app.options as any).databaseURL = 'https://next-shop.invalid';
         claim.resolve({ committed: true }); await flush();
         expect(cancellationCalls()).toHaveLength(0); expect(v2Rows()).toEqual([original]);

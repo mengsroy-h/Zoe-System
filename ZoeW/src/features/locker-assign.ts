@@ -1,4 +1,5 @@
 import { rowOperationActive } from '../services/row-operation-lock';
+import type { ParcelRow } from '../domain/parcel';
 import { viewState } from '../core/view-state';
 import { firebaseState, uiState } from '../core/state';
 import { captureClockOperation, getServerNow } from '../core/clock';
@@ -177,7 +178,7 @@ export async function assignLockerToEntry(code) {
         showToast('❌ មានបញ្ហា! មិនអាចរក្សាទុកទីតាំងបានទេ សូមព្យាយាមម្តងទៀត');
     };
 
-    const writePromise = firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${itemId}`), (currentItem) => {
+    const writePromise = firebaseState.fb.runTransaction(firebaseState.fb.ref<ParcelRow>(firebaseState.db, `zoew_scan_history_cod_dod/${itemId}`), (currentItem) => {
         applied = false;
         if (!assignIsCurrent() || !clock.current()) return;
         if (!currentItem || typeof currentItem !== 'object') return currentItem;

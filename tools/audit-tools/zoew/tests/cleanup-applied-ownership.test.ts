@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { acceptFixtureSession } from './helpers/accepted-session';
 import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -581,10 +582,10 @@ describe('ការកាន់កាប់ trash slot ពេលប្ដូរ 
         const trash = { ...clone(original), deletedAt: getServerNow(), trashReason: 'returned', trashGeneration: 1 };
         let retry: any;
         let reply: any;
-        firebaseState.fb.runTransaction = vi.fn((_ref, updater) => {
+        setPartialBackendFixtureValue(firebaseState.fb, "runTransaction", vi.fn((_ref, updater) => {
             retry = updater;
             return new Promise(resolve => { reply = resolve; });
-        });
+        }));
         const old = claimCleanupTrashSlot(trash).catch(error => error.message);
         await vi.waitFor(() => expect(typeof retry).toBe('function'));
         firebaseState.authGeneration++;

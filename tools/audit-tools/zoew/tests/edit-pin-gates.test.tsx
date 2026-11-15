@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { acceptFixtureSession, configureFixtureBackend } from './helpers/accepted-session';
 vi.mock('../../../../ZoeW/src/services/crypto', async (original) => ({
@@ -89,7 +90,7 @@ it.each(routes)('$name ៖ គ្មាន PIN ត្រូវកំណត់ស
 });
 
 it.each(routes)('$name ៖ ប្តូរគណនី/ហាងពេលសុំ PIN មិនបើក editor ក្នុង session ថ្មី', async (route) => {
-    route.open(); firebaseState.authGeneration++; firebaseState.db = {};
+    route.open(); firebaseState.authGeneration++; setPartialBackendFixtureValue(firebaseState, "db", {});
     setFieldValue('securityPinInput', '482915'); await verifySecurityPin();
     expect(modalIsOpen(route.modal)).toBe(false);
 });

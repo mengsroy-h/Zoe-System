@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { firebaseState, securityState, uiState } from '../../../../ZoeW/src/core/state';
 import { viewState } from '../../../../ZoeW/src/core/view-state';
@@ -49,7 +50,7 @@ describe('ចាកចេញមានពិដាន ដោយមិនអះអ
             localLogoutIntent.fence(scope, uid);
             return false;
         });
-        firebaseState.fb = { signOut: async () => { throw new Error('synthetic SDK persistence refusal'); } };
+        setPartialBackendFixtureValue(firebaseState, "fb", { signOut: async () => { throw new Error('synthetic SDK persistence refusal'); } });
         if (expiry) { forceExpireSession(); await turn(); } else await logoutApp();
         expect(note).toHaveBeenCalledOnce();
         expect(connectionFlowSnapshot().canWrite).toBe(false);
@@ -79,7 +80,7 @@ describe('ចាកចេញមានពិដាន ដោយមិនអះអ
     });
 
     for (const expiry of [false, true]) it((expiry ? 'expiry' : 'logout') + ' ខណៈ PIN veil បើក មិនលាក់ login ក្រោយ local session បិទ', async () => {
-        firebaseState.fb = { signOut: () => new Promise<void>(() => {}) };
+        setPartialBackendFixtureValue(firebaseState, "fb", { signOut: () => new Promise<void>(() => {}) });
         securityState.appIsLocked = true;
         viewState.appLockOpen = true;
         if (expiry) forceExpireSession(); else void logoutApp();
@@ -93,7 +94,7 @@ describe('ចាកចេញមានពិដាន ដោយមិនអះអ
 
     it('logout ដែល SDK ព្យួរ បិទផ្លូវសរសេរភ្លាម និងមិនត្រូវបើកឡើងវិញតាម clock/session retry', async () => {
         const getIdTokenResult = vi.fn(async () => ({ authTime: new Date().toISOString() }));
-        firebaseState.fb = { signOut: () => new Promise<void>(() => {}), getIdTokenResult };
+        setPartialBackendFixtureValue(firebaseState, "fb", { signOut: () => new Promise<void>(() => {}), getIdTokenResult });
         Object.assign(firebaseState, { isDatabaseInitialized: true, isDatabaseConnected: true, dbListenersFailed: false });
         expect(connectionFlowSnapshot().canWrite).toBe(true);
         const pending = logoutApp();
@@ -139,14 +140,14 @@ describe('ចាកចេញមានពិដាន ដោយមិនអះអ
 
     it('credentials ថ្មីដែល SDK បញ្ជាក់ អាចចូល និងដោះសោ local logout ដោយគ្មានការឆ្លើយ signOut ចាស់', async () => {
         vi.spyOn(licenseFlow, 'proceedAfterLogin').mockResolvedValue(false);
-        firebaseState.fb = { signOut: () => new Promise<void>(() => {}),
+        setPartialBackendFixtureValue(firebaseState, "fb", { signOut: () => new Promise<void>(() => {}),
             setPersistence: async () => {},
             signInWithEmailAndPassword: vi.fn(async () => {
                 const user = { uid: 'relogin-b' };
-                firebaseState.auth.currentUser = user;
+                setPartialBackendFixtureValue(firebaseState.auth, "currentUser", user);
                 return { user };
             }),
-            getIdTokenResult: async () => ({ authTime: new Date().toISOString() }) };
+            getIdTokenResult: async () => ({ authTime: new Date().toISOString() }) });
         const previousLogout = logoutApp();
         await turn();
         resetServerClock();
@@ -167,7 +168,7 @@ describe('ចាកចេញមានពិដាន ដោយមិនអះអ
 
     it('logout ព្យួរ ➜ បញ្ចប់ UI ក្នុងពិដាន និងសម្អាត secret ដែលកាន់ក្នុងសតិ', async () => {
         const user = firebaseState.auth.currentUser;
-        firebaseState.fb = { signOut: vi.fn(() => new Promise<void>(() => {})) };
+        setPartialBackendFixtureValue(firebaseState, "fb", { signOut: vi.fn(() => new Promise<void>(() => {})) });
         let settled = false;
         void logoutApp().then(() => { settled = true; });
         await turn();
@@ -186,9 +187,9 @@ describe('ចាកចេញមានពិដាន ដោយមិនអះអ
 
     for (const mode of ['hang', 'throw', 'absent'] as const) it('វគ្គផុតកំណត់ · signOut ' + mode + ' ➜ រក្សាសោ និងមិនទុក secret រង់ចាំគ្មានពិដាន', async () => {
         const user = firebaseState.auth.currentUser;
-        firebaseState.fb = mode === 'absent' ? {} : { signOut: mode === 'throw'
+        setPartialBackendFixtureValue(firebaseState, "fb", mode === 'absent' ? {} : { signOut: mode === 'throw'
             ? () => { throw new Error('synthetic persistence refusal'); }
-            : () => new Promise<void>(() => {}) };
+            : () => new Promise<void>(() => {}) });
         expect(() => forceExpireSession()).not.toThrow();
         await vi.advanceTimersByTimeAsync(DB_OP_TIMEOUT_MS + 1);
         expect(firebaseState.sessionExpiryCheck).toBe('signed-out');
@@ -203,10 +204,10 @@ describe('ចាកចេញមានពិដាន ដោយមិនអះអ
     });
 
     for (const expiry of [false, true]) it((expiry ? 'expire' : 'logout') + ' A កំពុងព្យួរ ➜ មិនសម្អាតវគ្គ B ពេលផុតពិដាន', async () => {
-        firebaseState.fb = { signOut: () => new Promise<void>(() => {}) };
+        setPartialBackendFixtureValue(firebaseState, "fb", { signOut: () => new Promise<void>(() => {}) });
         if (expiry) forceExpireSession(); else void logoutApp();
         await turn();
-        firebaseState.auth = { currentUser: { uid: 'logout-b' } };
+        setPartialBackendFixtureValue(firebaseState, "auth", { currentUser: { uid: 'logout-b' } });
         firebaseState.authGeneration++;
         securityState.lookupSecretKey = { owner: 'B' };
         const secret = securityState.lookupSecretKey;
@@ -219,9 +220,9 @@ describe('ចាកចេញមានពិដាន ដោយមិនអះអ
 
     for (const expiry of [false, true]) it((expiry ? 'expire' : 'logout') + ' A មិនទាន់ចាប់ផ្ដើម SDK ➜ មិនអាចចាកចេញវគ្គ B លើ auth object ដដែល', async () => {
         const signOut = vi.fn(async () => { firebaseState.auth.currentUser = null; });
-        firebaseState.fb = { signOut };
+        setPartialBackendFixtureValue(firebaseState, "fb", { signOut });
         if (expiry) forceExpireSession(); else void logoutApp();
-        firebaseState.auth.currentUser = { uid: 'logout-b' };
+        setPartialBackendFixtureValue(firebaseState.auth, "currentUser", { uid: 'logout-b' });
         firebaseState.authGeneration++;
         await turn();
         expect(signOut).not.toHaveBeenCalled();

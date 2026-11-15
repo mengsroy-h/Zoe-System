@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { firebaseState } from '../../../../ZoeW/src/core/state';
 import { DB_LIVENESS_PROBE_PATH, DB_LIVENESS_PROBE_TIMEOUT_MS } from '../../../../ZoeW/src/services/connection';
@@ -75,7 +76,7 @@ describe('អានសុខភាព Database ពី Server មិនមែន 
     });
     it.each(['token', 'fetch', 'body'])('Firebase %s ព្យួរ បញ្ចប់ត្រឹមពិដាន', async stage => {
         vi.useFakeTimers(); const pending = deferred();
-        if (stage === 'token') firebaseState.auth.currentUser.getIdToken = () => pending.promise;
+        if (stage === 'token') setPartialBackendFixtureValue(firebaseState.auth.currentUser, "getIdToken", () => pending.promise);
         if (stage === 'fetch') fetchSpy.mockReturnValue(pending.promise);
         if (stage === 'body') fetchSpy.mockResolvedValue({ ok: true, json: () => pending.promise });
         const result = healthDatabaseRead(); await vi.advanceTimersByTimeAsync(DB_LIVENESS_PROBE_TIMEOUT_MS);
@@ -92,7 +93,7 @@ describe('អានសុខភាព Database ពី Server មិនមែន 
         expect(await result).toBe(null);
     });
     it.each(['database', 'sdk', 'user', 'tenant', 'config'])('មិនយកលទ្ធផលក្រោយ %s ប្ដូរ', async change => {
-        supabase(); firebaseState.auth._account = { tenant_id: 'first' };
+        supabase(); setPartialBackendFixtureValue(firebaseState.auth, "_account", { tenant_id: 'first' });
         const pending = deferred(); sdk.getForHealth.mockReturnValue(pending.promise);
         const result = healthDatabaseRead();
         if (change === 'database') firebaseState.db = {} as any;

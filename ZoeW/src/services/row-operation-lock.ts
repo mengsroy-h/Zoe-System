@@ -1,24 +1,9 @@
 import { firebaseState } from '../core/state';
 import { liveShopScope } from '../core/shop-scope';
 import { barcodeEntriesOf } from '../domain/barcode';
+import type { PriceOperationMarker, PriceOperationOutcome, PriceOperationPhase } from '../domain/parcel';
+export type { PriceOperationPhase, PriceOperationOutcome, PriceOperationMarker } from '../domain/parcel';
 
-export type PriceOperationPhase = 'admitted' | 'history' | 'cancelling' | 'settled';
-export type PriceOperationOutcome = 'committed' | 'compensated';
-export type PriceOperationMarker = {
-    token: string;
-    actorUid: string;
-    code: string;
-    slot: string;
-    birth: number;
-    rowBirth: number;
-    scanDate: string;
-    priorCod: number;
-    priorDod: number;
-    wantCod: number;
-    wantDod: number;
-    phase: PriceOperationPhase;
-    outcome?: PriceOperationOutcome;
-};
 export type PriceOperationHandle = {
     itemId: string;
     marker: PriceOperationMarker;

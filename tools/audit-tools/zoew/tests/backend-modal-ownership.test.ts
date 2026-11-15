@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { refTo, fieldValue, setFieldValue } from '../../../../ZoeW/src/app/refs';
 import { MODAL_IDS, modalIsOpen, registerModalMeta, unregisterModalMeta } from '../../../../ZoeW/src/core/modals';
@@ -59,7 +60,7 @@ function sdkFixture() {
         update: async () => {}, set: async () => {}, increment: (amount: number) => ({ '.sv': { increment: amount } })
     };
     return { sdk, stores, writes, apps,
-        emit(uid: string | null) { const auth = firebaseState.auth; auth.currentUser = uid ? { uid, getIdToken: async () => 'fixture' } : null; callbacks.get(auth)?.(auth.currentUser); },
+        emit(uid: string | null) { const auth = firebaseState.auth; setPartialBackendFixtureValue(auth, "currentUser", uid ? { uid, getIdToken: async () => 'fixture' } : null); callbacks.get(auth)?.(auth.currentUser); },
         hold() { hold = true; }, release() { hold = false; delayed?.(); }, pending: () => !!delayed };
 }
 async function signIn(uid: string | null) {

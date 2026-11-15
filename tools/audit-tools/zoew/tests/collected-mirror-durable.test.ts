@@ -343,6 +343,57 @@ afterEach(() => {
     appLocalStore.clear();
 });
 
+it.each(['flip', 'ledger', 'collected'].flatMap(stage => [false, true].flatMap(reset => [false, true].flatMap(legacy => [false, true].map(missingEpoch => ({ stage, reset, legacy, missingEpoch }))))))(
+    'cleanup Restore receipt៖ $stage, legacy=$legacy, missingEpoch=$missingEpoch ក្រោយ restart គោរព Reset=$reset', async ({ stage, reset, legacy, missingEpoch }) => {
+        vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+        vi.setSystemTime(new Date(NOW));
+        seedItem('restoredphase', ['RESTOREDPHASE1', 'RESTOREDPHASE2'], ['RESTOREDPHASE1']);
+        seedRevenue();
+        loadViewsFromServer();
+        refuseMirror();
+        const removing = removeSingleBarcode('restoredphase', 'RESTOREDPHASE1');
+        await vi.advanceTimersByTimeAsync(500);
+        expect(await removing).toBe('done');
+        const entry = cleanupJournal()[0];
+        expect(entry.stage).toBe('collected');
+        expect(entry.ledger).toBe('keyed');
+        lab.fail = null;
+        if (legacy) {
+            const source = getPath(TRASH + '/' + entry.trashItem.id);
+            delete source.trashGeneration;
+            delete entry.trashItem.trashGeneration;
+            setPath(TRASH + '/' + entry.trashItem.id, source);
+        }
+        await restoreModernSource(entry.trashItem.id);
+        expect(getPath('zoew_trash_consumptions/' + entry.trashItem.id).generation).toBe(legacy ? 0 : entry.trashItem.trashGeneration);
+        expect(pickupJournal()).toEqual([]);
+        entry.stage = stage;
+        if (missingEpoch) delete entry.pickupResetEpoch;
+        cleanup.noteCleanupJournalEntry(entry);
+        setPath(MIRROR, null);
+        const record = pickupDay();
+        setPath(PICKUP + '/' + DAY, { ...record, packagesPickedUp: 0, pickedUpPhones: {}, pickedUpBarcodes: {}, pickupRevision: record.pickupRevision + 1 });
+        if (reset) await resetPickupDay();
+        crashAndReload();
+        const moneyRoots = ['zoew_daily_revenue_cod_dod', 'zoew_monthly_revenue_cod_dod'];
+        const moneyBefore = moneyRoots.map(root => getPath(root));
+        const moneyWrites: string[] = [];
+        lab.txGate = path => { if (moneyRoots.some(root => path.startsWith(root))) moneyWrites.push(path); return null; };
+        const resuming = resumeDoors();
+        await vi.advanceTimersByTimeAsync(1500);
+        await resuming;
+        expect(cleanupJournal()).toHaveLength(missingEpoch ? 1 : 0);
+        if (missingEpoch) expect(cleanupJournal()[0].stage).toBe(stage);
+        expect(actualMirror()).toEqual(missingEpoch ? {} : expectedMirror());
+        expect(Object.keys(actualMirror())).toHaveLength(missingEpoch ? 0 : 1);
+        expect(pickupDay().packagesPickedUp).toBe(reset || missingEpoch ? 0 : 1);
+        expect(pickupDay().pickedUpBarcodes || {}).toEqual(reset || missingEpoch ? {} : { [barcodeRegistryKey('RESTOREDPHASE1')]: PHONE });
+        expect(revenueDay()).toEqual([100, 10, 10]);
+        expect(moneyRoots.map(root => getPath(root))).toEqual(moneyBefore);
+        expect(moneyWrites).toEqual([]);
+    }
+);
+
 it.each(['barcode', 'whole'])('⛔ បិទ (%s) ៖ កញ្ចប់ + ស្ថិតិយក commit រួច · mirror ព្យួរ ➜ ទំព័រស្លាប់ ➜ ទ្វារស្តារសរសេរ mirror លើថ្ងៃបិទ', async (kind) => {
     seedItem('c1', ['MX1C0001', 'MX1C0002'], []);
     loadViewsFromServer();
@@ -446,7 +497,7 @@ it('⛔ mirror បដិសេធជាប់រហូត ➜ ប្រាក់
     expect(revenueDay()).toEqual([96, 9, 9]);
 });
 
-it.each(['delete', 'pickup'])('⛔ journal «ដក» ចាស់ (flip) ៖ barcode ត្រូវ Restore ពីឧបករណ៍ផ្សេង រួចទៅធុងសំរាម «%s» (បិទ · មិនដក) ➜ mark mirror ត្រូវនៅ', async (reason) => {
+it.each(['delete', 'pickup'])('⛔ journal «ដក» ចាស់ (flip)៖ source បាត់គ្មាន receipt ហើយ copy បិទនៅធុងសំរាម «%s» ➜ mirror នៅដដែល និង journal នៅ HOLD', async (reason) => {
     seedItem('x1', ['MX1X0001', 'MX1X0002'], ['MX1X0001']);
     seedRevenue();
     loadViewsFromServer();
@@ -472,9 +523,12 @@ it.each(['delete', 'pickup'])('⛔ journal «ដក» ចាស់ (flip) ៖ ba
     vi.setSystemTime(new Date(NOW + 4 * H));
     crashAndReload();
     expect(Object.keys(expectedMirror()), 'លក្ខខណ្ឌមុន ៖ barcode បិទ មិនដក ក្នុងធុងសំរាម «' + reason + '»').toHaveLength(1);
+    expect(getPath('zoew_trash_consumptions/' + journal[0].trashItem.id)).toBeNull();
+    const beforeRevenue = revenueDay();
     await resumeDoors();
     expect(actualMirror(), 'journal ចាស់មិនលុប mark របស់វដ្តថ្មី').toEqual(expectedMirror());
-    expect(cleanupJournal()).toEqual([]);
+    expect(cleanupJournal().map(entry => entry.stage)).toEqual(['flip']);
+    expect(revenueDay()).toEqual(beforeRevenue);
 });
 
 it('ទិសផ្ទុយ ៖ journal «ដក» ចាស់ (flip) ៖ copy ក្នុងធុងសំរាម «delete» ដែលដករួច (isDeducted) មិនការពារ mark ➜ mark ត្រូវលុប', async () => {

@@ -15,14 +15,16 @@ import { armLateWrite, dbOp, dbOpStalled } from '../services/network';
 import { txReadServerValue, txRestUrl } from '../services/tx-outcome';
 import { refreshCurrentHistoryView } from '../ui/history-refresh';
 import { showToast } from '../ui/toast';
+import { parseParcelNumber } from './parcel-number';
+import type { CollectedAmount, CollectedMark, CollectedMarkBatch } from './statistics';
 import { PICKUP_RESET_PENDING_TEXT, PICKUP_RESET_UNAVAILABLE_TEXT, pickupResetPendingState, runPickupResetBatch } from '../services/pickup-reset';
 
 export const DAILY_COLLECTED_KEEP_DAYS = 7;
 
 export const DAILY_COLLECTED_DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-export function collectedSetFromRecord(record) {
-    const out = {};
+export function collectedSetFromRecord(record): Record<string, CollectedAmount> {
+    const out: Record<string, CollectedAmount> = {};
     if (!record || typeof record !== 'object') return out;
     Object.keys(record).forEach((key) => {
         const entry = record[key];
@@ -32,7 +34,7 @@ export function collectedSetFromRecord(record) {
     return out;
 }
 
-export function collectedMarkValueOf(barcode) {
+export function collectedMarkValueOf(barcode): CollectedAmount {
     return { c: statsMoney(barcode && barcode.cod), d: statsMoney(barcode && barcode.dod) };
 }
 
@@ -51,20 +53,20 @@ export function collectedDayHoldingKey(key) {
     return '';
 }
 
-export function collectedMarksFor(barcode, desiredClosed, previousClosedAt) {
+export function collectedMarksFor(barcode, desiredClosed, previousClosedAt): CollectedMark[] {
     const key = pickupBarcodeKey(barcode && barcode.code);
     if (!key) return [];
     const priorDay = collectedDayHoldingKey(key) || collectedDayOfStamp(previousClosedAt);
     if (!desiredClosed) return priorDay ? [{ key: key, day: priorDay, value: null }] : [];
     const day = collectedDayOfStamp(barcode && barcode.closedAt);
     if (!day) return [];
-    const out = [];
+    const out: CollectedMark[] = [];
     if (priorDay && priorDay !== day) out.push({ key: key, day: priorDay, value: null });
     out.push({ key: key, day: day, value: collectedMarkValueOf(barcode) });
     return out;
 }
 
-export function commitCollectedMarks(marks, quiet?) {
+export function commitCollectedMarks(marks: readonly CollectedMark[] | null | undefined, quiet?: boolean): Promise<boolean | null> {
     if (!firebaseState.dbRefDailyCollected || !firebaseState.db || !firebaseState.fb || !marks || !marks.length) return Promise.resolve(null);
     const collectedAuthGeneration = firebaseState.authGeneration;
     const collectedDatabase = firebaseState.db;
@@ -80,11 +82,10 @@ export function commitCollectedMarks(marks, quiet?) {
     });
 }
 
-export function markCollectedRevenue(marks, quiet?) {
+export function markCollectedRevenue(marks: readonly CollectedMark[] | null | undefined, quiet?: boolean): CollectedMarkBatch | null {
     const list = (marks || []).filter((mark) => mark && mark.key && mark.day);
     if (!list.length) return null;
-    list.server = commitCollectedMarks(list, quiet);
-    return list;
+    return Object.assign(list, { server: commitCollectedMarks(list, quiet) });
 }
 
 export function reconcileCollectedPriceState(current, barcode, keep) {
@@ -94,13 +95,13 @@ export function reconcileCollectedPriceState(current, barcode, keep) {
 
 export const COLLECTED_SETTLE_HOLD_MS = 2 * 60 * 1000;
 
-export function collectedSettleHolds() {
-    const memo: any = collectedSettleHolds;
+export function collectedSettleHolds(): Map<string, Map<object, number>> {
+    const memo: typeof collectedSettleHolds & { holds?: Map<string, Map<object, number>> } = collectedSettleHolds;
     if (!(memo.holds instanceof Map)) memo.holds = new Map();
     return memo.holds;
 }
 
-export function holdCollectedSettle(itemId) {
+export function holdCollectedSettle(itemId: string) {
     const settles = collectedSettleHolds();
     const token = {};
     let holds = settles.get(itemId);
@@ -114,7 +115,7 @@ export function holdCollectedSettle(itemId) {
     };
 }
 
-export function collectedSettleHeld(itemId) {
+export function collectedSettleHeld(itemId: string) {
     const settles = collectedSettleHolds();
     const holds = settles.get(itemId);
     if (!holds) return false;
@@ -440,7 +441,7 @@ export async function resetPickupStats() {
         return;
     }
     const currentCustomers = targetDates.reduce((sum, d) => sum + countPickedUpCustomers(dataState.dailyPickupData[d]), 0);
-    const currentPackages = targetDates.reduce((sum, d) => sum + (parseFloat((dataState.dailyPickupData[d] || {}).packagesPickedUp) || 0), 0);
+    const currentPackages = targetDates.reduce((sum, d) => sum + (parseParcelNumber((dataState.dailyPickupData[d] || {}).packagesPickedUp) || 0), 0);
     if (!currentCustomers && !currentPackages) {
         showToast(`⚠️ តម្រង «${filterLabel}» មានចំនួនយករួច 0 រួចជាស្រេច — គ្មានអ្វីត្រូវ Reset ទេ។`);
         return;

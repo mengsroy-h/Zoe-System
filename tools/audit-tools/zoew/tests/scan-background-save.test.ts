@@ -177,7 +177,7 @@ beforeEach(() => {
     dataState.dailyCollectedData = {}; dataState.dailyPickupData = {};
     scanState.pendingBarcode = ''; scanState.pendingScanSession = null;
     viewState.phoneModalBusy = false; uiState.modalDisplay = {}; uiState.isModalOpen = false; uiState.toasts = [];
-    uiState.entryScanMode = 'add'; uiState.lastEnteredLocker = '';
+    uiState.entryScanMode = 'parcel'; uiState.lastEnteredLocker = '';
     ztoState.ztoListSyncInFlight = false; ztoState.ztoListSyncResult = null;
     firebaseState.authGeneration++;
     for (const field of fields) refTo(field)(document.createElement('input'));

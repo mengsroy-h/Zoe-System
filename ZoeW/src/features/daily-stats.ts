@@ -3,6 +3,7 @@ import { viewState } from '../core/view-state';
 import { dataState, scanState, uiState } from '../core/state';
 import { countPickedUpCustomers, getPickupPhoneKey } from '../domain/pickup';
 import { scanConfirmedBarcodes } from '../domain/scan-protocol';
+import { parseParcelNumber } from '../domain/parcel-number';
 import { rowOperationActive } from '../services/row-operation-lock';
 import { getFilterTargetDateKey, pickupStatsAreMeasurable } from './export';
 import { MONTHLY_REPORT_UNKNOWN } from './monthly-report';
@@ -27,9 +28,9 @@ export function updateDailyScheduleStats(filteredList, isSearchScoped = false) {
     const pickupUnknown = !isSearchScoped && (!!targetDateKey || uiState.currentFilterMode === 'all') && !pickupStatsAreMeasurable();
 
     if (!isSearchScoped && targetDateKey && dataState.dailyRevenueData[targetDateKey]) {
-        selectedAllPackages = parseFloat(dataState.dailyRevenueData[targetDateKey].totalCount) || 0;
+        selectedAllPackages = parseParcelNumber(dataState.dailyRevenueData[targetDateKey].totalCount) || 0;
     } else if (!isSearchScoped && uiState.currentFilterMode === 'all') {
-        selectedAllPackages = Object.values(dataState.dailyRevenueData).reduce((sum, d) => sum + (parseFloat(d.totalCount) || 0), 0);
+        selectedAllPackages = Object.values(dataState.dailyRevenueData).reduce((sum, d) => sum + (parseParcelNumber(d.totalCount) || 0), 0);
     } else {
         selectedAllPackages = filteredList.reduce((sum, item) => {
             if (item.barcodes && Array.isArray(item.barcodes)) {
@@ -41,10 +42,10 @@ export function updateDailyScheduleStats(filteredList, isSearchScoped = false) {
 
     if (!isSearchScoped && targetDateKey && dataState.dailyPickupData[targetDateKey]) {
         selectedClosedCount = countPickedUpCustomers(dataState.dailyPickupData[targetDateKey]);
-        selectedPackagesPickedUpCount = parseFloat(dataState.dailyPickupData[targetDateKey].packagesPickedUp) || 0;
+        selectedPackagesPickedUpCount = parseParcelNumber(dataState.dailyPickupData[targetDateKey].packagesPickedUp) || 0;
     } else if (!isSearchScoped && uiState.currentFilterMode === 'all') {
         selectedClosedCount = Object.values(dataState.dailyPickupData).reduce((sum, d) => sum + countPickedUpCustomers(d), 0);
-        selectedPackagesPickedUpCount = Object.values(dataState.dailyPickupData).reduce((sum, d) => sum + (parseFloat(d.packagesPickedUp) || 0), 0);
+        selectedPackagesPickedUpCount = Object.values(dataState.dailyPickupData).reduce((sum, d) => sum + (parseParcelNumber(d.packagesPickedUp) || 0), 0);
     } else {
         const pickedPhones = new Set();
         selectedPackagesPickedUpCount = filteredList.reduce((sum, item) => {

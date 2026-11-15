@@ -1,4 +1,5 @@
 import { canonicalBarcodeRegistryKey } from './barcode-key';
+export type { ScanPendingMarker } from './parcel';
 
 export const SCAN_OPERATIONS_ROOT = 'zoew_scan_operations';
 export const SCAN_PENDING_ROOT = 'zoew_scan_pending';
@@ -28,15 +29,6 @@ export type ScanOperation = {
     phone?: string;
     locker?: string;
     closedAt?: number;
-};
-
-export type ScanPendingMarker = {
-    intent: string;
-    actorUid: string;
-    code: string;
-    birth: number;
-    slot: string;
-    payloadHash: string;
 };
 
 export function scanProtocolText(value: unknown, maximum: number) {

@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 // Re-audit A444 (S1) ៖ the Supabase adapter keyed «Transaction outcome unknown» by the account signed in **when the report fired**.
 // Most of those reports fire after a session change (give-up on a shop switch · a closed database) ➜ the new shop's tenant, or none,
 // so a later unknown of the new shop on the same ledger path was folded into the old shop's dedup window and dropped. The scope is
@@ -21,7 +22,7 @@ it('⛔ unknown ៖ scope = គម្រោង + tenant នៃ topic របស�
     const sdk = createSupabaseSdk(() => ({ close() {} }), { onListenerError() {}, docsCache: null, writeJournal: null,
         onTxOutcomeUnknown: (path: any, scope: string) => { reports.push([path.join('/'), scope]); } });
     const app = sdk.initializeApp({ supabaseUrl: 'https://shop-p.supabase.co/' });
-    app._auth = { currentUser: null, _account: { tenant_id: 'B' } };
+    setPartialBackendFixtureValue(app, "_auth", { currentUser: null, _account: { tenant_id: 'B' } });
     sdk.getDatabase(app);
     const path = ['zoew_daily_revenue_cod_dod', '2026-10-28'];
     captured.hooks.onTxOutcomeUnknown(path, 'zoe:A');

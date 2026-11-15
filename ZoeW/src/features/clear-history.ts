@@ -18,6 +18,8 @@ import { CLEAR_HISTORY_CLAIM_LEASE_MS, activeClearHistoryClaims } from '../ui/hi
 import { getFilteredDataByDate } from '../ui/more-menu';
 import { showToast } from '../ui/toast';
 import { itemHasLiveTrashClaim } from '../domain/trash-claim';
+import type { ParcelRow } from '../domain/parcel';
+import type { BackendFinalization } from '../services/backend-types';
 
 let clearHistoryRun: TrashGenerationOwner | null = null;
 const clearTokenOwners = new Map<string, { token: string; owner: TrashGenerationOwner }>();
@@ -63,7 +65,7 @@ export function releaseStaleClearHistoryClaim(item) {
     if (staleClearClaimSweeps.has(item.id)) return;
     staleClearClaimSweeps.add(item.id);
     const release = () => { staleClearClaimSweeps.delete(item.id); };
-    dbOp(owner.sdk.runTransaction(owner.sdk.ref(owner.db, `zoew_scan_history_cod_dod/${item.id}`), (currentItem) => {
+    dbOp(owner.sdk.runTransaction(owner.sdk.ref<ParcelRow>(owner.db, `zoew_scan_history_cod_dod/${item.id}`), (currentItem) => {
         if (!trashGenerationOwnerCurrent(owner) || !clock.current() || activeClearHistoryClaims.has(item.id)) return;
         if (rowOperationActive(currentItem)) return;
         if (!currentItem || !clearHistoryClaimValid(currentItem.clearClaim)) return;
@@ -120,7 +122,7 @@ export async function claimHistoryItemForClear(id, token, owner = captureTrashGe
     clearTokenOwners.set(id, { token, owner });
     activeClearHistoryClaims.set(id, token);
     let result;
-    try { result = await dbOp(owner.sdk.runTransaction(owner.sdk.ref(owner.db, path), currentItem => {
+    try { result = await dbOp(owner.sdk.runTransaction(owner.sdk.ref<ParcelRow>(owner.db, path), currentItem => {
         if (!resume && !clock.current()) { status = 'CLEAR_HISTORY_CLOCK_CHANGED'; return; }
         if (!trashGenerationOwnerCurrent(owner) || !currentItem || !cleanupAdmissionMatches(expected, currentItem)) return;
         if (rowOperationActive(currentItem)) { status = 'ROW_OPERATION_BUSY'; return; }
@@ -142,7 +144,7 @@ export async function claimHistoryItemForClear(id, token, owner = captureTrashGe
 
 export async function clearClearHistoryFinalization(id, token, owner = captureTrashGenerationOwner()) {
     if (!trashGenerationOwnerCurrent(owner)) throw new Error('CLEAR_HISTORY_SESSION_SWITCHED');
-    await dbOp(owner.sdk.runTransaction(owner.sdk.ref(owner.db, `zoew_clear_history_finalizations/${id}`), (currentFinalization) => {
+    await dbOp(owner.sdk.runTransaction(owner.sdk.ref<BackendFinalization>(owner.db, `zoew_clear_history_finalizations/${id}`), (currentFinalization) => {
         if (!trashGenerationOwnerCurrent(owner)) return;
         if (!currentFinalization || currentFinalization.token !== token) return;
         return null;
@@ -199,7 +201,7 @@ export async function finalizeClaimedHistoryClear(id, token, trashItem, owner = 
 export async function releaseOwnClearHistoryClaim(id, token, owner = captureTrashGenerationOwner()) {
     if (!trashGenerationOwnerCurrent(owner)) throw new Error('CLEAR_HISTORY_SESSION_SWITCHED');
     let released = false;
-    const result = await dbOp(owner.sdk.runTransaction(owner.sdk.ref(owner.db, `zoew_scan_history_cod_dod/${id}`), (currentItem) => {
+    const result = await dbOp(owner.sdk.runTransaction(owner.sdk.ref<ParcelRow>(owner.db, `zoew_scan_history_cod_dod/${id}`), (currentItem) => {
         released = false;
         if (!trashGenerationOwnerCurrent(owner)) return;
         if (rowOperationActive(currentItem)) return;

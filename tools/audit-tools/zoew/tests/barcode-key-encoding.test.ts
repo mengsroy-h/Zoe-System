@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { describe, it, expect } from 'vitest';
 import { barcodeRegistryKey, claimBarcodeInRegistry, isBarcodeAlreadyUsed } from '../../../../ZoeW/src/domain/registry';
 import { collectPickupMarks, applyPickupMarksToSet, buildPickupRecordFromSet } from '../../../../ZoeW/src/domain/pickup';
@@ -25,7 +26,7 @@ describe('Registry/pickup barcode identity, using actual domain functions', () =
     const docs = new Map();
     const oldFb = firebaseState.fb, oldDb = firebaseState.db, oldHistory = dataState.scanHistory, oldTrash = dataState.deletedItems;
     try {
-      firebaseState.db = {};
+      setPartialBackendFixtureValue(firebaseState, "db", {});
       firebaseState.fb = { ref: (_: any, path: string) => ({ path }), runTransaction: async (ref: any, fn: any) => {
         const current = docs.get(ref.path) ?? null;
         const next = fn(current);

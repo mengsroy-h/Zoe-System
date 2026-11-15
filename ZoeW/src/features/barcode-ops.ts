@@ -26,6 +26,7 @@ import { getManualZtoTrashMode } from './lookup-config';
 import { admitPriceOperation, capturePriceOperation, priceOperationCurrent } from '../services/row-operation-lock';
 import { finishPriceOperation, withPriceOperationLock } from '../services/price-operation';
 import { readRestoreServerNode } from './restore';
+import { parseParcelNumber } from '../domain/parcel-number';
 
 export function openViewListModal(id?) {
     uiState.activeParentItemId = id;
@@ -37,8 +38,8 @@ export function openViewListModal(id?) {
     ensureBarcodeArrayForItem(item);
 
     uiState.viewListView = item.barcodes.map((b, idx) => {
-        const itemCod = parseFloat(b.cod) || 0;
-        const itemDod = parseFloat(b.dod) || 0;
+        const itemCod = parseParcelNumber(b.cod) || 0;
+        const itemDod = parseParcelNumber(b.dod) || 0;
         const isBcClosed = b.isClosed || false;
         const bcMoneyClass = isBcClosed ? 'money-collected' : 'money-pending';
         const bcCodRiel = Math.round(itemCod * dataState.exchangeRateRiel);
@@ -622,8 +623,8 @@ export function openEditBarcodePriceModal(itemId?, code?) {
 
     let barcodeList = item.barcodes || [{ code: item.barcode, cod: item.cod || 0, dod: item.dod || 0, isDeducted: false }];
     let targetB = barcodeList.find(b => b.code === code);
-    let currentCod = targetB ? (parseFloat(targetB.cod) || 0) : 0;
-    let currentDod = targetB ? (parseFloat(targetB.dod) || 0) : 0;
+    let currentCod = targetB ? (parseParcelNumber(targetB.cod) || 0) : 0;
+    let currentDod = targetB ? (parseParcelNumber(targetB.dod) || 0) : 0;
 
     viewState.editBcPcText = domText(code);
     setFieldValue('editBcCodInput', String(currentCod));

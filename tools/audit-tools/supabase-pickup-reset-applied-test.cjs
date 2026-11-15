@@ -194,8 +194,13 @@ async function main() {
         check('foreign authenticated tenant cannot read original proof', foreign.error?.code === 'PT409', foreign);
         await c.query("update public.zoe_ops set created_at=now()-interval '3 days' where tenant_id=$1 and op_id=$2", [A, first.attemptId]);
         await c.query('select private.zoe_housekeeping($1)', [A]);
+        const historicalFirst = await c.query(`with gone as (delete from public.zoe_ops where tenant_id=$1 and op_id=$2
+            returning private.zoe_op_bytes(op_id,result) as bytes)
+            update public.zoe_tenant_state set bytes=bytes-coalesce((select sum(bytes) from gone),0)
+            where tenant_id=$1 returning (select count(*)::int from gone) as removed`, [A, first.attemptId]);
         const expiredBefore = await snapshot(), expired = await call('status', first), staleExecute = await call('execute', first);
-        check('expired receipt UNKNOWN and delayed original CAS cannot reset newer pickup', expired.reset?.outcome === 'unknown' && expired.reset.proof === 'none'
+        check('historically missing receipt UNKNOWN and delayed original CAS cannot reset newer pickup', historicalFirst.rows[0].removed === 1
+            && expired.reset?.outcome === 'unknown' && expired.reset.proof === 'none'
             && expired.docs?.length === 0 && staleExecute.conflict === true && isDeepStrictEqual(await snapshot(), expiredBefore), { expired, staleExecute });
         const rebound = clone(first); rebound.casText = JSON.stringify({ ...rebound.operation, x: later, v: cleared(later) });
         const reboundResult = await call('execute', rebound);
@@ -422,9 +427,14 @@ async function main() {
             && callCounts.execute === executesBeforeRead && isDeepStrictEqual(await snapshot(lostAck.tenant), beforeRead), proven);
         await c.query("update public.zoe_ops set created_at=now()-interval '3 days' where tenant_id=$1 and op_id=$2", [lostAck.tenant, lostAck.req.attemptId]);
         await c.query('select private.zoe_housekeeping($1)', [lostAck.tenant]);
+        const historicalLost = await c.query(`with gone as (delete from public.zoe_ops where tenant_id=$1 and op_id=$2
+            returning private.zoe_op_bytes(op_id,result) as bytes)
+            update public.zoe_tenant_state set bytes=bytes-coalesce((select sum(bytes) from gone),0)
+            where tenant_id=$1 returning (select count(*)::int from gone) as removed`, [lostAck.tenant, lostAck.req.attemptId]);
         const unknownBefore = await snapshot(lostAck.tenant), executesBeforeUnknown = callCounts.execute;
         const missingOne = await call('status', lostAck.req, lostAck.who), missingTwo = await call('status', lostAck.req, lostAck.who);
-        check('postGC UNKNOWN probes remain read-only and never dispatch recovery execute in direct API control', missingOne.reset?.outcome === 'unknown'
+        check('historically missing UNKNOWN probes remain read-only and never dispatch recovery execute in direct API control', historicalLost.rows[0].removed === 1
+            && missingOne.reset?.outcome === 'unknown'
             && missingTwo.reset?.outcome === 'unknown' && missingOne.reset.proof === 'none' && missingTwo.reset.proof === 'none'
             && callCounts.execute === executesBeforeUnknown && isDeepStrictEqual(await snapshot(lostAck.tenant), unknownBefore), { missingOne, missingTwo });
         const concurrentQuota = await quotaFixture('concurrent quota rollback', empty);
@@ -609,10 +619,14 @@ async function main() {
                 && isDeepStrictEqual(await snapshot(fixture.tenant), beforeReplay), { replayed, status });
             await c.query("update public.zoe_ops set created_at=now()-interval '3 days' where tenant_id=$1 and op_id=$2", [fixture.tenant, typedRequest.attemptId]);
             await c.query('select private.zoe_housekeeping($1)', [fixture.tenant]);
+            const historicalComposed = await c.query(`with gone as (delete from public.zoe_ops where tenant_id=$1 and op_id=$2
+                returning private.zoe_op_bytes(op_id,result) as bytes)
+                update public.zoe_tenant_state set bytes=bytes-coalesce((select sum(bytes) from gone),0)
+                where tenant_id=$1 returning (select count(*)::int from gone) as removed`, [fixture.tenant, typedRequest.attemptId]);
             const gcBefore = await snapshot(fixture.tenant), gcExecutes = callCounts.execute;
             const gcOne = await call('status', typedRequest, fixture.who), gcTwo = await call('status', typedRequest, fixture.who);
-            check('postGC matching embedded day proof NEVER substitutes for missing SQL operation receipt',
-                isDeepStrictEqual((await valueOf(fixture.tenant)).pickupResetApplied, expectedDayProof)
+            check('matching embedded day proof NEVER substitutes for historically missing SQL operation receipt',
+                historicalComposed.rows[0].removed === 1 && isDeepStrictEqual((await valueOf(fixture.tenant)).pickupResetApplied, expectedDayProof)
                 && gcOne.reset?.outcome === 'unknown' && gcTwo.reset?.outcome === 'unknown'
                 && gcOne.reset.proof === 'none' && gcTwo.reset.proof === 'none' && gcOne.docs?.length === 0 && gcTwo.docs?.length === 0
                 && callCounts.execute === gcExecutes && isDeepStrictEqual(await snapshot(fixture.tenant), gcBefore), { gcOne, gcTwo });

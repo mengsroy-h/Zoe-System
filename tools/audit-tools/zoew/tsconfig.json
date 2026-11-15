@@ -3,5 +3,6 @@
   "compilerOptions": {
     "tsBuildInfoFile": "../../../ZoeW/node_modules/.cache/zoew-audit.tsbuildinfo"
   },
-  "include": ["tests", "runtime", "vitest.config.mts", "../../../ZoeW/src/types"]
+  "include": ["tests", "runtime", "vitest.config.mts", "../../../ZoeW/src/types"],
+  "exclude": ["tests/parcel-domain-strict.typecheck.ts"]
 }

@@ -33,6 +33,7 @@ const SIGN_STATUS_RECHECK_MS = 300000;
 const PHOTO_GRACE_CHECKS = 5;
 const PHOTO_POLL_DELAYS = [15000, 30000, 60000, 120000, 300000];
 const DISPATCH_REFRESH_GAP_MS = 300000;
+const UNVERIFIED_OPEN_SIGN_TEXT = '⚠️ ZTO បង្ហាញថា Sign រួច តែរូបដើមមិនទាន់ផ្ទៀងត្រូវ។ កញ្ចប់ក្នុង ZoeW មិនទាន់បិទ។ រូប និងសំណើដើមនៅរក្សាទុក; សូមពិនិត្យស្ថានភាព មិនផ្ញើ Sign ស្ទួន។';
 
 function pendingDeadline(deadline: number, now: number, maximum: number) {
     return Number.isFinite(deadline) && deadline > now && deadline - now <= maximum;
@@ -273,16 +274,23 @@ function retainedParcelCurrent(job: SignJob) {
         || !!trash && !trash.restoreClaim && !trash.restoreClaimId && !trash.restoreClaimToken;
 }
 
+function originalParcelIsOpen(job: SignJob) {
+    const item = dataState.scanHistory.find(row => row.id === job.itemId);
+    const barcode = item?.barcodes?.find(entry => entry.code === job.code && barcodeSignIdentity(item, entry) === job.parcelIdentity);
+    return !!barcode && !barcode.isClosed;
+}
+
 async function retainSignedJob(op: NonNullable<ReturnType<typeof context>>, value: StoredSignJob, check: SignRecoveryCheck) {
     if (!op.current() || !check.signedStatusVerified || !retainedParcelCurrent(value.job)) return false;
     const clock = captureClockOperation();
     const existing = Number.isFinite(value.job.signedVerifiedAt) && value.job.signedVerifiedAt! > 0;
     const verifiedAt = existing ? value.job.signedVerifiedAt : cleanupClockIsTrustworthy() && clock.current() ? getServerNow() : undefined;
+    const unverifiedOpen = !check.photoVerified && originalParcelIsOpen(value.job);
     await updateJob({ ...op, current: () => op.current() && retainedParcelCurrent(value.job)
-        && (existing || verifiedAt === undefined || clock.current() && cleanupClockIsTrustworthy()) }, value, { recovery: { ...(value.job.recovery || { archivedAt: Date.now(), previousPhase: value.job.phase, previousMessage: value.job.message }), dismissed: true },
+        && (existing || verifiedAt === undefined || clock.current() && cleanupClockIsTrustworthy()) }, value, { recovery: { ...(value.job.recovery || { archivedAt: Date.now(), previousPhase: value.job.phase, previousMessage: value.job.message }), dismissed: !unverifiedOpen },
         phase: 'action', readOnlyProbe: true, continueRequested: false, continuationAllowed: false,
         recoveryCheck: { ...check, continuation: undefined }, signedCleanupConfirmed: true, signedVerifiedAt: verifiedAt,
-        signedCleanupAt: verifiedAt ? verifiedAt + SIGN_CLEANUP_MS : undefined, message: '✅ ZTO បញ្ជាក់ Sign រួច។ ការងារ រូបដើម និងប្រវត្តិក្នុងឧបករណ៍នឹងលុបអចិន្ត្រៃយ៍ក្រោយ 24 ម៉ោង។' });
+        signedCleanupAt: verifiedAt ? verifiedAt + SIGN_CLEANUP_MS : undefined, message: unverifiedOpen ? UNVERIFIED_OPEN_SIGN_TEXT : '✅ ZTO បញ្ជាក់ Sign រួច។ ការងារ រូបដើម និងប្រវត្តិក្នុងឧបករណ៍នឹងលុបអចិន្ត្រៃយ៍ក្រោយ 24 ម៉ោង។' });
     return true;
 }
 
@@ -368,6 +376,10 @@ async function finishLocal(op: NonNullable<ReturnType<typeof context>>, value: S
         return op.current() && !!barcode && barcodeSignIdentity(item, barcode) === value.job.parcelIdentity;
     };
     if (!current()) { if (op.current()) await checkTrashedParent(op, value); return; }
+    if (!value.job.photoVerified) {
+        await waitForPhoto(op, value, originalParcelIsOpen(value.job) ? UNVERIFIED_OPEN_SIGN_TEXT : '✅ Sign រួច · ⏳ រង់ចាំផ្ទៀងរូបដើមពី ZTO; រូបនៅរក្សាទុក');
+        return;
+    }
     if (await recordPalmSignResult(value.job.itemId, value.job.code, current, value.job.parcelIdentity) && current()) {
         if (!value.job.photoVerified) {
             await waitForPhoto(op, value, '✅ Sign រួច · ⏳ រង់ចាំផ្ទៀងរូបដើមពី ZTO; រូបនៅរក្សាទុក');
@@ -684,8 +696,9 @@ async function publish(op: ConnectionView, loaded?: Awaited<ReturnType<typeof re
 }
 
 function signQueueView(op: ConnectionView, row: StoredSignJob['row'], job: SignJob): SignQueueView {
+    const unverifiedOpen = signedEvidence(job) && !(job.recoveryCheck?.photoVerified ?? job.photoVerified === true) && originalParcelIsOpen(job);
     return ({ id: row.id, code: job.code, signMan: job.signMan, phase: job.phase, recovery: !!job.recovery,
-        cleanupAt: job.signedCleanupAt, dismissed: job.recovery?.dismissed === true, signed: job.recoveryCheck?.signed ?? (signedEvidence(job) ? true : undefined),
+        cleanupAt: job.signedCleanupAt, dismissed: !unverifiedOpen && job.recovery?.dismissed === true, signed: job.recoveryCheck?.signed ?? (signedEvidence(job) ? true : undefined),
         statusUnavailable: job.recoveryCheck?.statusUnavailable === true || job.recoveryCheck?.statusChecked === true && job.recoveryCheck.signed === undefined,
         photoVerified: job.recoveryCheck?.photoVerified ?? job.photoVerified === true,
         restartAllowed: sameConnection(job, op) && restartEligible(job), restartPending: job.restartIntent?.pending === true,
@@ -694,8 +707,8 @@ function signQueueView(op: ConnectionView, row: StoredSignJob['row'], job: SignJ
         recoveryContinuation: !job.restartIntent?.pending && !!job.recovery && !!job.recoveryCheck?.continuation && !signedEvidence(job),
         continuationAllowed: job.continuationAllowed === true && !job.refreshStage,
         verificationRequired: job.verificationRequired, manualReviewReason: job.manualReviewReason,
-        message: sameConnection(job, op) ? job.message : '⚠️ ការភ្ជាប់ ZTO ប្រែ។ សូមស្តារការភ្ជាប់ដើមដើម្បីបន្ត Sign។',
-        warning: !job.recovery && job.warningToken && job.manualReviewReason !== 'parent_in_trash' ? job.message : '', busy: pendingDeadline(row.leaseUntil, Date.now(), SIGN_OUTBOX_LEASE_MS) || busyActions.has(row.id) || activeJobs.has(row.id) });
+        message: sameConnection(job, op) ? unverifiedOpen ? UNVERIFIED_OPEN_SIGN_TEXT : job.message : '⚠️ ការភ្ជាប់ ZTO ប្រែ។ សូមស្តារការភ្ជាប់ដើមដើម្បីបន្ត Sign។',
+        warning: job.recovery && unverifiedOpen ? UNVERIFIED_OPEN_SIGN_TEXT : !job.recovery && job.warningToken && job.manualReviewReason !== 'parent_in_trash' ? job.message : '', busy: pendingDeadline(row.leaseUntil, Date.now(), SIGN_OUTBOX_LEASE_MS) || busyActions.has(row.id) || activeJobs.has(row.id) });
 }
 
 export async function refreshPalmSignQueue() {
@@ -931,6 +944,15 @@ async function recoverQueuedSign(id: string, resume: boolean) {
             message: '⏳ កំពុងផ្ទៀងស្ថានភាព និងសិទ្ធិសំណើដើម; មិនផ្ញើ Sign។' }, 0, Date.now() + SIGN_OUTBOX_LEASE_MS);
         const check = await inspectRecovery(op, value);
         if (!op.current()) return;
+        if (check.photoVerified && check.signedStatusVerified
+            && (!value.job.photoVerified && originalParcelIsOpen(value.job)
+                || value.job.photoVerified && value.job.scanCompleted && !value.job.signedCleanupConfirmed)) {
+            await updateJob(op, value, { photoVerified: true, scanCompleted: true, recoveryCheck: check,
+                recovery: { ...value.job.recovery, dismissed: false }, signedCleanupConfirmed: false, signedCleanupAt: undefined,
+                message: '✅ Sign និងរូបដើមបានផ្ទៀង · ⏳ រង់ចាំរក្សាទុកក្នុង ZoeW' }, 0, value.row.leaseUntil);
+            await finishLocal(op, value);
+            return;
+        }
         if (await retainSignedJob(op, value, check)) return;
         if (!check.statusUnavailable && check.signed === false) await updateJob(op, value, { signedCleanupConfirmed: false, signedCleanupAt: undefined, signedVerifiedAt: undefined }, 0, value.row.leaseUntil);
         if (resume && check.continuation && check.signed === false && !signedEvidence(value.job) && recoveryParentCurrent(value.job)) {

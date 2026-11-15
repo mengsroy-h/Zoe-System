@@ -1,0 +1,15 @@
+{
+  "extends": "../../../ZoeW/tsconfig.app.json",
+  "compilerOptions": {
+    "strictNullChecks": true,
+    "noImplicitAny": true,
+    "useUnknownInCatchVariables": true,
+    "tsBuildInfoFile": "../../../ZoeW/node_modules/.cache/zoew-domain-strict.tsbuildinfo"
+  },
+  "include": [
+    "../../../ZoeW/src/domain/parcel.ts",
+    "../../../ZoeW/src/domain/parcel-number.ts",
+    "../../../ZoeW/src/domain/barcode-key.ts",
+    "tests/parcel-domain-strict.typecheck.ts"
+  ]
+}

@@ -348,7 +348,7 @@ describe('App កំណែចាស់សរសេរ record ថ្ងៃដោ�
 });
 
 describe('ការស្តារ ៖ បូកវិញតាមសោ · មិនបូកវិញពីរដង', () => {
-    it('HOLD មុន collected · ៨. flip ចុះ តែ App ស្លាប់មុនសម្អាត journal ➜ ស្តារ (+១០ តាម flag) ➜ journal រត់ម្តងទៀតមិនបូកវិញលើកទី ២ (១០០ មិនមែន ១១០)', async () => {
+    it('៨. flip ចុះ តែ App ស្លាប់មុនសម្អាត journal ➜ Restore receipt បញ្ចប់ journal ដោយមិនបូកប្រាក់ស្ទួន', async () => {
         seed([expiredItem()]);
         let flipJournal: Record<string, string> | null = null;
         lab.beforeTx = (path) => {
@@ -365,13 +365,14 @@ describe('ការស្តារ ៖ បូកវិញតាមសោ · ម�
         expect(getAt(TRASH + '/' + ID)).toBeNull();
         expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
         syncLocalViewsFromServer();
-        const pendingBeforeResume = cleanupStorageSnapshot();
+        expect(Object.keys(cleanupStorageSnapshot())).toHaveLength(1);
         await resumeCleanupJournalEntry(ID);
         await flush();
         expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
-        expect(readCleanupJournal().length).toBe(1);
+        expect(getAt('zoew_trash_consumptions/' + ID)?.kind).toBe('restore');
+        expect(readCleanupJournal().length).toBe(0);
         for (let attempt = 0; attempt < 3; attempt++) await resumeCleanupJournalEntry(ID);
-        expect(cleanupStorageSnapshot()).toEqual(pendingBeforeResume);
+        expect(cleanupStorageSnapshot()).toEqual({});
         expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
     }, 20000);
 
@@ -415,7 +416,7 @@ describe('ការស្តារ ៖ បូកវិញតាមសោ · ម�
         expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
     }, 20000);
 
-    it('HOLD មុន collected · ៩ខ. ដូចគ្នា តែ journal នៅរស់ ➜ ស្តារតាមសោ ➜ journal រត់ក្រោយ មិនបូកវិញលើកទី ២', async () => {
+    it('៩ខ. journal នៅរស់ ➜ Restore តាមសោ ➜ recovery បញ្ចប់ journal ដោយមិនបូកប្រាក់ស្ទួន', async () => {
         seed([expiredItem()]);
         lab.plan = { flip: 'hang' };
         claimAndCleanupItem(ID, 'abandon');
@@ -424,17 +425,18 @@ describe('ការស្តារ ៖ បូកវិញតាមសោ · ម�
         await restoreOnOtherDevice(ID);
         expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
         syncLocalViewsFromServer();
-        const pendingBeforeResume = cleanupStorageSnapshot();
+        expect(Object.keys(cleanupStorageSnapshot())).toHaveLength(1);
         await resumeCleanupJournalEntry(ID);
         await flush();
         expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
-        expect(readCleanupJournal().length).toBe(1);
+        expect(getAt('zoew_trash_consumptions/' + ID)?.kind).toBe('restore');
+        expect(readCleanupJournal().length).toBe(0);
         for (let attempt = 0; attempt < 3; attempt++) await resumeCleanupJournalEntry(ID);
-        expect(cleanupStorageSnapshot()).toEqual(pendingBeforeResume);
+        expect(cleanupStorageSnapshot()).toEqual({});
         expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
     }, 20000);
 
-    it('HOLD មុន collected · ១០. ទិដ្ឋភាពចាស់ ➜ ស្តារអានសោ server ថ្មី ➜ បូកថ្ងៃនិងខែតែម្តង · journal មិនបូកស្ទួន', async () => {
+    it('១០. ទិដ្ឋភាពចាស់ ➜ Restore អានសោ Server ថ្មី ➜ recovery បញ្ចប់ journal ដោយប្រាក់ថ្ងៃនិងខែមិនស្ទួន', async () => {
         seed([expiredItem()]);
         lab.plan = { flip: 'hang' };
         claimAndCleanupItem(ID, 'abandon');
@@ -453,13 +455,13 @@ describe('ការស្តារ ៖ បូកវិញតាមសោ · ម�
         resumeCleanupJournalEntry(ID);
         await flush();
         reloadPage();
-        const pendingBeforeResume = cleanupStorageSnapshot();
         await resumeCleanupJournalEntry(ID);
         await flush();
         expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
-        expect(readCleanupJournal().length).toBe(1);
+        expect(getAt('zoew_trash_consumptions/' + ID)?.kind).toBe('restore');
+        expect(readCleanupJournal().length).toBe(0);
         for (let attempt = 0; attempt < 3; attempt++) await resumeCleanupJournalEntry(ID);
-        expect(cleanupStorageSnapshot()).toEqual(pendingBeforeResume);
+        expect(cleanupStorageSnapshot()).toEqual({});
         expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
     }, 20000);
 
@@ -726,7 +728,7 @@ describe('M4 ៖ ដកកញ្ចប់បិទ · App បិទកណ្ត�
         const a = { ...barcode('A', cod, at), isClosed: true, closedAt: at + 60000 };
         return { id, phone: '012', scanDate: DAY, time: a.time, createdAt: at, count: 1, cod, dod: 0, price: cod, isClosed: true, closedAt: a.closedAt, isCalled: false, barcode: 'A', barcodes: [a] };
     }
-    it('HOLD មុន collected · ថ្ងៃចុះ ចម្លើយបាត់ · App បិទ ➜ ស្តារលើឧបករណ៍ផ្សេង ➜ resume ម្តងហើយម្តងទៀត ៖ journal នៅដដែល · គ្មាន «unverified» · ១០០/១០', async () => {
+    it('ថ្ងៃចុះ ចម្លើយបាត់ · App បិទ ➜ Restore លើឧបករណ៍ផ្សេង ➜ receipt បញ្ចប់ journal ស្ងាត់ ដោយប្រាក់មិនស្ទួន', async () => {
         seed([closedItem()]);
         lab.plan = { daily: 'applyHang' };
         void removeSingleBarcode(ID, 'A');
@@ -741,7 +743,7 @@ describe('M4 ៖ ដកកញ្ចប់បិទ · App បិទកណ្ត�
         const back = Object.values(getAt(HISTORY) || {}).flatMap((it: any) => it.barcodes || []).filter((b: any) => b.code === 'A');
         expect(back.map((b: any) => [b.isClosed, b.restoredAt === undefined])).toEqual([[true, true]]);
         uiState.toasts = [];
-        const pendingBeforeResume = cleanupStorageSnapshot();
+        expect(Object.keys(cleanupStorageSnapshot())).toHaveLength(1);
         for (let i = 0; i < CLEANUP_LEDGER_RETRY_MAX + 2; i++) {
             reloadPage();
             await resumeInterruptedCleanups();
@@ -749,8 +751,9 @@ describe('M4 ៖ ដកកញ្ចប់បិទ · App បិទកណ្ត�
         }
         const alarms = (window as any).ZoeErrors.capture.mock.calls.filter((call: any[]) => /unverified/.test(String(call[1] && call[1].context)));
         expect({ journal: readCleanupJournal().length, alarms: alarms.length, warned: uiState.toasts.some((t: any) => /មិនអាចផ្ទៀងផ្ទាត់/.test(t.msg)), money: money() })
-            .toEqual({ journal: 1, alarms: 0, warned: false, money: { day: [100, 10], month: [100, 10] } });
-        expect(cleanupStorageSnapshot()).toEqual(pendingBeforeResume);
+            .toEqual({ journal: 0, alarms: 0, warned: false, money: { day: [100, 10], month: [100, 10] } });
+        expect(getAt('zoew_trash_consumptions/' + trashId)?.kind).toBe('restore');
+        expect(cleanupStorageSnapshot()).toEqual({});
     }, 30000);
 });
 

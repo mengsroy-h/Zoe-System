@@ -1,6 +1,7 @@
 import { createStore, registerStore } from './store';
 import { appLocalStore, safeStoreGet } from './storage';
 import { ACTIVE_LOCKER_KEY, ENTRY_SCAN_MODE_KEY } from './storage-keys';
+import type { DeletedParcelRow, ParcelRow } from '../domain/parcel';
 
 void ACTIVE_LOCKER_KEY; void ENTRY_SCAN_MODE_KEY; void appLocalStore; void safeStoreGet;
 
@@ -132,8 +133,8 @@ registerStore(firebaseState);
 export interface DataState {
     exchangeRateRiel: any;
     exchangeRateObservedVersion: number;
-    scanHistory: any[];
-    deletedItems: any[];
+    scanHistory: ParcelRow[];
+    deletedItems: DeletedParcelRow[];
     dailyRevenueData: Record<string, any>;
     monthlyRevenueData: Record<string, any>;
     dailyPickupData: Record<string, any>;

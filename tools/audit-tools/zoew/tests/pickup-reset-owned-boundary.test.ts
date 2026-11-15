@@ -141,6 +141,27 @@ it.each(['session', 'caller'])('owned %s ending during synthetic token await nev
     await expect(pending).rejects.toMatchObject({ txOutcome: 'not-applied' });
     expect(raw.runTransaction).not.toHaveBeenCalled(); expect(fetches).not.toHaveBeenCalled();
 });
+it.each([false, true])('owned late Auth token after another Reset never erases newer pickup (endedSession=%s)', async endedSession => {
+    const original = await request(), replacement = await request(), token = deferred<any>();
+    replacement.context.nonce = 'newer-reset-nonce';
+    replacement.attemptId = await pickupResetAttemptId(replacement.tenant, replacement.actorUid, replacement.context, replacement.casText);
+    const proof = pickupResetAppliedReceipt(TENANT, UID, replacement.context, replacement.attemptId, replacement.casText, 'native-day');
+    auth.currentUser.getIdTokenResult.mockImplementationOnce(() => token.promise);
+    const pending = sdk.executePickupReset(ref, original, () => true).catch(error => error);
+    expect(auth.currentUser.getIdTokenResult).toHaveBeenCalledTimes(1);
+    server = { ...desired(), pickupResetApplied: proof, pickupRevision: 6, packagesPickedUp: 1,
+        pickedUpPhones: { AFTER: 1 }, pickedUpBarcodes: { AFTER: 'AFTER' } };
+    dataState.dailyPickupData = { [DAY]: clone(server) };
+    const physical = clone(server), view = clone(dataState.dailyPickupData);
+    if (endedSession) firebaseState.authGeneration++;
+    token.resolve({ claims: { aud: TENANT } });
+    const result = await pending;
+    if (endedSession) expect(result).toMatchObject({ txOutcome: 'not-applied' });
+    else expect(result).toMatchObject({ committed: false });
+    expect(server).toEqual(physical); expect(dataState.dailyPickupData).toEqual(view);
+    expect(raw.runTransaction).toHaveBeenCalledTimes(endedSession ? 0 : 1);
+    expect(raw.update).not.toHaveBeenCalled(); expect(raw.set).not.toHaveBeenCalled(); expect(fetches).not.toHaveBeenCalled();
+});
 it('owned request bytes are copied before token await and caller mutation cannot rebind nonce', async () => {
     const original = await request(), originalNonce = original.context.nonce, token = deferred<any>();
     auth.currentUser.getIdTokenResult.mockImplementationOnce(() => token.promise);

@@ -4,7 +4,8 @@
 #    ផ្សេង ➜ អ្នកប្រើត្រូវលុប App ចាស់ ➜ បាត់ការចូលប្រព័ន្ធ · PIN · និង **កៅអី License** (Device ID ថ្មី)។
 #    ដូច្នេះ ៖ គ្មាន keystore ➜ **មិន build** (⛔ គ្មានការធ្លាក់ចុះទៅ debug key ដែលប្រែរាល់ការរត់)។
 #
-# Secret ៥ ដែលត្រូវកំណត់ក្នុង Settings ➜ Secrets and variables ➜ Actions (មើល docs/zoew/ANDROID.md) ៖
+# Secret នៅ Settings ➜ Environments (មើល docs/zoew/ANDROID.md) ៖ main ប្រើ android-signing;
+# branch សាកប្រើ android-signing-preview ដែលត្រូវការម្ចាស់អនុម័ត និងគ្មាន ZOE_RELEASES_TOKEN។
 #   · ZOEW_KEYSTORE_BASE64   — ឯកសារ keystore (.jks) ជា base64
 #   · ZOEW_KEYSTORE_PASSWORD — ពាក្យសម្ងាត់ keystore
 #   · ZOEW_KEY_ALIAS         — ឈ្មោះ key
@@ -38,6 +39,7 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 env:
   ZOE_RELEASES_REPO: mengsroy-h/Zoe-System-releases
@@ -55,6 +57,7 @@ jobs:
     name: Build APK ➜ GitHub Release
     needs: ci-config
     if: (vars.ZOE_RUNNER_MODE == 'github' || github.event.repository.private == true) && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
+    environment: ${{ github.ref == 'refs/heads/main' && 'android-signing' || 'android-signing-preview' }}
     runs-on: ${{ fromJSON(vars.ZOE_RUNNER_MODE == 'github' && '["windows-latest"]' || '["self-hosted","Windows","X64","windows-zoe-android"]') }}
     timeout-minutes: 45
     steps:
@@ -82,6 +85,11 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
+
+      - name: ផ្ទៀងការការពារ signing environment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node tools/audit-tools/android-signing-preflight.cjs
 
       - name: ពិនិត្យ GitHub CLI
         run: |

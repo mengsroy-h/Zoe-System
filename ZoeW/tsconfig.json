@@ -6,6 +6,9 @@
     },
     {
       "path": "../tools/audit-tools/zoew/tsconfig.json"
+    },
+    {
+      "path": "../tools/audit-tools/zoew/tsconfig.domain-strict.json"
     }
   ]
 }

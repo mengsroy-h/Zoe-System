@@ -98,7 +98,7 @@ export function restorePendingCode(item, code) {
 }
 
 export const restoreCancellationInFlight = new Set();
-export const restoreRecoveryHolds = new Set();
+export const restoreRecoveryHolds = new Set<string>();
 export const RESTORE_ZTO_NEEDS_LOOKUP_TEXT = '⚠️ ហាងនេះប្រើ ZTO ៖ ស្តារពីឧបករណ៍ដែលភ្ជាប់ ZTO Lookup ដើម្បីផ្ទៀងស្ថានភាព Sign មុន។';
 export const RESTORE_ZTO_UNCONFIRMED_TEXT = '⚠️ ZTO មិនអាចបញ្ជាក់ថាកញ្ចប់នេះមិនទាន់ Sign (ឧ. កញ្ចប់សាខាផ្សេង ឬ Function មិនទាន់កំណត់ស្ថានភាព Sign) — មិនស្តារដើម្បីការពារប្រាក់។';
 export const RESTORE_SHOP_MODE_UNSYNCED_TEXT = '⏳ ការកំណត់ ZTO របស់ហាងមិនទាន់ Sync — សូមរង់ចាំបន្តិច ហើយស្តារម្តងទៀត។';
@@ -237,11 +237,11 @@ export async function resumeBlockedRestoreCancellations() {
     for (const item of rows) {
         if (!current()) return;
         if (!restoreAwaitsCancellation(dataState.deletedItems.find(entry => entry?.id === item.id))) continue;
-        const outcome = await cancelBlockedRestore(item.id, item.restoreClaim.token, { evidenceOnly: true });
+        const outcome = await cancelBlockedRestore(item.id, typeof item.restoreClaim === 'string' ? undefined : item.restoreClaim.token, { evidenceOnly: true });
         if (!current()) return;
         if (outcome === 'recovery-required' && !restoreRecoveryHolds.has(item.id)) {
             restoreRecoveryHolds.add(item.id);
-            if (window.ZoeErrors) ZoeErrors.capture(new Error('Restore held: prepared row cannot be cancelled'), { zone: 'money', context: 'resumeBlockedRestoreCancellations', itemId: item.id, targetId: item.restoreClaim.targetId || '' });
+            if (window.ZoeErrors) ZoeErrors.capture(new Error('Restore held: prepared row cannot be cancelled'), { zone: 'money', context: 'resumeBlockedRestoreCancellations', itemId: item.id, targetId: typeof item.restoreClaim === 'string' ? '' : item.restoreClaim.targetId || '' });
             showToast(RESTORE_RECOVERY_REQUIRED_TEXT);
         }
     }

@@ -472,13 +472,18 @@ async function behavior(index, f, id) {
         check(id('retained-old-sql-receipt-still-applied'), oldBeforeGC.outcome === 'applied' && equal(oldBeforeGC.pickupReset, await bound(a, req)));
         const aged = await c.query("update public.zoe_ops set created_at=now()-interval '3 days' where tenant_id=$1 and op_id=$2 returning op_id", [f.tenant, req.attemptId]);
         await c.query('select private.zoe_housekeeping($1)', [f.tenant]);
+        const historicalRemoved = await c.query(`with gone as (delete from public.zoe_ops where tenant_id=$1 and op_id=$2
+            returning private.zoe_op_bytes(op_id,result) as bytes)
+            update public.zoe_tenant_state set bytes=bytes-coalesce((select sum(bytes) from gone),0)
+            where tenant_id=$1 returning (select count(*)::int from gone) as removed`, [f.tenant, req.attemptId]);
         const gcState = await snapshot(f.tenant);
-        check(id('owned-expired-original-receipt-gc-only'), aged.rowCount === 1 && !gcState.ops.some(row => row.op_id === req.attemptId) && gcState.ops.some(row => row.op_id === newer.request.attemptId));
+        check(id('owned-expired-original-receipt-gc-only'), aged.rowCount === 1 && historicalRemoved.rows[0].removed === 1
+            && !gcState.ops.some(row => row.op_id === req.attemptId) && gcState.ops.some(row => row.op_id === newer.request.attemptId));
         const before = await snapshot(f.tenant), rpcBefore = resetCalls(a).length, unknown = await status(a, req), resumed = await task(a, a.api.resumePickupResetOutcomes());
         check(id('old-status-unknown'), unknown.outcome === 'unknown' && unknown.pickupReset === null);
         check(id('original-held'), resumed.held === true && pending(a)[0].value.days[0].attempts[0].outcome === 'pending' && resetCalls(a).slice(rpcBefore).every(row => row.fn.endsWith('status_v1')));
         check(id('server-kept'), equal(before, await snapshot(f.tenant)));
-        currentCase.providerMechanism = 'SQL keeps original zoe_ops receipt across newer Reset within retention. Only original owned receipt is aged3days and actual existing housekeeping removes it (two-day retention); this models missing/expired receipt, then UNKNOWN/HOLD; native latest-day replacement loses old proof earlier. No automatic GC policy was changed.';
+        currentCase.providerMechanism = 'SQL retains typed original Reset receipts across newer Reset and housekeeping. This historical-loss control explicitly removes only the exact retained original receipt with byte accounting after aging/collection; UNKNOWN/HOLD remains for previously lost proof. Native latest-day replacement still loses old proof earlier.';
     } else if (caseId === 'concurrent-reset') {
         const requests = await Promise.all([request(a, f), request(a, f)]), outcomes = await Promise.allSettled(requests.map(req => execute(a, req)));
         check(id('one-applied'), outcomes.filter(row => row.status === 'fulfilled' && row.value.committed === true).length === 1);

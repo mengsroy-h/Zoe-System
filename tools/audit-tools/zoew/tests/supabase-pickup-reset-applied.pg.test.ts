@@ -52,7 +52,7 @@ it('Supabase ៖ Reset រក្សា original CAS និង proof ដោយ at
         expect(new Set(summary.cases.map((entry: { label: string }) => entry.label)).size).toBe(75);
         expect(summary.cases.every((entry: { pass: boolean; kind: string }) => entry.pass === true && entry.kind === 'behavior')).toBe(true);
         expect(createHash('sha256').update(JSON.stringify(summary.cases.slice(0, 68).map((entry: { label: string }) => entry.label))).digest('hex'))
-            .toBe('a8a945967a60526608f4d9d8ee9172926450e5ae8208e960c45b0ff8b4d185cf');
+            .toBe('eb2e2ef830d353e9a25a2ea682e83f1b71381dd437a862c4f303d8b411b6580a');
         expect(summary.cases.slice(68).map((entry: { label: string }) => entry.label)).toEqual([
             "paired distinct Reset IDs are concurrently blocked before original effects",
             "paired distinct Reset IDs apply one fixed attempt and hold the losing original identity",
@@ -65,7 +65,7 @@ it('Supabase ៖ Reset រក្សា original CAS និង proof ដោយ at
         for (const label of [
             'composition uses all current migrations including native-day compiled preservation',
             'typed SQL Reset atomically composes exact original BASE CAS with new native-day proof',
-            'postGC matching embedded day proof NEVER substitutes for missing SQL operation receipt',
+            'matching embedded day proof NEVER substitutes for historically missing SQL operation receipt',
             'composed positive receipt growth quota refusal retains old proof and rolls back all effects',
             'supported admin document restore preserves original native-day identity without invented SQL receipt'
         ]) expect(summary.cases.some((entry: { label: string }) => entry.label === label)).toBe(true);

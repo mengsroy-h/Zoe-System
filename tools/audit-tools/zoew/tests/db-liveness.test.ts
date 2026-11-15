@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { firebaseState } from '../../../../ZoeW/src/core/state';
 import { dbListenerPendingPaths } from '../../../../ZoeW/src/core/text';
 import {
-    DB_LIVENESS_CYCLE_MIN_GAP_MS, DB_LIVENESS_IDLE_MS, DB_LIVENESS_PROBE_PATH, DB_LIVENESS_PROBE_TIMEOUT_MS,
+    DB_LIVENESS_CYCLE_MIN_GAP_MS, DB_LIVENESS_IDLE_MS, DB_LIVENESS_PROBE_PATH, DB_LIVENESS_PROBE_TIMEOUT_MS, DB_LISTENER_PROGRESS_GRACE_MS,
     attachInfoListeners, clearReconnectWatchdog, detachInfoListeners, probeDatabaseLiveness, probeDatabaseLivenessIfIdle
 } from '../../../../ZoeW/src/services/connection';
 
@@ -82,11 +82,50 @@ describe('ការវាស់ភាពរស់របស់ការតភ្�
         expect(calls.get.length).toBe(1);
     });
 
-    it('⛔ listener នៅ pending (ការទាញដំបូង) ➜ មិនវាស់ (ចម្លើយត្រូវដាក់ខាងក្រោយការទាញធំ)', async () => {
+    it('listener ទើបចាប់ផ្ដើមទាញ ➜ ទុក grace មុនវាស់', async () => {
         const calls = install(never);
         dbListenerPendingPaths.add('history');
+        firebaseState.dbListenerProgressAt = Date.now();
         expect(await probeDatabaseLiveness('test')).toBe(null);
         expect(calls.get.length).toBe(0);
+    });
+
+    it('listener ដំបូងនៅ pending គ្មាន progress ➜ probe ផុតពិដាន ហើយភ្ជាប់ឡើងវិញ ដោយរក្សា pending', async () => {
+        const calls = install(never);
+        dbListenerPendingPaths.add('history');
+        firebaseState.lastDbLivenessOkAt = Date.now();
+        firebaseState.dbListenerProgressAt = 0;
+        expect(await probeDatabaseLiveness('initial-fresh')).toBe(null);
+        await vi.advanceTimersByTimeAsync(DB_LISTENER_PROGRESS_GRACE_MS);
+        const running = probeDatabaseLiveness('initial-stalled');
+        expect(calls.get).toEqual([DB_LIVENESS_PROBE_PATH]);
+        await vi.advanceTimersByTimeAsync(DB_LIVENESS_PROBE_TIMEOUT_MS);
+        expect(await running).toBe(false);
+        expect(calls.goOffline).toBe(1);
+        expect(calls.goOnline).toBe(1);
+        expect([...dbListenerPendingPaths]).toEqual(['history']);
+    });
+
+    it('pending យូរ តែ Server ឆ្លើយ probe ➜ មិនសន្មតថាទិន្នន័យទាញចប់', async () => {
+        const calls = install(() => Promise.resolve(null));
+        dbListenerPendingPaths.add('history');
+        firebaseState.dbListenerProgressAt = 0;
+        expect(await probeDatabaseLiveness('initial-alive')).toBe(true);
+        expect(calls.get).toEqual([DB_LIVENESS_PROBE_PATH]);
+        expect(calls.goOffline).toBe(0);
+        expect([...dbListenerPendingPaths]).toEqual(['history']);
+    });
+
+    it('listener ជំនាន់ថ្មីចាប់ផ្ដើមពេល probe ចាស់នៅ pending ➜ មិន cycle ជំនាន់ថ្មី', async () => {
+        const calls = install(never);
+        dbListenerPendingPaths.add('history');
+        firebaseState.dbListenerProgressAt = 0;
+        const running = probeDatabaseLiveness('old-initial');
+        expect(calls.get).toEqual([DB_LIVENESS_PROBE_PATH]);
+        firebaseState.dbListenerGeneration++;
+        await vi.advanceTimersByTimeAsync(DB_LIVENESS_PROBE_TIMEOUT_MS);
+        expect(await running).toBe(null);
+        expect(calls.goOffline).toBe(0);
     });
 
     it('មិនទាន់ភ្ជាប់ ➜ មិនវាស់ (ជណ្តើរភ្ជាប់ឡើងវិញជាអ្នកទទួលខុសត្រូវ)', async () => {

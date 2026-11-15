@@ -19,6 +19,17 @@
 
 ការពិនិត្យទាំងនេះមិនជំនួសតេស្តឥរិយាបថ ឬការផ្ទៀងទិន្នន័យពីបណ្ដាញទេ។
 
+`npm --prefix ZoeW run typecheck` ពិនិត្យ project ដាច់ដោយឡែក
+`tools/audit-tools/zoew/tsconfig.domain-strict.json` ផងដែរ។ វាបើក `strictNullChecks`,
+`noImplicitAny` និង `useUnknownInCatchVariables` សម្រាប់ `src/domain/parcel.ts`,
+`parcel-number.ts` និង `barcode-key.ts` ព្រមទាំងកិច្ចសន្យា type របស់វា។ វិសាលភាពនេះមិនបើក
+ការពិនិត្យ `null` សកលសម្រាប់ App ឬការចូលប្រើ DOM ទេ។
+
+`ParcelRow`, `DeletedParcelRow` និង `ParcelBarcode` ក្នុង `src/domain/parcel.ts` ជា interface
+របស់ `scanHistory` និង `deletedItems` ក្នុង `src/core/state.ts`។ Field ដែលទិន្នន័យចាស់អាចខ្វះ
+រក្សាជា optional; ចំនួនប្រាក់ និងត្រាពេលមាន type `number`។ Recovery marker ក្នុង view អាចនៅមិនពេញលេញ;
+interface របស់វាមិនជំនួសការផ្ទៀង Server ឬ validated marker មុនអនុវត្តការងារទេ។
+
 ---
 
 ## ២. ផ្លូវតឹងបន្តិចម្តងៗ
@@ -35,8 +46,10 @@ TypeScript គ្មាន pragma `@ts-strict-check-null` សម្រាប់�
 ១. ជ្រើស module មួយ (ចាប់ផ្តើមពី `src/domain/*` — វាសុទ្ធសាធជាងគេ)
 ២. ការចូលប្រើ DOM មាន type រួចហើយ ៖ `elementOf<T>()` ក្នុង `src/app/refs.ts` ត្រឡប់ `T | null` ➜ កូដដែលប្រើវា
    ត្រូវពិនិត្យ `null` ពេលប្រើ (មើលផ្នែក ៣); `strictNullChecks: false` មិនធានាថាអ្នកហៅទាំងអស់បានពិនិត្យរួចទេ
-៣. បន្ថែម interface ពិតជំនួស `any` — ⛔ **មិនទាន់មាន** interface សម្រាប់កញ្ចប់ ឬ barcode ទេ (វាលឃ្លាំងក្នុង
-   `src/core/state.ts` ភាគច្រើនជា `any`) ➜ ចាប់ផ្តើមពីរូបរាងដែល Firebase rules ចាក់សោ (`firebase-database.rules.json`)
+៣. បន្ថែម interface ពិតជំនួស `any` សម្រាប់ SDK/backend handles, ឃ្លាំង daily/monthly revenue,
+   pickup/collected និង UI view models ដែលនៅសល់។ ប្រើ interface កញ្ចប់/Barcode ដែលមានស្រាប់
+   ហើយផ្ទៀងរូបរាងជាមួយ Firebase rules (`firebase-database.rules.json`); ការដាក់ type លើ state
+   មិនធ្វើឱ្យ parameter ដែលនៅជា `any` ក្នុង domain/service functions តឹងដោយស្វ័យប្រវត្តិទេ
 ៤. រត់ typecheck · lint និងតេស្តតាមសេណារីយ៉ូដែលកែក្នុង session ហើយរង់ចាំ suite ពេញក្នុង CI តាម [Runbook](../../CLAUDE.md#-runbook); បៃតងមិនធានាថាឥរិយាបថទាំងអស់ដូចដើមទេ
 ៥. ពេល module ទាំងអស់រឹងរួច ➜ បើក `strictNullChecks` សកល រួចលុបផ្នែកនេះចោល
 

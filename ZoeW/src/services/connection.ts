@@ -128,10 +128,15 @@ export function nudgeDatabaseConnection() {
     scheduleReconnectWatchdog();
 }
 
+function pendingDatabaseViewsAreProgressing() {
+    return dbListenerPendingPaths.size && Math.min(elapsedSince(firebaseState.dbListenerProgressAt),
+        elapsedSince(firebaseState.lastDbLivenessOkAt)) < DB_LISTENER_PROGRESS_GRACE_MS;
+}
+
 export function databaseLivenessProbeAllowed() {
     if (!firebaseState.fb || !firebaseState.db || typeof firebaseState.fb.get !== 'function' || typeof firebaseState.fb.ref !== 'function') return false;
     if (!firebaseState.isDatabaseConnected || (navigator.onLine as boolean) === false) return false;
-    return !dbListenerPendingPaths.size;
+    return !pendingDatabaseViewsAreProgressing();
 }
 
 export function noteDatabaseLinkUnresponsive(reason?) {
@@ -154,6 +159,8 @@ export function probeDatabaseLiveness(reason?) {
     const probeTransportEpoch = typeof probeSdk.connectionEpoch === 'function' ? probeSdk.connectionEpoch(probeConnectionRef) : null;
     const probeAuthEpoch = firebaseState.authGeneration;
     const generation = firebaseState.infoListenerGeneration;
+    const dataGeneration = firebaseState.dbListenerGeneration;
+    const pendingAtStart = new Set(dbListenerPendingPaths);
     const probe = new Promise((resolve) => {
         const timer = setTimeout(() => resolve(false), DB_LIVENESS_PROBE_TIMEOUT_MS);
         const answered = (alive) => { clearTimeout(timer); resolve(alive); };
@@ -171,7 +178,8 @@ export function probeDatabaseLiveness(reason?) {
             firebaseState.lastDbLivenessOkAt = Date.now();
             return true;
         }
-        if (dbListenerPendingPaths.size) return null;
+        if (dataGeneration !== firebaseState.dbListenerGeneration || pendingDatabaseViewsAreProgressing()
+            || [...dbListenerPendingPaths].some(key => !pendingAtStart.has(key))) return null;
         noteDatabaseLinkUnresponsive(reason);
         return false;
     });

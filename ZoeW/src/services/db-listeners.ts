@@ -4,6 +4,7 @@ import { elapsedSince } from '../core/elapsed';
 import { appLocalStore } from '../core/storage';
 import { DB_LISTENER_KEYS, DB_LISTENER_KEY_DAILY_COLLECTED, DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY, DB_LISTENER_KEY_MONTHLY_REVENUE, VIEW_NOT_MEASURABLE_NOTICE, dbListenerFailedPaths, dbListenerPendingPaths } from '../core/text';
 import { generateUniqueId, normalizeBarcodesOf, parseTimestampFromId } from '../domain/barcode';
+import { parseParcelNumber } from '../domain/parcel-number';
 import { runAutomaticDeletedCleanup } from '../domain/cleanup';
 import { flushPendingRegistryReleases } from '../domain/registry';
 import { refreshNotifyRemovedView } from '../features/notifications';
@@ -250,15 +251,15 @@ export function initDatabaseListeners() {
             }
 
             if (item.cod === undefined) {
-                item.cod = item.price !== undefined ? parseFloat(item.price) || 0 : 0;
+                item.cod = item.price !== undefined ? parseParcelNumber(item.price) || 0 : 0;
             } else {
-                item.cod = parseFloat(item.cod) || 0;
+                item.cod = parseParcelNumber(item.cod) || 0;
             }
 
             if (item.dod === undefined) {
                 item.dod = 0;
             } else {
-                item.dod = parseFloat(item.dod) || 0;
+                item.dod = parseParcelNumber(item.dod) || 0;
             }
 
             item.price = Math.round((item.cod + item.dod) * 100) / 100;
@@ -271,8 +272,8 @@ export function initDatabaseListeners() {
             if (item.barcodes && Array.isArray(item.barcodes)) {
                 item.barcodes.forEach(b => {
                     if (!b || typeof b !== 'object') return;
-                    b.cod = parseFloat(b.cod) || 0;
-                    b.dod = parseFloat(b.dod) || 0;
+                    b.cod = parseParcelNumber(b.cod) || 0;
+                    b.dod = parseParcelNumber(b.dod) || 0;
                     if (b.isDeducted === undefined) b.isDeducted = false;
                     if (b.isFromDeletion === undefined) b.isFromDeletion = false;
                 });

@@ -317,8 +317,6 @@ describe('resume ការសម្អាតដែលត្រូវរំខា
     it.each([['moved', false], ['slot', false], ['ledger', false], ['moved', true], ['slot', true], ['ledger', true]] as const)('peer Restore មុន recovery អាន trash ចុងក្រោយ · stage=%s · merge target=%s · view ចាស់ ➜ មិនស្តារ trash ឬកាត់ប្រាក់វិញ', async (stage, merged) => {
         const trash = await install(stage, stage === 'slot', stage === 'ledger' ? { ledger: 'keyed' } : {});
         const targetId = merged ? ID + '_peer' : ID;
-        const sdk = firebaseState.fb as any;
-        const get = sdk.get;
         const restore = () => {
             const restored = { ...clone(trash), restoredAt: getServerNow() };
             restored.barcodes = restored.barcodes.map((b: any) => ({ ...b, restoredAt: restored.restoredAt, isDeducted: false }));
@@ -330,10 +328,8 @@ describe('resume ការសម្អាតដែលត្រូវរំខា
         if (stage === 'moved') restore();
         else {
             let reads = 0;
-            sdk.get = async (ref: any) => {
-                const snapshot = await get(ref);
-                if (ref.path === TRASH + '/' + ID && ++reads === 1) restore();
-                return snapshot;
+            lab.hook = ({ kind, path }) => {
+                if (kind === 'get' && path === TRASH + '/' + ID && ++reads === 1) restore();
             };
         }
         dataState.scanHistory = []; dataState.deletedItems = [];
@@ -344,7 +340,7 @@ describe('resume ការសម្អាតដែលត្រូវរំខា
         expect(getAt(MONTHLY + '/' + MONTH).codDollar).toBe(100);
         if (stage === 'ledger') {
             expect(readCleanupJournal()).toHaveLength(1);
-            expect(readCleanupJournal()[0].stage).toBe('undo');
+            expect(readCleanupJournal()[0].stage).toBe('ledger');
             await resumeCleanupJournalEntry(ID);
             expect(readCleanupJournal()).toHaveLength(1);
             expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);

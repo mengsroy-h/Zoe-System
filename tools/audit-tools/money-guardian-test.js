@@ -91,8 +91,8 @@ const MUTATIONS = [
         // ⛔ ថ្នាក់ ៖ កញ្ចក់ `pickedUpPhones` លែងដេរីវេពីសំណុំ ➜ អថេរ
         // `sum(pickedUpPhones) === packagesPickedUp` បែក។
         name: 'ស្ថិតិយក ៖ ការរាប់អតិថិជនលែងដេរីវេពីសំណុំ barcode',
-        from: '            phones[phone] = (phones[phone] || 0) + 1;',
-        to: '            phones[phone] = 1;'
+        from: '            phones.set(phone, (phones.get(phone) || 0) + 1);',
+        to: '            phones.set(phone, 1);'
     },
     {
         // 🔴 ថ្នាក់ដដែលនឹង 2.26.0–2.26.2 តាមទ្វារថ្មី ៖ transaction សរសេរ

@@ -47,6 +47,8 @@ function makeCtx(src) {
         generateUniqueId: () => 'id_generated'
     };
     vm.createContext(ctx);
+    const numberParser = extractFn(src, 'parseParcelNumber');
+    if (numberParser) vm.runInContext(numberParser, ctx);
     const helper = extractFn(src, 'barcodeEntriesOf');
     if (helper) vm.runInContext(helper, ctx);
     vm.runInContext("var SCANNER_LOOKUP_BARCODE_INDEX_FIELD = '__zoeScannerLookupIndex';", ctx);

@@ -76,6 +76,24 @@ const persistenceContract = async () => ({
         where conrelid='public.zoe_ops'::regclass order by conname`)).rows
 });
 
+const resetRetentionClause = "            and not coalesce(o.result -> 'ok' = 'true'::jsonb\n"
+    + "                and private.zoe_pickup_reset_receipt_v1(o.result -> 'reset')\n"
+    + "                and o.result #>> '{reset,proof}' = 'operation'\n"
+    + "                and o.result #>> '{reset,tenant}' = o.tenant_id::text\n"
+    + "                and o.result #>> '{reset,attemptId}' = o.op_id\n"
+    + "                and o.result #>> '{reset,actorUid}' ~ '^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$', false)\n";
+
+function projectReviewedHousekeeping(definition: string) {
+    const anchor = "        delete from public.zoe_ops o where o.tenant_id = p_tenant and o.created_at < now() - interval '2 days'\n";
+    const selfMark = ["    prior_raw text := current_setting('zoe.raw_docs', true);\n", "    perform set_config('zoe.raw_docs', 'on', true);\n",
+        "    perform set_config('zoe.raw_docs', coalesce(prior_raw, ''), true);\n"];
+    const once = (fragment: string) => definition.split(fragment).length === 2;
+    if (!once(anchor) || !once(resetRetentionClause) || !once(anchor + resetRetentionClause) || !selfMark.every(once)) {
+        throw new Error('Reviewed housekeeping extension changed');
+    }
+    return selfMark.reduce((text, line) => text.replace(line, ''), definition.replace(resetRetentionClause, ''));
+}
+
 beforeAll(async () => {
     vi.stubGlobal('BroadcastChannel', undefined);
     await PG.start();
@@ -724,7 +742,7 @@ it('C04 SQL៖ v2 RPC ACL បិទ anon និង service_role ហើយ public
     expect(flags).toEqual([{ nspname: 'private', prosecdef: true }, { nspname: 'public', prosecdef: false }]);
 });
 
-it('C04 minimum៖ schema និង receipt/quota/retention contract ដដែល ក្រៅពី reviewed registration · business audit · restore authority', async () => {
+it('C04 minimum៖ schema និង receipt/quota/retention contract ដដែល ក្រៅពី reviewed registration · business audit · restore authority · typed Reset retention', async () => {
     expect(contractBefore).not.toBeNull(); expect(contractAfter).toEqual(contractBefore);
     const deltaRelations = new Set(['zoe_daily_delta_heads', 'zoe_daily_delta_heads_pkey', 'zoe_daily_deltas', 'zoe_daily_deltas_pkey']);
     const registrationRelations = new Set(['registration_protocol', 'registration_protocol_pkey']);
@@ -737,15 +755,42 @@ it('C04 minimum៖ schema និង receipt/quota/retention contract ដដែ�
     expect(contractRuntime.relations.filter(isRegistration).map((row: any) => row.schema + '.' + row.name + ':' + row.kind).sort())
         .toEqual(['private.registration_protocol:r', 'private.registration_protocol_pkey:i']);
     expect(contractRuntime.receiptConstraints).toEqual(contractAfter.receiptConstraints);
-    const housekeepingSelfMark = ["    prior_raw text := current_setting('zoe.raw_docs', true);\n", "    perform set_config('zoe.raw_docs', 'on', true);\n",
-        "    perform set_config('zoe.raw_docs', coalesce(prior_raw, ''), true);\n"];
-    expect(housekeepingSelfMark.reduce((text: string, line: string) => text.replace(line, ''), contractRuntime.functions.housekeeping))
-        .toBe(contractAfter.functions.housekeeping);
+    expect(projectReviewedHousekeeping(contractRuntime.functions.housekeeping)).toBe(contractAfter.functions.housekeeping);
     expect(contractRuntime.functions.legacy_write).toBe(contractAfter.functions.legacy_write);
     const names = contractAfter.relations.filter((row: any) => row.kind === 'r').map((row: any) => row.schema + '.' + row.name);
     for (const name of ['public.tenants', 'public.tenant_members', 'public.zoe_docs', 'public.zoe_ops', 'public.zoe_tenant_state']) expect(names).toContain(name);
     expect(contractAfter.receiptConstraints).toContainEqual({ definition: 'PRIMARY KEY (tenant_id, op_id)' });
     expect((await admin.query("select to_regclass('private.zoe_write_tenants') as binding")).rows[0].binding).toBeNull();
+});
+
+it('C04 reviewed housekeeping៖ predicate, binding, TTL, quota និង security ផ្លាស់ ត្រូវបដិសេធ', () => {
+    const current = contractRuntime.functions.housekeeping, original = contractAfter.functions.housekeeping;
+    expect(projectReviewedHousekeeping(current)).toBe(original);
+    const mutations: [string, (text: string) => string][] = [
+        ['missing-retention', text => text.replace(resetRetentionClause, '')],
+        ['duplicate-retention', text => text.replace(resetRetentionClause, resetRetentionClause + resetRetentionClause)],
+        ['success-required', text => text.replace("o.result -> 'ok' = 'true'", "o.result -> 'ok' = 'false'")],
+        ['receipt-validation', text => text.replace("private.zoe_pickup_reset_receipt_v1(o.result -> 'reset')", 'true')],
+        ['operation-proof', text => text.replace("'{reset,proof}' = 'operation'", "'{reset,proof}' = 'native-day'")],
+        ['tenant-binding', text => text.replace("'{reset,tenant}' = o.tenant_id::text", "'{reset,tenant}' is not null")],
+        ['attempt-binding', text => text.replace("'{reset,attemptId}' = o.op_id", "'{reset,attemptId}' is not null")],
+        ['actor-binding', text => text.replace("o.result #>> '{reset,actorUid}' ~", "o.result #>> '{reset,tenant}' ~")],
+        ['null-fallback', text => text.replace("{12}$', false)", "{12}$', true)")],
+        ['ordinary-ttl', text => text.replace("interval '2 days'", "interval '3 days'")],
+        ['tenant-filter', text => text.replace('delete from public.zoe_ops o where o.tenant_id = p_tenant and', 'delete from public.zoe_ops o where true and')],
+        ['tombstone-ttl', text => text.replace("interval '7 days'", "interval '6 days'")],
+        ['quota-bytes', text => text.replace('s.bytes - freed_docs - freed_ops', 's.bytes - freed_docs')],
+        ['self-marker', text => text.replace("    perform set_config('zoe.raw_docs', 'on', true);\n", '')],
+        ['security-mode', text => text.replace('LANGUAGE plpgsql', 'LANGUAGE plpgsql SECURITY DEFINER')],
+        ['search-path', text => text.replace("SET search_path TO ''", "SET search_path TO 'public'")]
+    ];
+    for (const [label, mutate] of mutations) {
+        const changed = mutate(current);
+        expect(changed, label + ' changes the actual function').not.toBe(current);
+        let accepted = false;
+        try { accepted = projectReviewedHousekeeping(changed) === original; } catch {}
+        expect(accepted, label).toBe(false);
+    }
 });
 
 it('C04 reviewed audit schema allowance rejects ACL, RLS, column, index, sequence and namespace mutations', async () => {

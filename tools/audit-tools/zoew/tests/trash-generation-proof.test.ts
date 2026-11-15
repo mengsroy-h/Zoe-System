@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { firebaseState } from '../../../../ZoeW/src/core/state';
 import { TRASH_GENERATION_MAX, trashConsumptionOf, trashConsumptionSame, trashConsumptionValid, trashGenerationOf, trashSourceUnconsumed } from '../../../../ZoeW/src/domain/trash-generation';
@@ -59,7 +60,7 @@ it.each(['db', 'sdk', 'uid', 'scope', 'authGeneration'])('generation áŸ– read áž
     afterRead = () => {
         if (kind === 'db') firebaseState.db = { other: true } as any;
         if (kind === 'sdk') firebaseState.fb = { ...firebaseState.fb };
-        if (kind === 'uid') firebaseState.auth.currentUser.uid = 'other';
+        if (kind === 'uid') setPartialBackendFixtureValue(firebaseState.auth.currentUser, "uid", 'other');
         if (kind === 'scope') (firebaseState.db as any).app.options.databaseURL = HOST + '/other';
         if (kind === 'authGeneration') firebaseState.authGeneration++;
     };

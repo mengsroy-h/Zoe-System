@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 /**
  * ⛔ ជម្រើស ឃ (សំណើម្ចាស់គម្រោង «បើក PR ហើយធ្វើជម្រើស ឃ»)៖ ឧបករណ៍ក្នុងសាខាតែមួយ «ផ្លាស់វេនគ្នា» អានបញ្ជី «ចុះហត្ថលេខា» ZTO
  * ជំនួសឲ្យគ្រប់ឧបករណ៍អានព្រមគ្នា។
@@ -391,11 +392,11 @@ describe('សោវេន (lane) ៖ តាមសាខា · តម្លៃខ
         expect(of({ palmAccount: { siteCode: '85501' } }, true)).toBe('palm_85501');
         expect(of({ palmAccount: { siteCode: ' AB-12 ' } }, true)).toBe('palm_ab-12');
         expect(of({}, true)).toBe('');
-        d.state.firebaseState.auth.currentUser.email = 'Staff@ZoeW123.com';
+        setPartialBackendFixtureValue(d.state.firebaseState.auth.currentUser, "email", 'Staff@ZoeW123.com');
         expect(of({}, false)).toBe('cookie_zoew123_com');
-        d.state.firebaseState.auth.currentUser.email = '';
+        setPartialBackendFixtureValue(d.state.firebaseState.auth.currentUser, "email", '');
         expect(of({}, false)).toBe('');
-        d.state.firebaseState.auth.currentUser.email = 'staff@' + 'x'.repeat(60) + '.com';
+        setPartialBackendFixtureValue(d.state.firebaseState.auth.currentUser, "email", 'staff@' + 'x'.repeat(60) + '.com');
         expect(of({}, false)).toBe('');
     });
 

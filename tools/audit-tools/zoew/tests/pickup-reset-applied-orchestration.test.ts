@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../../../../ZoeW/src/core/state';
@@ -69,7 +70,8 @@ beforeEach(() => {
     dataState.dailyPickupData = clone(server); dataState.pickupResetInFlight = false;
     dataState.dailyRevenueData = { [DAY]: { codDollar: 37, dodDollar: 5, totalCount: 11 } };
     dataState.monthlyRevenueData = { '2026-10': { codDollar: 37, dodDollar: 5, totalCount: 11 } };
-    dataState.dailyCollectedData = { [DAY]: { codDollar: 7, dodDollar: 2 } };
+    const untrustedCollectedSnapshot: unknown = { [DAY]: { codDollar: 7, dodDollar: 2 } };
+    Reflect.set(dataState, 'dailyCollectedData', untrustedCollectedSnapshot);
     dataState.scanHistory = [{ id: 'retained-item', isClosed: true, barcodes: [{ code: 'RESET_A', isClosed: true, cod: 7 }] }];
     dataState.deletedItems = []; uiState.currentFilterMode = 'all'; uiState.toasts = [];
 });
@@ -161,7 +163,7 @@ it('read-only APPLIED recovery annotates original partial outcome without a tail
     const result = await resumePickupResetOutcomes();
     expect(result).toEqual({ checked: 1, resolved: 1, held: false }); expect(sends).toHaveLength(2);
     expect(firebaseState.fb.pickupResetStatus).toHaveBeenCalledTimes(1);
-    expect(firebaseState.fb.pickupResetStatus.mock.calls[0][1]).toEqual(sends[1].request);
+    expect(vi.mocked(firebaseState.fb.pickupResetStatus).mock.calls[0][1]).toEqual(sends[1].request);
     const recovered = journals()[0]; expect(recovered.key).toBe(original.key); expect(recovered.value.id).toBe(original.value.id);
     expect(recovered.value.days[1].attempts[0]).toMatchObject({ ...descriptor, outcome: 'applied' });
     expect(recovered.value.days[2].attempts).toEqual([]); expect(recovered.value.complete).toBe(false); expect(recovered.value.settled).toBe(true);
@@ -171,7 +173,7 @@ it('read-only APPLIED recovery annotates original partial outcome without a tail
 
 it.each(['missing', 'foreign', 'malformed', 'error', 'replaced', 'wrong-kind', 'unknown-envelope'])('status %s cannot resolve original UNKNOWN or authorize replay', async kind => {
     mode = 'unknown'; await resetPickupStats(); const original = journals()[0].value.days[0].attempts[0];
-    firebaseState.fb.pickupResetStatus = vi.fn(async () => {
+    setPartialBackendFixtureValue(firebaseState.fb, "pickupResetStatus", vi.fn(async () => {
         if (kind === 'error') throw new Error('read denied');
         const proof = await pickupResetBoundReceipt(original.tenant, original.actorUid, original.context, original.attemptId, original.casText, 'native-day');
         if (kind === 'missing') return { outcome: 'unknown', pickupReset: null };
@@ -179,7 +181,7 @@ it.each(['missing', 'foreign', 'malformed', 'error', 'replaced', 'wrong-kind', '
         return { outcome: 'applied', pickupReset: kind === 'foreign' ? { ...proof, actorUid: 'other' }
             : kind === 'replaced' ? { ...proof, attemptId: 'a'.repeat(64), intentHash: 'a'.repeat(64) }
                 : kind === 'wrong-kind' ? { ...proof, proof: 'operation' } : { v: 1, outcome: 'applied' } };
-    });
+    }));
     const result = await resumePickupResetOutcomes(); expect(result.held).toBe(true); expect(result.resolved).toBe(0);
     expect(journals()[0].value.days[0].attempts[0]).toEqual(original); expect(journals()[0].value.settled).toBe(false);
     await resetPickupStats(); expect(sends).toHaveLength(1);
@@ -205,7 +207,7 @@ it.each(['db-app', 'auth-app-only'])('Supabase authority uses current tenantScop
     const tenant = '00000000-0000-4000-8000-000000000001', url = 'https://f09-sb.invalid';
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ supabaseUrl: url }));
     const app = { options: { supabaseUrl: url } };
-    firebaseState.db = optionsOwner === 'db-app' ? { app } : { _sb: true } as any; firebaseState.auth.app = app;
+    firebaseState.db = optionsOwner === 'db-app' ? { app } : { _sb: true } as any; setPartialBackendFixtureValue(firebaseState.auth, "app", app);
     if (optionsOwner === 'auth-app-only') expect(firebaseState.db.app).toBeUndefined();
     firebaseState.fb.tenantScope = () => tenant;
     firebaseState.fb.executePickupReset = async (_ref: any, request: any, current: () => boolean) => {
@@ -221,7 +223,7 @@ it.each(['url', 'tenant', 'auth-object', 'db-object'])('Supabase auth-app fallba
     const url = 'https://f09-sb.invalid', app = { options: { supabaseUrl: 'https://f09-sb.invalid' } };
     let tenant = '00000000-0000-4000-8000-000000000001';
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ supabaseUrl: url }));
-    firebaseState.db = { _sb: true } as any; firebaseState.auth.app = app; firebaseState.fb.tenantScope = () => tenant;
+    firebaseState.db = { _sb: true } as any; setPartialBackendFixtureValue(firebaseState.auth, "app", app); firebaseState.fb.tenantScope = () => tenant;
     const digest = webcrypto.subtle.digest.bind(webcrypto.subtle); let mutated = false;
     vi.spyOn(webcrypto.subtle, 'digest').mockImplementation((...args: Parameters<typeof digest>) => {
         if (!mutated) {
@@ -329,10 +331,10 @@ it('read-only recovery refuses a crashed unlocked owner with no durable ended fe
 });
 
 it('backend current callback fences a physical effect after the journal owner is replaced', async () => {
-    firebaseState.fb.executePickupReset = async (_ref: any, request: any, current: () => boolean) => {
+    setPartialBackendFixtureValue(firebaseState.fb, "executePickupReset", async (_ref: any, request: any, current: () => boolean) => {
         sends.push({ request: clone(request) }); const entry = journals()[0]; entry.value.owner.token = 'other-page'; appLocalStore.setItem(entry.key, JSON.stringify(entry.value));
         expect(current()).toBe(false); return { committed: false, snapshot: { val: () => clone(server[DAY]) } };
-    };
+    });
     await resetPickupStats(); expect(sends).toHaveLength(1); expect(server[DAY]).toEqual(record()); expect(journals()[0].value.owner.token).toBe('other-page');
     expect(journals()[0].value.days[0].attempts[0].outcome).toBe('pending');
 });
@@ -356,11 +358,11 @@ it('recovery after module restart performs only original status reads and keeps 
 it.each(['session', 'journal'])('status await rechecks %s ownership before annotating original evidence', async kind => {
     mode = 'applied-unknown'; await resetPickupStats();
     const pending = journals()[0].value.days[0].attempts[0];
-    firebaseState.fb.pickupResetStatus = vi.fn(async () => {
+    setPartialBackendFixtureValue(firebaseState.fb, "pickupResetStatus", vi.fn(async () => {
         if (kind === 'session') firebaseState.authGeneration++;
         else { const entry = journals()[0]; entry.value.owner.token = 'new-status-owner'; appLocalStore.setItem(entry.key, JSON.stringify(entry.value)); }
         return { outcome: 'applied', pickupReset: clone(server[DAY].pickupResetApplied) };
-    });
+    }));
     expect((await resumePickupResetOutcomes()).held).toBe(true); expect(journals()[0].value.days[0].attempts[0]).toEqual(pending); expect(sends).toHaveLength(1);
     if (kind === 'journal') expect(journals()[0].value.owner.token).toBe('new-status-owner');
 });

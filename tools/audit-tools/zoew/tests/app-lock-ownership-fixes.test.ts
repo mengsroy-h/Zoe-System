@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { appLocalStore, appSessionStore } from '../../../../ZoeW/src/core/storage';
 import { firebaseState, securityState, uiState } from '../../../../ZoeW/src/core/state';
@@ -36,7 +37,7 @@ beforeEach(() => {
     Object.assign(viewState, { appLockOpen: false, appLockMessage: '' });
     firebaseState.authGeneration++; firebaseState.auth = { currentUser: { uid: 'shop-a' } } as any;
     firebaseState.fb = { signOut: vi.fn(async () => { firebaseState.auth.currentUser = null; }) } as any;
-    firebaseState.db = {};
+    setPartialBackendFixtureValue(firebaseState, "db", {});
     acceptFixtureSession();
     resetServerClock(); firebaseState.isDatabaseConnected = true;
     acceptServerClockOffset(0, { epochMs: Date.now(), wallMs: Date.now(), monotonicMs: performance.now() }, false);
@@ -96,7 +97,7 @@ it('F01 integration control៖ same UID/user object ថ្មី នៅ epoch �
     const confirmPinRemoval = vi.fn(() => true); vi.stubGlobal('confirm', confirmPinRemoval);
     try {
         showAppLockScreen(); forgetAppLockPin(); await turns();
-        firebaseState.auth.currentUser = { uid: firebaseState.auth.currentUser.uid };
+        setPartialBackendFixtureValue(firebaseState.auth, "currentUser", { uid: firebaseState.auth.currentUser.uid });
         forgetAppLockPin(); await turns(); expect(signOut).toHaveBeenCalledOnce(); expect(confirmPinRemoval).toHaveBeenCalledOnce();
         firebaseState.auth.currentUser = null; pending.resolve(); await turns(); expect(modalIsOpen('loginModal')).toBe(true);
     } finally { pending.resolve(); await turns(); }
@@ -105,7 +106,7 @@ it.each(['success', 'failure'])('F01 integration៖ same UID/user object ថ្�
     const pending = deferred<void>(), signOut = vi.fn(() => pending.promise); firebaseState.fb.signOut = signOut;
     try {
         showAppLockScreen(); forgetAppLockPin(); await turns();
-        firebaseState.auth.currentUser = { uid: firebaseState.auth.currentUser.uid };
+        setPartialBackendFixtureValue(firebaseState.auth, "currentUser", { uid: firebaseState.auth.currentUser.uid });
         forgetAppLockPin(); await turns(); expect(signOut).toHaveBeenCalledOnce();
         if (outcome === 'success') pending.resolve(); else pending.reject(new Error('synthetic same-session signout failure'));
         await turns();
@@ -129,7 +130,7 @@ it.each(['uid', 'generation'])('F01 integration control៖ active session %s ថ
     const pending = deferred<void>(); firebaseState.fb.signOut = vi.fn(() => pending.promise);
     try {
         showAppLockScreen(); forgetAppLockPin(); await turns();
-        if (change === 'uid') firebaseState.auth.currentUser = { uid: 'replacement-account' }; else firebaseState.authGeneration++;
+        if (change === 'uid') setPartialBackendFixtureValue(firebaseState.auth, "currentUser", { uid: 'replacement-account' }); else firebaseState.authGeneration++;
         showAppLockScreen(true); expect(viewState.appLockMessage).toBe('');
         pending.reject(new Error('synthetic old-session logout failure')); await turns();
         expect(viewState.appLockMessage).toBe(''); expect(securityState.appIsLocked).toBe(true);
@@ -286,7 +287,7 @@ it.each(['auth-replaced', 'other-user'])('Forgot PIN control ៖ a late success 
         const message = viewState.appLockMessage;
         firebaseState.authGeneration++;
         if (change === 'auth-replaced') { firebaseState.auth = { currentUser: null } as any; firebaseState.fb = { signOut: vi.fn(async () => {}) } as any; }
-        else firebaseState.auth.currentUser = { uid: 'shop-b' };
+        else setPartialBackendFixtureValue(firebaseState.auth, "currentUser", { uid: 'shop-b' });
         pending.resolve(); await turns();
         expect(loginCalls.count).toBe(0); expect(modalIsOpen('loginModal')).toBe(false);
         expect(securityState.appIsLocked).toBe(true); expect(viewState.appLockMessage).toBe(message);
@@ -332,7 +333,7 @@ it.each(['same-user', 'other-user'])('Forgot PIN ៖ a session change (%s) while
         showAppLockScreen(); forgetAppLockPin(); await turns();
         expect(securityState.appLockBusy).toBe(true);
         firebaseState.authGeneration++;
-        firebaseState.auth.currentUser = { uid: change === 'same-user' ? 'shop-a' : 'shop-b' };
+        setPartialBackendFixtureValue(firebaseState.auth, "currentUser", { uid: change === 'same-user' ? 'shop-a' : 'shop-b' });
         await vi.advanceTimersByTimeAsync(APP_LOCK_SIGN_OUT_MS + 10);
         expect(securityState.appLockBusy).toBe(false);
         expect(viewState.appLockMessage).toContain('មិនទាន់អាចបញ្ជាក់ថាបានចាកចេញ');
@@ -340,7 +341,7 @@ it.each(['same-user', 'other-user'])('Forgot PIN ៖ a session change (%s) while
         firebaseState.auth.currentUser = null; pending.resolve(); await turns();
         expect(loginCalls.count).toBe(0); expect(toastCount(SIGNED_OUT_TOAST)).toBe(0);
         firebaseState.fb.signOut = vi.fn(async () => { firebaseState.auth.currentUser = null; });
-        firebaseState.auth.currentUser = { uid: 'shop-a' };
+        setPartialBackendFixtureValue(firebaseState.auth, "currentUser", { uid: 'shop-a' });
         forgetAppLockPin(); await turns();
         expect(confirmSpy).toHaveBeenCalledTimes(2); expect(loginCalls.count).toBe(1); expect(securityState.appIsLocked).toBe(false);
     } finally { vi.useRealTimers(); vi.unstubAllGlobals(); }

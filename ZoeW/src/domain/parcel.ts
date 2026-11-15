@@ -98,11 +98,20 @@ export interface ParcelRow {
     restoredAt?: number;
 }
 
+export interface ParcelRestoreClaim {
+    token: string;
+    claimedAt: number;
+    targetId?: string;
+}
+
+export type LegacyRestoreClaimString = string & { token?: never; claimedAt?: never; targetId?: never };
+export type ParcelRestoreClaimView = Partial<ParcelRestoreClaim> | LegacyRestoreClaimString;
+
 export interface DeletedParcelRow extends ParcelRow {
     deletedAt?: number;
     isFromDeletion?: boolean;
     trashReason?: string;
-    restoreClaim?: { token?: string; claimedAt?: number; targetId?: string } | string;
+    restoreClaim?: ParcelRestoreClaimView;
     trashMode?: string;
     restoreBlocked?: boolean;
     trashGeneration?: number;

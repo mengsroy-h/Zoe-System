@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { acceptFixtureSession } from './helpers/accepted-session';
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -31,7 +32,7 @@ beforeEach(() => {
     vi.stubGlobal('crypto', webcrypto);
     server = basis(); current = true;
     firebaseState.firebaseConfig = { databaseURL: scope };
-    firebaseState.auth = { currentUser: { uid: actorUid, getIdToken: vi.fn(async () => 'synthetic-token') } };
+    setPartialBackendFixtureValue(firebaseState, "auth", { currentUser: { uid: actorUid, getIdToken: vi.fn(async () => 'synthetic-token') } });
     appLocalStore.clear();
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: scope }));
     acceptFixtureSession();

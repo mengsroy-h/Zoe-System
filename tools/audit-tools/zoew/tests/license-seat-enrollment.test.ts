@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { firebaseState, securityState, uiState } from '../../../../ZoeW/src/core/state';
 import { viewState } from '../../../../ZoeW/src/core/view-state';
@@ -16,7 +17,7 @@ const api = () => license as any;
 beforeEach(() => {
     configureFixtureBackend('license-seat-enrollment-fixture');
     firebaseState.auth = { currentUser: { uid: 'enrollment-user' } } as any; firebaseState.authGeneration++;
-    firebaseState.db = {} as any; firebaseState.fb = {}; firebaseState.isDatabaseInitialized = true;
+    firebaseState.db = {} as any; setPartialBackendFixtureValue(firebaseState, "fb", {}); firebaseState.isDatabaseInitialized = true;
     firebaseState.serverClockTrusted = true; firebaseState.sessionExpiryCheck = 'live';
     acceptFixtureSession();
     viewState.backendKind = 'firebase'; input = 'ZOEKEY-synthetic'; uiState.modalDisplay = {}; uiState.isModalOpen = false;

@@ -335,7 +335,7 @@ function runResetPickup(mode, opts) {
         'src/domain/pickup.ts',
         { path: 'src/services/tx-outcome.ts', expose: ['executeNativePickupReset', 'nativePickupResetStatus'] },
         { path: 'src/services/pickup-reset.ts', expose: ['PICKUP_RESET_PENDING_TEXT', 'PICKUP_RESET_UNAVAILABLE_TEXT', 'pickupResetPendingState', 'runPickupResetBatch'] },
-        'src/domain/collected.ts', { path: 'src/features/restore.ts', expose: ['clearRestoreFinalization'] }]);
+        'src/domain/parcel-number.ts', 'src/domain/collected.ts', { path: 'src/features/restore.ts', expose: ['clearRestoreFinalization'] }]);
     const rawSdk = box.fb;
     const owner = current => ({ tenant: config.projectId, actorUid: box.auth.currentUser.uid,
         tokenRealm: async () => config.projectId, sessionCurrent: current });

@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { acceptServerClockOffset, resetServerClock } from '../../../../ZoeW/src/core/clock';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { firebaseState, uiState } from '../../../../ZoeW/src/core/state';
@@ -120,7 +121,7 @@ it.each(['db', 'generation', 'uid', 'tenant'])('%s ប្តូរ ➜ handle �
     const handle = prepare();
     if (changed === 'db') firebaseState.db = { ...firebaseState.db } as any;
     if (changed === 'generation') firebaseState.authGeneration++;
-    if (changed === 'uid') firebaseState.auth.currentUser.uid = 'other';
+    if (changed === 'uid') setPartialBackendFixtureValue(firebaseState.auth.currentUser, "uid", 'other');
     if (changed === 'tenant') (firebaseState.auth as any)._account.tenant_id = 'B';
     expect(pendingScanIsCurrent(handle)).toBe(false);
     expect(() => notePendingScan(handle, 'claimed')).toThrow(/session changed/);
@@ -175,9 +176,9 @@ it('ចូលវគ្គថ្មីក្នុងហាង និងគណន
 it('warning scope មិនលេច barcode របស់ user ផ្សេង និងមិនបញ្ជា replay', () => {
     const handle = prepare('PRIVATE003'); releasePendingScan(handle);
     const user = firebaseState.auth.currentUser.uid;
-    firebaseState.auth.currentUser.uid = 'other';
+    setPartialBackendFixtureValue(firebaseState.auth.currentUser, "uid", 'other');
     warnPendingScans(); expect(messages()).toEqual([]);
-    firebaseState.auth.currentUser.uid = user;
+    setPartialBackendFixtureValue(firebaseState.auth.currentUser, "uid", user);
     warnPendingScans(); expect(messages().join('\n')).toContain('PRIVATE003');
     expect(rows()).toHaveLength(1);
     expect(writes).not.toHaveBeenCalled();
@@ -239,7 +240,7 @@ it.each(['db', 'generation', 'uid', 'tenant'])('%s changes while compensation is
     const settled = settlePendingScanRelease(handle, money.promise, releaseRegistry);
     if (changed === 'db') firebaseState.db = { ...firebaseState.db } as any;
     if (changed === 'generation') firebaseState.authGeneration++;
-    if (changed === 'uid') firebaseState.auth.currentUser.uid = 'other';
+    if (changed === 'uid') setPartialBackendFixtureValue(firebaseState.auth.currentUser, "uid", 'other');
     if (changed === 'tenant') (firebaseState.auth as any)._account.tenant_id = 'B';
     money.resolve(true);
     expect(await settled).toBe(false);

@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { acceptServerClockOffset, resetServerClock } from '../../../../ZoeW/src/core/clock';
 import { webcrypto } from 'node:crypto';
 import { setTimeout as realSetTimeout, clearTimeout as realClearTimeout } from 'node:timers';
@@ -509,14 +510,14 @@ it('import cannot reuse fallback birth captured before the pickup epoch read and
     Object.assign(ztoState.ztoListSyncResult, { verifiedAt: NOW, verifiedServerAt: NOW });
     const get = firebaseState.fb.get;
     let crossed = false;
-    firebaseState.fb.get = async ref => {
+    setPartialBackendFixtureValue(firebaseState.fb, "get", async ref => {
         const result = await get(ref);
         if (!crossed && ref.path.startsWith('zoew_daily_pickup_cod_dod/')) {
             crossed = true;
             resetServerClock(); acceptServerClockOffset(3600000, null, false);
         }
         return result;
-    };
+    });
     await importZtoListRows();
     expect(crossed).toBe(true);
     expect(lab.claims).toBe(0);

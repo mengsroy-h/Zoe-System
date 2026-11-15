@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { acceptFixtureSession } from './helpers/accepted-session';
 import * as serverClock from '../../../../ZoeW/src/core/clock';
 import { exportQueuedSignPhoto } from '../../../../ZoeW/src/features/queued-sign-photo';
@@ -105,8 +106,8 @@ beforeEach(async () => {
     vi.stubGlobal('crypto', webcrypto); vi.stubGlobal('indexedDB', {});
     vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
-    firebaseState.authGeneration++; firebaseState.db = {}; firebaseState.auth = { currentUser: { uid: 'audit-user' } };
-    firebaseState.fb = { getIdTokenResult: async () => ({ token: 'synthetic-id' }) };
+    firebaseState.authGeneration++; setPartialBackendFixtureValue(firebaseState, "db", {}); setPartialBackendFixtureValue(firebaseState, "auth", { currentUser: { uid: 'audit-user' } });
+    setPartialBackendFixtureValue(firebaseState, "fb", { getIdTokenResult: async () => ({ token: 'synthetic-id' }) });
     securityState.appIsLocked = false; securityState.appLockVeiled = false;
     key = await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']) as CryptoKey;
     securityState.lookupSecretKey = key;
@@ -331,7 +332,7 @@ async function autoTrashQueued(partial: boolean) {
         if (value == null) delete target[last]; else target[last] = clone(value);
     };
     const snapshot = (value: any) => ({ val: () => clone(value), exists: () => value != null });
-    firebaseState.fb = {
+    setPartialBackendFixtureValue(firebaseState, "fb", {
         getIdTokenResult: async () => ({ token: 'synthetic-id' }),
         ref: (_db: unknown, path = '') => ({ path }),
         get: async (ref: any) => { reads.push(ref.path); return snapshot(read(ref.path)); },
@@ -342,10 +343,10 @@ async function autoTrashQueued(partial: boolean) {
         },
         update: async (ref: any, updates: any) => { for (const [name, value] of Object.entries(updates)) write([ref.path, name].filter(Boolean).join('/'), value); },
         set: async (ref: any, value: any) => write(ref.path, value)
-    };
+    });
     firebaseState.isDatabaseConnected = true; firebaseState.serverClockTrusted = true; firebaseState.serverTimeOffsetMs = 0;
-    firebaseState.dbRefHistory = { path: 'zoew_scan_history_cod_dod' }; firebaseState.dbRefDeleted = { path: 'zoew_recently_deleted_cod_dod' };
-    firebaseState.dbRefDailyPickup = { path: 'zoew_daily_pickup_cod_dod' }; firebaseState.dbRefDailyCollected = { path: 'zoew_daily_collected_cod_dod' };
+    setPartialBackendFixtureValue(firebaseState, "dbRefHistory", { path: 'zoew_scan_history_cod_dod' }); setPartialBackendFixtureValue(firebaseState, "dbRefDeleted", { path: 'zoew_recently_deleted_cod_dod' });
+    setPartialBackendFixtureValue(firebaseState, "dbRefDailyPickup", { path: 'zoew_daily_pickup_cod_dod' }); setPartialBackendFixtureValue(firebaseState, "dbRefDailyCollected", { path: 'zoew_daily_collected_cod_dod' });
     dataState.dailyPickupData = {}; dataState.dailyCollectedData = {}; dataState.scanHistory = [clone(item)];
     vi.mocked(applyBarcodeCloseChange).mockImplementation(real.applyBarcodeCloseChange);
     reservationFixtures = false; network = async body => receipt(body, { photoProof: null });
@@ -408,12 +409,12 @@ it.each(['photo', 'wrong-hash', 'wrong-request', 'unsigned', 'restore-claim', 'r
         fixture.state.zoew_scan_history_cod_dod.restored1 = { id: 'restored1', barcodes: [{ code: codes[0], restoredAt: Date.now() }] };
     }
     const get = firebaseState.fb.get; let protectedRow: any;
-    firebaseState.fb.get = async ref => {
+    setPartialBackendFixtureValue(firebaseState.fb, "get", async ref => {
         if (kind === 'database') throw new Error('synthetic-offline');
         if (kind === 'trash-vanished' && ref.path.startsWith('zoew_scan_history')) delete fixture.state.zoew_recently_deleted_cod_dod[fixture.trash.id];
         if (kind === 'auth') { protectedRow = { ...disk.rows.get(fixture.original.row.id) }; firebaseState.authGeneration++; }
         return get(ref);
-    };
+    });
     network = async body => {
         if (kind === 'cas') {
             const row = disk.rows.get(fixture.original.row.id); protectedRow = { ...row, revision: row.revision + 1 }; disk.rows.set(row.id, protectedRow);
@@ -649,7 +650,7 @@ it('DB មាន restore ថ្មីជាង local៖ transaction មិនប
     dataState.dailyPickupData = {}; dataState.dailyCollectedData = {};
     let mutation: any = 'not-called';
     const update = vi.fn(async () => {});
-    firebaseState.fb = {
+    setPartialBackendFixtureValue(firebaseState, "fb", {
         ref: (_db: unknown, path: string) => ({ path }), update,
         get: async (ref: any) => {
             expect(ref.path).toBe(pickupPath);
@@ -665,7 +666,7 @@ it('DB មាន restore ថ្មីជាង local៖ transaction មិនប
             mutation = change(structuredClone(server));
             return { committed: false, snapshot: { val: () => server } };
         }
-    };
+    });
     expect(await real.applyBarcodeCloseChange(item.id, codes[0], true, { silent: true, showModal: false, expectedSignIdentity: identity })).toBe(false);
     expect(mutation).toBeUndefined(); expect(server.barcodes[0].isClosed).toBe(false);
     expect(update).not.toHaveBeenCalled(); expect(item.barcodes[0].isClosed).toBe(false);
@@ -679,7 +680,7 @@ it.each(['auth', 'shop', 'database', 'lock', 'key'])('ចម្លើយមក�
     await submitZtoPalmSign([codes[0]]); await vi.waitFor(() => expect(bodies('receipt')).toHaveLength(1));
     if (kind === 'auth') firebaseState.authGeneration++;
     if (kind === 'shop') appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://other.firebaseio.com' }));
-    if (kind === 'database') firebaseState.db = {};
+    if (kind === 'database') setPartialBackendFixtureValue(firebaseState, "db", {});
     if (kind === 'lock') securityState.appIsLocked = true;
     if (kind === 'key') securityState.lookupSecretKey = null;
     ack.resolve(reply({})); await new Promise((resolve) => setTimeout(resolve, 30));
@@ -702,7 +703,7 @@ it.each<[number, boolean, boolean, boolean]>([[2, false, false, false], [3, fals
         for (const part of parts) target = target[part] ||= {};
         if (value == null) delete target[last]; else target[last] = clone(value);
     };
-    firebaseState.fb = {
+    setPartialBackendFixtureValue(firebaseState, "fb", {
         getIdTokenResult: async () => ({ token: 'synthetic-id' }),
         ref: (_db: unknown, path: string) => ({ path }),
         get: async (ref: any) => ({ val: () => read(ref.path), exists: () => read(ref.path) !== null }),
@@ -711,10 +712,10 @@ it.each<[number, boolean, boolean, boolean]>([[2, false, false, false], [3, fals
             write(ref.path, next); return { committed: true, snapshot: { val: () => read(ref.path) } };
         },
         update: async (ref: any, updates: any) => { for (const [key, value] of Object.entries(updates)) write(ref.path + '/' + key, value); }
-    };
+    });
     dataState.scanHistory = [clone(db.zoew_scan_history_cod_dod.item1)]; dataState.deletedItems = []; dataState.dailyCollectedData = {}; dataState.dailyPickupData = {};
     firebaseState.serverClockTrusted = true; firebaseState.serverTimeOffsetMs = 0;
-    firebaseState.dbRefDailyPickup = { path: 'zoew_daily_pickup_cod_dod' }; firebaseState.dbRefDailyCollected = { path: 'zoew_daily_collected_cod_dod' };
+    setPartialBackendFixtureValue(firebaseState, "dbRefDailyPickup", { path: 'zoew_daily_pickup_cod_dod' }); setPartialBackendFixtureValue(firebaseState, "dbRefDailyCollected", { path: 'zoew_daily_collected_cod_dod' });
     vi.mocked(applyBarcodeCloseChange).mockImplementation(real.applyBarcodeCloseChange);
     const journal = new Map<string, { data: string; etag: string }>(); let revision = 0;
     const session = { token: 'session', site: 'KH1', operator: 'operator' };
@@ -1330,7 +1331,7 @@ it.each(['auth', 'key', 'restore'])('cancel ACK មកក្រោយ %s មិ�
 it('reservation headers រង់ចាំ ហើយកញ្ចប់ត្រូវដក មិនហៅ fetch និងរក្សារូប', async () => {
     await ready(1); const pending = gate<void>();
     const identity = vi.fn(async () => { await pending.promise; return { token: 'synthetic-id' }; });
-    firebaseState.fb.getIdTokenResult = identity;
+    setPartialBackendFixtureValue(firebaseState.fb, "getIdTokenResult", identity);
     await submitZtoPalmSign([codes[0]]); await vi.waitFor(() => expect(identity).toHaveBeenCalled());
     dataState.scanHistory[0].barcodes = dataState.scanHistory[0].barcodes.slice(1);
     pending.resolve(); await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));

@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 /**
  * ⛔ Push ខាង App ៖ `src/features/push.ts` · SW `push`/`notificationclick` · ផ្ទាំង 🔔។
  * ⛔ iPhone ទាមទារ `Notification.requestPermission()` ក្នុង **gesture ដដែល** ➜ វាត្រូវហៅ **មុន** `await` ណាមួយ (មុនទាញ config)។
@@ -118,7 +119,7 @@ beforeEach(() => {
     try { localStorage.clear(); } catch {}
     configureFixtureBackend('push-client');
     firebaseState.auth = { currentUser: { uid: 'push-client-user' } } as any;
-    firebaseState.fb = {}; firebaseState.db = {}; firebaseState.sessionExpiryCheck = 'live';
+    setPartialBackendFixtureValue(firebaseState, "fb", {}); setPartialBackendFixtureValue(firebaseState, "db", {}); firebaseState.sessionExpiryCheck = 'live';
     acceptFixtureSession();
     uiState.pushStatus = 'unknown';
     Object.assign(pushRuntime, { nativeListeners: false, nativeEnabling: false, nativeWanted: false, scheduleAttemptAt: 0, scheduleInFlight: false, nativePendingToken: '', webKeyChecked: false, offSends: new Set() });

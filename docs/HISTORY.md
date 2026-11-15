@@ -51,19 +51,19 @@
 
 ### 🔧 Rollout និងការកំណត់ដែលនៅបើក
 
-- ⏳ **កំណែដែលកំពុងរៀបចំ**៖ ZoeW `2.50.205` / `zoew-v469` មិនទាន់ដាក់ប្រើ។ អានស្ថានភាព CI លើ commit ក្នុង PR របស់កំណែនេះ ហើយបំពេញ signing/backup/drain prerequisites មុន merge/deploy; CI របស់ production `2.50.204` មិនជំនួសការផ្ទៀងកូដថ្មី។
+- ⏳ **កំណែដែលកំពុងរៀបចំ**៖ ZoeW `2.50.206` / `zoew-v470` មិនទាន់ដាក់ប្រើ។ អាន CI លើ head ចុងក្រោយនៃ PR។ Client អាចប្រើ active migrations ៧២ ដដែល; SQL ដែលរង់ចាំ backup នៅក្រៅ auto-deploy path។ APK ត្រូវ signing ready; បើ workflow ផ្អាក ត្រូវទុក APK release រហូតម្ចាស់រៀបចំរួច។
 - 🔍 **ZTO Restore authority**៖ hosted Supabase «ZoeW» នៅគ្មាន active attestor key និង `zoew_restore_policy/shop`។ ត្រូវកំណត់កូនសោត្រូវគ្នាក្នុង Netlify/DB, trusted shop policy និង Cookie branch projection; Firebase ត្រូវ verified project/branch target និង service account ត្រឹមគម្រោង តាម [ZTO setup](zoew/ZTO-SETUP-KH.md#សិទ្ធិស្តារ-palm-និង-cookie-ដែល-db-ផ្ទៀងបាន)។ ត្រូវ full DB/private-state backup ដែលសាក restore បាន និង quiesced import មុនបើកប្រើ។
 - 🧾 **Firebase Business rules និងឧបករណ៍**៖ ផ្ទៀង dry-run/Publish artifact `firebase-database.rules.min.json` លើ project អាជីវកម្មពិត; service account ដែលមានផ្ទៀងបានតែ License Project ហើយ Business projects ឆ្លើយ PERMISSION_DENIED។ Update គ្រប់ tab/PWA/APK ជាក្រុមក្រោយ drain confirmed writes និង backup ដែលម្ចាស់រៀបចំ។ Supabase project ផ្សេងពី «ZoeW» ត្រូវផ្ទៀង migrations ដាច់ដោយឡែក។
 - 🔍 **License cutover**៖ ផ្ទេរគ្រប់ Key/ឧបករណ៍ និងផ្ទៀង signed receipt ជាមួយ Server រួចបិទ legacy ដោយ `legacyProtocolEnabled:false`។ APK gate រក្សាតាមការសម្រេចម្ចាស់គម្រោង; មិនទាន់មានភស្តុតាងបញ្ចប់ការផ្ទេរទាំងអស់។
 - 🧾 **Registration rollout**៖ នៅត្រូវ full hosted backup/restore និងរង់ចាំ handler ចាស់ឱ្យចប់ មុន coordinated cutover; migration/protocol readiness មិនបញ្ជាក់ជំហានទាំងនេះ។
-- 🧾 **Google Apps Script**៖ copy និង Deploy reader ថ្មី; writer/Watch/Web និង App ត្រូវ cutover version ៧ / `writeProtocol=1` ជាក្រុមក្រោយ backup/drain។ បិទ deployment/URL/sibling Script project/trigger ចាស់ និងផ្អាក editors ក្នុងពេល cutover។ Watcher private `_` ត្រូវសាកថា Run menu/trigger ហៅបាន។
+- 🧾 **Google Apps Script**៖ ម្ចាស់បញ្ជាក់ថាគ្មានតំណ editor; Google Drive ភ្ជាប់បាន តែ Script IDs និង active deployments មិនទាន់កំណត់។ Reader និង writer/Watch/Web source package មានរួច; ត្រូវកំណត់គម្រោងគោលដៅ និង deploy access មុន cutover version ៧ / `writeProtocol=1` ជាក្រុមក្រោយ backup/drain។ បិទ deployment/URL/sibling project/trigger ចាស់ និងផ្ទៀង watcher private `_` នៅគម្រោងដែលបានបញ្ជាក់។
 - 🧾 **Netlify និងបណ្ដាញពិត**៖ ផ្ទៀង `FIREBASE_PROJECT_IDS` ជា `projectId:branch` និង `?diag=1`; ផ្ទៀង Firebase WebSocket លើបណ្ដាញប្រើប្រាស់ និង OpenCode លើ thread ដែលមាន bot comment (App ដែលបានដំឡើង ទទួល · អ្នកក្រៅក្រុម បដិសេធ)។
 - 🔍 **Firebase business-audit hosted**៖ optional audit-trigger delivery នៅខ្វះ target ដែលគាំទ្រ Functions; `zoew-v1` Spark នៅ BLOCKED_TARGET_PLAN។ ផ្លូវ Netlify Restore attestor មិនទាមទារ Functions/Blaze នេះទេ។
 
 ### 🔍 Recovery និងចន្លោះការផ្ទៀង
 
-- **Reset និងភស្តុតាងចាស់**៖ អនុវត្ត migration `20261115020214_zoe_pickup_reset_receipt_retention.sql` ក្រោយ backup ដើម្បីរក្សា typed operation receipts; rows ដែលរក្សានៅគិត quota។ Receipt ដែលត្រូវបានលុបពីមុន ឬ Firebase latest-day proof ដែល Reset ថ្មីជំនួស នៅ HOLD; epoch ដដែលមិនបញ្ជាក់ not-applied។ R2 មាន controlled Auth/CAS coverage តែ hosted processing order នៅមិនទាន់ផ្ទៀង។
-- **ភាពស៊ីគ្នា v2**៖ legacy generation0 គ្មាន source ត្រូវគ្នា, pickup packet ចាស់/no-plan និង receipt ខ្វះ/ជំនាន់ខុស នៅ HOLD។ RESTORE-consumed journal ខ្វះ current lifecycle ឬ keyed money proof នៅរក្សាទុក។ មិនអនុញ្ញាត tab/ឧបករណ៍ខុសកំណែធ្វើប្រតិបត្តិការលាយ។
+- **Reset និងភស្តុតាងចាស់**៖ SQL candidate នៅ `supabase/pending-production-sql/20261115020214_zoe_pickup_reset_receipt_retention.sql`; promote ទៅ migrations និងអនុវត្តក្រោយ backup/drain។ Production នៅ GC ២ ថ្ងៃ; ការរក្សា typed operation receipts មិនទាន់ live។ Receipt ដែលបាត់ពីមុន ឬ Firebase latest-day proof ដែល Reset ថ្មីជំនួស នៅ HOLD; epoch ដដែលមិនបញ្ជាក់ not-applied។ R2 hosted processing order នៅត្រូវផ្ទៀង។
+- **ភាពស៊ីគ្នា v2**៖ generation ០ ដែលគ្មានទាំង source និង terminal receipt, pickup packet ចាស់/no-plan និង receipt ខ្វះ/ជំនាន់ខុស នៅ HOLD។ RESTORE-consumed journal ខ្វះ current lifecycle ឬ keyed money proof នៅរក្សាទុក។ មិនអនុញ្ញាត tab/ឧបករណ៍ខុសកំណែធ្វើប្រតិបត្តិការលាយ។
 - **ការស្កេន legacy និង proof មិនពេញ**៖ legacy v1, committed-money/unknown-history និង membership conflict គ្មាន receipt នៅ PARTIAL/HOLD។ មិនមានការធានា automatic recovery គ្រប់ករណី; កុំសង delta ledger ឬដោះ registry claim ដោយទាយ។
 - **ទិន្នន័យ pickup ចាស់**៖ ការជួសជុល pickup key លើជួរចាស់មានសញ្ញាស្តារ ប៉ុន្តែគ្មាន original Reset epoch/transition receipt នៅត្រូវ historical proof ឬការសម្រេចម្ចាស់តាម barcode; មិន recount ដោយទាយ។
 
@@ -74,13 +74,22 @@
 - **បន្ទុក និងសេវាពិត**៖ sustained hosted parcel workload, live ZTO Sign/Return mutations, Push delivery និងរាប់រយឧបករណ៍នៅមិនទាន់ផ្ទៀង។ Local load/matrix និង CI មិនជំនួស hosted capacity ឬទូរស័ព្ទពិត។
 - **Backup ស្វ័យប្រវត្តិ — ម្ចាស់ស្នើទុកសិន**៖ ម្ចាស់រៀបចំ secrets/Run workflow/restore rehearsal ដោយខ្លួនឯង។ Full DB/private-state backup និង drain នៅជាលក្ខខណ្ឌមុន hosted authority/migration cutover; session នេះមិនរៀបចំ backup ជំនួស។
 - **Repo Private — ម្ចាស់ធ្វើដោយខ្លួនឯង**៖ ម្ចាស់នឹងប្ដូរក្រោយគម្រោងកែសម្រួលរួច; source repo នៅ Public រហូតដល់ម្ចាស់ធ្វើ។ Secret scanning/Push protection នៅត្រូវផ្ទៀងដោយ GitHub admin។
-- **APK signing setup**៖ កូដ preflight រៀបចំរួច តែ GitHub admin ត្រូវ provision `android-signing`/`android-signing-preview`, exact branch/reviewer policies និង environment-scoped secrets តាម [setup artifact](../tools/audit-tools/android-signing-environments.json)។ ផ្ទៀង environment មុនដក repository-scoped signing secrets; ការកំណត់ខ្វះធ្វើឱ្យ build បរាជ័យ។ GitHub environment GET ឆ្លើយ 200 តែ environment PUT និង secrets API ឆ្លើយ 403 «Resource not accessible by integration»; ត្រូវ GitHub admin connection ដែលមានសិទ្ធិ។
-- **Palm protocol ក្នុងប្រវត្តិ git — review របស់ម្ចាស់**៖ candidate ក្នុង shared downloads សម្អាតរួចដោយមិនប្ដូរ source/remote refs។ `REVIEW.txt` និង `ref-map.json` កត់ source refs ដែលបានផ្ទៀង; ត្រូវ candidate គ្រប head ចុងក្រោយរបស់ PR #419 និងការពិនិត្យម្ចាស់មុនសម្រេច publish rewrite។
+- **APK signing setup**៖ ម្ចាស់កំពុងរៀបចំ GitHub admin access។ កូដ preflight និង [setup payload](../tools/audit-tools/android-signing-environments.json) មានរួច; ត្រូវ provision `android-signing`/`android-signing-preview`, exact branch/reviewer policies និង environment-scoped secrets។ ផ្ទៀង environment មុនដក repository-scoped secrets។ Fresh GET ឆ្លើយ 200 មាន environments ០ តែ PUT និង secret-name API នៅ 403 «Resource not accessible by integration»។
+- **Palm protocol ក្នុងប្រវត្តិ git**៖ ម្ចាស់អនុញ្ញាតបន្តអនុវត្ត rewrite។ ត្រូវ candidate គ្រប head ចុងក្រោយ, atomic exact leases សម្រាប់ public refs ទាំង ៥, ផ្អាក APK និងបន្ថែម `[skip netlify]` លើ rewritten main commit ដើម្បីរក្សា production។ ស្ថានភាពអនុវត្ត និង CI លើ SHA ថ្មីអានតាម PR។ GitHub hidden PR refs/cache ត្រូវ provider ដោះស្រាយដាច់ដោយឡែក។
 - **សមត្ថភាពមុន launch**៖ ម្ចាស់ត្រូវសម្រេច Firebase egress/License Project, Netlify credit, Supabase realtime និងពិដាន Push; ការអានកញ្ចប់បើកម៉ោងម្តងមិនទាន់ចែករំលែក។ ជម្រើស leader សាខានៅតំបន់ LOCK; ការផ្លាស់វេនអាន Sign មិនបិទជម្រើសសមត្ថភាពផ្សេងទៀត។
 - **ការផ្ទេរ backend តាមជម្រើស**៖ `tools/supabase-migrate/` ប្រើតែពេលអតិថិជន Firebase ចង់ប្ដូរ ហើយត្រូវ dry-run មុន។
-- **TypeScript បន្ត**៖ Parcel/Barcode model និង strict domain project មានរួច; នៅសល់ SDK/backend handles, ledger/pickup/collected buckets, UI models និង domain/service parameters មុនបើក global `strictNullChecks` តាម [ផែនការ TypeScript](zoew/TYPESCRIPT.md#២-ផ្លូវតឹងបន្តិចម្តងៗ)។
+- **Strict mode សកល**៖ private RTDB/transport/env, hardware audio/scanner handles និង producer/raw parameters នៅត្រូវធ្វើតាម module មុនបើក global flags។ តំបន់ LOCK គោរពលក្ខខណ្ឌឧបករណ៍ពិតតាម [CLAUDE](../CLAUDE.md); មើល [ផែនការ TypeScript](zoew/TYPESCRIPT.md#២-ផ្លូវតឹងបន្តិចម្តងៗ)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### ZoeW [2.50.206] — 2026-11-15 · ការសង្គ្រោះ Legacy ដែលមានភស្តុតាងពេញ
+
+**ZoeW** (`zoew-v469` ➜ `zoew-v470`)។ **ZoeKeyGen មិនប្រែ**។ Candidate ក្នុង [PR #419](https://github.com/mengsroy-h/Zoe-System/pull/419); CI និងការដាក់ប្រើអានតាម head ចុងក្រោយរបស់ PR។
+
+- Cleanup journal ដែល public Restore បានប្រើ source generation ០ អាចបញ្ចប់ FLIP/LEDGER/COLLECTED ក្រោយផ្ទៀង receipt, barcode birth/lifecycle, current holder និង keyed reversal ពេញ។ មិន replay ប្រាក់; original Reset epoch ខ្វះនៅ HOLD។
+- Pickup counter រាប់ reserved owner strings ដោយមិនបាត់ identity។ Native SDK ដែលមិនអាចរក្សាទុកកូនសោបានពេញទុក journal នៅ HOLD ដោយគ្មាន wire write; committed snapshot ដែលបាត់ key/count ឬផ្លាស់ projection មិនបញ្ចប់ intent។ Supabase serialization គោរព raw keys ដដែល។
+- Ledger/pickup/collected និង backend handles មាន type contracts ដែលពិពណ៌នា legacy view និង validated proof ដាច់ពីគ្នា។ Type មិនជំនួសការផ្ទៀងទិន្នន័យពី Server ហើយមិនប្រើដើម្បីសន្មតថា unknown operation បានបញ្ចប់។
+- **សកម្មភាពមុន rollout**៖ GitHub signing setup ត្រូវបញ្ចប់មុន merge ដែលបង្ក APK។ Hosted migration/authority cutover នៅពឹង backup/drain ដែលម្ចាស់រៀបចំ។ History rewrite ត្រូវផ្ទៀង refs/tree/diff និង CI លើ SHA ថ្មី ដោយរក្សា production និង pending journals តាមជំហានដែលបានផ្ទៀង។
 
 ### ZoeW [2.50.205] — 2026-11-15 · ការសង្គ្រោះក្រោយ Restore និងការភ្ជាប់ពេលទិន្នន័យជាប់
 
@@ -2154,6 +2163,16 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-11-15 — បន្ត Legacy, TypeScript និងការបំបែក client release ពី SQL cutover
+
+- **សិទ្ធិដែលម្ចាស់បញ្ជាក់**៖ បន្ត GitHub/Google និង merge/deploy, history rewrite និង Legacy/TypeScript។ Backup, ទូរស័ព្ទពិត និង repo Private នៅម្ចាស់ធ្វើ។ ម្ចាស់គ្មាន Google editor URLs ហើយកំពុងរៀបចំ GitHub admin access; API signing PUT និង secret-name GET នៅ 403 ខណៈ environments GET 200/០។ Google Drive auth ដើរ តែគ្មាន Script IDs/deploy access។ Source/owner-step package នៅ shared downloads; មិនក្លែងថា deploy រួច។
+- **Legacy ដែលផ្ទៀងបាន**៖ public Restore បង្កើត generation ០ receipt ពិត តែ cleanup guard `!generation` ទប់ការបញ្ចប់ journal។ ១២ RED ➜ ៣៣ focused PASS; cleanup/generation/session ៧ files/៤៦៧ PASS និង HOLD controls ២៣ PASS។ កែតែ null-generation guard, positive barcode birth និង keyed proof សម្រាប់ revenue-bearing COLLECTED។ Missing original epoch/receipt, source reuse និង unknown history នៅ HOLD; មិន recount ឬ replay ប្រាក់។ Independent review PASS។
+- **Type contracts**៖ statistics state ៩ RED និង UI contracts ៣៦ RED ➜ PASS។ Public backend/ref/snapshot/user models និង actual Supabase factory compiler-checked; nested-path writes/updaters ទប់ type widening។ Factory/state annotation emit ដូច source `979f5e3f`; partial fixture gateway រក្សា raw object/identity និង assertions ដើម។ Known-path types ជា schema views មិនមែន wire validation ឬ provider identity proof។ Private RTDB internals មិនត្រូវបានអះអាងថា strict ទាំងអស់។
+- **Reset codec strict scope**៖ strict baseline ៥៩ diagnostics ➜ ០; actual contracts ១៣ និង typed CAS metadata។ Pinned fixture `979f5e3f` មាន SHA256 `e1eece598dc41ee327b92f7a14c0a8b6316b79fb249f292317e7d70f8ba06ca0`។ Differential ២៧០១ cases និង identity/getter/prototype controls ២០ ដូចដើម; related ៥ files/១៤៣ tests PASS។ Full strict island រួម pure models/proof/backend contracts; App global strict flags មិនទាន់បើក។
+- **Pickup serialization**៖ type review បង្ហាញ inherited-key counter bug; actual Firebase SDK បដិសេធ null-prototype object ហើយអាចបាត់ `__proto__` ឬ throw លើ `hasOwnProperty`។ Map ➜ plain own properties រក្សា normal/constructor/toString counts; unsupported native requested marks ទុក started journal នៅ HOLD មុន proof filtering/SDK mutation។ Supabase adapter ឆ្លង JSON boundary ដោយគ្មាន identity encoding។ Post-CAS own-key primitive projection ទប់ corrupted ACK និង false/0/empty-string maps; nullish/empty maps និង sparse arrays នៅទទួលបាន។ Final affected group ១៧៨ PASS, related ៣០៨ PASS; មិនអះអាង hosted RLS ពី controlled-wire test។
+- **Client/SQL profiles**៖ live «ZoeW» មាន ៧២ migrations; housekeeping body MD5 `29028dbae76804bd6bdec81ba38e9ac4` ត្រូវ local ៧២ ដដែល។ Supabase main integration អាច auto-apply SQL។ ផ្លាស់ candidate ៧៣ ទៅ pending production path ដោយ bytes ដដែល; active paths/bytes ទាំង ៧២ ត្រូវ base `67b7df0a`។ Packaging RED ៤ cases ➜ profile checks ៤ files/៦៦ PASS រួម SQL ៧៥ និង paired SDK ១៩ scenarios/១០៩ assertions។ C04 strict current-GC guard, pending retention extension និង negative controls ១៦ រក្សាគ្រប់។ Functions, rules, registration/License flags និង Script source មិនប្រែពី base; client release មិនបើក authority ឬអនុវត្ត pending SQL។
+- **VM dependencies**៖ `pickup-reset-test` និង `db-stall-guard` reproduce `parseParcelNumber is not defined` ក្នុង direct module contexts។ បញ្ចូល module ពិតពី selected source ដោយមិនបន្ធូរ assertions; ក្រោយកែ ៦២ និង ៣៥ checks PASS។ Final source/CI អានតាម PR head; កុំយក CI របស់ `979f5e3f` មកគ្របកូដថ្មី។
 
 ### 2026-11-15 — បន្តការងារកូដ Recovery, Reset, browser និង signing
 

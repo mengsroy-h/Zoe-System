@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { acceptFixtureSession } from './helpers/accepted-session';
 import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -29,7 +30,7 @@ function commit(job: typeof pending[number]) {
     return next;
 }
 function startB(sameDb = false, sameGeneration = false) {
-    if (!sameDb) firebaseState.db = B;
+    if (!sameDb) setPartialBackendFixtureValue(firebaseState, "db", B);
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: sameDb ? A.app.options.databaseURL : B.app.options.databaseURL }));
     if (!sameGeneration) firebaseState.authGeneration++;
     resetClearHistoryOperationState();
@@ -46,8 +47,8 @@ beforeEach(() => {
     vi.stubGlobal('navigator', { locks: { request: async (_name: string, _options: any, action: (lock: object) => any) => action({}) } });
     firebaseState.isInitializingFirebase = false;
     stores = new Map([A, B].map((db) => [db, Object.fromEntries(DAYS.map((day) => [day, record(db.name + '_' + day)]))]));
-    firebaseState.authGeneration++; firebaseState.db = A;
-    firebaseState.auth = { currentUser: { uid: 'A' } };
+    firebaseState.authGeneration++; setPartialBackendFixtureValue(firebaseState, "db", A);
+    setPartialBackendFixtureValue(firebaseState, "auth", { currentUser: { uid: 'A' } });
     firebaseState.firebaseConfig = { databaseURL: A.app.options.databaseURL };
     acceptFixtureSession();
     firebaseState.dbRefDailyPickup = { path: PATH } as any;
@@ -126,7 +127,7 @@ describe('Reset ច្រើនថ្ងៃ៖ រក្សាម្ចាស់
         paused = true; const oldRun = resetPickupStats(); await flush(); const old = pending.shift()!;
         startB();
         firebaseState.firebaseConfig = B.app.options;
-        firebaseState.auth = { currentUser: { uid: 'A' } };
+        setPartialBackendFixtureValue(firebaseState, "auth", { currentUser: { uid: 'A' } });
         acceptFixtureSession();
         const newRun = resetPickupStats(); await flush(); const fresh = pending.shift()!;
         expect(fresh.db).toBe(B); expect(dataState.pickupResetInFlight).toBe(true);

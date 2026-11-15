@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { firebaseState, scanState, securityState, uiState } from '../../../../ZoeW/src/core/state';
 import { viewState } from '../../../../ZoeW/src/core/view-state';
@@ -323,10 +324,10 @@ it.each(['auth', 'user', 'sdk', 'database', 'scope', 'generation'])('ចម្�
     token.mockReturnValueOnce(new Promise(yes => { oldReply = yes; }));
     armSessionExpiryCheck(firebaseState.auth.currentUser, firebaseState.authGeneration);
     expect(firebaseState.sessionExpiryCheck).toBe('live');
-    if (boundary === 'auth') firebaseState.auth = { currentUser: firebaseState.auth.currentUser };
-    if (boundary === 'user') firebaseState.auth.currentUser = { uid: 'clock-policy' };
+    if (boundary === 'auth') setPartialBackendFixtureValue(firebaseState, "auth", { currentUser: firebaseState.auth.currentUser });
+    if (boundary === 'user') setPartialBackendFixtureValue(firebaseState.auth, "currentUser", { uid: 'clock-policy' });
     if (boundary === 'sdk') firebaseState.fb = { ...firebaseState.fb };
-    if (boundary === 'database') firebaseState.db = {};
+    if (boundary === 'database') setPartialBackendFixtureValue(firebaseState, "db", {});
     if (boundary === 'scope') firebaseState.firebaseConfig = { databaseURL: 'https://new-clock-policy.invalid' };
     if (boundary === 'generation') firebaseState.authGeneration++;
     expect(acceptLocalAuthSession(firebaseState.auth, loginBackendScope(), firebaseState.auth.currentUser)).toBe(true);

@@ -1,3 +1,4 @@
+import { callPartialBackendFixtureMethod, setPartialBackendFixtureValue } from './helpers/backend-fixture';
 /**
  * ⛔ M5 (ការសម្រេចម្ចាស់គម្រោង ៖ «ដក» ដក key យករួចផង) ៖ ស្ថិតិ «យករួច» តាមប្រាក់។ «ដក» Barcode ដែលបិទរួចកាត់ COD · DOD ·
  *    ចំនួនកញ្ចប់ ប៉ុន្តែ key របស់វានៅក្នុង `zoew_daily_pickup_cod_dod/<ថ្ងៃ>/pickedUpBarcodes` ➜ «យករួច» រាប់កញ្ចប់ដែលលែងមាន
@@ -486,7 +487,7 @@ it('⛔ ឧបករណ៍ ២ ៖ ឧបករណ៍ផ្សេង «ដក» 
 
 it('ទិសផ្ទុយ ៖ Reset ស្ថិតិយក ➜ ដក Barcode បិទ ➜ Reset មិនកើតវិញ', async () => {
     seedItem('p8', ['M5P0081', 'M5P0082'], ['M5P0081', 'M5P0082']);
-    await firebaseState.fb.runTransaction(makeRef(DB, PICKUP + '/' + DAY), pickup.pickupResetRecord);
+    await callPartialBackendFixtureMethod(firebaseState.fb, 'runTransaction', [makeRef(DB, PICKUP + '/' + DAY), pickup.pickupResetRecord]);
     loadViewsFromServer();
     expect(await removeSingleBarcode('p8', 'M5P0081')).toBe('done');
     await sleep(20);
@@ -544,14 +545,14 @@ it('ការដកដែលបានបញ្ជាក់នៅតែបញ្�
     loadViewsFromServer();
     const runTransaction = firebaseState.fb.runTransaction;
     let calls = 0;
-    firebaseState.fb.runTransaction = async (ref, updater) => {
+    setPartialBackendFixtureValue(firebaseState.fb, "runTransaction", async (ref, updater) => {
         const result = await runTransaction(ref, updater);
         if (ref.path === HISTORY + '/p1' && ++calls === 2 && result.committed) {
             firebaseState.serverClockTrusted = false;
             firebaseState.serverTimeOffsetMs = 7 * 86400000;
         }
         return result;
-    };
+    });
     expect(await removeSingleBarcode('p1', 'M5P0001')).toBe('done');
     expect(trashItems()).toHaveLength(1);
     expect(trashItems()[0].closedAt).toBe(NOW);
@@ -663,7 +664,7 @@ it.each(['exact', 'reordered', 'reset', 'missing-final', 'final-token', 'final-t
             switched = true;
             if (fault === 'session-db') firebaseState.db = { name: 'foreign' } as any;
             if (fault === 'session-sdk') firebaseState.fb = { ...sdk };
-            if (fault === 'session-uid') firebaseState.auth.currentUser.uid = 'foreign';
+            if (fault === 'session-uid') setPartialBackendFixtureValue(firebaseState.auth.currentUser, "uid", 'foreign');
             if (fault === 'session-scope') appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://foreign.firebaseio.com' }));
             if (fault === 'session-generation') firebaseState.authGeneration++;
         }

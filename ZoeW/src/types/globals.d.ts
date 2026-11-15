@@ -23,7 +23,7 @@ declare global {
     interface Window {
         ZoeErrors?: ZoeErrorsApi;
         ZoeLicense?: ZoeLicenseApi;
-        firebaseSDK?: any;
+        firebaseSDK?: import('../services/backend-types').BackendSdk;
         loadFirebaseSDK?: () => void;
         XLSX?: any;
         ZXingWASM?: any;

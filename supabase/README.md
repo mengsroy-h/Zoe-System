@@ -126,7 +126,17 @@ npx supabase@3.0.0 migration repair --status applied <version> <version> … --r
 ⛔ **migration ដែលមានក្នុង `main` រួច កុំកែ កុំលុប កុំប្តូរឈ្មោះ** ៖ ការ deploy អនុវត្តតែ version ថ្មី ➜ ការកែឯកសារចាស់ **មិនទៅដល់ Database ទេ (ស្ងាត់)**។
 ការប្តូរ schema = ឯកសារ `YYYYMMDDHHMMSS_<ឈ្មោះ>.sql` **ថ្មី** ដែល version ក្រោយគេ (`supabase-datastore-test` ធ្លាក់ពេលឯកសារក្នុង `origin/main` ប្រែ ឬ version ថ្មីនៅមុន)។
 
-ផ្លូវដោយដៃ ៖ ពាក្យបញ្ជាខាងក្រោម pin CLI `3.0.0`។ មុនប្រើ ពិនិត្យ `npx supabase@3.0.0 --version` និង `--help` របស់ command នោះ។
+### SQL រង់ចាំអនុវត្តនៅ production
+
+[`pending-production-sql/`](pending-production-sql) រក្សា SQL សម្រាប់ការពិនិត្យមុនអនុវត្តនៅ production។ ថតនេះនៅក្រៅ `migrations/` ដូច្នេះ GitHub integration និង `db push` មិនយក SQL ក្នុងថតនេះទៅអនុវត្ត។ ការបញ្ចូល client ដែលប្រើ schema បច្ចុប្បន្នអាចទុក SQL ទាំងនេះឱ្យរង់ចាំបាន។
+
+តេស្ត `pickup-reset-retention.pg.test.ts` អនុវត្ត migration សកម្មជាមុន រួចអនុវត្ត SQL retention ពីថតនេះដោយបញ្ជាក់ផ្លូវច្បាស់លាស់ ក្នុង PostgreSQL សាកល្បងដែលតេស្តបង្កើតនិងគ្រប់គ្រងផ្ទាល់។ តេស្តធម្មតានិង driver Reset អនុវត្តតែ `migrations/` ដើម្បីផ្ទៀង schema បច្ចុប្បន្ន។
+
+មុនដាក់ SQL រង់ចាំចូល `migrations/` ត្រូវបើក PR Database ដាច់ដោយឡែក ក្រោយម្ចាស់បានរៀបចំ backup និងផ្អាក writer ដែលពាក់ព័ន្ធរួច ហើយបានអនុម័ត target និងការអនុវត្ត។ ពិនិត្យ migration ចុងក្រោយម្ដងទៀត; បើត្រូវការលេខ version ថ្មី ប្រើ `supabase migration new` ហើយផ្ទេរ SQL ដែលបានពិនិត្យទៅឯកសារថ្មី មុនរត់តេស្តឡើងវិញ។ កុំអនុវត្តថតរង់ចាំនេះទាំងមូលទៅ hosted target។
+
+### អនុវត្ត migration សកម្មដោយដៃ
+
+ពាក្យបញ្ជាខាងក្រោម pin CLI `3.0.0`។ មុនប្រើ ពិនិត្យ `npx supabase@3.0.0 --version` និង `--help` របស់ command នោះ។
 Hosted target ត្រូវច្បាស់ជា `--remote=<project-ref>`; កុំយកជោគជ័យរបស់ local stack ជា deployment។ CLI សួរបញ្ជាក់មុន hosted change;
 automation ប្រើ `--yes` តែក្រោយអនុម័ត project និងសកម្មភាពនោះ។ មិនត្រូវ upgrade/install ឧបករណ៍ដោយស្ងាត់ទេ។
 ឯកសារផ្លូវការ៖ [CLI v3 និងការជ្រើស target](https://supabase.com/docs/guides/local-development/cli/migrating-to-v3)។

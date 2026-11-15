@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -61,7 +62,7 @@ it('Cookie សាខាច្រើនក្នុង project តែមួយប
     firebaseState.firebaseConfig = { databaseURL: 'https://shop.firebaseio.com', projectId: 'shop-project' } as any;
     firebaseState.auth = { currentUser: { uid: 'a', email: 'staff@zoew123.com' } } as any;
     const first = ztoSweepLaneOf({}, false);
-    firebaseState.auth.currentUser.email = 'staff@zoew456.com';
+    setPartialBackendFixtureValue(firebaseState.auth.currentUser, "email", 'staff@zoew456.com');
     expect(ztoSweepLaneOf({}, false)).toBe(first);
     expect(first).toBe('cookie_shop-project');
     expect(ztoSweepLaneOf({ palmAccount: { siteCode: '123' } }, true)).not.toBe(ztoSweepLaneOf({ palmAccount: { siteCode: '456' } }, true));

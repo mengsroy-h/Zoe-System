@@ -1,6 +1,7 @@
 import { captureConnectionOperation } from '../services/connection-flow';
 import { captureTrashGenerationOwner, trashGenerationOwnerCurrent } from '../services/trash-generation';
 import { rowOperationActive } from '../services/row-operation-lock';
+import type { ParcelRow } from '../domain/parcel';
 import { fieldValue, focusField, setFieldValue } from '../app/refs';
 import { domText, viewState } from '../core/view-state';
 import { dataState, firebaseState, uiState } from '../core/state';
@@ -346,7 +347,7 @@ export async function toggleCloseStatus(id?) {
     const settleClose = (result, late) => settleCloseOnce(result, late).finally(releaseSettle);
     let closeTx = null;
     try {
-        closeTx = firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${id}`), (currentItem) => {
+        closeTx = firebaseState.fb.runTransaction(firebaseState.fb.ref<ParcelRow>(firebaseState.db, `zoew_scan_history_cod_dod/${id}`), (currentItem) => {
             if (!closeIsCurrent()) return;
             serverApplied = false;
             serverPickupMarks = null;

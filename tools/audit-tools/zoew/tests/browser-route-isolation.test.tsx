@@ -1,3 +1,4 @@
+import { callPartialBackendFixtureMethod, setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -131,10 +132,10 @@ async function startSession(fixture: ReturnType<typeof checker>, defect = '') {
     if (defect === 'missing-token') delete sdk.getIdTokenResult;
     if (defect === 'rejected-token') sdk.getIdTokenResult = async () => { throw new Error('token rejected'); };
     if (defect === 'expired') {
-        sdk.getIdTokenResult = async () => ({ authTime: new Date(now - 4 * 60 * 60 * 1000 - 1).toISOString() });
-        sdk.signOut = vi.fn(() => new Promise(() => {}));
+        setPartialBackendFixtureValue(sdk, "getIdTokenResult", async () => ({ authTime: new Date(now - 4 * 60 * 60 * 1000 - 1).toISOString() }));
+        setPartialBackendFixtureValue(sdk, "signOut", vi.fn(() => new Promise(() => {})));
     }
-    Object.assign(firebaseState, { fb: sdk, auth: sdk.getAuth(), db: sdk.getDatabase(),
+    Object.assign(firebaseState, { fb: sdk, auth: callPartialBackendFixtureMethod(sdk, 'getAuth', []), db: callPartialBackendFixtureMethod(sdk, 'getDatabase', []),
         sessionExpiryCheck: 'pending',
         authGeneration: firebaseState.authGeneration + 1 });
     firebaseState.dbRefConnected = sdk.ref(firebaseState.db, '.info/connected');

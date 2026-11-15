@@ -27,6 +27,7 @@ import { admitPriceOperation, capturePriceOperation, priceOperationCurrent } fro
 import { finishPriceOperation, withPriceOperationLock } from '../services/price-operation';
 import { readRestoreServerNode } from './restore';
 import { parseParcelNumber } from '../domain/parcel-number';
+import type { ParcelRow } from '../domain/parcel';
 
 export function openViewListModal(id?) {
     uiState.activeParentItemId = id;
@@ -541,7 +542,7 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
     const settleBarcodeClose = (result, late) => settleBarcodeCloseOnce(result, late).finally(releaseSettle);
     let closeTx = null;
     try {
-        closeTx = firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${itemId}`), (currentItem) => {
+        closeTx = firebaseState.fb.runTransaction(firebaseState.fb.ref<ParcelRow>(firebaseState.db, `zoew_scan_history_cod_dod/${itemId}`), (currentItem) => {
             if (!closeIsCurrent()) return;
             serverApplied = false;
             serverPickupMarks = null;

@@ -1,4 +1,5 @@
 import { rowOperationActive } from './row-operation-lock';
+import type { ParcelRow } from '../domain/parcel';
 import { isNativeAndroid } from '../platform/native';
 import { playNativeScanBeep } from '../platform/scan-beep';
 import { dataState, firebaseState, uiState } from '../core/state';
@@ -35,7 +36,7 @@ export function mergeBarcodeIntoHistoryItem(id, mergeFn, fallbackItem) {
         showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! (ID មិនត្រឹមត្រូវ)");
         return Promise.reject(err);
     }
-    return firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${id}`), (currentItem) => {
+    return firebaseState.fb.runTransaction(firebaseState.fb.ref<ParcelRow>(firebaseState.db, `zoew_scan_history_cod_dod/${id}`), (currentItem) => {
         if (rowOperationActive(currentItem)) return;
         if (currentItem && currentItem.clearClaim) return;
         if (!currentItem) return fallbackItem ? freshHistoryItemFrom(fallbackItem, mergeFn) : fallbackItem;
@@ -252,7 +253,7 @@ export function patchHistoryItemFields(item, fields, previousFields, onServerIte
     let serverRowBusy = false;
     let patchTransaction;
     try {
-        patchTransaction = firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${item.id}`), (currentItem) => {
+        patchTransaction = firebaseState.fb.runTransaction(firebaseState.fb.ref<ParcelRow>(firebaseState.db, `zoew_scan_history_cod_dod/${item.id}`), (currentItem) => {
             if (!patchIsCurrent()) return;
             serverItemExisted = false;
             serverRowBusy = rowOperationActive(currentItem);

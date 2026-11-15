@@ -1,3 +1,4 @@
+import { callPartialBackendFixtureMethod, setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { pickupResetAttemptId, pickupResetBoundReceipt, pickupResetCasOf, pickupResetReceiptMatches } from '../../../../ZoeW/src/domain/pickup-reset-proof';
@@ -5,6 +6,7 @@ import { createSupabaseDatabase, SbNetworkError, SbRpcError } from '../../../../
 import { createSupabaseSdk } from '../../../../ZoeW/src/services/supabase-sdk';
 import { firebaseState } from '../../../../ZoeW/src/core/state';
 import { acceptFixtureSession } from './helpers/accepted-session';
+import type { PickupResetContext } from '../../../../ZoeW/src/domain/statistics';
 
 const url = 'https://reset-adapter.supabase.co';
 const authScope = url + '|user';
@@ -17,7 +19,7 @@ const helpers = { boundReceipt: pickupResetBoundReceipt, receiptMatches: pickupR
 const turn = async () => { for (let i = 0; i < 100; i++) await Promise.resolve(); };
 const deferred = () => { let resolve: (value?: any) => void; const promise = new Promise<any>(res => { resolve = res; }); return { promise, resolve: (...args: any[]) => resolve(args[0]) }; };
 const request = async (nonce = 'attempt-nonce') => {
-    const context = { v: 1, scope: url + '#A', batchId: 'batch-one', batchHash: 'a'.repeat(64), dayId: 'batch-one:' + day, day, nonce };
+    const context: PickupResetContext = { v: 1, scope: url + '#A', batchId: 'batch-one', batchHash: 'a'.repeat(64), dayId: 'batch-one:' + day, day, nonce };
     const casText = JSON.stringify({ k: 'cas', p: path, x: before, v: { ...next, pickedUpPhones: null, pickedUpBarcodes: null } }, null, 1);
     return { tenant: 'A', actorUid: 'user', context, attemptId: await pickupResetAttemptId('A', 'user', context, casText), casText };
 };
@@ -222,8 +224,8 @@ it('late reply ក្រោយ owner ផ្លាស់ មាន actual commit 
 it('SDK បញ្ជូន execute/status និង owner callback ដោយរក្សា request ដដែល', async () => {
     const req = await request(), owner = () => true, execute = vi.fn().mockResolvedValue({ committed: false }), status = vi.fn().mockResolvedValue({ outcome: 'unknown', pickupReset: null });
     const sdk = createSupabaseSdk(() => ({}), {}), ref = { _db: { executePickupReset: execute, pickupResetStatus: status } };
-    expect(await sdk.executePickupReset(ref, req, owner)).toEqual({ committed: false });
-    expect(await sdk.pickupResetStatus(ref, req, owner)).toEqual({ outcome: 'unknown', pickupReset: null });
+    expect(await callPartialBackendFixtureMethod(sdk, 'executePickupReset', [ref, req, owner])).toEqual({ committed: false });
+    expect(await callPartialBackendFixtureMethod(sdk, 'pickupResetStatus', [ref, req, owner])).toEqual({ outcome: 'unknown', pickupReset: null });
     expect(execute).toHaveBeenCalledExactlyOnceWith(ref, req, owner); expect(status).toHaveBeenCalledExactlyOnceWith(ref, req, owner);
 });
 
@@ -309,7 +311,7 @@ it('SDK getDatabase បញ្ជូន codec ពិត ដល់ fixed-attempt a
         onListenerError: vi.fn(), onWriteRecovery: vi.fn(), dbOptions: { pollFallbackMs: 600000 } });
     const config = { supabaseUrl: url }, app = sdk.initializeApp(config);
     const previous = { auth: firebaseState.auth, fb: firebaseState.fb, db: firebaseState.db, firebaseConfig: firebaseState.firebaseConfig };
-    app._auth = { app, currentUser: { uid: 'user' }, _account: { tenant_id: 'A' }, _close: vi.fn() }; app._tenantTopic = 'zoe:A';
+    setPartialBackendFixtureValue(app, "_auth", { app, currentUser: { uid: 'user' }, _account: { tenant_id: 'A' }, _close: vi.fn() }); app._tenantTopic = 'zoe:A';
     try {
         const db = sdk.getDatabase(app);
         Object.assign(firebaseState, { auth: app._auth, fb: sdk, db, firebaseConfig: config });

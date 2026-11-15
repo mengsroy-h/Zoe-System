@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { webcrypto } from 'node:crypto';
 import { DB_OP_TIMEOUT_MS } from '../../../../ZoeW/src/services/network';
 import { RETURNED_TRASH_RETENTION_MS, TRASH_RETENTION_MS } from '../../../../ZoeW/src/features/session';
@@ -239,7 +240,7 @@ it.each(['db', 'sdk', 'uid', 'scope', 'generation'])('atomic purge ៖ owner %s 
         readHook = null;
         if (kind === 'db') firebaseState.db = { name: 'other' } as any;
         if (kind === 'sdk') firebaseState.fb = { ...firebaseState.fb };
-        if (kind === 'uid') firebaseState.auth.currentUser.uid = 'other';
+        if (kind === 'uid') setPartialBackendFixtureValue(firebaseState.auth.currentUser, "uid", 'other');
         if (kind === 'scope') localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://other.firebaseio.com' }));
         if (kind === 'generation') firebaseState.authGeneration++;
     };
@@ -482,7 +483,7 @@ it.each(['claim', 'history', 'bind', 'final'].flatMap(phase => ['uid', 'sdk', 's
     const reached = deferred(), released = deferred();
     const original = firebaseState.fb, run = original.runTransaction;
     let held = false, trashCalls = 0, targetChanged = false;
-    original.runTransaction = async (target, updater, options) => {
+    setPartialBackendFixtureValue(original, "runTransaction", async (target, updater, options) => {
         if (target.path === T + '/source') trashCalls++;
         if (phase === 'bind' && target.path === H + '/source' && !targetChanged) {
             targetChanged = true;
@@ -497,11 +498,11 @@ it.each(['claim', 'history', 'bind', 'final'].flatMap(phase => ['uid', 'sdk', 's
             held = true; reached.resolve(); await released.promise;
         }
         return run(target, updater, options);
-    };
+    });
     uiState.pendingRestoreId = 'source'; const restoring = executeRestoreItem();
     await reached.promise; expect(held).toBe(true);
     const before = clone(store), scope = liveShopScope(), eventCount = events.length;
-    if (owner === 'uid') firebaseState.auth.currentUser.uid = 'next-user';
+    if (owner === 'uid') setPartialBackendFixtureValue(firebaseState.auth.currentUser, "uid", 'next-user');
     if (owner === 'sdk') firebaseState.fb = { ...original };
     if (owner === 'scope') {
         firebaseState.db.app.options.databaseURL = 'https://next-shop.firebaseio.com';

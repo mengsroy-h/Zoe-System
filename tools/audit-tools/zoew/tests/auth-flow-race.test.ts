@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
 import { firebaseState } from '../../../../ZoeW/src/core/state';
 import { viewState } from '../../../../ZoeW/src/core/view-state';
@@ -64,12 +65,12 @@ describe('login/logout callbacks own their actual App auth and backend', () => {
   it('internal write recovery resumes only after the current restored SDK session is accepted', () => {
     let callback: any;
     const auth = firebaseState.auth, user = { uid: 'restored-recovery-owner' };
-    auth.currentUser = user;
+    setPartialBackendFixtureValue(auth, "currentUser", user);
     const resumeAcceptedSession = vi.fn(value => {
       expect(value).toBe(auth);
       expect(localAuthSessionCurrent(auth, loginBackendScope(), user)).toBe(true);
     });
-    firebaseState.fb = { onAuthStateChanged: (_auth, listener) => { callback = listener; return () => {}; }, resumeAcceptedSession };
+    setPartialBackendFixtureValue(firebaseState, "fb", { onAuthStateChanged: (_auth, listener) => { callback = listener; return () => {}; }, resumeAcceptedSession });
     setupAuthListener();
     expect(resumeAcceptedSession).not.toHaveBeenCalled();
     callback(user);
@@ -89,9 +90,9 @@ describe('login/logout callbacks own their actual App auth and backend', () => {
       expect(localLogoutIntent.blocked(loginBackendScope(), user.uid)).toBe(false);
       expect(localAuthSessionCurrent(auth, loginBackendScope(), user)).toBe(true);
     });
-    firebaseState.fb = { setPersistence: async () => {}, signInWithEmailAndPassword: async () => {
-      auth.currentUser = user; return { user };
-    }, resumeAcceptedSession };
+    setPartialBackendFixtureValue(firebaseState, "fb", { setPersistence: async () => {}, signInWithEmailAndPassword: async () => {
+      setPartialBackendFixtureValue(auth, "currentUser", user); return { user };
+    }, resumeAcceptedSession });
     await performLogin('owner@example.invalid', 'synthetic-password', false, false);
     expect(resumeAcceptedSession).toHaveBeenCalledOnce();
     expect(proceedAfterLogin).toHaveBeenCalledOnce();
@@ -99,8 +100,8 @@ describe('login/logout callbacks own their actual App auth and backend', () => {
 
   it('a stale credential owner cannot resume internal recovery on its replacement backend', async () => {
     const persistence = deferred<void>(), resumeAcceptedSession = vi.fn();
-    firebaseState.fb = { setPersistence: () => persistence.promise,
-      signInWithEmailAndPassword: vi.fn(), resumeAcceptedSession };
+    setPartialBackendFixtureValue(firebaseState, "fb", { setPersistence: () => persistence.promise,
+      signInWithEmailAndPassword: vi.fn(), resumeAcceptedSession });
     const running = performLogin('old@example.invalid', 'synthetic-password', false, false);
     await turn();
     attach('replacement'); firebaseState.authGeneration++;
@@ -116,10 +117,10 @@ describe('login/logout callbacks own their actual App auth and backend', () => {
       get length() { return session.size; }, key: (i: number) => [...session.keys()][i] ?? null,
       getItem: (key: string) => session.get(key) ?? null, setItem: (key: string, value: string) => { session.set(key, value); }
     });
-    const resumeAcceptedSession = vi.fn(), signInWithEmailAndPassword = vi.fn(async () => { auth.currentUser = user; return { user }; });
+    const resumeAcceptedSession = vi.fn(), signInWithEmailAndPassword = vi.fn(async () => { setPartialBackendFixtureValue(auth, "currentUser", user); return { user }; });
     let publishAuth: any;
-    firebaseState.fb = { setPersistence: async () => {}, signInWithEmailAndPassword, resumeAcceptedSession,
-      onAuthStateChanged: (_auth, callback) => { publishAuth = callback; return () => {}; } };
+    setPartialBackendFixtureValue(firebaseState, "fb", { setPersistence: async () => {}, signInWithEmailAndPassword, resumeAcceptedSession,
+      onAuthStateChanged: (_auth, callback) => { publishAuth = callback; return () => {}; } });
     setupAuthListener();
     const original = localLogoutIntent.acknowledge;
     let interleaved = 0;
@@ -150,7 +151,7 @@ describe('login/logout callbacks own their actual App auth and backend', () => {
   it('late current-user auth callback cannot reopen a locally closed session without a new login', async () => {
     let callback;
     const user = { uid: 'A' };
-    firebaseState.auth.currentUser = user;
+    setPartialBackendFixtureValue(firebaseState.auth, "currentUser", user);
     firebaseState.fb = { onAuthStateChanged: (_auth, listener) => { callback = listener; return () => {}; },
       signOut: () => new Promise<void>(() => {}) } as any;
     setupAuthListener(); callback(user); await turn();
@@ -166,10 +167,10 @@ describe('login/logout callbacks own their actual App auth and backend', () => {
 
   it('control: a current login remembers its scoped account and completes once', async () => {
     const user = { uid: 'A' };
-    firebaseState.fb = { setPersistence: () => Promise.resolve(), signInWithEmailAndPassword: async () => {
-      firebaseState.auth.currentUser = user;
+    setPartialBackendFixtureValue(firebaseState, "fb", { setPersistence: () => Promise.resolve(), signInWithEmailAndPassword: async () => {
+      setPartialBackendFixtureValue(firebaseState.auth, "currentUser", user);
       return { user };
-    } } as any;
+    } } as any);
     performLogin('a@example.invalid', 'test-password', true, false);
     await turn();
     expect(appLocalStore.getItem(REMEMBERED_LOGIN_KEY)).toBe('a@example.invalid');
@@ -369,9 +370,9 @@ function foreignInitialAuthIntent() {
 
 it('the initial SDK callback cannot adopt a logout acknowledged after listener registration', () => {
   let publish!: (user: any) => void;
-  const auth = firebaseState.auth, user = { uid: 'pending-initial-sdk-owner' }; auth.currentUser = user;
+  const auth = firebaseState.auth, user = { uid: 'pending-initial-sdk-owner' }; setPartialBackendFixtureValue(auth, "currentUser", user);
   const resume = vi.fn();
-  firebaseState.fb = { onAuthStateChanged: (_auth, cb) => { publish = cb; return () => {}; }, resumeAcceptedSession: resume };
+  setPartialBackendFixtureValue(firebaseState, "fb", { onAuthStateChanged: (_auth, cb) => { publish = cb; return () => {}; }, resumeAcceptedSession: resume });
   setupAuthListener();
   const other = foreignInitialAuthIntent(), scope = loginBackendScope();
   expect(other.note(scope, user.uid)).toBe(true);
@@ -386,21 +387,21 @@ it('the initial SDK callback cannot adopt a logout acknowledged after listener r
 it('an initial null callback consumes startup proof before a later legitimate SDK signin', () => {
   let publish!: (user: any) => void;
   const auth = firebaseState.auth, user = { uid: 'initial-null-later-sdk-owner' }, resume = vi.fn();
-  firebaseState.fb = { onAuthStateChanged: (_auth, cb) => { publish = cb; return () => {}; }, resumeAcceptedSession: resume };
+  setPartialBackendFixtureValue(firebaseState, "fb", { onAuthStateChanged: (_auth, cb) => { publish = cb; return () => {}; }, resumeAcceptedSession: resume });
   setupAuthListener(); publish(null);
   const other = foreignInitialAuthIntent(), scope = loginBackendScope();
   expect(other.note(scope, user.uid)).toBe(true);
   expect(other.acknowledge(scope, user.uid, other.capture(scope))).toBe(true);
-  auth.currentUser = user; publish(user);
+  setPartialBackendFixtureValue(auth, "currentUser", user); publish(user);
   expect(localAuthSessionCurrent(auth, scope, user)).toBe(true);
   expect(resume).toHaveBeenCalledOnce(); expect(proceedAfterLogin).toHaveBeenCalledOnce();
 });
 
 it('owned credential login supersedes startup proof while its initial SDK callback is pending', async () => {
   let publish!: (user: any) => void;
-  const auth = firebaseState.auth, user = { uid: 'pending-initial-explicit-owner' }; auth.currentUser = user;
-  firebaseState.fb = { onAuthStateChanged: (_auth, cb) => { publish = cb; return () => {}; },
-    setPersistence: async () => {}, signInWithEmailAndPassword: async () => ({ user }) };
+  const auth = firebaseState.auth, user = { uid: 'pending-initial-explicit-owner' }; setPartialBackendFixtureValue(auth, "currentUser", user);
+  setPartialBackendFixtureValue(firebaseState, "fb", { onAuthStateChanged: (_auth, cb) => { publish = cb; return () => {}; },
+    setPersistence: async () => {}, signInWithEmailAndPassword: async () => ({ user }) });
   setupAuthListener();
   const other = foreignInitialAuthIntent(), scope = loginBackendScope();
   expect(other.note(scope, user.uid)).toBe(true);
@@ -413,9 +414,9 @@ it('owned credential login supersedes startup proof while its initial SDK callba
 
 it('a changed raw Config cannot refresh a pending initial Auth proof during listener reattachment', () => {
   let publish!: (user: any) => void;
-  const auth = firebaseState.auth, user = { uid: 'pending-config-owner' }; auth.currentUser = user;
+  const auth = firebaseState.auth, user = { uid: 'pending-config-owner' }; setPartialBackendFixtureValue(auth, "currentUser", user);
   appLocalStore.setItem('zoew_firebase_config', JSON.stringify(firebaseState.firebaseConfig));
-  firebaseState.fb = { onAuthStateChanged: (_auth, cb) => { publish = cb; return () => {}; } };
+  setPartialBackendFixtureValue(firebaseState, "fb", { onAuthStateChanged: (_auth, cb) => { publish = cb; return () => {}; } });
   setupAuthListener();
   appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ ...firebaseState.firebaseConfig, syntheticChanged: true }));
   setupAuthListener(); publish(user);
@@ -427,10 +428,10 @@ it('a changed raw Config cannot refresh a pending initial Auth proof during list
 
 it('an initial unacknowledged logout cannot become implicit admission when a foreign tab only acknowledges its token', () => {
   let publish!: (user: any) => void;
-  const auth = firebaseState.auth, user = { uid: 'initial-unacknowledged-owner' }; auth.currentUser = user;
+  const auth = firebaseState.auth, user = { uid: 'initial-unacknowledged-owner' }; setPartialBackendFixtureValue(auth, "currentUser", user);
   const resume = vi.fn(), other = foreignInitialAuthIntent(), scope = loginBackendScope();
   expect(other.note(scope, user.uid)).toBe(true);
-  firebaseState.fb = { onAuthStateChanged: (_auth, cb) => { publish = cb; return () => {}; }, resumeAcceptedSession: resume };
+  setPartialBackendFixtureValue(firebaseState, "fb", { onAuthStateChanged: (_auth, cb) => { publish = cb; return () => {}; }, resumeAcceptedSession: resume });
   setupAuthListener();
   expect(other.acknowledge(scope, user.uid, other.capture(scope))).toBe(true); publish(user);
   expect(localAuthSessionCurrent(auth, scope, user)).toBe(false); expect(resume).not.toHaveBeenCalled();

@@ -18,6 +18,7 @@ import { TX_ROOT_READ_TIMEOUT_MS, txDelay, txReadServerValue, txRestUrl, txSameV
 import { showToast } from '../ui/toast';
 import { assertPickupResetApplied, preservePickupResetApplied } from './pickup-reset-proof';
 import { trashConsumptionSame, trashConsumptionValid } from './trash-generation';
+import type { PickupDayView, PickupMark, PickupRestoreGuard } from './statistics';
 
 export const PICKUP_PHONE_KEY_MAX = 64;
 
@@ -37,25 +38,25 @@ export function pickupBarcodeKey(code) {
     return raw ? barcodeRegistryKey(raw) : '';
 }
 
-export function pickupSetSize(set) {
+export function pickupSetSize(set: unknown) {
     return (set && typeof set === 'object') ? Object.keys(set).length : 0;
 }
 
-export function tallyPickupPhones(set) {
-    const phones = {};
+export function tallyPickupPhones(set: Record<string, unknown> | null | undefined): Record<string, number> {
+    const phones = new Map<string, number>();
     Object.keys(set || {}).forEach((key) => {
         const phone = set[key];
         if (typeof phone !== 'string' || !phone) return;
-        phones[phone] = (phones[phone] || 0) + 1;
+        phones.set(phone, (phones.get(phone) || 0) + 1);
     });
-    return phones;
+    return Object.fromEntries(phones);
 }
 
 export function pickupSetFromRecord(record) {
     return record && record.pickedUpBarcodes && typeof record.pickedUpBarcodes === 'object' ? { ...record.pickedUpBarcodes } : {};
 }
 
-export function buildPickupRecordFromSet(set, metadata?, previous?) {
+export function buildPickupRecordFromSet(set: Record<string, string> | null | undefined, metadata?: { revision: number; epoch: number }, previous?: unknown): PickupDayView {
     const size = pickupSetSize(set);
     const phones = tallyPickupPhones(set);
     return preservePickupResetApplied(previous, {
@@ -66,21 +67,21 @@ export function buildPickupRecordFromSet(set, metadata?, previous?) {
     });
 }
 
-export function applyPickupMarksToSet(set, marks, existingOnly = false) {
+export function applyPickupMarksToSet(set: Record<string, string>, marks: readonly PickupMark[] | null | undefined, existingOnly = false) {
     (marks || []).forEach((mark) => {
         if (!mark || !mark.key) return;
         if (existingOnly && !Object.prototype.hasOwnProperty.call(set, mark.key)) return;
         if (mark.closed) {
-            if (typeof mark.phoneKey === 'string' && mark.phoneKey) set[mark.key] = mark.phoneKey;
+            if (typeof mark.phoneKey === 'string' && mark.phoneKey) Object.defineProperty(set, mark.key, { value: mark.phoneKey, writable: true, enumerable: true, configurable: true });
         } else delete set[mark.key];
     });
     return set;
 }
 
-export function collectPickupMarks(item, closed?, phoneKey?) {
+export function collectPickupMarks(item, closed?: boolean, phoneKey?: string | null): PickupMark[] {
     if (!item) return [];
     const owner = phoneKey || getPickupPhoneKey(item);
-    const marks = [];
+    const marks: PickupMark[] = [];
     (Array.isArray(item.barcodes) ? item.barcodes : []).forEach((b) => {
         if (!b) return;
         const key = pickupBarcodeKey(b.code);
@@ -218,10 +219,21 @@ export async function capturePickupContext(date, original?) {
     return { ...context, ...metadata, presentKeys: Object.keys(pickupSetFromRecord(raw)) };
 }
 
-export function pickupResetRecord(current) {
+export function pickupResetRecord(current): PickupDayView | undefined {
     const metadata = pickupMetadata(current);
     if (metadata.revision >= PICKUP_PROTOCOL_MAX || metadata.epoch >= PICKUP_PROTOCOL_MAX) return;
     return buildPickupRecordFromSet({}, { revision: metadata.revision + 1, epoch: metadata.epoch + 1 });
+}
+
+function pickupNativeKeyUnsupported(key: unknown) {
+    return key === '__proto__' || key === 'hasOwnProperty';
+}
+
+function pickupOwnMapSame(left: unknown, right: unknown) {
+    const first = left ?? {}, second = right ?? {};
+    if (typeof first !== 'object' || typeof second !== 'object') return false;
+    const keys = Object.keys(first);
+    return keys.length === Object.keys(second).length && keys.every(key => Object.prototype.hasOwnProperty.call(second, key) && Reflect.get(first, key) === Reflect.get(second, key));
 }
 
 export async function commitPickupMarks(scanDateStr, marks, existingOnly = false, quiet = false, keep?: (key: string) => boolean, context?, compareRevision = false) {
@@ -243,6 +255,7 @@ export async function commitPickupMarks(scanDateStr, marks, existingOnly = false
             const currentOwner = restore ? await capturePickupContext(scanDateStr, owner) : owner;
             if (!pickupContextIsCurrent(currentOwner)) return null;
             let refusal = 'version-conflict';
+            let expected: PickupDayView | undefined;
             const ref = currentOwner.sdk.ref(currentOwner.db, `zoew_daily_pickup_cod_dod/${scanDateStr}`);
             await dbOp(currentOwner.sdk.get(ref));
             if (!pickupContextIsCurrent(currentOwner)) return null;
@@ -254,15 +267,31 @@ export async function commitPickupMarks(scanDateStr, marks, existingOnly = false
                 const set = pickupSetFromRecord(current);
                 const proof = currentOwner.intent ? readPickupJournal().find(entry => entry.id === currentOwner.intent) : null;
                 if (currentOwner.intent && (!pickupJournalStarted(proof) || restore && !txSameValue(proof.restorePlan, entry.restorePlan))) return;
-                const allowed = (job.marks || []).filter(mark => mark && (!keep || keep(mark.key)) && (!mark.closed || !proof || proof.allowedAddKeys?.includes(mark.key)));
+                const requested = (job.marks || []).filter(mark => mark && (!keep || keep(mark.key)));
+                if (!currentOwner.sdk.__supabase && requested.some(mark => pickupNativeKeyUnsupported(mark.key) || mark.closed && pickupNativeKeyUnsupported(mark.phoneKey))) {
+                    refusal = 'recovery-pending';
+                    return;
+                }
+                const allowed = requested.filter(mark => !mark.closed || !proof || proof.allowedAddKeys?.includes(mark.key));
                 applyPickupMarksToSet(set, allowed, existingOnly);
-                const next: any = buildPickupRecordFromSet(set, { revision: metadata.revision + 1, epoch: metadata.epoch }, current);
+                if (!currentOwner.sdk.__supabase && Object.keys(set).some(key => pickupNativeKeyUnsupported(key) || pickupNativeKeyUnsupported(set[key]))) {
+                    refusal = 'recovery-pending';
+                    return;
+                }
+                const next = buildPickupRecordFromSet(set, { revision: metadata.revision + 1, epoch: metadata.epoch }, current);
                 if (restore) next.restoreGuard = job.guard;
+                expected = next;
                 return next;
             });
             if (!pickupContextIsCurrent(currentOwner)) return null;
             if (!result?.committed) { if (currentOwner.intent) patchPickupJournalEntry(currentOwner.intent, { hold: refusal }); return null; }
             const saved = result.snapshot.val();
+            if (!expected || saved?.packagesPickedUp !== expected.packagesPickedUp
+                || !pickupOwnMapSame(saved?.pickedUpPhones, expected.pickedUpPhones)
+                || !pickupOwnMapSame(saved?.pickedUpBarcodes, expected.pickedUpBarcodes)) {
+                if (currentOwner.intent) patchPickupJournalEntry(currentOwner.intent, { hold: 'recovery-pending' });
+                return null;
+            }
             const visibleMetadata = pickupMetadata(dataState.dailyPickupData[scanDateStr]);
             const savedMetadata = pickupMetadata(saved);
             if (visibleMetadata.epoch <= savedMetadata.epoch && visibleMetadata.revision <= savedMetadata.revision) {
@@ -627,7 +656,7 @@ async function pickupRestoreProof(entry, context) {
     const item = truth.history.find(item => item.id === entry.item);
     if (plan.targets.length && (!item || item.scanDate !== entry.date || itemHasRestoreMarkers(item) || item.phone !== plan.phone || getPickupPhoneKey(item) !== plan.phoneKey)) return null;
     const records = [...truth.history, ...truth.trash].flatMap(item => barcodeEntriesOf(item?.barcodes).map(({ barcode, index }) => ({ item, barcode, index })));
-    const guards = [];
+    const guards: PickupRestoreGuard[] = [];
     if (!plan.targets.every(target => {
         const found = records.filter(({ barcode }) => pickupBarcodeKey(barcode?.code) === target.key);
         if (found.length !== 1 || found[0].item !== item || !pickupTransitionNumber(found[0].index)

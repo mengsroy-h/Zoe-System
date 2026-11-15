@@ -1,3 +1,4 @@
+import { callPartialBackendFixtureMethod, setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { parse } from 'acorn';
@@ -196,7 +197,7 @@ it.each(['sleep', 'slow'])('request មិនស្រស់ %s មិនបើ�
 it.each(['listener', 'database', 'sdk', 'library', 'reset'])('ចម្លើយពី owner ចាស់ %s មិនបើក trust', async owner => {
     attachInfoListeners(); await turn();
     if (owner === 'listener') detachInfoListeners();
-    if (owner === 'database') firebaseState.db = {};
+    if (owner === 'database') setPartialBackendFixtureValue(firebaseState, "db", {});
     if (owner === 'sdk') firebaseState.fb = { ...firebaseState.fb };
     if (owner === 'library') new Function(verifierSource)();
     if (owner === 'reset') api.resetServerTime();
@@ -293,7 +294,7 @@ it('ព្រំដែនលើឆ្លងពេលផុតវគ្គ មិ
  expect(api.getServerTimeSample().uncertaintyMs).toBe(9000);
  expect(serverClockIsTrustworthy()).toBe(true);
  const user = installUser('synthetic');
- firebaseState.fb.getIdTokenResult.mockResolvedValue({authTime:new Date(START - 4*HOUR + 5000).toISOString()});
+ callPartialBackendFixtureMethod(firebaseState.fb.getIdTokenResult, 'mockResolvedValue', [{authTime:new Date(START - 4*HOUR + 5000).toISOString()}]);
  expect(Date.now() - (START - 4*HOUR + 5000)).toBeGreaterThan(4*HOUR);
  expect(await getFirebaseSessionVerdict(user)).toBe('unverified');
 });
@@ -340,7 +341,7 @@ it('sample native ស្រស់សាក Activation ម្តង មិនធ�
 
 it('sample Supabase ស្រស់សាក Activation ម្តង ហើយ cache មិនសាកម្ដងទៀត', async () => {
     const retry = vi.spyOn(licenseRecovery, 'retryPendingActivation').mockResolvedValue(false);
-    firebaseState.fb.__supabase = true; attachInfoListeners();
+    setPartialBackendFixtureValue(firebaseState.fb, "__supabase", true); attachInfoListeners();
     const sample = Object.freeze({ epochMs: START, estimateEpochMs: START, uncertaintyMs: 0, monotonicMs: elapsed, wallMs: START, source: 'supabase-rpc' });
     callbacks.get('offset')!({ val: () => 0, serverClockSample: sample } as any); await turn();
     expect(retry).toHaveBeenCalledTimes(1);

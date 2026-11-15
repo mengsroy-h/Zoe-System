@@ -5536,9 +5536,6 @@
     "ZoeW/src/domain/parcel.ts": {
       "policy": "zoew-self-verification"
     },
-    "supabase/migrations/20261115020214_zoe_pickup_reset_receipt_retention.sql": {
-      "policy": "supabase-db"
-    },
     "tools/audit-tools/android-signing-environments.json": {
       "policy": "android-release"
     },
@@ -5564,6 +5561,61 @@
       "policy": "zoew-self-verification"
     },
     "tools/audit-tools/zoew/tsconfig.domain-strict.json": {
+      "policy": "zoew-self-verification"
+    },
+    "supabase/pending-production-sql/20261115020214_zoe_pickup_reset_receipt_retention.sql": {
+      "policy": "supabase-db"
+    },
+    "ZoeW/src/domain/statistics.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/backend-types.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/supabase-types.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/ui/view-types.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/fixtures/pickup-reset-proof-979f5e3f.ts": {
+      "policy": "zoew-self-verification",
+      "sha256": "e1eece598dc41ee327b92f7a14c0a8b6316b79fb249f292317e7d70f8ba06ca0"
+    },
+    "tools/audit-tools/zoew/tests/backend-contracts-strict.typecheck.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/backend-factory.typecheck.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/backend-fixture.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/helpers/backend-fixture.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/pickup-owner-sdk.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/pickup-owner-supabase.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/pickup-prototype-owner.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/pickup-reset-proof-differential.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/pickup-reset-proof-strict.typecheck.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/statistics-domain-strict.typecheck.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/statistics-state.typecheck.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/ui-view-state.typecheck.ts": {
       "policy": "zoew-self-verification"
     }
   }

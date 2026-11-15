@@ -2,13 +2,14 @@ import { dataState, firebaseState } from '../core/state';
 import { getFormattedDate } from '../core/timezone';
 import { refreshCurrentHistoryView } from '../ui/history-refresh';
 import { showToast } from '../ui/toast';
+import type { LedgerDeduction, LedgerDeductionInput, LedgerDeductionRecord, LedgerDelta, LedgerTotals } from './statistics';
 
 export function ledgerNumber(value) {
     const n = parseFloat(value);
     return isFinite(n) ? n : 0;
 }
 
-export function ledgerAppliedDelta(before, after) {
+export function ledgerAppliedDelta(before, after): LedgerDelta {
     return {
         cod: Math.round((ledgerNumber(after.codDollar) - ledgerNumber(before.codDollar)) * 100) / 100,
         dod: Math.round((ledgerNumber(after.dodDollar) - ledgerNumber(before.dodDollar)) * 100) / 100,
@@ -16,7 +17,7 @@ export function ledgerAppliedDelta(before, after) {
     };
 }
 
-export function ledgerDeltaWithClamp(before, codToAdd, dodToAdd, countToAdd, label, context) {
+export function ledgerDeltaWithClamp(before: LedgerTotals, codToAdd, dodToAdd, countToAdd, label, context): LedgerTotals {
     let codDollar = Math.round((before.codDollar + (parseFloat(codToAdd) || 0)) * 100) / 100;
     let dodDollar = Math.round((before.dodDollar + (parseFloat(dodToAdd) || 0)) * 100) / 100;
     let totalCount = before.totalCount + (parseFloat(countToAdd) || 0);
@@ -239,7 +240,7 @@ export function ledgerPriorSeen(record, prior) {
     return prior.some((token) => seen.indexOf(token) !== -1);
 }
 
-export function ledgerDedOf(record, trashId) {
+export function ledgerDedOf(record, trashId): LedgerDeduction | null {
     const ded = record && typeof record === 'object' && record.ded && typeof record.ded === 'object' ? record.ded : null;
     const entry = ded && typeof trashId === 'string' ? ded[trashId] : null;
     if (!entry || typeof entry !== 'object' || typeof entry.at !== 'number' || !isFinite(entry.at) || entry.at <= 0) return null;
@@ -253,8 +254,8 @@ export function ledgerDedOf(record, trashId) {
     };
 }
 
-export function ledgerDedValue(entry) {
-    const value: any = { at: entry.at, cod: entry.cod, dod: entry.dod, count: entry.count };
+export function ledgerDedValue(entry: LedgerDeductionInput): LedgerDeductionRecord {
+    const value: LedgerDeductionRecord = { at: entry.at, cod: entry.cod, dod: entry.dod, count: entry.count };
     if (entry.back) value.back = true;
     if (entry.undo) value.undo = true;
     return value;
@@ -272,7 +273,7 @@ export function ledgerCarryDed(record, next) {
     return Object.keys(kept).length ? { ...next, ded: kept } : next;
 }
 
-export function ledgerTotalsOf(record) {
+export function ledgerTotalsOf(record): LedgerTotals {
     return {
         codDollar: parseFloat(record && record.codDollar) || 0,
         dodDollar: parseFloat(record && record.dodDollar) || 0,
@@ -391,7 +392,7 @@ export function commitLedgerEventStep(bucket, scanDateStr, trashId, at, mode, am
     });
 }
 
-export function ledgerZeroDelta() {
+export function ledgerZeroDelta(): LedgerDelta {
     return { cod: 0, dod: 0, count: 0 };
 }
 

@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 /**
  * ⛔ «ចងចាំពាក្យសម្ងាត់» (សំណើម្ចាស់គម្រោង) ៖ checkbox ក្នុងប្រអប់ចូល · លំនាំដើមធីក · ដកធីក ➜ លុបភ្លាម
  *    (១) រក្សាតែក្រោយចូលជោគជ័យ · ជាអក្សរកូដ AES-GCM ដោយ key មិនអាចនាំចេញ (IndexedDB) ➜ អក្សរធម្មតាមិនចូល storage ណាមួយ
@@ -107,7 +108,7 @@ function useBackend(cfg: Rec, fb: any, kind: 'firebase' | 'supabase' = 'firebase
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify(firebaseState.firebaseConfig));
     firebaseState.fb = fb;
     firebaseState.auth = { app: { name: 'x', options: firebaseState.firebaseConfig }, currentUser: null } as any;
-    firebaseState.db = {}; firebaseState.isDatabaseConnected = true;
+    setPartialBackendFixtureValue(firebaseState, "db", {}); firebaseState.isDatabaseConnected = true;
     resetServerClock();
     acceptServerClockOffset(0, { epochMs: Date.now(), wallMs: Date.now(), monotonicMs: performance.now() }, false);
     step(() => { viewState.backendKind = kind; });

@@ -20,7 +20,8 @@ beforeEach(() => {
     firebaseState.dbRefDailyCollected = {} as any;
     firebaseState.fb = { update: vi.fn(async () => {}), ref: vi.fn(() => ({})), runTransaction: vi.fn(async () => ({ committed: false })) } as any;
     acceptFixtureSession();
-    dataState.dailyCollectedData = { '2020-01-01': { totalCount: 1 } };
+    const untrustedCollectedSnapshot: unknown = { '2020-01-01': { totalCount: 1 } };
+    Reflect.set(dataState, 'dailyCollectedData', untrustedCollectedSnapshot);
     dataState.scanHistory = []; dataState.deletedItems = []; dataState.deletedCleanupInFlight = false;
     cleanupInFlight.clear(); dbListenerFailedPaths.clear(); dbListenerPendingPaths.clear();
     localStorage.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true, url: 'https://zoew.example/.netlify/functions/zto-order-detail' }));

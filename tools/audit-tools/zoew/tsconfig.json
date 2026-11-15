@@ -4,5 +4,5 @@
     "tsBuildInfoFile": "../../../ZoeW/node_modules/.cache/zoew-audit.tsbuildinfo"
   },
   "include": ["tests", "runtime", "vitest.config.mts", "../../../ZoeW/src/types"],
-  "exclude": ["tests/parcel-domain-strict.typecheck.ts"]
+  "exclude": ["tests/parcel-domain-strict.typecheck.ts", "tests/statistics-domain-strict.typecheck.ts", "tests/backend-contracts-strict.typecheck.ts", "tests/pickup-reset-proof-strict.typecheck.ts"]
 }

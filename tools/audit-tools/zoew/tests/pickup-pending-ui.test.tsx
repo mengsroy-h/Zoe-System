@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, securityState } from '../../../../ZoeW/src/core/state';
 import { CLEANUP_JOURNAL_KEY, PICKUP_JOURNAL_KEY } from '../../../../ZoeW/src/core/storage-keys';
@@ -29,9 +30,9 @@ beforeEach(() => {
     lab.realSummary = false;
     localStorage.clear();
     dataState.pickupPendingVersion = 0;
-    firebaseState.auth = { currentUser: { uid: 'account-a' } };
+    setPartialBackendFixtureValue(firebaseState, "auth", { currentUser: { uid: 'account-a' } });
     firebaseState.authGeneration = 1;
-    firebaseState.db = {};
+    setPartialBackendFixtureValue(firebaseState, "db", {});
     firebaseState.isInitializingFirebase = false;
     securityState.appIsLocked = false;
     securityState.appLockVeiled = false;
@@ -91,9 +92,9 @@ describe('ស្ថានភាព pickup រង់ចាំនៅក្បា�
         const reads = lab.reads;
         step(() => {
             lab.summary = { total: 0, held: 0, reasons: [] };
-            firebaseState.auth = { currentUser: { uid: 'account-b' } };
+            setPartialBackendFixtureValue(firebaseState, "auth", { currentUser: { uid: 'account-b' } });
             firebaseState.authGeneration++;
-            firebaseState.db = {};
+            setPartialBackendFixtureValue(firebaseState, "db", {});
         });
         expect(lab.reads).toBeGreaterThan(reads);
         expect(pending()).toBeNull();
@@ -121,7 +122,7 @@ describe('ស្ថានភាព pickup រង់ចាំនៅក្បា�
         step(() => { firebaseState.auth = null; firebaseState.authGeneration++; });
         expect(pending()).toBeNull();
         step(() => {
-            firebaseState.auth = { currentUser: { uid: 'account-b' } };
+            setPartialBackendFixtureValue(firebaseState, "auth", { currentUser: { uid: 'account-b' } });
             firebaseState.isInitializingFirebase = true;
         });
         expect(pending()).toBeNull();
@@ -144,14 +145,14 @@ describe('ស្ថានភាព pickup រង់ចាំនៅក្បា�
         mount(<AppNavbar />);
         expect(pending()!.textContent).toContain('1 ត្រូវពិនិត្យ');
         step(() => {
-            firebaseState.auth = { currentUser: { uid: 'account-b' } };
+            setPartialBackendFixtureValue(firebaseState, "auth", { currentUser: { uid: 'account-b' } });
             firebaseState.authGeneration++;
         });
         expect(pending()!.textContent).toContain('1 រង់ចាំ');
         expect(pending()!.getAttribute('aria-label')).not.toContain('Reset');
         step(() => {
             localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://pickup-ui-b.invalid' }));
-            firebaseState.db = {};
+            setPartialBackendFixtureValue(firebaseState, "db", {});
             firebaseState.authGeneration++;
         });
         expect(pending()).toBeNull();
@@ -211,7 +212,7 @@ describe('ស្ថានភាព pickup រង់ចាំនៅក្បា�
         expect(pending()!.textContent).toContain('1 រង់ចាំ');
         const key = cleanupJournalEntryKey(entry);
         const stored = localStorage.getItem(key);
-        step(() => { firebaseState.auth = { currentUser: { uid: 'account-b' } }; firebaseState.authGeneration++; });
+        step(() => { setPartialBackendFixtureValue(firebaseState, "auth", { currentUser: { uid: 'account-b' } }); firebaseState.authGeneration++; });
         expect(pending()).toBeNull();
         expect(localStorage.getItem(key)).toBe(stored);
     });

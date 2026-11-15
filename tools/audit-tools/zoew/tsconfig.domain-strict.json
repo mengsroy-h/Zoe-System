@@ -9,7 +9,13 @@
   "include": [
     "../../../ZoeW/src/domain/parcel.ts",
     "../../../ZoeW/src/domain/parcel-number.ts",
+    "../../../ZoeW/src/domain/statistics.ts",
+    "../../../ZoeW/src/domain/pickup-reset-proof.ts",
     "../../../ZoeW/src/domain/barcode-key.ts",
-    "tests/parcel-domain-strict.typecheck.ts"
+    "../../../ZoeW/src/services/backend-types.ts",
+    "tests/backend-contracts-strict.typecheck.ts",
+    "tests/parcel-domain-strict.typecheck.ts",
+    "tests/pickup-reset-proof-strict.typecheck.ts",
+    "tests/statistics-domain-strict.typecheck.ts"
   ]
 }

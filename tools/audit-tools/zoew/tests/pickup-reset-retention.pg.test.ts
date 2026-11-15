@@ -13,6 +13,25 @@ const harness = createPgHarness({ depsDirs: [path.join(root, 'supabase/node_modu
 const day = '2026-11-01', pickup = 'zoew_daily_pickup_cod_dod';
 let connection: any;
 let serial = 0;
+let housekeepingBefore = '', housekeepingCandidate = '';
+
+const resetRetentionClause = "            and not coalesce(o.result -> 'ok' = 'true'::jsonb\n"
+    + "                and private.zoe_pickup_reset_receipt_v1(o.result -> 'reset')\n"
+    + "                and o.result #>> '{reset,proof}' = 'operation'\n"
+    + "                and o.result #>> '{reset,tenant}' = o.tenant_id::text\n"
+    + "                and o.result #>> '{reset,attemptId}' = o.op_id\n"
+    + "                and o.result #>> '{reset,actorUid}' ~ '^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$', false)\n";
+
+function projectReviewedHousekeeping(definition: string) {
+    const anchor = "        delete from public.zoe_ops o where o.tenant_id = p_tenant and o.created_at < now() - interval '2 days'\n";
+    const selfMark = ["    prior_raw text := current_setting('zoe.raw_docs', true);\n", "    perform set_config('zoe.raw_docs', 'on', true);\n",
+        "    perform set_config('zoe.raw_docs', coalesce(prior_raw, ''), true);\n"];
+    const once = (fragment: string) => definition.split(fragment).length === 2;
+    if (!once(anchor) || !once(resetRetentionClause) || !once(anchor + resetRetentionClause) || !selfMark.every(once)) {
+        throw new Error('Reviewed housekeeping extension changed');
+    }
+    return selfMark.reduce((text, line) => text.replace(line, ''), definition.replace(resetRetentionClause, ''));
+}
 
 beforeAll(async () => {
     const unavailable = harness.unavailableReason();
@@ -22,13 +41,17 @@ beforeAll(async () => {
     connection = (await harness.freshDb()).c;
     const migrations = fs.readdirSync(path.join(root, 'supabase/migrations')).filter(name => /^\d{14}_[a-z0-9_]+\.sql$/.test(name)).sort();
     for (const name of migrations) await connection.query(fs.readFileSync(path.join(root, 'supabase/migrations', name), 'utf8'));
+    const pending = '20261115020214_zoe_pickup_reset_receipt_retention.sql';
+    expect(migrations).not.toContain(pending);
+    housekeepingBefore = (await connection.query("select pg_get_functiondef('private.zoe_housekeeping(uuid)'::regprocedure) as definition")).rows[0].definition;
+    await connection.query(fs.readFileSync(path.join(root, 'supabase/pending-production-sql', pending), 'utf8'));
+    housekeepingCandidate = (await connection.query("select pg_get_functiondef('private.zoe_housekeeping(uuid)'::regprocedure) as definition")).rows[0].definition;
 }, 60000);
 
 afterAll(async () => {
     if (connection) await connection.end();
     await harness.stop();
 });
-
 async function fixture() {
     const number = ++serial;
     const actor = await harness.makeAuthUser(connection, 'reset-retention-' + number + '@u.zoe.test');
@@ -118,4 +141,37 @@ it('Reset ៖ proof SQL ដែលបាត់ពិតនៅ UNKNOWN ទោះ n
     const before = await snapshot(request.tenant);
     expect((await call('status', request)).reset).toMatchObject({ outcome: 'unknown', proof: 'none' });
     expect(await snapshot(request.tenant)).toEqual(before);
+});
+
+it('Reset pending SQL៖ reviewed housekeeping predicate, binding, TTL, quota និង security ផ្លាស់ ត្រូវបដិសេធ', () => {
+    const current = housekeepingCandidate;
+    const selfMark = ["    prior_raw text := current_setting('zoe.raw_docs', true);\n", "    perform set_config('zoe.raw_docs', 'on', true);\n",
+        "    perform set_config('zoe.raw_docs', coalesce(prior_raw, ''), true);\n"];
+    const original = selfMark.reduce((text, line) => text.replace(line, ''), housekeepingBefore);
+    expect(projectReviewedHousekeeping(current)).toBe(original);
+    const mutations: [string, (text: string) => string][] = [
+        ['missing-retention', text => text.replace(resetRetentionClause, '')],
+        ['duplicate-retention', text => text.replace(resetRetentionClause, resetRetentionClause + resetRetentionClause)],
+        ['success-required', text => text.replace("o.result -> 'ok' = 'true'", "o.result -> 'ok' = 'false'")],
+        ['receipt-validation', text => text.replace("private.zoe_pickup_reset_receipt_v1(o.result -> 'reset')", 'true')],
+        ['operation-proof', text => text.replace("'{reset,proof}' = 'operation'", "'{reset,proof}' = 'native-day'")],
+        ['tenant-binding', text => text.replace("'{reset,tenant}' = o.tenant_id::text", "'{reset,tenant}' is not null")],
+        ['attempt-binding', text => text.replace("'{reset,attemptId}' = o.op_id", "'{reset,attemptId}' is not null")],
+        ['actor-binding', text => text.replace("o.result #>> '{reset,actorUid}' ~", "o.result #>> '{reset,tenant}' ~")],
+        ['null-fallback', text => text.replace("{12}$', false)", "{12}$', true)")],
+        ['ordinary-ttl', text => text.replace("interval '2 days'", "interval '3 days'")],
+        ['tenant-filter', text => text.replace('delete from public.zoe_ops o where o.tenant_id = p_tenant and', 'delete from public.zoe_ops o where true and')],
+        ['tombstone-ttl', text => text.replace("interval '7 days'", "interval '6 days'")],
+        ['quota-bytes', text => text.replace('s.bytes - freed_docs - freed_ops', 's.bytes - freed_docs')],
+        ['self-marker', text => text.replace("    perform set_config('zoe.raw_docs', 'on', true);\n", '')],
+        ['security-mode', text => text.replace('LANGUAGE plpgsql', 'LANGUAGE plpgsql SECURITY DEFINER')],
+        ['search-path', text => text.replace("SET search_path TO ''", "SET search_path TO 'public'")]
+    ];
+    for (const [label, mutate] of mutations) {
+        const changed = mutate(current);
+        expect(changed, label + ' changes the actual function').not.toBe(current);
+        let accepted = false;
+        try { accepted = projectReviewedHousekeeping(changed) === original; } catch {}
+        expect(accepted, label).toBe(false);
+    }
 });

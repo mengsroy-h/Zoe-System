@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 /**
  * ស្កេន Lookup ទល់នឹងទាញបញ្ជី ZTO៖ ច្រកស្កេន, lookup, protocol រក្សាទុក,
  * preview/import, sweep, close/pickup, final marks, cleanup, restore និង purge ជា App ពិត។
@@ -213,16 +214,16 @@ beforeEach(async () => {
     autoLookupFailureAt.clear(); autoLookupInFlight.clear(); lookupFastCache.clear(); clearAutoLookupQueueRetries();
     activeRestoreClaims.clear(); restoreInFlight.clear(); cleanupInFlight.clear(); cleanupJournalLive.clear();
     dbListenerPendingPaths.clear(); dbListenerFailedPaths.clear();
-    firebaseState.authGeneration++; firebaseState.db = { name: 'lookup-compare-db' }; firebaseState.fb = sdk() as any;
+    firebaseState.authGeneration++; setPartialBackendFixtureValue(firebaseState, "db", { name: 'lookup-compare-db' }); firebaseState.fb = sdk() as any;
     firebaseState.auth = { currentUser: { uid: 'money-user', getIdToken: async () => 'synthetic-id' } } as any;
     firebaseState.isInitializingFirebase = false; firebaseState.isDatabaseInitialized = true;
     firebaseState.isDatabaseConnected = true; firebaseState.hasEverConnectedToDatabase = true;
-    firebaseState.dbRefHistory = ref(H); firebaseState.dbRefDeleted = ref(T); firebaseState.dbRefDailyRevenue = ref(D); firebaseState.dbRefMonthlyRevenue = ref(M);
-    firebaseState.dbRefDailyPickup = ref(P); firebaseState.dbRefDailyCollected = ref(C);
+    setPartialBackendFixtureValue(firebaseState, "dbRefHistory", ref(H)); setPartialBackendFixtureValue(firebaseState, "dbRefDeleted", ref(T)); setPartialBackendFixtureValue(firebaseState, "dbRefDailyRevenue", ref(D)); setPartialBackendFixtureValue(firebaseState, "dbRefMonthlyRevenue", ref(M));
+    setPartialBackendFixtureValue(firebaseState, "dbRefDailyPickup", ref(P)); setPartialBackendFixtureValue(firebaseState, "dbRefDailyCollected", ref(C));
     firebaseState.dbLivenessProbe = Promise.resolve(null);
     securityState.lookupSecretKey = await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']) as any;
     securityState.appIsLocked = false; securityState.appLockVeiled = false;
-    uiState.toasts = []; uiState.isModalOpen = false; uiState.entryScanMode = 'normal'; viewState.phoneModalBusy = false;
+    uiState.toasts = []; uiState.isModalOpen = false; uiState.entryScanMode = 'parcel'; viewState.phoneModalBusy = false;
     scanState.pendingBarcode = null; dataState.deletedCleanupInFlight = false;
     ztoState.ztoStatusInFlight = false; ztoState.ztoListSyncInFlight = false; ztoState.ztoListSyncResult = null;
     lookupState.customerDataTableSessionGeneration++; sync();

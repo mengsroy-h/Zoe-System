@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
 import { firebaseState, securityState, uiState } from '../../../../ZoeW/src/core/state';
@@ -26,7 +27,7 @@ beforeEach(() => {
     firebaseState.auth = { currentUser: { uid: 'test-user' } } as any;
     firebaseState.authGeneration++; firebaseState.db = {} as any;
     configureFixtureBackend('license-invitations');
-    firebaseState.fb = {}; firebaseState.sessionExpiryCheck = 'live'; firebaseState.serverClockTrusted = true;
+    setPartialBackendFixtureValue(firebaseState, "fb", {}); firebaseState.sessionExpiryCheck = 'live'; firebaseState.serverClockTrusted = true;
     acceptFixtureSession();
     viewState.backendKind = 'firebase'; viewState.activationBusy = false; viewState.seatEnrollmentBusy = false;
     viewState.invitationCode = code; uiState.modalDisplay = { activationModal: 'flex' };

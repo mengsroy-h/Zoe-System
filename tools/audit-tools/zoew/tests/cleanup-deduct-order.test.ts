@@ -169,7 +169,7 @@ const ledger = () => getAt(DAILY + '/' + DAY);
 const month = () => getAt(MONTHLY + '/' + MONTH);
 const journalStage = () => (readCleanupJournal()[0] || {}).stage;
 
-async function interruptedCleanupRestored(stage: 'flip' | 'ledger', codDollar = 100) {
+async function interruptedCleanupRestored(stage: 'flip' | 'ledger' | 'collected', codDollar = 100, generation: 'current' | 'absent' | 0 = 'current') {
     seed([returnedItem()]);
     setAt(DAILY + '/' + DAY + '/codDollar', codDollar);
     setAt(MONTHLY + '/' + MONTH + '/codDollar', codDollar);
@@ -188,9 +188,15 @@ async function interruptedCleanupRestored(stage: 'flip' | 'ledger', codDollar = 
     expect(entry.trashItem.trashGeneration).toBeGreaterThan(0);
     expect(entry.ledger).toBe('keyed');
     lab.beforeTx = null;
+    if (generation !== 'current') {
+        setAt(TRASH + '/' + ID + '/trashGeneration', generation === 'absent' ? null : 0);
+        if (generation === 'absent') delete entry.trashItem.trashGeneration;
+        else entry.trashItem.trashGeneration = 0;
+        noteCleanupJournalEntry(entry);
+    }
     await restoreOnOtherDevice(ID, 'cleanup-restored');
     expect(getAt(TRASH + '/' + ID)).toBeNull();
-    expect(getAt('zoew_trash_consumptions/' + ID)).toMatchObject({ kind: 'restore', generation: entry.trashItem.trashGeneration });
+    expect(getAt('zoew_trash_consumptions/' + ID)).toMatchObject({ kind: 'restore', generation: entry.trashItem.trashGeneration ?? 0 });
     expect(ledger().ded[ID]).toMatchObject({ at: entry.trashItem.deletedAt, back: true });
     expect(month().ded[ID]).toMatchObject({ at: entry.trashItem.deletedAt, back: true });
     entry.stage = stage;
@@ -233,10 +239,46 @@ it.each(['flip', 'ledger'] as const)('ការសម្អាត %s ដែល R
     expect(lab.store).toEqual(before);
 });
 
+it.each((['flip', 'ledger', 'collected'] as const).flatMap(stage => (['absent', 0] as const).map(generation => ({ stage, generation }))))(
+    'legacy generation $generation នៅ $stage ដែល public Restore បញ្ចប់៖ exact receipt និង keyed proof បញ្ចប់ journal ដោយមិនប៉ះប្រាក់', async ({ stage, generation }) => {
+        await interruptedCleanupRestored(stage, 100, generation);
+        const before = clone(lab.store);
+        expect(getAt('zoew_trash_consumptions/' + ID)).toMatchObject({ generation: 0, kind: 'restore', sourceId: ID, targetId: ID });
+        expect(await resumeCleanupJournalEntry(ID)).toBe('');
+        expect(readCleanupJournal()).toEqual([]);
+        expect(lab.store).toEqual(before);
+        expect(lab.tx).toEqual([]);
+        await resumeCleanupJournalEntry(ID);
+        expect(lab.store).toEqual(before);
+        expect(lab.tx).toEqual([]);
+    }
+);
+
+it.each(['barcode-birth', 'daily-pending', 'legacy-ledger'])(
+    'legacy generation 0 នៅ collected ដែល Restore បញ្ចប់៖ %s នៅ HOLD ដោយមិនសរសេរទិន្នន័យ', async fault => {
+        const entry = await interruptedCleanupRestored('collected', 100, 0);
+        const receipt = getAt('zoew_trash_consumptions/' + ID);
+        if (fault === 'barcode-birth') {
+            delete entry.trashItem.barcodes[0].createdAt;
+            setAt(HISTORY + '/' + receipt.targetId + '/barcodes/0/createdAt', null);
+        }
+        if (fault === 'daily-pending') setAt(DAILY + '/' + DAY + '/ded/' + ID + '/back', null);
+        if (fault === 'legacy-ledger') delete entry.ledger;
+        noteCleanupJournalEntry(entry);
+        syncLocalViewsFromServer();
+        const before = clone(lab.store);
+        await resumeCleanupJournalEntry(ID);
+        expect(readCleanupJournal()).toHaveLength(1);
+        expect(journalStage()).toBe('collected');
+        expect(lab.store).toEqual(before);
+        expect(lab.tx).toEqual([]);
+    }
+);
+
 it.each(['consumption-missing', 'foreign-scope', 'generation', 'deleted-at', 'row-birth', 'target-missing', 'barcode-birth', 'target-claim', 'duplicate-holder', 'missing-barcode-birth',
-    'daily-missing', 'daily-pending', 'monthly-missing', 'monthly-pending', 'malformed-amount', 'legacy-ledger'])(
-    'ការសម្អាតដែល Restore បានបញ្ចប់៖ %s រក្សា HOLD និងមិនសរសេរប្រាក់', async fault => {
-        const entry = await interruptedCleanupRestored('ledger');
+    'daily-missing', 'daily-pending', 'monthly-missing', 'monthly-pending', 'malformed-amount', 'legacy-ledger', 'source-reused'].flatMap(fault => (['current', 0] as const).map(generation => ({ fault, generation }))))(
+    'ការសម្អាត generation $generation ដែល Restore បានបញ្ចប់៖ $fault រក្សា HOLD និងមិនសរសេរប្រាក់', async ({ fault, generation }) => {
+        const entry = await interruptedCleanupRestored('ledger', 100, generation);
         const receipt = getAt('zoew_trash_consumptions/' + ID), target = getAt(HISTORY + '/' + receipt.targetId);
         if (fault === 'consumption-missing') setAt('zoew_trash_consumptions/' + ID, null);
         if (fault === 'foreign-scope') setAt('zoew_trash_consumptions/' + ID + '/scope', 'https://foreign.firebaseio.com');
@@ -251,6 +293,7 @@ it.each(['consumption-missing', 'foreign-scope', 'generation', 'deleted-at', 'ro
             noteCleanupJournalEntry(entry);
         }
         if (fault === 'target-claim') setAt(HISTORY + '/' + receipt.targetId + '/restoreClaimId', 'another-source');
+        if (fault === 'source-reused') setAt(TRASH + '/' + ID, { ...clone(entry.trashItem), deletedAt: entry.trashItem.deletedAt + 1 });
         if (fault === 'duplicate-holder') setAt(HISTORY + '/duplicate', { ...clone(target), id: 'duplicate' });
         if (fault === 'daily-missing') setAt(DAILY + '/' + DAY + '/ded/' + ID, null);
         if (fault === 'daily-pending') setAt(DAILY + '/' + DAY + '/ded/' + ID + '/back', null);

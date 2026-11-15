@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createContext, runInContext } from 'node:vm';
@@ -53,7 +54,7 @@ beforeEach(() => {
     appLocalStore.clear();
     configureFixtureBackend('sheet-lookup-freshness');
     firebaseState.auth = { currentUser: { uid: 'sheet-lookup-user' } } as any;
-    firebaseState.fb = {}; firebaseState.db = {};
+    setPartialBackendFixtureValue(firebaseState, "fb", {}); setPartialBackendFixtureValue(firebaseState, "db", {});
     firebaseState.sessionExpiryCheck = 'live'; firebaseState.serverClockTrusted = true;
     acceptFixtureSession();
     clearCustomerDataTableCache();
@@ -145,7 +146,7 @@ describe('នាំចូល Excel ទៅ Sheet ៖ ការពារទិន�
         setFieldValue('siModeSel', 'upsert');
         await runSheetImport();
         expect(fetch).not.toHaveBeenCalled();
-        expect(uiState.sheetImportView.messages?.siActionMsg?.text || JSON.stringify(uiState.sheetImportView)).toMatch(/DOD · COD · Phone/);
+        expect(uiState.sheetImportView.msgs.siActionMsg?.text || JSON.stringify(uiState.sheetImportView)).toMatch(/DOD · COD · Phone/);
         setFieldValue('siModeSel', 'newOnly');
         fetch.mockImplementation(writerFixture().respond);
         await runSheetImport();

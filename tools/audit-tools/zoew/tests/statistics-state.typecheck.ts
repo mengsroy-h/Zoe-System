@@ -1,0 +1,34 @@
+import type { DataState } from '../../../../ZoeW/src/core/state';
+import type { ledgerAppliedDelta, ledgerDedOf, ledgerDedValue, ledgerTotalsOf } from '../../../../ZoeW/src/domain/ledger';
+import type { applyPickupMarksToSet, buildPickupRecordFromSet, collectPickupMarks, tallyPickupPhones } from '../../../../ZoeW/src/domain/pickup';
+import type { collectedMarksFor, collectedSetFromRecord, collectedSettleHolds, markCollectedRevenue } from '../../../../ZoeW/src/domain/collected';
+
+type Assert<T extends true> = T;
+type IsAny<T> = 0 extends (1 & T) ? true : false;
+type DailyLedger = NonNullable<DataState['dailyRevenueData'][string]>;
+type MonthlyLedger = NonNullable<DataState['monthlyRevenueData'][string]>;
+type PickupDay = NonNullable<DataState['dailyPickupData'][string]>;
+type CollectedDay = NonNullable<DataState['dailyCollectedData'][string]>;
+type CollectedValue = NonNullable<CollectedDay[string]>;
+
+export type DailyLedgerIsTyped = Assert<IsAny<DailyLedger> extends false ? true : false>;
+export type MonthlyLedgerIsTyped = Assert<IsAny<MonthlyLedger> extends false ? true : false>;
+export type DailyLedgerRejectsObjectMoney = Assert<{ codDollar: object } extends DailyLedger ? false : true>;
+export type MonthlyLedgerRejectsObjectMoney = Assert<{ dodDollar: object } extends MonthlyLedger ? false : true>;
+export type PickupDayIsTyped = Assert<IsAny<PickupDay> extends false ? true : false>;
+export type PickupDayRejectsObjectCount = Assert<{ packagesPickedUp: object } extends PickupDay ? false : true>;
+export type CollectedDayIsTyped = Assert<IsAny<CollectedDay> extends false ? true : false>;
+export type CollectedValueIsTyped = Assert<IsAny<CollectedValue> extends false ? true : false>;
+export type CollectedValueRejectsObjectMoney = Assert<{ c: object } extends CollectedValue ? false : true>;
+export type LedgerDeltaOutputIsTyped = Assert<IsAny<ReturnType<typeof ledgerAppliedDelta>> extends false ? true : false>;
+export type LedgerTotalsOutputRejectsTextMoney = Assert<{ codDollar: string; dodDollar: number; totalCount: number } extends ReturnType<typeof ledgerTotalsOf> ? false : true>;
+export type LedgerDeductionOutputIsTyped = Assert<IsAny<NonNullable<ReturnType<typeof ledgerDedOf>>> extends false ? true : false>;
+export type StoredDeductionRejectsFalse = Assert<false extends ReturnType<typeof ledgerDedValue>['back'] ? false : true>;
+export type PickupMarkOutputIsTyped = Assert<IsAny<ReturnType<typeof collectPickupMarks>[number]> extends false ? true : false>;
+export type PickupTallyHasNumbers = Assert<string extends ReturnType<typeof tallyPickupPhones>[string] ? false : true>;
+export type PickupBuilderRejectsNumericOwners = Assert<{ barcode: number } extends NonNullable<Parameters<typeof buildPickupRecordFromSet>[0]> ? false : true>;
+export type PickupWriterRejectsUntypedMarks = Assert<{ key: string; closed: boolean }[] extends NonNullable<Parameters<typeof applyPickupMarksToSet>[1]> ? false : true>;
+export type CollectedMarksAreTyped = Assert<IsAny<ReturnType<typeof collectedMarksFor>[number]> extends false ? true : false>;
+export type CollectedSetHasTypedAmounts = Assert<IsAny<ReturnType<typeof collectedSetFromRecord>[string]> extends false ? true : false>;
+export type CollectedBatchPromiseIsTyped = Assert<IsAny<NonNullable<ReturnType<typeof markCollectedRevenue>>['server']> extends false ? true : false>;
+export type CollectedHoldMapIsTyped = Assert<IsAny<ReturnType<typeof collectedSettleHolds>> extends false ? true : false>;

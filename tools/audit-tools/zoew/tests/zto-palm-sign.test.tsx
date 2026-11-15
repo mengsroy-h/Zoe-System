@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { acceptFixtureSession } from './helpers/accepted-session';
 import { barcodeSignIdentity } from '../../../../ZoeW/src/domain/barcode';
 import { createHash, webcrypto } from 'node:crypto';
@@ -145,9 +146,9 @@ beforeEach(async () => {
     appLocalStore.clear();
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://sign-shop.firebaseio.com' }));
     firebaseState.authGeneration++;
-    firebaseState.db = {};
-    firebaseState.fb = { getIdTokenResult: async () => ({ token: 'synthetic-identity' }) };
-    firebaseState.auth = { currentUser: { uid: 'audit-user' } };
+    setPartialBackendFixtureValue(firebaseState, "db", {});
+    setPartialBackendFixtureValue(firebaseState, "fb", { getIdTokenResult: async () => ({ token: 'synthetic-identity' }) });
+    setPartialBackendFixtureValue(firebaseState, "auth", { currentUser: { uid: 'audit-user' } });
     firebaseState.firebaseConfig = { databaseURL: 'https://sign-shop.firebaseio.com' };
     acceptFixtureSession();
     securityState.appIsLocked = false; securityState.appLockVeiled = false;
@@ -275,7 +276,7 @@ it('ការងារ durable ផ្ញើ session និង ID token តាម
 });
 it('Palm បង្ហាញ Sign លើប្រវត្តិ និង Barcode · Cookie ត្រឡប់ជា បិទ', async () => {
     verifiedUiSession();
-    uiState.viewListView = [{ itemId: 'item1', code: CODE, index: 1, locker: '', time: null, origin: '', moneyClass: '', money: [], sum: null, closed: false }];
+    uiState.viewListView = [{ itemId: 'item1', code: CODE, index: 1, locker: '', time: null, origin: '', moneyClass: '', money: [], sum: null, closed: false, signed: false }];
     mount(<><table><tbody><tr><HistoryRow row={buildHistoryRowModel(dataState.scanHistory[0], 1, false, false)} /></tr></tbody></table><BarcodeListContainer /></>);
     expect(document.querySelector('.close-btn')?.textContent).toContain('Sign');
     expect(document.querySelector('.btn-toggle-bc-close')?.textContent).toContain('Sign');
@@ -361,7 +362,7 @@ it.each(['auth', 'shop', 'database', 'config', 'close'])('ប្តូរ %s ខ
     await vi.waitFor(() => expect(nonReservationCalls()).toHaveLength(2));
     if (kind === 'auth') firebaseState.authGeneration++;
     if (kind === 'shop') appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://other.firebaseio.com' }));
-    if (kind === 'database') firebaseState.db = {};
+    if (kind === 'database') setPartialBackendFixtureValue(firebaseState, "db", {});
     if (kind === 'config') appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ ...config, enabled: false }));
     if (kind === 'close') closeModal('ztoPalmSignModal');
     gate.resolve(signed());
@@ -1099,7 +1100,7 @@ it.each(['auth', 'database'] as const)('ការសរសេរហាងចា�
         await vi.waitFor(() => expect(closeCalls().map((row) => row[1])).toEqual([CODE]));
         cancelZtoPalmSign(); closeModal('ztoPalmSignModal');
         if (kind === 'auth') firebaseState.authGeneration++;
-        else firebaseState.db = { next: true };
+        else setPartialBackendFixtureValue(firebaseState, "db", { next: true });
         dataState.scanHistory[0].barcodes = [{ code: SECOND, isClosed: false }, { code: third, isClosed: false }];
         openZtoPalmSign('item1');
         await vi.waitFor(() => expect(closeCalls().map((row) => row[1])).toEqual([CODE, SECOND]));
@@ -1454,11 +1455,11 @@ it.each(['dispatch', 'receipt'])('pending row ៖ marker មកខណៈ headers
     const headers = deferred();
     let waiting = false;
     let calls = 0;
-    firebaseState.fb.getIdTokenResult = vi.fn(async () => {
+    setPartialBackendFixtureValue(firebaseState.fb, "getIdTokenResult", vi.fn(async () => {
         calls++;
         if (stage === 'dispatch' || calls === 2) { waiting = true; await headers.promise; }
         return { token: 'synthetic-identity' };
-    });
+    }));
     const work = stage === 'dispatch' ? dispatchPalmSignCode(CODE) : submit();
     await vi.waitFor(() => expect(waiting).toBe(true));
     dataState.scanHistory[0].scanPending = {};

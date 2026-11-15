@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../../../../ZoeW/src/core/state';
 import { getServerNow } from '../../../../ZoeW/src/core/clock';
@@ -140,7 +141,7 @@ function install() {
     firebaseState.sessionExpiryCheck = 'live';
     firebaseState.hasEverConnectedToDatabase = true;
     pointAt('A');
-    firebaseState.auth.app = firebaseState.db.app;
+    setPartialBackendFixtureValue(firebaseState.auth, "app", firebaseState.db.app);
     acceptFixtureSession();
     dataState.scanHistory = [clone(item)];
     dataState.deletedItems = [];

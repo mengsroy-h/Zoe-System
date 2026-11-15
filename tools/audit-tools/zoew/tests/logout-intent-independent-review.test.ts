@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { appLocalStore, appSessionStore } from '../../../../ZoeW/src/core/storage';
 import { dataState, firebaseState, uiState } from '../../../../ZoeW/src/core/state';
@@ -74,7 +75,7 @@ it('expiry remains visually covered while SDK sign-out is pending', () => {
     registerModalMeta('loginModal', { noDismiss: true });
     Object.assign(uiState, { modalDisplay: {}, modalStack: [], isModalOpen: false });
     dataState.scanHistory = [{ id: 'private-old-row', phone: 'synthetic-old', barcodes: [{ code: 'PRIVATE' }] }];
-    firebaseState.fb = { signOut: () => new Promise<void>(() => {}) };
+    setPartialBackendFixtureValue(firebaseState, "fb", { signOut: () => new Promise<void>(() => {}) });
     try {
         forceExpireSession();
         expect(firebaseState.sessionExpiryCheck).toBe('expired');
@@ -95,10 +96,10 @@ it('acknowledging logout in another tab never revives the old authenticated leas
 
 it('an accepted old tab cannot admit new actions or leases after foreign logout and acknowledgement before storage delivery', async () => {
     let publishAuth!: (user: any) => void;
-    firebaseState.fb = {
+    setPartialBackendFixtureValue(firebaseState, "fb", {
         onAuthStateChanged: (_auth, callback) => { publishAuth = callback; return () => {}; },
         getIdTokenResult: async () => ({ authTime: new Date().toISOString() })
-    };
+    });
     const { setupAuthListener } = await import('../../../../ZoeW/src/features/auth');
     setupAuthListener();
     try {
@@ -126,11 +127,11 @@ it('an accepted old tab cannot admit new actions or leases after foreign logout 
 it('a delayed logout storage event cannot cancel an explicit login begun after that intent', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     const auth = firebaseState.auth;
-    firebaseState.fb = {
+    setPartialBackendFixtureValue(firebaseState, "fb", {
         onAuthStateChanged: () => () => {}, setPersistence: async () => {},
         signInWithEmailAndPassword: async () => ({ user: auth.currentUser }),
         getIdTokenResult: async () => ({ authTime: new Date().toISOString() })
-    };
+    });
     resetServerClock();
     expect(acceptServerClockOffset(0, Object.freeze({ source: 'nonce', generation: 1, monotonicMs: performance.now(), wallMs: Date.now(), epochMs: Date.now(), uncertaintyMs: 0 }), true)).toBe(true);
     firebaseState.sessionExpiryCheck = 'live';
@@ -154,7 +155,7 @@ it('auth listener replacement and teardown remove every owned storage observer a
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     const add = vi.spyOn(window, 'addEventListener'), remove = vi.spyOn(window, 'removeEventListener');
     const stopSdk = vi.fn();
-    firebaseState.fb = { onAuthStateChanged: () => stopSdk };
+    setPartialBackendFixtureValue(firebaseState, "fb", { onAuthStateChanged: () => stopSdk });
     const { setupAuthListener } = await import('../../../../ZoeW/src/features/auth');
     try {
         for (let i = 0; i < 20; i++) setupAuthListener();
@@ -177,7 +178,7 @@ it('auth listener replacement and teardown remove every owned storage observer a
 
 it('active auth observer ignores foreign backend and UID logout markers', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-    firebaseState.fb = { onAuthStateChanged: () => () => {} };
+    setPartialBackendFixtureValue(firebaseState, "fb", { onAuthStateChanged: () => () => {} });
     const { setupAuthListener } = await import('../../../../ZoeW/src/features/auth');
     setupAuthListener();
     try {
@@ -203,7 +204,7 @@ for (const expiry of [false, true]) it((expiry ? 'expiry' : 'manual logout') + '
             return original.call(area, key, value);
         });
     });
-    firebaseState.fb = { signOut: async () => { throw new Error('synthetic SDK persistence refusal'); } };
+    setPartialBackendFixtureValue(firebaseState, "fb", { signOut: async () => { throw new Error('synthetic SDK persistence refusal'); } });
     uiState.toasts = [];
     try {
         if (expiry) { forceExpireSession(); for (let i = 0; i < 40; i++) await Promise.resolve(); }

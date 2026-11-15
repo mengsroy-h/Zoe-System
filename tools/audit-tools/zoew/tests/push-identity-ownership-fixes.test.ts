@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../../../../ZoeW/src/core/state';
 import { viewState } from '../../../../ZoeW/src/core/view-state';
@@ -163,7 +164,7 @@ it.each(['complete-new', 'old-finishes-first'])('F06 integration៖ actual auth 
   setupAuthListener();callback(auth.currentUser);await turn();
   const oldWork=enablePush();await turn();expect(uiState.pushStatus).toBe('busy');
   auth.currentUser=null;callback(null);await turn();
-  auth._account={tenant_id:'b'};auth.currentUser={uid:'b',getIdToken:()=>newToken.promise};callback(auth.currentUser);await turn();
+  setPartialBackendFixtureValue(auth, "_account", {tenant_id:'b'});setPartialBackendFixtureValue(auth, "currentUser", {uid:'b',getIdToken:()=>newToken.promise});callback(auth.currentUser);await turn();
   expect(uiState.pushStatus).not.toBe('busy');
   const newWork=togglePush();await turn();expect(uiState.pushStatus).toBe('busy');
   if(order==='old-finishes-first'){
@@ -207,7 +208,7 @@ it.each([1,5])('F06 metadata៖ offline %sh អាន authTime ដោយគ្�
   await expect(f.auth.currentUser.getIdToken()).rejects.toThrow(f.ended);
   const result=await f.sdk.getIdTokenResult(f.auth.currentUser);
   expect(result.token).toBe('');expect(result.authTime).toBe(new Date(cached.authTime*1000).toISOString());
-  firebaseState.fb=f.sdk;firebaseState.auth=f.auth;firebaseState.db={};resetServerClock();
+  firebaseState.fb=f.sdk;firebaseState.auth=f.auth;setPartialBackendFixtureValue(firebaseState, "db", {});resetServerClock();
   acceptFixtureSession();
   const {getFirebaseSessionVerdict}=await import('../../../../ZoeW/src/features/session');
   expect(await getFirebaseSessionVerdict(f.auth.currentUser)).toBe('unverified');
@@ -225,7 +226,7 @@ it.each(['generation','user','auth','sdk','db','backend'])('F06 metadata៖ ម�
  const gate=deferred<string|null>(),f=await metadataSdk(()=>gate.promise,metadataJwt(1).token);
  const user=f.auth.currentUser,previousConfig=firebaseState.firebaseConfig;
  try{
-  firebaseState.fb=f.sdk;firebaseState.auth=f.auth;firebaseState.db={};resetServerClock();
+  firebaseState.fb=f.sdk;firebaseState.auth=f.auth;setPartialBackendFixtureValue(firebaseState, "db", {});resetServerClock();
   firebaseState.firebaseConfig={supabaseUrl:BASE};
   acceptFixtureSession();
   firebaseState.isDatabaseConnected=true;
@@ -237,7 +238,7 @@ it.each(['generation','user','auth','sdk','db','backend'])('F06 metadata៖ ម�
   if(owner==='user')firebaseState.auth.currentUser={...user};
   if(owner==='auth')firebaseState.auth={...f.auth};
   if(owner==='sdk')firebaseState.fb={...f.sdk};
-  if(owner==='db')firebaseState.db={};
+  if(owner==='db')setPartialBackendFixtureValue(firebaseState, "db", {});
   if(owner==='backend')firebaseState.firebaseConfig={supabaseUrl:'https://other.invalid'};
   gate.resolve(null);
   expect(await work).toBe('unverified');

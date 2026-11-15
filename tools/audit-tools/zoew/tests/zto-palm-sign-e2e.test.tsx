@@ -1,3 +1,4 @@
+import { setPartialBackendFixtureValue } from './helpers/backend-fixture';
 import { acceptFixtureSession } from './helpers/accepted-session';
 /**
  * ✍️ ZTO Palm Sign ពីដើមដល់ចប់ ៖ App ពិត (`zto-palm-sign.ts`) ➜ Function ពិត (`zto-order-detail-core.cjs` ➜ `_shared/zto-palm-sign.js`) ➜ ZTO Palm ក្លែង។
@@ -162,9 +163,9 @@ beforeEach(async () => {
     appLocalStore.clear();
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://sign-shop.firebaseio.com' }));
     firebaseState.authGeneration++;
-    firebaseState.db = {};
-    firebaseState.fb = { getIdTokenResult: async () => ({ token: 'synthetic-identity' }) };
-    firebaseState.auth = { currentUser: { uid: 'audit-user' } };
+    setPartialBackendFixtureValue(firebaseState, "db", {});
+    setPartialBackendFixtureValue(firebaseState, "fb", { getIdTokenResult: async () => ({ token: 'synthetic-identity' }) });
+    setPartialBackendFixtureValue(firebaseState, "auth", { currentUser: { uid: 'audit-user' } });
     firebaseState.firebaseConfig = { databaseURL: 'https://sign-shop.firebaseio.com' };
     acceptFixtureSession();
     securityState.appIsLocked = false; securityState.appLockVeiled = false;

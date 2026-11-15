@@ -88,6 +88,7 @@ function lockerView(locker = 'B7') {
 function trashView(label: string) {
     return {
         empty: null,
+        more: 0,
         overflow: 0,
         rows: [counted('trash', {
             key: 'k1', metaLabel: label, metaCls: 'trash-tag-delete', whenText: 'ឥឡូវ',

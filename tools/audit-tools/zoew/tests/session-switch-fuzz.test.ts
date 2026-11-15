@@ -10,6 +10,8 @@ import { PRICE_RESUME_GRACE_MS, priceOperationSeen, resumePriceOperations } from
 import { PRICE_PROTOCOL_V2_TAG } from '../../../../ZoeW/src/services/row-operation-lock';
 import { claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, clearCleanupJournalEntry, readCleanupJournal, noteCleanupJournalEntry, resumeCleanupJournalEntry, runAutomaticCleanupRules, runAutomaticDeletedCleanup } from '../../../../ZoeW/src/domain/cleanup';
 import { claimBarcodeInRegistry, releaseBarcodesInRegistry } from '../../../../ZoeW/src/domain/registry';
+import { ledgerEventToken } from '../../../../ZoeW/src/domain/ledger';
+import { trashConsumptionOf } from '../../../../ZoeW/src/domain/trash-generation';
 import { resetPickupStats } from '../../../../ZoeW/src/domain/collected';
 import { pickupResetBoundReceipt, pickupResetCasOf, pickupResetReceiptMatches } from '../../../../ZoeW/src/domain/pickup-reset-proof';
 import { applyBarcodeCloseChange, removeSingleBarcode, saveEditedBarcodePrice } from '../../../../ZoeW/src/features/barcode-ops';
@@ -363,10 +365,20 @@ const SCENARIOS: Scenario[] = [
     {
         name: 'resume journal (stage flip)',
         prepare: () => {
-            // New lifecycle with no trash row yet must carry its allocated first generation.
+            // FLIP បន្តពីការដកដែល commit រួច និង source ត្រូវគ្នាដែលមិនទាន់ដាក់ flag។
             const trashItem = { ...clone(lab.store[HISTORY][ID2]), trashGeneration: 1, deletedAt: getServerNow() - 60000, isFromDeletion: false, trashReason: 'returned' };
             delete lab.store[HISTORY][ID2];
+            lab.store[TRASH][ID2] = clone(trashItem);
             dataState.scanHistory = dataState.scanHistory.filter((i: any) => i.id !== ID2);
+            dataState.deletedItems.push(clone(trashItem));
+            const token = ledgerEventToken(ID2, trashItem.deletedAt, 'd');
+            for (const bucket of [lab.store[DAILY][lab.day], lab.store[MONTHLY][lab.day.substring(0, 7)]]) {
+                bucket.codDollar -= 5; bucket.totalCount--;
+                bucket.op = token; bucket.ops = { [token]: 1 };
+                bucket.ded[ID2] = { at: trashItem.deletedAt, cod: 5, dod: 0, count: 1 };
+            }
+            dataState.dailyRevenueData = clone(lab.store[DAILY]);
+            dataState.monthlyRevenueData = clone(lab.store[MONTHLY]);
             noteCleanupJournalEntry({ id: ID2, reason: 'abandon', journalAt: trashItem.deletedAt, stage: 'flip', ledger: 'keyed', prior: { d: [], m: [] }, trashItem,
                 revenue: { scanDate: lab.day, cod: 5, dod: 0, count: 1 } });
         },
@@ -519,6 +531,16 @@ it.each(['resume journal (stage moved)', 'resume journal (stage flip)'])('%s: mi
         // Re-create the old fixture's legacy journal, without changing its amount.
         const entry = readCleanupJournal().find(row => row.id === ID2)!;
         clearCleanupJournalEntry(entry.trashItem.id, entry.trashItem, entry.scope);
+        if (name === 'resume journal (stage flip)') {
+            delete lab.store[TRASH][ID2];
+            dataState.deletedItems = dataState.deletedItems.filter(row => row.id !== ID2);
+            for (const bucket of [lab.store[DAILY][lab.day], lab.store[MONTHLY][lab.day.substring(0, 7)]]) {
+                bucket.codDollar += 5; bucket.totalCount++;
+                delete bucket.op; delete bucket.ops; delete bucket.ded[ID2];
+            }
+            dataState.dailyRevenueData = clone(lab.store[DAILY]);
+            dataState.monthlyRevenueData = clone(lab.store[MONTHLY]);
+        }
         delete entry.trashItem.trashGeneration;
         noteCleanupJournalEntry(entry);
     } };
@@ -528,6 +550,45 @@ it.each(['resume journal (stage moved)', 'resume journal (stage flip)'])('%s: mi
     expect(getAt(DAILY + '/' + lab.day).codDollar).toBe(100);
     expect(getAt(TRASH + '/' + ID2)).toBeNull();
 });
+
+it('resume journal (stage flip): source ត្រូវគ្នាបញ្ចប់ flag ដោយមិនកាត់ប្រាក់ដែល commit រួចម្ដងទៀត', async () => {
+    const scenario = SCENARIOS.find(row => row.name === 'resume journal (stage flip)')!;
+    resetBetweenRuns();
+    const result = await runScenario(scenario, Infinity);
+    expect(result.writes).toBeGreaterThan(0);
+    expect(result.late).toEqual([]);
+    expect(getAt(TRASH + '/' + ID2).barcodes.every((barcode: any) => barcode.isDeducted === true)).toBe(true);
+    const month = lab.day.substring(0, 7), at = getAt(TRASH + '/' + ID2).deletedAt;
+    for (const bucket of [getAt(DAILY + '/' + lab.day), getAt(MONTHLY + '/' + month)]) {
+        expect(bucket).toMatchObject({ codDollar: 95, dodDollar: 0, totalCount: 9, ded: { [ID2]: { at, cod: 5, dod: 0, count: 1 } } });
+    }
+    expect(readCleanupJournal()).toEqual([]);
+});
+
+it.each(['absent-source', 'changed-source', 'foreign-receipt'])(
+    'resume journal (stage flip): %s រក្សាប្រាក់ដែលដករួច និង journal នៅ HOLD ដោយគ្មានការសរសេរ', async fault => {
+        const original = SCENARIOS.find(row => row.name === 'resume journal (stage flip)')!;
+        let journalBefore: unknown, moneyBefore: unknown;
+        const scenario: Scenario = { ...original, prepare: () => {
+            original.prepare!();
+            const entry = readCleanupJournal()[0];
+            if (fault === 'changed-source') lab.store[TRASH][ID2].createdAt++;
+            else delete lab.store[TRASH][ID2];
+            if (fault === 'foreign-receipt') setAt('zoew_trash_consumptions/' + ID2, trashConsumptionOf(entry.trashItem, 'purge', { uid: 'u1', scope: URL_B }));
+            dataState.deletedItems = Object.values(lab.store[TRASH]);
+            journalBefore = clone(readCleanupJournal());
+            moneyBefore = { daily: clone(lab.store[DAILY]), monthly: clone(lab.store[MONTHLY]) };
+        } };
+        resetBetweenRuns();
+        const result = await runScenario(scenario, Infinity);
+        expect(result.writes).toBe(0);
+        expect(result.late).toEqual([]);
+        expect(readCleanupJournal()).toEqual(journalBefore);
+        expect({ daily: lab.store[DAILY], monthly: lab.store[MONTHLY] }).toEqual(moneyBefore);
+        expect(getAt(DAILY + '/' + lab.day).codDollar).toBe(95);
+        expect(getAt(MONTHLY + '/' + lab.day.substring(0, 7)).codDollar).toBe(95);
+    }
+);
 it('malformed legacy clear claim is not released', async () => {
     resetBetweenRuns();
     const result = await runScenario({ name: 'invalid claim', prepare: () => {

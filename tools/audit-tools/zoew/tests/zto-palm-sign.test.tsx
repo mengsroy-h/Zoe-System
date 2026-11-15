@@ -1133,7 +1133,8 @@ it.each([{ photoAccepted: undefined }, { requestId: 'other-request' }])('កា�
     expect(disk.rows.size).toBe(1);
     expect((await queuedJobs())[0].photo).toBe(PHOTO);
     expect((await queuedJobs())[0].photoVerified).not.toBe(true);
-    expect(closeCalls()).toHaveLength(patch.requestId ? 0 : 1);
+    expect(closeCalls()).toHaveLength(0);
+    expect(dataState.scanHistory[0].barcodes[0].isClosed).toBe(false);
 });
 
 it('ការពារ៖ recheck រក្សាអត្តសញ្ញាណកញ្ចប់មុន await មិនបិទកញ្ចប់ស្តារថ្មី', async () => {

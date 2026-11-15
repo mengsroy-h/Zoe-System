@@ -41,7 +41,7 @@ beforeAll(async () => {
         new RegExp('(?:from|import)\\s*["\']\\./' + backendFiles[0].replaceAll('.', '\\.') + '["\']').test(readFileSync(path.join(output, 'assets', name), 'utf8')));
     expect(importers).toEqual([]);
     production = await serveDir(output);
-    browser = await chromium.launch({ executablePath: process.env.ZOEW_TEST_BROWSER || '/usr/bin/chromium', args: ['--no-sandbox'] });
+    browser = await chromium.launch({ executablePath: process.env.ZOEW_TEST_BROWSER || '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
 }, 60000);
 
 afterAll(async () => {

@@ -281,7 +281,7 @@ const REACT_HELPERS = [
     'animateElement', 'videoElement',
     'registerModalMeta', 'unregisterModalMeta', 'modalMeta', 'modalIsMounted', 'modalDisplay', 'setModalDisplay',
     'modalIsOpen', 'openModalIds',
-    'domText',
+    'domText', 'parseParcelNumber',
     'commitNow', 'renderNow',
     'documentIsHidden', 'onDocumentVisibilityChange', 'resetDocumentScroll', 'scrollWindowToTop',
     'createScratchCanvas', 'loadScratchImage', 'addPreconnectHint', 'injectScript', 'downloadObjectUrl',

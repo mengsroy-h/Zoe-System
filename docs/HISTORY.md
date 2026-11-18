@@ -81,6 +81,22 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### ZoeW [2.50.207] — 2026-11-18 · ភាពស្រស់នៃផ្ទាំងជូនដំណឹង
+
+**ZoeW** (`zoew-v470` ➜ `zoew-v471`)។
+
+- ផ្ទាំងជូនដំណឹងដែលបើករួច និង badge មិនរក្សាចំនួនចាស់ជាចំនួនវាស់បាន ពេល listener ប្រវត្តិ ឬធុងសំរាមដាច់ ឬចាប់ផ្ដើមភ្ជាប់ឡើងវិញ។ ផ្នែកដែលមិនប៉ះពាល់រក្សាទិដ្ឋភាពដដែល ហើយ snapshot ថ្មីស្ដារភាពវាស់បានតាមផ្នែកនីមួយៗ។
+- អ្នកយាម៖ `tools/audit-tools/zoew/tests/notifications.test.tsx`។ ការកែនេះមិនប្ដូរ money, registry, cleanup, license ឬសិទ្ធិ backend ទេ។
+- **សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ Update web/PWA/APK ក្រោយការចេញកំណែ; គ្មានការកែ env/rules/migration។ CI និងឧបករណ៍ពិតមិនទាន់ផ្ទៀងលើការកែនេះ។
+
+### ZoeKeyGen [2.24.51] — 2026-11-18 · ស្ថានភាពការអញ្ជើញច្បាស់លាស់
+
+- ពេលបង្កើត ឬពិនិត្យសំណើ បង្ហាញសាររង់ចាំ និងបិទប៊ូតុងការអញ្ជើញបណ្ដោះអាសន្ន។ ប៊ូតុងបិទផ្ទាំងនៅប្រើបាន។
+- ពេល Server ប្រាប់ថាសេវាអញ្ជើញបិទ បង្ហាញការណែនាំពិនិត្យការកំណត់ Netlify របស់ ZoeW ជាក់លាក់ ដោយមិនបង្ហាញព័ត៌មានផ្ទៃក្នុង។
+- សារបរាជ័យប្រាប់ថាកូដត្រូវបានរក្សាទុក តែពេលមានកូដពិតក្នុងផ្ទាំងនេះ។
+- **សកម្មភាពដែលត្រូវធ្វើដោយដៃ៖** បន្ទាប់ពី deploy សូមផ្ទុក ZoeKeyGen ឡើងវិញ។ គ្មានការផ្លាស់ប្ដូរ DB ឬសោអាជ្ញាប័ណ្ណ។
+- **ការផ្ទៀង៖** `license-invitations-seller.test.ts` បន្ថែម regression ៣៖ មុនកែធ្លាក់ ៣ និងជាប់ ១២; ក្រោយកែរួម `keygen-secure-inventory.test.ts` ជាប់ ៣០។ ការតភ្ជាប់ fieldset ក្នុង HTML ពិតត្រូវបានផ្ទៀងបន្ថែម។ CI និងការសាកលើសេវាពិតមិនទាន់បានរត់។
+
 ### ZoeW [2.50.206] — 2026-11-15 · ការសង្គ្រោះ Legacy ដែលមានភស្តុតាងពេញ
 
 **ZoeW** (`zoew-v469` ➜ `zoew-v470`)។ **ZoeKeyGen មិនប្រែ**។ កំណត់ត្រាមុន merge៖ candidate ក្នុង [PR #419](https://github.com/mengsroy-h/Zoe-System/pull/419); CI និងការដាក់ប្រើអានតាម head ចុងក្រោយរបស់ PR។
@@ -2165,6 +2181,22 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-11-18 · ភាពស្រស់នៃជូនដំណឹងក្រោយ listener ដាច់
+
+- មូលហេតុ៖ handler កត់ failed path និងប្ដូរស្ថានភាព connection ប៉ុន្តែ cached notification view នៅ `measurable: true`។ ផ្ទាំងដែលបើករួចមិនអាន failed path ដោយខ្លួនឯង។
+- ការផ្ទៀងមុនកែ៖ regression UI ២ ករណី (history និង deleted) ធ្លាក់ ខណៈ ៣៤ ករណីមានស្រាប់ជាប់។ ក្រោយកែ៖ ៣៧ ករណីជាប់ រួមទាំង reattach → snapshot តាមផ្នែក និង repeated error មិនបង្កើត view ថ្មីស្ទួន។
+- ការកែ៖ invalidate តែ view ដែលធ្លាប់វាស់បាន និង path ដែល stale ដោយមិនដើរ history ឬ sort rows ឡើងវិញ។ មិនកែ business data ឬបន្ធូរសិទ្ធិទេ។
+- ភស្តុតាង៖ `notifications.test.tsx` លើ baseline `e2af2e82e923683461d907cd89fb97c86f7baa2f`; happy-dom មិនមែនឧបករណ៍ពិត។ ដក wiring ការកែទាំងពីរចេញវិញ៖ ៣ regression ធ្លាក់ និង ៣៤ ករណីចាស់ជាប់; ដាក់ការកែវិញ៖ ៦១ ករណីក្នុង ៣ files ជាប់។ CI មិនទាន់រត់។
+
+### 2026-11-18 — ព្រំដែនអានចម្លើយ Backup
+
+- Supabase backup/import អាន response តាម stream និងបញ្ឈប់ពេលលើស 64 MiB មុនប្រមូល body ទាំងមូល។ Response ដែលដល់ព្រំដែនពិត, UTF-8 បែកតាម chunk និង body ទទេរក្សាឥរិយាបថដដែល។ ពេលលើសព្រំដែនឬ timeout ដោះ reader និង cancel stream; មិន retry response ដែលលើសព្រំដែន។
+- `firebase-backup-test` បន្ថែមករណីអាន stream ក្នុងម៉ាស៊ីន៖ baseline 169 PASS / 3 FAIL; ក្រោយកែ 172 PASS / 0 FAIL។ `supabase-audit-archive-test` មិនអាចបង្កើត Unix-domain socket សម្រាប់ PostgreSQL ក្នុងបរិស្ថានតេស្តនេះ ដូច្នេះមិនរាប់ថា full PASS។ មិនកែ app version, rules, migrations ឬទិន្នន័យ hosted; មិនមាន deploy។
+
+### 2026-11-18 · កំណែ parser ក្នុង CI
+
+- Workflow Audit យក Acorn ពី ZoeW lockfile សម្រាប់ job ទាំងពីរ ដូចការយក Playwright។ `dependency-security-test` ផ្ទៀងបញ្ជា install ដោយ fixture ទាំង lockfile ដែលមាន និងដែលខ្វះ dependency។ មិនកែ workflow release APK។
 
 ### 2026-11-15 — ផ្ទៀងការចេញផ្សាយ និង Restore ក្នុងបរិស្ថានដាច់ដោយឡែក
 
@@ -5533,6 +5565,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `storage-guard` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `strip-comments` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៦ · ផ្នែក ៨ |
 | `supabase-app-network-e2e-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ · ផ្នែក ៩ |
+| `supabase-audit-archive-test` | ផ្នែក ២ | — |
 | `supabase-data-tools-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ · ផ្នែក ៩ |
 | `supabase-datastore-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `supabase-docs-cache-test` | — | ផ្នែក ៧ · ផ្នែក ៩ |
@@ -5738,7 +5771,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `tools/audit-tools/zoew/tests/native/zto-preflight.test.ts` | ផ្នែក ១ | ផ្នែក ៦ |
 | `tools/audit-tools/zoew/tests/network-toast-phase.test.tsx` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/network-toast.test.tsx` | — | ផ្នែក ៧ |
-| `tools/audit-tools/zoew/tests/notifications.test.tsx` | — | ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
+| `tools/audit-tools/zoew/tests/notifications.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `tools/audit-tools/zoew/tests/notify-apk-link.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/notify-groups.test.tsx` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/notify-removed-seen-live.test.ts` | ផ្នែក ២ | — |

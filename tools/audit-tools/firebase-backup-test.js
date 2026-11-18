@@ -303,9 +303,47 @@ async function credentialRedirectScenario(kind, status) {
     ok(kind + ' HTTP ' + status + ' ៖ មិនតាម redirect និងមិនផ្ញើ credential/body ទៅទីតាំងបន្ទាប់', rejected && redirected === 0, { rejected, redirected });
 }
 
+async function supabaseResponseBudgetScenarios() {
+    const supabase = require(path.join(ROOT, 'tools/firebase-backup', 'supabase.js'));
+    const limit = 64 * 1024 * 1024;
+    async function run(parts, stalled = false) {
+        let reads = 0, cancelled = false, calls = 0, signal;
+        const body = new ReadableStream({
+            pull(controller) {
+                if (reads < parts.length) controller.enqueue(parts[reads++]);
+                else if (!stalled) controller.close();
+            },
+            cancel() { cancelled = true; }
+        }, { highWaterMark: 0 });
+        const client = supabase.createClient({ url: 'https://backup-test.supabase.co', key: 'sb_secret_' + 'x'.repeat(32),
+            timeoutMs: stalled ? 60 : 3000, retryCount: 1, retryDelayMs: 0,
+            fetchImpl: async (_url, init) => { calls++; signal = init.signal; return new Response(body); }
+        });
+        let value, error;
+        try { value = await client.rpc('zoe_admin_export', {}); } catch (e) { error = e; }
+        await new Promise(resolve => setTimeout(resolve, 0));
+        return { value, error, reads, cancelled, calls, aborted: signal.aborted };
+    }
+    const padding = Buffer.alloc(1024 * 1024, 32);
+    const exact = [Buffer.from('{}'), ...Array(63).fill(padding), padding.subarray(2)];
+    const accepted = await run(exact);
+    ok('Supabase ៖ JSON ទំហំ 64 MiB ពិតទទួលបានតាមព្រំដែន', !accepted.error && accepted.value && Object.keys(accepted.value).length === 0);
+    const oversized = await run([...exact, Buffer.from(' '), Buffer.from(' ') ]);
+    ok('Supabase ៖ បញ្ឈប់អានភ្លាមពេលលើសព្រំដែន មិនអានកន្ទុយ', oversized.error && /response byte limit/.test(oversized.error.message) && oversized.reads === exact.length + 1, { reads: oversized.reads });
+    ok('Supabase ៖ response លើសព្រំដែនត្រូវ cancel និងមិន retry', oversized.cancelled && oversized.aborted && oversized.calls === 1);
+    const utf8 = Buffer.from(JSON.stringify({ text: 'ខ្មែរ' }));
+    const decoded = await run([...utf8].map(byte => Uint8Array.of(byte)));
+    ok('Supabase ៖ UTF-8 ដែលបែកតាម chunk នៅអានត្រឹមត្រូវ', decoded.value?.text === 'ខ្មែរ');
+    const empty = await run([]);
+    ok('Supabase ៖ body ទទេរក្សាលទ្ធផល null', empty.value === null && !empty.error);
+    const held = await run([Buffer.from('{')], true);
+    ok('Supabase ៖ body ព្យួរត្រូវបាន cancel ពេល timeout', held.error && held.cancelled && held.aborted);
+}
+
 (async () => {
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-backup-test-'));
     try {
+        await supabaseResponseBudgetScenarios();
         for (const status of [301, 302, 303, 307, 308]) {
             await credentialRedirectScenario('supabase', status);
             await credentialRedirectScenario('firebase-oauth', status);

@@ -199,6 +199,47 @@ const installs = workflow.split(/\r?\n/).filter((line) => /\bnpm\s+(?:install|i)
 ok('CI មិនដំឡើង npm xlsx ចាស់ជំនួស vendor ដែល App ប្រើ',
     installs.length > 0 && installs.every((line) => !/(?:^|\s)xlsx(?:@[^\s]+)?(?=\s|$)/.test(line)), installs);
 
+
+function auditDependencyArgs(source, versions) {
+    const blocks = [...source.matchAll(/^        run: \|\r?\n((?:          .*\r?\n|\r?\n)+)/gm)]
+        .map(match => match[1].split(/\r?\n/).map(line => line.slice(10)).join('\n'))
+        .filter(script => /npm install .*playwright-core/.test(script));
+    if (blocks.length !== 2) return false;
+    const os = require('os'), cp = require('child_process');
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-audit-dependencies-'));
+    try {
+        fs.mkdirSync(path.join(temp, 'ZoeW'));
+        fs.writeFileSync(path.join(temp, 'ZoeW/package-lock.json'), JSON.stringify({
+            packages: Object.fromEntries(Object.entries(versions).map(([name, version]) =>
+                ['node_modules/' + name, { version }]))
+        }));
+        return blocks.every(script => {
+            const result = cp.spawnSync('bash', ['-e', '-c',
+                'npm() { printf "%s\\n" "$@"; };\n' + script], {
+                cwd: temp, encoding: 'utf8', timeout: 5000,
+                env: { ...process.env, BASH_ENV: '/dev/null' }
+            });
+            const expected = ['install', '--prefer-offline', '--no-save', '--no-audit', '--no-fund',
+                'acorn@' + versions.acorn, 'playwright-core@' + versions['playwright-core'],
+                'playwright@' + versions['playwright-core']];
+            return result.status === 0 && JSON.stringify(result.stdout.trim().split('\n')) === JSON.stringify(expected);
+        });
+    } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+}
+const auditVersions = {
+    acorn: packageLock?.packages?.['node_modules/acorn']?.version,
+    'playwright-core': packageLock?.packages?.['node_modules/playwright-core']?.version
+};
+ok('CI ទាំងពីរដំឡើង Acorn និង Playwright តាមកំណែច្បាស់ក្នុង lockfile',
+    Object.values(auditVersions).every(version => /^\d+\.\d+\.\d+$/.test(version || ''))
+        && auditDependencyArgs(workflow, auditVersions));
+ok('CI dependency control ៖ ការប្ដូរ lockfile ប្ដូរកំណែដំឡើងទាំងពីរ',
+    auditDependencyArgs(workflow, { acorn: '8.99.1', 'playwright-core': '1.99.2' }));
+ok('CI dependency control ៖ Acorn គ្មានកំណែជាក់លាក់ត្រូវបដិសេធ',
+    !auditDependencyArgs(workflow.replace(/"acorn@\$ACORN_VERSION"/g, 'acorn'), auditVersions));
+ok('CI dependency control ៖ lockfile ខ្វះ Acorn ត្រូវបដិសេធ',
+    !auditDependencyArgs(workflow, { 'playwright-core': auditVersions['playwright-core'] }));
+
 try {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([

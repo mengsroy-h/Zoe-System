@@ -210,6 +210,15 @@ export function nearExpiryView(history, now, stale): NotifyView {
     };
 }
 
+export function invalidateStaleNotifyViews() {
+    if (dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY) && uiState.notifyView?.measurable) {
+        uiState.notifyView = { measurable: false, packages: 0, customers: 0, rows: [], emptyText: VIEW_NOT_MEASURABLE_NOTICE };
+    }
+    if (dbListenerViewIsStale(DB_LISTENER_KEY_DELETED) && uiState.notifyRemovedView?.measurable) {
+        uiState.notifyRemovedView = { measurable: false, packages: 0, customers: 0, unseen: 0, rows: [], emptyText: VIEW_NOT_MEASURABLE_NOTICE };
+    }
+}
+
 export function refreshNotifyView() {
     const stale = !serverClockIsTrustworthy()
         || !firebaseState.isDatabaseInitialized || dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY);

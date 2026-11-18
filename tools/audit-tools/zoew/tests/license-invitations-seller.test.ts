@@ -34,12 +34,14 @@ describe('ការអញ្ជើញអ្នកលក់', () => {
     it('បិទផ្ទាំងលុបកូដ និងប៊ូតុងសំណើ', () => {
         const elements = new Map<string, {value: string; textContent: string; disabled: boolean; replaceChildren: () => void}>();
         let cleared = false;
-        for (const id of ['licenseInvitationQueue', 'licenseInvitationReference', 'secureKeyEnrollmentInput', 'secureKeySetupKey', 'secureKeyFingerprint', 'secureKeySetupStatus', 'secureKeySetupId', 'secureKeyApproveBtn']) {
+        for (const id of ['licenseInvitationControls', 'licenseInvitationQueue', 'licenseInvitationReference', 'secureKeyEnrollmentInput', 'secureKeySetupKey', 'secureKeyFingerprint', 'secureKeySetupStatus', 'secureKeySetupId', 'secureKeyApproveBtn']) {
             elements.set(id, {value: 'secret', textContent: 'secret', disabled: false, replaceChildren: () => { cleared = true; }});
         }
         const context = vm.createContext({document: { getElementById: (id: string) => elements.get(id) }});
         vm.runInContext(source.slice(source.indexOf('let secureKeySetup = null;'), source.indexOf('async function licenseInvitationCommand')), context);
+        elements.get('licenseInvitationControls')!.disabled = true;
         context.clearSecureKeySetup();
+        expect(elements.get('licenseInvitationControls')?.disabled).toBe(false);
         expect(cleared).toBe(true);
         expect(elements.get('licenseInvitationReference')?.value).toBe('');
         expect(elements.get('secureKeyApproveBtn')?.disabled).toBe(true);
@@ -116,6 +118,7 @@ describe('ស្ថានភាពសំណើអ្នកលក់', () => {
         h.context.confirm = () => false;
         await h.context.actLicenseInvitation(h.setup, invite, 'approve', request);
         expect(h.calls.filter(c => c.action === 'approve')).toHaveLength(0);
+        expect(h.messages.at(-1)).not.toContain('កំពុង');
         h.context.confirm = () => true;
         await h.context.actLicenseInvitation(h.setup, invite, 'approve', request);
         expect(h.calls.find(c => c.action === 'approve')).toMatchObject({ requestId: 'hash', fingerprint: 'fp', enrollmentHash: 'hash', revision: 7, releaseEpoch: 0, receiptKeyFingerprint: 'receipt' });
@@ -204,4 +207,62 @@ it('បង្កើតការអញ្ជើញថ្មីក្រោយប�
     expect(h.calls).toHaveLength(2);
     expect(h.calls[0].inviteId).not.toBe(h.calls[1].inviteId);
     expect(h.calls[1]).toMatchObject({ target: 'apk', invitationExpiresAt: 7240000 });
+});
+
+it('បង្ហាញកំពុងធ្វើការ បិទប៊ូតុងស្ទួន និងបើកឡើងវិញពេលបរាជ័យ', async () => {
+    const h = harness();
+    let rejectRead!: (error: Error) => void;
+    let reads = 0;
+    h.context.licenseInvitationCommand = () => { reads++; return new Promise((_resolve, reject) => { rejectRead = reject; }); };
+    const pending = h.context.createLicenseInvitation();
+    expect(h.elements.get('licenseInvitationControls')?.disabled).toBe(true);
+    expect(h.messages.at(-1)).toContain('កំពុង');
+    await h.context.createLicenseInvitation();
+    expect(reads).toBe(1);
+    rejectRead(new Error('network'));
+    await pending;
+    expect(h.elements.get('licenseInvitationControls').disabled).toBe(false);
+    expect(h.messages.at(-1)).not.toContain('កូដដដែលត្រូវបានរក្សា');
+});
+
+it('ពេលសេវាអញ្ជើញបិទ ប្រាប់ម្ចាស់ឱ្យពិនិត្យការកំណត់', async () => {
+    const h = harness();
+    h.context.licenseInvitationCommand = async () => { throw new Error('invitation-disabled'); };
+    await h.context.refreshLicenseInvitations();
+    expect(h.messages.at(-1)).toContain('សេវាអញ្ជើញមិនទាន់បើក');
+    expect(h.messages.at(-1)).toContain('Netlify របស់ ZoeW');
+    expect(h.setup.busy).toBe(false);
+});
+
+it('ទុកតែកូដកំហុសដែលបានអនុញ្ញាត មិនបង្ហាញសារផ្ទៃក្នុងរបស់ server', async () => {
+    const h = harness();
+    h.context.captureKeygenClock = () => ({ now: 100000 });
+    h.context.keygenClockIsCurrent = () => true;
+    h.context.signingPrivateKeyJwk = h.setup.context.privateKey = {};
+    h.context.seatSellerEncode = () => 'encoded';
+    h.context.crypto = { subtle: { importKey: async () => ({}), sign: async () => new Uint8Array(64) } };
+    vm.runInContext(functions, h.context);
+    h.context.fetchWithTimeout = async () => ({res: {ok: false, status: 503}, body: {reason: 'invitation-disabled'}});
+    await expect(h.context.licenseInvitationCommand(h.setup, 'list')).rejects.toThrow('invitation-disabled');
+    h.context.fetchWithTimeout = async () => ({res: {ok: false, status: 500}, body: {reason: 'private-server-details'}});
+    await expect(h.context.licenseInvitationCommand(h.setup, 'list')).rejects.toThrow('invitation-unverified');
+});
+
+it('ស្ថានភាពរង់ចាំភ្ជាប់ជាមួយប៊ូតុងក្នុង HTML ពិត និងទុកបិទផ្ទាំងនៅក្រៅ', () => {
+    const html = readFileSync('../ZoeKeyGen/index.html', 'utf8');
+    const template = document.createElement('template');
+    template.innerHTML = html;
+    const controls = template.content.querySelector('#licenseInvitationControls') as HTMLFieldSetElement;
+    expect(controls.tagName).toBe('FIELDSET');
+    expect(controls.querySelector('[data-act="createLicenseInvitation"]')).not.toBeNull();
+    expect(controls.querySelector('[data-act="refreshLicenseInvitations"]')).not.toBeNull();
+    expect(controls.querySelector('#licenseInvitationQueue')).not.toBeNull();
+    expect(controls.querySelector('[data-act="closeModal"]')).toBeNull();
+    const h = harness();
+    h.context.document = { getElementById: (id: string) => template.content.querySelector(`#${id}`) };
+    h.context.setLicenseInvitationBusy(h.setup, true);
+    expect(controls.disabled).toBe(true);
+    h.context.setLicenseInvitationBusy(h.setup, false);
+    expect(controls.disabled).toBe(false);
+
 });

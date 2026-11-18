@@ -7,7 +7,7 @@ import { generateUniqueId, normalizeBarcodesOf, parseTimestampFromId } from '../
 import { parseParcelNumber } from '../domain/parcel-number';
 import { runAutomaticDeletedCleanup } from '../domain/cleanup';
 import { flushPendingRegistryReleases } from '../domain/registry';
-import { refreshNotifyRemovedView } from '../features/notifications';
+import { invalidateStaleNotifyViews, refreshNotifyRemovedView } from '../features/notifications';
 import { RECENT_PHONES_MAX, collectPhoneSuggestions } from '../features/phone-suggest';
 import { DB_LISTENER_PROGRESS_GRACE_MS, DB_LISTENER_RETRY_MIN_GAP_MS, LISTENER_RECOVERY_STEPS_MS, clearInfoListenerRecovery, clearReconnectWatchdog, renderConnectionStatus } from './connection';
 import { debouncedRenderAfterHistorySync } from './network';
@@ -136,6 +136,7 @@ export function handleDbListenerError(err, pathKey) {
         if (window.ZoeErrors) ZoeErrors.capture(err, { context: 'Firebase listener error' });
     }
     if (pathKey) dbListenerFailedPaths.add(pathKey);
+    invalidateStaleNotifyViews();
     firebaseState.dbListenersFailed = true;
     renderConnectionStatus();
     if (!firebaseState.dbListenerOutageNoticeShown) {
@@ -162,6 +163,7 @@ export function initDatabaseListeners() {
         deleted: firebaseState.dbRefDeleted
     };
     DB_LISTENER_KEYS.forEach((key) => { if (listenerRefs[key]) dbListenerPendingPaths.add(key); });
+    invalidateStaleNotifyViews();
     firebaseState.dbListenerPendingSeen = dbListenerPendingPaths.size;
     firebaseState.dbListenerProgressAt = 0;
 

@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.50';
+const APP_VERSION = '2.24.51';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -3501,6 +3501,8 @@ let secureKeySetup = null;
 
 function clearSecureKeySetup() {
     secureKeySetup = null;
+    const invitationControls = document.getElementById('licenseInvitationControls');
+    if (invitationControls) invitationControls.disabled = false;
     const inventory = document.getElementById('secureSeatInventoryModal');
     if (inventory) inventory.inventoryOwner = null;
     ['secureSeatInventoryId', 'secureSeatInventoryStatus', 'secureSeatInventoryList'].forEach((id) => {
@@ -3532,8 +3534,25 @@ async function licenseInvitationCommand(setup, action, fields = {}) {
     const signature = seatSellerEncode(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, new TextEncoder().encode(payload)));
     if (!current() || getTrustedServerNow() >= command.expiresAt) throw new Error('invitation-session');
     const out = await fetchWithTimeout('https://zoew.netlify.app/.netlify/functions/license-invitations', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payload, signature }) }, 15000, 'Invitation outcome unknown', res => res.json());
-    if (!current() || !out.res.ok) throw new Error('invitation-unverified');
+    if (!current()) throw new Error('invitation-unverified');
+    if (!out.res.ok) {
+        if (out.res.status === 503 && out.body?.reason === 'invitation-disabled') throw new Error('invitation-disabled');
+        throw new Error('invitation-unverified');
+    }
     return out.body;
+}
+
+function setLicenseInvitationBusy(setup, busy) {
+    if (!secureKeySetupCurrent(setup)) return;
+    setup.busy = busy;
+    const controls = document.getElementById('licenseInvitationControls');
+    if (controls) controls.disabled = busy;
+}
+
+function licenseInvitationFailureMessage(error, fallback) {
+    return error?.message === 'invitation-disabled'
+        ? 'សេវាអញ្ជើញមិនទាន់បើក។ សូមពិនិត្យការកំណត់សេវាអញ្ជើញក្នុង Netlify របស់ ZoeW រួច Deploy ឡើងវិញ។ អាចប្រើវិធីដោយដៃខាងលើបាន។'
+        : fallback;
 }
 
 async function verifyLicenseInvitationRequest(setup, invite, request) {
@@ -3602,19 +3621,21 @@ async function licenseInvitationList(setup) {
 async function refreshLicenseInvitations() {
     const setup = secureKeySetup;
     if (!secureKeySetupCurrent(setup) || setup.busy) return;
-    setup.busy = true;
+    setLicenseInvitationBusy(setup, true);
+    secureKeySetupMessage(setup, 'កំពុងផ្ទៀងផ្ទាត់ជាមួយ Server… សូមរង់ចាំ។');
     try {
         await licenseInvitationList(setup);
         secureKeySetupMessage(setup, 'បានអានសំណើថ្មី។ ផ្ទៀងលេខ និងកម្មវិធីជាមួយអតិថិជនដែលអ្នកស្គាល់មុនអនុម័ត។');
-    } catch {
-        secureKeySetupMessage(setup, 'ការអញ្ជើញមិនទាន់អាចប្រើបាន ឬលទ្ធផលមិនទាន់ច្បាស់។ សូមពិនិត្យម្ដងទៀត ឬប្រើវិធីដោយដៃ។');
-    } finally { if (secureKeySetupCurrent(setup)) setup.busy = false; }
+    } catch (error) {
+        secureKeySetupMessage(setup, licenseInvitationFailureMessage(error, 'ការអញ្ជើញមិនទាន់អាចប្រើបាន ឬលទ្ធផលមិនទាន់ច្បាស់។ សូមពិនិត្យម្ដងទៀត ឬប្រើវិធីដោយដៃ។'));
+    } finally { setLicenseInvitationBusy(setup, false); }
 }
 
 async function createLicenseInvitation() {
     const setup = secureKeySetup;
     if (!secureKeySetupCurrent(setup) || setup.busy) return;
-    setup.busy = true;
+    setLicenseInvitationBusy(setup, true);
+    secureKeySetupMessage(setup, 'កំពុងផ្ទៀងផ្ទាត់ជាមួយ Server… សូមរង់ចាំ។');
     try {
         const list = await licenseInvitationList(setup);
         const inspected = await secureKeySetupInspect(setup);
@@ -3638,9 +3659,9 @@ async function createLicenseInvitation() {
         setup.invitationDraft = null;
         document.getElementById('licenseInvitationReference').value = found.inviteId;
         secureKeySetupMessage(setup, found.target === 'apk' ? 'ចម្លងកូដនេះទៅបិទភ្ជាប់ក្នុង APK ដែលបានដំឡើង។' : 'ផ្ញើតំណ ឬកូដនេះទៅអតិថិជន។');
-    } catch {
-        secureKeySetupMessage(setup, 'មិនទាន់បញ្ជាក់ការអញ្ជើញ។ ពិនិត្យសំណើមុនសាកម្ដងទៀត។ កូដដដែលត្រូវបានរក្សាក្នុងផ្ទាំងនេះ។ វិធីដោយដៃនៅខាងក្រោម។');
-    } finally { if (secureKeySetupCurrent(setup)) setup.busy = false; }
+    } catch (error) {
+        secureKeySetupMessage(setup, licenseInvitationFailureMessage(error, 'មិនទាន់បញ្ជាក់ការអញ្ជើញ។ ពិនិត្យសំណើមុនសាកម្ដងទៀត។ ' + (setup.invitationDraft ? 'កូដដដែលត្រូវបានរក្សាក្នុងផ្ទាំងនេះ។ ' : '') + 'វិធីដោយដៃនៅខាងលើ។'));
+    } finally { setLicenseInvitationBusy(setup, false); }
 }
 
 async function copyLicenseInvitation(link) {
@@ -3653,21 +3674,25 @@ async function copyLicenseInvitation(link) {
 
 async function actLicenseInvitation(setup, invite, action, request) {
     if (!secureKeySetupCurrent(setup) || setup.busy) return;
-    setup.busy = true;
+    setLicenseInvitationBusy(setup, true);
+    secureKeySetupMessage(setup, 'កំពុងផ្ទៀងផ្ទាត់ជាមួយ Server… សូមរង់ចាំ។');
     try {
         const list = await licenseInvitationList(setup);
         const fresh = list.invitations.find(i => i.inviteId === invite.inviteId);
         const r = request && fresh && fresh.requests.find(r => r.requestId === request.requestId);
         if (!fresh || fresh.status !== 'open' || (request && (!r || r.status !== 'pending' || r.enrollmentHash !== request.enrollmentHash || r.fingerprint !== request.fingerprint || r.verificationCode !== request.verificationCode))) throw new Error('invitation-changed');
         if (r) await verifyLicenseInvitationRequest(setup, fresh, r);
-        if (!confirm(action === 'approve' ? 'តើអតិថិជនដែលអ្នកស្គាល់បានបញ្ជាក់លេខ ' + r.verificationCode + ' និងកម្មវិធី ' + fresh.target + ' ដូចគ្នាមែនទេ?' : 'តើអ្នកចង់បដិសេធ ឬបោះបង់សំណើនេះមែនទេ?')) return;
+        if (!confirm(action === 'approve' ? 'តើអតិថិជនដែលអ្នកស្គាល់បានបញ្ជាក់លេខ ' + r.verificationCode + ' និងកម្មវិធី ' + fresh.target + ' ដូចគ្នាមែនទេ?' : 'តើអ្នកចង់បដិសេធ ឬបោះបង់សំណើនេះមែនទេ?')) {
+            secureKeySetupMessage(setup, 'បានបោះបង់សកម្មភាព។ មិនបានផ្ញើការផ្លាស់ប្ដូរទៅ Server ទេ។');
+            return;
+        }
         if (!secureKeySetupCurrent(setup)) return;
         await licenseInvitationCommand(setup, action, { inviteId: fresh.inviteId, revision: list.revision, releaseEpoch: list.releaseEpoch, ...(r ? { requestId: r.requestId, fingerprint: r.fingerprint, enrollmentHash: r.enrollmentHash, receiptKeyFingerprint: list.receiptKeyFingerprint } : {}) });
         await licenseInvitationList(setup);
         secureKeySetupMessage(setup, 'Server បានបញ្ជាក់សកម្មភាព។');
-    } catch {
-        secureKeySetupMessage(setup, 'លទ្ធផលមិនទាន់ច្បាស់។ ចុចពិនិត្យសំណើមុនធ្វើសកម្មភាពម្ដងទៀត។');
-    } finally { if (secureKeySetupCurrent(setup)) setup.busy = false; }
+    } catch (error) {
+        secureKeySetupMessage(setup, licenseInvitationFailureMessage(error, 'លទ្ធផលមិនទាន់ច្បាស់។ ចុចពិនិត្យសំណើមុនធ្វើសកម្មភាពម្ដងទៀត។'));
+    } finally { setLicenseInvitationBusy(setup, false); }
 }
 
 async function publishSecureGeneratedKey(context, id, keyString) {

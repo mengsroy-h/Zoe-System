@@ -81,7 +81,8 @@ jobs:
       - name: ដំឡើង dependency
         run: |
           PW_VERSION=$(node -p "require('./ZoeW/package-lock.json').packages['node_modules/playwright-core'].version")
-          npm install --prefer-offline --no-save --no-audit --no-fund acorn "playwright-core@$PW_VERSION" "playwright@$PW_VERSION"
+          ACORN_VERSION=$(node -p "require('./ZoeW/package-lock.json').packages['node_modules/acorn'].version")
+          npm install --prefer-offline --no-save --no-audit --no-fund "acorn@$ACORN_VERSION" "playwright-core@$PW_VERSION" "playwright@$PW_VERSION"
 
       - name: ទាញ Chromium លើម៉ាស៊ីនអ្នក
         if: vars.ZOE_RUNNER_MODE != 'github'
@@ -197,7 +198,8 @@ jobs:
       - name: ដំឡើង dependency
         run: |
           PW_VERSION=$(node -p "require('./ZoeW/package-lock.json').packages['node_modules/playwright-core'].version")
-          npm install --prefer-offline --no-save --no-audit --no-fund acorn "playwright-core@$PW_VERSION" "playwright@$PW_VERSION"
+          ACORN_VERSION=$(node -p "require('./ZoeW/package-lock.json').packages['node_modules/acorn'].version")
+          npm install --prefer-offline --no-save --no-audit --no-fund "acorn@$ACORN_VERSION" "playwright-core@$PW_VERSION" "playwright@$PW_VERSION"
 
       - name: ទាញ Chromium លើម៉ាស៊ីនអ្នក
         if: vars.ZOE_RUNNER_MODE != 'github'

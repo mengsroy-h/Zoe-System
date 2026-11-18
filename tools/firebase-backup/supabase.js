@@ -78,6 +78,32 @@ function rpcError(fn, status, body) {
     return error;
 }
 
+async function readResponseText(response, signal, fn) {
+    if (!response.body || typeof response.body.getReader !== 'function') return response.text();
+    const reader = response.body.getReader();
+    const chunks = [];
+    let bytes = 0;
+    const cancel = () => { reader.cancel().catch(() => {}); };
+    signal.addEventListener('abort', cancel, { once: true });
+    try {
+        if (signal.aborted) cancel();
+        for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            bytes += value.byteLength;
+            if (bytes > MAX_RESPONSE_BYTES) {
+                cancel();
+                throw Object.assign(new Error(fn + ' reply exceeds the response byte limit.'), { retryable: false });
+            }
+            chunks.push(Buffer.from(value.buffer, value.byteOffset, value.byteLength));
+        }
+        return new TextDecoder().decode(Buffer.concat(chunks, bytes));
+    } finally {
+        signal.removeEventListener('abort', cancel);
+        reader.releaseLock();
+    }
+}
+
 function createClient(options) {
     const url = normalizeSupabaseUrl(options.url);
     const key = validateSecretKey(options.key);
@@ -118,8 +144,9 @@ function createClient(options) {
             }
             let text;
             try {
-                text = await response.text();
+                text = await readResponseText(response, controller.signal, fn);
             } catch (e) {
+                if (e && e.retryable === false) throw e;
                 throw Object.assign(new Error(fn + ' reply was cut off.'), { retryable: true });
             }
             if (Buffer.byteLength(text) > MAX_RESPONSE_BYTES) throw Object.assign(new Error(fn + ' reply exceeds the response byte limit.'), { retryable: false });

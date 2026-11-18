@@ -481,6 +481,7 @@ const firebaseConfig = {
         <details class="secure-key-options">
             <summary>⚙️ ជម្រើសបន្ថែម · ការអញ្ជើញអតិថិជន</summary>
             <p>ប្រើតែពេលសេវាអញ្ជើញបានបើក។ វិធីដោយដៃនៅខាងលើអាចប្រើដដែល។</p>
+        <fieldset id="licenseInvitationControls">
         <label for="licenseInvitationTarget">កម្មវិធីអតិថិជន</label>
         <select id="licenseInvitationTarget"><option value="pwa">PWA</option><option value="apk">APK</option></select>
         <label for="licenseInvitationHours">សុពលភាពអញ្ជើញ · ម៉ោង (អតិបរមា 24)</label>
@@ -492,6 +493,7 @@ const firebaseConfig = {
         <p>APK៖ បិទភ្ជាប់កូដក្នុងកម្មវិធីដែលបានដំឡើង។ ផ្ទៀងលេខជាមួយអតិថិជនផ្ទាល់ មុនអនុម័ត។</p>
         <button class="btn-secondary seat-action-info w-full" data-act="refreshLicenseInvitations">ពិនិត្យសំណើអតិថិជន</button>
         <div id="licenseInvitationQueue"></div>
+        </fieldset>
         </details>
         <div class="modal-btns mt-12">
             <button class="btn-secondary seat-action-info" data-act="refreshSecureKeySetup">🔄 ពិនិត្យ និងបន្ត</button>

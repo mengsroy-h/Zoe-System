@@ -599,6 +599,36 @@ async function supabaseResponseBudgetScenarios() {
             const savedPass = process.env.ZOE_BACKUP_PASSPHRASE;
             process.env.ZOE_BACKUP_PASSPHRASE = PASS_A;
             try {
+                const retentionDir = path.join(tempRoot, 'sealed-retention');
+                fs.mkdirSync(retentionDir);
+                const generation = n => path.join(retentionDir, `2026-09-0${n}T00-00-00-000Z-aabbcc.json.gz`);
+                for (const n of [1, 2, 3]) {
+                    fs.writeFileSync(generation(n), zlib.gzipSync(plain));
+                    crypt.runSeal(retentionDir, 1);
+                }
+                ok('seal រក្សាជំនាន់ថ្មីបំផុតតាមចំនួន', fs.readdirSync(retentionDir).join() === path.basename(generation(3) + '.enc'));
+                const stable = fs.readFileSync(generation(3) + '.enc');
+                fs.writeFileSync(generation(4), zlib.gzipSync(plain));
+                const partial = `${generation(4)}.enc.${process.pid}.partial`;
+                fs.writeFileSync(partial, 'occupied');
+                expectThrow('seal ធ្លាក់មិន prune archive ចាស់', () => crypt.runSeal(retentionDir, 1), /EEXIST/);
+                ok('seal ធ្លាក់រក្សា bytes ចាស់ និង plaintext ថ្មី', fs.readFileSync(generation(3) + '.enc').equals(stable) && fs.existsSync(generation(4)));
+                fs.unlinkSync(partial);
+                fs.writeFileSync(path.join(retentionDir, 'manual.json.gz.enc'), 'unmanaged');
+                fs.writeFileSync(generation(3), zlib.gzipSync(plain));
+                crypt.runSeal(retentionDir, 2);
+                ok('ជំនាន់ដូចគ្នារាប់តែមួយ និងរក្សាឯកសារក្រៅទម្រង់', fs.existsSync(generation(3) + '.enc') && fs.existsSync(generation(4) + '.enc') && fs.existsSync(path.join(retentionDir, 'manual.json.gz.enc')));
+                fs.writeFileSync(generation(5), zlib.gzipSync('invalid JSON'));
+                expectThrow('plaintext ខូចមិន prune', () => crypt.runSeal(retentionDir, 1), /invalid gzip JSON/);
+                ok('plaintext ខូចរក្សា archive ចាស់', fs.existsSync(generation(3) + '.enc') && fs.existsSync(generation(4) + '.enc'));
+                fs.writeFileSync(generation(5), zlib.gzipSync(plain));
+                crypt.runSeal(retentionDir);
+                ok('មិនផ្តល់ចំនួន មិន prune', fs.existsSync(generation(3) + '.enc') && fs.existsSync(generation(5) + '.enc'));
+                fs.writeFileSync(generation(9) + '.enc', 'damaged surviving archive');
+                fs.writeFileSync(generation(6), zlib.gzipSync(plain));
+                expectThrow('archive ដែលនឹងរក្សាត្រូវផ្ទៀងផ្ទាត់មុន prune', () => crypt.runSeal(retentionDir, 1), /retained archive failed verification/);
+                ok('survivor ខូចមិនលុបជំនាន់ល្អ', zlib.gunzipSync(crypt.decryptBuffer(fs.readFileSync(generation(3) + '.enc'), PASS_A)).equals(plain) && fs.existsSync(generation(6) + '.enc'));
+                expectThrow('ចំនួនខុសមិនកែឯកសារ', () => crypt.runSeal(retentionDir, 0), /keepCount/);
                 const sealedCount = crypt.runSeal(sealRoot);
                 ok('seal អ៊ិនគ្រីបគ្រប់ឯកសារ backup', sealedCount === 1 && fs.existsSync(gzPath + '.enc'));
                 ok('⛔ seal លុប plaintext ចោល ➜ គ្មាន .json.gz សល់ឲ្យ upload',

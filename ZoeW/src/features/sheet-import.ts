@@ -1,3 +1,4 @@
+import { sheetImportStrictMoney, sheetImportMoneyDecimalMark, validateSheetImportDelimitedBytes } from './sheet-import-validation';
 import { uiState } from '../core/state';
 import { emptySheetImportView } from '../app/components/sheet/model';
 function patchSheetImportView(patch) {
@@ -569,7 +570,10 @@ export async function handleSheetImportFile(file) {
     if (generation !== sheetFileGeneration) return;
     try {
         const sheetImportBytes = new Uint8Array(buffer);
-        sheetImportState.sheetImportWorkbook = XLSX.read(sheetImportBytes, sheetImportReadOptions(sheetImportBytes));
+        const delimiter = validateSheetImportDelimitedBytes(sheetImportBytes, file.name || '');
+        const options = sheetImportReadOptions(sheetImportBytes);
+        if (delimiter) options.FS = delimiter;
+        sheetImportState.sheetImportWorkbook = XLSX.read(sheetImportBytes, options);
         const names = sheetImportState.sheetImportWorkbook.SheetNames || [];
         if (!names.length) throw new Error('ឯកសារនេះគ្មាន tab ទេ');
         patchSheetImportView({ sheetNames: names, sheetValue: names[0] || '' });
@@ -682,17 +686,31 @@ export function currentSheetImportMapping() {
 export function sheetImportMappedRows() {
     const mapping: any = currentSheetImportMapping();
     const start = sheetImportHeaderRowNumber();
+    const moneyCells = [];
+    for (let i = start; i < sheetImportState.sheetImportSheetRows.length; i++) {
+        const row = sheetImportState.sheetImportSheetRows[i] || [];
+        if (mapping.barcode < 0 || !sheetImportCellToText(row[mapping.barcode])) continue;
+        if (mapping.dod >= 0) moneyCells.push(row[mapping.dod]);
+        if (mapping.cod >= 0) moneyCells.push(row[mapping.cod]);
+    }
+    const decimalMark = sheetImportMoneyDecimalMark(moneyCells);
     const out = [];
     for (let i = start; i < sheetImportState.sheetImportSheetRows.length; i++) {
         const row = sheetImportState.sheetImportSheetRows[i] || [];
+        const barcode = mapping.barcode >= 0 ? sheetImportCellToText(row[mapping.barcode]) : '';
         out.push([
-            mapping.barcode >= 0 ? sheetImportCellToText(row[mapping.barcode]) : '',
-            mapping.dod >= 0 ? sheetImportToMoney(row[mapping.dod]) : 0,
-            mapping.cod >= 0 ? sheetImportToMoney(row[mapping.cod]) : 0,
+            barcode,
+            barcode && mapping.dod >= 0 ? sheetImportStrictMoney(row[mapping.dod], decimalMark) : 0,
+            barcode && mapping.cod >= 0 ? sheetImportStrictMoney(row[mapping.cod], decimalMark) : 0,
             mapping.phone >= 0 ? sheetImportCellToText(row[mapping.phone]) : ''
         ]);
     }
     return out;
+}
+
+export function sheetImportMoneyError(rows) {
+    const invalid = rows.findIndex((row) => row[0] && (row[1] === null || row[2] === null));
+    return invalid < 0 ? '' : 'ទឹកប្រាក់ DOD/COD មិនត្រឹមត្រូវនៅជួរដេក ' + (sheetImportHeaderRowNumber() + invalid + 1) + ' — សូមកែទម្រង់ប្រាក់ USD ឬការផ្គូផ្គង Column មុននាំចូល';
 }
 
 export function addSheetImportChip(host, text, kind) {
@@ -701,6 +719,13 @@ export function addSheetImportChip(host, text, kind) {
 
 export function renderSheetImportPreview() {
     const rows = sheetImportMappedRows();
+    const error = sheetImportMoneyError(rows);
+    if (error) {
+        patchSheetImportView({ chips: [{ text: error, kind: 'bad' }], previewRows: [] });
+        showSheetImportPart('siPreviewWrap', false);
+        viewState.siImportBtnDisabled = true;
+        return;
+    }
     const usable = rows.filter((r) => r[0] !== '');
     const seen = Object.create(null);
     let duplicates = 0;
@@ -728,7 +753,14 @@ export async function runSheetImport() {
         setSheetImportMsg('siActionMsg', SHEET_IMPORT_PREPARE_PENDING_TEXT, 'warn');
         return;
     }
-    const rows = sheetImportMappedRows().filter((r) => r[0] !== '');
+    const mappedRows = sheetImportMappedRows();
+    const error = sheetImportMoneyError(mappedRows);
+    if (error) {
+        setSheetImportMsg('siActionMsg', error, 'bad');
+        viewState.siImportBtnDisabled = true;
+        return;
+    }
+    const rows = mappedRows.filter((r) => r[0] !== '');
     if (!rows.length) {
         setSheetImportMsg('siActionMsg', 'គ្មានជួរដេកត្រូវនាំចូលទេ', 'bad');
         return;

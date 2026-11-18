@@ -17,6 +17,7 @@ vi.mock('../../../../ZoeW/src/features/lookup-api', async (importOriginal) => ({
 import { scanState } from '../../../../ZoeW/src/core/state';
 import { viewState } from '../../../../ZoeW/src/core/view-state';
 import { closeCameraManually, stopCurrentStream } from '../../../../ZoeW/src/features/daily-stats';
+import { setupVisibilityHandling } from '../../../../ZoeW/src/app/behaviors/scanner-input';
 import { requestCameraPermission } from '../../../../ZoeW/src/services/camera';
 
 function deferred<T>() {
@@ -123,4 +124,76 @@ it('សំណើបច្ចុប្បន្នបដិសេធ ៖ ប្�
     expect(scanState.currentStream).toBe(current);
     expect(scanState.isCameraStarting).toBe(false);
     expect(alert).toHaveBeenCalledOnce();
+});
+
+// Use the real lifecycle handler and real permission ownership/stream cleanup.
+setupVisibilityHandling();
+function visibility(hidden: boolean) {
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(hidden);
+    document.dispatchEvent(new Event('visibilitychange'));
+}
+
+for (const rejectOld of [false, true]) {
+    it('លាក់កម្មវិធីពេលរង់ចាំសិទ្ធិ ៖ បោះបង់ម្ចាស់សំណើ ហើយមិនបើកកាមេរ៉ាយឺត ' + (rejectOld ? 'បដិសេធ' : 'ជោគជ័យ'), async () => {
+        const permission = deferred<any>(), late = stream();
+        camera(vi.fn(() => permission.promise));
+        requestCameraPermission();
+        const requestId = scanState.cameraRequestId;
+        visibility(true);
+        expect(scanState.cameraRequestId).toBeGreaterThan(requestId);
+        expect(scanState.isCameraStarting).toBe(false);
+        expect(viewState.cameraView).toBe('closed');
+        if (rejectOld) permission.reject(new Error('late denial')); else permission.resolve(late);
+        await flush();
+        expect(late.track.stop).toHaveBeenCalledTimes(rejectOld ? 0 : 1);
+        expect(scanState.currentStream).toBeNull();
+        expect(scanState.isCameraScanning).toBe(false);
+        expect(video.srcObject).toBeNull();
+        expect(video.play).not.toHaveBeenCalled();
+        expect(alert).not.toHaveBeenCalled();
+    });
+}
+
+it('ត្រឡប់មកវិញ ៖ សំណើចាស់មិនប៉ះពាល់ stream ថ្មី ហើយមិនបើកដោយស្វ័យប្រវត្តិ', async () => {
+    const first = deferred<any>(), second = deferred<any>(), old = stream(), current = stream();
+    const getUserMedia = vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    camera(getUserMedia);
+    requestCameraPermission();
+    visibility(true); visibility(false);
+    expect(getUserMedia).toHaveBeenCalledOnce();
+    requestCameraPermission();
+    expect(getUserMedia).toHaveBeenCalledTimes(2);
+    second.resolve(current); await flush();
+    first.resolve(old); await flush();
+    expect(old.track.stop).toHaveBeenCalledOnce();
+    expect(current.track.stop).not.toHaveBeenCalled();
+    expect(scanState.currentStream).toBe(current);
+    expect(scanState.isCameraScanning).toBe(true);
+    expect(video.srcObject).toBe(current);
+    expect(video.play).toHaveBeenCalledOnce();
+});
+
+it('កាមេរ៉ាបើករួច ៖ លាក់កម្មវិធីបិទ stream ដូចមុន', async () => {
+    const current = stream();
+    camera(vi.fn().mockResolvedValue(current));
+    requestCameraPermission(); await flush();
+    visibility(true);
+    expect(current.track.stop).toHaveBeenCalledOnce();
+    expect(scanState.currentStream).toBeNull();
+    expect(scanState.isCameraScanning).toBe(false);
+    expect(video.srcObject).toBeNull();
+    expect(viewState.cameraView).toBe('closed');
+});
+
+it('កម្មវិធីនៅបង្ហាញ ៖ មិនបោះបង់សំណើសិទ្ធិកំពុងរង់ចាំ', async () => {
+    const permission = deferred<any>(), current = stream();
+    camera(vi.fn(() => permission.promise));
+    requestCameraPermission();
+    const requestId = scanState.cameraRequestId;
+    visibility(false);
+    expect(scanState.cameraRequestId).toBe(requestId);
+    expect(scanState.isCameraStarting).toBe(true);
+    permission.resolve(current); await flush();
+    expect(scanState.currentStream).toBe(current);
+    expect(current.track.stop).not.toHaveBeenCalled();
 });

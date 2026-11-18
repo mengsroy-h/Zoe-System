@@ -340,6 +340,7 @@ function parseDelimitedText_(text, mimeType) {
             cell += ch;
         }
     }
+    if (quoted) throw new Error('CSV មានសញ្ញាដកស្រង់បើកដែលមិនទាន់បិទ — មិនទាន់សរសេរអ្វីទេ');
     if (cell !== '' || row.length) {
         row.push(excelTextCell_(cell));
         rows.push(row);

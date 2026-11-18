@@ -2131,6 +2131,9 @@
     "ZoeW/src/features/session.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/features/sheet-import-validation.ts": {
+      "policy": "zoew-app"
+    },
     "ZoeW/src/features/sheet-import.ts": {
       "policy": "zoew-app"
     },
@@ -5407,6 +5410,9 @@
       "policy": "zoew-self-verification"
     },
     "tools/audit-tools/zoew/tests/helpers/sheet-import-protocol.cjs": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/sheet-import-input-validation.test.ts": {
       "policy": "zoew-self-verification"
     },
     "tools/audit-tools/zoew/tests/sheet-import-protocol.test.ts": {

@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.51';
+const APP_VERSION = '2.24.52';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -3639,6 +3639,11 @@ async function createLicenseInvitation() {
     try {
         const list = await licenseInvitationList(setup);
         const inspected = await secureKeySetupInspect(setup);
+        const prior = setup.invitationDraft;
+        const trustedNow = getTrustedServerNow();
+        if (prior && !list.invitations.some(invite => invite.inviteId === prior.inviteId)
+            && Number.isFinite(trustedNow) && Number.isFinite(prior.invitationExpiresAt)
+            && prior.invitationExpiresAt <= trustedNow) setup.invitationDraft = null;
         if (!setup.invitationDraft) {
             const target = document.getElementById('licenseInvitationTarget').value;
             const hours = Number(document.getElementById('licenseInvitationHours').value);

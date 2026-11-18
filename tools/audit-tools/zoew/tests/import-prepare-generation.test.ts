@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createRequire } from 'node:module';
 import { webcrypto } from 'node:crypto';
-import { TextEncoder } from 'node:util';
+import { TextDecoder, TextEncoder } from 'node:util';
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
@@ -63,7 +63,7 @@ function harness() {
         readAsArrayBuffer(file: any) { this.file = file; }
         finish() { this.onload({ target: { result: new Uint8Array([this.file.book]).buffer } }); }
     }
-    const context: any = vm.createContext({ console, Date, Promise, Uint8Array, TextEncoder, FileReader: Reader, XLSX: { read: (bytes: Uint8Array) => books[bytes[0]], utils: { sheet_to_json: (sheet: any) => sheet } }, window: { confirm: () => true, crypto: webcrypto, localStorage: storage }, localStorage: storage, document: { getElementById: el, createElement: () => ({ value: '', textContent: '', appendChild() {} }) }, google: { script: { run: gateway } } });
+    const context: any = vm.createContext({ console, Date, Promise, Uint8Array, TextEncoder, TextDecoder, FileReader: Reader, XLSX: { read: (bytes: Uint8Array) => books[bytes[0]], utils: { sheet_to_json: (sheet: any) => sheet } }, window: { confirm: () => true, crypto: webcrypto, localStorage: storage }, localStorage: storage, document: { getElementById: el, createElement: () => ({ value: '', textContent: '', appendChild() {} }) }, google: { script: { run: gateway } } });
     vm.runInContext(script, context);
     context.state.password = 'synthetic-password';
     context.state.writeScope = server.ctx.getStatus(context.state.password).writeScope;

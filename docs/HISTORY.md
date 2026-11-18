@@ -81,6 +81,15 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### ZoeW [2.50.208] · ZoeKeyGen [2.24.52] — 2026-11-18 · កាមេរ៉ា ការអញ្ជើញ និងភាពត្រឹមត្រូវនៃឯកសារ
+
+**ZoeW** (`zoew-v471` ➜ `zoew-v472`) និង **ZoeKeyGen** (`zoekeygen-v162` ➜ `zoekeygen-v163`)។
+
+- លាក់ App ពេលកាមេរ៉ាកំពុងសុំសិទ្ធិ បោះបង់សិទ្ធិរបស់ការស្នើនោះ; stream ដែលមកយឺតត្រូវបញ្ឈប់។ ការអញ្ជើញដែលផុតកំណត់លើ Server អាចរៀបចំការស្នើថ្មីតាមលំហូរដើម។
+- ការនាំចូលទឹកប្រាក់ពិនិត្យតម្លៃទាំងមូល មិនលុបអក្សរខុសដើម្បីបង្កើតចំនួនថ្មី។ រក្សាទម្រង់ដុល្លារ និងសញ្ញាបំបែកដែលមានភស្តុតាង បម្លែងលេខខ្មែរជាក់លាក់ ហើយបដិសេធ CSV ដែលមានសញ្ញាដកស្រង់មិនទាន់បិទ។
+- ការរក្សា archive អ៊ិនគ្រីបចាស់ប្រើចំនួនជំនាន់ជាជម្រើសច្បាស់លាស់ ហើយផ្ទៀង archive ដែលនឹងរក្សាមុន prune។ មិនផ្តល់ចំនួន មិន prune។
+- **សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ ផ្ទៀងការកែ និង CI មុនចេញកំណែ; Update web/PWA/APK និង Apps Script ដោយដំណើរការចេញកំណែធម្មតា។ គ្មានការកែ env/rules/migration ក្នុងការកែនេះ។ ការនេះមិនទាន់ push ឬ deploy ហើយមិនទាន់សាកលើឧបករណ៍ពិត។
+
 ### ZoeW [2.50.207] — 2026-11-18 · ភាពស្រស់នៃផ្ទាំងជូនដំណឹង
 
 **ZoeW** (`zoew-v470` ➜ `zoew-v471`)។
@@ -2181,6 +2190,15 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-11-18 · ស្តារការកែ local ដែលបាត់ក្រោយ workspace ចាប់ផ្ដើមឡើងវិញ
+
+- ស្តារឡើងវិញលើ `a53bb153e46ebfd2783b7ede9c016e4976a7b156` ពីភស្តុតាងការកែ និង regression។ មិនអះអាងថាបានរកឃើញ Git objects ចាស់ `c869521` ឬ `21561bb` វិញទេ។
+- កាមេរ៉ា៖ `tools/audit-tools/zoew/tests/camera-acquisition-owner.test.ts` មុនកែធ្លាក់ ៣; ជាមួយតេស្តកាមេរ៉ាពាក់ព័ន្ធ ក្រោយកែឆ្លង ៤០។
+- ការអញ្ជើញ៖ `license-invitation-default-ui-test` មុនកែឆ្លង ៧៣ ធ្លាក់ ២; ក្រោយកែឆ្លង ៧៥។ Backup៖ `firebase-backup-test` មុនកែឆ្លង ១៧៨ ធ្លាក់ ៤; ក្រោយកែឆ្លង ១៨២។
+- Standalone importer៖ `zto-import/test` មុនកែឆ្លង ៣៣៨ ធ្លាក់ ៤៧; ក្រោយកែឆ្លង ៣៨៥។ វាស់ parser និង Sheet writer ក្លែងក្នុង memory ដោយមិនហៅ Google; រួម quote/CRLF/UTF-16 និងឯកសារមានចំណងជើងមុន header។
+- Embedded importer៖ `tools/audit-tools/zoew/tests/sheet-import-input-validation.test.ts` មុនកែធ្លាក់ ១១ ឆ្លង ១៧; ជាមួយ `sheet-import-protocol.test.ts` និង `import-prepare-generation.test.ts` ក្រោយកែឆ្លង ១២៩។ រក្សា parser អាន customer table ដើមដាច់ពី parser នាំចូលថ្មី។
+- លទ្ធផល local មិនជំនួស full CI, browser និងឧបករណ៍ពិតទេ។ ការស្ដារនេះមិនធ្វើសកម្មភាពលើ production ឬប្ដូរច្បាប់ការចេញ APK។
 
 ### 2026-11-18 · តភ្ជាប់អ្នកយាម CI ឱ្យស៊ីនឹងផ្ទាំងថ្មី
 
@@ -5605,6 +5623,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `zto-cookie-session-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ |
 | `zto-cookie-store-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `zto-cookie-sync-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៧ · ផ្នែក ៨ |
+| `zto-import/test` | ផ្នែក ២ | — |
 | `zto-list-sync-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `zto-negative-cache-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `zto-network-boundaries-test` | — | ផ្នែក ២ · ផ្នែក ៩ |
@@ -5693,6 +5712,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `tools/audit-tools/zoew/tests/history-observer-session-recovery.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/history-paging.test.tsx` | ផ្នែក ១ | ផ្នែក ៧ |
 | `tools/audit-tools/zoew/tests/history-patch-late-commit.test.ts` | — | ផ្នែក ៨ |
+| `tools/audit-tools/zoew/tests/import-prepare-generation.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/ios-accessory-focus.test.ts` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/ios-adjusted-tap-focus.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/ios-entry-search-tap.test.ts` | — | ផ្នែក ៨ |
@@ -5870,6 +5890,8 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `tools/audit-tools/zoew/tests/setup-link-dsn-pin.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/setup-link-hashchange.test.tsx` | ផ្នែក ១ | — |
 | `tools/audit-tools/zoew/tests/setup-lookup.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ · ផ្នែក ៩ |
+| `tools/audit-tools/zoew/tests/sheet-import-input-validation.test.ts` | ផ្នែក ២ | — |
+| `tools/audit-tools/zoew/tests/sheet-import-protocol.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/sheet-lookup-freshness.test.ts` | ផ្នែក ១ | — |
 | `tools/audit-tools/zoew/tests/shop-bound-settings.test.ts` | — | ផ្នែក ៨ · ផ្នែក ៩ |
 | `tools/audit-tools/zoew/tests/shop-bound-ui-refresh.test.ts` | — | ផ្នែក ៨ |

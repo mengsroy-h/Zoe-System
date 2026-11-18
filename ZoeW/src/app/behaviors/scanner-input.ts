@@ -283,7 +283,7 @@ export function hardwareScannerKeyPress(e: { key: string; preventDefault(): void
 export function setupVisibilityHandling() {
     document.addEventListener('visibilitychange', () => {
         if (document.hidden && securityState.configQrScanActive) closeConfigQrScanner();
-        if (document.hidden && scanState.isCameraScanning) {
+        if (document.hidden && (scanState.isCameraScanning || scanState.isCameraStarting)) {
             stopCurrentStream();
             showCameraClosedBox();
         }

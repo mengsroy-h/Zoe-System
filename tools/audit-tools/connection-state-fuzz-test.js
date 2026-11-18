@@ -65,7 +65,7 @@ if (!KEYS_DECL) missing.push('DB_LISTENER_KEYS');
 const KEYS = KEYS_DECL ? vm.runInNewContext(KEYS_DECL + '\nDB_LISTENER_KEYS') : ['history'];
 
 const FNS = ['dbListenerViewIsStale', 'anyDbListenerViewIsStale', 'emptyViewMessage',
-    'noteDbListenerAlive', 'handleDbListenerError', 'dbListenerResyncIsProgressing'];
+    'invalidateStaleNotifyViews', 'noteDbListenerAlive', 'handleDbListenerError', 'dbListenerResyncIsProgressing'];
 
 function makeWorld() {
     const log = { toasts: [], captures: [] };
@@ -79,6 +79,9 @@ function makeWorld() {
     };
     const ctx = vm.createContext(sandbox);
     vm.runInContext(`
+        var uiState = { notifyView: { measurable: true }, notifyRemovedView: { measurable: true } };
+        const DB_LISTENER_KEY_HISTORY = 'history';
+        const DB_LISTENER_KEY_DELETED = 'deleted';
         var dbListenerPendingPaths = new Set();
         var dbListenerFailedPaths = new Set();
         var dbListenerReportedFailures = new Set();
@@ -124,6 +127,14 @@ function snapshot(ctx) {
         failed: Array.from(dbListenerFailedPaths),
         failedFlag: dbListenersFailed
     })`, ctx);
+}
+
+for (const key of ['history', 'deleted']) {
+    const w = makeWorld();
+    vm.runInContext("handleDbListenerError(new Error('fixture'), " + JSON.stringify(key) + ")", w.ctx);
+    const views = vm.runInContext('({ history: uiState.notifyView, deleted: uiState.notifyRemovedView })', w.ctx);
+    ok('ទិដ្ឋភាពដែលដាច់ត្រូវផ្អាកការវាស់ ' + key, views[key].measurable === false && views[key].rows.length === 0);
+    ok('ទិដ្ឋភាពផ្សេងនៅស្រស់ ' + key, views[key === 'history' ? 'deleted' : 'history'].measurable === true);
 }
 
 console.log('=== connection-state-fuzz — ស្ថានភាពការតភ្ជាប់លើលំដាប់ចៃដន្យ ===');

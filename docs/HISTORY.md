@@ -2182,6 +2182,11 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-11-18 · តភ្ជាប់អ្នកយាម CI ឱ្យស៊ីនឹងផ្ទាំងថ្មី
+
+- [Audit #1353](https://github.com/mengsroy-h/Zoe-System/actions/runs/44325310718) ធ្លាក់នៅ ៥ ផ្នែកលើ `2b8c95e`។ `connection-recovery-test`, `connection-state-fuzz-test` និង `registry-release-test` ខ្វះការភ្ជាប់មុខងារជូនដំណឹងក្នុង VM; វាក៏ប៉ះ `exit-code-integrity` និងតេស្ត Vitest ដែលហៅអ្នកយាមនោះ។ ភ្ជាប់ source ពិតដោយមិនដកលក្ខខណ្ឌផ្ទៀងផ្ទាត់។
+- `tools/audit-tools/zoew/tests/license-secure-issuance.test.ts` មិនកាត់ markup តាមប្រវែងថេរទៀតទេ។ អ្នកយាមផ្ទៀងថាប៊ូតុងបិទនៅប្រើបានក្រៅ fieldset អញ្ជើញ។ មិនកែកូដ App, កំណែ, rules ឬសិទ្ធិទេ; ត្រូវរង់ចាំ CI លើ commit កែអ្នកយាម។
+
 ### 2026-11-18 · ភាពស្រស់នៃជូនដំណឹងក្រោយ listener ដាច់
 
 - មូលហេតុ៖ handler កត់ failed path និងប្ដូរស្ថានភាព connection ប៉ុន្តែ cached notification view នៅ `measurable: true`។ ផ្ទាំងដែលបើករួចមិនអាន failed path ដោយខ្លួនឯង។

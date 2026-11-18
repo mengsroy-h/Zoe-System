@@ -381,6 +381,8 @@ const tick = (n) => new Promise((resolve) => setTimeout(resolve, n || 0));
             const ctx = makeCtx(() => Promise.resolve());
             const callbacks = new Map();
             Object.assign(ctx, {
+                uiState: { notifyView: { measurable: true }, notifyRemovedView: { measurable: true } },
+                VIEW_NOT_MEASURABLE_NOTICE: 'fixture-stale',
                 dbRefHistory: { path: 'history' }, dbRefDeleted: { path: 'deleted' },
                 dbRefDailyRevenue: null, dbRefMonthlyRevenue: null, dbRefDailyPickup: null,
                 dbRefDailyCollected: null, dbRefExchangeRate: null,
@@ -393,12 +395,14 @@ const tick = (n) => new Promise((resolve) => setTimeout(resolve, n || 0));
             });
             ctx.fb.off = () => {};
             ctx.fb.onValue = (ref, cb) => { callbacks.set(ref.path, cb); };
-            const names = ['initDatabaseListeners', 'detachDatabaseListeners', 'noteDbListenerAlive',
+            const names = ['invalidateStaleNotifyViews', 'initDatabaseListeners', 'detachDatabaseListeners', 'noteDbListenerAlive',
                 'dbListenerViewIsStale', 'rawSnapshotToItemList', 'barcodeEntriesOf', 'normalizeBarcodesOf', 'parseParcelNumber'];
             const absent = names.filter((name) => !sliceFn(name));
             ok('callback ' + finalPath + ' ៖ ផ្ទុក listener និង helper ពិតគ្រប់', absent.length === 0, absent);
             vm.runInContext(names.map((name) => sliceFn(name) || 'function ' + name + '() {}').join('\n'), ctx);
             vm.runInContext('initDatabaseListeners()', ctx);
+            ok('ទិដ្ឋភាពចាស់ត្រូវបានផ្អាកពេលភ្ជាប់ឡើងវិញ',
+                ctx.uiState.notifyView.measurable === false && ctx.uiState.notifyRemovedView.measurable === false);
             ok('callback ' + finalPath + ' ៖ attach history/deleted ពិត', callbacks.size === 2, [...callbacks.keys()]);
             if (callbacks.size !== 2) continue;
             callbacks.get(finalPath === 'history' ? 'deleted' : 'history')({ val: () => null });

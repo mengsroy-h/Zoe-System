@@ -713,7 +713,8 @@ async function cmdRules(opts) {
             say('  [FAIL] ' + state.projectId + ' - ' + api.messageOf(e));
         }
     }
-    return failed ? EXIT.FAIL : EXIT.OK;
+    if (failed) return EXIT.FAIL;
+    return opts.verify === true && !dryRun ? cmdVerify(opts) : EXIT.OK;
 }
 
 async function cmdUser(opts) {
@@ -834,7 +835,7 @@ function help() {
         '  node provision.js doctor                      check the tool',
         '  node provision.js new --branch 881859 --user sok,chan [--app-url https://...]',
         '        [--project-id id] [--region asia-southeast1] [--adopt]',
-        '  node provision.js rules --all | --project id[,id] [--yes] [--dry-run]',
+        '  node provision.js rules --all | --project id[,id] [--yes] [--dry-run] [--verify]',
         '  node provision.js user --project id --user name [--reset]',
         '  node provision.js verify --all | --project id[,id]',
         '  node provision.js show --project id [--branch 881859]',

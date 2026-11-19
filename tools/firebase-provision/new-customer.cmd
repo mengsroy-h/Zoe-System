@@ -10,9 +10,9 @@ if errorlevel 1 (
     exit /b 1
 )
 
-node -e "process.exit(Number(process.versions.node.split('.')[0])>=20?0:1)"
+node -e "const v=process.versions.node.split('.').map(Number);process.exit((v[0]===22&&(v[1]>22||v[1]===22&&v[2]>=2)||v[0]===24&&v[1]>=15)?0:1)"
 if errorlevel 1 (
-    echo ERROR: Node.js 20 or newer is required.
+    echo ERROR: Node.js 22.22.2 or newer in 22.x, or 24.15.0 or newer in 24.x is required.
     pause
     exit /b 1
 )

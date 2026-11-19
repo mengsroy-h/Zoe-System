@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.53';
+const APP_VERSION = '2.24.54';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -5016,6 +5016,18 @@ function renderSbInviteResult() {
 }
 
 async function sbIssueInvite(session, tenant, role) {
+    if (!sbAdminIsCurrent(session)) return false;
+    sbLastInvite = null;
+    ['sbInviteResultLabel', 'sbInviteCodeText', 'sbInviteLinkText'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = '';
+    });
+    const qr = document.getElementById('sbInviteQrContainer');
+    if (qr) qr.innerHTML = '';
+    ['sbInviteResultBox', 'sbInviteQrSaveBtn'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+    });
     const out = await sbAdminRpc(session, 'admin_issue_invite', { p_tenant_id: tenant.id, p_role: role, p_max_uses: 1, p_valid_hours: SB_INVITE_VALID_HOURS });
     if (!sbAdminIsCurrent(session)) return false;
     const row = out.ok && Array.isArray(out.body) ? out.body[0] : null;
@@ -5139,15 +5151,18 @@ async function sbIssueResetCode() {
     if (!confirm('ចេញកូដប្តូរពាក្យសម្ងាត់សម្រាប់ «' + username + '»? (ប្រើបាន ១ ដង · ' + SB_RESET_VALID_HOURS + ' ម៉ោង)')) return;
     if (!sbAdminIsCurrent(session)) return;
     return sbAdminWrite(session, async () => {
+        sbLastResetCode = '';
+        const text = document.getElementById('sbResetCodeText');
+        if (text) text.textContent = '';
+        const box = document.getElementById('sbResetResultBox');
+        if (box) box.classList.add('hidden');
         try {
             const out = await sbAdminRpc(session, 'admin_issue_reset_code', { p_username: username, p_valid_hours: SB_RESET_VALID_HOURS });
             if (!sbAdminIsCurrent(session)) return;
             const row = out.ok && Array.isArray(out.body) ? out.body[0] : null;
             if (!row || typeof row.code !== 'string') { alert('ចេញកូដមិនបាន ៖ ' + sbAdminErrorText(out)); return; }
             sbLastResetCode = row.code;
-            const text = document.getElementById('sbResetCodeText');
             if (text) text.textContent = username + ' ➜ ' + row.code;
-            const box = document.getElementById('sbResetResultBox');
             if (box) box.classList.remove('hidden');
         } catch (e) {
             if (sbAdminIsCurrent(session)) alert('ចេញកូដមិនបាន — សូមពិនិត្យអ៊ីនធឺណិត!');

@@ -81,6 +81,15 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### ZoeW [2.50.210] · ZoeKeyGen [2.24.54] — 2026-11-19 · លទ្ធផលគណនី និងកូដដែលកំពុងរៀបចំ
+
+**ZoeW** (`zoew-v473` ➜ `zoew-v474`) និង **ZoeKeyGen** (`zoekeygen-v164` ➜ `zoekeygen-v165`)។
+
+- ZoeW បង្ហាញលទ្ធផលមិនទាន់ប្រាកដបើចម្លើយបង្កើតគណនី/ប្តូរពាក្យសម្ងាត់បាត់ ឬអានមិនចប់; HTTP 429 ប្រាប់ឱ្យរង់ចាំ ទោះ body មិនមែន JSON។ មិនសាកការសរសេរឡើងវិញស្វ័យប្រវត្តិ។
+- ZoeKeyGen លាក់កូដអញ្ជើញ/Setup Link/QR និងកូដ reset ចាស់នៅពេលការស្នើថ្មីបានចាប់ផ្ដើម ដើម្បីកុំឱ្យច្រឡំថាកូដចាស់ជាលទ្ធផលថ្មី។ បោះបង់មុនចាប់ផ្ដើម មិនលុបលទ្ធផលបច្ចុប្បន្ន។
+- **សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ រង់ចាំ exact-head CI និងផ្ទៀងលំហូរគណនីលើ APK/PWA និង KeyGen ពិត មុនចេញកំណែ។ Function business-audit ត្រូវ deploy តាមដំណើរការដែលមានការអនុញ្ញាតដាច់ដោយឡែក ដើម្បីឱ្យការកែ pickup ទទេមានប្រសិទ្ធភាពលើ Server; ជុំនេះមិន deploy ឬប្ដូរ rules/env/migration ទេ។
+
+
 ### ZoeW [2.50.209] · ZoeKeyGen [2.24.53] — 2026-11-19 · របាយការណ៍ បញ្ជូនការកំណត់ និងការរៀបចំ APK
 
 **ZoeW** (`zoew-v472` ➜ `zoew-v473`) និង **ZoeKeyGen** (`zoekeygen-v163` ➜ `zoekeygen-v164`)។
@@ -2199,6 +2208,18 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-11-19 · Audit ទាំង repo លើ `e8dfee6` និងការកែលទ្ធផលមិនប្រាកដ
+
+- រាប់ឯកសារដែល Git តាមដានបាន 1,539 និងរក្សាបញ្ជី blob តាមឯកសារ។ បញ្ជីនេះមិនមែនជាភស្តុតាងថាបានសាកអាកប្បកិរិយាគ្រប់បន្ទាត់ទេ។ ផ្នែក ZoeW runtime/native និងអ្នកយាមត្រូវបានពិនិត្យប្រភព ដោយមិនធ្វើសំណើផលិតកម្ម។
+- `firebase-business-audit.test.ts`៖ pickup ដែលគ្មាន barcode ធ្វើឱ្យ digest ទទួល `undefined` ហើយបាត់ការកត់ត្រា Audit។ បម្លែងបញ្ជី key ទៅ JSON មុន digest; រក្សា fingerprint របស់បញ្ជីមិនទទេ។ ករណី create/reset/add/delete 4 ធ្លាក់មុនកែ; បន្ទាប់កែ 65 ឆ្លង ហើយរួម stage/CI 106 ឆ្លង។ មិនផ្លាស់ទិន្នន័យលុយ ឬ deploy function ទេ។
+- `supabase-account-transport.test.ts`៖ ចម្លើយ HTTP ដែលអានមិនចប់ក្រោយសំណើគណនី មិនបញ្ជាក់ថា Server មិនបានសរសេរទេ។ រក្សាលទ្ធផល «មិនទាន់ប្រាកដ» សម្រាប់ register/reset និងបង្ហាញឱ្យរង់ចាំសម្រាប់ HTTP 429 ទោះ body មិនមែន JSON។ 12 ករណីធ្លាក់មុនកែ និង 2 control ឆ្លង; បន្ទាប់កែ 112 ឆ្លងក្នុង 8 ឯកសារ។ មិនបន្ថែមការសាកសំណើឡើងវិញស្វ័យប្រវត្តិ។
+- `keygen-supabase-code-output.test.ts`៖ កូដ invite/reset ចាស់នៅមើលឃើញបន្ទាប់ពីការស្នើថ្មីបរាជ័យ អាចធ្វើឱ្យអ្នកគ្រប់គ្រងចម្លងលទ្ធផលខុស។ កែតែពេល session បច្ចុប្បន្នទទួលសំណើថ្មី; 2 ករណីធ្លាក់មុនកែ, 5 ករណីថ្មីឆ្លង និងរួម setup-link/lock 28 ឆ្លង។
+- `firebase-provision-rules-wrapper.test.ts` និង `firebase-provision-runtime.test.ts`៖ wrapper `deploy-rules.cmd --dry-run` មុននេះនៅបន្ត verify ដែលអាចបង្កើត probe account។ បញ្ជូនជម្រើស `--verify` ក្នុង parser ដើម ដើម្បីរំលង verify ជានិច្ចពេល dry-run ហើយធ្វើ verify តែក្រោយ deploy/readback ពិតជោគជ័យទាំងអស់។ Node engine guard របស់ wrapper ស្មើ package។ 23 ករណីធ្លាក់មុនកែ; បន្ទាប់កែ 58/58 ឆ្លង; fake-HTTPS provision 121/121។ មិនបានរត់ Windows cmd.exe ឬ live API។
+- លើ base ដដែល៖ typecheck/lint ឆ្លង; Vitest ពេញបាន 544 ឯកសារឆ្លង និង 23 ធ្លាក់ដោយបរិស្ថាន (Chromium 7, PostgreSQL/dependency 16)។ 11,398 ករណីឆ្លង, 5 assertion រាយ infrastructure បរាជ័យ និង 225 រំលង។ មិនហៅថា full audit ឆ្លងទេ។ តេស្តជាក់លាក់ runtime 93/93 ឆ្លង។
+- លើ candidate រួម៖ focused backend 106, account 112, KeyGen 28 និង provision 58 ឆ្លង។ Vitest ទូលំទូលាយបាន 11,454 ករណីឆ្លង ប៉ុន្តែមិនជាប់ពេញ៖ ករណី browser/PG ខ្វះបរិស្ថាននៅតែរត់ និង artifact guard បដិសេធ node_modules symlink របស់ worktree។ មិនបន្ថយ guard; បន្ទាប់ដាក់ dependency នៅក្នុង worktree ពិត តេស្ត artifact 9/9 ឆ្លង។
+- នៅត្រូវផ្ទៀង exact-head CI ទាំង shard, browser/emulator/Postgres និងឧបករណ៍ APK/PWA ពិត៖ camera/background, offline/reconnect/process death, biometric, share/print, update និង storage។ fake native bridge មិនជំនួស Android WebView/Keystore ឬ OEM camera ទេ។ ការទទួលយក APK gate ដើមនៅដដែល; ការផ្ទៀង license cutover ពេញលេញនៅតែមិនទាន់មានភស្តុតាងថ្មី។
+
 
 ### 2026-11-19 · កែ fixture របស់ Audit #1356 លើ `b1f0157`
 
@@ -6060,3 +6081,8 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `tools/audit-tools/zoew/tests/zto-trash-mode-devices.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/zto-trash-mode-shop.test.ts` | ផ្នែក ១ | — |
 | `tools/audit-tools/zoew/tests/zto-upstream-timing.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
+| `tools/audit-tools/zoew/tests/firebase-business-audit.test.ts` | ផ្នែក ២ | — |
+| `tools/audit-tools/zoew/tests/firebase-provision-rules-wrapper.test.ts` | ផ្នែក ២ | — |
+| `tools/audit-tools/zoew/tests/firebase-provision-runtime.test.ts` | ផ្នែក ២ | — |
+| `tools/audit-tools/zoew/tests/keygen-supabase-code-output.test.ts` | ផ្នែក ២ | — |
+| `tools/audit-tools/zoew/tests/supabase-account-transport.test.ts` | ផ្នែក ២ | — |

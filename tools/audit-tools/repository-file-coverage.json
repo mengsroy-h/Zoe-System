@@ -5644,6 +5644,15 @@
     },
     "tools/audit-tools/zoew/tests/listener-store-vm.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/supabase-account-transport.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/keygen-supabase-code-output.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/firebase-provision-rules-wrapper.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

@@ -189,6 +189,7 @@ function buildRuntime(over) {
         lookupSecretKey: o.unlocked === false ? null : {},
         healthActiveRun: 0,
         healthCompletedRun: 0,
+        lastPalmHealthEvidence: null,
         healthCheckTask: null,
         authGeneration: 0,
         lookupTestGeneration: 0,

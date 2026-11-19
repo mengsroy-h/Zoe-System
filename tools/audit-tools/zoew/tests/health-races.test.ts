@@ -462,3 +462,93 @@ it.each(['close', 'hidden', 'offline', 'auth', 'lookup-config', 'supersede'])('H
         expect(uiState.healthRows[0].state).toBe('ok');
     }
 });
+
+it('ប្ដូរហាង និង offline→online ក្នុង tick ដដែល៖ notification ចាស់មិន abort manual របស់ហាងថ្មី', async () => {
+    watch(); const old = start();
+    online = false; window.dispatchEvent(new Event('offline'));
+    const config = { supabaseUrl: 'https://new-health-shop.supabase.co', supabaseKey: 'sb_publishable_NEW' };
+    localStorage.setItem('zoew_firebase_config', JSON.stringify(config));
+    const app = { options: config };
+    firebaseState.firebaseConfig = config as any;
+    firebaseState.db = { app } as any;
+    firebaseState.auth = { app, currentUser: { uid: 'new-health-user' } } as any;
+    firebaseState.authGeneration++;
+    acceptFixtureSession();
+    online = true; window.dispatchEvent(new Event('online'));
+    const fresh = start();
+    expect(requests).toHaveLength(2);
+    const freshSignal = requests[1].signal;
+    expect(requests[0].signal?.aborted).toBe(true);
+    expect(freshSignal?.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(freshSignal?.aborted).toBe(false);
+    answer(1); await fresh;
+    expect(uiState.healthRows[0].state).toBe('ok');
+    const newShopRows = uiState.healthRows;
+    answer(0); await old;
+    expect(uiState.healthRows).toBe(newShopRows);
+    expect(viewState.healthRecheckBusy).toBe(false);
+});
+
+const palmRow = () => uiState.healthRows?.find(row => row.label === 'Lookup អតិថិជន (ZTO)');
+async function finishPalmHealth(success: boolean) {
+    await vi.advanceTimersByTimeAsync(1);
+    requests.forEach((request, index) => {
+        if (new URL(request.url, window.location.origin).searchParams.get('verify') === '1') {
+            request.resolve(new Response(JSON.stringify(success
+                ? { provider: 'zto-palm', success: true, configured: true, verified: true, session: { source: 'shared' } }
+                : { code: 'ZTO_AUTH_EXPIRED' }), { status: success ? 200 : 401 }));
+        } else answer(index);
+    });
+}
+async function checkedPalmSuccess() {
+    configurePalmHealth();
+    const manual = start(); await finishPalmHealth(true); await manual;
+    expect(palmRow()?.state).toBe('ok');
+    expect(palmRow()?.detail).toContain('ZTO ទទួលយក session ZTO');
+}
+
+it('Palm លទ្ធផល manual ជោគជ័យនៅសល់ក្រោយ passive poll ជា info និងប្រាប់ការពិនិត្យចុងក្រោយ', async () => {
+    await checkedPalmSuccess(); watch();
+    const verifiedCount = palmVerificationRequests().length;
+    await vi.advanceTimersByTimeAsync(30251);
+    await finishPalmHealth(true); await vi.advanceTimersByTimeAsync(1);
+    expect(palmVerificationRequests()).toHaveLength(verifiedCount);
+    expect(palmRow()?.state).toBe('info');
+    expect(palmRow()?.detail).toMatch(/ចុងក្រោយ/);
+    expect(palmRow()?.detail).toContain('ZTO ទទួលយក session ZTO');
+});
+
+it.each(['auth', 'lookup-config', 'branch'])('Palm ភស្តុតាងចាស់ត្រូវជម្រះក្រោយប្ដូរ %s', async change => {
+    await checkedPalmSuccess();
+    if (change === 'auth') { firebaseState.authGeneration++; acceptFixtureSession(); }
+    else if (change === 'branch') { firebaseState.auth._account = { branch_code: 'KH002' }; }
+    else {
+        const config = JSON.parse(localStorage.getItem('zoew_lookup_api_config')!);
+        config.palmAccount.siteCode = 'KH002';
+        localStorage.setItem('zoew_lookup_api_config', JSON.stringify(config));
+    }
+    const passive = startPassive(); await finishPalmHealth(true); await passive;
+    expect(palmRow()?.state).not.toBe('ok');
+    expect(palmRow()?.detail).not.toContain('ZTO ទទួលយក session ZTO');
+    expect(palmRow()?.detail).not.toMatch(/ចុងក្រោយ/);
+});
+
+it('Palm manual បរាជ័យជំនួសភស្តុតាងជោគជ័យចាស់ ហើយ passive មិនយកវាមកវិញ', async () => {
+    await checkedPalmSuccess();
+    const failed = start(); await finishPalmHealth(false); await failed;
+    expect(palmRow()?.state).toBe('warn');
+    expect(palmRow()?.detail).not.toContain('ZTO ទទួលយក session ZTO');
+    const passive = startPassive(); await finishPalmHealth(true); await passive;
+    expect(palmRow()?.state).not.toBe('ok');
+    expect(palmRow()?.detail).not.toContain('ZTO ទទួលយក session ZTO');
+});
+
+it('Palm history ផុតកំណត់ក្រោយ ៥ នាទី ហើយ passive មិនផ្ញើសំណើផ្ទាល់', async () => {
+    await checkedPalmSuccess();
+    await vi.advanceTimersByTimeAsync(300001);
+    const passive = startPassive(); await finishPalmHealth(true); await passive;
+    expect(palmVerificationRequests()).toHaveLength(1);
+    expect(palmRow()?.state).toBe('info');
+    expect(palmRow()?.detail).not.toMatch(/ចុងក្រោយ/);
+});

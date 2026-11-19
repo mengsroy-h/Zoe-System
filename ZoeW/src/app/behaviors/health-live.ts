@@ -33,22 +33,22 @@ export function watchHealthCheck() {
         clear();
         if (available()) timer = setTimeout(tick, Math.max(ms, nextAutomaticAt - performance.now()));
     };
-    const invalidate = () => {
-        invalidateHealthCheck();
+    const invalidate = (clearPalm = false) => {
+        invalidateHealthCheck(clearPalm);
         uiState.healthRows = [(navigator.onLine as boolean) === false ? healthNetworkRow() : healthPendingRow()];
         uiState.healthAdvice = null;
     };
-    const changed = () => {
+    const changed = (clearPalm = false) => {
         if (!available()) return;
         dirty = true;
-        invalidate();
+        invalidate(clearPalm);
         schedule(250);
     };
     const tick = () => {
         timer = null;
         if (!available()) return;
         if (!dirty && viewState.healthRecheckBusy) { schedule(30000); return; }
-        if (!dirty) { changed(); return; }
+        if (!dirty) { dirty = true; schedule(250); return; }
         if (viewState.healthRecheckBusy) return;
         dirty = false;
         nextAutomaticAt = performance.now() + 30000;
@@ -74,15 +74,23 @@ export function watchHealthCheck() {
         owner = captureConnectionOperation();
         changed();
     };
+    const externalChange = () => {
+        // The external event already invalidates this snapshot. A queued store notification
+        // for the same transition must not cancel a manual check started after the event.
+        previous = signature();
+        previousSecret = securityState.lookupSecretKey;
+        owner = captureConnectionOperation();
+        changed(true);
+    };
     const visibility = () => {
-        if (document.hidden) { clear(); invalidate(); dirty = true; }
-        else changed();
+        if (document.hidden) { clear(); invalidate(true); dirty = true; }
+        else externalChange();
     };
     const storage = (event: StorageEvent) => {
         if (event.storageArea && event.storageArea !== appLocalStore) return;
         if (event.key !== null && !['zoew_firebase_config', 'zoew_lookup_api_config', 'zoe_license_activation_ZOE',
             'zoe_license_device_id', 'zoew-sb-auth', 'zoew-sb-account', 'zoew-sb-auth-owner'].includes(event.key)) return;
-        changed();
+        externalChange();
     };
     const offs = [firebaseState, lookupState, securityState].map((store) => store.subscribe(stateChanged));
     offs.push(viewState.subscribe(() => {
@@ -94,20 +102,20 @@ export function watchHealthCheck() {
             else schedule(250);
         }
     }));
-    window.addEventListener('online', changed);
-    window.addEventListener('offline', changed);
+    window.addEventListener('online', externalChange);
+    window.addEventListener('offline', externalChange);
     window.addEventListener('storage', storage);
     document.addEventListener('visibilitychange', visibility);
     const workers = navigator.serviceWorker;
-    if (typeof workers?.addEventListener === 'function') scope.listen(workers, 'controllerchange', changed);
+    if (typeof workers?.addEventListener === 'function') scope.listen(workers, 'controllerchange', externalChange);
     schedule(30000);
     return () => {
         stopped = true;
         clear();
-        invalidateHealthCheck();
+        invalidateHealthCheck(true);
         offs.forEach((off) => off());
-        window.removeEventListener('online', changed);
-        window.removeEventListener('offline', changed);
+        window.removeEventListener('online', externalChange);
+        window.removeEventListener('offline', externalChange);
         window.removeEventListener('storage', storage);
         document.removeEventListener('visibilitychange', visibility);
         scope.dispose();

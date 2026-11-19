@@ -179,7 +179,7 @@ for (const app of ['ZoeW']) {
         const deletedIdb = [];
         if (typeof ctx.setTimeout !== 'function') ctx.setTimeout = () => 0;
         ctx.indexedDB = { deleteDatabase: (name) => { deletedIdb.push(name); const req = {}; queueMicrotask(() => { if (req.onsuccess) req.onsuccess(); }); return req; } };
-        const healthDecls = ['healthActiveRun', 'healthCompletedRun', 'healthCheckTask'].map((name) =>
+        const healthDecls = ['healthActiveRun', 'healthCompletedRun', 'healthCheckTask', 'lastPalmHealthEvidence'].map((name) =>
             (src.match(new RegExp('^ *let ' + name + ' = .*$', 'm')) || [])[0]);
         const resetHealthFn = sliceFn(src, 'resetHealthCheck');
         const invalidateHealthFn = sliceFn(src, 'invalidateHealthCheck');
@@ -188,7 +188,7 @@ for (const app of ['ZoeW']) {
         if (invalidateHealthFn) vm.runInContext(invalidateHealthFn, ctx);
         if (resetHealthFn) vm.runInContext(resetHealthFn, ctx);
         ctx.healthAborted = 0;
-        vm.runInContext('healthActiveRun = 41; healthCompletedRun = 40; healthCheckTask = { owner: { uid: "health-fixture" }, controller: { abort() { healthAborted++; } } };'
+        vm.runInContext('healthActiveRun = 41; healthCompletedRun = 40; lastPalmHealthEvidence = { verifiedAt: 1, current: () => true }; healthCheckTask = { owner: { uid: "health-fixture" }, controller: { abort() { healthAborted++; } } };'
             + ' uiState.healthRunSeq = 41; uiState.healthRows = [{ state: "ok" }]; uiState.healthAdvice = { level: "ok" }; viewState.healthRecheckBusy = true;', ctx);
         // ⛔ re-audit (D1) ៖ ការចាកចេញបញ្ចប់លំហូរស្កេន (`endScanFlow()`) ➜ ចាក់កូដ **ពិត** និងបញ្ជីប្រអប់របស់វា
         const scanFlowDecl = (src.match(/^ *const SCAN_FLOW_MODALS = .*$/m) || [])[0];
@@ -283,9 +283,9 @@ for (const app of ['ZoeW']) {
         ctx.clearSensitiveModalFields();
         ok(vm.runInContext('pendingLink === null && viewState.invitationCode === ""', ctx),
             'ការចាកចេញពិតលុប locator របស់តំណអញ្ជើញផងដែរ');
-        const healthState = vm.runInContext('({ active: healthActiveRun, completed: healthCompletedRun, task: healthCheckTask,'
+        const healthState = vm.runInContext('({ active: healthActiveRun, completed: healthCompletedRun, task: healthCheckTask, palm: lastPalmHealthEvidence,'
             + ' seq: uiState.healthRunSeq, busy: viewState.healthRecheckBusy, rows: uiState.healthRows, advice: uiState.healthAdvice })', ctx);
-        ok(ctx.healthAborted === 1 && healthState.active === 0 && healthState.completed === 0 && healthState.task === null
+        ok(ctx.healthAborted === 1 && healthState.active === 0 && healthState.completed === 0 && healthState.task === null && healthState.palm === null
             && healthState.seq > 41 && healthState.busy === false && healthState.rows === null && healthState.advice === null,
             'ចាកចេញ ➜ សម្អាត context និងលទ្ធផល health ហើយដកសិទ្ធិចម្លើយចាស់', healthState);
 

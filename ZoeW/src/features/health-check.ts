@@ -586,14 +586,16 @@ export function openHealthCheck() {
 
 let healthActiveRun = 0;
 let healthCompletedRun = 0;
+let lastPalmHealthEvidence: { verifiedAt: number; current: () => boolean } | null = null;
 
-export function invalidateHealthCheck() {
+export function invalidateHealthCheck(clearPalm = false) {
+    if (clearPalm || (lastPalmHealthEvidence && !lastPalmHealthEvidence.current())) lastPalmHealthEvidence = null;
     ++uiState.healthRunSeq;
     healthCheckTask?.controller.abort();
 }
 
 export function resetHealthCheck() {
-    invalidateHealthCheck();
+    invalidateHealthCheck(true);
     healthActiveRun = 0;
     healthCompletedRun = 0;
     healthCheckTask = null;
@@ -612,6 +614,8 @@ interface HealthCheckTask {
     worker: ServiceWorker | null | undefined;
     lookupConfig: string | null;
     lookupSecret: typeof securityState.lookupSecretKey;
+    tenant: string | undefined;
+    branch: string | undefined;
     verifyPalm: boolean;
     controller: AbortController;
     promise: Promise<void>;
@@ -621,6 +625,7 @@ let healthCheckTask: HealthCheckTask | null = null;
 
 function healthTaskIsCurrent(task: HealthCheckTask) {
     return !task.controller.signal.aborted && task.run === uiState.healthRunSeq && task.owner.current()
+        && task.tenant === firebaseState.auth?._account?.tenant_id && task.branch === firebaseState.auth?._account?.branch_code
         && task.lookupConfig === safeStoreGet(appLocalStore, 'zoew_lookup_api_config')
         && task.lookupSecret === securityState.lookupSecretKey && modalIsOpen('healthCheckModal') && !document.hidden;
 }
@@ -635,7 +640,8 @@ export function runHealthCheck(force = false, verifyPalm = true): Promise<void> 
     previous?.controller.abort();
     const task: HealthCheckTask = {
         run: ++uiState.healthRunSeq, owner: captureConnectionOperation(), worker, lookupConfig,
-        lookupSecret: securityState.lookupSecretKey, verifyPalm, controller: new AbortController(), promise: Promise.resolve()
+        lookupSecret: securityState.lookupSecretKey, tenant: firebaseState.auth?._account?.tenant_id,
+        branch: firebaseState.auth?._account?.branch_code, verifyPalm, controller: new AbortController(), promise: Promise.resolve()
     };
     healthCheckTask = task;
     const stopOwner = task.owner.watch(() => task.controller.abort());
@@ -647,7 +653,7 @@ export function runHealthCheck(force = false, verifyPalm = true): Promise<void> 
 }
 
 async function runHealthCheckRound(task: HealthCheckTask) {
-    const { run, worker, verifyPalm, controller: { signal } } = task;
+    const { run, worker, verifyPalm, controller: { signal }, owner, lookupConfig, lookupSecret, tenant, branch } = task;
     const current = () => healthTaskIsCurrent(task);
     healthActiveRun = run;
     viewState.healthRecheckBusy = true;
@@ -656,6 +662,8 @@ async function runHealthCheckRound(task: HealthCheckTask) {
     uiState.touch();
     try {
         if (!current()) return;
+        const palm = lookupApiIsPalm(getLookupApiConfig());
+        if (palm && verifyPalm) lastPalmHealthEvidence = null;
         const [databaseRow, licenseRow, lookupRow, offlineRow, networkRow] = await Promise.all([
             healthDatabaseLiveRow(signal), healthLicenseRow(signal), healthLookupRow(verifyPalm, signal, current),
             healthServiceWorkerLiveRow(signal), healthNetworkLiveRow(signal)
@@ -666,7 +674,20 @@ async function runHealthCheckRound(task: HealthCheckTask) {
         const currentDatabase = healthDatabaseRow();
         rows.splice(1, 0, healthDatabaseWriteRow() || (currentDatabase.state === 'ok' ? databaseRow : currentDatabase));
         rows.splice(3, 0, licenseRow);
-        rows.push(lookupRow);
+        const online = (navigator.onLine as boolean) !== false;
+        if (palm && verifyPalm && online && lookupRow.state === 'ok') {
+            lastPalmHealthEvidence = { verifiedAt: performance.now(), current: () => owner.current()
+                && tenant === firebaseState.auth?._account?.tenant_id && branch === firebaseState.auth?._account?.branch_code
+                && lookupSecret === securityState.lookupSecretKey
+                && lookupConfig === safeStoreGet(appLocalStore, 'zoew_lookup_api_config') };
+        }
+        const evidence = lastPalmHealthEvidence;
+        const age = evidence && evidence.current() ? performance.now() - evidence.verifiedAt : null;
+        // Published as history, never as the verdict of this passive round.
+        rows.push(palm && !verifyPalm && online && age !== null && age >= 0 && age < 300000 && lookupRow.state === 'info'
+            ? healthRow('info', lookupRow.label, 'ការផ្ទៀងចុងក្រោយ៖ ZTO ទទួលយក session ZTO ' + durationText(age)
+                + 'មុន — មិនបានផ្ទៀងផ្ទាត់ជាថ្មី។ ចុច «ពិនិត្យម្តងទៀត» ដើម្បីផ្ទៀងផ្ទាត់')
+            : lookupRow);
         uiState.healthRows = rows;
         healthCompletedRun = run;
         uiState.healthAdvice = buildHealthAdvice(rows);

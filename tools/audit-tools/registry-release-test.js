@@ -96,7 +96,7 @@ function makeCtx(behaviour) {
     const fixtureApp = { options: backendConfig };
     const calls = [];
     const ctx = {
-        console, Math, JSON, Promise, setTimeout, clearTimeout, Object, Array, String, Number,
+        console, Math, JSON, Promise, setTimeout, clearTimeout, queueMicrotask, Object, Array, String, Number,
         parseFloat, parseInt, isNaN, isFinite, Date, Error, Map, Set, window: {},
         firebaseConfig: backendConfig,
         db: { app: fixtureApp }, auth: { app: fixtureApp, currentUser: { uid: 'registry-release-fixture' } }, fb: {
@@ -121,6 +121,8 @@ function makeCtx(behaviour) {
     ctx.localStorage = memoryStorage();
     ctx.appLocalStore = ctx.localStorage;
     vm.createContext(ctx);
+    vm.runInContext(moduleRuntime(ROOT, SRC, [{ path: 'src/core/store.ts', expose: ['createStore'] }]).code
+        + "\nconst firebaseState = createStore('firebaseState', {});", ctx);
     registryAuthRuntime.install(ctx, backendConfig);
     const ownership = moduleRuntime(ROOT, SRC, ['src/core/storage.ts',
         { path: 'src/core/shop-scope.ts', expose: ['liveShopScope'] },

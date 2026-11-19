@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const acorn = require('acorn');
 
 const ROOT = process.env.SETUPRT_APP_DIR || path.join(__dirname, '../..');
 let pass = 0, fail = 0;
@@ -60,8 +61,18 @@ check(appSelectsIn('<select id="setupLinkAppSelect"><option value="ZOE">ZoeW</op
     && appSelectsIn('<select id="x"><option value="ZOE">ZoeW</option></select>').length === 1
     && appSelectsIn('<select id="noticeKindInput"><option value="notice">a</option></select>').length === 0,
     'ទិសផ្ទុយ ៖ ការស្កេនចាប់ប្រអប់ជ្រើសរើស App គំរូ · មិនចាប់ប្រអប់ផ្សេង');
-const linkLine = (genSrc.match(/lastGeneratedSetupLink = ([^;]+);/) || [])[1];
-check(!!linkLine, 'រកឃើញបន្ទាត់សាង Link');
+const keygenDecls = new Map();
+for (const node of acorn.parse(keygenSrc, { ecmaVersion: 'latest' }).body) {
+    if (node.type === 'FunctionDeclaration') keygenDecls.set(node.id.name, keygenSrc.slice(node.start, node.end));
+    if (node.type === 'VariableDeclaration' && node.declarations.length === 1) {
+        keygenDecls.set(node.declarations[0].id.name, keygenSrc.slice(node.start, node.end));
+    }
+}
+const producerNames = ['FIREBASE_CONFIG_KEYS', 'SETUP_LINK_URL_KEY', 'lookupSetupGeneration', 'lastGeneratedSetupLink',
+    'lookupSetupBaseUrl', 'generateSetupLink', 'readNormalizedFirebaseConfig', 'normalizeFirebaseConfig', 'firebaseConfigErrorMessage',
+    'stripJsCommentsOutsideStrings', 'extractFirebaseConfigObject', 'firebaseObjectTextToJson', 'sbAdminConfigProblem', 'sbAdminJwtRole'];
+check(producerNames.every((name) => keygenDecls.has(name)), 'រកឃើញ producer Setup Link និង helper ពិតគ្រប់',
+    producerNames.filter((name) => !keygenDecls.has(name)).join(', '));
 
 // ⛔ រកមិនឃើញ ➜ **ការធ្លាក់ដែលមានឈ្មោះ + stub** មិនមែន crash។
 // crash នៅត្រង់នេះបិទបាំងការអះអាងទាំងអស់ខាងក្រោម ➜ tree មុនកែរាយ
@@ -83,8 +94,23 @@ function defineOrStub(src, name, alias, stubBody) {
 const APP_DSN_KEY = (fs.readFileSync(path.join(ROOT, 'ZoeW', 'error-reporting.js'), 'utf8').match(/const APP_DSN = 'https:\/\/([0-9a-f]{32})@/) || [])[1] || '';
 check(/^[0-9a-f]{32}$/.test(APP_DSN_KEY), 'ជាន់អប្បបរមា ៖ error-reporting.js មាន APP_DSN', APP_DSN_KEY);
 vm.runInContext('function encodeSetup(parsed) { let b64; b64 = ' + encLine + '; return b64; }', ctx);
-vm.runInContext('function buildLink(baseUrl, b64) { let lastGeneratedSetupLink; lastGeneratedSetupLink = '
-    + linkLine.replace(/\bb64\b/g, 'b64') + '; return lastGeneratedSetupLink; }', ctx);
+// រត់ producer ពេញលេញ៖ ការសម្អាតលទ្ធផលដើម មិនមែនជាលទ្ធផលសាង Link ទេ។
+const producerElements = new Map();
+Object.assign(ctx, {
+    document: { getElementById(id) {
+        if (!producerElements.has(id)) producerElements.set(id, { value: '', textContent: '', innerHTML: '', checked: false, classList: { add() {}, remove() {} } });
+        return producerElements.get(id);
+    } },
+    appLocalStore: {}, safeStoreSet() {}, showToast() {}, renderQrInto() { return true; }, window: {},
+    alert(message) { throw new Error(message); }
+});
+vm.runInContext(producerNames.map((name) => keygenDecls.get(name) || '').join('\n'), ctx);
+vm.runInContext(`function buildLink(baseUrl, b64) {
+    document.getElementById('setupLinkUrlInput').value = baseUrl;
+    document.getElementById('setupLinkConfigInput').value = decodeURIComponent(escape(atob(b64)));
+    generateSetupLink();
+    return lastGeneratedSetupLink;
+}`, ctx);
 
 const APPS = ['ZoeW'];
 APPS.forEach((app) => {

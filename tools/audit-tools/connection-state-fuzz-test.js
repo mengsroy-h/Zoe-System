@@ -23,6 +23,7 @@ process.exitCode = 1;
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { moduleRuntime } = require('./react-view');
 
 const ROOT = process.env.CONNFUZZ_APP_DIR ? path.resolve(process.env.CONNFUZZ_APP_DIR) : path.resolve(__dirname, '../..');
 const FILE = path.join(ROOT, 'ZoeW/app.js');
@@ -71,13 +72,15 @@ function makeWorld() {
     const log = { toasts: [], captures: [] };
     const sandbox = {
         console: { error: () => {}, log: () => {} },
-        Date, Math, Array, Object, JSON, Set, Map, Number, String, Boolean,
+        Date, Math, Array, Object, JSON, Set, Map, Number, String, Boolean, queueMicrotask,
         setTimeout: () => 0, clearTimeout: () => {},
         window: {},
         navigator: { onLine: true },
         __log: log
     };
     const ctx = vm.createContext(sandbox);
+    vm.runInContext(moduleRuntime(ROOT, SRC, [{ path: 'src/core/store.ts', expose: ['createStore'] }]).code
+        + "\nconst firebaseState = createStore('firebaseState', {});", ctx);
     vm.runInContext(`
         var uiState = { notifyView: { measurable: true }, notifyRemovedView: { measurable: true } };
         const DB_LISTENER_KEY_HISTORY = 'history';

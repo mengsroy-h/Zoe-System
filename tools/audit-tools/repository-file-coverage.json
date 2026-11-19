@@ -5635,6 +5635,15 @@
     },
     "tools/audit-tools/zoew/tests/lookup-freshness-vm.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/layout-react-node-ownership.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/setup-link-checker-wiring.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/listener-store-vm.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

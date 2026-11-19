@@ -2200,6 +2200,15 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-11-19 · កែ fixture របស់ Audit #1356 លើ `b1f0157`
+
+- ផ្ទៀង log [Audit #1356](https://github.com/mengsroy-h/Zoe-System/actions/runs/44430134105) ជាមុន៖ shard ១, ២, ៣ និង ៥ ធ្លាក់; shard ៤ និង Windows/F03/Registration ឆ្លង។ ការកែនេះប៉ះតែអ្នកយាម និងឯកសារ មិនប្ដូរកំណែ App ឬអាកប្បកិរិយាផលិតកម្ម។
+- `layout-check` រក្សា node ដើមរបស់ React និងស្ដារ display ក្នុង `finally` ជំនួសបង្កើត node ថ្មីពី `innerHTML`។ `tools/audit-tools/zoew/tests/layout-react-node-ownership.test.tsx` រត់ callback ពិតលើ AppPages និងប្រអប់របាយការណ៍ពិត៖ baseline ធ្លាក់ ៣ រួមកាត App បាត់ក្រោយ update; ក្រោយកែឆ្លង ៣។ រក្សាអ្នកយាមទទឹង កាត និង CSS ដដែល។
+- `setup-link-roundtrip-test` រត់មុខងារ builder និង URL normalizer ពិត ជំនួសចាប់ assignment ដំបូងដែលឥឡូវជាការសម្អាត output។ `keygen-supabase-admin-test` ភ្ជាប់ `lookupSetupBaseUrl` ពិតក្នុង VM។ `tools/audit-tools/zoew/tests/setup-link-checker-wiring.test.ts` baseline ធ្លាក់ ៦ ➜ ឆ្លង ៦; រួម product cases ឆ្លង ២៣; roundtrip checker ឆ្លង ២៨។
+- `connection-state-fuzz-test` និង `registry-release-test` ភ្ជាប់ store runtime ពិតសម្រាប់ notification ថ្មី មិនប្រើ no-op។ `tools/audit-tools/zoew/tests/listener-store-vm.test.ts` baseline ធ្លាក់ ២ ➜ ឆ្លង ២; រួម poison reachability ឆ្លង ១១។ Fuzz ពេញលេញឆ្លង ៥២៩៧៥ assertions / ៥៧៦០ operations និង registry ឆ្លង ៦១; poison របស់ integrity ត្រូវ verdict `failed` មិនមែន `unverified`។ មិនកែអ្នកយាម integrity ឬបន្ធូរ assertion ណាមួយ។
+- តេស្តរួមលើ candidate ឆ្លង ៦៧ ក្នុង ៨ suites; typecheck, lint, doc, coverage និង comments ឆ្លង។
+- Chromium local socket នៅតែរារាំង audit measurement ពេញលេញ។ តេស្ត DOM ក្នុង jsdom មិនជំនួសការវាស់ geometry ក្នុង browser ពិត ឬ exact-head CI ទេ។ មិនបាន push, merge ឬ deploy; ត្រូវរង់ចាំ CI លើ commit ដែលដាក់ពិត។
+
 ### 2026-11-19 · ការផ្ទៀងរបាយការណ៍ និងការបញ្ជូនលទ្ធផលលើមូលដ្ឋាន `3b1d57d`
 
 - `tools/audit-tools/zoew/tests/monthly-report-live-view.test.tsx`៖ baseline ធ្លាក់ ១៤ ឆ្លង ១; fixed ឆ្លង ១៥។ វាស់ DOM ពិតលើទិន្នន័យក្លែង រួម daily/monthly ledger, history/trash, pickup, exchange rate, ខែថ្មី, empty, hidden/reopen, pending operation និង listener បរាជ័យបន្តបន្ទាប់/សះស្បើយមួយផ្នែក រួមចាប់ផ្ដើម listener និង reset។ ការគូរមិនសរសេរទិន្នន័យ ឬប្ដូរ state។
@@ -5757,6 +5766,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `tools/audit-tools/zoew/tests/label-image.test.tsx` | — | ផ្នែក ៨ · ផ្នែក ៩ |
 | `tools/audit-tools/zoew/tests/label-print.test.tsx` | ផ្នែក ២ | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/late-commit-stale-session.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
+| `tools/audit-tools/zoew/tests/layout-react-node-ownership.test.tsx` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/ledger-late-session-notice.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/ledger-native-retry-identity.test.ts` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/ledger-not-applied-retry.test.ts` | — | ផ្នែក ៧ · ផ្នែក ៨ |
@@ -5775,6 +5785,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `tools/audit-tools/zoew/tests/list-paging.test.tsx` | — | ផ្នែក ៧ |
 | `tools/audit-tools/zoew/tests/list-render-scope.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៦ · ផ្នែក ៧ |
 | `tools/audit-tools/zoew/tests/listener-leak-coverage.test.ts` | ផ្នែក ២ | — |
+| `tools/audit-tools/zoew/tests/listener-store-vm.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/locker-assign-session.test.ts` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/locker-occupant.test.ts` | — | ផ្នែក ៩ |
 | `tools/audit-tools/zoew/tests/locker-scan-direct.test.tsx` | — | ផ្នែក ៨ |
@@ -5912,6 +5923,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `tools/audit-tools/zoew/tests/session-expiry-race.test.ts` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/session-listener-scope.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/session-switch-fuzz.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ · ផ្នែក ៩ |
+| `tools/audit-tools/zoew/tests/setup-link-checker-wiring.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/setup-link-dsn-pin.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/setup-link-hashchange.test.tsx` | ផ្នែក ១ | — |
 | `tools/audit-tools/zoew/tests/setup-lookup.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ · ផ្នែក ៩ |

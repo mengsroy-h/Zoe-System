@@ -88,7 +88,7 @@ const decls = topLevel(src);
 const SB_FN_NAMES = [...decls.keys()].filter((n) => decls.get(n).kind === 'function' && /^sb[A-Z]|Sb[A-Z]/.test(n));
 const SB_VAR_NAMES = [...decls.keys()].filter((n) => decls.get(n).kind !== 'function' && /^(SB_|sb[A-Z])/.test(n));
 const HELPER_FNS = [...['keygenIdleStamp', 'keygenIdleElapsed', 'getTrustedServerNow', 'captureKeygenClock'].filter(n => decls.has(n)), 'fetchWithTimeout', 'elapsedSince', 'captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession', 'clearSecureKeySetup', ...(decls.has('lookupSetupScrubUrl') ? ['lookupSetupScrubUrl', 'lookupSetupSecretName'] : []), 'adminOwnerIsCurrent', 'adminOperationIsCurrent', 'safeStoreGet',
-    'safeStoreSet', 'escapeHtml', 'copySensitiveText', 'showLoginModalWithPrefill', 'makeQrCode', 'renderQrInto',
+    'safeStoreSet', 'lookupSetupBaseUrl', 'escapeHtml', 'copySensitiveText', 'showLoginModalWithPrefill', 'makeQrCode', 'renderQrInto',
     'downloadQrPng', 'saveQrImage', 'seatMetaText'];
 const HELPER_VARS = ['SETUP_LINK_URL_KEY', 'QR_MAX_MODULES', 'lookupSetupGeneration', 'secureKeySetup'];
 const REQUIRED_SB = ['sbAdminConfigProblem', 'sbAdminLogin', 'sbAdminLogout', 'sbAdminReset', 'sbAdminRefresh', 'renderSbTenantList', 'sbCreateTenant',

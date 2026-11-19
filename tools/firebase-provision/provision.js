@@ -87,6 +87,32 @@ function ensureStateDir() {
     fs.mkdirSync(STATE_DIR, { recursive: true, mode: 0o700 });
 }
 
+function acquireStateLock(command) {
+    ensureStateDir();
+    const file = path.join(STATE_DIR, '.provision.lock');
+    let fd;
+    try {
+        fd = fs.openSync(file, 'wx', 0o600);
+    } catch (error) {
+        if (error.code === 'EEXIST') {
+            throw new UsageError('State folder is locked by another or interrupted invocation: ' + file
+                + '. Do not remove an active lock. See README-KH.md for manual recovery.');
+        }
+        throw error;
+    }
+    const token = crypto.randomUUID();
+    try {
+        fs.writeFileSync(fd, JSON.stringify({ token, pid: process.pid, startedAt: new Date().toISOString(), command }) + '\n');
+    } finally {
+        fs.closeSync(fd);
+    }
+    return () => {
+        const owner = readJson(file);
+        if (!owner || owner.token !== token) throw new Error('State lock ownership changed; lock was not removed: ' + file);
+        fs.unlinkSync(file);
+    };
+}
+
 function writeJsonPrivate(file, value) {
     ensureStateDir();
     const tmp = file + '.tmp-' + process.pid;
@@ -848,25 +874,39 @@ function help() {
 async function main(argv) {
     const opts = parseArgs(argv);
     const cmd = opts._[0] || '';
-    if (API_POLL_MS) {
-        try { api.load().ensureApiEnabled.POLL_SETTINGS.pollInterval = API_POLL_MS; } catch (e) { }
-    }
     try {
-        if (cmd === 'new') return await cmdNew(opts);
-        if (cmd === 'rules') return await cmdRules(opts);
-        if (cmd === 'user') return await cmdUser(opts);
-        if (cmd === 'verify') return await cmdVerify(opts);
-        if (cmd === 'show') return await cmdShow(opts);
-        if (cmd === 'doctor') return cmdDoctor();
-        if (cmd === 'login') return await cmdLogin(opts);
-        return help();
+        const mutatesState = cmd === 'new' || cmd === 'user' || (cmd === 'rules' && opts['dry-run'] !== true)
+            || (cmd === 'show' && (typeof opts['app-url'] === 'string' || typeof opts['email-prefix'] === 'string'));
+        const release = mutatesState ? acquireStateLock(cmd) : null;
+        let retainLock = false;
+        try {
+            if (API_POLL_MS) {
+                try { api.load().ensureApiEnabled.POLL_SETTINGS.pollInterval = API_POLL_MS; } catch (e) { }
+            }
+            if (cmd === 'new') return await cmdNew(opts);
+            if (cmd === 'rules') return await cmdRules(opts);
+            if (cmd === 'user') return await cmdUser(opts);
+            if (cmd === 'verify') return await cmdVerify(opts);
+            if (cmd === 'show') return await cmdShow(opts);
+            if (cmd === 'doctor') return cmdDoctor();
+            if (cmd === 'login') return await cmdLogin(opts);
+            return help();
+        } catch (error) {
+            retainLock = cmd === 'new' && error && error.code === 'TIMEOUT';
+            throw error;
+        } finally {
+            if (release && !retainLock) release();
+        }
     } catch (e) {
         if (e instanceof UsageError) {
             warn('ERROR: ' + e.message);
             return EXIT.USAGE;
         }
         warn('ERROR: ' + api.messageOf(e));
-        if (e && e.code === 'TIMEOUT') warn('The change may still finish on Google\'s side. Re-run the same command to continue.');
+        if (e && e.code === 'TIMEOUT') {
+            if (cmd === 'new') warn('The pending step may still finish. State lock retained; stop the original process and reconcile Google/state before manual recovery. See README-KH.md.');
+            else warn('The change may still finish on Google\'s side. Re-run the same command to continue.');
+        }
         else if (cmd === 'new') warn('Fix the problem and re-run the same command; finished steps are skipped.');
         return EXIT.FAIL;
     }

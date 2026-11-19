@@ -4050,6 +4050,9 @@
     "tools/audit-tools/firebase-config-paste-test.js": {
       "policy": "guard-1"
     },
+    "tools/audit-tools/firebase-provision-state-lock.test.cjs": {
+      "policy": "guard-1"
+    },
     "tools/audit-tools/firebase-provision-test.js": {
       "policy": "guard-1"
     },

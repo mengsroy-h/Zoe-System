@@ -1000,7 +1000,15 @@ async function scenarioSlow(t, ctx, toolDir) {
         const st = stateOf(env, 'zoew-6060');
         t('ដ.១ ការបង្កើត Project មិនចប់ ➜ tool ចេញក្នុងពិដាន (timed out) · state ចងចាំ pendingProject', r.code === 1 && !r.killed && r.ms < 15000
             && /timed out/.test(r.stderr) && !!st && st.pendingProject === 'zoew-6060', { code: r.code, ms: r.ms, err: r.stderr });
+        const stateLock = path.join(env.stateDir, '.provision.lock');
+        t('ដ.១ timeout រក្សា local lock សម្រាប់ការផ្ទៀងមុនសង្គ្រោះ', fs.existsSync(stateLock));
         fake.knobs.neverFinishCreate = false;
+        const beforeRetry = fake.log.length;
+        const blocked = await runTool(toolDir, ['new', '--branch', '6060', '--user', 'sok'], env);
+        t('ដ.១ retry មុនសង្គ្រោះបដិសេធមុន API', blocked.code === 2 && fake.log.length === beforeRetry);
+        // child ដើមបាន close ហើយ; server ក្លែងបញ្ជាក់ Project ដែលបង្កើតមុន។ សាកតែការសង្គ្រោះដោយដៃ។
+        t('ដ.១ server ក្លែងមាន Project ដើមមុនដោះ lock', !!fake.projects['zoew-6060']);
+        if (fs.existsSync(stateLock)) fs.unlinkSync(stateLock);
         const r2 = await runTool(toolDir, ['new', '--branch', '6060', '--user', 'sok'], env);
         t('ដ.២ ⛔ យឺតតែជោគជ័យ ➜ រត់ម្តងទៀតទទួលស្គាល់ Project ខ្លួនឯង ដោយគ្មាន --adopt · គ្មានការបង្កើតទី ២',
             r2.code === 0 && fake.count('POST', /^\/v1\/projects$/) === 1, r2.stderr + r2.stdout.slice(-500));
@@ -1244,6 +1252,7 @@ async function partialUserHandoff() {
 }
 
 (async () => {
+    await require('./firebase-provision-state-lock.test.cjs').run(ROOT, ok);
     await partialUserHandoff();
     await redirectGuards();
     const contract = staticContract();

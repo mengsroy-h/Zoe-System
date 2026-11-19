@@ -13,6 +13,7 @@ import { firebaseState, scanState, securityState, uiState } from '../../../../Zo
 import { sealLookupHeader } from './helpers/sealed-lookup';
 import { viewState } from '../../../../ZoeW/src/core/view-state';
 import { appLocalStore } from '../../../../ZoeW/src/core/storage';
+import { shopScope } from '../../../../ZoeW/src/core/shop-scope';
 import { AUTO_LOOKUP_TRANSIENT_COOLDOWN_MS, attemptAutoLookup, autoLookupFailureAt, autoLookupInFlight, autoLookupQueueRetries, lookupFastCache } from '../../../../ZoeW/src/features/auto-lookup';
 import { testLookupApiConfig } from '../../../../ZoeW/src/features/lookup-config';
 import { refTo } from '../../../../ZoeW/src/app/refs';
@@ -26,7 +27,7 @@ const BARCODE = '77130500000012';
 
 async function useConfig(url: string) {
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(await sealLookupHeader({
-        enabled: true, fastMode: true, url, phoneField: 'phone', codField: 'cod', dodField: 'dod',
+        enabled: true, fastMode: true, shop: shopScope(), url, phoneField: 'phone', codField: 'cod', dodField: 'dod',
         headerName: 'X-Zoe-Proxy-Key'
     }, 'shop-a-key-0123456789abcdef')));
 }

@@ -84,10 +84,22 @@ function cleanText_(value) {
 }
 
 function moneyShape_(value) {
-    var text = String(value).replace(/[^0-9.,\-]/g, '');
+    if (typeof value !== 'string') return null;
+    var text = value.trim().replace(/[០-៩]/g, function (digit) { return String(digit.charCodeAt(0) - 0x17e0); });
+    if (!text) return { text: '0', mark: '', negative: false };
+    var excelText = /^="([^"]*)"$/.exec(text);
+    if (excelText) text = excelText[1].trim();
+    var currencyPrefix = /^(-?)(?:USD|\$)\s*/i.exec(text);
+    text = currencyPrefix ? currencyPrefix[1] + text.slice(currencyPrefix[0].length) : text.replace(/\s*(?:USD|\$)$/i, '');
+    text = text.trim();
+    if (/[ \u00a0\u202f]/.test(text)) {
+        if (!/^-?[0-9]{1,3}(?:[ \u00a0\u202f][0-9]{3})+(?:[.,][0-9]+)?$/.test(text)) return null;
+        text = text.replace(/[ \u00a0\u202f]/g, '');
+    }
+    if (!/^-?(?:[0-9]+(?:[.,][0-9]*)*|[.,][0-9]+)$/.test(text)) return null;
     var negative = text.charAt(0) === '-';
     var body = negative ? text.slice(1) : text;
-    if (!/[0-9]/.test(body)) return { text: '0', mark: '', negative: false };
+    if (!/[0-9]/.test(body)) return null;
     if (body.indexOf('-') !== -1) return null;
     var commas = body.split(',').length - 1;
     var dots = body.split('.').length - 1;
@@ -124,15 +136,15 @@ function moneyShape_(value) {
 
 function toMoney_(value, decimalMark) {
     if (value === null || value === undefined || value === '') return 0;
-    if (typeof value === 'number') return isFinite(value) ? Math.round(value * 100) / 100 : 0;
+    if (typeof value === 'number') return Number.isSafeInteger(Math.round(value * 100)) ? Math.round(value * 100) / 100 : null;
     var shape = moneyShape_(value);
     if (!shape) return null;
     var text = shape.text;
     if (text === undefined) text = decimalMark === '.' ? shape.dot : decimalMark === ',' ? shape.comma : undefined;
     if (text === undefined) return null;
     var n = parseFloat(text);
-    if (!isFinite(n)) return 0;
-    return Math.round((shape.negative ? -n : n) * 100) / 100;
+    var cents = Math.round((shape.negative ? -n : n) * 100);
+    return Number.isSafeInteger(cents) ? cents / 100 : null;
 }
 
 function moneyDecimalMark_(values) {
@@ -297,7 +309,7 @@ function normalizeRecords_(rows) {
     var moneyCells = [];
     for (var m = 0; m < rows.length; m++) {
         var cells = rows[m] || [];
-        moneyCells.push(cells[1], cells[2]);
+        if (cleanText_(cells[0])) moneyCells.push(cells[1], cells[2]);
     }
     var mark = moneyDecimalMark_(moneyCells);
     for (var i = 0; i < rows.length; i++) {

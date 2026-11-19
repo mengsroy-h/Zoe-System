@@ -283,7 +283,11 @@ it('ការយល់ព្រមដែលបិទប្រអប់មិន�
 describe('កិច្ចសន្យា markup និងការបិទប្រអប់ដោយ DOM fixture', () => {
     it('ភ្ជាប់ប៊ូតុងតាម allowlist និងបិទការអនុម័តជាមុន', () => {
         const html = readFileSync(resolve(root, 'ZoeKeyGen/index.html'), 'utf8');
-        const modal = html.slice(html.indexOf('<div id="secureKeySetupModal"'), html.indexOf('<div id="secureKeySetupModal"') + 3000);
+        const modalStart = html.indexOf('<div id="secureKeySetupModal"');
+        const nextModal = html.indexOf('<div id="secureSeatInventoryModal"', modalStart + 1);
+        expect(modalStart).toBeGreaterThanOrEqual(0);
+        expect(nextModal).toBeGreaterThan(modalStart);
+        const modal = html.slice(modalStart, nextModal);
         const allowlist = JSON.parse(source.slice(source.indexOf('const ACTION_ALLOWLIST = [') + 'const ACTION_ALLOWLIST = '.length, source.indexOf('];', source.indexOf('const ACTION_ALLOWLIST = [')) + 1));
         for (const action of ['inspectSecureKeyEnrollment', 'approveSecureKeyEnrollment', 'refreshSecureKeySetup']) {
             expect(modal).toContain(`data-act="${action}"`); expect(allowlist).toContain(action);
@@ -291,7 +295,14 @@ describe('កិច្ចសន្យា markup និងការបិទប�
         expect(modal).toMatch(/<textarea[^>]*id="secureKeySetupKey"[^>]*readonly/);
         expect(modal).toMatch(/<textarea[^>]*id="secureKeyEnrollmentInput"[^>]*maxlength="8192"/);
         expect(modal).toMatch(/<button[^>]*id="secureKeyApproveBtn"[^>]*disabled/);
-        expect(modal).toContain('data-args=\'["secureKeySetupModal"]\'');
+        const close = modal.match(/<button[^>]*data-act="closeModal"[^>]*data-args='\["secureKeySetupModal"\]'[^>]*>/);
+        expect(close).not.toBeNull();
+        expect(close?.[0]).not.toMatch(/\bdisabled\b/);
+        const invitationFieldset = modal.indexOf('<fieldset id="licenseInvitationControls"');
+        const invitationEnd = modal.indexOf('</fieldset>', invitationFieldset + 1);
+        expect(invitationFieldset).toBeGreaterThanOrEqual(0);
+        expect(invitationEnd).toBeGreaterThan(invitationFieldset);
+        expect(close?.index).toBeGreaterThan(invitationEnd);
         expect(modal).toMatch(/id="secureKeySetupStatus"[^>]*aria-live="polite"/);
     });
     it('closeModal ពិតសម្អាតសោ សំណើ និងស្នាមសោ ហើយមិនអនុម័តក្រោយបិទ', async () => {

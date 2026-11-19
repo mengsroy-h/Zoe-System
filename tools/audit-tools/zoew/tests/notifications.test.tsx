@@ -23,7 +23,7 @@ import {
     newerAppVersion, notifyBadgeCount, openNotifyDrawer, refreshNotifyRemovedView, refreshNotifyView, removedParcelsView,
     sanitizeFeed
 } from '../../../../ZoeW/src/features/notifications';
-import { initDatabaseListeners } from '../../../../ZoeW/src/services/db-listeners';
+import { clearDbListenerRecovery, handleDbListenerError, initDatabaseListeners } from '../../../../ZoeW/src/services/db-listeners';
 import { closeSideDrawer, isSideDrawerOpen, openSideDrawer } from '../../../../ZoeW/src/ui/page-nav';
 import { showUpdateAvailableBanner } from '../../../../ZoeW/src/ui/boot-splash';
 import { AppNavbar } from '../../../../ZoeW/src/app/components/AppNavbar';
@@ -427,4 +427,65 @@ it.each([[false, 0], [true, NaN], [true, Infinity]])('រំលឹក៖ history
     refreshNotifyView();
     expect(uiState.notifyView).toEqual(nearExpiryView(dataState.scanHistory, NOW, false));
     expect(uiState.notifyView!.packages).toBe(1);
+});
+
+
+describe('ភាពស្រស់នៃផ្ទាំងជូនដំណឹងពេល listener ដាច់', () => {
+    it.each([DB_LISTENER_KEY_HISTORY, DB_LISTENER_KEY_DELETED])('ផ្ទាំងដែលបើករួចបង្ហាញវាស់មិនបានភ្លាមសម្រាប់ %s', (key) => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const view = { measurable: true, packages: 2, customers: 1, rows: [], emptyText: '', unseen: 2 };
+        uiState.notifyView = { ...view };
+        uiState.notifyRemovedView = { ...view };
+        uiState.notifyDrawerOpen = true;
+        mount(<><AppNavbar /><NotifyDrawer /></>);
+        const unaffected = key === DB_LISTENER_KEY_HISTORY ? uiState.notifyRemovedView : uiState.notifyView;
+        try {
+            step(() => { handleDbListenerError(new Error('permission_denied'), key); });
+            const failed = key === DB_LISTENER_KEY_HISTORY ? uiState.notifyView : uiState.notifyRemovedView;
+            expect(failed).toMatchObject({ measurable: false, packages: 0, customers: 0, rows: [], emptyText: VIEW_NOT_MEASURABLE_NOTICE });
+            const head = document.getElementById(key === DB_LISTENER_KEY_HISTORY ? 'notifyExpiryHead' : 'notifyRemovedHead')!;
+            expect(head.querySelector('.notify-group-count')!.textContent).toBe('—');
+            expect(key === DB_LISTENER_KEY_HISTORY ? uiState.notifyRemovedView : uiState.notifyView).toBe(unaffected);
+            const identity = failed;
+            step(() => { handleDbListenerError(new Error('permission_denied'), key); });
+            expect(key === DB_LISTENER_KEY_HISTORY ? uiState.notifyView : uiState.notifyRemovedView).toBe(identity);
+        } finally {
+            clearDbListenerRecovery();
+            firebaseState.dbListenersFailed = false;
+            firebaseState.dbListenerOutageNoticeShown = false;
+        }
+    });
+});
+
+
+it('ភ្ជាប់ listener ឡើងវិញលាក់ចំនួនចាស់រហូត snapshot នីមួយៗមកដល់', () => {
+    const saved = { db: firebaseState.db, fb: firebaseState.fb, history: firebaseState.dbRefHistory, deleted: firebaseState.dbRefDeleted };
+    const callbacks: Record<string, (snapshot: any) => void> = {};
+    vi.useFakeTimers();
+    try {
+        firebaseState.db = {} as any;
+        firebaseState.fb = { onValue: (ref: any, cb: any) => { callbacks[ref] = cb; return () => {}; }, off: () => {} } as any;
+        firebaseState.dbRefHistory = 'HISTORY' as any;
+        firebaseState.dbRefDeleted = 'DELETED' as any;
+        uiState.notifyView = { measurable: true, packages: 3, customers: 1, rows: [], emptyText: '' };
+        uiState.notifyRemovedView = { measurable: true, packages: 2, customers: 1, unseen: 2, rows: [], emptyText: '' };
+        mount(<NotifyDrawer />);
+        step(() => { initDatabaseListeners(); });
+        expect(uiState.notifyView!.measurable).toBe(false);
+        expect(uiState.notifyRemovedView!.measurable).toBe(false);
+        step(() => { callbacks.DELETED({ val: () => null }); });
+        expect(uiState.notifyRemovedView).toMatchObject({ measurable: true, packages: 0 });
+        expect(uiState.notifyView!.measurable).toBe(false);
+        step(() => { callbacks.HISTORY({ val: () => null }); vi.advanceTimersByTime(120); });
+        expect(uiState.notifyView).toMatchObject({ measurable: true, packages: 0 });
+        expect(uiState.notifyRemovedView).toMatchObject({ measurable: true, packages: 0 });
+    } finally {
+        clearDbListenerRecovery();
+        firebaseState.db = saved.db;
+        firebaseState.fb = saved.fb;
+        firebaseState.dbRefHistory = saved.history;
+        firebaseState.dbRefDeleted = saved.deleted;
+        vi.clearAllTimers();
+        vi.useRealTimers();
+    }
 });

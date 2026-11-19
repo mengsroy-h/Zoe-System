@@ -127,6 +127,40 @@ async function run() {
         check(disabled.length === 4 && computed.every(actual => actual.opacity === '1' && actual.boxShadow === 'none' && actual.backgroundColor === busyDocument.defaultView.getComputedStyle(busyDocument.documentElement).getPropertyValue('--body-bg').trim()),
             'ស្ថានភាពមិនអាចចុចប្រើពណ៌ស្ងប់ រក្សាអក្សរច្បាស់ និងលុបស្រមោល');
     }
+    const keygenSource = fs.readFileSync(path.join(ROOT, 'ZoeKeyGen/app.js'), 'utf8');
+    const createSource = keygenSource.slice(keygenSource.indexOf('async function createLicenseInvitation()'), keygenSource.indexOf('async function copyLicenseInvitation('));
+    async function draftCase({ expires = 999, now = 1000, existing = null, listFails = false, createFails = false } = {}) {
+        const original = { inviteId: 'license.OLD', target: 'pwa', invitationExpiresAt: expires };
+        const setup = { id: 'license', invitationDraft: original, busy: false };
+        const calls = [], rows = existing ? [existing] : [];
+        const fields = { licenseInvitationTarget: { value: 'pwa' }, licenseInvitationHours: { value: '1' }, secureKeySetupKey: { value: 'fixture' }, licenseInvitationReference: { value: '' } };
+        const context = {
+            secureKeySetup: setup, secureKeySetupCurrent: () => true,
+            setLicenseInvitationBusy: (_setup, busy) => { setup.busy = busy; }, secureKeySetupMessage: () => {},
+            licenseInvitationFailureMessage: () => '',
+            licenseInvitationList: async () => { if (listFails) throw Error('offline'); return { invitations: rows, revision: 1, releaseEpoch: 0 }; },
+            secureKeySetupInspect: async () => ({ state: { licenseExpiresAt: 99999999 } }), getTrustedServerNow: () => now,
+            document: { getElementById: id => fields[id] }, crypto: { getRandomValues: array => array.fill(1) },
+            licenseInvitationCommand: async (_setup, _action, draft) => { calls.push(draft); if (createFails) throw Error('unknown'); rows.push({ ...draft, status: 'open' }); }
+        };
+        vm.runInNewContext(createSource, context);
+        await context.createLicenseInvitation();
+        return { setup, original, calls };
+    }
+    let draftResult = await draftCase();
+    check(draftResult.calls.length === 1 && draftResult.calls[0].inviteId !== 'license.OLD', 'សំណើផុតកំណត់ដែលបញ្ជីថ្មីគ្មាន បង្កើតកូដថ្មី');
+    draftResult = await draftCase({ expires: 1000 });
+    check(draftResult.calls[0]?.inviteId !== 'license.OLD', 'ព្រំដែនផុតកំណត់ស្មើម៉ោង Server បង្កើតកូដថ្មី');
+    draftResult = await draftCase({ expires: 1001, createFails: true });
+    check(draftResult.calls[0]?.inviteId === 'license.OLD' && draftResult.setup.invitationDraft === draftResult.original, 'សំណើមិនទាន់ផុតកំណត់ និងលទ្ធផលមិនច្បាស់រក្សាកូដដើម');
+    draftResult = await draftCase({ now: null, createFails: true });
+    check(draftResult.calls[0]?.inviteId === 'license.OLD' && draftResult.setup.invitationDraft === draftResult.original, 'គ្មានម៉ោងទុកចិត្តបាន មិនបោះចោលសំណើ');
+    draftResult = await draftCase({ listFails: true });
+    check(!draftResult.calls.length && draftResult.setup.invitationDraft === draftResult.original, 'អានបញ្ជីមិនបាន មិនបោះចោលសំណើ');
+    draftResult = await draftCase({ existing: { inviteId: 'license.OLD', status: 'open', target: 'pwa' } });
+    check(!draftResult.calls.length && draftResult.setup.invitationReference.id === 'license.OLD', 'Server មានកូដដើម រក្សាលទ្ធផលដើម');
+    draftResult = await draftCase({ existing: { inviteId: 'license.OLD', status: 'approved', target: 'pwa' } });
+    check(!draftResult.calls.length && draftResult.setup.invitationDraft === draftResult.original, 'សំណើមានលទ្ធផលលើ Server មិនបង្កើតជំនួសស្ងាត់ៗ');
     console.log(`${passed} PASS, ${failed} FAIL`);
     process.exitCode = failed ? 1 : 0;
 }

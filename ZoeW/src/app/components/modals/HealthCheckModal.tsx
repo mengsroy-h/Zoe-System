@@ -12,7 +12,7 @@ import { DeviceInfoLine } from '../device/DeviceInfoLine';
 export function HealthCheckModal() {
     const open = useStoreValue(uiState, (st) => st.modalDisplay.healthCheckModal === 'flex');
     useEffect(() => open ? watchHealthCheck() : undefined, [open]);
-    const busy = useStoreValue(viewState, (st) => st.healthRecheckBusy);
+    const recheckDisabled = useStoreValue(viewState, (st) => st.healthRecheckBusy && !st.healthRecheckCanInterrupt);
     return (
         <Modal id="healthCheckModal">
             <div className="modal-content">
@@ -23,12 +23,12 @@ export function HealthCheckModal() {
                 </div>
                 <HealthAdviceBox />
                 <p className="health-note">
-                    បណ្ដាញ/គណនីប្ដូរ ➜ ពិនិត្យថ្មី · ផ្ទៀងផ្ទាត់រៀងរាល់ 30 វិនាទីពេលប្រអប់បើក។{' '}
+                    បណ្ដាញ/គណនីប្ដូរ ➜ ពិនិត្យថ្មី · ផ្ទៀងផ្ទាត់រៀងរាល់ 30 វិនាទីពេលប្រអប់បើក។ ZTO Palm ផ្ទៀងផ្ទាត់ផ្ទាល់តែពេលចុច «ពិនិត្យម្តងទៀត»។{' '}
                     <b>មិនកែទិន្នន័យកញ្ចប់ ឬលុយ</b>
                     {' '}— ពិនិត្យការតភ្ជាប់ និងការផ្ទុកក្នុងឧបករណ៍។
                 </p>
                 <div className="modal-btns">
-                    <button className="btn-confirm" id="healthRecheckBtn" disabled={busy} onClick={onAct("runHealthCheck")}>ពិនិត្យម្តងទៀត</button>
+                    <button className="btn-confirm" id="healthRecheckBtn" disabled={recheckDisabled} onClick={onAct("runHealthCheck")}>ពិនិត្យម្តងទៀត</button>
                     <button className="btn-cancel" onClick={onAct("closeModal", { args: ["healthCheckModal"] })}>បិទ</button>
                 </div>
             </div>

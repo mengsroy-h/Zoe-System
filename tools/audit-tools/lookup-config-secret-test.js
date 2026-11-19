@@ -37,7 +37,7 @@ function sliceFnOptional(source, name) {
 
 function createRuntime(existing, key, encrypt, failStorage) {
     const source = fs.readFileSync(path.join(APP_ROOT, 'ZoeW', 'app.js'), 'utf8');
-    const start = source.indexOf('    function getLookupApiConfig() {');
+    const start = source.indexOf('    function getLookupApiConfig(');
     const end = source.indexOf('    async function testLookupApiConfig(', start);
     if (start === -1 || end === -1) throw new Error('lookup config functions not found');
     // ⛔ រាល់ឈ្មោះដែល sandbox *ហៅ* ត្រូវមានក្នុង sandbox — helper ទាំងនេះ

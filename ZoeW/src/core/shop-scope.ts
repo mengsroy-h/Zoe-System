@@ -64,11 +64,12 @@ export function sameShop(a, b) {
     return !!left && left === key(b);
 }
 
-export function shopOwnsSetting(setting, storeKey) {
+export function shopOwnsSetting(setting, storeKey, adoptLegacy = true) {
     if (!setting || typeof setting !== 'object') return false;
     const here = shopScope();
     if (typeof setting.shop === 'string' && setting.shop) return sameShop(setting.shop, here);
     if (here) {
+        if (!adoptLegacy) return false;
         setting.shop = here;
         safeStoreSet(appLocalStore, storeKey, JSON.stringify(setting));
     }

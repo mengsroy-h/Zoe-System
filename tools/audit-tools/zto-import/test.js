@@ -134,15 +134,21 @@ equal('dod not stolen by cod hint', detectMapping_(['Waybill', 'DOD($)']).dod, 1
 equal('money rounds to 2 decimals', toMoney_(2.5899999), 2.59);
 equal('money parses currency text', toMoney_('$ 13.18'), 13.18);
 equal('money on blank is zero', toMoney_(''), 0);
-equal('money on junk is zero', toMoney_('abc'), 0);
+equal('money rejects junk', toMoney_('abc'), null);
 equal('money keeps negative', toMoney_('-3.5'), -3.5);
 
 // ទឹកប្រាក់ជាអត្ថបទ ៖ «,» ឬ «.» ដែលមានតែមួយខ្ទង់ ១-២ ខាងក្រោយ ជាចុចទសភាគជានិច្ច · ក្រុម ៣ ខ្ទង់ច្រើនក្រុម ជាសញ្ញាបំបែកខ្ទង់ ·
 // ក្រុមតែមួយ (1.234 · 1,234) ទាយមិនបាន ➜ សម្រេចតាមភស្តុតាងក្នុងឯកសារដដែល បើគ្មាន ➜ null (បដិសេធ)
 const MONEY_TEXT_CASES = [
+    ['USD5$', '', null], ['$5USD', '', null], ['-$5', '', -5], ['$-5', '', -5],
+    ['12abc34', '', null], ['N/A', '', null], ['1e3', '', null], ['(12.50)', '', null],
+    ['១២.៥០', '', 12.5], ['USD ១ ២៣៤,៥០', '', 1234.5], ['KHR 12', '', null], ['៛ ១២', '', null], [1e14, '', null], ['12.50 USD', '', 12.5],
+    ['1 23,50', '', null], ['1\u00a0234,50', '', 1234.5], ['1\u202f234.50', '', 1234.5],
+    ['USD', '', null], [true, '', null], [Infinity, '', null], [NaN, '', null], [1e308, '', null],
+
     ['5,50', '', 5.5], ['5,5', '', 5.5], ['0,75', '', 0.75], ['1234,5', '', 1234.5], ['5.50', '', 5.5], ['$ 13.18', '', 13.18],
     ['1.234,50', '', 1234.5], ['1,234.50', '', 1234.5], ['1.234.567', '', 1234567], ['1,234,567', '', 1234567], ['1 234,50', '', 1234.5],
-    ['="5,50"', '', 5.5], ['-3,5', '', -3.5], ['12', '', 12], ['abc', '', 0], ['', '', 0],
+    ['="5,50"', '', 5.5], ['-3,5', '', -3.5], ['12', '', 12], ['abc', '', null], ['', '', 0],
     ['1.234', '', null], ['1,234', '', null], ['5,500', '', null], ['1.234', ',', 1234], ['1.234', '.', 1.23], ['1,234', '.', 1234], ['1,234', ',', 1.23],
     ['1,23,456', '', null], ['5-6', '', null], ['1.234,5.6', '', null]
 ];
@@ -168,6 +174,11 @@ check('normalizeRecords_ ៖ ជួរដែលគ្មាន Barcode មិន
 
 // ករណី CSV ពេញ (ផ្លូវ Watch និងទំព័រ Web ត្រូវឲ្យលទ្ធផលដូចគ្នា) ៖ [ឈ្មោះ, ឯកសារ, អត្ថបទ, ជួរដេកដែលសរសេរ (null = បដិសេធ)]
 const MONEY_CSV_CASES = [
+    ['blank barcode cannot resolve amount', 'blank-style.csv', 'Barcode;COD($);DOD($)\nTEST-A;1.234;20\n;5,50;0\n', null],
+    ['malformed mixed amount', 'bad.csv', 'Barcode;COD($)\nTEST-A;12abc34\n', null],
+    ['nonempty missing amount', 'bad-na.csv', 'Barcode;COD($)\nTEST-A;N/A\n', null],
+    ['Khmer currency and grouping', 'khmer.csv', '\uFEFFBarcode;COD($);DOD($)\nTEST-A;USD ១ ២៣៤,៥០;២,៥០\n', [['TEST-A', 2.5, 1234.5, '']]],
+
     ['CSV ; + «,» ទសភាគ ៖ 5,50 = 5.50 · 1,5 = 1.5 · សូន្យខាងមុខនៅដដែល', 'eu.csv',
         'Barcode;Phone;COD($);DOD($)\n00888;011000444;5,50;1,5\n0099;012000111;12;0,75\n',
         [['00888', 1.5, 5.5, '011000444'], ['0099', 0.75, 12, '012000111']]],
@@ -338,6 +349,18 @@ function importFixture(initial, capacity, options) {
 
 const originalRows = [['barcode', 'dod', 'cod', 'phone'], ['OLD001', 1, 2, '012345678']];
 const incomingRows = [['NEW001', 1, 3, '012345678'], ['NEW002', 1, 4, '012345679']];
+for (const amount of ['12abc34', 'N/A', '1e3', '(12.50)', '1 23,50', 'KHR 12', '៛ ១២', 1e14, Infinity, NaN, 1e308]) {
+    const fixture = importFixture(originalRows, 5);
+    let rejected = false;
+    try { fixture.run([['NEW001', amount, 3, '012']]); } catch (_) { rejected = true; }
+    check('server replace rejects invalid amount before writing ' + String(amount), rejected && fixture.state.clears === 0 && JSON.stringify(fixture.state.rows) === JSON.stringify(originalRows));
+}
+{
+    const fixture = importFixture(originalRows, 5);
+    const result = fixture.run([['NEW001', '១២.៥០', 'USD ១ ២៣៤,៥០', '012']]);
+    check('server replace writes explicitly normalized Khmer amounts', result.ok && JSON.stringify(fixture.state.rows[1]) === JSON.stringify(['NEW001', 12.5, 1234.5, '012']));
+}
+
 for (const rows of [[], [['', 0, 0, '']]]) {
     const fixture = importFixture(originalRows, 5);
     let rejected = false;
@@ -727,6 +750,13 @@ function watcherAccessFixture(handlers, options) {
         + '"ZT-B1","012 000 111","5","say ""hi"", then\r\nleave"\r\n\r\nZT-B2,0970000222,7.5,plain\r\n', 'utf8'));
     equal('Watch CSV ៖ cell មាន , · ចុះបន្ទាត់ · "" ក្នុងសញ្ញាដកស្រង់ · CRLF · BOM · ជួរទទេ', quoted.added,
         [['ZT-B1', 0, 5, '012 000 111'], ['ZT-B2', 0, 7.5, '0970000222']]);
+    const destructive = watcherAccessFixture([], { source: { name: 'broken-replace.csv', mime: 'text/csv', bytes: Buffer.from('Barcode,DOD,COD,Phone\nTEST-A,1,2,"012\nTEST-B,3,4,098') } });
+    destructive.context.rememberMapping_(destructive.context.mappingSignature_(['Barcode', 'DOD', 'COD', 'Phone']), { barcode: 0, dod: 1, cod: 2, phone: 3 }, 'replace');
+    const original = JSON.stringify(destructive.state.rows);
+    destructive.context.watchInboxFolder_();
+    check('Watch malformed CSV refuses saved replace mode before destructive write', !destructive.state.effects.includes('write') && JSON.stringify(destructive.state.rows) === original && destructive.state.moved === 'failed');
+    const broken = runSource('broken.csv', 'text/csv', Buffer.from('Barcode,DOD,COD,Phone\nTEST-A,1,2,"012\nTEST-B,3,4,098'));
+    check('Watch rejects unterminated quoted field before writes', broken.state.moved === 'failed' && !broken.state.effects.includes('write') && broken.added.length === 0, JSON.stringify(broken));
     const tsv = runSource('zto.tsv', 'text/tab-separated-values', Buffer.from('Barcode\tPhone\tCOD($)\n00777\t010000333\t4\n'));
     equal('Watch TSV ៖ បំបែកដោយ tab · សូន្យខាងមុខនៅដដែល', tsv.added, [['00777', 0, 4, '010000333']]);
     const semicolon = runSource('zto.txt', 'text/plain', Buffer.from('Barcode;Phone;COD($)\n00888;011000444;2.5\n'));
@@ -762,7 +792,7 @@ function watcherAccessFixture(handlers, options) {
             equal('Watch ' + label, run.added, expected);
         } else {
             check('Watch ' + label + ' ៖ បដិសេធ (Failed · អ៊ីមែលប្រាប់តម្លៃ) · មិនសរសេរ Sheet', run.state.moved === 'failed' && !run.state.effects.includes('write')
-                && /អានមិនច្បាស់/.test(run.state.mail || '') && /1\.234|5,500/.test(run.state.mail || ''),
+                && /អានមិនច្បាស់/.test(run.state.mail || '') && /1\.234|5,500|12abc34|N\/A/.test(run.state.mail || ''),
                 JSON.stringify({ moved: run.state.moved, effects: run.state.effects, mail: run.state.mail, added: run.added }));
         }
     }
@@ -828,7 +858,7 @@ function webPageFixture(XLSX) {
         readAsArrayBuffer(file) { Promise.resolve().then(() => this.onload({ target: { result: Uint8Array.from(file.bytes).buffer } })); }
     }
     const localStorage = memoryStorage();
-    const context = vm.createContext({ console, Promise, TextEncoder, Uint8Array, FileReader: Reader, XLSX,
+    const context = vm.createContext({ console, Promise, TextEncoder, TextDecoder, Uint8Array, FileReader: Reader, XLSX,
         window: { confirm: () => true, localStorage, crypto: crypto.webcrypto },
         localStorage, document: { getElementById: el, createElement: () => node() }, google: { script: { run } } });
     vm.runInContext(script, context, { filename: 'Index.html' });
@@ -870,7 +900,30 @@ async function webMoneyTests() {
                 JSON.stringify({ imports: imports.length, effects: web.fixture.state.effects, disabled: web.el('importBtn').disabled, shown, added }));
         }
     }
+    for (const separator of [';', '\t']) {
+        const metadata = webPageFixture(lib.XLSX);
+        const text = 'Report, today\n' + ['Barcode', 'COD', 'Phone'].join(separator) + '\n' + ['QA01', '"7,25"', '012000111'].join(separator) + '\n' + ['QA02', '"2,00"', '012000222'].join(separator);
+        await metadata.context.handleFile({ name: 'metadata.csv', bytes: Buffer.from(text) }); await settle();
+        metadata.el('headerRow').value = 2;
+        metadata.context.applyHeaderRow(); await settle();
+        metadata.context.runImport(); await metadata.settleWrite();
+        equal('Web actual SheetJS preserves semicolon rows after comma metadata', metadata.fixture.state.rows.slice(2), [['QA01', 0, 7.25, '012000111'], ['QA02', 0, 2, '012000222']]);
+    }
+    for (const [name, bytes] of [
+        ['broken-preamble.csv', Buffer.from('Report, today\nBarcode;COD;Phone\nQA01;"7,25";012000111\nQA02;"2,00";"012000222')],
+        ['broken.csv', Buffer.from('Barcode,DOD,COD,Phone\nTEST-A,1,2,"012\nTEST-B,3,4,098')],
+        ['broken.tsv', Buffer.from('Barcode\tCOD\tPhone\r\nTEST-A\t1\t"012')],
+        ['broken-utf16.csv', Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from('Barcode;COD;Phone\r\nTEST-A;1;"012', 'utf16le')])]
+    ]) {
+        const bad = webPageFixture(lib.XLSX);
+        await bad.context.handleFile({ name, bytes }); await settle();
+        check('Web rejects unterminated text before preview/write ' + name, bad.context.state.workbook === null && bad.context.state.rows.length === 0 && !bad.fixture.state.effects.includes('write') && /CSV/.test(bad.texts('fileMsg')), bad.texts('fileMsg'));
+    }
     const web = webPageFixture(lib.XLSX);
+    for (const text of ['Barcode,Phone\r\nA,"say ""hi"", then\r\nleave"\r\n', 'sep=;\nBarcode;Phone\n="0012";="0123"\n']) {
+        let error; try { web.context.validateDelimitedTextQuotes(text, ''); } catch (caught) { error = caught; }
+        check('Web quote guard preserves escaped/multiline/Excel text', !error, error && error.message);
+    }
     const pageToMoney = web.context.toMoney;
     const pageMark = web.context.moneyDecimalMark;
     const sameAsServer = MONEY_TEXT_CASES.filter(([cell, mark]) => typeof pageToMoney !== 'function' || JSON.stringify(pageToMoney(cell, mark)) !== JSON.stringify(toMoney_(cell, mark)));
@@ -1104,6 +1157,58 @@ for (const failMove of [false, true]) {
     const foreign = f.state.otherRows.map(row => row.slice()); f.run();
     check('Watch ប្តូរ Script Properties ក្រោយ guard ៖ មិនសរសេរចូល Sheet/tab ថ្មី', f.state.writtenTargets.every(([id, tab]) => id === 'target' && tab === 'Customers'));
     equal('Watch target lookup race ៖ ទិន្នន័យ Sheet ថ្មីនៅដដែល', f.state.otherRows, foreign);
+}
+
+for (const backlogKind of ['done', 'unsupported']) {
+    const f = watcherReceiptFixture('upsert', { single: true, failMoveIds: [] });
+    for (let n = 0; n < 12; n++) {
+        const file = n === 0 ? f.old : f.add('backlog-' + n, n, n + 1, 'BACKLOG-' + n);
+        f.settings.failMoveIds.push(file.getId());
+        if (backlogKind === 'done') {
+            f.props['ZTO_WATCH_RECEIPT_V1_' + file.getId()] = JSON.stringify({ version: 1, fileId: file.getId(),
+                sheetId: 'target', sheetName: 'Customers', inboxId: 'in', state: 'done' });
+        } else file.getMimeType = () => 'image/png';
+    }
+    const fresh = Array.from({ length: 12 }, (_, n) => f.add('fresh-' + n, 100 + n, 20 + n, 'FRESH-' + n));
+    let receiptChecks = 0;
+    const actualReadReceipt = f.context.readWatchReceipt_;
+    f.context.readWatchReceipt_ = (...args) => { receiptChecks++; return actualReadReceipt(...args); };
+    f.run();
+    check('Watch backlog ' + backlogKind + ' ៖ ឈប់អាន receipt ពេល budget ទាំងពីរអស់', receiptChecks === 22);
+    check('Watch backlog ' + backlogKind + ' ៖ ឯកសារថ្មី ១០ ដំបូងបន្តតាមលំដាប់',
+        fresh.slice(0, 10).every(file => file.folder === 'done') && fresh.slice(10).every(file => file.folder === 'in') &&
+        f.rows().find(row => row[0] === 'SHARED-123')?.[2] === 109);
+    check('Watch backlog ' + backlogKind + ' ៖ សាក move ចាស់មិនលើស ១០ ក្នុងមួយជុំ',
+        f.state.moves.filter(([id]) => f.settings.failMoveIds.includes(id)).length === 10);
+    f.run();
+    check('Watch backlog ' + backlogKind + ' ៖ ជុំបន្ទាប់បញ្ចប់ថ្មីដោយមិន replay ចាស់',
+        fresh.every(file => file.folder === 'done') && f.rows().find(row => row[0] === 'SHARED-123')?.[2] === 111 &&
+        !f.rows().some(row => String(row[0]).startsWith('BACKLOG-')));
+}
+{
+    const f = watcherReceiptFixture('upsert', { single: true, failWriteAfterApply: true });
+    f.run();
+    f.settings.failWriteAfterApply = false;
+    f.state.rows[1][2] = 888;
+    const writes = f.state.writes;
+    const fresh = f.add('after-unknown', 123, 20, 'AFTER-UNKNOWN');
+    f.run();
+    check('Watch backlog ៖ pending fence មិនស្រប postimage នៅតែរារាំង write ថ្មី',
+        f.state.writes === writes && !f.rows().some(row => row[0] === 'AFTER-UNKNOWN') && fresh.folder !== 'done');
+}
+
+{
+    const f = watcherReceiptFixture('upsert', { single: true });
+    let scanned = 0;
+    let dateReads = 0;
+    const files = Array.from({ length: 201 }, (_, n) => ({
+        getDateCreated: () => { dateReads++; return new Date(n < 200 ? 199 - n : n); },
+        getName: () => String(n)
+    }));
+    const inbox = { getFiles: () => ({ hasNext: () => scanned < files.length, next: () => files[scanned++] }) };
+    const selected = f.context.oldestInboxFiles_(inbox, 200);
+    check('Watch backlog ៖ ការស្កេននៅតែមានពិដាន ២០០ ឯកសារ', scanned === 200 && selected.length === 200 && selected[0].getName() === '199' && selected[199].getName() === '0');
+    check('Watch backlog ៖ អានម៉ោងបង្កើតតែម្ដងក្នុងមួយឯកសារ', dateReads === 200, dateReads);
 }
 
 webMoneyTests().catch((error) => check('Web money tests ៖ រត់ចប់ដោយគ្មាន exception', false, error && error.stack)).then(() => {

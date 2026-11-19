@@ -8,7 +8,7 @@ export interface HealthLicenseStatus {
     daysLeft?: number;
 }
 
-export async function healthLicenseStatus(): Promise<HealthLicenseStatus> {
+export async function healthLicenseStatus(signal?: AbortSignal): Promise<HealthLicenseStatus> {
     const unknown = (reason = 'verify-unavailable'): HealthLicenseStatus => ({ state: 'unverified', reason });
     const licenseApi = window.ZoeLicense;
     if (!licenseApi || ['activationKeyString', 'verifyKeyString', 'checkOnline', 'getServerNow', 'getServerTimeOffset']
@@ -18,7 +18,7 @@ export async function healthLicenseStatus(): Promise<HealthLicenseStatus> {
     try {
         const operation = captureConnectionOperation();
         const key = licenseApi.activationKeyString(LICENSE_APP_CODE);
-        const current = () => !ended && operation.current() && window.ZoeLicense === licenseApi
+        const current = () => !ended && !signal?.aborted && operation.current() && window.ZoeLicense === licenseApi
             && licenseApi.activationKeyString(LICENSE_APP_CODE) === key;
         if (!current()) return unknown();
         if (!key) return { state: 'required' };

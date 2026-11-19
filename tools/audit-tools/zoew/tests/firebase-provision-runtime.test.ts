@@ -9,21 +9,24 @@ const require = createRequire(import.meta.url);
 const semver = require('semver');
 const root = process.env.PROVISION_RUNTIME_SOURCE_ROOT || path.resolve(import.meta.dirname, '../../../..');
 const tool = path.join(root, 'tools/firebase-provision');
+const wrappers = ['setup.cmd', 'new-customer.cmd', 'deploy-rules.cmd'];
 const source = fs.readFileSync(path.join(tool, 'setup.cmd'), 'utf8');
 const manifest = JSON.parse(fs.readFileSync(path.join(tool, 'package.json'), 'utf8'));
 const lock = JSON.parse(fs.readFileSync(path.join(tool, 'package-lock.json'), 'utf8'));
-const check = source.match(/^node -e "([^"\r\n]+)"\r?$/m)?.[1];
-if (!check) throw new Error('Missing production Node.js admission command');
+
 const engines = Object.entries(lock.packages)
     .filter(([name]) => name !== '')
     .map(([, item]: [string, any]) => item.engines?.node)
     .filter((value): value is string => typeof value === 'string');
 
-for (const version of [
+for (const wrapper of wrappers) for (const version of [
     '18.20.8', '20.0.0', '20.19.0', '22.17.0', '22.22.1', '22.22.2', '22.23.0',
     '23.0.0', '24.14.9', '24.15.0', '24.22.1', '25.0.0', '26.0.0', '28.0.0'
 ]) {
-    it('Firebase provision៖ bootstrap និង package engine ស្រប lock នៅ Node ' + version, () => {
+    it('Firebase provision៖ ' + wrapper + ' និង package engine ស្រប lock នៅ Node ' + version, () => {
+        const command = fs.readFileSync(path.join(tool, wrapper), 'utf8');
+        const check = command.match(/^node -e "([^"\r\n]+)"\r?$/m)?.[1];
+        if (!check) throw new Error('Missing production Node.js admission command: ' + wrapper);
         const supported = engines.every(range => semver.satisfies(version, range));
         const exitCodes: number[] = [];
         vm.runInNewContext(check, { process: {

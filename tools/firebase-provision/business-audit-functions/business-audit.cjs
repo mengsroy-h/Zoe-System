@@ -138,7 +138,7 @@ function projectRecord(root, value, recordId) {
         const keys = plain(value.pickedUpBarcodes) ? Object.keys(value.pickedUpBarcodes).sort() : [];
         out.pickup = compact({ packagesPickedUp: number(value.packagesPickedUp), revision: integer(value.pickupRevision),
             resetEpoch: integer(value.pickupResetEpoch),
-            barcodeCount: keys.length, barcodeDigest: digest(keys), barcodeSamples: keys.slice(0, SAMPLE_LIMIT).map(code),
+            barcodeCount: keys.length, barcodeDigest: digest(JSON.stringify(keys)), barcodeSamples: keys.slice(0, SAMPLE_LIMIT).map(code),
             barcodeSampleLimit: SAMPLE_LIMIT, barcodeSampleTruncated: keys.length > SAMPLE_LIMIT,
             phoneCount: plain(value.pickedUpPhones) ? Object.keys(value.pickedUpPhones).length : 0 });
     } else if (root === 'zoew_daily_collected_cod_dod') {

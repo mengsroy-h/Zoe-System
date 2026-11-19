@@ -71,7 +71,7 @@ function readNumConst(name, fallback) {
 const WANT = ['sanitizeInput', 'ledgerNumber', 'statsMonthOf', 'statsPositive', 'statsMoney',
     'statsCount', 'countPickedUpCustomers', 'uncollectedBarcodeValue', 'uncollectedItemValue',
     'uncollectedValueByDate', 'collectedValueOf', 'collectedMoneyText',
-    'collectedRielText', 'monthlyReportRiel', 'buildStatCardItem', 'buildMonthlyReport',
+    'collectedRielText', 'monthlyReportRiel', 'buildStatCardItem', 'buildMonthlyReport', 'buildMonthlyReportView',
     'openDailyStatsModal', 'openCollectedStatsModal', 'renderMonthlyReport',
     'monthlyReportMismatchNote', 'renderHistory', 'renderRecentlyDeleted',
     'buildTrashGroups', 'trashGroupMatchesQuery', 'trashFilterOf', 'trashGroupInFilter', 'renderTrashSummary', 'trashGroupRowHtml',
@@ -216,7 +216,7 @@ const SCREENS = [
     // **ការអះអាងអំពីអាជីវកម្ម** ដដែល ➜ ត្រូវមានច្រកទ្វារផ្ទាល់ខ្លួន។
     { name: '💵 ចំណូលប្រចាំថ្ងៃ', run: (s) => s.openCollectedStatsModal(), read: 'collectedStatsContainer',
         breaks: ['dailyCollected'] },
-    { name: '📊 របាយការណ៍ខែ', run: (s) => s.renderMonthlyReport(), read: 'monthlyReportBody',
+    { name: '📊 របាយការណ៍ខែ', run: (s) => vm.runInContext("uiState.modalDisplay = { monthlyReportModal: 'flex' }; renderMonthlyReport();", s), read: 'monthlyReportBody',
         breaks: ['dailyRevenue', 'history', 'deleted'] },
     { name: '🗑️ ធុងសំរាម', run: (s) => s.renderRecentlyDeleted(), read: 'deletedTableBody',
         breaks: ['deleted'] },
@@ -256,7 +256,7 @@ scenario('លក្ខខណ្ឌចាំបាច់៖ កូដពិតត
         WANT.length - missing.length >= 40, 'បាត់៖ ' + missing.join(', '));
     ok('អេក្រង់ទាំងអស់ និងច្រកទ្វារមានក្នុង app.js ពិត',
         ['openDailyStatsModal', 'openCollectedStatsModal', 'renderMonthlyReport',
-            'renderRecentlyDeleted', 'renderHistory', 'dbListenerViewIsStale',
+            'buildMonthlyReportView', 'renderRecentlyDeleted', 'renderHistory', 'dbListenerViewIsStale',
             'renderZtoSyncModalList', 'renderZtoSyncBanner']
             .every((n) => missing.indexOf(n) === -1), 'បាត់៖ ' + missing.join(', '));
     ok('⛔ អត្ថបទ «វាស់មិនបាន» ត្រូវអានចេញពីថេរក្នុង app.js ពិត',

@@ -192,12 +192,18 @@ async function callAccountFunction(kind, body) {
     if (!app) return { ok: false, code: 'server-unconfigured' };
     try {
         const res = kind === 'register' ? await firebaseState.fb.registerAccount(app, body) : await firebaseState.fb.resetPassword(app, body);
+        if (res?.status === 429) return { ok: false, code: 'rate-limited' };
         const out = res && res.body && typeof res.body === 'object' ? res.body : {};
-        return { ok: out.ok === true, code: typeof out.code === 'string' ? out.code : (res && res.status === 429 ? 'rate-limited' : 'bad-response') };
+        if (out.code === 'account-outcome-unknown') return { ok: false, code: unknownAccountOutcome(kind) };
+        return { ok: out.ok === true, code: typeof out.code === 'string' ? out.code : 'bad-response' };
     } catch (e) {
         if (!accountCallTimedOut(e)) return { ok: false, code: 'network' };
-        return { ok: false, code: kind === 'register' ? 'registration-unknown' : 'password-reset-unknown' };
+        return { ok: false, code: unknownAccountOutcome(kind) };
     }
+}
+
+function unknownAccountOutcome(kind) {
+    return kind === 'register' ? 'registration-unknown' : 'password-reset-unknown';
 }
 
 function accountCallTimedOut(e) {

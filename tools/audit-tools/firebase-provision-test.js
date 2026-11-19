@@ -1206,7 +1206,45 @@ async function redirectGuards() {
     }
 }
 
+async function partialUserHandoff() {
+    const source = read('tools/firebase-provision/provision.js');
+    const state = { projectId: 'fixture-project', users: [], pendingUsers: {} };
+    const messages = [], saved = [], accounts = new Map();
+    let secondFails = true, serial = 0;
+    const context = vm.createContext({
+        say: line => messages.push(line === undefined ? '' : String(line)),
+        saveState: value => saved.push(JSON.stringify(value)),
+        generatePassword: () => 'synthetic-ephemeral-' + (++serial),
+        api: { createUser: async (_project, email, password) => {
+            if (email === 'second@example.test' && secondFails) throw new Error('synthetic network failure');
+            if (accounts.has(email)) return { created: false };
+            accounts.set(email, password);
+            return { created: true };
+        } }
+    });
+    const formatter = sliceFn(source, 'printStaffPasswords');
+    vm.runInContext(formatter + '\nasync ' + sliceFn(source, 'stepUsers') + '\nthis.run = stepUsers;', context);
+    let failed = false;
+    try { await context.run(state, ['first@example.test', 'second@example.test'], {}, []); }
+    catch (e) { failed = e.message === 'synthetic network failure'; }
+    const firstPassword = accounts.get('first@example.test');
+    ok('បង្កើតម្នាក់ជោគជ័យមុនម្នាក់ទៀតធ្លាក់ ផ្តល់ពាក្យសម្ងាត់ដែលបញ្ជាក់រួចភ្លាម', failed && firstPassword && messages.some(line => line.includes('first@example.test') && line.includes('password: ' + firstPassword)));
+    ok('ពាក្យសម្ងាត់មិនចូល state ទោះ partial success', saved.every(value => !value.includes('synthetic-ephemeral-')));
+    messages.length = 0;
+    secondFails = false;
+    await context.run(state, ['first@example.test', 'second@example.test'], {}, []);
+    ok('retry មិនប្តូរពាក្យសម្ងាត់គណនីដែលបានបង្កើត', accounts.get('first@example.test') === firstPassword && accounts.has('second@example.test'));
+    ok('retry ប្រាប់វិធី reset ដោយចេតនា បើបាត់ handoff ចាស់', messages.some(line => line.includes('--user first@example.test --reset')));
+    ok('retry បង្ហាញតែពាក្យសម្ងាត់គណនីថ្មី', !messages.some(line => line.includes('password: ' + firstPassword)) && messages.some(line => line.includes('password: ' + accounts.get('second@example.test'))));
+    const ambiguous = { projectId: 'fixture-project', users: [], pendingUsers: { 'first@example.test': true } };
+    messages.length = 0;
+    const notes = [];
+    await context.run(ambiguous, ['first@example.test'], {}, notes);
+    ok('លទ្ធផលមុនមិនច្បាស់ មិនបង្ហាញ password ដែលមិនបានបញ្ជាក់', !messages.some(line => line.includes('password:')) && accounts.get('first@example.test') === firstPassword && notes.some(line => line.includes('--reset')));
+}
+
 (async () => {
+    await partialUserHandoff();
     await redirectGuards();
     const contract = staticContract();
     if (!contract) {

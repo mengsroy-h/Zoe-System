@@ -46,6 +46,7 @@ function renderReactSurfaces(m) {
     fn('openCollectedStatsModal')();
     out.collected = render('src/app/components/stats/StatsCards.tsx', 'CollectedStatsCards');
     uiState.monthlyReportMonth = day.slice(0, 7);
+    uiState.modalDisplay = { ...uiState.modalDisplay, monthlyReportModal: 'flex' };
     fn('renderMonthlyReport')();
     out.monthly = render('src/app/components/reports/MonthlyReportBody.tsx', 'MonthlyReportBody');
     return out;

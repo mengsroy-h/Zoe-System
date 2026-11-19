@@ -81,6 +81,71 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.215] — 2026-11-19 · ភ្លើងកាមេរ៉ា និងសេចក្ដីសរុប Barcode
+
+**ZoeW** (`zoew-v478` ➜ `zoew-v479`)៖ លទ្ធផលប្ដូរភ្លើងយឺតមិនប្ដូរស្ថានភាពកាមេរ៉ាថ្មី។ សេចក្ដីសរុបការបញ្ចូល Barcode ច្រើនរាប់ «បញ្ចូល» តែក្រោយការរក្សាទុកត្រូវបានបញ្ជាក់។ ករណីមិនទាន់ដឹងលទ្ធផលបង្ហាញដាច់ពីចំនួនរំលង។ **ZoeKeyGen មិនប្រែ**។
+
+**សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ លើ APK និង PWA ដែលគាំទ្រភ្លើងកាមេរ៉ា សាកបើកភ្លើង រួចបិទ/បើកកាមេរ៉ាភ្លាមៗ។ នៅហាងសាក បញ្ចូល Barcode ច្រើនដោយឱ្យបណ្ដាញឆ្លើយយឺត ផ្ទៀងចំនួនដែលបានបញ្ចូល និងកុំផ្ញើស្ទួនករណីមិនទាន់បញ្ជាក់។
+
+### [2.50.214] — 2026-11-19 · ប៊ូតុងពិនិត្យ Palm និង Config Lookup
+
+**ZoeW** (`zoew-v477` ➜ `zoew-v478`)៖ ប៊ូតុង «ពិនិត្យម្តងទៀត» អាចជំនួសជុំ Palm ស្វ័យប្រវត្តិភ្លាម តែបិទពេលជុំដោយដៃកំពុងរត់។ Health Check មិនសរសេរ shop tag ចូល Config Lookup ចាស់ទេ។ ការទទួល Config ចាស់នៅក្នុងលំហូរធម្មតានៅដដែល។
+
+### [2.50.213] — 2026-11-19 · ពិដានពេល Health Check
+
+**ZoeW** (`zoew-v476` ➜ `zoew-v477`)៖ ជុំពិនិត្យមានពិដាន ៣០ វិនាទី។ បិទផ្ទាំង ឬបាត់ម្ចាស់វគ្គ ឈប់រង់ចាំភ្លាម និងមិនអនុញ្ញាតលទ្ធផលយឺតដាក់ជួរថ្មី។ តេស្តសាកការស្រាយសោមិនឆ្លើយ និងការឆ្លើយក្រោយបិទផ្ទាំង ដោយមិនហៅ ZTO ពិត។
+
+### [2.50.212] — 2026-11-19 · Health Check ក្រោយភ្ជាប់បណ្ដាញវិញ
+
+**ZoeW** (`zoew-v475` ➜ `zoew-v476`)៖ ការជូនដំណឹងស្ថានភាពដែលមកយឺតសម្រាប់ការផ្លាស់ប្ដូរដែលបានទទួលរួច មិនបោះបង់ការពិនិត្យដោយដៃបន្ទាប់ទេ។ ជុំស្វ័យប្រវត្តិបង្ហាញការផ្ទៀង Palm ជោគជ័យចុងក្រោយ (រហូតដល់ ៥ នាទី) ជាព័ត៌មាន មិនមែនបៃតងថ្មី។ ប្ដូរវគ្គ ហាង សាខា ឬ Lookup config លុបភស្តុតាងចាស់។
+
+### [2.50.211] — 2026-11-19 · Health Check និង ZTO Palm
+
+**ZoeW** (`zoew-v474` ➜ `zoew-v475`)៖ ផ្ទាំងពិនិត្យសុខភាពបោះបង់សំណើ HTTP ដែលនៅរង់ចាំពេលបិទផ្ទាំង ប្ដូរហាង ឬជុំថ្មីជំនួស។ ការផ្ទៀង Palm ដល់ ZTO រត់តែពេលចុច «ពិនិត្យម្តងទៀត»។ ជុំស្វ័យប្រវត្តិបង្ហាញថាមិនទាន់ផ្ទៀង Palm ផ្ទាល់។ មិនកែប្រតិបត្តិការលុយ ឬកញ្ចប់។
+
+### ZoeW [2.50.210] · ZoeKeyGen [2.24.54] — 2026-11-19 · លទ្ធផលគណនី និងកូដដែលកំពុងរៀបចំ
+
+**ZoeW** (`zoew-v473` ➜ `zoew-v474`) និង **ZoeKeyGen** (`zoekeygen-v164` ➜ `zoekeygen-v165`)។
+
+- ZoeW បង្ហាញលទ្ធផលមិនទាន់ប្រាកដបើចម្លើយបង្កើតគណនី/ប្តូរពាក្យសម្ងាត់បាត់ ឬអានមិនចប់; HTTP 429 ប្រាប់ឱ្យរង់ចាំ ទោះ body មិនមែន JSON។ មិនសាកការសរសេរឡើងវិញស្វ័យប្រវត្តិ។
+- ZoeKeyGen លាក់កូដអញ្ជើញ/Setup Link/QR និងកូដ reset ចាស់នៅពេលការស្នើថ្មីបានចាប់ផ្ដើម ដើម្បីកុំឱ្យច្រឡំថាកូដចាស់ជាលទ្ធផលថ្មី។ បោះបង់មុនចាប់ផ្ដើម មិនលុបលទ្ធផលបច្ចុប្បន្ន។
+- **សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ រង់ចាំ exact-head CI និងផ្ទៀងលំហូរគណនីលើ APK/PWA និង KeyGen ពិត មុនចេញកំណែ។ Function business-audit ត្រូវ deploy តាមដំណើរការដែលមានការអនុញ្ញាតដាច់ដោយឡែក ដើម្បីឱ្យការកែ pickup ទទេមានប្រសិទ្ធភាពលើ Server; ជុំនេះមិន deploy ឬប្ដូរ rules/env/migration ទេ។
+
+
+### ZoeW [2.50.209] · ZoeKeyGen [2.24.53] — 2026-11-19 · របាយការណ៍ បញ្ជូនការកំណត់ និងការរៀបចំ APK
+
+**ZoeW** (`zoew-v472` ➜ `zoew-v473`) និង **ZoeKeyGen** (`zoekeygen-v163` ➜ `zoekeygen-v164`)។
+
+- របាយការណ៍ប្រចាំខែគូរពីទិន្នន័យបច្ចុប្បន្នពេលបើក មិនប្រើ projection ចាស់។ ស្ថានភាព listener បរាជ័យ និងសះស្បើយមួយផ្នែកជូនដំណឹងទៅ UI។ ប្រអប់របាយការណ៍ និងការនាំចូលមាន role និងឈ្មោះដែលកម្មវិធីអានអេក្រង់ស្គាល់។
+- Setup Link រក្សា path របស់ App ដក query/hash ចាស់ និងសម្អាតលទ្ធផលដែលមិនអាចប្រើបានពេលការបង្កើតបរាជ័យ ឬ session ផ្លាស់។
+- Provisioning បង្ហាញព័ត៌មានចូលរបស់គណនីដែលបង្កើតបានមុនបន្តគណនីបន្ទាប់។ APK ពិនិត្យ signing input និង artifact មុន publish ដោយមិនប្ដូរលក្ខខណ្ឌ Audit ដែលអ្នកប្រើទទួលយក។
+- **សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ ផ្ទៀង CI លើ commit ចុងក្រោយ និង real-device APK/PWA រួម TalkBack/VoiceOver មុន merge។ មិនកែ Firebase rules, env ឬទិន្នន័យអាជីវកម្ម។ ការផ្ទៀង signing ជាមួយ keystore ពិត និង hosted release នៅមិនទាន់វាស់; កុំផ្ញើ secrets ក្នុង chat ឬ log។
+
+### ZoeW [2.50.208] · ZoeKeyGen [2.24.52] — 2026-11-18 · កាមេរ៉ា ការអញ្ជើញ និងភាពត្រឹមត្រូវនៃឯកសារ
+
+**ZoeW** (`zoew-v471` ➜ `zoew-v472`) និង **ZoeKeyGen** (`zoekeygen-v162` ➜ `zoekeygen-v163`)។
+
+- លាក់ App ពេលកាមេរ៉ាកំពុងសុំសិទ្ធិ បោះបង់សិទ្ធិរបស់ការស្នើនោះ; stream ដែលមកយឺតត្រូវបញ្ឈប់។ ការអញ្ជើញដែលផុតកំណត់លើ Server អាចរៀបចំការស្នើថ្មីតាមលំហូរដើម។
+- ការនាំចូលទឹកប្រាក់ពិនិត្យតម្លៃទាំងមូល មិនលុបអក្សរខុសដើម្បីបង្កើតចំនួនថ្មី។ រក្សាទម្រង់ដុល្លារ និងសញ្ញាបំបែកដែលមានភស្តុតាង បម្លែងលេខខ្មែរជាក់លាក់ ហើយបដិសេធ CSV ដែលមានសញ្ញាដកស្រង់មិនទាន់បិទ។
+- ការរក្សា archive អ៊ិនគ្រីបចាស់ប្រើចំនួនជំនាន់ជាជម្រើសច្បាស់លាស់ ហើយផ្ទៀង archive ដែលនឹងរក្សាមុន prune។ មិនផ្តល់ចំនួន មិន prune។
+- **សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ ផ្ទៀងការកែ និង CI មុនចេញកំណែ; Update web/PWA/APK និង Apps Script ដោយដំណើរការចេញកំណែធម្មតា។ គ្មានការកែ env/rules/migration ក្នុងការកែនេះ។ ការនេះមិនទាន់ push ឬ deploy ហើយមិនទាន់សាកលើឧបករណ៍ពិត។
+
+### ZoeW [2.50.207] — 2026-11-18 · ភាពស្រស់នៃផ្ទាំងជូនដំណឹង
+
+**ZoeW** (`zoew-v470` ➜ `zoew-v471`)។
+
+- ផ្ទាំងជូនដំណឹងដែលបើករួច និង badge មិនរក្សាចំនួនចាស់ជាចំនួនវាស់បាន ពេល listener ប្រវត្តិ ឬធុងសំរាមដាច់ ឬចាប់ផ្ដើមភ្ជាប់ឡើងវិញ។ ផ្នែកដែលមិនប៉ះពាល់រក្សាទិដ្ឋភាពដដែល ហើយ snapshot ថ្មីស្ដារភាពវាស់បានតាមផ្នែកនីមួយៗ។
+- អ្នកយាម៖ `tools/audit-tools/zoew/tests/notifications.test.tsx`។ ការកែនេះមិនប្ដូរ money, registry, cleanup, license ឬសិទ្ធិ backend ទេ។
+- **សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ Update web/PWA/APK ក្រោយការចេញកំណែ; គ្មានការកែ env/rules/migration។ CI និងឧបករណ៍ពិតមិនទាន់ផ្ទៀងលើការកែនេះ។
+
+### ZoeKeyGen [2.24.51] — 2026-11-18 · ស្ថានភាពការអញ្ជើញច្បាស់លាស់
+
+- ពេលបង្កើត ឬពិនិត្យសំណើ បង្ហាញសាររង់ចាំ និងបិទប៊ូតុងការអញ្ជើញបណ្ដោះអាសន្ន។ ប៊ូតុងបិទផ្ទាំងនៅប្រើបាន។
+- ពេល Server ប្រាប់ថាសេវាអញ្ជើញបិទ បង្ហាញការណែនាំពិនិត្យការកំណត់ Netlify របស់ ZoeW ជាក់លាក់ ដោយមិនបង្ហាញព័ត៌មានផ្ទៃក្នុង។
+- សារបរាជ័យប្រាប់ថាកូដត្រូវបានរក្សាទុក តែពេលមានកូដពិតក្នុងផ្ទាំងនេះ។
+- **សកម្មភាពដែលត្រូវធ្វើដោយដៃ៖** បន្ទាប់ពី deploy សូមផ្ទុក ZoeKeyGen ឡើងវិញ។ គ្មានការផ្លាស់ប្ដូរ DB ឬសោអាជ្ញាប័ណ្ណ។
+- **ការផ្ទៀង៖** `license-invitations-seller.test.ts` បន្ថែម regression ៣៖ មុនកែធ្លាក់ ៣ និងជាប់ ១២; ក្រោយកែរួម `keygen-secure-inventory.test.ts` ជាប់ ៣០។ ការតភ្ជាប់ fieldset ក្នុង HTML ពិតត្រូវបានផ្ទៀងបន្ថែម។ CI និងការសាកលើសេវាពិតមិនទាន់បានរត់។
+
 ### ZoeW [2.50.206] — 2026-11-15 · ការសង្គ្រោះ Legacy ដែលមានភស្តុតាងពេញ
 
 **ZoeW** (`zoew-v469` ➜ `zoew-v470`)។ **ZoeKeyGen មិនប្រែ**។ កំណត់ត្រាមុន merge៖ candidate ក្នុង [PR #419](https://github.com/mengsroy-h/Zoe-System/pull/419); CI និងការដាក់ប្រើអានតាម head ចុងក្រោយរបស់ PR។
@@ -2165,6 +2230,76 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-11-19 · Audit បន្តលើ `c489a45` ៖ កាមេរ៉ា សារបញ្ចូល និង Drive watcher
+
+- [Audit #1364](https://github.com/mengsroy-h/Zoe-System/actions/runs/44463481360) ឆ្លងទាំងប្រាំផ្នែកលើ `c489a45`។ ក្នុង Chrome របស់ runner ការសាក duplicate scan ២៦ និងល្បឿន ៣១ ឆ្លង។ Postgres RLS ៦៤០ និងតេស្ត App ច្រើនហាង ១៤ ឆ្លង។ វាមិនមែនជាការវាស់ល្បឿនទូរស័ព្ទពិត ឬភស្តុតាងសម្រាប់ commit ក្រោយទេ។
+- `camera-acquisition-owner.test.ts`៖ ការប្ដូរភ្លើងដែលឆ្លើយក្រោយបិទកាមេរ៉ា ប្ដូរ track ឬប្ដូរជំនាន់ អាចដាក់ស្ថានភាពចាស់លើកាមេរ៉ាបច្ចុប្បន្ន។ ៣ ករណីធ្លាក់មុនកែ; កែដោយផ្ទៀងទាំង track និងជំនាន់ មុនទទួលលទ្ធផល។ រួមតេស្តកាមេរ៉ា និង recovery ឆ្លង ៥១។
+- `batch-scan-save-outcome.test.ts`៖ ពេលបិទផ្ទាំងមុនការរក្សាទុកចប់ ប្រវត្តិក្នុងម៉ាស៊ីនមិនជាភស្តុតាងថាកញ្ចប់បានសរសេរ។ សេចក្ដីសរុបប្រើលទ្ធផលរបស់សំណើនីមួយៗ មិនប្ដូរវិធីសរសេរ លុយ ឬសិទ្ធិទិន្នន័យ។ ករណីមូលដ្ឋាន ២ និងសញ្ញា ✅ លើលទ្ធផលមិនទាន់ច្បាស់ ១ ធ្លាក់មុនកែ; ក្រោយកែ តេស្តរួមតាមលំហូរពាក់ព័ន្ធឆ្លង ២៨១ ក្នុង ១៣ ឯកសារ រួម scanner ដែលរង់ចាំវគ្គ និងហៅតាមទម្រង់ដើម។
+- `tools/audit-tools/zto-import/test.js`៖ ឯកសារចាស់ដែលផ្លាស់ទីមិនបានមិនប្រើអស់ជួរនាំចូលថ្មី។ មានពិដានដាច់គ្នា ១០ សម្រាប់សម្អាត និង ១០ សម្រាប់នាំចូលពីក្នុងបញ្ជីដែលស្កេនបានអតិបរមា ២០០។ ការតម្រៀបអានម៉ោងបង្កើត ២០០ ដង ជំនួស ៣៩៨ ដងក្នុង fixture ដដែល។ តេស្ត importer ឆ្លង ៣៩៦; receipt និង pending fence នៅដដែល។ Apps Script ត្រូវសាកលើ Sheet/Drive ដាច់ដោយឡែក មុនដាក់ប្រើដោយដៃ; មិនបាន deploy។
+- ការផ្ទៀងឧបករណ៍ពិត (APK/PWA, កាមេរ៉ា និង offline រវាងឧបករណ៍) និងកំណត់ Apps Script ដែល deploy នៅតែត្រូវការភស្តុតាងផ្ទាល់។ មិនប្ដូរ Firebase rules, Supabase schema, ឬកំណត់សេវាផលិតកម្មទេ។
+
+### 2026-11-19 · Audit ទាំង repo លើ `e8dfee6` និងការកែលទ្ធផលមិនប្រាកដ
+
+- រាប់ឯកសារដែល Git តាមដានបាន 1,539 និងរក្សាបញ្ជី blob តាមឯកសារ។ បញ្ជីនេះមិនមែនជាភស្តុតាងថាបានសាកអាកប្បកិរិយាគ្រប់បន្ទាត់ទេ។ ផ្នែក ZoeW runtime/native និងអ្នកយាមត្រូវបានពិនិត្យប្រភព ដោយមិនធ្វើសំណើផលិតកម្ម។
+- `firebase-business-audit.test.ts`៖ pickup ដែលគ្មាន barcode ធ្វើឱ្យ digest ទទួល `undefined` ហើយបាត់ការកត់ត្រា Audit។ បម្លែងបញ្ជី key ទៅ JSON មុន digest; រក្សា fingerprint របស់បញ្ជីមិនទទេ។ ករណី create/reset/add/delete 4 ធ្លាក់មុនកែ; បន្ទាប់កែ 65 ឆ្លង ហើយរួម stage/CI 106 ឆ្លង។ មិនផ្លាស់ទិន្នន័យលុយ ឬ deploy function ទេ។
+- `supabase-account-transport.test.ts`៖ ចម្លើយ HTTP ដែលអានមិនចប់ក្រោយសំណើគណនី មិនបញ្ជាក់ថា Server មិនបានសរសេរទេ។ រក្សាលទ្ធផល «មិនទាន់ប្រាកដ» សម្រាប់ register/reset និងបង្ហាញឱ្យរង់ចាំសម្រាប់ HTTP 429 ទោះ body មិនមែន JSON។ 12 ករណីធ្លាក់មុនកែ និង 2 control ឆ្លង; បន្ទាប់កែ 112 ឆ្លងក្នុង 8 ឯកសារ។ មិនបន្ថែមការសាកសំណើឡើងវិញស្វ័យប្រវត្តិ។
+- `keygen-supabase-code-output.test.ts`៖ កូដ invite/reset ចាស់នៅមើលឃើញបន្ទាប់ពីការស្នើថ្មីបរាជ័យ អាចធ្វើឱ្យអ្នកគ្រប់គ្រងចម្លងលទ្ធផលខុស។ កែតែពេល session បច្ចុប្បន្នទទួលសំណើថ្មី; 2 ករណីធ្លាក់មុនកែ, 5 ករណីថ្មីឆ្លង និងរួម setup-link/lock 28 ឆ្លង។
+- `firebase-provision-rules-wrapper.test.ts` និង `firebase-provision-runtime.test.ts`៖ wrapper `deploy-rules.cmd --dry-run` មុននេះនៅបន្ត verify ដែលអាចបង្កើត probe account។ បញ្ជូនជម្រើស `--verify` ក្នុង parser ដើម ដើម្បីរំលង verify ជានិច្ចពេល dry-run ហើយធ្វើ verify តែក្រោយ deploy/readback ពិតជោគជ័យទាំងអស់។ Node engine guard របស់ wrapper ស្មើ package។ 23 ករណីធ្លាក់មុនកែ; បន្ទាប់កែ 58/58 ឆ្លង; fake-HTTPS provision 121/121។ មិនបានរត់ Windows cmd.exe ឬ live API។
+- លើ base ដដែល៖ typecheck/lint ឆ្លង; Vitest ពេញបាន 544 ឯកសារឆ្លង និង 23 ធ្លាក់ដោយបរិស្ថាន (Chromium 7, PostgreSQL/dependency 16)។ 11,398 ករណីឆ្លង, 5 assertion រាយ infrastructure បរាជ័យ និង 225 រំលង។ មិនហៅថា full audit ឆ្លងទេ។ តេស្តជាក់លាក់ runtime 93/93 ឆ្លង។
+- លើ candidate រួម៖ focused backend 106, account 112, KeyGen 28 និង provision 58 ឆ្លង។ Vitest ទូលំទូលាយបាន 11,454 ករណីឆ្លង ប៉ុន្តែមិនជាប់ពេញ៖ ករណី browser/PG ខ្វះបរិស្ថាននៅតែរត់ និង artifact guard បដិសេធ node_modules symlink របស់ worktree។ មិនបន្ថយ guard; បន្ទាប់ដាក់ dependency នៅក្នុង worktree ពិត តេស្ត artifact 9/9 ឆ្លង។
+- នៅត្រូវផ្ទៀង exact-head CI ទាំង shard, browser/emulator/Postgres និងឧបករណ៍ APK/PWA ពិត៖ camera/background, offline/reconnect/process death, biometric, share/print, update និង storage។ fake native bridge មិនជំនួស Android WebView/Keystore ឬ OEM camera ទេ។ ការទទួលយក APK gate ដើមនៅដដែល; ការផ្ទៀង license cutover ពេញលេញនៅតែមិនទាន់មានភស្តុតាងថ្មី។
+
+
+### 2026-11-19 · កែ fixture របស់ Audit #1356 លើ `b1f0157`
+
+- ផ្ទៀង log [Audit #1356](https://github.com/mengsroy-h/Zoe-System/actions/runs/44430134105) ជាមុន៖ shard ១, ២, ៣ និង ៥ ធ្លាក់; shard ៤ និង Windows/F03/Registration ឆ្លង។ ការកែនេះប៉ះតែអ្នកយាម និងឯកសារ មិនប្ដូរកំណែ App ឬអាកប្បកិរិយាផលិតកម្ម។
+- `layout-check` រក្សា node ដើមរបស់ React និងស្ដារ display ក្នុង `finally` ជំនួសបង្កើត node ថ្មីពី `innerHTML`។ `tools/audit-tools/zoew/tests/layout-react-node-ownership.test.tsx` រត់ callback ពិតលើ AppPages និងប្រអប់របាយការណ៍ពិត៖ baseline ធ្លាក់ ៣ រួមកាត App បាត់ក្រោយ update; ក្រោយកែឆ្លង ៣។ រក្សាអ្នកយាមទទឹង កាត និង CSS ដដែល។
+- `setup-link-roundtrip-test` រត់មុខងារ builder និង URL normalizer ពិត ជំនួសចាប់ assignment ដំបូងដែលឥឡូវជាការសម្អាត output។ `keygen-supabase-admin-test` ភ្ជាប់ `lookupSetupBaseUrl` ពិតក្នុង VM។ `tools/audit-tools/zoew/tests/setup-link-checker-wiring.test.ts` baseline ធ្លាក់ ៦ ➜ ឆ្លង ៦; រួម product cases ឆ្លង ២៣; roundtrip checker ឆ្លង ២៨។
+- `connection-state-fuzz-test` និង `registry-release-test` ភ្ជាប់ store runtime ពិតសម្រាប់ notification ថ្មី មិនប្រើ no-op។ `tools/audit-tools/zoew/tests/listener-store-vm.test.ts` baseline ធ្លាក់ ២ ➜ ឆ្លង ២; រួម poison reachability ឆ្លង ១១។ Fuzz ពេញលេញឆ្លង ៥២៩៧៥ assertions / ៥៧៦០ operations និង registry ឆ្លង ៦១; poison របស់ integrity ត្រូវ verdict `failed` មិនមែន `unverified`។ មិនកែអ្នកយាម integrity ឬបន្ធូរ assertion ណាមួយ។
+- តេស្តរួមលើ candidate ឆ្លង ៦៧ ក្នុង ៨ suites; typecheck, lint, doc, coverage និង comments ឆ្លង។
+- Chromium local socket នៅតែរារាំង audit measurement ពេញលេញ។ តេស្ត DOM ក្នុង jsdom មិនជំនួសការវាស់ geometry ក្នុង browser ពិត ឬ exact-head CI ទេ។ មិនបាន push, merge ឬ deploy; ត្រូវរង់ចាំ CI លើ commit ដែលដាក់ពិត។
+
+### 2026-11-19 · ការផ្ទៀងរបាយការណ៍ និងការបញ្ជូនលទ្ធផលលើមូលដ្ឋាន `3b1d57d`
+
+- `tools/audit-tools/zoew/tests/monthly-report-live-view.test.tsx`៖ baseline ធ្លាក់ ១៤ ឆ្លង ១; fixed ឆ្លង ១៥។ វាស់ DOM ពិតលើទិន្នន័យក្លែង រួម daily/monthly ledger, history/trash, pickup, exchange rate, ខែថ្មី, empty, hidden/reopen, pending operation និង listener បរាជ័យបន្តបន្ទាប់/សះស្បើយមួយផ្នែក រួមចាប់ផ្ដើម listener និង reset។ ការគូរមិនសរសេរទិន្នន័យ ឬប្ដូរ state។
+- `tools/audit-tools/zoew/tests/report-import-dialog.test.tsx`៖ baseline ធ្លាក់ ២ ឆ្លង ២; fixed ឆ្លង ៤។ ជាមួយអ្នកយាម focus/backdrop/chrome/forbidden zone ឆ្លង ៤៥; គ្របលំដាប់ stack ទាំងពីរ និង Tab/Shift+Tab ដោយមិនប្ដូរ scroll។
+- `tools/audit-tools/zoew/tests/keygen-setup-link-output.test.ts`៖ baseline ធ្លាក់ ១៧; fixed ឆ្លង ១៧។ តេស្ត encrypted setup ដែលមានស្រាប់ឆ្លង ៧ រួម encrypt/decrypt ពិត; async fixture ក្លែង session/encryption។ Clipboard ដែលបញ្ជូនរួចមិនអាចដកវិញ; មិនបង្ហាញសារជោគជ័យរបស់ session ចាស់។
+- `firebase-provision-test`៖ strict synthetic HTTPS suite ឆ្លង ១២១; baseline បង្ហាញកំហុស ៣។ មិនរក្សា password ក្នុង state; unknown outcome មិនបង្ហាញ password ដែលមិនផ្ទៀងថាបង្កើតរួច។ Retry មិនប្ដូរគណនីដែលមានដោយស្វ័យប្រវត្តិ ហើយប្រាប់ផ្លូវ `--reset` ច្បាស់លាស់។
+- `tools/audit-tools/zoew/tests/android-signing-preflight.test.ts`៖ baseline ធ្លាក់ ៣២ ឆ្លង ៤៤; fixed signing និង APK-link checks ឆ្លង ៩៨; បន្ថែមការផ្ទៀង matcher FCM ៦ ករណី ឆ្លងសរុប ១០៤។ វាស់ script ជាមួយ fixtures មិនប្រើ signing key ពិត ឬបង្កើត release ពិត។
+- `lookup-freshness-test` បន្ថែម dependency ពិតរបស់ validator ក្នុង VM; `tools/audit-tools/zoew/tests/lookup-freshness-vm.test.ts` baseline ធ្លាក់ ៣ ក្រោយកែឆ្លង ៣; ជាមួយ sheet lookup ឆ្លង ៣៧។ សេណារីយ៉ូ CI ដែលធ្លាក់ ៣ រត់លើ generated JS ពិតក្រោយកែឆ្លង ៩ assertions; មិនអះអាងថា full checker ដែលត្រូវការ HTML prerender ឆ្លងទេ។
+- `empty-state-truth-test` បន្ថែម dependency របស់ projection និង fixture បើក modal៖ ៤៣ ឆ្លង/៤ ធ្លាក់ ➜ ៦២ ឆ្លង/០ ធ្លាក់។ `semantic-ui-color-test` ផ្នែកពណ៌របាយការណ៍ឆ្លងក្រោយ fixture បើក modal; `monthly-report-test` ពិនិត្យ projection ក្នុង no-money-write scan ផង។ ការវាស់នេះប្រើ JS/SSR ពិតដោយមិនរត់ Chromium stage; assertions ដែលត្រូវការ initial HTML នៅមិនទាន់ផ្ទៀង។
+- តេស្តរួម ១៥ suites ឆ្លង ២៦៥ រួម deferred Excel ដែលមានស្រាប់; typecheck/lint/build/doc/slot/purity/coverage/comments ឆ្លង។ Audit measurement build រារាំងនៅ Chromium local socket (`Operation not permitted`) ទោះសាកបរិស្ថានដែលបានអនុញ្ញាត។ Full CI, hosted deployment និង real-device QA នៅមិនទាន់រត់។ ការកែនេះមិនអះអាងថាគ្មានកំហុសទាំងអស់ និងមិនប្ដូរ APK Audit gate។
+
+### 2026-11-18 · ស្តារការកែ local ដែលបាត់ក្រោយ workspace ចាប់ផ្ដើមឡើងវិញ
+
+- ស្តារឡើងវិញលើ `a53bb153e46ebfd2783b7ede9c016e4976a7b156` ពីភស្តុតាងការកែ និង regression។ មិនអះអាងថាបានរកឃើញ Git objects ចាស់ `c869521` ឬ `21561bb` វិញទេ។
+- កាមេរ៉ា៖ `tools/audit-tools/zoew/tests/camera-acquisition-owner.test.ts` មុនកែធ្លាក់ ៣; ជាមួយតេស្តកាមេរ៉ាពាក់ព័ន្ធ ក្រោយកែឆ្លង ៤០។
+- ការអញ្ជើញ៖ `license-invitation-default-ui-test` មុនកែឆ្លង ៧៣ ធ្លាក់ ២; ក្រោយកែឆ្លង ៧៥។ Backup៖ `firebase-backup-test` មុនកែឆ្លង ១៧៨ ធ្លាក់ ៤; ក្រោយកែឆ្លង ១៨២។
+- Standalone importer៖ `zto-import/test` មុនកែឆ្លង ៣៣៨ ធ្លាក់ ៤៧; ក្រោយកែឆ្លង ៣៨៥។ វាស់ parser និង Sheet writer ក្លែងក្នុង memory ដោយមិនហៅ Google; រួម quote/CRLF/UTF-16 និងឯកសារមានចំណងជើងមុន header។
+- Embedded importer៖ `tools/audit-tools/zoew/tests/sheet-import-input-validation.test.ts` មុនកែធ្លាក់ ១១ ឆ្លង ១៧; ជាមួយ `sheet-import-protocol.test.ts` និង `import-prepare-generation.test.ts` ក្រោយកែឆ្លង ១២៩។ រក្សា parser អាន customer table ដើមដាច់ពី parser នាំចូលថ្មី។
+- លទ្ធផល local មិនជំនួស full CI, browser និងឧបករណ៍ពិតទេ។ ការស្ដារនេះមិនធ្វើសកម្មភាពលើ production ឬប្ដូរច្បាប់ការចេញ APK។
+
+### 2026-11-18 · តភ្ជាប់អ្នកយាម CI ឱ្យស៊ីនឹងផ្ទាំងថ្មី
+
+- [Audit #1353](https://github.com/mengsroy-h/Zoe-System/actions/runs/44325310718) ធ្លាក់នៅ ៥ ផ្នែកលើ `2b8c95e`។ `connection-recovery-test`, `connection-state-fuzz-test` និង `registry-release-test` ខ្វះការភ្ជាប់មុខងារជូនដំណឹងក្នុង VM; វាក៏ប៉ះ `exit-code-integrity` និងតេស្ត Vitest ដែលហៅអ្នកយាមនោះ។ ភ្ជាប់ source ពិតដោយមិនដកលក្ខខណ្ឌផ្ទៀងផ្ទាត់។
+- `tools/audit-tools/zoew/tests/license-secure-issuance.test.ts` មិនកាត់ markup តាមប្រវែងថេរទៀតទេ។ អ្នកយាមផ្ទៀងថាប៊ូតុងបិទនៅប្រើបានក្រៅ fieldset អញ្ជើញ។ មិនកែកូដ App, កំណែ, rules ឬសិទ្ធិទេ; ត្រូវរង់ចាំ CI លើ commit កែអ្នកយាម។
+
+### 2026-11-18 · ភាពស្រស់នៃជូនដំណឹងក្រោយ listener ដាច់
+
+- មូលហេតុ៖ handler កត់ failed path និងប្ដូរស្ថានភាព connection ប៉ុន្តែ cached notification view នៅ `measurable: true`។ ផ្ទាំងដែលបើករួចមិនអាន failed path ដោយខ្លួនឯង។
+- ការផ្ទៀងមុនកែ៖ regression UI ២ ករណី (history និង deleted) ធ្លាក់ ខណៈ ៣៤ ករណីមានស្រាប់ជាប់។ ក្រោយកែ៖ ៣៧ ករណីជាប់ រួមទាំង reattach → snapshot តាមផ្នែក និង repeated error មិនបង្កើត view ថ្មីស្ទួន។
+- ការកែ៖ invalidate តែ view ដែលធ្លាប់វាស់បាន និង path ដែល stale ដោយមិនដើរ history ឬ sort rows ឡើងវិញ។ មិនកែ business data ឬបន្ធូរសិទ្ធិទេ។
+- ភស្តុតាង៖ `notifications.test.tsx` លើ baseline `e2af2e82e923683461d907cd89fb97c86f7baa2f`; happy-dom មិនមែនឧបករណ៍ពិត។ ដក wiring ការកែទាំងពីរចេញវិញ៖ ៣ regression ធ្លាក់ និង ៣៤ ករណីចាស់ជាប់; ដាក់ការកែវិញ៖ ៦១ ករណីក្នុង ៣ files ជាប់។ CI មិនទាន់រត់។
+
+### 2026-11-18 — ព្រំដែនអានចម្លើយ Backup
+
+- Supabase backup/import អាន response តាម stream និងបញ្ឈប់ពេលលើស 64 MiB មុនប្រមូល body ទាំងមូល។ Response ដែលដល់ព្រំដែនពិត, UTF-8 បែកតាម chunk និង body ទទេរក្សាឥរិយាបថដដែល។ ពេលលើសព្រំដែនឬ timeout ដោះ reader និង cancel stream; មិន retry response ដែលលើសព្រំដែន។
+- `firebase-backup-test` បន្ថែមករណីអាន stream ក្នុងម៉ាស៊ីន៖ baseline 169 PASS / 3 FAIL; ក្រោយកែ 172 PASS / 0 FAIL។ `supabase-audit-archive-test` មិនអាចបង្កើត Unix-domain socket សម្រាប់ PostgreSQL ក្នុងបរិស្ថានតេស្តនេះ ដូច្នេះមិនរាប់ថា full PASS។ មិនកែ app version, rules, migrations ឬទិន្នន័យ hosted; មិនមាន deploy។
+
+### 2026-11-18 · កំណែ parser ក្នុង CI
+
+- Workflow Audit យក Acorn ពី ZoeW lockfile សម្រាប់ job ទាំងពីរ ដូចការយក Playwright។ `dependency-security-test` ផ្ទៀងបញ្ជា install ដោយ fixture ទាំង lockfile ដែលមាន និងដែលខ្វះ dependency។ មិនកែ workflow release APK។
 
 ### 2026-11-15 — ផ្ទៀងការចេញផ្សាយ និង Restore ក្នុងបរិស្ថានដាច់ដោយឡែក
 
@@ -5513,7 +5648,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `sdk-surface` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ · ផ្នែក ៩ |
 | `secret-hygiene` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `security-guard-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ · ផ្នែក ៩ |
-| `semantic-ui-color-test` | — | ផ្នែក ១ · ផ្នែក ២ |
+| `semantic-ui-color-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `sentry-load-race-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `setup-link-browser-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `setup-link-logout-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
@@ -5533,6 +5668,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `storage-guard` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `strip-comments` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៦ · ផ្នែក ៨ |
 | `supabase-app-network-e2e-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ · ផ្នែក ៩ |
+| `supabase-audit-archive-test` | ផ្នែក ២ | — |
 | `supabase-data-tools-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ · ផ្នែក ៩ |
 | `supabase-datastore-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `supabase-docs-cache-test` | — | ផ្នែក ៧ · ផ្នែក ៩ |
@@ -5567,6 +5703,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `zto-cookie-session-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ |
 | `zto-cookie-store-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `zto-cookie-sync-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៧ · ផ្នែក ៨ |
+| `zto-import/test` | ផ្នែក ២ | — |
 | `zto-list-sync-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `zto-negative-cache-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `zto-network-boundaries-test` | — | ផ្នែក ២ · ផ្នែក ៩ |
@@ -5576,6 +5713,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `tools/audit-tools/zoew/tests/account-session-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/activation-retry.test.ts` | — | ផ្នែក ៧ |
 | `tools/audit-tools/zoew/tests/adaptive-refresh.test.ts` | — | ផ្នែក ៨ |
+| `tools/audit-tools/zoew/tests/android-signing-preflight.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/app-icon-logo.test.tsx` | — | ផ្នែក ៧ |
 | `tools/audit-tools/zoew/tests/app-lock-ownership-fixes.test.ts` | ផ្នែក ១ | — |
 | `tools/audit-tools/zoew/tests/apps-script-key-encrypted.test.tsx` | ផ្នែក ២ | — |
@@ -5595,6 +5733,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `tools/audit-tools/zoew/tests/backup-config-private-files.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/barcode-key-encoding.test.ts` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/barcode-origin.test.tsx` | — | ផ្នែក ៨ |
+| `tools/audit-tools/zoew/tests/batch-scan-save-outcome.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/batch-scan.test.ts` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/biometric-android-prf.test.ts` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/biometric-no-device-mode.test.tsx` | ផ្នែក ១ | ផ្នែក ៨ |
@@ -5646,7 +5785,10 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `tools/audit-tools/zoew/tests/f03-admission-quiescence.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/f03-heap-diagnostic.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/firebase-auth-write-ownership.test.ts` | — | ផ្នែក ៨ · ផ្នែក ៩ |
+| `tools/audit-tools/zoew/tests/firebase-business-audit.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/firebase-loader-gate.test.ts` | — | ផ្នែក ៧ |
+| `tools/audit-tools/zoew/tests/firebase-provision-rules-wrapper.test.ts` | ផ្នែក ២ | — |
+| `tools/audit-tools/zoew/tests/firebase-provision-runtime.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/forbidden-zone-lock.test.ts` | ផ្នែក ១ | ផ្នែក ៨ · ផ្នែក ៩ |
 | `tools/audit-tools/zoew/tests/hardware-scanner.test.tsx` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/health-advice.test.ts` | — | ផ្នែក ៨ |
@@ -5655,6 +5797,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `tools/audit-tools/zoew/tests/history-observer-session-recovery.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/history-paging.test.tsx` | ផ្នែក ១ | ផ្នែក ៧ |
 | `tools/audit-tools/zoew/tests/history-patch-late-commit.test.ts` | — | ផ្នែក ៨ |
+| `tools/audit-tools/zoew/tests/import-prepare-generation.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/ios-accessory-focus.test.ts` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/ios-adjusted-tap-focus.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/ios-entry-search-tap.test.ts` | — | ផ្នែក ៨ |
@@ -5674,9 +5817,12 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `tools/audit-tools/zoew/tests/keygen-login-ownership.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/keygen-sb-lock-ownership-fixes.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/keygen-secure-inventory.test.ts` | ផ្នែក ១ | — |
+| `tools/audit-tools/zoew/tests/keygen-setup-link-output.test.ts` | ផ្នែក ២ | — |
+| `tools/audit-tools/zoew/tests/keygen-supabase-code-output.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/label-image.test.tsx` | — | ផ្នែក ៨ · ផ្នែក ៩ |
 | `tools/audit-tools/zoew/tests/label-print.test.tsx` | ផ្នែក ២ | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/late-commit-stale-session.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
+| `tools/audit-tools/zoew/tests/layout-react-node-ownership.test.tsx` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/ledger-late-session-notice.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/ledger-native-retry-identity.test.ts` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/ledger-not-applied-retry.test.ts` | — | ផ្នែក ៧ · ផ្នែក ៨ |
@@ -5695,12 +5841,14 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `tools/audit-tools/zoew/tests/list-paging.test.tsx` | — | ផ្នែក ៧ |
 | `tools/audit-tools/zoew/tests/list-render-scope.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៦ · ផ្នែក ៧ |
 | `tools/audit-tools/zoew/tests/listener-leak-coverage.test.ts` | ផ្នែក ២ | — |
+| `tools/audit-tools/zoew/tests/listener-store-vm.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/locker-assign-session.test.ts` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/locker-occupant.test.ts` | — | ផ្នែក ៩ |
 | `tools/audit-tools/zoew/tests/locker-scan-direct.test.tsx` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/login-autofill.test.tsx` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/login-over-drawer.test.tsx` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/login-routing.test.tsx` | — | ផ្នែក ៧ · ផ្នែក ៩ |
+| `tools/audit-tools/zoew/tests/lookup-freshness-vm.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/lookup-import-race.test.ts` | ផ្នែក ១ | ផ្នែក ៩ |
 | `tools/audit-tools/zoew/tests/lookup-key-restore-idb.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/lookup-late-answer-busy.test.ts` | — | ផ្នែក ៨ · ផ្នែក ៩ |
@@ -5719,6 +5867,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `tools/audit-tools/zoew/tests/modal-keyboard.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/money-cookie-readiness.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/money-multidevice-oracle.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `tools/audit-tools/zoew/tests/monthly-report-live-view.test.tsx` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/more-menu-scroll.test.ts` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/native-durable-write.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/native-live-failure.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -5738,7 +5887,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `tools/audit-tools/zoew/tests/native/zto-preflight.test.ts` | ផ្នែក ១ | ផ្នែក ៦ |
 | `tools/audit-tools/zoew/tests/network-toast-phase.test.tsx` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/network-toast.test.tsx` | — | ផ្នែក ៧ |
-| `tools/audit-tools/zoew/tests/notifications.test.tsx` | — | ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
+| `tools/audit-tools/zoew/tests/notifications.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `tools/audit-tools/zoew/tests/notify-apk-link.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/notify-groups.test.tsx` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/notify-removed-seen-live.test.ts` | ផ្នែក ២ | — |
@@ -5798,6 +5947,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `tools/audit-tools/zoew/tests/remember-password.test.tsx` | — | ផ្នែក ៧ · ផ្នែក ៩ |
 | `tools/audit-tools/zoew/tests/remove-pickup-key.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/remove-stale-session.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
+| `tools/audit-tools/zoew/tests/report-import-dialog.test.tsx` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/restore-prepared-retry.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/restore-resync-read-gate.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/restore-terminal-cancel.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -5829,15 +5979,19 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `tools/audit-tools/zoew/tests/session-expiry-race.test.ts` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/session-listener-scope.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/session-switch-fuzz.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ · ផ្នែក ៩ |
+| `tools/audit-tools/zoew/tests/setup-link-checker-wiring.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/setup-link-dsn-pin.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/setup-link-hashchange.test.tsx` | ផ្នែក ១ | — |
 | `tools/audit-tools/zoew/tests/setup-lookup.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ · ផ្នែក ៩ |
+| `tools/audit-tools/zoew/tests/sheet-import-input-validation.test.ts` | ផ្នែក ២ | — |
+| `tools/audit-tools/zoew/tests/sheet-import-protocol.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/sheet-lookup-freshness.test.ts` | ផ្នែក ១ | — |
 | `tools/audit-tools/zoew/tests/shop-bound-settings.test.ts` | — | ផ្នែក ៨ · ផ្នែក ៩ |
 | `tools/audit-tools/zoew/tests/shop-bound-ui-refresh.test.ts` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/shop-device-note.test.ts` | — | ផ្នែក ៨ · ផ្នែក ៩ |
 | `tools/audit-tools/zoew/tests/shop-pending-cleanup.test.tsx` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/static-checker-contracts.test.ts` | ផ្នែក ២ | — |
+| `tools/audit-tools/zoew/tests/supabase-account-transport.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/supabase-account.test.tsx` | ផ្នែក ២ | ផ្នែក ៧ |
 | `tools/audit-tools/zoew/tests/supabase-auth-unavailable.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ |
 | `tools/audit-tools/zoew/tests/supabase-auth-write-ownership.test.ts` | — | ផ្នែក ៨ · ផ្នែក ៩ |

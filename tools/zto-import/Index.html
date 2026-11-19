@@ -379,10 +379,22 @@ function cellToText(value) {
 }
 
 function moneyShape(value) {
-    var text = String(value).replace(/[^0-9.,\-]/g, '');
+    if (typeof value !== 'string') return null;
+    var text = value.trim().replace(/[០-៩]/g, function (digit) { return String(digit.charCodeAt(0) - 0x17e0); });
+    if (!text) return { text: '0', mark: '', negative: false };
+    var excelText = /^="([^"]*)"$/.exec(text);
+    if (excelText) text = excelText[1].trim();
+    var currencyPrefix = /^(-?)(?:USD|\$)\s*/i.exec(text);
+    text = currencyPrefix ? currencyPrefix[1] + text.slice(currencyPrefix[0].length) : text.replace(/\s*(?:USD|\$)$/i, '');
+    text = text.trim();
+    if (/[ \u00a0\u202f]/.test(text)) {
+        if (!/^-?[0-9]{1,3}(?:[ \u00a0\u202f][0-9]{3})+(?:[.,][0-9]+)?$/.test(text)) return null;
+        text = text.replace(/[ \u00a0\u202f]/g, '');
+    }
+    if (!/^-?(?:[0-9]+(?:[.,][0-9]*)*|[.,][0-9]+)$/.test(text)) return null;
     var negative = text.charAt(0) === '-';
     var body = negative ? text.slice(1) : text;
-    if (!/[0-9]/.test(body)) return { text: '0', mark: '', negative: false };
+    if (!/[0-9]/.test(body)) return null;
     if (body.indexOf('-') !== -1) return null;
     var commas = body.split(',').length - 1;
     var dots = body.split('.').length - 1;
@@ -418,15 +430,15 @@ function moneyShape(value) {
 }
 function toMoney(value, decimalMark) {
     if (value === null || value === undefined || value === '') return 0;
-    if (typeof value === 'number') return isFinite(value) ? Math.round(value * 100) / 100 : 0;
+    if (typeof value === 'number') return Number.isSafeInteger(Math.round(value * 100)) ? Math.round(value * 100) / 100 : null;
     var shape = moneyShape(value);
     if (!shape) return null;
     var text = shape.text;
     if (text === undefined) text = decimalMark === '.' ? shape.dot : decimalMark === ',' ? shape.comma : undefined;
     if (text === undefined) return null;
     var n = parseFloat(text);
-    if (!isFinite(n)) return 0;
-    return Math.round((shape.negative ? -n : n) * 100) / 100;
+    var cents = Math.round((shape.negative ? -n : n) * 100);
+    return Number.isSafeInteger(cents) ? cents / 100 : null;
 }
 function moneyDecimalMark(values) {
     var seen = '';
@@ -456,6 +468,44 @@ function preparationIsCurrent() {
     return !!state.prepared && state.preparedGeneration === state.generation;
 }
 
+function detectDelimitedTextSeparator(text) {
+    var sample = String(text).slice(0, 1024), candidates = [',', '\t', ';', '|'];
+    var counts = [0, 0, 0, 0], quoted = false;
+    for (var i = 0; i < sample.length; i++) {
+        var ch = sample.charAt(i);
+        if (ch === '"') quoted = !quoted;
+        else if (!quoted) {
+            var at = candidates.indexOf(ch);
+            if (at >= 0) counts[at]++;
+        }
+    }
+    var best = 0;
+    for (var j = 1; j < candidates.length; j++) if (counts[j] > counts[best]) best = j;
+    return candidates[best];
+}
+
+function validateDelimitedTextQuotes(text, delimiterHint) {
+    var body = String(text).replace(/^\uFEFF/, '');
+    var hint = /^sep=([^\r\n])(\r\n|\r|\n)/i.exec(body);
+    var delimiter = hint ? hint[1] : delimiterHint;
+    if (hint) body = body.slice(hint[0].length);
+    if (!delimiter) delimiter = detectDelimitedTextSeparator(body);
+    var quoted = false, fieldStart = true;
+    for (var i = 0; i < body.length; i++) {
+        var ch = body.charAt(i);
+        if (quoted) {
+            if (ch === '"' && body.charAt(i + 1) === '"') i++;
+            else if (ch === '"') quoted = false;
+        } else if (ch === '"' && fieldStart) {
+            quoted = true;
+            fieldStart = false;
+        } else if (ch === delimiter || ch === '\r' || ch === '\n') fieldStart = true;
+        else fieldStart = false;
+    }
+    if (quoted) throw new Error('CSV មានសញ្ញាដកស្រង់បើកដែលមិនទាន់បិទ — មិនទាន់សរសេរអ្វីទេ');
+    return delimiter;
+}
+
 async function handleFile(file) {
     if (!file) return;
     var pendingFileGeneration = ++state.fileGeneration, pendingPassword = state.password, pendingScope = state.writeScope;
@@ -476,7 +526,13 @@ async function handleFile(file) {
         try {
             var bytes = new Uint8Array(evt.target.result);
             var container = (bytes[0] === 0x50 && bytes[1] === 0x4b) || (bytes[0] === 0xd0 && bytes[1] === 0xcf && bytes[2] === 0x11 && bytes[3] === 0xe0);
-            state.workbook = XLSX.read(bytes, container ? { type: 'array' } : { type: 'array', raw: true });
+            var delimiter;
+            if (!container) {
+                var encoding = bytes[0] === 0xff && bytes[1] === 0xfe ? 'utf-16le' : bytes[0] === 0xfe && bytes[1] === 0xff ? 'utf-16be' : 'utf-8';
+                var text = new TextDecoder(encoding).decode(bytes);
+                if (!/^\s*</.test(text)) delimiter = validateDelimitedTextQuotes(text, /\.tsv$/i.test(file.name || '') ? '\t' : '');
+            }
+            state.workbook = XLSX.read(bytes, container ? { type: 'array' } : delimiter ? { type: 'array', raw: true, FS: delimiter } : { type: 'array', raw: true });
             state.sheetNames = state.workbook.SheetNames || [];
             if (!state.sheetNames.length) throw new Error('ឯកសារនេះគ្មាន tab ទេ');
             var sel = $('sheetSel');
@@ -601,8 +657,9 @@ function mappedRows() {
     var moneyCells = [];
     for (var m = start; m < state.rows.length; m++) {
         var cells = state.rows[m] || [];
-        if (mapping.dod >= 0) moneyCells.push(cells[mapping.dod]);
-        if (mapping.cod >= 0) moneyCells.push(cells[mapping.cod]);
+        var dodCell = mapping.dod >= 0 ? cells[mapping.dod] : '';
+        var codCell = mapping.cod >= 0 ? cells[mapping.cod] : '';
+        if (mapping.barcode >= 0 && cellToText(cells[mapping.barcode])) moneyCells.push(dodCell, codCell);
     }
     var mark = moneyDecimalMark(moneyCells);
     var out = [];

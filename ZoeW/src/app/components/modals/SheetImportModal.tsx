@@ -25,9 +25,9 @@ export function SheetImportModal() {
         'siClearBtnBusy', 'siDropHot']);
     const part = (base: string, id: string) => (v.siParts[id] ? base : (base ? base + ' hidden' : 'hidden'));
     return (
-        <Modal id="sheetImportModal" close="closeSheetImportModal">
+        <Modal id="sheetImportModal" close="closeSheetImportModal" role="dialog" aria-modal="true" aria-labelledby="sheetImportTitle">
             <div className="modal-content si-modal-content">
-                <h3>📥 នាំចូល Excel ទៅ Sheet</h3>
+                <h3 id="sheetImportTitle">📥 នាំចូល Excel ទៅ Sheet</h3>
                 <p>អាន .xlsx · .xls · .csv ពីឧបករណ៍ រួចសរសេរចូល Google Sheet ដដែលដែល «API ស្វែងរកអតិថិជន» ទាញយក។</p>
                 <div className="si-scroll">
                     <section className="si-card" id="siConfigCard">

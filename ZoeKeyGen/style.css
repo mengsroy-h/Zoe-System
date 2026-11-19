@@ -470,3 +470,5 @@ input[type="radio"]:focus-visible,
 @media (prefers-reduced-motion: reduce) {
     button, .toast { transition: none; }
 }
+
+#licenseInvitationControls { border: 0; padding: 0; margin: 0; min-width: 0; }

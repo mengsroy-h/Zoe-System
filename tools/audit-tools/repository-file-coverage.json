@@ -2131,6 +2131,9 @@
     "ZoeW/src/features/session.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/features/sheet-import-validation.ts": {
+      "policy": "zoew-app"
+    },
     "ZoeW/src/features/sheet-import.ts": {
       "policy": "zoew-app"
     },
@@ -2441,6 +2444,9 @@
       "policy": "zoew-self-verification"
     },
     "tools/audit-tools/zoew/tests/barcode-origin.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/batch-scan-save-outcome.test.ts": {
       "policy": "zoew-self-verification"
     },
     "tools/audit-tools/zoew/tests/batch-scan.test.ts": {
@@ -5409,6 +5415,9 @@
     "tools/audit-tools/zoew/tests/helpers/sheet-import-protocol.cjs": {
       "policy": "zoew-self-verification"
     },
+    "tools/audit-tools/zoew/tests/sheet-import-input-validation.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "tools/audit-tools/zoew/tests/sheet-import-protocol.test.ts": {
       "policy": "zoew-self-verification"
     },
@@ -5616,6 +5625,36 @@
       "policy": "zoew-self-verification"
     },
     "tools/audit-tools/zoew/tests/ui-view-state.typecheck.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/monthly-report-live-view.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/report-import-dialog.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/keygen-setup-link-output.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/lookup-freshness-vm.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/layout-react-node-ownership.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/setup-link-checker-wiring.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/listener-store-vm.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/supabase-account-transport.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/keygen-supabase-code-output.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/firebase-provision-rules-wrapper.test.ts": {
       "policy": "zoew-self-verification"
     }
   }

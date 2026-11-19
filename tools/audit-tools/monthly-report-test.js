@@ -309,7 +309,9 @@ scenario('⛔ អានសុទ្ធសាធ ៖ របាយការណ៍�
     ok('⛔ គ្មានការសរសេរទៅ Firebase សោះ', writes.length === 0, JSON.stringify(writes.map((w) => w[0])));
     const noWriteNames = ['commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'addRevenueToDailyAndMonthlyRecord',
         'applyLedgerBucketDelta', 'runTransaction', 'fb.update', 'fb.set'];
-    const body = (sliceFn(src, 'buildMonthlyReport') || '') + (sliceFn(src, 'monthlyReportAvailableMonths') || '')
+    const projection = sliceFn(src, 'buildMonthlyReportView');
+    ok('⛔ រក projection ពិតរបស់របាយការណ៍ប្រចាំខែ', !!projection);
+    const body = (projection || '') + (sliceFn(src, 'buildMonthlyReport') || '') + (sliceFn(src, 'monthlyReportAvailableMonths') || '')
         + (sliceFn(src, 'renderMonthlyReport') || '') + (sliceFn(src, 'monthlyReportRows') || '');
     const touched = noWriteNames.filter((n) => body.indexOf(n) !== -1);
     ok('⛔ កូដរបាយការណ៍មិនហៅផ្លូវសរសេរលុយណាមួយ', touched.length === 0, touched.join(', '));

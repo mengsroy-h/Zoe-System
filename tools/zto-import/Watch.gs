@@ -75,11 +75,16 @@ function watchInboxFolder_() {
         var done = DriveApp.getFolderById(readProp_(PROP_DONE) || inboxId);
         var failed = DriveApp.getFolderById(readProp_(PROP_FAILED) || inboxId);
         var report = [];
-        var files = oldestInboxFiles_(inbox, WATCH_MAX_FILES_PER_RUN);
+        var files = oldestInboxFiles_(inbox, WATCH_MAX_FILES_SCANNED);
+        var imports = 0;
+        var cleanupAttempts = 0;
         for (var f = 0; f < files.length; f++) {
+            if (imports >= WATCH_MAX_FILES_PER_RUN && cleanupAttempts >= WATCH_MAX_FILES_PER_RUN) break;
             var file = files[f];
             var receipt = readWatchReceipt_(file, inboxId);
             if (receipt.state === 'done') {
+                if (cleanupAttempts >= WATCH_MAX_FILES_PER_RUN) continue;
+                cleanupAttempts++;
                 report.push('✅ ' + file.getName() + ' — បាននាំចូលរួច · សាកផ្លាស់ទីតែប៉ុណ្ណោះ' + moveCompletedWatchFile_(file, done, receipt, inboxId));
                 continue;
             }
@@ -87,11 +92,15 @@ function watchInboxFolder_() {
                 report.push('⏸️ ' + file.getName() + ' — HOLD៖ ភស្តុតាងនាំចូលត្រូវការម្ចាស់ផ្ទៀងផ្ទាត់ · មិននាំចូលឡើងវិញ');
                 continue;
             }
-            if (CONVERTIBLE_MIME_TYPES.indexOf(file.getMimeType()) === -1 &&
-                file.getMimeType() !== MimeType.GOOGLE_SHEETS) {
+            var mimeType = file.getMimeType();
+            if (CONVERTIBLE_MIME_TYPES.indexOf(mimeType) === -1 && mimeType !== MimeType.GOOGLE_SHEETS) {
+                if (cleanupAttempts >= WATCH_MAX_FILES_PER_RUN) continue;
+                cleanupAttempts++;
                 report.push('❌ ' + file.getName() + ' — មិនមែនឯកសារ Excel · CSV · Google Sheets ទេ' + moveWatchFile_(file, failed));
                 continue;
             }
+            if (imports >= WATCH_MAX_FILES_PER_RUN) continue;
+            imports++;
             if (!writeWatchReceipt_(receipt, 'pending')) {
                 report.push('⏸️ ' + file.getName() + ' — រក្សាទុក intent មិនបាន · គ្មានការនាំចូល ឬផ្លាស់ទី');
                 break;
@@ -181,10 +190,11 @@ function oldestInboxFiles_(inbox, limit) {
     var all = [];
     var iterator = inbox.getFiles();
     while (iterator.hasNext() && all.length < WATCH_MAX_FILES_SCANNED) {
-        all.push(iterator.next());
+        var file = iterator.next();
+        all.push({ file: file, createdAt: file.getDateCreated().getTime() });
     }
-    all.sort(function (a, b) { return a.getDateCreated().getTime() - b.getDateCreated().getTime(); });
-    return all.slice(0, limit);
+    all.sort(function (a, b) { return a.createdAt - b.createdAt; });
+    return all.slice(0, limit).map(function (entry) { return entry.file; });
 }
 
 function moveWatchFile_(file, folder) {
@@ -340,6 +350,7 @@ function parseDelimitedText_(text, mimeType) {
             cell += ch;
         }
     }
+    if (quoted) throw new Error('CSV មានសញ្ញាដកស្រង់បើកដែលមិនទាន់បិទ — មិនទាន់សរសេរអ្វីទេ');
     if (cell !== '' || row.length) {
         row.push(excelTextCell_(cell));
         rows.push(row);

@@ -425,16 +425,21 @@ export function createSupabaseTransport(config, deps?) {
             };
         },
         async callFunction(name, body) {
+            const payload = JSON.stringify(body || {});
             const res = await sbFetchWithTimeout(fetchImpl, url + '/functions/v1/' + name, {
                 method: 'POST',
                 headers: { apikey: key, 'Content-Type': 'application/json' },
-                body: JSON.stringify(body || {}),
+                body: payload,
                 cache: 'no-store',
                 credentials: 'omit'
-            }, 20000);
+            }, 20000).catch(() => null);
+            if (!res) return { status: 0, body: { ok: false, code: 'account-outcome-unknown' } };
+            if (res.status === 429) return { status: res.status, body: { ok: false, code: 'rate-limited' } };
             let parsed = null;
             try { parsed = JSON.parse(res.text); } catch (e) { parsed = null; }
-            return { status: res.status, body: parsed && typeof parsed === 'object' ? parsed : { ok: false, code: 'bad-response' } };
+            const matchesContract = parsed && parsed.ok === res.ok && typeof parsed.code === 'string' && parsed.code.length > 0;
+            const unreadableCode = res.ok || res.status >= 500 ? 'account-outcome-unknown' : 'bad-response';
+            return { status: res.status, body: matchesContract ? parsed : { ok: false, code: unreadableCode } };
         },
         close() {
             if (closed) return;

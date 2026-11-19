@@ -3,6 +3,7 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 
 const MAGIC = Buffer.from('ZOEBAK1\n', 'utf8');
 const SALT_BYTES = 16;
@@ -144,24 +145,53 @@ function readPassphrase() {
 function usage() {
     return [
         'Usage:',
-        '  ZOE_BACKUP_PASSPHRASE=... node crypt.js seal   <backupDir>          encrypt every .json.gz, then delete the plaintext',
+        '  ZOE_BACKUP_PASSPHRASE=... node crypt.js seal   <backupDir> [keepCount]  encrypt .json.gz; optional verified generation retention (omitted: no pruning)',
         '  ZOE_BACKUP_PASSPHRASE=... node crypt.js open   <file.enc> <out.gz>  decrypt one archive back to .json.gz',
         '',
         `The passphrase must be at least ${MIN_PASSPHRASE_LENGTH} characters. Keep it outside this repository.`
     ].join('\n');
 }
 
-function runSeal(dir) {
+function sealedRetentionPlan(dir, keepCount, passphrase) {
+    const generations = new Map();
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const match = /^(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z-[a-f0-9]{6})\.json\.gz(\.enc)?$/.exec(entry.name);
+        if (!entry.isFile() || !match) continue;
+        const files = generations.get(match[1]) || [];
+        files.push(entry.name);
+        generations.set(match[1], files);
+    }
+    const sealed = [...generations.keys()].filter(key => generations.get(key).some(file => file.endsWith('.enc'))).sort();
+    const split = Math.max(0, sealed.length - keepCount);
+    if (!split) return [];
+    for (const key of sealed.slice(split)) {
+        const file = path.join(dir, key + '.json.gz.enc');
+        try { JSON.parse(zlib.gunzipSync(decryptBuffer(fs.readFileSync(file), passphrase)).toString('utf8')); }
+        catch (e) { throw new Error('Cannot apply retention: retained archive failed verification ' + path.basename(file) + '.'); }
+    }
+    return sealed.slice(0, split).flatMap(key => generations.get(key).map(file => path.join(dir, file)));
+}
+
+function runSeal(dir, keepCount) {
+    if (keepCount !== undefined && (!Number.isInteger(keepCount) || keepCount < 1 || keepCount > 10000)) throw new Error('keepCount must be a whole number from 1 to 10000.');
     const passphrase = readPassphrase();
     const files = collectBackupFiles(path.resolve(process.cwd(), dir));
     if (files.length === 0) {
         throw new Error(`No .json.gz backups found under ${dir} — refusing to report success with nothing sealed.`);
+    }
+    if (keepCount !== undefined) for (const file of files) {
+        try { JSON.parse(zlib.gunzipSync(fs.readFileSync(file)).toString('utf8')); }
+        catch (e) { throw new Error('Cannot apply retention: invalid gzip JSON backup ' + path.basename(file) + '.'); }
     }
     for (const file of files) {
         const outFile = `${file}.enc`;
         const sizes = encryptFile(file, outFile, passphrase);
         fs.unlinkSync(file);
         console.log(`[SEAL] ${path.basename(outFile)} (${sizes.bytesIn} -> ${sizes.bytesOut} bytes)`);
+    }
+    if (keepCount !== undefined) {
+        const plans = [...new Set(files.map(file => path.dirname(file)))].map(folder => sealedRetentionPlan(folder, keepCount, passphrase));
+        for (const file of plans.flat()) fs.unlinkSync(file);
     }
     console.log(`\nSealed ${files.length} backup file(s).`);
     return files.length;
@@ -179,7 +209,8 @@ function main(argv) {
     const command = args[0];
     if (command === 'seal') {
         if (!args[1]) throw new Error(`Missing <backupDir>.\n\n${usage()}`);
-        return runSeal(args[1]);
+        if (args.length > 3) throw new Error(usage());
+        return runSeal(args[1], args[2] === undefined ? undefined : Number(args[2]));
     }
     if (command === 'open') {
         if (!args[1] || !args[2]) throw new Error(`Missing <file.enc> <out.gz>.\n\n${usage()}`);

@@ -25,6 +25,7 @@ import { BATCH_SCAN_MAX, batchScanIsRunning, openBatchScanModal, parseBatchBarco
 
 let input: HTMLTextAreaElement;
 let opensModal: Set<string>;
+let reportCurrent: ((outcome: scanAction.ScanConfirmationOutcome) => void) | undefined;
 
 function saved(code: string) {
     dataState.scanHistory.push({ id: 'I' + code, phone: '0961000000', barcodes: [{ code }] });
@@ -34,7 +35,7 @@ function flush() { uiState.flush(); viewState.flush(); }
 
 function finishModal(save: boolean) {
     const code = scanState.pendingBarcode;
-    if (save) saved(code);
+    if (save) { reportCurrent?.('saving'); saved(code); reportCurrent?.('saved'); }
     closeModal('phoneModal');
     flush();
 }
@@ -43,7 +44,9 @@ beforeEach(() => {
     toasts.length = 0;
     vi.spyOn(toastModule, 'showToast').mockImplementation((t: any) => { toasts.push(String(t)); return 0; });
     opensModal = new Set();
-    trigger = vi.spyOn(scanAction, 'triggerScanAction').mockImplementation((code: string) => {
+    reportCurrent = undefined;
+    trigger = vi.spyOn(scanAction, 'triggerScanAction').mockImplementation((code: string, report) => {
+        reportCurrent = report;
         if (!opensModal.has(code)) return;
         scanState.pendingBarcode = code;
         openModalHelper('phoneModal');
@@ -244,14 +247,14 @@ describe('បញ្ចូល Barcode ច្រើន ៖ triggerScanAction ព�
         expect(modalIsOpen('phoneModal')).toBe(true);
         expect(scanState.pendingBarcode).toBe('L1');
         expect(uiState.isModalOpen).toBe(true);
-        finishModal(true);
+        finishModal(false);
         expect(lookups).toEqual(['L1', 'L2']);
         expect(scanState.pendingBarcode).toBe('L2');
         finishModal(false);
         expect(lookups).toEqual(['L1', 'L2', 'L3']);
-        finishModal(true);
+        finishModal(false);
         expect(batchScanIsRunning()).toBe(false);
         expect(modalIsOpen('phoneModal')).toBe(false);
-        expect(toasts[toasts.length - 1]).toBe('✅ បញ្ចូលច្រើនចប់ ៖ បញ្ចូល 2 · រំលង 1');
+        expect(toasts[toasts.length - 1]).toBe('✅ បញ្ចូលច្រើនចប់ ៖ បញ្ចូល 0 · រំលង 3');
     });
 });

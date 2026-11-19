@@ -1438,21 +1438,24 @@ async function historyRowLayout(browser, port) {
                     const prevAll = [...document.querySelectorAll('.modal')].map((x) => [x, x.style.display]);
                     prevAll.forEach(([x]) => { x.style.display = 'none'; });
                     modal.style.display = 'flex';
-                    const prevBody = body.innerHTML;
-                    const cell = (i) => (i === 0 ? '2026-09-01' : (i === hs.length - 1 || i === hs.length - 2 ? '122' : '$1,234.56'));
-                    const row = '<tr>' + hs.map((h, i) => '<td>' + cell(i) + '</td>').join('') + '</tr>';
-                    body.innerHTML = '<div class="mrep-table-wrap"><table class="mrep-table"><thead><tr>'
-                        + hs.map((h) => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>' + row + row + '</tbody></table></div>';
-                    const wrap = body.querySelector('.mrep-table-wrap');
-                    const table = body.querySelector('.mrep-table');
-                    const cells = [...body.querySelectorAll('.mrep-table th, .mrep-table td')];
-                    const clipped = cells.filter((c) => c.scrollWidth > c.clientWidth + 1)
-                        .map((c) => (c.textContent || '').slice(0, 14) + ' ' + c.scrollWidth + '>' + c.clientWidth);
-                    const needsScroll = Math.round(table.getBoundingClientRect().width) > wrap.clientWidth + 1;
-                    const canScroll = /(auto|scroll)/.test(getComputedStyle(wrap).overflowX);
-                    body.innerHTML = prevBody;
-                    prevAll.forEach(([x, d]) => { x.style.display = d; });
-                    return { clipped, needsScroll, canScroll, cols: hs.length };
+                    const prevBody = Array.from(body.childNodes);
+                    try {
+                        const cell = (i) => (i === 0 ? '2026-09-01' : (i === hs.length - 1 || i === hs.length - 2 ? '122' : '$1,234.56'));
+                        const row = '<tr>' + hs.map((h, i) => '<td>' + cell(i) + '</td>').join('') + '</tr>';
+                        body.innerHTML = '<div class="mrep-table-wrap"><table class="mrep-table"><thead><tr>'
+                            + hs.map((h) => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>' + row + row + '</tbody></table></div>';
+                        const wrap = body.querySelector('.mrep-table-wrap');
+                        const table = body.querySelector('.mrep-table');
+                        const cells = [...body.querySelectorAll('.mrep-table th, .mrep-table td')];
+                        const clipped = cells.filter((c) => c.scrollWidth > c.clientWidth + 1)
+                            .map((c) => (c.textContent || '').slice(0, 14) + ' ' + c.scrollWidth + '>' + c.clientWidth);
+                        const needsScroll = Math.round(table.getBoundingClientRect().width) > wrap.clientWidth + 1;
+                        const canScroll = /(auto|scroll)/.test(getComputedStyle(wrap).overflowX);
+                        return { clipped, needsScroll, canScroll, cols: hs.length };
+                    } finally {
+                        body.replaceChildren(...prevBody);
+                        prevAll.forEach(([x, d]) => { x.style.display = d; });
+                    }
                 }, headers) : { skip: true };
                 if (cellR.skip) {
                     check(false, label + ': វាស់តារាងរបាយការណ៍ខែបាន', 'រក MONTHLY_REPORT_HEADERS ឬ #monthlyReportBody មិនឃើញ');

@@ -131,10 +131,13 @@ export function applyCameraZoomFromSlider(value) {
 }
 
 export function toggleTorch() {
-    if (!scanState.currentVideoTrack) return;
+    const track = scanState.currentVideoTrack;
+    const requestId = scanState.cameraRequestId;
+    if (!track) return;
     const nextState = !scanState.torchOn;
-    scanState.currentVideoTrack.applyConstraints({ advanced: [{ torch: nextState }] })
+    track.applyConstraints({ advanced: [{ torch: nextState }] })
         .then(() => {
+            if (scanState.currentVideoTrack !== track || scanState.cameraRequestId !== requestId) return;
             scanState.torchOn = nextState;
         })
         .catch(() => {});

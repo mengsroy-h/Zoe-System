@@ -7,7 +7,7 @@ import { generateUniqueId, normalizeBarcodesOf, parseTimestampFromId } from '../
 import { parseParcelNumber } from '../domain/parcel-number';
 import { runAutomaticDeletedCleanup } from '../domain/cleanup';
 import { flushPendingRegistryReleases } from '../domain/registry';
-import { refreshNotifyRemovedView } from '../features/notifications';
+import { invalidateStaleNotifyViews, refreshNotifyRemovedView } from '../features/notifications';
 import { RECENT_PHONES_MAX, collectPhoneSuggestions } from '../features/phone-suggest';
 import { DB_LISTENER_PROGRESS_GRACE_MS, DB_LISTENER_RETRY_MIN_GAP_MS, LISTENER_RECOVERY_STEPS_MS, clearInfoListenerRecovery, clearReconnectWatchdog, renderConnectionStatus } from './connection';
 import { debouncedRenderAfterHistorySync } from './network';
@@ -62,7 +62,8 @@ export function emptyViewMessage(pathKeys, emptyText) {
 
 export function noteDbListenerAlive(pathKey) {
     const wasPending = dbListenerPendingPaths.delete(pathKey);
-    dbListenerFailedPaths.delete(pathKey);
+    const wasFailed = dbListenerFailedPaths.delete(pathKey);
+    if (wasPending || wasFailed) firebaseState.touch();
     dbListenerReportedFailures.delete(pathKey);
     flushPendingRegistryReleases();
     if (wasPending) {
@@ -135,7 +136,11 @@ export function handleDbListenerError(err, pathKey) {
         dbListenerReportedFailures.add(reportKey);
         if (window.ZoeErrors) ZoeErrors.capture(err, { context: 'Firebase listener error' });
     }
-    if (pathKey) dbListenerFailedPaths.add(pathKey);
+    if (pathKey && !dbListenerFailedPaths.has(pathKey)) {
+        dbListenerFailedPaths.add(pathKey);
+        firebaseState.touch();
+    }
+    invalidateStaleNotifyViews();
     firebaseState.dbListenersFailed = true;
     renderConnectionStatus();
     if (!firebaseState.dbListenerOutageNoticeShown) {
@@ -162,6 +167,7 @@ export function initDatabaseListeners() {
         deleted: firebaseState.dbRefDeleted
     };
     DB_LISTENER_KEYS.forEach((key) => { if (listenerRefs[key]) dbListenerPendingPaths.add(key); });
+    invalidateStaleNotifyViews();
     firebaseState.dbListenerPendingSeen = dbListenerPendingPaths.size;
     firebaseState.dbListenerProgressAt = 0;
 

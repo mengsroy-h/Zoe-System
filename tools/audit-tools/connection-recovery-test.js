@@ -130,8 +130,9 @@ const ELAPSED_HELPER = sliceFn('elapsedSince') ||
         const extras = [
             'renderConnectionStatus', 'refreshLiveToasts', 'liveSuccessCount', 'scheduleDbListenerRecovery', 'clearDbListenerRecovery',
             'attemptDbListenerRecovery', 'noteDbListenerAlive', 'initDatabaseListeners',
+            'invalidateStaleNotifyViews', 'dbListenerViewIsStale',
             'barcodeEntriesOf', 'rawSnapshotToItemList', 'firebaseSdkNeedsRefresh', 'firebaseSdkReloadCount'
-        ].map(sliceFn).filter(Boolean).join('\n\n') + '\n' + ['FIREBASE_SDK_RELOAD_KEY', 'FIREBASE_SDK_RELOAD_MAX'].map(sliceConst).filter(Boolean).join('\n') + '\n\n' + RESYNC_GUARD + '\n\n' + ELAPSED_HELPER;
+        ].map(sliceFn).filter(Boolean).join('\n\n') + '\n' + ['FIREBASE_SDK_RELOAD_KEY', 'FIREBASE_SDK_RELOAD_MAX', 'DB_LISTENER_KEY_HISTORY', 'DB_LISTENER_KEY_DELETED', 'VIEW_NOT_MEASURABLE_TEXT', 'VIEW_NOT_MEASURABLE_NOTICE'].map(sliceConst).filter(Boolean).join('\n') + '\n\n' + RESYNC_GUARD + '\n\n' + ELAPSED_HELPER;
         // ⛔ `refreshLiveToasts()` អានសំណុំ module `expiredLiveKeys` ➜ ការប្រកាស **ពិត** ពី SRC
         const expiredDecl = sliceConst('expiredLiveKeys') || 'const expiredLiveKeys = new Set();';
         const src = expiredDecl + '\n' + LIVE_SUCCESS_DECL + '\n' + 'let dbListenersFailed = false;\n' +
@@ -176,6 +177,7 @@ const ELAPSED_HELPER = sliceFn('elapsedSince') ||
 }
 
 const REQUIRED_FNS = [
+    'invalidateStaleNotifyViews', 'dbListenerViewIsStale',
     'connectionLooksOnline', 'connectionIsSettlingIn', 'renderConnectionStatus', 'refreshLiveToasts', 'liveSuccessCount',
     'nudgeDatabaseConnection',
     'forceDatabaseReconnect', 'canCycleDatabaseConnection', 'scheduleReconnectWatchdog', 'clearReconnectWatchdog',
@@ -222,7 +224,7 @@ const REAL_LISTENER_REF_NAMES = (function () {
     return out;
 })();
 
-const REQUIRED_CONSTS = ['RECONNECT_FORCE_MIN_GAP_MS', 'RECONNECT_WATCHDOG_STEPS_MS', 'LISTENER_RECOVERY_STEPS_MS',
+const REQUIRED_CONSTS = ['VIEW_NOT_MEASURABLE_TEXT', 'VIEW_NOT_MEASURABLE_NOTICE', 'RECONNECT_FORCE_MIN_GAP_MS', 'RECONNECT_WATCHDOG_STEPS_MS', 'LISTENER_RECOVERY_STEPS_MS',
     'DB_LISTENER_RETRY_MIN_GAP_MS', 'DB_LISTENER_PROGRESS_GRACE_MS', 'CONNECTING_GRACE_ATTEMPTS', 'INFO_LISTENER_RECOVERY_STEPS_MS',
     'FIREBASE_SDK_RELOAD_KEY', 'FIREBASE_SDK_RELOAD_MAX',
     // ⛔ `refreshLiveToasts()` អានសំណុំ module `expiredLiveKeys` (toast រស់ដែលផុតពិដាន) ➜ ការប្រកាស **ពិត**

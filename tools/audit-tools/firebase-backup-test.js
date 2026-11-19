@@ -303,9 +303,47 @@ async function credentialRedirectScenario(kind, status) {
     ok(kind + ' HTTP ' + status + ' ៖ មិនតាម redirect និងមិនផ្ញើ credential/body ទៅទីតាំងបន្ទាប់', rejected && redirected === 0, { rejected, redirected });
 }
 
+async function supabaseResponseBudgetScenarios() {
+    const supabase = require(path.join(ROOT, 'tools/firebase-backup', 'supabase.js'));
+    const limit = 64 * 1024 * 1024;
+    async function run(parts, stalled = false) {
+        let reads = 0, cancelled = false, calls = 0, signal;
+        const body = new ReadableStream({
+            pull(controller) {
+                if (reads < parts.length) controller.enqueue(parts[reads++]);
+                else if (!stalled) controller.close();
+            },
+            cancel() { cancelled = true; }
+        }, { highWaterMark: 0 });
+        const client = supabase.createClient({ url: 'https://backup-test.supabase.co', key: 'sb_secret_' + 'x'.repeat(32),
+            timeoutMs: stalled ? 60 : 3000, retryCount: 1, retryDelayMs: 0,
+            fetchImpl: async (_url, init) => { calls++; signal = init.signal; return new Response(body); }
+        });
+        let value, error;
+        try { value = await client.rpc('zoe_admin_export', {}); } catch (e) { error = e; }
+        await new Promise(resolve => setTimeout(resolve, 0));
+        return { value, error, reads, cancelled, calls, aborted: signal.aborted };
+    }
+    const padding = Buffer.alloc(1024 * 1024, 32);
+    const exact = [Buffer.from('{}'), ...Array(63).fill(padding), padding.subarray(2)];
+    const accepted = await run(exact);
+    ok('Supabase ៖ JSON ទំហំ 64 MiB ពិតទទួលបានតាមព្រំដែន', !accepted.error && accepted.value && Object.keys(accepted.value).length === 0);
+    const oversized = await run([...exact, Buffer.from(' '), Buffer.from(' ') ]);
+    ok('Supabase ៖ បញ្ឈប់អានភ្លាមពេលលើសព្រំដែន មិនអានកន្ទុយ', oversized.error && /response byte limit/.test(oversized.error.message) && oversized.reads === exact.length + 1, { reads: oversized.reads });
+    ok('Supabase ៖ response លើសព្រំដែនត្រូវ cancel និងមិន retry', oversized.cancelled && oversized.aborted && oversized.calls === 1);
+    const utf8 = Buffer.from(JSON.stringify({ text: 'ខ្មែរ' }));
+    const decoded = await run([...utf8].map(byte => Uint8Array.of(byte)));
+    ok('Supabase ៖ UTF-8 ដែលបែកតាម chunk នៅអានត្រឹមត្រូវ', decoded.value?.text === 'ខ្មែរ');
+    const empty = await run([]);
+    ok('Supabase ៖ body ទទេរក្សាលទ្ធផល null', empty.value === null && !empty.error);
+    const held = await run([Buffer.from('{')], true);
+    ok('Supabase ៖ body ព្យួរត្រូវបាន cancel ពេល timeout', held.error && held.cancelled && held.aborted);
+}
+
 (async () => {
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-backup-test-'));
     try {
+        await supabaseResponseBudgetScenarios();
         for (const status of [301, 302, 303, 307, 308]) {
             await credentialRedirectScenario('supabase', status);
             await credentialRedirectScenario('firebase-oauth', status);
@@ -561,6 +599,36 @@ async function credentialRedirectScenario(kind, status) {
             const savedPass = process.env.ZOE_BACKUP_PASSPHRASE;
             process.env.ZOE_BACKUP_PASSPHRASE = PASS_A;
             try {
+                const retentionDir = path.join(tempRoot, 'sealed-retention');
+                fs.mkdirSync(retentionDir);
+                const generation = n => path.join(retentionDir, `2026-09-0${n}T00-00-00-000Z-aabbcc.json.gz`);
+                for (const n of [1, 2, 3]) {
+                    fs.writeFileSync(generation(n), zlib.gzipSync(plain));
+                    crypt.runSeal(retentionDir, 1);
+                }
+                ok('seal រក្សាជំនាន់ថ្មីបំផុតតាមចំនួន', fs.readdirSync(retentionDir).join() === path.basename(generation(3) + '.enc'));
+                const stable = fs.readFileSync(generation(3) + '.enc');
+                fs.writeFileSync(generation(4), zlib.gzipSync(plain));
+                const partial = `${generation(4)}.enc.${process.pid}.partial`;
+                fs.writeFileSync(partial, 'occupied');
+                expectThrow('seal ធ្លាក់មិន prune archive ចាស់', () => crypt.runSeal(retentionDir, 1), /EEXIST/);
+                ok('seal ធ្លាក់រក្សា bytes ចាស់ និង plaintext ថ្មី', fs.readFileSync(generation(3) + '.enc').equals(stable) && fs.existsSync(generation(4)));
+                fs.unlinkSync(partial);
+                fs.writeFileSync(path.join(retentionDir, 'manual.json.gz.enc'), 'unmanaged');
+                fs.writeFileSync(generation(3), zlib.gzipSync(plain));
+                crypt.runSeal(retentionDir, 2);
+                ok('ជំនាន់ដូចគ្នារាប់តែមួយ និងរក្សាឯកសារក្រៅទម្រង់', fs.existsSync(generation(3) + '.enc') && fs.existsSync(generation(4) + '.enc') && fs.existsSync(path.join(retentionDir, 'manual.json.gz.enc')));
+                fs.writeFileSync(generation(5), zlib.gzipSync('invalid JSON'));
+                expectThrow('plaintext ខូចមិន prune', () => crypt.runSeal(retentionDir, 1), /invalid gzip JSON/);
+                ok('plaintext ខូចរក្សា archive ចាស់', fs.existsSync(generation(3) + '.enc') && fs.existsSync(generation(4) + '.enc'));
+                fs.writeFileSync(generation(5), zlib.gzipSync(plain));
+                crypt.runSeal(retentionDir);
+                ok('មិនផ្តល់ចំនួន មិន prune', fs.existsSync(generation(3) + '.enc') && fs.existsSync(generation(5) + '.enc'));
+                fs.writeFileSync(generation(9) + '.enc', 'damaged surviving archive');
+                fs.writeFileSync(generation(6), zlib.gzipSync(plain));
+                expectThrow('archive ដែលនឹងរក្សាត្រូវផ្ទៀងផ្ទាត់មុន prune', () => crypt.runSeal(retentionDir, 1), /retained archive failed verification/);
+                ok('survivor ខូចមិនលុបជំនាន់ល្អ', zlib.gunzipSync(crypt.decryptBuffer(fs.readFileSync(generation(3) + '.enc'), PASS_A)).equals(plain) && fs.existsSync(generation(6) + '.enc'));
+                expectThrow('ចំនួនខុសមិនកែឯកសារ', () => crypt.runSeal(retentionDir, 0), /keepCount/);
                 const sealedCount = crypt.runSeal(sealRoot);
                 ok('seal អ៊ិនគ្រីបគ្រប់ឯកសារ backup', sealedCount === 1 && fs.existsSync(gzPath + '.enc'));
                 ok('⛔ seal លុប plaintext ចោល ➜ គ្មាន .json.gz សល់ឲ្យ upload',

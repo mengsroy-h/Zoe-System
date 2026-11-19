@@ -332,13 +332,17 @@ async function stepUsers(state, emails, passwords, notes) {
     state.pendingUsers = state.pendingUsers || {};
     for (const email of emails) {
         const wasPending = !!state.pendingUsers[email];
-        if (state.users.indexOf(email) !== -1 && !wasPending) continue;
+        if (state.users.indexOf(email) !== -1 && !wasPending) {
+            say('  note: ' + email + ' was recorded earlier; its password was NOT changed. If the earlier handoff was not saved, run: node provision.js user --project ' + state.projectId + ' --user ' + email + ' --reset');
+            continue;
+        }
         state.pendingUsers[email] = true;
         saveState(state);
         const password = generatePassword();
         const res = await api.createUser(state.projectId, email, password);
         if (res.created) {
             passwords[email] = password;
+            printStaffPasswords({ [email]: password });
         } else {
             notes.push(email + ' already exists; its password was NOT changed.'
                 + (wasPending ? ' An earlier run may have created it without finishing.' : '')
@@ -551,6 +555,15 @@ function reportVerify(results) {
     return EXIT.OK;
 }
 
+function printStaffPasswords(passwords) {
+    const shown = Object.keys(passwords || {});
+    if (shown.length) {
+        say('');
+        say('Staff accounts - passwords are shown ONLY NOW, copy them:');
+        shown.forEach((email) => say('  ' + email + '   password: ' + passwords[email]));
+    }
+}
+
 function printCard(state, config, settings, passwords, notes) {
     say('');
     say('==================== ' + state.projectId + ' ====================');
@@ -562,12 +575,7 @@ function printCard(state, config, settings, passwords, notes) {
         if (settings.appUrl) say('Setup Link: ' + buildSetupLink(settings.appUrl, config));
         else say('Setup Link: (not built - pass --app-url https://<your ZoeW site> once)');
     }
-    const shown = Object.keys(passwords || {});
-    if (shown.length) {
-        say('');
-        say('Staff accounts - passwords are shown ONLY NOW, copy them:');
-        shown.forEach((email) => say('  ' + email + '   password: ' + passwords[email]));
-    }
+    printStaffPasswords(passwords);
     (notes || []).forEach((n) => say('  note: ' + n));
     say('');
     say('Still manual:');
@@ -631,7 +639,7 @@ async function cmdNew(opts) {
     state.complete = true;
     saveState(state);
     const check = await verifyProject(state, rules, passwords);
-    printCard(state, check.config, loadSettings(), passwords, notes);
+    printCard(state, check.config, loadSettings(), {}, notes);
     return reportVerify(check.results);
 }
 
@@ -705,7 +713,8 @@ async function cmdRules(opts) {
             say('  [FAIL] ' + state.projectId + ' - ' + api.messageOf(e));
         }
     }
-    return failed ? EXIT.FAIL : EXIT.OK;
+    if (failed) return EXIT.FAIL;
+    return opts.verify === true && !dryRun ? cmdVerify(opts) : EXIT.OK;
 }
 
 async function cmdUser(opts) {
@@ -826,7 +835,7 @@ function help() {
         '  node provision.js doctor                      check the tool',
         '  node provision.js new --branch 881859 --user sok,chan [--app-url https://...]',
         '        [--project-id id] [--region asia-southeast1] [--adopt]',
-        '  node provision.js rules --all | --project id[,id] [--yes] [--dry-run]',
+        '  node provision.js rules --all | --project id[,id] [--yes] [--dry-run] [--verify]',
         '  node provision.js user --project id --user name [--reset]',
         '  node provision.js verify --all | --project id[,id]',
         '  node provision.js show --project id [--branch 881859]',

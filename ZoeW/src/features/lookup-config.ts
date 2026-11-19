@@ -37,11 +37,11 @@ export function refreshShopBoundUi() {
     refreshZtoListSyncUi();
 }
 
-export function getLookupApiConfig() {
+export function getLookupApiConfig(adoptLegacy = true) {
     try {
         const raw = appLocalStore.getItem('zoew_lookup_api_config');
         const cfg = raw ? JSON.parse(raw) : null;
-        return shopOwnsSetting(cfg, 'zoew_lookup_api_config') ? cfg : null;
+        return shopOwnsSetting(cfg, 'zoew_lookup_api_config', adoptLegacy) ? cfg : null;
     } catch (e) {
         return null;
     }

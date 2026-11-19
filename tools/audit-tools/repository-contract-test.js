@@ -70,7 +70,8 @@ scenario('Apps Script manifest អានបាន', () => {
 });
 
 scenario('CSV template ឆ្លង importer និង reader ពិត', () => {
-    const XLSX = require(path.join(ROOT, 'ZoeW/vendor/xlsx.full.min.js'));
+    const XLSX = require([path.join(ROOT, 'ZoeW/public/vendor/xlsx.full.min.js'),
+        path.join(ROOT, 'ZoeW/vendor/xlsx.full.min.js')].find((file) => fs.existsSync(file)));
     const wb = XLSX.read(read('tools/zto-import/google-sheets-api/customer-template.csv'), { type: 'string', raw: true });
     const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: '' });
     const importer = vm.createContext({});

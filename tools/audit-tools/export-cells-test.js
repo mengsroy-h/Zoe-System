@@ -11,7 +11,9 @@ const zlib = require('zlib');
 
 const ROOT = path.resolve(process.env.EXPORT_APP_DIR || path.join(__dirname, '../..'));
 let XLSX;
-try { XLSX = require(path.join(ROOT, 'ZoeW', 'vendor', 'xlsx.full.min.js')); }
+const xlsxVendor = [path.join(ROOT, 'ZoeW', 'public', 'vendor', 'xlsx.full.min.js'),
+    path.join(ROOT, 'ZoeW', 'vendor', 'xlsx.full.min.js')].find((file) => fs.existsSync(file));
+try { XLSX = xlsxVendor ? require(xlsxVendor) : null; }
 catch (e) { console.log('FAIL — មិនអាចផ្ទុក SheetJS ពិតពី target tree'); process.exit(1); }
 
 let pass = 0, fail = 0;

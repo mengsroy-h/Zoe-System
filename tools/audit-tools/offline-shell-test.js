@@ -50,12 +50,15 @@ ok('index.html ផ្ទុក engine ស្កេនពី repo ខ្លួន
 
 // engine មាន **២ ឯកសារ**៖ glue JS និង binary WASM។ បើភ្លេចយកមួយណាចូល
 // APP_SHELL នោះការស្កេននឹងស្លាប់ពេលបណ្តាញដាច់ ខណៈ App នៅបើកបានធម្មតា។
-const wasmGlue = path.join(ROOT, 'ZoeW', 'vendor', 'zxing-wasm.js');
-const wasmBin = path.join(ROOT, 'ZoeW', 'vendor', 'zxing_reader.wasm');
-ok('ZoeW/vendor/zxing-wasm.js មានក្នុង repo', fs.existsSync(wasmGlue));
-ok('ZoeW/vendor/zxing_reader.wasm មានក្នុង repo', fs.existsSync(wasmBin));
+const wasmGlue = [path.join(ROOT, 'ZoeW', 'public', 'vendor', 'zxing-wasm.js'),
+    path.join(ROOT, 'ZoeW', 'vendor', 'zxing-wasm.js')].find((file) => fs.existsSync(file));
+const wasmBin = [path.join(ROOT, 'ZoeW', 'public', 'vendor', 'zxing_reader.wasm'),
+    path.join(ROOT, 'ZoeW', 'vendor', 'zxing_reader.wasm')].find((file) => fs.existsSync(file));
+ok('ZoeW/public/vendor/zxing-wasm.js មានក្នុង repo', fs.existsSync(wasmGlue));
+ok('ZoeW/public/vendor/zxing_reader.wasm មានក្នុង repo', fs.existsSync(wasmBin));
 ok('ZXing-JS ចាស់ត្រូវបានដកចេញពី repo (លែងផ្ទុក engine ២)',
-    !fs.existsSync(path.join(ROOT, 'ZoeW', 'vendor', 'zxing.min.js')));
+    ![path.join(ROOT, 'ZoeW', 'public', 'vendor', 'zxing.min.js'),
+        path.join(ROOT, 'ZoeW', 'vendor', 'zxing.min.js')].some((file) => fs.existsSync(file)));
 if (fs.existsSync(wasmBin)) {
     // ឯកសារ .wasm ត្រូវជាកំណែដដែលនឹង glue JS — zxing-wasm បញ្ចូល sha256
     // របស់ binary ដែលវារំពឹងទុក ដូច្នេះការមិនស៊ីគ្នាចាប់បានភ្លាម។

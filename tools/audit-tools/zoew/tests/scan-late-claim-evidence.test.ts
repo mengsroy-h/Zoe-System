@@ -33,6 +33,7 @@ let scope = '';
 let updates: ReturnType<typeof vi.fn>;
 let transactions: ReturnType<typeof vi.fn>;
 let unexpectedWrites: string[];
+let registryTransactionCalls = 0;
 const journal = () => createScanEvidenceJournal(appLocalStore);
 const rows = () => journal().list(scope);
 const flush = async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); };
@@ -43,6 +44,7 @@ beforeEach(() => {
     appLocalStore.clear(); pendingRegistryReleases.clear(); clearZtoPickupStatusStore();
     dbListenerFailedPaths.clear(); dbListenerPendingPaths.clear();
     claim = deferred(); release = deferred(); releaseMode = 'ack'; unexpectedWrites = [];
+    registryTransactionCalls = 0;
     for (const field of fields) refTo(field)(document.createElement('input'));
     const options = { databaseURL: 'https://late-claim-fixture.firebaseio.com' };
     firebaseState.authGeneration++;
@@ -53,6 +55,16 @@ beforeEach(() => {
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
     firebaseState.firebaseConfig = options;
     transactions = vi.fn((ref: any) => {
+        if (ref.path === REGISTRY + '/' + CODE) {
+            registryTransactionCalls++;
+            if (registryTransactionCalls > 1) {
+                const invokeUpdates = updates as unknown as (ref: any, payload: any) => Promise<any>;
+                const result = invokeUpdates({ path: REGISTRY }, { [CODE]: null });
+                if (releaseMode === 'fail') return Promise.reject(new Error('disconnect'));
+                if (releaseMode === 'pending') return result.then(() => release.promise).then(() => ({ committed: true, snapshot: { val: () => null } }));
+                return result.then(() => ({ committed: true, snapshot: { val: () => null } }));
+            }
+        }
         if (ref.path !== REGISTRY + '/' + CODE) { unexpectedWrites.push(ref.path); throw new Error('Unexpected transaction'); }
         return claim.promise;
     });
@@ -118,7 +130,7 @@ for (const route of ['legacy-v1']) describe(route + ' actual late-claim release 
     it('claim ACK យឺតមុនប៉ះលុយ + release ACK ➜ បញ្ចប់ evidence មិនបង្ហាញ HOLD ក្លែង', async () => {
         await reachTimedOutClaim(route);
         claim.resolve({ committed: true }); await flush();
-        expect(updates).toHaveBeenCalledOnce();
+        expect(transactions.mock.calls.length).toBeGreaterThanOrEqual(2);
         expect(rows()).toEqual([]);
         uiState.toasts = []; warnPendingScans();
         expect(uiState.toasts).toEqual([]);

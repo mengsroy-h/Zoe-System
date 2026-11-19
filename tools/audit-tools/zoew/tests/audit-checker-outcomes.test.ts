@@ -336,29 +336,31 @@ it('SheetJS origin guard follows the real target-tree React preflight and reject
     mkdirSync(path.join(root, 'tools/audit-tools'), { recursive: true });
     mkdirSync(path.join(root, 'ZoeW'));
     writeFileSync(path.join(root, 'ZoeW/app.js'), 'const auditSource = true;');
+    mkdirSync(path.join(root, 'ZoeW/public/vendor'), { recursive: true });
+    writeFileSync(path.join(root, 'ZoeW/public/vendor/xlsx.full.min.js'), 'synthetic-xlsx');
     const checkers = ['export-cells-test.js', 'monthly-report-test.js', 'sheet-import-test.js'];
     for (const file of [...checkers, 'react-view.js']) {
         writeFileSync(path.join(root, 'tools/audit-tools', file), readFileSync(path.join(repo, 'tools/audit-tools', file)));
     }
     const monthlyPath = path.join(root, 'tools/audit-tools/monthly-report-test.js');
     const original = readFileSync(monthlyPath, 'utf8');
-    const vendorCall = "require(path.join(ROOT, 'ZoeW', 'vendor', 'xlsx.full.min.js'))";
-    expect(original).toContain(vendorCall);
+    expect(original).toContain("path.join(ROOT, 'ZoeW', 'public', 'vendor', 'xlsx.full.min.js')");
+    expect(original).toContain("path.join(ROOT, 'ZoeW', 'vendor', 'xlsx.full.min.js')");
     const run = () => {
         const ok = vi.fn();
         vm.runInNewContext(source.slice(probe.start, probe.end), {
-            ROOT: root, VENDOR: path.join(root, 'ZoeW/vendor/xlsx.full.min.js'),
-            fs: { readFileSync }, path, vm, require, ok
+            ROOT: root, VENDOR: path.join(root, 'ZoeW/public/vendor/xlsx.full.min.js'),
+            fs: { readFileSync, existsSync: (file: string) => file === path.join(root, 'ZoeW/public/vendor/xlsx.full.min.js') }, path, vm, require, ok
         });
         return ok.mock.calls.filter(([label]) => label.startsWith('monthly-report-test.js'));
     };
     try {
         expect(run().every(([, passed]) => passed)).toBe(true);
-        for (const replacement of ["require('xlsx')", "require(path.join(ROOT, 'wrong-vendor.js'))"]) {
-            writeFileSync(monthlyPath, original.replace(vendorCall, () => replacement));
+        const publicCandidate = "path.join(ROOT, 'ZoeW', 'public', 'vendor', 'xlsx.full.min.js')";
+        for (const replacement of ["path.join(ROOT, 'wrong-vendor.js')", "path.join(ROOT, 'xlsx')"]) {
+            writeFileSync(monthlyPath, original.replace(publicCandidate, () => replacement));
             const verdict = run();
             expect(verdict[0][1]).toBe(false);
-            expect(verdict[0][2]).toBe(replacement === "require('xlsx')" ? 'xlsx' : path.join(root, 'wrong-vendor.js'));
         }
         writeFileSync(monthlyPath, original);
         rmSync(path.join(root, 'ZoeW/app.js'));

@@ -823,7 +823,7 @@ function watcherAccessFixture(handlers, options) {
 function sheetJsLibrary() {
     const html = fs.readFileSync(path.join(root, 'Index.html'), 'utf8');
     const integrity = (/xlsx\.full\.min\.js"\s+integrity="(sha384-[^"]+)"/.exec(html) || [])[1] || '';
-    for (const rel of ['ZoeW/vendor/xlsx.full.min.js', 'ZoeW/public/vendor/xlsx.full.min.js']) {
+    for (const rel of ['ZoeW/public/vendor/xlsx.full.min.js', 'ZoeW/vendor/xlsx.full.min.js']) {
         const file = path.join(repoRoot, rel);
         if (!fs.existsSync(file)) continue;
         const bytes = fs.readFileSync(file);

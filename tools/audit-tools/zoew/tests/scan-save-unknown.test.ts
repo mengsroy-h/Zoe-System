@@ -458,10 +458,10 @@ it('legacy v1 native reboot retains actionable pending evidence after a refused 
 it('legacy v1 queued registry release retains evidence and never announces safe retry after money compensation', async () => {
     lab.fault = 'mergeLost'; setAt('zoew_barcode_registry/X200000002', true); uiState.toasts = [];
     vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
-    const update = firebaseState.fb.update; let rejectedReleases = 0;
-    (firebaseState.fb as any).update = async (r: any, values: any) => {
-        if (r.path === 'zoew_barcode_registry') { rejectedReleases++; throw new Error('permission_denied'); }
-        return update(r, values);
+    const runTransaction = firebaseState.fb.runTransaction; let rejectedReleases = 0;
+    (firebaseState.fb as any).runTransaction = async (r: any, fn: any) => {
+        if (r.path === 'zoew_barcode_registry/X200000002') { rejectedReleases++; throw new Error('permission_denied'); }
+        return runTransaction(r, fn);
     };
     const outcome = addOrUpdateEntry('X200000002', '012000111', 5, 0).catch(error => error);
     await vi.advanceTimersByTimeAsync(10000);

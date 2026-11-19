@@ -8,7 +8,9 @@ const crypto = require('crypto');
 const vm = require('vm');
 
 const ROOT = process.env.DEPSEC_APP_DIR ? path.resolve(process.env.DEPSEC_APP_DIR) : path.resolve(__dirname, '../..');
-const VENDOR = path.join(ROOT, 'ZoeW', 'vendor', 'xlsx.full.min.js');
+const VENDOR = [path.join(ROOT, 'ZoeW', 'public', 'vendor', 'xlsx.full.min.js'),
+    path.join(ROOT, 'ZoeW', 'vendor', 'xlsx.full.min.js')].find((file) => fs.existsSync(file))
+    || path.join(ROOT, 'ZoeW', 'public', 'vendor', 'xlsx.full.min.js');
 const IMPORT_HTML = path.join(ROOT, 'tools/zto-import', 'Index.html');
 const APPROVED_XLSX_SHA256 = 'cc015130aa8521e7f088f88898eba949ccdcbfb38df0bd129b44b7273c3a6f41';
 const APPROVED_XLSX_SHA384 = 'sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT';
@@ -180,6 +182,7 @@ for (const [checker, envName] of [['export-cells-test.js', 'EXPORT_APP_DIR'],
             __dirname: path.join(ROOT, 'tools/audit-tools'),
             process: { env: { [envName]: ROOT }, exit() { throw stop; } },
             console: { log() {}, error() {} },
+            fs: { existsSync: (file) => file === VENDOR },
             require(name) {
                 if (requested) throw stop;
                 if (name === 'xlsx' || path.isAbsolute(name)) { requested = name; throw stop; }

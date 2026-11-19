@@ -151,8 +151,10 @@ for (const app of APPS) {
         !/AbortController/.test(fetchHandler),
         'ការបន្ថែម AbortController ទីនោះនឹងសម្លាប់ការទាញ wasm ១ MB លើ 2G');
 }
-if (fs.existsSync(path.join(ROOT, 'ZoeW', 'vendor', 'zxing_reader.wasm'))) {
-    const kb = fs.statSync(path.join(ROOT, 'ZoeW', 'vendor', 'zxing_reader.wasm')).size / 1024;
+const zxingWasm = [path.join(ROOT, 'ZoeW', 'public', 'vendor', 'zxing_reader.wasm'),
+    path.join(ROOT, 'ZoeW', 'vendor', 'zxing_reader.wasm')].find((file) => fs.existsSync(file));
+if (zxingWasm) {
+    const kb = fs.statSync(zxingWasm).size / 1024;
     ok('ZoeW: `zxing_reader.wasm` ធំល្មមឲ្យ timeout ថេរជាគ្រោះថ្នាក់ (> 500 kB)',
         kb > 500, Math.round(kb) + ' kB ➜ ~' + Math.round(kb / 35) + 's លើ 2G');
 }

@@ -94,9 +94,29 @@ export function queueRegistryReleaseRetry(keys, attempts) {
 
 export function releaseRegistryKeys(keys) {
     if (!firebaseState.db || !firebaseState.fb || !keys.length) return Promise.resolve(true);
-    const updates = {};
-    keys.forEach((key) => { updates[key] = null; });
-    return dbOp(firebaseState.fb.update(firebaseState.fb.ref(firebaseState.db, 'zoew_barcode_registry'), updates)).then(() => true, () => false);
+    const operationDb = firebaseState.db;
+    const operationAuth = firebaseState.authGeneration;
+    const operationSdk = firebaseState.fb;
+    const current = () => operationDb === firebaseState.db && operationAuth === firebaseState.authGeneration && operationSdk === firebaseState.fb;
+    if (typeof operationSdk.runTransaction !== 'function') {
+        const updates = {};
+        keys.forEach((key) => { updates[key] = null; });
+        return dbOp(operationSdk.update(operationSdk.ref(operationDb, 'zoew_barcode_registry'), updates)).then(() => {
+            return current() ? true : false;
+        }, () => false);
+    }
+    return Promise.all(keys.map((key) => dbOp(operationSdk.runTransaction(
+        operationSdk.ref(operationDb, `zoew_barcode_registry/${key}`),
+        (registryValue) => registryValue === true ? null : undefined
+    )).then((result) => {
+        const serverValue = result?.snapshot?.val();
+        if (serverValue !== null && serverValue !== undefined && serverValue !== true) return false;
+        if (result?.committed === true) return true;
+        return serverValue === null || serverValue === undefined;
+    }, () => false))).then((results) => {
+        if (!current()) return false;
+        return results.every((done) => done === true);
+    });
 }
 
 export function releaseLateBarcodeClaim(claimPromise, code, scanEvidence?) {

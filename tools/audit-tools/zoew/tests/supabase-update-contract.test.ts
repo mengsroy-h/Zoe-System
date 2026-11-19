@@ -116,7 +116,6 @@ const CALLERS: Record<string, string> = {
     'services/zto-shop-sweep.ts#markZtoShopSweep': 'IDEMPOTENT ៖ { activeAt · completeAt } តម្លៃដាច់ខាត ផ្លូវ ≤ ២',
     'services/native-write-recovery.ts#createNativeWriteRecovery': 'BOUNDED ៖ Firebase ប៉ុណ្ណោះ ៖ ការសរសេររបស់អ្នកហៅ + receipt ១ (អ្នកហៅចាត់ថ្នាក់រួច) · purgeReceipts { receipt: null } ≤ NATIVE_RECEIPT_PURGE_MAX',
     'features/restore.ts#finalizeClaimedRestore': 'BOUNDED ៖ របង + ធុងសំរាម + consumption ១ + marker ២ + increment ledger ៣ ក្នុងមួយថ្ងៃ/ខែនៃធាតុមួយ + សោដក ១ ➜ ត្រូវ atomic',
-    'domain/registry.ts#releaseRegistryKeys': 'IDEMPOTENT ៖ { key: null } · ការបរាជ័យ ➜ ជួរ retry ដែលពិនិត្យ registryReleaseVerdict ម្តងទៀត',
     'domain/collected.ts#commitCollectedMarks': 'IDEMPOTENT ៖ { day/key: {c,d} | null } តម្លៃដាច់ខាត · reconcileCollectedHistory() ព្យាបាល',
     'domain/collected.ts#runAutomaticCollectedCleanup': 'IDEMPOTENT ៖ { day: null } ថ្ងៃចាស់',
 };

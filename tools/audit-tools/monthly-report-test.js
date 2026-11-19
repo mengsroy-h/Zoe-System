@@ -26,7 +26,9 @@ try { src = require('./react-view').readAppCode(ROOT, 'ZoeW'); }
 catch (e) { console.log('FAIL — ' + e.message); process.exit(1); }
 
 let XLSX;
-try { XLSX = require(path.join(ROOT, 'ZoeW', 'vendor', 'xlsx.full.min.js')); }
+const xlsxVendor = [path.join(ROOT, 'ZoeW', 'public', 'vendor', 'xlsx.full.min.js'),
+    path.join(ROOT, 'ZoeW', 'vendor', 'xlsx.full.min.js')].find((file) => fs.existsSync(file));
+try { XLSX = xlsxVendor ? require(xlsxVendor) : null; }
 catch (e) { console.log('FAIL — មិនអាចផ្ទុក SheetJS ពិតពី target tree'); process.exit(1); }
 
 let pass = 0, fail = 0;

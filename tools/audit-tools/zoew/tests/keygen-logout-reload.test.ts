@@ -7,6 +7,7 @@ import { Buffer } from 'node:buffer';
 import { webcrypto } from 'node:crypto';
 import ts from 'typescript';
 import { createRequire } from 'node:module';
+import os from 'node:os';
 
 const ROOT = process.env.KEYGEN_LOGOUT_SOURCE_ROOT || path.resolve(__dirname, '../../../..');
 const source = fs.readFileSync(ROOT + '/ZoeKeyGen/app.js', 'utf8');
@@ -259,7 +260,7 @@ it('KeyGen ៖ Firebase SDK persistence._remove បរាជ័យ → reload �
     fresh.ctx.setupAuthListener(); await turn();
     const evidence = { sdk: 'Firebase Auth 12.19.0', persistedAfterFailedSignOut: true, restoredUid: auth.currentUser?.uid,
         automaticAdminRoleChecks: fresh.roles(), signedIn: fresh.calls.signedIn, loginRequests };
-    fs.writeFileSync(process.env.KEYGEN_LOGOUT_EVIDENCE || '/tmp/keygen-logout-reload-evidence.json', JSON.stringify(evidence, null, 2));
+    fs.writeFileSync(process.env.KEYGEN_LOGOUT_EVIDENCE || path.join(os.tmpdir(), 'keygen-logout-reload-evidence.json'), JSON.stringify(evidence, null, 2));
     expect(fresh.roles()).toBe(0); expect(fresh.calls.signedIn).toBe(false);
     await fresh.ctx.doLogin(); await turn();
     expect(loginRequests).toBe(2); expect(fresh.roles()).toBe(1); expect(fresh.calls.signedIn).toBe(true);

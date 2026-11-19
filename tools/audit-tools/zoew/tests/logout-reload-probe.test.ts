@@ -1,5 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const Buffer = require('node:buffer').Buffer;
@@ -110,7 +112,7 @@ it('Firebase Auth ពិត៖ persistence បរាជ័យរក្សា loc
         restoredUid: auth.currentUser?.uid ?? null, defaultState, stateAfterAuthListener: reloaded.sessionExpiryCheck,
         loginRequests, automaticallyProceeded: vi.mocked(proceedAfterLogin).mock.calls.length,
         canWriteAfterReload: connectionFlowSnapshot().canWrite };
-    fs.writeFileSync(process.env.PROBE_EVIDENCE_PATH || '/tmp/zoe-logout-reload-probe-evidence.json', JSON.stringify(evidence, null, 2));
+    fs.writeFileSync(process.env.PROBE_EVIDENCE_PATH || path.join(os.tmpdir(), 'zoe-logout-reload-probe-evidence.json'), JSON.stringify(evidence, null, 2));
     expect(evidence.canWriteAfterReload).toBe(false);
     expect(evidence.automaticallyProceeded).toBe(0);
     expect(lookupRequests).toBeGreaterThanOrEqual(2);

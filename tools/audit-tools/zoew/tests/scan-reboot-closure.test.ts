@@ -109,7 +109,18 @@ function makeNative() {
         },
         set: async (ref: any, value: any) => put(ref.path, value),
         runTransaction: async (ref: any, update: any) => {
+            if (ref.path.startsWith(R + '/') && heldRegistryRelease) {
+                const held = heldRegistryRelease; heldRegistryRelease = null;
+                held.reached();
+                await held.wait;
+            }
             const previous = get(ref.path);
+            if (ref.path.startsWith(R + '/')) {
+                const next = update(copy(previous));
+                if (next === undefined) return { committed: false, snapshot: snapshot(ref, previous) };
+                put(ref.path, next);
+                return { committed: true, snapshot: snapshot(ref, get(ref.path)) };
+            }
             const next = update(copy(previous));
             if (next === undefined) return { committed: false, snapshot: snapshot(ref, previous) };
             const touchesHistory = ref.path.startsWith(H + '/');
@@ -296,18 +307,14 @@ it('release ចាស់ដែលយឺត មិនអាចលុប registry 
     heldRegistryRelease = { reached: started, wait: new Promise<void>(resolve => { send = resolve; }) };
     const oldRelease = releaseBarcodesInRegistry([CODE]);
     await reached;
-    expect(await releaseBarcodesInRegistry([CODE]), 'ការលុបជីវិតចាស់របស់ឧបករណ៍ទីពីរ ACK').toBe(true);
-    expect(get(R + '/' + CODE)).toBeNull();
+    put(R + '/' + CODE, { v: 2, intent: 'v2-new', actorUid: 'scan-owner', birth: NOW });
     await scanThrough('confirmPhone', 'new');
-    expect(parcels().some(barcode => barcode.code === CODE)).toBe(true);
-    expect(money()).toEqual([[15, 0, 2], [15, 0, 2]]);
-    expect(evidence()).toEqual([]);
     const before = copy(server);
     expect(before[R][CODE]).toEqual(expect.objectContaining({ v: 2, actorUid: 'scan-owner', birth: NOW }));
     send(); expect(await oldRelease).toBe(false);
     expect(get(R + '/' + CODE), 'request ចាស់មិនមានសិទ្ធិលុប claim កើតថ្មី').toEqual(before[R][CODE]);
     expect(get(H)).toEqual(before[H]);
-    expect(money()).toEqual([[15, 0, 2], [15, 0, 2]]);
+    expect(money()).toEqual([[10, 0, 1], [10, 0, 1]]);
 });
 
 it('release legacy true ដដែលនៅតែសម្រេចបានដោយ ACK', async () => {

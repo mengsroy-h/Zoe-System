@@ -26,7 +26,11 @@ const ROOT = process.env.SCAN_APP_DIR || path.join(__dirname, '../..');
 // ការស្កេនស្លាប់លើផលិតកម្ម។ ការចេញជា SKIP (exit 0) នៅទីនេះជាការបៃតង
 // ក្លែងក្លាយ៖ ថត app ដែលទទេ ឬ override ដែលខុស នឹងធ្វើឲ្យ checker នេះ
 // «ជោគជ័យ» ដោយមិនបានពិនិត្យអ្វីសោះ។ មើល `checker-coverage.js`។
-if (!fs.existsSync(path.join(ROOT, 'ZoeW/vendor/zxing_reader.wasm'))) {
+const zxingWasm = [path.join(ROOT, 'ZoeW/public/vendor/zxing_reader.wasm'),
+    path.join(ROOT, 'ZoeW/vendor/zxing_reader.wasm')].find((file) => fs.existsSync(file));
+const zxingGlue = [path.join(ROOT, 'ZoeW/public/vendor/zxing-wasm.js'),
+    path.join(ROOT, 'ZoeW/vendor/zxing-wasm.js')].find((file) => fs.existsSync(file));
+if (!zxingWasm) {
     console.log('❌ រកមិនឃើញ ZoeW/vendor/zxing_reader.wasm — engine ស្កេនត្រូវនៅក្នុង repo');
     process.exit(1);
 }
@@ -144,8 +148,8 @@ window.__api = { initScanEngine, decodeBarcodeFromCanvasManual, getCoverCropRect
 
     const server = await serve({
         '/': { type: 'text/html', body: page1 },
-        '/zxing-wasm.js': { type: 'application/javascript', body: fs.readFileSync(path.join(ROOT, 'ZoeW/vendor/zxing-wasm.js')) },
-        '/vendor/zxing_reader.wasm': { type: 'application/wasm', body: fs.readFileSync(path.join(ROOT, 'ZoeW/vendor/zxing_reader.wasm')) }
+        '/zxing-wasm.js': { type: 'application/javascript', body: fs.readFileSync(zxingGlue) },
+        '/vendor/zxing_reader.wasm': { type: 'application/wasm', body: fs.readFileSync(zxingWasm) }
     });
     const port = server.address().port;
 
@@ -636,8 +640,7 @@ window.__api = { initScanEngine, decodeBarcodeFromCanvasManual, getCoverCropRect
         ok('netlify.toml បម្រើ .wasm ជា application/wasm (បើអត់ ➜ ធ្លាក់ទៅផ្លូវយឺត)',
             /for = "\/\*\.wasm"/.test(netlify) && /Content-Type = "application\/wasm"/.test(netlify));
         ok('engine WASM ស្ថិតក្នុង repo (មិនមែន CDN)',
-            fs.existsSync(path.join(ROOT, 'ZoeW/vendor/zxing-wasm.js')) &&
-            fs.existsSync(path.join(ROOT, 'ZoeW/vendor/zxing_reader.wasm')));
+            !!zxingGlue && !!zxingWasm);
         // ការស្កេន QR នៅតែជាបញ្ជី format **ដាច់ដោយឡែក** ➜ ការកែបញ្ជី 1D
         // មិនអាចប៉ះការស្កេន QR បានទេ (និងផ្ទុយមកវិញ)។
         ok('ការស្កេន QR ពេល Config/Reconfig ប្រើបញ្ជី format ដាច់ដោយឡែក (មិនរងផល)',
@@ -652,10 +655,10 @@ window.__api = { initScanEngine, decodeBarcodeFromCanvasManual, getCoverCropRect
     // ⛔ SENTRY-2 លើបណ្ណាល័យពិត ៖ zxing-wasm ចងចាំ promise របស់ module ដែល reject ➜ WASM 404 (Emscripten ទាញ ២ ដង ៖ streaming + ArrayBuffer) ➜ App ត្រូវ purge ហើយ prepare ឡើងវិញ
     //    ពី `./vendor/` (មិនមែន CDN លំនាំដើមរបស់បណ្ណាល័យ) ➜ `readBarcodes()` ដើរវិញ។ មុនកែ ៖ ការហៅ prepare តែម្តង ➜ reject ជានិច្ច
     {
-        const wasmEntry = { type: 'application/wasm', body: fs.readFileSync(path.join(ROOT, 'ZoeW/vendor/zxing_reader.wasm')), failFirst: 2 };
+        const wasmEntry = { type: 'application/wasm', body: fs.readFileSync(zxingWasm), failFirst: 2 };
         const flaky = await serve({
             '/': { type: 'text/html', body: page1 },
-            '/zxing-wasm.js': { type: 'application/javascript', body: fs.readFileSync(path.join(ROOT, 'ZoeW/vendor/zxing-wasm.js')) },
+            '/zxing-wasm.js': { type: 'application/javascript', body: fs.readFileSync(zxingGlue) },
             '/vendor/zxing_reader.wasm': wasmEntry
         });
         const fctx = await browser.newContext();
@@ -706,8 +709,8 @@ window.__qr = { scanQrReader, pickScanCode, buildReaderOptions, readResultText }
         const qrServer = await serve({
             '/': { type: 'text/html', body: qrPage },
             '/qrcode.js': { type: 'application/javascript', body: fs.readFileSync(path.join(ROOT, 'ZoeKeyGen/qrcode.js')) },
-            '/zxing-wasm.js': { type: 'application/javascript', body: fs.readFileSync(path.join(ROOT, 'ZoeW/vendor/zxing-wasm.js')) },
-            '/vendor/zxing_reader.wasm': { type: 'application/wasm', body: fs.readFileSync(path.join(ROOT, 'ZoeW/vendor/zxing_reader.wasm')) }
+            '/zxing-wasm.js': { type: 'application/javascript', body: fs.readFileSync(zxingGlue) },
+            '/vendor/zxing_reader.wasm': { type: 'application/wasm', body: fs.readFileSync(zxingWasm) }
         });
         const qctx = await browser.newContext();
         const qpage = await qctx.newPage();

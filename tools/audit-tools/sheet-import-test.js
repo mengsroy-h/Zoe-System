@@ -27,9 +27,14 @@ const vm = require('vm');
 
 const CHROME = process.env.SHEETIMPORT_CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const ROOT = process.env.SHEETIMPORT_APP_DIR ? path.resolve(process.env.SHEETIMPORT_APP_DIR) : path.resolve(__dirname, '../..');
+const REPO = process.env.ZOE_REPO_ROOT ? path.resolve(process.env.ZOE_REPO_ROOT)
+    : fs.existsSync(path.join(ROOT, 'tools/audit-tools/zoew/tests/helpers/sheet-import-fixture.cjs'))
+        ? ROOT : path.resolve(__dirname, '../..');
 const APP = path.join(ROOT, 'ZoeW');
 let XLSX;
-try { XLSX = require(path.join(APP, 'vendor', 'xlsx.full.min.js')); }
+const xlsxVendor = [path.join(APP, 'public', 'vendor', 'xlsx.full.min.js'),
+    path.join(APP, 'vendor', 'xlsx.full.min.js')].find((file) => fs.existsSync(file));
+try { XLSX = xlsxVendor ? require(xlsxVendor) : null; }
 catch (e) { console.log('FAIL — មិនអាចផ្ទុក SheetJS ពិតពី target tree'); process.exit(1); }
 let chromium;
 try { chromium = require('playwright-core').chromium; } catch (e) {
@@ -287,8 +292,8 @@ async function withTimeout(promise, ms, label) {
     const page = await ctx.newPage();
 
     const sent = [];
-    const createProtocolFixture = require(path.join(ROOT, 'tools/audit-tools/zoew/tests/helpers/sheet-import-fixture.cjs'));
-    const protocol = createProtocolFixture(fs.readFileSync(path.join(ROOT, 'tools/zto-import/Code.gs'), 'utf8'));
+    const createProtocolFixture = require(path.join(REPO, 'tools/audit-tools/zoew/tests/helpers/sheet-import-fixture.cjs'));
+    const protocol = createProtocolFixture(fs.readFileSync(path.join(REPO, 'tools/zto-import/Code.gs'), 'utf8'));
     protocol.store.props.IMPORT_PASSWORD = FAKE_PASSWORD;
     protocol.store.props.SHEET_NAME = 'Data';
     protocol.store.capacity = 512;

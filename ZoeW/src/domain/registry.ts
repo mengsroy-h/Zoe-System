@@ -94,9 +94,17 @@ export function queueRegistryReleaseRetry(keys, attempts) {
 
 export function releaseRegistryKeys(keys) {
     if (!firebaseState.db || !firebaseState.fb || !keys.length) return Promise.resolve(true);
-    const updates = {};
-    keys.forEach((key) => { updates[key] = null; });
-    return dbOp(firebaseState.fb.update(firebaseState.fb.ref(firebaseState.db, 'zoew_barcode_registry'), updates)).then(() => true, () => false);
+    const operationDb = firebaseState.db;
+    const operationAuth = firebaseState.authGeneration;
+    const operationSdk = firebaseState.fb;
+    const current = () => operationDb === firebaseState.db && operationAuth === firebaseState.authGeneration && operationSdk === firebaseState.fb;
+    return Promise.all(keys.map((key) => dbOp(operationSdk.runTransaction(
+        operationSdk.ref(operationDb, `zoew_barcode_registry/${key}`),
+        (registryValue) => registryValue === true ? null : undefined
+    )).then((result) => result?.committed === true || result?.snapshot?.val() !== true, () => false))).then((results) => {
+        if (!current()) return false;
+        return results.every((done) => done === true);
+    });
 }
 
 export function releaseLateBarcodeClaim(claimPromise, code, scanEvidence?) {

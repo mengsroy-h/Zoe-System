@@ -3,7 +3,7 @@ import { dataState, firebaseState, scanState } from '../../../../ZoeW/src/core/s
 import { viewState } from '../../../../ZoeW/src/core/view-state';
 import { pendingRegistryReleases } from '../../../../ZoeW/src/core/clock';
 import { appLocalStore } from '../../../../ZoeW/src/core/storage';
-import { claimBarcodeInRegistry, releaseBarcodesInRegistry, releaseLateBarcodeClaim } from '../../../../ZoeW/src/domain/registry';
+import { claimBarcodeInRegistry, releaseBarcodesInRegistry, releaseLateBarcodeClaim, releaseRegistryKeys } from '../../../../ZoeW/src/domain/registry';
 import { initFirebase } from '../../../../ZoeW/src/services/firebase-init';
 import { setupAuthListener } from '../../../../ZoeW/src/features/auth';
 
@@ -68,6 +68,31 @@ afterEach(() => {
 });
 
 describe('Registry ៖ ការងារចាស់មិនសរសេរគម្រោងថ្មី', () => {
+    it('legacy release នឹងមិនលុប v2 claim ដែលឧបករណ៍ក្រោយបានកាន់', async () => {
+        let registryValue: any = { v: 2, intent: 'scan-op-000000000000000000000000000000000000', actorUid: 'registry-user', birth: 123 };
+        const updates: any[] = [];
+        const transactions: any[] = [];
+        firebaseState.fb = {
+            ref: (db: any, path: string) => ({ db, path }),
+            update: async (_ref: any, changes: any) => {
+                updates.push(changes);
+                if (changes.legacyKey === null) registryValue = null;
+            },
+            runTransaction: async (ref: any, updater: any) => {
+                transactions.push(ref.path);
+                const proposed = updater(registryValue);
+                if (proposed === undefined) return { committed: false, snapshot: { val: () => registryValue } };
+                registryValue = proposed;
+                return { committed: true, snapshot: { val: () => registryValue } };
+            }
+        } as any;
+
+        await releaseRegistryKeys(['legacyKey']);
+
+        expect(updates).toEqual([]);
+        expect(transactions.length).toBe(1);
+        expect(registryValue).toEqual({ v: 2, intent: 'scan-op-000000000000000000000000000000000000', actorUid: 'registry-user', birth: 123 });
+    });
     it('evidence storage quota ធ្លាក់ ➜ confirmPhone មិន claim ឬសរសេរ backend', async () => {
         const writes = vi.fn();
         firebaseState.fb = { ref: (db: any, path: string) => ({ db, path }), runTransaction: writes, set: writes, update: writes } as any;
@@ -249,16 +274,16 @@ describe('Registry ៖ ការងារចាស់មិនសរសេរគ
     });
 
     it('retry ដោះលេខ ➜ មិនបន្តសរសេរ ឬដាក់ជួរក្នុងគម្រោងថ្មី', async () => {
-        const update = vi.fn(() => Promise.reject(new Error('disconnect')));
-        firebaseState.fb = { ref: (db: any, path: string) => ({ db, path }), update } as any;
+        const transaction = vi.fn(() => Promise.reject(new Error('disconnect')));
+        firebaseState.fb = { ref: (db: any, path: string) => ({ db, path }), runTransaction: transaction } as any;
         const running = releaseBarcodesInRegistry(['ZTO123']);
         await vi.advanceTimersByTimeAsync(0);
-        expect(update).toHaveBeenCalledOnce();
+        expect(transaction).toHaveBeenCalledOnce();
         firebaseState.db = { name: 'next' } as any;
         firebaseState.authGeneration++;
         await vi.advanceTimersByTimeAsync(10000);
         await running;
-        expect(update).toHaveBeenCalledOnce();
+        expect(transaction).toHaveBeenCalledOnce();
         expect(pendingRegistryReleases.size).toBe(0);
     });
 });

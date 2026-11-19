@@ -2207,7 +2207,9 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 - `tools/audit-tools/zoew/tests/keygen-setup-link-output.test.ts`៖ baseline ធ្លាក់ ១៧; fixed ឆ្លង ១៧។ តេស្ត encrypted setup ដែលមានស្រាប់ឆ្លង ៧ រួម encrypt/decrypt ពិត; async fixture ក្លែង session/encryption។ Clipboard ដែលបញ្ជូនរួចមិនអាចដកវិញ; មិនបង្ហាញសារជោគជ័យរបស់ session ចាស់។
 - `firebase-provision-test`៖ strict synthetic HTTPS suite ឆ្លង ១២១; baseline បង្ហាញកំហុស ៣។ មិនរក្សា password ក្នុង state; unknown outcome មិនបង្ហាញ password ដែលមិនផ្ទៀងថាបង្កើតរួច។ Retry មិនប្ដូរគណនីដែលមានដោយស្វ័យប្រវត្តិ ហើយប្រាប់ផ្លូវ `--reset` ច្បាស់លាស់។
 - `tools/audit-tools/zoew/tests/android-signing-preflight.test.ts`៖ baseline ធ្លាក់ ៣២ ឆ្លង ៤៤; fixed signing និង APK-link checks ឆ្លង ៩៨; បន្ថែមការផ្ទៀង matcher FCM ៦ ករណី ឆ្លងសរុប ១០៤។ វាស់ script ជាមួយ fixtures មិនប្រើ signing key ពិត ឬបង្កើត release ពិត។
-- តេស្តរួម ១៣ suites ឆ្លង ២២៨ រួម deferred Excel ដែលមានស្រាប់; typecheck/lint/build/doc/slot/purity/coverage/comments ឆ្លង។ Audit measurement build រារាំងនៅ Chromium local socket (`Operation not permitted`) ទោះសាកបរិស្ថានដែលបានអនុញ្ញាត។ Full CI, hosted deployment និង real-device QA នៅមិនទាន់រត់។ ការកែនេះមិនអះអាងថាគ្មានកំហុសទាំងអស់ និងមិនប្ដូរ APK Audit gate។
+- `lookup-freshness-test` បន្ថែម dependency ពិតរបស់ validator ក្នុង VM; `tools/audit-tools/zoew/tests/lookup-freshness-vm.test.ts` baseline ធ្លាក់ ៣ ក្រោយកែឆ្លង ៣; ជាមួយ sheet lookup ឆ្លង ៣៧។ សេណារីយ៉ូ CI ដែលធ្លាក់ ៣ រត់លើ generated JS ពិតក្រោយកែឆ្លង ៩ assertions; មិនអះអាងថា full checker ដែលត្រូវការ HTML prerender ឆ្លងទេ។
+- `empty-state-truth-test` បន្ថែម dependency របស់ projection និង fixture បើក modal៖ ៤៣ ឆ្លង/៤ ធ្លាក់ ➜ ៦២ ឆ្លង/០ ធ្លាក់។ `semantic-ui-color-test` ផ្នែកពណ៌របាយការណ៍ឆ្លងក្រោយ fixture បើក modal; `monthly-report-test` ពិនិត្យ projection ក្នុង no-money-write scan ផង។ ការវាស់នេះប្រើ JS/SSR ពិតដោយមិនរត់ Chromium stage; assertions ដែលត្រូវការ initial HTML នៅមិនទាន់ផ្ទៀង។
+- តេស្តរួម ១៥ suites ឆ្លង ២៦៥ រួម deferred Excel ដែលមានស្រាប់; typecheck/lint/build/doc/slot/purity/coverage/comments ឆ្លង។ Audit measurement build រារាំងនៅ Chromium local socket (`Operation not permitted`) ទោះសាកបរិស្ថានដែលបានអនុញ្ញាត។ Full CI, hosted deployment និង real-device QA នៅមិនទាន់រត់។ ការកែនេះមិនអះអាងថាគ្មានកំហុសទាំងអស់ និងមិនប្ដូរ APK Audit gate។
 
 ### 2026-11-18 · ស្តារការកែ local ដែលបាត់ក្រោយ workspace ចាប់ផ្ដើមឡើងវិញ
 
@@ -5586,7 +5588,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `sdk-surface` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ · ផ្នែក ៩ |
 | `secret-hygiene` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `security-guard-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ · ផ្នែក ៩ |
-| `semantic-ui-color-test` | — | ផ្នែក ១ · ផ្នែក ២ |
+| `semantic-ui-color-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `sentry-load-race-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `setup-link-browser-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `setup-link-logout-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
@@ -5779,6 +5781,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `tools/audit-tools/zoew/tests/login-autofill.test.tsx` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/login-over-drawer.test.tsx` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/login-routing.test.tsx` | — | ផ្នែក ៧ · ផ្នែក ៩ |
+| `tools/audit-tools/zoew/tests/lookup-freshness-vm.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/lookup-import-race.test.ts` | ផ្នែក ១ | ផ្នែក ៩ |
 | `tools/audit-tools/zoew/tests/lookup-key-restore-idb.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/lookup-late-answer-busy.test.ts` | — | ផ្នែក ៨ · ផ្នែក ៩ |

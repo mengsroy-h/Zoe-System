@@ -5632,6 +5632,9 @@
     },
     "tools/audit-tools/zoew/tests/keygen-setup-link-output.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/lookup-freshness-vm.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

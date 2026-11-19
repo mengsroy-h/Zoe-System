@@ -75,8 +75,6 @@ export function watchHealthCheck() {
         changed();
     };
     const externalChange = () => {
-        // The external event already invalidates this snapshot. A queued store notification
-        // for the same transition must not cancel a manual check started after the event.
         previous = signature();
         previousSecret = securityState.lookupSecretKey;
         owner = captureConnectionOperation();

@@ -17,6 +17,7 @@ import { refTo } from '../../../../ZoeW/src/app/refs';
 import { dataState, firebaseState, uiState, ztoState } from '../../../../ZoeW/src/core/state';
 import { viewState } from '../../../../ZoeW/src/core/view-state';
 import { appLocalStore } from '../../../../ZoeW/src/core/storage';
+import { shopScope } from '../../../../ZoeW/src/core/shop-scope';
 import { clearCustomerDataTableCache } from '../../../../ZoeW/src/features/customer-table';
 import { fetchZtoSignedCodes, runZtoListSyncPreview, ztoListPositiveCount } from '../../../../ZoeW/src/features/zto-list-sync';
 import { clearZtoPickupStatusStore } from '../../../../ZoeW/src/features/zto-status';
@@ -57,7 +58,6 @@ beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date(NOW));
     appLocalStore.clear();
-    appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(CFG));
     appLocalStore.setItem('zoew_zto_listsync_v1', '1');
     clearCustomerDataTableCache();
     clearZtoPickupStatusStore();
@@ -73,6 +73,7 @@ beforeEach(() => {
     firebaseState.db = { audit: true } as any;
     firebaseState.fb = { getIdTokenResult: async () => ({ token: 'audit-token' }) } as any;
     configureFixtureBackend('zto-signed-mismatch');
+    appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ ...CFG, shop: shopScope() }));
     acceptFixtureSession();
     for (const name of ['ztoListSyncFrom', 'ztoListSyncTo'] as const) {
         const input = document.createElement('input');

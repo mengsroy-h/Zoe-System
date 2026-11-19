@@ -55,7 +55,7 @@ function sliceFn(name) {
 
 const NEEDED = ['healthAgeText', 'healthNetworkRow', 'healthNetworkLiveRow', 'healthServiceWorkerLiveRow', 'healthDatabaseRow', 'healthDatabaseLiveRow', 'healthDatabaseWriteRow', 'captureConnectionOperation', 'healthStorageWritable',
     'healthClockRow', 'healthLicenseRow', 'healthCustomerTableRow', 'healthStorageRow',
-    'healthServiceWorkerRow', 'healthLookupRow', 'ztoRenewalText', 'healthSheetScriptRow', 'clearCustomerDataTableCache', 'ztoDiagnosticsUrl', 'runHealthCheck', 'runHealthCheckRound', 'healthTaskIsCurrent', 'settleHealthProbes',
+    'healthServiceWorkerRow', 'healthLookupRow', 'ztoRenewalText', 'healthSheetScriptRow', 'clearCustomerDataTableCache', 'ztoDiagnosticsUrl', 'runHealthCheck', 'runHealthCheckRound', 'healthTaskIsCurrent', 'settleHealthProbes', 'createLifecycleScope', 'documentIsHidden',
     'openHealthCheck', 'safeLookupReason', 'lookupApiIsZto', 'lookupApiIsPalm', 'addPalmSessionHeader', 'healthPalmLookupRow', 'lookupApiIsAppsScript',
     'sanitizeInput', 'elapsedSince', 'fetchWithTimeout', 'testLookupApiConfig',
     'attemptAutoLookup', 'lookupApiSendsHeader', 'retryAsync', 'lookupResponseError', 'lookupSecretLocked', 'lookupKeyedUrl', 'lookupUrlWithKey', 'lookupUrlSplitKey',

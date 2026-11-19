@@ -3,6 +3,8 @@ import { healthLicenseStatus } from './health-license-status';
 import { loadDeviceInfo } from './device-info';
 import { modalIsOpen } from '../core/modals';
 import { healthPendingRow, healthRow } from '../app/components/health/model';
+import { createLifecycleScope } from '../app/lifecycle/scope';
+import { documentIsHidden } from '../platform/document-io';
 import { viewState } from '../core/view-state';
 import { firebaseState, lookupState, securityState, uiState } from '../core/state';
 import { cleanupClockIsTrustworthy, getServerNow, serverClockIsTrustworthy } from '../core/clock';
@@ -278,12 +280,13 @@ export async function healthServiceWorkerLiveRow(signal?: AbortSignal) {
     try {
         return await new Promise<ReturnType<typeof healthRow>>((resolve) => {
             const channel = new MessageChannel();
+            const scope = createLifecycleScope();
             let settled = false;
             const finish = (row: ReturnType<typeof healthRow>) => {
                 if (settled) return;
                 settled = true;
                 clearTimeout(timer);
-                signal?.removeEventListener('abort', abort);
+                scope.dispose();
                 channel.port1.onmessage = null;
                 channel.port1.close();
                 channel.port2.close();
@@ -291,7 +294,7 @@ export async function healthServiceWorkerLiveRow(signal?: AbortSignal) {
             };
             const abort = () => finish(base);
             const timer = setTimeout(abort, 2000);
-            signal?.addEventListener('abort', abort, { once: true });
+            scope.listen(signal, 'abort', abort, { once: true });
             channel.port1.onmessage = (event) => {
                 const data = event.data;
                 if (navigator.serviceWorker.controller !== controller || !data
@@ -628,7 +631,7 @@ function healthTaskIsCurrent(task: HealthCheckTask) {
     return !task.controller.signal.aborted && task.run === uiState.healthRunSeq && task.owner.current()
         && task.tenant === firebaseState.auth?._account?.tenant_id && task.branch === firebaseState.auth?._account?.branch_code
         && task.lookupConfig === safeStoreGet(appLocalStore, 'zoew_lookup_api_config')
-        && task.lookupSecret === securityState.lookupSecretKey && modalIsOpen('healthCheckModal') && !document.hidden;
+        && task.lookupSecret === securityState.lookupSecretKey && modalIsOpen('healthCheckModal') && !documentIsHidden();
 }
 
 export function runHealthCheck(force = false, verifyPalm = true): Promise<void> {
@@ -659,18 +662,17 @@ const HEALTH_ROUND_TIMEOUT_MS = 30000;
 
 function settleHealthProbes<T>(probes: Promise<T>, signal: AbortSignal): Promise<T | null> {
     return new Promise((resolve, reject) => {
+        const scope = createLifecycleScope();
         const clean = () => {
             clearTimeout(timer);
-            signal.removeEventListener('abort', aborted);
+            scope.dispose();
         };
         const aborted = () => { clean(); resolve(null); };
         const timer = setTimeout(() => {
             clean();
             reject(new Error('Health round timed out'));
         }, HEALTH_ROUND_TIMEOUT_MS);
-        signal.addEventListener('abort', aborted, { once: true });
-        // Even if a non-cancellable SDK/crypto operation settles later, observe it
-        // without holding the UI busy or accepting a result after invalidation.
+        scope.listen(signal, 'abort', aborted, { once: true });
         probes.then(value => { clean(); resolve(value); }, error => { clean(); reject(error); });
         if (signal.aborted) aborted();
     });
@@ -708,7 +710,6 @@ async function runHealthCheckRound(task: HealthCheckTask, palm: boolean) {
         }
         const evidence = lastPalmHealthEvidence;
         const age = evidence && evidence.current() ? performance.now() - evidence.verifiedAt : null;
-        // Published as history, never as the verdict of this passive round.
         rows.push(palm && !verifyPalm && online && age !== null && age >= 0 && age < 300000 && lookupRow.state === 'info'
             ? healthRow('info', lookupRow.label, 'ការផ្ទៀងចុងក្រោយ៖ ZTO ទទួលយក session ZTO ' + durationText(age)
                 + 'មុន — មិនបានផ្ទៀងផ្ទាត់ជាថ្មី។ ចុច «ពិនិត្យម្តងទៀត» ដើម្បីផ្ទៀងផ្ទាត់')

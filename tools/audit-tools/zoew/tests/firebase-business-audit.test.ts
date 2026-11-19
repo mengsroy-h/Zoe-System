@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -212,6 +213,30 @@ describe('trusted Firebase business audit projection', () => {
         const after = Object.fromEntries(Array.from({ length: 70 }, (_, i) => ['field' + i, 2]));
         const result = audit.changedFields(before, after);
         expect(result.fields).toHaveLength(32); expect(result.total).toBe(70); expect(result.truncated).toBe(true);
+    });
+    it.each([
+        [null, { packagesPickedUp: 0 }],
+        [{ packagesPickedUp: 1, pickedUpBarcodes: { QA000001: 'PRIVATE_A' } }, { packagesPickedUp: 0, pickupResetEpoch: 1 }],
+        [{ packagesPickedUp: 0, pickedUpBarcodes: {} }, { packagesPickedUp: 1, pickedUpBarcodes: { QA000001: 'PRIVATE_A' } }],
+        [{ packagesPickedUp: 0 }, null]
+    ])('records ordinary pickup create/reset/add/delete with an empty member set', async (before, after) => {
+        const root = 'zoew_daily_pickup_cod_dod', id = '2026-11-19';
+        const db = memory(), handler = audit.createHandler(root, config);
+        const result = await handler(db.change(before, after), context(root, id));
+        expect(db.writes()).toBe(1);
+        const event = db.data.get(audit.AUDIT_ROOT + '/' + result.eventId);
+        for (const snapshot of [event.before, event.after]) {
+            if (snapshot.pickup?.barcodeCount === 0) expect(snapshot.pickup.barcodeDigest).toBe(createHash('sha256').update('[]').digest('hex'));
+        }
+        expect(JSON.stringify(event)).not.toContain('PRIVATE_A');
+        expect((await handler(db.change(before, after), context(root, id))).duplicate).toBe(true);
+        expect(db.writes()).toBe(1);
+    });
+    it('retains the exact historical digest and fingerprint for nonempty pickup members', () => {
+        const root = 'zoew_daily_pickup_cod_dod', value = { packagesPickedUp: 2, pickedUpBarcodes: { Z: 'PRIVATE_Z', A: 'PRIVATE_A' } };
+        const event = audit.buildEvent(root, '2026-11-19', null, value, context(root, '2026-11-19'), config);
+        expect(event.after.pickup.barcodeDigest).toBe(createHash('sha256').update(audit.stable(['A', 'Z'])).digest('hex'));
+        expect(event.fingerprint).toBe('2da66554a77eb084f412d4c700f05781f3038b16d34f12dd182b10ba2901448d');
     });
     it('same-count pickup barcode reassignment changes the full key digest without copying phone values', () => {
         const root = 'zoew_daily_pickup_cod_dod', before = { packagesPickedUp: 1, pickedUpBarcodes: { QA000001: 'PRIVATE_PHONE_A' }, pickedUpPhones: { PRIVATE_PHONE_A: 1 } };

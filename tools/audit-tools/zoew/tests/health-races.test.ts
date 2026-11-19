@@ -13,13 +13,14 @@ function deferred<T>() {
     return { promise, resolve };
 }
 let stops: Array<() => void>;
-let requests: Array<{ url: string; resolve: (response: Response) => void }>;
+let requests: Array<{ url: string; signal?: AbortSignal | null; resolve: (response: Response) => void }>;
 let runs: Array<Promise<unknown>>;
 let online: boolean;
 let hidden: boolean;
 let workers: EventTarget & { controller: null };
 let originalWorker: PropertyDescriptor | undefined;
 const start = () => { const run = runHealthCheck(); runs.push(run); return run; };
+const startPassive = () => { const run = runHealthCheck(false, false); runs.push(run); return run; };
 const watch = () => { const stop = watchHealthCheck(); stops.push(stop); return stop; };
 const answer = (index: number, valid = true) => {
     const request = requests[index];
@@ -45,7 +46,7 @@ beforeEach(() => {
     vi.spyOn(navigator, 'onLine', 'get').mockImplementation(() => online);
     vi.spyOn(document, 'hidden', 'get').mockImplementation(() => hidden);
     Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: workers });
-    vi.stubGlobal('fetch', vi.fn((url: string) => new Promise<Response>(resolve => requests.push({ url, resolve }))));
+    vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => new Promise<Response>(resolve => requests.push({ url, signal: init?.signal, resolve }))));
     acceptFixtureSession();
 });
 afterEach(async () => {
@@ -62,11 +63,11 @@ afterEach(async () => {
 it('openHealthCheck ពិតហៅស្ទួនក្នុង modal ដដែល មិនបង្កើតជុំថ្មី', async () => {
     registerModalMeta('healthCheckModal', {});
     setModalDisplay('healthCheckModal', 'none');
-    openHealthCheck(); const first = start();
+    openHealthCheck(); const first = startPassive();
     expect(requests).toHaveLength(1);
     openHealthCheck();
     expect(requests).toHaveLength(1);
-    expect(start()).toBe(first);
+    expect(startPassive()).toBe(first);
     answer(0); await first;
     expect(uiState.healthRows[0].state).toBe('ok');
 });
@@ -74,9 +75,9 @@ it('openHealthCheck ពិតហៅស្ទួនក្នុង modal ដដ�
 it('openHealthCheck ពិតក្រោយបិទនិងបើក ត្រូវបង្កើតជុំថ្មីមិនប្រើចម្លើយចាស់', async () => {
     registerModalMeta('healthCheckModal', {});
     setModalDisplay('healthCheckModal', 'none');
-    openHealthCheck(); const first = start();
+    openHealthCheck(); const first = startPassive();
     setModalDisplay('healthCheckModal', 'none');
-    openHealthCheck(); const second = start();
+    openHealthCheck(); const second = startPassive();
     expect(second).not.toBe(first);
     expect(requests).toHaveLength(2);
     answer(1, false); await second;
@@ -387,4 +388,77 @@ it('ជុំ manual ក្នុង cooldown ដំណើរការភ្ល�
     await vi.advanceTimersByTimeAsync(20250);
     expect(requests).toHaveLength(3);
     answer(2); await vi.advanceTimersByTimeAsync(1);
+});
+
+
+function configurePalmHealth() {
+    localStorage.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true,
+        url: window.location.origin + '/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}',
+        palmAccount: { siteCode: 'KH001' } }));
+}
+const palmVerificationRequests = () => requests.filter(request => new URL(request.url, window.location.origin).searchParams.get('verify') === '1');
+
+it('បើក Health ជាដំបូង និង poll ស្វ័យប្រវត្តិ មិនផ្ញើ Palm verify=1', async () => {
+    configurePalmHealth();
+    registerModalMeta('healthCheckModal', {});
+    setModalDisplay('healthCheckModal', 'none');
+    openHealthCheck(); watch();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(palmVerificationRequests()).toHaveLength(0);
+    requests.forEach((_, index) => answer(index));
+    await vi.advanceTimersByTimeAsync(1);
+    const beforePoll = requests.length;
+    await vi.advanceTimersByTimeAsync(30251);
+    expect(requests.length).toBeGreaterThan(beforePoll);
+    expect(palmVerificationRequests()).toHaveLength(0);
+});
+
+it('manual Health នៅតែផ្ញើ Palm verify=1 តែម្តង ហើយ manual ស្ទួន share ជុំ', async () => {
+    configurePalmHealth();
+    const first = start(); const second = start();
+    expect(second).toBe(first);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(palmVerificationRequests()).toHaveLength(1);
+    requests.forEach((_, index) => answer(index));
+    await first;
+});
+
+it('manual ជំនួស passive ដែលកំពុងរង់ចាំ មិនបាត់ការផ្ទៀង Palm ដែលអ្នកប្រើស្នើ', async () => {
+    configurePalmHealth();
+    const passive = startPassive();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(palmVerificationRequests()).toHaveLength(0);
+    const manual = start();
+    expect(manual).not.toBe(passive);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(palmVerificationRequests()).toHaveLength(1);
+    requests.forEach((_, index) => answer(index));
+    await Promise.all([passive, manual]);
+});
+
+it.each(['close', 'hidden', 'offline', 'auth', 'lookup-config', 'supersede'])('HTTP Health ត្រូវ abort ពេល %s ហើយចម្លើយយឺតមិនដាក់ភស្តុតាងចាស់', async change => {
+    const stop = watch(); const old = start();
+    expect(requests).toHaveLength(1);
+    const signal = requests[0].signal;
+    expect(signal).toBeDefined();
+    expect(signal?.aborted).toBe(false);
+    let newer: Promise<void> | undefined;
+    if (change === 'close') { uiState.modalDisplay = {}; stop(); }
+    if (change === 'hidden') { hidden = true; document.dispatchEvent(new Event('visibilitychange')); }
+    if (change === 'offline') { online = false; window.dispatchEvent(new Event('offline')); }
+    if (change === 'auth') { firebaseState.authGeneration++; firebaseState.flush(); }
+    if (change === 'lookup-config') {
+        localStorage.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: false }));
+        window.dispatchEvent(new StorageEvent('storage', { key: 'zoew_lookup_api_config' }));
+    }
+    if (change === 'supersede') { newer = runHealthCheck(true); runs.push(newer); }
+    expect(signal?.aborted).toBe(true);
+    const currentRows = uiState.healthRows;
+    answer(0); await old;
+    expect(uiState.healthRows).toEqual(currentRows);
+    if (newer) {
+        expect(viewState.healthRecheckBusy).toBe(true);
+        answer(1); await newer;
+        expect(uiState.healthRows[0].state).toBe('ok');
+    }
 });

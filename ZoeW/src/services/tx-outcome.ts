@@ -98,7 +98,7 @@ export function txRestUrl(ref) {
     return url.toString();
 }
 
-export async function txReadServerValue(restUrl, budgetMs = TX_OUTCOME_READ_TIMEOUT_MS, isCurrent = () => true) {
+export async function txReadServerValue(restUrl, budgetMs = TX_OUTCOME_READ_TIMEOUT_MS, isCurrent = () => true, signal?: AbortSignal) {
     const startedAt = Date.now();
     const user = firebaseState.auth && firebaseState.auth.currentUser;
     if (!restUrl || !user || typeof user.getIdToken !== 'function' || !isCurrent()) throw new Error('Transaction outcome read unavailable');
@@ -108,7 +108,7 @@ export async function txReadServerValue(restUrl, budgetMs = TX_OUTCOME_READ_TIME
     if (remaining <= 0) throw new Error('Transaction outcome read timed out');
     const url = new URL(restUrl);
     url.searchParams.set('auth', String(token));
-    const out = await fetchWithTimeout(url.toString(), { cache: 'no-store', credentials: 'omit' },
+    const out = await fetchWithTimeout(url.toString(), { cache: 'no-store', credentials: 'omit', signal },
         remaining, 'Transaction outcome read timed out',
         (res) => (res && res.ok ? res.json() : Promise.reject(new Error('HTTP ' + (res ? res.status : 0)))));
     return out.body === undefined ? null : out.body;

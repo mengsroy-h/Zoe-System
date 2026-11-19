@@ -3,7 +3,7 @@ import { firebaseState, uiState } from '../../../../ZoeW/src/core/state';
 import { viewState } from '../../../../ZoeW/src/core/view-state';
 import * as live from '../../../../ZoeW/src/app/behaviors/health-live';
 const mocks = vi.hoisted(() => ({ run: vi.fn(async () => {}), clock: vi.fn(() => ({ label: 'នាឡិកា Server', state: 'ok', detail: 'ចាស់' })) }));
-vi.mock('../../../../ZoeW/src/features/health-check', () => ({ runHealthCheck: mocks.run, openHealthCheck: () => {}, healthCheckResultIsCurrent: () => false, healthNetworkRow: () => ({ state: 'bad', icon: '❌' }), healthClockRow: mocks.clock, healthDatabaseRow: () => ({}), healthDatabaseWriteRow: () => null }));
+vi.mock('../../../../ZoeW/src/features/health-check', () => ({ runHealthCheck: mocks.run, invalidateHealthCheck: () => { ++uiState.healthRunSeq; }, openHealthCheck: () => {}, healthCheckResultIsCurrent: () => false, healthNetworkRow: () => ({ state: 'bad', icon: '❌' }), healthClockRow: mocks.clock, healthDatabaseRow: () => ({}), healthDatabaseWriteRow: () => null }));
 let stop: (() => void) | undefined;
 beforeEach(() => {
     vi.useFakeTimers(); mocks.run.mockReset(); mocks.run.mockResolvedValue(undefined); mocks.clock.mockReturnValue({ label: 'នាឡិកា Server', state: 'ok', detail: 'ចាស់' });

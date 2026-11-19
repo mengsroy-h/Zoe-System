@@ -61,12 +61,12 @@ export function healthNetworkRow(serverVerified = false) {
             : healthRow('info', 'អ៊ីនធឺណិត', 'ភ្ជាប់បណ្ដាញឧបករណ៍ តែមិនទាន់ផ្ទៀងផ្ទាត់ Server — នេះជាព័ត៌មាន មិនមែនកំហុស');
 }
 
-export async function healthNetworkLiveRow() {
+export async function healthNetworkLiveRow(signal?: AbortSignal) {
     if ((navigator.onLine as boolean) === false) return healthNetworkRow();
     try {
         const nonce = Array.from(crypto.getRandomValues(new Uint8Array(16)), (n) => n.toString(16).padStart(2, '0')).join('');
         const out = await fetchWithTimeout('/.netlify/functions/health?nonce=' + nonce,
-            { method: 'GET', cache: 'no-store', credentials: 'omit', redirect: 'error' },
+            { method: 'GET', cache: 'no-store', credentials: 'omit', redirect: 'error', signal },
             4000, 'Network health timed out', (res) => res.ok && !res.redirected ? res.json() : null);
         return healthNetworkRow(!!out && out.res.ok && !out.res.redirected && out.body?.nonce === nonce);
     } catch (e) { return healthNetworkRow(); }
@@ -99,7 +99,7 @@ export function healthDatabaseWriteRow() {
     return null;
 }
 
-export async function healthDatabaseLiveRow() {
+export async function healthDatabaseLiveRow(signal?: AbortSignal) {
     const owner = captureConnectionOperation();
     const unverified = () => healthRow('warn', databaseHealthLabel(), 'មិនទាន់អាចផ្ទៀងផ្ទាត់ការតភ្ជាប់ Server ក្នុងគណនីនេះ — សូមពិនិត្យម្តងទៀត');
     if (!owner.current()) return unverified();
@@ -107,7 +107,7 @@ export async function healthDatabaseLiveRow() {
     if (writes) return writes;
     const base = healthDatabaseRow();
     if (base.state !== 'ok') return base;
-    const alive = await healthDatabaseRead();
+    const alive = await healthDatabaseRead(signal);
     if (!owner.current()) return unverified();
     const pending = healthDatabaseWriteRow();
     if (pending) return pending;
@@ -142,13 +142,13 @@ export function healthTenantRow(account?, verified = false) {
     return healthRow(until > getServerNow() ? 'ok' : 'bad', 'ហាង (Supabase)', label + (until > getServerNow() ? ' — Server បានបញ្ជាក់ក្នុងការពិនិត្យនេះ' : ' — ផុតកំណត់'));
 }
 
-export async function healthTenantLiveRow() {
+export async function healthTenantLiveRow(signal?: AbortSignal) {
     const owner = captureConnectionOperation();
     const account = firebaseState.fb && typeof firebaseState.fb.accountOf === 'function' ? firebaseState.fb.accountOf(firebaseState.auth) : null;
     const transport = firebaseState.auth?._transport;
     if (!firebaseState.auth?.currentUser || !transport || typeof transport.rpc !== 'function' || (navigator.onLine as boolean) === false) return healthTenantRow(account);
     try {
-        const rows = await withTimeout(transport.rpc('my_account', {}, 8000, { observational: true, current: owner.current, deadline: performance.now() + 8000 }), 8000, 'Shop health timed out');
+        const rows = await withTimeout(transport.rpc('my_account', {}, 8000, { observational: true, current: () => !signal?.aborted && owner.current(), deadline: performance.now() + 8000 }), 8000, 'Shop health timed out');
         if (!owner.current()) return healthTenantRow();
         const row = Array.isArray(rows) ? rows[0] : null;
         if (account?.tenant_id && row?.tenant_id !== account.tenant_id) return healthTenantRow();
@@ -167,15 +167,15 @@ export function healthKeyValidityText(status) {
     return 'ផុត ' + getZoneDateKey(exp, 0) + (Number.isFinite(days) && days >= 0 ? ' (នៅសល់ ' + days + ' ថ្ងៃ)' : '');
 }
 
-export async function healthLicenseRow() {
+export async function healthLicenseRow(signal?: AbortSignal) {
     const backend = healthBackendKind();
     if (backend === 'none') return healthRow('info', HEALTH_ADVICE_LABELS.license, 'អាស្រ័យលើ Server ៖ Firebase ➜ Activation Key ពីអ្នកលក់ · Supabase ➜ ស្ថានភាពហាង (គ្មាន Key) — កំណត់ Config សិន');
-    if (backend === 'supabase') return healthTenantLiveRow();
+    if (backend === 'supabase') return healthTenantLiveRow(signal);
     if (!window.ZoeLicense || typeof ZoeLicense.checkOnline !== 'function') {
         return healthRow('warn', 'អាជ្ញាប័ណ្ណ', 'ម៉ូឌុល License មិនទាន់ផ្ទុក');
     }
     try {
-        const status = await withTimeout(healthLicenseStatus(), 8000, 'License check timed out');
+        const status = await withTimeout(healthLicenseStatus(signal), 8000, 'License check timed out');
         const validity = healthKeyValidityText(status);
         if (status && status.state === 'active') {
             const days = Number(status.daysLeft);
@@ -271,9 +271,9 @@ export function healthServiceWorkerRow() {
         : healthRow('warn', 'របៀបក្រៅបណ្ដាញ', 'មិនទាន់គ្រប់គ្រងទំព័រនេះ — សូមទាញចុះ ១ ដងទៀត');
 }
 
-export async function healthServiceWorkerLiveRow() {
+export async function healthServiceWorkerLiveRow(signal?: AbortSignal) {
     const base = healthServiceWorkerRow();
-    if (base.state !== 'info' || typeof MessageChannel !== 'function') return base;
+    if (signal?.aborted || base.state !== 'info' || typeof MessageChannel !== 'function') return base;
     const controller = navigator.serviceWorker.controller;
     try {
         return await new Promise<ReturnType<typeof healthRow>>((resolve) => {
@@ -283,12 +283,15 @@ export async function healthServiceWorkerLiveRow() {
                 if (settled) return;
                 settled = true;
                 clearTimeout(timer);
+                signal?.removeEventListener('abort', abort);
                 channel.port1.onmessage = null;
                 channel.port1.close();
                 channel.port2.close();
                 resolve(row);
             };
-            const timer = setTimeout(() => finish(base), 2000);
+            const abort = () => finish(base);
+            const timer = setTimeout(abort, 2000);
+            signal?.addEventListener('abort', abort, { once: true });
             channel.port1.onmessage = (event) => {
                 const data = event.data;
                 if (navigator.serviceWorker.controller !== controller || !data
@@ -439,7 +442,7 @@ export function ztoSignedMismatchText(body) {
         + ' ➜ មិនរាប់ជាភស្តុតាងបិទ — សូមកែអត្ថបទនោះនៅ Netlify';
 }
 
-export async function healthLookupRow() {
+export async function healthLookupRow(verifyPalm = true, signal?: AbortSignal, current = () => !signal?.aborted) {
     const cfg = getLookupApiConfig();
     if (!cfg || !cfg.enabled || !cfg.url) {
         return healthRow('info', 'Lookup អតិថិជន', 'មិនទាន់បើក');
@@ -460,18 +463,23 @@ export async function healthLookupRow() {
     if ((navigator.onLine as boolean) === false) {
         return healthRow('warn', 'Lookup អតិថិជន (ZTO)', 'បើករួច — ពិនិត្យមិនបានខណៈក្រៅបណ្ដាញ');
     }
+    const palm = lookupApiIsPalm(cfg);
+    const unverified = () => healthRow('info', 'Lookup អតិថិជន (ZTO)',
+        'មិនទាន់ផ្ទៀងផ្ទាត់ជាមួយ ZTO — ចុច «ពិនិត្យម្តងទៀត» ដើម្បីផ្ទៀងផ្ទាត់');
+    if (!current() || (palm && !verifyPalm)) return unverified();
     const headers = {};
     if (cfg.headerName) {
         const value = cfg.headerValueEnc ? await decryptLookupSecret(cfg.headerValueEnc) : '';
+        if (!current()) return unverified();
         if (!value) {
             return healthRow('warn', 'Lookup អតិថិជន (ZTO)', 'បើករួច តែស្រាយសោមិនបាន — សូមកំណត់ Header ម្តងទៀត');
         }
         headers[cfg.headerName] = value;
     }
-    if (lookupApiIsPalm(cfg)) return healthPalmLookupRow(cfg, headers);
+    if (palm) return healthPalmLookupRow(cfg, headers, signal, current, unverified);
     try {
         const out = await fetchWithTimeout(ztoDiagnosticsUrl(cfg),
-            { method: 'GET', headers, cache: 'no-store', credentials: 'same-origin' },
+            { method: 'GET', headers, cache: 'no-store', credentials: 'same-origin', signal },
             ZTO_TEST_TIMEOUT_MS, 'ZTO diagnostics timed out',
             (r) => (r.ok ? r.json() : null));
         const res = out && out.res;
@@ -517,7 +525,7 @@ export async function healthLookupRow() {
     }
 }
 
-async function healthPalmLookupRow(cfg, headers) {
+async function healthPalmLookupRow(cfg, headers, signal: AbortSignal | undefined, current: () => boolean, unverified: () => ReturnType<typeof healthRow>) {
     const title = 'Lookup អតិថិជន (ZTO)';
     try {
         const identityHeaders = {};
@@ -526,9 +534,10 @@ async function healthPalmLookupRow(cfg, headers) {
     } catch (e) {
         return healthRow('warn', title, 'មិនទាន់មាន session ZTO — សូម Login ZTO ក្នុង «API ស្វែងរកអតិថិជន»');
     }
+    if (!current()) return unverified();
     try {
         const out = await fetchWithTimeout(ztoDiagnosticsUrl(cfg) + '&verify=1',
-            { method: 'GET', headers, cache: 'no-store', credentials: 'same-origin' },
+            { method: 'GET', headers, cache: 'no-store', credentials: 'same-origin', signal },
             ZTO_TEST_TIMEOUT_MS, 'ZTO diagnostics timed out',
             (r) => r.json().catch(() => null));
         const res = out && out.res;
@@ -572,14 +581,19 @@ export function openHealthCheck() {
     closeSideDrawer();
     openModalHelper('healthCheckModal');
     loadDeviceInfo();
-    runHealthCheck(!alreadyOpen);
+    runHealthCheck(!alreadyOpen, false);
 }
 
 let healthActiveRun = 0;
 let healthCompletedRun = 0;
 
-export function resetHealthCheck() {
+export function invalidateHealthCheck() {
     ++uiState.healthRunSeq;
+    healthCheckTask?.controller.abort();
+}
+
+export function resetHealthCheck() {
+    invalidateHealthCheck();
     healthActiveRun = 0;
     healthCompletedRun = 0;
     healthCheckTask = null;
@@ -597,45 +611,68 @@ interface HealthCheckTask {
     owner: ReturnType<typeof captureConnectionOperation>;
     worker: ServiceWorker | null | undefined;
     lookupConfig: string | null;
+    lookupSecret: typeof securityState.lookupSecretKey;
+    verifyPalm: boolean;
+    controller: AbortController;
     promise: Promise<void>;
 }
 
 let healthCheckTask: HealthCheckTask | null = null;
 
-export function runHealthCheck(force = false): Promise<void> {
+function healthTaskIsCurrent(task: HealthCheckTask) {
+    return !task.controller.signal.aborted && task.run === uiState.healthRunSeq && task.owner.current()
+        && task.lookupConfig === safeStoreGet(appLocalStore, 'zoew_lookup_api_config')
+        && task.lookupSecret === securityState.lookupSecretKey && modalIsOpen('healthCheckModal') && !document.hidden;
+}
+
+export function runHealthCheck(force = false, verifyPalm = true): Promise<void> {
     const worker = navigator.serviceWorker?.controller;
     const lookupConfig = safeStoreGet(appLocalStore, 'zoew_lookup_api_config');
     const previous = healthCheckTask;
-    if (force !== true && previous && previous.run === uiState.healthRunSeq && previous.owner.current()
-        && previous.worker === worker && previous.lookupConfig === lookupConfig && modalIsOpen('healthCheckModal')) return previous.promise;
-    const task: HealthCheckTask = { run: ++uiState.healthRunSeq, owner: captureConnectionOperation(), worker, lookupConfig, promise: Promise.resolve() };
+    const needsPalm = verifyPalm && lookupApiIsPalm(getLookupApiConfig());
+    if (force !== true && previous && healthTaskIsCurrent(previous) && previous.worker === worker
+        && (!needsPalm || previous.verifyPalm)) return previous.promise;
+    previous?.controller.abort();
+    const task: HealthCheckTask = {
+        run: ++uiState.healthRunSeq, owner: captureConnectionOperation(), worker, lookupConfig,
+        lookupSecret: securityState.lookupSecretKey, verifyPalm, controller: new AbortController(), promise: Promise.resolve()
+    };
     healthCheckTask = task;
-    task.promise = runHealthCheckRound(task).finally(() => { if (healthCheckTask === task) healthCheckTask = null; });
+    const stopOwner = task.owner.watch(() => task.controller.abort());
+    task.promise = runHealthCheckRound(task).finally(() => {
+        stopOwner();
+        if (healthCheckTask === task) healthCheckTask = null;
+    });
     return task.promise;
 }
 
 async function runHealthCheckRound(task: HealthCheckTask) {
-    const { run, owner, worker, lookupConfig } = task;
+    const { run, worker, verifyPalm, controller: { signal } } = task;
+    const current = () => healthTaskIsCurrent(task);
     healthActiveRun = run;
     viewState.healthRecheckBusy = true;
     uiState.healthRows = [healthPendingRow()];
     uiState.healthAdvice = null;
     uiState.touch();
     try {
-        const [databaseRow, licenseRow, lookupRow, offlineRow, networkRow] = await Promise.all([healthDatabaseLiveRow(), healthLicenseRow(), healthLookupRow(), healthServiceWorkerLiveRow(), healthNetworkLiveRow()]);
-        const rows = [healthNetworkRow(owner.current() && networkRow.state === 'ok'), healthClockRow(), healthStorageRow(), healthServiceWorkerRow(), healthCustomerTableRow(), healthSheetScriptRow()];
+        if (!current()) return;
+        const [databaseRow, licenseRow, lookupRow, offlineRow, networkRow] = await Promise.all([
+            healthDatabaseLiveRow(signal), healthLicenseRow(signal), healthLookupRow(verifyPalm, signal, current),
+            healthServiceWorkerLiveRow(signal), healthNetworkLiveRow(signal)
+        ]);
+        if (!current()) return;
+        const rows = [healthNetworkRow(networkRow.state === 'ok'), healthClockRow(), healthStorageRow(), healthServiceWorkerRow(), healthCustomerTableRow(), healthSheetScriptRow()];
         rows[3] = worker === navigator.serviceWorker?.controller ? offlineRow : healthServiceWorkerRow();
         const currentDatabase = healthDatabaseRow();
         rows.splice(1, 0, healthDatabaseWriteRow() || (currentDatabase.state === 'ok' ? databaseRow : currentDatabase));
         rows.splice(3, 0, licenseRow);
         rows.push(lookupRow);
-        if (run !== uiState.healthRunSeq || !owner.current() || lookupConfig !== safeStoreGet(appLocalStore, 'zoew_lookup_api_config') || !modalIsOpen('healthCheckModal')) return;
         uiState.healthRows = rows;
         healthCompletedRun = run;
         uiState.healthAdvice = buildHealthAdvice(rows);
         uiState.touch();
     } catch (e) {
-        if (run === uiState.healthRunSeq && modalIsOpen('healthCheckModal')) {
+        if (current()) {
             uiState.healthRows = [healthRow('warn', 'ពិនិត្យសុខភាព', 'ពិនិត្យមិនបានពេញលេញ — សូមពិនិត្យម្តងទៀត')];
             healthCompletedRun = run;
             uiState.healthAdvice = null;

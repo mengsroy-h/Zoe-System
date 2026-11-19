@@ -6,7 +6,7 @@ import { appLocalStore, safeStoreGet } from '../../core/storage';
 import { modalIsOpen } from '../../core/modals';
 import { buildHealthAdvice } from '../../features/health-advice';
 import { healthPendingRow } from '../components/health/model';
-import { healthCheckResultIsCurrent, healthClockRow, healthDatabaseRow, healthDatabaseWriteRow, healthNetworkRow, runHealthCheck } from '../../features/health-check';
+import { healthCheckResultIsCurrent, healthClockRow, healthDatabaseRow, healthDatabaseWriteRow, healthNetworkRow, invalidateHealthCheck, runHealthCheck } from '../../features/health-check';
 
 export function watchHealthCheck() {
     const scope = createLifecycleScope();
@@ -25,6 +25,7 @@ export function watchHealthCheck() {
         !!securityState.lookupSecretKey, safeStoreGet(appLocalStore, 'zoew_lookup_api_config')
     ]);
     let previous = signature();
+    let previousSecret = securityState.lookupSecretKey;
     let owner = captureConnectionOperation();
     const available = () => !stopped && modalIsOpen('healthCheckModal') && !document.hidden;
     const clear = () => { if (timer !== null) clearTimeout(timer); timer = null; };
@@ -33,7 +34,7 @@ export function watchHealthCheck() {
         if (available()) timer = setTimeout(tick, Math.max(ms, nextAutomaticAt - performance.now()));
     };
     const invalidate = () => {
-        ++uiState.healthRunSeq;
+        invalidateHealthCheck();
         uiState.healthRows = [(navigator.onLine as boolean) === false ? healthNetworkRow() : healthPendingRow()];
         uiState.healthAdvice = null;
     };
@@ -51,7 +52,7 @@ export function watchHealthCheck() {
         if (viewState.healthRecheckBusy) return;
         dirty = false;
         nextAutomaticAt = performance.now() + 30000;
-        void runHealthCheck().finally(() => {
+        void runHealthCheck(false, false).finally(() => {
             nextAutomaticAt = performance.now() + 30000;
             if (available()) schedule(dirty ? 250 : 30000);
         });
@@ -67,8 +68,9 @@ export function watchHealthCheck() {
             }
         }
         const current = signature();
-        if (current === previous && owner.current()) return;
+        if (current === previous && previousSecret === securityState.lookupSecretKey && owner.current()) return;
         previous = current;
+        previousSecret = securityState.lookupSecretKey;
         owner = captureConnectionOperation();
         changed();
     };
@@ -102,7 +104,7 @@ export function watchHealthCheck() {
     return () => {
         stopped = true;
         clear();
-        ++uiState.healthRunSeq;
+        invalidateHealthCheck();
         offs.forEach((off) => off());
         window.removeEventListener('online', changed);
         window.removeEventListener('offline', changed);

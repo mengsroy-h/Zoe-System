@@ -182,10 +182,13 @@ for (const app of ['ZoeW']) {
         const healthDecls = ['healthActiveRun', 'healthCompletedRun', 'healthCheckTask'].map((name) =>
             (src.match(new RegExp('^ *let ' + name + ' = .*$', 'm')) || [])[0]);
         const resetHealthFn = sliceFn(src, 'resetHealthCheck');
-        ok(healthDecls.every(Boolean) && !!resetHealthFn, 'រកឃើញ state និងមុខងារសម្អាត health ពិត');
+        const invalidateHealthFn = sliceFn(src, 'invalidateHealthCheck');
+        ok(healthDecls.every(Boolean) && !!resetHealthFn && !!invalidateHealthFn, 'រកឃើញ state និងមុខងារសម្អាត health ពិត');
         healthDecls.filter(Boolean).forEach((decl) => vm.runInContext(decl, ctx));
+        if (invalidateHealthFn) vm.runInContext(invalidateHealthFn, ctx);
         if (resetHealthFn) vm.runInContext(resetHealthFn, ctx);
-        vm.runInContext('healthActiveRun = 41; healthCompletedRun = 40; healthCheckTask = { owner: { uid: "health-fixture" } };'
+        ctx.healthAborted = 0;
+        vm.runInContext('healthActiveRun = 41; healthCompletedRun = 40; healthCheckTask = { owner: { uid: "health-fixture" }, controller: { abort() { healthAborted++; } } };'
             + ' uiState.healthRunSeq = 41; uiState.healthRows = [{ state: "ok" }]; uiState.healthAdvice = { level: "ok" }; viewState.healthRecheckBusy = true;', ctx);
         // ⛔ re-audit (D1) ៖ ការចាកចេញបញ្ចប់លំហូរស្កេន (`endScanFlow()`) ➜ ចាក់កូដ **ពិត** និងបញ្ជីប្រអប់របស់វា
         const scanFlowDecl = (src.match(/^ *const SCAN_FLOW_MODALS = .*$/m) || [])[0];
@@ -282,7 +285,7 @@ for (const app of ['ZoeW']) {
             'ការចាកចេញពិតលុប locator របស់តំណអញ្ជើញផងដែរ');
         const healthState = vm.runInContext('({ active: healthActiveRun, completed: healthCompletedRun, task: healthCheckTask,'
             + ' seq: uiState.healthRunSeq, busy: viewState.healthRecheckBusy, rows: uiState.healthRows, advice: uiState.healthAdvice })', ctx);
-        ok(healthState.active === 0 && healthState.completed === 0 && healthState.task === null
+        ok(ctx.healthAborted === 1 && healthState.active === 0 && healthState.completed === 0 && healthState.task === null
             && healthState.seq > 41 && healthState.busy === false && healthState.rows === null && healthState.advice === null,
             'ចាកចេញ ➜ សម្អាត context និងលទ្ធផល health ហើយដកសិទ្ធិចម្លើយចាស់', healthState);
 

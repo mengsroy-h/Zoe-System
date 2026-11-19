@@ -5,7 +5,7 @@ import { firebaseState, scanState, uiState } from '../core/state';
 import { sessionUserActionAllowed } from '../core/session-verification';
 import { viewState } from '../core/view-state';
 import { isBarcodeAlreadyUsed } from '../domain/registry';
-import { triggerScanAction } from './scan-action';
+import { triggerScanAction, type ScanConfirmationOutcome } from './scan-action';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { showToast } from '../ui/toast';
 
@@ -19,6 +19,9 @@ interface BatchRun {
     saved: number;
     skipped: number;
     existing: number;
+    pending: number;
+    confirming: number;
+    currentConfirmation: { started: boolean } | null;
     current: string;
     waiting: boolean;
     scanner: boolean;
@@ -90,8 +93,10 @@ function endBatchScan(reason: 'done' | 'stopped' | 'session' | 'mode' | 'offline
     const parts = ['បញ្ចូល ' + run.saved];
     if (run.existing) parts.push('មានរួច ' + run.existing);
     if (run.skipped) parts.push('រំលង ' + run.skipped);
+    const unconfirmed = run.pending + run.confirming;
+    if (unconfirmed) parts.push('មិនទាន់បញ្ជាក់ ' + unconfirmed);
     if (left > 0) parts.push('មិនទាន់បញ្ចូល ' + left);
-    const head = reason === 'done' ? '✅ បញ្ចូលច្រើនចប់ ៖ ' : (reason === 'mode' ? '⚠️ ការបញ្ចូលច្រើនឈប់ (ប្តូររបៀបស្កេន) ៖ ' : (reason === 'offline' ? '⚠️ ការបញ្ចូលច្រើនឈប់ (ក្រៅបណ្ដាញ — ភ្ជាប់វិញ រួចចាប់ផ្តើមម្តងទៀត) ៖ ' : 'ℹ️ បានបញ្ឈប់ការបញ្ចូលច្រើន ៖ '));
+    const head = reason === 'done' ? (unconfirmed ? '⚠️' : '✅') + ' បញ្ចូលច្រើនចប់ ៖ ' : (reason === 'mode' ? '⚠️ ការបញ្ចូលច្រើនឈប់ (ប្តូររបៀបស្កេន) ៖ ' : (reason === 'offline' ? '⚠️ ការបញ្ចូលច្រើនឈប់ (ក្រៅបណ្ដាញ) ៖ ' : 'ℹ️ បានបញ្ឈប់ការបញ្ចូលច្រើន ៖ '));
     showToast(head + parts.join(' · '));
 }
 
@@ -105,8 +110,8 @@ function settleCurrent(run: BatchRun) {
         run.current = '';
         return;
     }
-    if (isBarcodeAlreadyUsed(run.current)) run.saved++;
-    else run.skipped++;
+    if (!run.currentConfirmation?.started) run.skipped++;
+    run.currentConfirmation = null;
     run.current = '';
 }
 
@@ -138,17 +143,36 @@ function pumpBatchScan() {
         if (!run.scanner && isBarcodeAlreadyUsed(code)) { run.existing++; continue; }
         run.current = code;
         renderBatchScanStatus();
-        triggerScanAction(code);
+        const confirmation: { started: boolean; outcome?: ScanConfirmationOutcome } = { started: false };
+        run.currentConfirmation = confirmation;
+        triggerScanAction(code, run.scanner ? undefined : (outcome) => {
+            if (batchRun !== run || !batchSessionIsCurrent(run)) return;
+            if (confirmation.outcome === 'saving') run.confirming--;
+            else if (confirmation.outcome === 'saved') run.saved--;
+            else if (confirmation.outcome === 'skipped') run.skipped--;
+            else if (confirmation.outcome === 'pending') run.pending--;
+            confirmation.outcome = outcome;
+            if (outcome === 'saving') {
+                confirmation.started = true;
+                run.confirming++;
+                return;
+            }
+            if (!confirmation.started) return;
+            if (outcome === 'saved') run.saved++;
+            else if (outcome === 'skipped') run.skipped++;
+            else run.pending++;
+            queueMicrotask(() => { if (batchRun === run) pumpBatchScan(); });
+        });
         if (currentIsOpen(run)) { run.waiting = true; return; }
         settleCurrent(run);
         if (scanPathBusy()) return;
     }
-    endBatchScan('done');
+    if (run.confirming === 0) endBatchScan('done');
 }
 
 function beginRun(codes: string[], scanner: boolean) {
     const run: BatchRun = {
-        queue: codes, index: 0, saved: 0, skipped: 0, existing: 0, current: '', waiting: false,
+        queue: codes, index: 0, saved: 0, skipped: 0, existing: 0, pending: 0, confirming: 0, currentConfirmation: null, current: '', waiting: false,
         scanner, mode: scanner ? String(uiState.entryScanMode || 'parcel') : 'parcel',
         db: firebaseState.db, auth: firebaseState.authGeneration, unsubscribe: null
     };

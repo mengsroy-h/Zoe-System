@@ -18,7 +18,7 @@ import { scanState } from '../../../../ZoeW/src/core/state';
 import { viewState } from '../../../../ZoeW/src/core/view-state';
 import { closeCameraManually, stopCurrentStream } from '../../../../ZoeW/src/features/daily-stats';
 import { setupVisibilityHandling } from '../../../../ZoeW/src/app/behaviors/scanner-input';
-import { requestCameraPermission } from '../../../../ZoeW/src/services/camera';
+import { requestCameraPermission, toggleTorch } from '../../../../ZoeW/src/services/camera';
 
 function deferred<T>() {
     let resolve!: (value: T) => void, reject!: (error: Error) => void;
@@ -196,4 +196,31 @@ it('កម្មវិធីនៅបង្ហាញ ៖ មិនបោះប�
     permission.resolve(current); await flush();
     expect(scanState.currentStream).toBe(current);
     expect(current.track.stop).not.toHaveBeenCalled();
+});
+
+
+it.each(['closed', 'replaced', 'generation'] as const)('ភ្លើងកាមេរ៉ា៖ លទ្ធផលយឺតមិនកែស្ថានភាពក្រោយ %s', async change => {
+    const pending = deferred<void>();
+    const track = { applyConstraints: vi.fn(() => pending.promise) };
+    scanState.currentVideoTrack = track as any;
+    toggleTorch();
+    expect(track.applyConstraints).toHaveBeenCalledWith({ advanced: [{ torch: true }] });
+    if (change === 'closed') stopCurrentStream();
+    else if (change === 'replaced') scanState.currentVideoTrack = { applyConstraints: vi.fn() } as any;
+    else scanState.cameraRequestId++;
+    pending.resolve(); await flush();
+    expect(scanState.torchOn).toBe(false);
+});
+
+it('ភ្លើងកាមេរ៉ា៖ ជំនាន់និង track ដដែល អាចបើក បិទ និងរក្សាស្ថានភាពពេលបរាជ័យ', async () => {
+    const track = { applyConstraints: vi.fn().mockResolvedValue(undefined) };
+    scanState.currentVideoTrack = track as any;
+    toggleTorch(); await flush();
+    expect(scanState.torchOn).toBe(true);
+    toggleTorch(); await flush();
+    expect(scanState.torchOn).toBe(false);
+    expect(track.applyConstraints).toHaveBeenLastCalledWith({ advanced: [{ torch: false }] });
+    track.applyConstraints.mockRejectedValueOnce(new Error('unsupported'));
+    toggleTorch(); await flush();
+    expect(scanState.torchOn).toBe(false);
 });

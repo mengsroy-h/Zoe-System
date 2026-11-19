@@ -2446,6 +2446,9 @@
     "tools/audit-tools/zoew/tests/barcode-origin.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "tools/audit-tools/zoew/tests/batch-scan-save-outcome.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "tools/audit-tools/zoew/tests/batch-scan.test.ts": {
       "policy": "zoew-self-verification"
     },

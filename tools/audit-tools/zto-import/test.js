@@ -1159,6 +1159,58 @@ for (const failMove of [false, true]) {
     equal('Watch target lookup race ៖ ទិន្នន័យ Sheet ថ្មីនៅដដែល', f.state.otherRows, foreign);
 }
 
+for (const backlogKind of ['done', 'unsupported']) {
+    const f = watcherReceiptFixture('upsert', { single: true, failMoveIds: [] });
+    for (let n = 0; n < 12; n++) {
+        const file = n === 0 ? f.old : f.add('backlog-' + n, n, n + 1, 'BACKLOG-' + n);
+        f.settings.failMoveIds.push(file.getId());
+        if (backlogKind === 'done') {
+            f.props['ZTO_WATCH_RECEIPT_V1_' + file.getId()] = JSON.stringify({ version: 1, fileId: file.getId(),
+                sheetId: 'target', sheetName: 'Customers', inboxId: 'in', state: 'done' });
+        } else file.getMimeType = () => 'image/png';
+    }
+    const fresh = Array.from({ length: 12 }, (_, n) => f.add('fresh-' + n, 100 + n, 20 + n, 'FRESH-' + n));
+    let receiptChecks = 0;
+    const actualReadReceipt = f.context.readWatchReceipt_;
+    f.context.readWatchReceipt_ = (...args) => { receiptChecks++; return actualReadReceipt(...args); };
+    f.run();
+    check('Watch backlog ' + backlogKind + ' ៖ ឈប់អាន receipt ពេល budget ទាំងពីរអស់', receiptChecks === 22);
+    check('Watch backlog ' + backlogKind + ' ៖ ឯកសារថ្មី ១០ ដំបូងបន្តតាមលំដាប់',
+        fresh.slice(0, 10).every(file => file.folder === 'done') && fresh.slice(10).every(file => file.folder === 'in') &&
+        f.rows().find(row => row[0] === 'SHARED-123')?.[2] === 109);
+    check('Watch backlog ' + backlogKind + ' ៖ សាក move ចាស់មិនលើស ១០ ក្នុងមួយជុំ',
+        f.state.moves.filter(([id]) => f.settings.failMoveIds.includes(id)).length === 10);
+    f.run();
+    check('Watch backlog ' + backlogKind + ' ៖ ជុំបន្ទាប់បញ្ចប់ថ្មីដោយមិន replay ចាស់',
+        fresh.every(file => file.folder === 'done') && f.rows().find(row => row[0] === 'SHARED-123')?.[2] === 111 &&
+        !f.rows().some(row => String(row[0]).startsWith('BACKLOG-')));
+}
+{
+    const f = watcherReceiptFixture('upsert', { single: true, failWriteAfterApply: true });
+    f.run();
+    f.settings.failWriteAfterApply = false;
+    f.state.rows[1][2] = 888;
+    const writes = f.state.writes;
+    const fresh = f.add('after-unknown', 123, 20, 'AFTER-UNKNOWN');
+    f.run();
+    check('Watch backlog ៖ pending fence មិនស្រប postimage នៅតែរារាំង write ថ្មី',
+        f.state.writes === writes && !f.rows().some(row => row[0] === 'AFTER-UNKNOWN') && fresh.folder !== 'done');
+}
+
+{
+    const f = watcherReceiptFixture('upsert', { single: true });
+    let scanned = 0;
+    let dateReads = 0;
+    const files = Array.from({ length: 201 }, (_, n) => ({
+        getDateCreated: () => { dateReads++; return new Date(n < 200 ? 199 - n : n); },
+        getName: () => String(n)
+    }));
+    const inbox = { getFiles: () => ({ hasNext: () => scanned < files.length, next: () => files[scanned++] }) };
+    const selected = f.context.oldestInboxFiles_(inbox, 200);
+    check('Watch backlog ៖ ការស្កេននៅតែមានពិដាន ២០០ ឯកសារ', scanned === 200 && selected.length === 200 && selected[0].getName() === '199' && selected[199].getName() === '0');
+    check('Watch backlog ៖ អានម៉ោងបង្កើតតែម្ដងក្នុងមួយឯកសារ', dateReads === 200, dateReads);
+}
+
 webMoneyTests().catch((error) => check('Web money tests ៖ រត់ចប់ដោយគ្មាន exception', false, error && error.stack)).then(() => {
     console.log('');
     console.log('zto-import — ' + passed + ' assertions passed, ' + failed + ' failed');

@@ -29,7 +29,10 @@ import { showToast } from '../ui/toast';
 
 export const SCAN_MONEY_MAX = 100000;
 
-export function triggerScanAction(barcode) {
+export type ScanConfirmationOutcome = 'saving' | 'saved' | 'pending' | 'skipped';
+const scanConfirmationReports = new WeakMap<object, (outcome: ScanConfirmationOutcome) => void>();
+
+export function triggerScanAction(barcode, report?: (outcome: ScanConfirmationOutcome) => void) {
     if (!sessionUserActionAllowed('scan')) return;
     if (uiState.isModalOpen) return;
 
@@ -58,6 +61,7 @@ export function triggerScanAction(barcode) {
 
     scanState.pendingBarcode = cleanBarcode;
     scanState.pendingScanSession = { db: firebaseState.db, auth: firebaseState.authGeneration };
+    if (report) scanConfirmationReports.set(scanState.pendingScanSession, report);
     scanState.phoneModalTyped = false;
     viewState.modalBarcodeText = cleanBarcode;
 
@@ -171,6 +175,9 @@ export async function confirmPhone(isSkip = false) {
         return;
     }
 
+    const report = opened ? scanConfirmationReports.get(opened) : undefined;
+    let reportedOutcome: ScanConfirmationOutcome = 'pending';
+    report?.('saving');
     viewState.phoneModalBusy = true;
     lookupAnswersHeldWhileSaving.clear();
     let scanEvidence = null;
@@ -201,6 +208,7 @@ export async function confirmPhone(isSkip = false) {
         }
         if (!current()) return;
         if (claim === 'taken') {
+            reportedOutcome = 'skipped';
             if (scanEvidence.record.v !== 2) finishPendingScan(scanEvidence, 'not-started');
             rejectScanAndRefocus(`⚠️ លេខ Barcode នេះ (${barcodeToSave}) ត្រូវបានបញ្ចូលរួចហើយ! (ប្រហែលមកពី device ផ្សេង) សូមស្កេនម្ដងទៀត។`);
             return;
@@ -234,6 +242,7 @@ export async function confirmPhone(isSkip = false) {
             const saveStatus = await withTimeout(savePromise, 15000, 'Save timed out');
             lateSave = null;
             if (!current()) return;
+            if (saveStatus === true) reportedOutcome = 'saved';
             if (saveStatus !== true) {
                 if (saveStatus === false) warnHeldLookupMoney(heldAnswer, barcodeToSave, cod, dod);
                 refreshCurrentHistoryView();
@@ -265,6 +274,7 @@ export async function confirmPhone(isSkip = false) {
         showToast(`✅ (${barcodeToSave}) រក្សាទុកបានជោគជ័យ!`);
         warnHeldLookupMoney(heldAnswer, barcodeToSave, cod, dod);
     } catch (e) {
+        if (!claimStarted) reportedOutcome = 'skipped';
         if (scanEvidence && !claimStarted) finishPendingScan(scanEvidence, 'not-started');
         if (!current()) return;
         if (e && e.scanSettlement) return;
@@ -274,6 +284,7 @@ export async function confirmPhone(isSkip = false) {
     } finally {
         releasePendingScanAfter(scanEvidence, lateSave);
         releaseScanModal();
+        if (current()) report?.(reportedOutcome);
     }
 }
 

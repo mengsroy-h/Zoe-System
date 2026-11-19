@@ -44,8 +44,8 @@ ok('Action delegation មាន confirm/cancel scan removal តែមិនប�
     !/ACTION_ALLOWLIST[\s\S]{0,5000}"removeSingleBarcode"/.test(app));
 ok('remove mode មិន persist ជារបៀបគ្រោះថ្នាក់ក្រោយ reload',
     /entryScanMode\s*===\s*'remove'\s*\?\s*'parcel'\s*:\s*entryScanMode/.test(app));
-ok('គ្រប់ប្រភពស្កេនចូល trigger តែមួយ ហើយ remove mode មាន route ផ្ទាល់',
-    /function triggerScanAction\(barcode\)[\s\S]{0,500}?entryScanMode\s*===\s*'remove'[\s\S]{0,180}?handleRemoveScan\(cleanBarcode\)/.test(app));
+ok('triggerScanAction នាំ barcode ដែលសម្អាតរួចទៅផ្លូវ remove ហើយឈប់',
+    /function triggerScanAction\(barcode(?:\s*,\s*report)?\)\s*\{[\s\S]{0,500}?if\s*\((?:uiState\.)?entryScanMode\s*===\s*'remove'\)\s*\{\s*handleRemoveScan\(cleanBarcode\);\s*return;\s*\}/.test(app));
 // App React ៖ អត្ថបទ preview ជា state (`viewState.scanRemoveTexts`) ហើយ JSX ពិតគូរវាជា **កូនអត្ថបទ** ➜ វាស់ **ឥរិយាបថ** ៖
 // គូរប្រអប់ពិត (`react-render.cjs`) ដោយ payload HTML ក្នុងវាលនីមួយៗ ➜ ត្រូវចេញជាអក្សរ escape មិនមែនធាតុ។
 const REACT_BUNDLE = fs.existsSync(path.join(APP_DIR, 'react-render.cjs'));

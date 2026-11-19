@@ -5733,6 +5733,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `tools/audit-tools/zoew/tests/backup-config-private-files.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/barcode-key-encoding.test.ts` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/barcode-origin.test.tsx` | — | ផ្នែក ៨ |
+| `tools/audit-tools/zoew/tests/batch-scan-save-outcome.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/batch-scan.test.ts` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/biometric-android-prf.test.ts` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/biometric-no-device-mode.test.tsx` | ផ្នែក ១ | ផ្នែក ៨ |

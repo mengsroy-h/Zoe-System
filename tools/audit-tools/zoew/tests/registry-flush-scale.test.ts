@@ -33,6 +33,14 @@ beforeEach(() => {
     firebaseState.fb = {
         ref: (_db: any, path: string) => ({ path }),
         update: vi.fn(async (_ref: any, u: any) => { updates.push(u); }),
+        runTransaction: vi.fn(async (ref: any, updater: any) => {
+            const key = ref.path.split('/').pop();
+            const owned = Array.from({ length: 50 }, (_, i) => barcodeRegistryKey('T' + (i * 7) + 'b')).includes(key);
+            const proposed = updater(owned ? { v: 2 } : true);
+            if (proposed === undefined) return { committed: false, snapshot: { val: () => (owned ? { v: 2 } : true) } };
+            if (!owned) updates.push({ [key]: null });
+            return { committed: true, snapshot: { val: () => proposed } };
+        }),
     } as any;
 });
 
@@ -62,9 +70,8 @@ describe('SCALE-6 ៖ flush registry គណនាសំណុំ key មាន�
         flushPendingRegistryReleases();
         expect(reads).toBeLessThanOrEqual(2 * pass);
         await Promise.resolve();
-        expect(updates.length).toBe(1);
-        expect(Object.keys(updates[0]).sort()).toEqual([...free].sort());
-        expect(Object.values(updates[0]).every((v) => v === null)).toBe(true);
+        expect(updates.length).toBe(150);
+        expect((firebaseState.fb.runTransaction as any).mock.calls.length).toBe(150);
         expect(pendingRegistryReleases.size).toBe(0);
     });
 

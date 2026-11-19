@@ -98,10 +98,22 @@ export function releaseRegistryKeys(keys) {
     const operationAuth = firebaseState.authGeneration;
     const operationSdk = firebaseState.fb;
     const current = () => operationDb === firebaseState.db && operationAuth === firebaseState.authGeneration && operationSdk === firebaseState.fb;
+    if (typeof operationSdk.runTransaction !== 'function') {
+        const updates = {};
+        keys.forEach((key) => { updates[key] = null; });
+        return dbOp(operationSdk.update(operationSdk.ref(operationDb, 'zoew_barcode_registry'), updates)).then(() => {
+            return current() ? true : false;
+        }, () => false);
+    }
     return Promise.all(keys.map((key) => dbOp(operationSdk.runTransaction(
         operationSdk.ref(operationDb, `zoew_barcode_registry/${key}`),
         (registryValue) => registryValue === true ? null : undefined
-    )).then((result) => result?.committed === true || result?.snapshot?.val() !== true, () => false))).then((results) => {
+    )).then((result) => {
+        const serverValue = result?.snapshot?.val();
+        if (serverValue !== null && serverValue !== undefined && serverValue !== true) return false;
+        if (result?.committed === true) return true;
+        return serverValue === null || serverValue === undefined;
+    }, () => false))).then((results) => {
         if (!current()) return false;
         return results.every((done) => done === true);
     });

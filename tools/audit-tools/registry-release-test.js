@@ -88,7 +88,7 @@ ok('`.info/connected` ត្រឡប់ `true` ➜ ហៅ flushPendingRegistryR
 ok('ការចាកចេញសម្អាតជួរ (គ្មានកូនសោអតិថិជនសល់)',
     /pendingRegistryReleases\.clear\(\)/.test(SRC));
 ok('ការដោះឆ្លងកាត់ `dbOp(` ➜ ការព្យួរក្លាយជាកំហុសធម្មតា (ច្បាប់ 2.23.1)',
-    /releaseRegistryKeys[\s\S]{0,400}?dbOp\(fb\.update\(fb\.ref\(db, 'zoew_barcode_registry'\)/.test(SRC));
+    /releaseRegistryKeys[\s\S]{0,500}?dbOp\(operationSdk\.runTransaction/.test(SRC));
 
 // ── ២. ឥរិយាបថ ៖ ការដោះដែលធ្លាក់ ត្រូវចូលជួរ រួចរត់ឡើងវិញ ─────────────
 function makeCtx(behaviour) {
@@ -104,6 +104,14 @@ function makeCtx(behaviour) {
             update: (r, updates) => {
                 calls.push(Object.keys(updates));
                 return behaviour(calls.length);
+            },
+            runTransaction: (r, updater) => {
+                calls.push([r.path]);
+                return Promise.resolve(behaviour(calls.length)).then((value) => {
+                    const proposed = updater(true);
+                    if (proposed === undefined) return { committed: false, snapshot: { val: () => true } };
+                    return { committed: true, snapshot: { val: () => proposed } };
+                });
             }
         },
         dbOp: null,

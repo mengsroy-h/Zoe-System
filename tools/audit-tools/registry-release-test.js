@@ -88,7 +88,9 @@ ok('`.info/connected` ត្រឡប់ `true` ➜ ហៅ flushPendingRegistryR
 ok('ការចាកចេញសម្អាតជួរ (គ្មានកូនសោអតិថិជនសល់)',
     /pendingRegistryReleases\.clear\(\)/.test(SRC));
 ok('ការដោះឆ្លងកាត់ `dbOp(` ➜ ការព្យួរក្លាយជាកំហុសធម្មតា (ច្បាប់ 2.23.1)',
-    /releaseRegistryKeys[\s\S]{0,500}?dbOp\(operationSdk\.runTransaction/.test(SRC));
+    fnSrc.releaseRegistryKeys && /dbOp\([^;]*\.runTransaction/.test(fnSrc.releaseRegistryKeys)
+        && /registryValue\s*===\s*true\s*\?\s*null/.test(fnSrc.releaseRegistryKeys),
+    fnSrc.releaseRegistryKeys && fnSrc.releaseRegistryKeys.slice(0, 500));
 
 // ── ២. ឥរិយាបថ ៖ ការដោះដែលធ្លាក់ ត្រូវចូលជួរ រួចរត់ឡើងវិញ ─────────────
 function makeCtx(behaviour) {
@@ -175,8 +177,9 @@ const tick = (n) => new Promise((resolve) => setTimeout(resolve, n || 0));
         ok('ការភ្ជាប់មកវិញកេះការសរសេរថ្មី', ctx.__calls.length > before, { before, after: ctx.__calls.length });
         ok('⛔ ជួរទទេវិញក្រោយជោគជ័យ ➜ barcode លែងជាប់អន្ទាក់',
             ctx.pendingRegistryReleases.size === 0, Array.from(ctx.pendingRegistryReleases.keys()));
-        ok('ការសរសេរចុងក្រោយផ្ទុកកូនសោទាំង ២',
-            ctx.__calls[ctx.__calls.length - 1].length === 2, ctx.__calls[ctx.__calls.length - 1]);
+        ok('ការសរសេរចុងក្រោយដោះកូនសោទាំង ២ តាម transaction',
+            ctx.__calls.length >= 4 && ctx.__calls[ctx.__calls.length - 1].length === 1,
+            ctx.__calls[ctx.__calls.length - 1]);
     }
 
     console.log('\n=== ៤. ⛔ ទិសផ្ទុយ ៖ បណ្តាញធម្មតា ➜ ដោះម្តងគត់ គ្មានជួរ ===');
@@ -184,7 +187,7 @@ const tick = (n) => new Promise((resolve) => setTimeout(resolve, n || 0));
         const ctx = makeCtx(() => Promise.resolve());
         vm.runInContext('releaseBarcodesInRegistry(["ZTO900111"])', ctx);
         await tick(30);
-        ok('ការដោះជោគជ័យហៅ update តែ ១ ដង', ctx.__calls.length === 1, ctx.__calls);
+        ok('ការដោះជោគជ័យកន្លែងមួយហៅ transaction ម្តង', ctx.__calls.length === 1, ctx.__calls);
         ok('គ្មានអ្វីចូលជួរ', ctx.pendingRegistryReleases.size === 0, Array.from(ctx.pendingRegistryReleases.keys()));
     }
 

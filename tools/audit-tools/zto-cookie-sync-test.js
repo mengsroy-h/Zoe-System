@@ -12,9 +12,8 @@ const { EventEmitter } = require('events');
 let acorn = null;
 try { acorn = require('acorn'); } catch (_) { acorn = null; }
 
-const INPUT_ROOT = process.env.ZTOCOOKIETEST_APP_DIR || process.env.ZTO_SYNC_APP_DIR;
-const ROOT = INPUT_ROOT
-    ? path.resolve(INPUT_ROOT)
+const ROOT = process.env.ZTO_SYNC_APP_DIR
+    ? path.resolve(process.env.ZTO_SYNC_APP_DIR)
     : path.resolve(__dirname, '../..');
 const TOOL_DIR = path.join(ROOT, 'tools', 'zto-cookie-sync-windows');
 const SOURCE_PATH = path.join(TOOL_DIR, 'sync-zto-cookie.js');

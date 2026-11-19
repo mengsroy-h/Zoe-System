@@ -123,6 +123,7 @@ export interface ViewState {
     seatEnrollmentMessage: string;
 
     healthRecheckBusy: boolean;
+    healthRecheckCanInterrupt: boolean;
 
     lookupHeaderValuePlaceholder: string;
     lookupUrlKeyNote: string;
@@ -266,6 +267,7 @@ export const viewState = createStore<ViewState>('viewState', {
     seatEnrollmentFingerprint: '',
     seatEnrollmentMessage: '',
     healthRecheckBusy: false,
+    healthRecheckCanInterrupt: false,
     lookupHeaderValuePlaceholder: 'ឧ. Bearer xxxxx ឬ Secret Key',
     lookupUrlKeyNote: '',
     lookupTestBusy: false,

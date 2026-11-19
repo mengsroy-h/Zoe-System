@@ -204,7 +204,7 @@ export async function healthLicenseRow(signal?: AbortSignal) {
 }
 
 export function healthSheetScriptRow() {
-    const cfg = getLookupApiConfig();
+    const cfg = getLookupApiConfig(false);
     if (!cfg || !cfg.enabled || !lookupApiIsAppsScript(cfg)) {
         return healthRow('info', 'កំណែ Apps Script (Lookup)', 'មិនពាក់ព័ន្ធ (Lookup មិនប្រើ Google Sheet)');
     }
@@ -443,7 +443,7 @@ export function ztoSignedMismatchText(body) {
 }
 
 export async function healthLookupRow(verifyPalm = true, signal?: AbortSignal, current = () => !signal?.aborted) {
-    const cfg = getLookupApiConfig();
+    const cfg = getLookupApiConfig(false);
     if (!cfg || !cfg.enabled || !cfg.url) {
         return healthRow('info', 'Lookup អតិថិជន', 'មិនទាន់បើក');
     }
@@ -600,6 +600,7 @@ export function resetHealthCheck() {
     healthCompletedRun = 0;
     healthCheckTask = null;
     viewState.healthRecheckBusy = false;
+    viewState.healthRecheckCanInterrupt = false;
     uiState.healthRows = null;
     uiState.healthAdvice = null;
 }
@@ -634,7 +635,9 @@ export function runHealthCheck(force = false, verifyPalm = true): Promise<void> 
     const worker = navigator.serviceWorker?.controller;
     const lookupConfig = safeStoreGet(appLocalStore, 'zoew_lookup_api_config');
     const previous = healthCheckTask;
-    const needsPalm = verifyPalm && lookupApiIsPalm(getLookupApiConfig());
+    const lookup = getLookupApiConfig(false);
+    const palm = !!lookup?.enabled && lookupApiIsPalm(lookup);
+    const needsPalm = verifyPalm && palm;
     if (force !== true && previous && healthTaskIsCurrent(previous) && previous.worker === worker
         && (!needsPalm || previous.verifyPalm)) return previous.promise;
     previous?.controller.abort();
@@ -645,7 +648,7 @@ export function runHealthCheck(force = false, verifyPalm = true): Promise<void> 
     };
     healthCheckTask = task;
     const stopOwner = task.owner.watch(() => task.controller.abort());
-    task.promise = runHealthCheckRound(task).finally(() => {
+    task.promise = runHealthCheckRound(task, palm).finally(() => {
         stopOwner();
         if (healthCheckTask === task) healthCheckTask = null;
     });
@@ -673,17 +676,17 @@ function settleHealthProbes<T>(probes: Promise<T>, signal: AbortSignal): Promise
     });
 }
 
-async function runHealthCheckRound(task: HealthCheckTask) {
+async function runHealthCheckRound(task: HealthCheckTask, palm: boolean) {
     const { run, worker, verifyPalm, controller: { signal }, owner, lookupConfig, lookupSecret, tenant, branch } = task;
     const current = () => healthTaskIsCurrent(task);
     healthActiveRun = run;
+    viewState.healthRecheckCanInterrupt = palm && !verifyPalm;
     viewState.healthRecheckBusy = true;
     uiState.healthRows = [healthPendingRow()];
     uiState.healthAdvice = null;
     uiState.touch();
     try {
         if (!current()) return;
-        const palm = lookupApiIsPalm(getLookupApiConfig());
         if (palm && verifyPalm) lastPalmHealthEvidence = null;
         const result = await settleHealthProbes(Promise.all([
             healthDatabaseLiveRow(signal), healthLicenseRow(signal), healthLookupRow(verifyPalm, signal, current),
@@ -722,6 +725,9 @@ async function runHealthCheckRound(task: HealthCheckTask) {
         }
         task.controller.abort();
     } finally {
-        if (healthActiveRun === run) viewState.healthRecheckBusy = false;
+        if (healthActiveRun === run) {
+            viewState.healthRecheckCanInterrupt = false;
+            viewState.healthRecheckBusy = false;
+        }
     }
 }

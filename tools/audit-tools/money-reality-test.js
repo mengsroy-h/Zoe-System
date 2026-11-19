@@ -40,6 +40,23 @@ function measured(body) {
     return body.split(/\r?\n/).filter((line) => !line.startsWith('ឯកសារ ៖ ') && !line.startsWith('កូដលុយ ៖ ')).join('\n');
 }
 
+// វាស់ JavaScript ដែល launcher ប្រើកក់ថត និងផ្លូវដែលវាផ្ដល់ទៅ CLI ពិត។
+// មិនសន្មតថា harness នេះជំនួស cmd.exe បានទេ; Windows មានតេស្តខាងក្រោមដាច់ដោយឡែក។
+function launcherOutputs(profile) {
+    const source = fs.readFileSync(path.join(ROOT, 'tools/money-check-windows/check-money.cmd'), 'utf8');
+    const allocator = source.match(/^for \/f "delims=" %%O in \('node -e "([^"\r\n]+)"'\) do set "OUTPUT_DIR=%%O"/m);
+    const result = allocator ? spawnSync(process.execPath, ['-e', allocator[1]], {
+        encoding: 'utf8', timeout: 10000, env: { ...process.env, USERPROFILE: profile }
+    }) : { status: 0, stdout: '' };
+    const values = { USERPROFILE: profile, OUTPUT_DIR: (result.stdout || '').trim() };
+    for (const name of ['REPORT', 'SAFE']) {
+        const line = source.match(new RegExp('^set "' + name + '=([^"\\r\\n]+)"', 'm'));
+        if (!line) throw new Error('launcher output assignment missing: ' + name);
+        values[name] = line[1].replace(/[%!]([A-Z_]+)[%!]/g, (_, key) => values[key] || '').replace(/\\/g, path.sep);
+    }
+    return { ...values, status: result.status, source, allocator: !!allocator };
+}
+
 // ទិន្នន័យប្រឌិតទាំងអស់៖ រួមមានលុយបើក/បិទ/ធុងសំរាម និងអត្តសញ្ញាណភ្ជាប់ឆ្លង node។
 const phone = '+855000000001';
 const openCode = '86000000000001';
@@ -542,6 +559,51 @@ try {
             && fs.readFileSync(alias).equals(original) && fs.readFileSync(linked).equals(original));
     });
 
+    scenario('ការរត់ត្រួតគ្នារក្សារបាយការណ៍ និងច្បាប់ចម្លងរបស់ខ្លួន', () => {
+        const profile = path.join(tempRoot, 'shared output profile');
+        fs.mkdirSync(path.join(profile, 'Desktop'), { recursive: true });
+        const first = launcherOutputs(profile);
+        const second = launcherOutputs(profile);
+        ok('កក់ផ្លូវទាំងពីរបានមុនចាប់ផ្ដើមវាស់', first.status === 0 && second.status === 0);
+        ok('ការរត់ពីរលើ Desktop ដដែលមានផ្លូវដាច់ពីគ្នា', first.REPORT !== second.REPORT && first.SAFE !== second.SAFE);
+        ok('របាយការណ៍ និងច្បាប់ចម្លងនៅក្នុងថតកក់រួមតាមការរត់',
+            first.allocator && second.allocator && fs.statSync(first.OUTPUT_DIR).isDirectory()
+            && fs.statSync(second.OUTPUT_DIR).isDirectory()
+            && path.dirname(first.REPORT) === first.OUTPUT_DIR && path.dirname(first.SAFE) === first.OUTPUT_DIR
+            && path.dirname(second.REPORT) === second.OUTPUT_DIR && path.dirname(second.SAFE) === second.OUTPUT_DIR);
+        const laterData = copy();
+        laterData.zoew_monthly_revenue_cod_dod['2026-09'].codDollar += 2;
+        const later = save('second run input.json', laterData);
+        const firstMoney = run('money-reality-check.js', [dump, '--report', first.REPORT]);
+        const firstRedact = run('redact-dump.js', [dump, first.SAFE]);
+        ok('ជុំទីមួយមានលទ្ធផលពិតមុនជុំទីពីរសរសេរ', firstMoney.status === 0 && firstRedact.status === 0);
+        const firstReport = fs.readFileSync(first.REPORT);
+        const firstSafe = fs.readFileSync(first.SAFE);
+        const secondMoney = run('money-reality-check.js', [later, '--report', second.REPORT]);
+        const secondRedact = run('redact-dump.js', [later, second.SAFE]);
+        ok('ជុំទីពីរវាស់កំហុសប្រឌិត និងសម្អាតបានពិត', secondMoney.status === 1 && secondRedact.status === 0);
+        ok('ជុំទីពីរមិនសរសេរជាន់របាយការណ៍ទីមួយ', fs.readFileSync(first.REPORT).equals(firstReport));
+        ok('ជុំទីពីរមិនសរសេរជាន់ច្បាប់ចម្លងដែលបានផ្ទៀងរួច', fs.readFileSync(first.SAFE).equals(firstSafe));
+        const clear = run('redact-dump.js', ['--clear-output', later, second.SAFE]);
+        fs.writeFileSync(later, '{');
+        const failed = run('redact-dump.js', [later, second.SAFE]);
+        const cleanup = run('redact-dump.js', ['--clear-output', later, second.SAFE]);
+        ok('ជុំទីពីរចូលផ្លូវបរាជ័យ និង cleanup ពិត', clear.status === 0 && failed.status === 1 && cleanup.status === 0
+            && !fs.existsSync(second.SAFE));
+        ok('cleanup ជុំទីពីរមិនលុបលទ្ធផលដែលបានផ្ទៀងរបស់ជុំទីមួយ',
+            fs.existsSync(first.SAFE) && fs.readFileSync(first.SAFE).equals(firstSafe));
+    });
+
+    scenario('កក់ថតមិនបានមិនបន្តទៅផ្លូវថេរ', () => {
+        const outputs = launcherOutputs(path.join(tempRoot, 'missing desktop profile'));
+        ok('ការកក់ថតធ្លាក់ដោយ exit 3 និងគ្មាន output directory', outputs.status === 3 && !outputs.OUTPUT_DIR);
+        const beforeMoney = outputs.source.slice(0, outputs.source.indexOf('node "!REPO!\\tools\\audit-tools\\money-reality-check.js"'));
+        ok('launcher បិទផ្លូវមុនការវាស់ពេលកក់ថតមិនបាន',
+            /if not defined OUTPUT_DIR \([\s\S]*?exit \/b 3\s*\)/.test(beforeMoney)
+            && !outputs.source.includes('set "REPORT=%USERPROFILE%\\Desktop\\')
+            && !outputs.source.includes('set "SAFE=%USERPROFILE%\\Desktop\\'));
+    });
+
     scenario('Windows launcher មានកិច្ចសន្យាការហៅ CLI ពេញលេញ', () => {
         const source = fs.readFileSync(path.join(ROOT, 'tools', 'money-check-windows', 'check-money.cmd'), 'utf8');
         const moneyAt = source.indexOf('node "!REPO!\\tools\\audit-tools\\money-reality-check.js" "!DUMP!" --report "%REPORT%"');
@@ -606,10 +668,16 @@ try {
                 text.includes('SAFE TO SEND') === (moneyCode < 2 && redactCode === 0 && !noOutput), text);
             ok('cmd ហៅ redactor តែពេលការវាស់លុយរត់ពេញ ' + index,
                 text.includes('REDACTOR_CALLED') === (moneyCode < 2));
+            const runDirs = fs.readdirSync(path.join(profile, 'Desktop'), { withFileTypes: true })
+                .filter((entry) => entry.isDirectory() && entry.name.startsWith('zoe-money-'));
+            ok('cmd កក់ថតថ្មីតែមួយក្នុងជុំ ' + index, runDirs.length === 1);
+            const runSafe = path.join(profile, 'Desktop', runDirs[0].name, 'zoe-dump-SAFE-TO-SHARE.json');
+            ok('cmd មិនប៉ះ output ថេរពីការរត់មុន ' + index,
+                staleOutput ? fs.readFileSync(safePath, 'utf8') === 'STALE_FIXTURE' : !fs.existsSync(safePath));
             if (failedRedaction) ok('cmd មិនបន្សល់ output ដែលមានស្លាក SAFE ក្រោយសម្អាតធ្លាក់ ' + index,
-                !fs.existsSync(safePath));
-            if (moneyCode < 2 && !failedRedaction) ok('cmd output ថ្មីជំនួស output ចាស់ពិត ' + index,
-                fs.existsSync(safePath) && fs.readFileSync(safePath, 'utf8') === '{}');
+                !fs.existsSync(runSafe));
+            if (moneyCode < 2 && !failedRedaction) ok('cmd output ថ្មីនៅក្នុងថតរបស់ជុំនេះពិត ' + index,
+                fs.existsSync(runSafe) && fs.readFileSync(runSafe, 'utf8') === '{}');
         });
         fs.writeFileSync(path.join(launcherRoot, 'tools/audit-tools', 'redact-dump.js'),
             "console.log('LEGACY_REDACTOR_CALLED'); require('fs').writeFileSync(process.argv[3], 'CORRUPTED_INPUT');\n");

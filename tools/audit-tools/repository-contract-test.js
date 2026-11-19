@@ -1042,7 +1042,7 @@ scenario('APK សាក ៖ branch ផ្សេងពី main ➜ Pre-release �
             tokenStep.includes("if: steps.meta.outputs.test == 'false'") && /RELEASES_TOKEN: \$\{\{ secrets\.ZOE_RELEASES_TOKEN \}\}/.test(tokenStep) && /-z "\$RELEASES_TOKEN"[\s\S]*?exit 1/.test(tokenStep)
             && /mirrored=(true|false)/.test(tokenStep) && apk.indexOf(tokenStep) < apk.indexOf('- name: ពិនិត្យ secret របស់ keystore')
             && mirrorStep.includes("steps.meta.outputs.exists == 'true' && steps.releases.outputs.mirrored == 'false'") && /gh release download "\$TAG"/.test(mirrorStep)
-            && /gh release create "\$TAG" mirror\/\*[\s\S]*?--repo "\$ZOE_RELEASES_REPO"/.test(mirrorStep),
+            && /gh release create "\$TAG" "mirror\/\$OUT" "mirror\/\$OUT\.sha256"[\s\S]*?--repo "\$ZOE_RELEASES_REPO"/.test(mirrorStep),
             (tokenStep.slice(0, 60) + ' | ' + mirrorStep.slice(0, 60)).replace(/\n/g, ' '));
         const webStep = (apk.match(/^      -[^\n]*(?:\n(?!      -)[^\n]*)*/gm) || []).find((st) => st.includes('- name: Build web')) || '';
         check('APK សាក និង Release ពី main build web ដូចគ្នា (android:sync · គ្មានការកំណត់ផ្សេងតាម test)',

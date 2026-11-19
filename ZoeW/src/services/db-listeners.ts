@@ -62,7 +62,8 @@ export function emptyViewMessage(pathKeys, emptyText) {
 
 export function noteDbListenerAlive(pathKey) {
     const wasPending = dbListenerPendingPaths.delete(pathKey);
-    dbListenerFailedPaths.delete(pathKey);
+    const wasFailed = dbListenerFailedPaths.delete(pathKey);
+    if (wasPending || wasFailed) firebaseState.touch();
     dbListenerReportedFailures.delete(pathKey);
     flushPendingRegistryReleases();
     if (wasPending) {
@@ -135,7 +136,10 @@ export function handleDbListenerError(err, pathKey) {
         dbListenerReportedFailures.add(reportKey);
         if (window.ZoeErrors) ZoeErrors.capture(err, { context: 'Firebase listener error' });
     }
-    if (pathKey) dbListenerFailedPaths.add(pathKey);
+    if (pathKey && !dbListenerFailedPaths.has(pathKey)) {
+        dbListenerFailedPaths.add(pathKey);
+        firebaseState.touch();
+    }
     invalidateStaleNotifyViews();
     firebaseState.dbListenersFailed = true;
     renderConnectionStatus();

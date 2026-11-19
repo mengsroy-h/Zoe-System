@@ -120,7 +120,6 @@ jobs:
           echo "test=${TEST}" >> "$GITHUB_OUTPUT"
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::Release ${TAG} មានរួច — មិន build ម្តងទៀត (ឡើង APP_VERSION ដើម្បីបង្កើត Release ថ្មី)"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
@@ -142,6 +141,47 @@ jobs:
             echo "mirrored=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: ផ្ទៀង Release ដែលមានរួច
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASES_TOKEN: ${{ secrets.ZOE_RELEASES_TOKEN }}
+          SOURCE_REPO: ${{ github.repository }}
+          SOURCE_EXISTS: ${{ steps.meta.outputs.exists }}
+          MIRRORED: ${{ steps.releases.outputs.mirrored }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          FILE: ${{ steps.meta.outputs.file }}
+          TEST: ${{ steps.meta.outputs.test }}
+        run: |
+          for TARGET in source public; do
+            if [ "$TARGET" = source ]; then
+              [ "$SOURCE_EXISTS" = true ] || continue
+              REPO="$SOURCE_REPO"
+              TOKEN="$GH_TOKEN"
+            else
+              [ "$TEST" = false ] && [ "$MIRRORED" = true ] || continue
+              REPO="$ZOE_RELEASES_REPO"
+              TOKEN="$RELEASES_TOKEN"
+            fi
+            if ! GH_TOKEN="$TOKEN" gh release view "$TAG" --repo "$REPO" --json tagName,isDraft,isPrerelease,assets | node -e '
+              try {
+                const release = JSON.parse(require("fs").readFileSync(0, "utf8"));
+                const [tag, file, test] = process.argv.slice(1);
+                const complete = release && release.tagName === tag && release.isDraft === false
+                  && release.isPrerelease === (test === "true") && Array.isArray(release.assets)
+                  && [file, file + ".sha256"].every(name => {
+                    const matches = release.assets.filter(asset => asset && asset.name === name);
+                    return matches.length === 1 && matches[0].state === "uploaded"
+                      && Number.isSafeInteger(matches[0].size) && matches[0].size > 0;
+                  });
+                if (!complete) process.exit(1);
+              } catch { process.exit(1); }
+            ' "$TAG" "$FILE" "$TEST"; then
+              echo "::error::Release ${TAG} នៅ ${REPO} មិនទាន់ផ្ទៀងថាបានចេញពេញលេញជាមួយ ${FILE} និង ${FILE}.sha256។ ឈប់ដោយមិនកែ Release ដែលមានរួច។"
+              exit 1
+            fi
+            echo "::notice::Release ${TAG} នៅ ${REPO} មាន APK និង checksum ដែលបាន upload ពេញលេញ។"
+          done
+
       - name: ចម្លង Release ដែលមានរួចទៅ repo Release
         if: steps.meta.outputs.test == 'false' && steps.meta.outputs.exists == 'true' && steps.releases.outputs.mirrored == 'false'
         env:
@@ -149,10 +189,12 @@ jobs:
           RELEASES_TOKEN: ${{ secrets.ZOE_RELEASES_TOKEN }}
         run: |
           TAG="${{ steps.meta.outputs.tag }}"
+          OUT="${{ steps.meta.outputs.file }}"
           mkdir -p mirror
-          gh release download "$TAG" --dir mirror --pattern '*.apk' --pattern '*.sha256'
+          gh release download "$TAG" --dir mirror --pattern "$OUT" --pattern "$OUT.sha256"
+          test -s "mirror/$OUT" && test -s "mirror/$OUT.sha256" || { echo "::error::APK ឬ checksum ដែលត្រូវចម្លងមិនពេញលេញ"; exit 1; }
           gh release view "$TAG" --json body --jq .body > mirror-notes.md
-          GH_TOKEN="$RELEASES_TOKEN" gh release create "$TAG" mirror/* \
+          GH_TOKEN="$RELEASES_TOKEN" gh release create "$TAG" "mirror/$OUT" "mirror/$OUT.sha256" \
             --repo "$ZOE_RELEASES_REPO" \
             --title "ZoeW ${{ steps.meta.outputs.version }} (Android)" \
             --notes-file mirror-notes.md
@@ -203,11 +245,26 @@ jobs:
             echo "::warning::គ្មាន secret ZOEW_GOOGLE_SERVICES_JSON ➜ APK នេះគ្មានការជូនដំណឹងលើទូរស័ព្ទ (App ប្រាប់អ្នកប្រើ)"
             exit 0
           fi
-          case "$GSJ" in
-            "{"*) printf '%s' "$GSJ" > ZoeW/android/app/google-services.json ;;
-            *) printf '%s' "$GSJ" | base64 -d > ZoeW/android/app/google-services.json ;;
-          esac
-          node -e "const j=require('./ZoeW/android/app/google-services.json'); const ok=(j.client||[]).some((c)=>c&&c.client_info&&c.client_info.android_client_info&&c.client_info.android_client_info.package_name==='com.zoesystem.zoew'); if(!ok){console.error('google-services.json មិនមែនសម្រាប់ com.zoesystem.zoew');process.exit(1)}"
+          node <<'NODE'
+          const fs = require('fs');
+          try {
+            const raw = process.env.GSJ;
+            let text = raw;
+            if (!raw.trimStart().startsWith('{')) {
+              const encoded = raw.replace(/\s/g, '');
+              if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded)) throw new Error('base64');
+              text = Buffer.from(encoded, 'base64').toString('utf8');
+            }
+            const config = JSON.parse(text);
+            const ok = config && Array.isArray(config.client) && config.client.some(client =>
+              client?.client_info?.android_client_info?.package_name === 'com.zoesystem.zoew');
+            if (!ok) throw new Error('package');
+            fs.writeFileSync('ZoeW/android/app/google-services.json', JSON.stringify(config), { mode: 0o600 });
+          } catch {
+            console.error('::error::ZOEW_GOOGLE_SERVICES_JSON មិនមែន JSON/base64 ត្រឹមត្រូវសម្រាប់ com.zoesystem.zoew');
+            process.exit(1);
+          }
+          NODE
 
       - name: Build web (--mode android) ➜ cap sync
         if: steps.keystore.outputs.ready == 'true'

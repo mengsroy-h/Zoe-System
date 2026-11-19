@@ -81,6 +81,15 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### ZoeW [2.50.209] · ZoeKeyGen [2.24.53] — 2026-11-19 · របាយការណ៍ បញ្ជូនការកំណត់ និងការរៀបចំ APK
+
+**ZoeW** (`zoew-v472` ➜ `zoew-v473`) និង **ZoeKeyGen** (`zoekeygen-v163` ➜ `zoekeygen-v164`)។
+
+- របាយការណ៍ប្រចាំខែគូរពីទិន្នន័យបច្ចុប្បន្នពេលបើក មិនប្រើ projection ចាស់។ ស្ថានភាព listener បរាជ័យ និងសះស្បើយមួយផ្នែកជូនដំណឹងទៅ UI។ ប្រអប់របាយការណ៍ និងការនាំចូលមាន role និងឈ្មោះដែលកម្មវិធីអានអេក្រង់ស្គាល់។
+- Setup Link រក្សា path របស់ App ដក query/hash ចាស់ និងសម្អាតលទ្ធផលដែលមិនអាចប្រើបានពេលការបង្កើតបរាជ័យ ឬ session ផ្លាស់។
+- Provisioning បង្ហាញព័ត៌មានចូលរបស់គណនីដែលបង្កើតបានមុនបន្តគណនីបន្ទាប់។ APK ពិនិត្យ signing input និង artifact មុន publish ដោយមិនប្ដូរលក្ខខណ្ឌ Audit ដែលអ្នកប្រើទទួលយក។
+- **សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ ផ្ទៀង CI លើ commit ចុងក្រោយ និង real-device APK/PWA រួម TalkBack/VoiceOver មុន merge។ មិនកែ Firebase rules, env ឬទិន្នន័យអាជីវកម្ម។ ការផ្ទៀង signing ជាមួយ keystore ពិត និង hosted release នៅមិនទាន់វាស់; កុំផ្ញើ secrets ក្នុង chat ឬ log។
+
 ### ZoeW [2.50.208] · ZoeKeyGen [2.24.52] — 2026-11-18 · កាមេរ៉ា ការអញ្ជើញ និងភាពត្រឹមត្រូវនៃឯកសារ
 
 **ZoeW** (`zoew-v471` ➜ `zoew-v472`) និង **ZoeKeyGen** (`zoekeygen-v162` ➜ `zoekeygen-v163`)។
@@ -2190,6 +2199,15 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-11-19 · ការផ្ទៀងរបាយការណ៍ និងការបញ្ជូនលទ្ធផលលើមូលដ្ឋាន `3b1d57d`
+
+- `tools/audit-tools/zoew/tests/monthly-report-live-view.test.tsx`៖ baseline ធ្លាក់ ១៤ ឆ្លង ១; fixed ឆ្លង ១៥។ វាស់ DOM ពិតលើទិន្នន័យក្លែង រួម daily/monthly ledger, history/trash, pickup, exchange rate, ខែថ្មី, empty, hidden/reopen, pending operation និង listener បរាជ័យបន្តបន្ទាប់/សះស្បើយមួយផ្នែក រួមចាប់ផ្ដើម listener និង reset។ ការគូរមិនសរសេរទិន្នន័យ ឬប្ដូរ state។
+- `tools/audit-tools/zoew/tests/report-import-dialog.test.tsx`៖ baseline ធ្លាក់ ២ ឆ្លង ២; fixed ឆ្លង ៤។ ជាមួយអ្នកយាម focus/backdrop/chrome/forbidden zone ឆ្លង ៤៥; គ្របលំដាប់ stack ទាំងពីរ និង Tab/Shift+Tab ដោយមិនប្ដូរ scroll។
+- `tools/audit-tools/zoew/tests/keygen-setup-link-output.test.ts`៖ baseline ធ្លាក់ ១៧; fixed ឆ្លង ១៧។ តេស្ត encrypted setup ដែលមានស្រាប់ឆ្លង ៧ រួម encrypt/decrypt ពិត; async fixture ក្លែង session/encryption។ Clipboard ដែលបញ្ជូនរួចមិនអាចដកវិញ; មិនបង្ហាញសារជោគជ័យរបស់ session ចាស់។
+- `firebase-provision-test`៖ strict synthetic HTTPS suite ឆ្លង ១២១; baseline បង្ហាញកំហុស ៣។ មិនរក្សា password ក្នុង state; unknown outcome មិនបង្ហាញ password ដែលមិនផ្ទៀងថាបង្កើតរួច។ Retry មិនប្ដូរគណនីដែលមានដោយស្វ័យប្រវត្តិ ហើយប្រាប់ផ្លូវ `--reset` ច្បាស់លាស់។
+- `tools/audit-tools/zoew/tests/android-signing-preflight.test.ts`៖ baseline ធ្លាក់ ៣២ ឆ្លង ៤៤; fixed signing និង APK-link checks ឆ្លង ៩៨; បន្ថែមការផ្ទៀង matcher FCM ៦ ករណី ឆ្លងសរុប ១០៤។ វាស់ script ជាមួយ fixtures មិនប្រើ signing key ពិត ឬបង្កើត release ពិត។
+- តេស្តរួម ១៣ suites ឆ្លង ២២៨ រួម deferred Excel ដែលមានស្រាប់; typecheck/lint/build/doc/slot/purity/coverage/comments ឆ្លង។ Audit measurement build រារាំងនៅ Chromium local socket (`Operation not permitted`) ទោះសាកបរិស្ថានដែលបានអនុញ្ញាត។ Full CI, hosted deployment និង real-device QA នៅមិនទាន់រត់។ ការកែនេះមិនអះអាងថាគ្មានកំហុសទាំងអស់ និងមិនប្ដូរ APK Audit gate។
 
 ### 2026-11-18 · ស្តារការកែ local ដែលបាត់ក្រោយ workspace ចាប់ផ្ដើមឡើងវិញ
 
@@ -5633,6 +5651,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `tools/audit-tools/zoew/tests/account-session-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/activation-retry.test.ts` | — | ផ្នែក ៧ |
 | `tools/audit-tools/zoew/tests/adaptive-refresh.test.ts` | — | ផ្នែក ៨ |
+| `tools/audit-tools/zoew/tests/android-signing-preflight.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/app-icon-logo.test.tsx` | — | ផ្នែក ៧ |
 | `tools/audit-tools/zoew/tests/app-lock-ownership-fixes.test.ts` | ផ្នែក ១ | — |
 | `tools/audit-tools/zoew/tests/apps-script-key-encrypted.test.tsx` | ផ្នែក ២ | — |
@@ -5732,6 +5751,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `tools/audit-tools/zoew/tests/keygen-login-ownership.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/keygen-sb-lock-ownership-fixes.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/keygen-secure-inventory.test.ts` | ផ្នែក ១ | — |
+| `tools/audit-tools/zoew/tests/keygen-setup-link-output.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/label-image.test.tsx` | — | ផ្នែក ៨ · ផ្នែក ៩ |
 | `tools/audit-tools/zoew/tests/label-print.test.tsx` | ផ្នែក ២ | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/late-commit-stale-session.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
@@ -5777,6 +5797,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `tools/audit-tools/zoew/tests/modal-keyboard.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/money-cookie-readiness.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/money-multidevice-oracle.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `tools/audit-tools/zoew/tests/monthly-report-live-view.test.tsx` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/more-menu-scroll.test.ts` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/native-durable-write.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/native-live-failure.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -5856,6 +5877,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `tools/audit-tools/zoew/tests/remember-password.test.tsx` | — | ផ្នែក ៧ · ផ្នែក ៩ |
 | `tools/audit-tools/zoew/tests/remove-pickup-key.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/remove-stale-session.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
+| `tools/audit-tools/zoew/tests/report-import-dialog.test.tsx` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/restore-prepared-retry.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/restore-resync-read-gate.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/restore-terminal-cancel.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |

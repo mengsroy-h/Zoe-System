@@ -462,7 +462,7 @@ ok('កំណែ Release ដេរីវេពី src/core/version.ts', releaseW
 const gsjAt = releaseWf.indexOf('ZoeW/android/app/google-services.json');
 const webBuildAt = releaseWf.indexOf('npm run android:sync');
 ok('FCM ៖ workflow សរសេរ google-services.json **មុន** build web (បើក __FCM_CONFIGURED__) ហើយផ្ទៀង package',
-    gsjAt > 0 && webBuildAt > gsjAt && releaseWf.includes('ZOEW_GOOGLE_SERVICES_JSON') && releaseWf.includes("package_name==='com.zoesystem.zoew'"));
+    gsjAt > 0 && webBuildAt > gsjAt && releaseWf.includes('ZOEW_GOOGLE_SERVICES_JSON') && /client\?\.client_info\?\.android_client_info\?\.package_name\s*===\s*'com\.zoesystem\.zoew'/.test(releaseWf));
 ok('FCM ៖ vite ដេរីវេ __FCM_CONFIGURED__ ពីវត្តមាន android/app/google-services.json',
     /__FCM_CONFIGURED__:\s*JSON\.stringify\(existsSync\(path\.join\(ROOT, 'android\/app\/google-services\.json'\)\)\)/.test(read('vite.config.mts')));
 const certPin = read('android/release-cert.sha256').trim();

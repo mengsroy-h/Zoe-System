@@ -1,4 +1,6 @@
-import { uiState } from '../../../core/state';
+import { dataState, firebaseState, uiState } from '../../../core/state';
+import { modalIsOpen } from '../../../core/modals';
+import { buildMonthlyReportView } from '../../../features/monthly-report';
 import { useStore } from '../../hooks/useStore';
 
 export interface MonthlyTile {
@@ -23,9 +25,9 @@ export interface MonthlyReportView {
 }
 
 export function MonthlyReportBody() {
-    useStore(uiState);
-    const view = uiState.monthlyReportView as MonthlyReportView | null;
-    if (!view) return null;
+    useStore(uiState, dataState, firebaseState);
+    if (!modalIsOpen('monthlyReportModal')) return null;
+    const view = buildMonthlyReportView(uiState.monthlyReportMonth);
 
     if (view.empty !== null) return <p className="mrep-empty">{view.empty}</p>;
 

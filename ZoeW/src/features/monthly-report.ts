@@ -162,12 +162,10 @@ export function monthlyReportRows(report) {
     return rows;
 }
 
-export function renderMonthlyReport() {
-    const report = buildMonthlyReport(uiState.monthlyReportMonth);
+export function buildMonthlyReportView(month = uiState.monthlyReportMonth) {
+    const report = buildMonthlyReport(month);
     if (!report.month || !report.days.length) {
-        uiState.monthlyReportView = { empty: emptyViewMessage(STATS_DAILY_VIEW_KEYS, 'គ្មានទិន្នន័យសម្រាប់ខែនេះទេ'), tiles: [], mismatch: null, headers: [], rows: [] };
-        uiState.touch();
-        return;
+        return { empty: emptyViewMessage(STATS_DAILY_VIEW_KEYS, 'គ្មានទិន្នន័យសម្រាប់ខែនេះទេ'), tiles: [], mismatch: null, headers: [], rows: [] };
     }
     const totals = report.totals;
     const measurable = totals.collectedMeasurable;
@@ -188,7 +186,7 @@ export function renderMonthlyReport() {
             pending: 'មិនទាន់យក ' + collectedMoneyText(totals.pendingTotal, measurable)
         }
     ];
-    uiState.monthlyReportView = {
+    return {
         empty: null,
         tiles: tiles,
         mismatch: (report.mismatch && report.ledger)
@@ -207,6 +205,10 @@ export function renderMonthlyReport() {
             customers: pickText(d.customers)
         }))
     };
+}
+
+export function renderMonthlyReport() {
+    uiState.monthlyReportView = buildMonthlyReportView();
     uiState.touch();
 }
 

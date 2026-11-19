@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.52';
+const APP_VERSION = '2.24.53';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -817,16 +817,16 @@ function invalidateSensitiveSession() {
     const setupUrl = document.getElementById('setupLookupUrlInput');
     if (setupUrl && setupUrl.value) setupUrl.value = lookupSetupScrubUrl(setupUrl.value);
     const setupCode = document.getElementById('setupLookupCodeOutput');
-    if (setupCode && setupCode.textContent) {
-        setupCode.textContent = '';
-        lastGeneratedSetupLink = '';
-        const setupResult = document.getElementById('setupLinkResultText');
-        if (setupResult) setupResult.textContent = '';
-        const setupQr = document.getElementById('setupLinkQrContainer');
-        if (setupQr) setupQr.innerHTML = '';
-        const setupBox = document.getElementById('setupLinkResultBox');
-        if (setupBox) setupBox.classList.add('hidden');
-    }
+    if (setupCode) setupCode.textContent = '';
+    lastGeneratedSetupLink = '';
+    const setupResult = document.getElementById('setupLinkResultText');
+    if (setupResult) setupResult.textContent = '';
+    const setupQr = document.getElementById('setupLinkQrContainer');
+    if (setupQr) setupQr.innerHTML = '';
+    const setupBox = document.getElementById('setupLinkResultBox');
+    if (setupBox) setupBox.classList.add('hidden');
+    const setupQrSave = document.getElementById('setupLinkQrSaveBtn');
+    if (setupQrSave) setupQrSave.classList.add('hidden');
 }
 
 function captureSensitiveSession(requireAuthorizedUi) {
@@ -2867,20 +2867,36 @@ async function encryptSetupLookup(metadata, secret, code) {
     return { v: 2, salt: base64(salt), iv: base64(iv), ct: base64(new Uint8Array(cipher)), iter: 300000 };
 }
 
+function lookupSetupBaseUrl(value) {
+    const base = new URL(value);
+    if (base.protocol !== 'https:' || base.username || base.password) throw new Error('bad base');
+    base.search = '';
+    base.hash = '';
+    return base;
+}
+
 function generateSetupLink() {
     lookupSetupGeneration++;
-    const lookupChoice = document.getElementById('setupLookupIncludeCheckbox');
-    if (lookupChoice && lookupChoice.checked) return generateLookupSetupLink();
+    lastGeneratedSetupLink = '';
     const codeOutput = document.getElementById('setupLookupCodeOutput');
     if (codeOutput) codeOutput.textContent = '';
+    const resultBox = document.getElementById('setupLinkResultBox');
+    if (resultBox) resultBox.classList.add('hidden');
+    const resultText = document.getElementById('setupLinkResultText');
+    if (resultText) resultText.textContent = '';
+    const qrContainer = document.getElementById('setupLinkQrContainer');
+    if (qrContainer) qrContainer.innerHTML = '';
+    const qrSave = document.getElementById('setupLinkQrSaveBtn');
+    if (qrSave) qrSave.classList.add('hidden');
+    const lookupChoice = document.getElementById('setupLookupIncludeCheckbox');
+    if (lookupChoice && lookupChoice.checked) return generateLookupSetupLink();
     const urlInput = document.getElementById('setupLinkUrlInput');
     const cfgInput = document.getElementById('setupLinkConfigInput');
-    const resultBox = document.getElementById('setupLinkResultBox');
-    const resultText = document.getElementById('setupLinkResultText');
     if (!urlInput || !cfgInput) return;
 
-    const baseUrl = urlInput.value.trim().replace(/\/+$/, '');
-    if (!/^https:\/\/.+/.test(baseUrl)) { alert('សូមបញ្ចូល Base URL ត្រឹមត្រូវ (ចាប់ផ្តើមដោយ https://)!'); return; }
+    let base;
+    try { base = lookupSetupBaseUrl(urlInput.value.trim()); }
+    catch (e) { alert('សូមបញ្ចូល Base URL ត្រឹមត្រូវ (ចាប់ផ្តើមដោយ https://)!'); return; }
 
     let candidate;
     try { candidate = JSON.parse(cfgInput.value); } catch (e) {}
@@ -2897,7 +2913,7 @@ function generateSetupLink() {
     const parsed = normalized.config;
     if (normalized.extras.length) showToast('ℹ️ រំលងវាលដែលមិនមែនរបស់ Firebase៖ ' + normalized.extras.join(', '));
 
-    safeStoreSet(appLocalStore, SETUP_LINK_URL_KEY, baseUrl);
+    safeStoreSet(appLocalStore, SETUP_LINK_URL_KEY, base.href);
 
     let b64;
     try {
@@ -2907,12 +2923,11 @@ function generateSetupLink() {
         return;
     }
 
-    lastGeneratedSetupLink = baseUrl + '/#setup=' + encodeURIComponent(b64);
+    base.hash = 'setup=' + encodeURIComponent(b64);
+    lastGeneratedSetupLink = base.href;
     if (resultText) resultText.textContent = lastGeneratedSetupLink;
     if (resultBox) resultBox.classList.remove('hidden');
 
-    const qrContainer = document.getElementById('setupLinkQrContainer');
-    const qrSave = document.getElementById('setupLinkQrSaveBtn');
     try {
         const drawn = renderQrInto(qrContainer, lastGeneratedSetupLink);
         if (qrSave) qrSave.classList[drawn ? 'remove' : 'add']('hidden');
@@ -2945,10 +2960,7 @@ async function generateLookupSetupLink() {
     if (element('setupLinkQrContainer')) element('setupLinkQrContainer').innerHTML = '';
     if (element('setupLinkResultBox')) element('setupLinkResultBox').classList.add('hidden');
     try {
-        const base = new URL(value('setupLinkUrlInput'));
-        if (base.protocol !== 'https:' || base.username || base.password) throw new Error('bad base');
-        base.search = '';
-        base.hash = '';
+        const base = lookupSetupBaseUrl(value('setupLinkUrlInput'));
         const payload = {};
         const raw = value('setupLinkConfigInput');
         if (raw) {
@@ -4971,11 +4983,11 @@ function renderSbTenantList() {
 }
 
 function sbInviteSetupLink(session, code) {
-    const baseUrl = String(safeStoreGet(appLocalStore, SETUP_LINK_URL_KEY) || sbInputValue('setupLinkUrlInput')).replace(/\/+$/, '');
-    if (!/^https:\/\/.+/.test(baseUrl)) return '';
     const payload = { supabaseUrl: session.url, supabaseKey: session.key, invite: code };
     try {
-        return baseUrl + '/#setup=' + encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(payload)))));
+        const base = lookupSetupBaseUrl(safeStoreGet(appLocalStore, SETUP_LINK_URL_KEY) || sbInputValue('setupLinkUrlInput'));
+        base.hash = 'setup=' + encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(payload)))));
+        return base.href;
     } catch (e) {
         return '';
     }

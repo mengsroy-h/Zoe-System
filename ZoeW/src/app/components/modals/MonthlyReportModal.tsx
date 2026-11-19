@@ -5,9 +5,9 @@ import { MonthlyReportBody } from '../reports/MonthlyReportBody';
 
 export function MonthlyReportModal() {
     return (
-        <Modal id="monthlyReportModal">
+        <Modal id="monthlyReportModal" role="dialog" aria-modal="true" aria-labelledby="monthlyReportTitle">
             <div className="modal-content">
-                <h3>📈 របាយការណ៍អាជីវកម្មប្រចាំខែ</h3>
+                <h3 id="monthlyReportTitle">📈 របាយការណ៍អាជីវកម្មប្រចាំខែ</h3>
                 <p>
                     សង្ខេបចំណូល និងកញ្ចប់ក្នុងមួយខែ គិតចេញពី{' '}
                     <b>កំណត់ត្រាប្រចាំថ្ងៃ</b>

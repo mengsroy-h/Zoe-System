@@ -2,8 +2,6 @@
 
 const { spawn } = require('child_process');
 
-const CDP_PORT = 9222;
-const CDP_ORIGIN = `http://127.0.0.1:${CDP_PORT}`;
 const TARGET_POLL_MS = 900;
 const ARGUS_OPEN_DELAY_MS = 7000;
 const CDP_COMMAND_TIMEOUT_MS = 10000;
@@ -19,8 +17,8 @@ function codedErrorFallback(code) {
     return error;
 }
 
-function adbPrefix() {
-    const serial = String(process.env.ANDROID_SERIAL || '').trim();
+function adbPrefix(selectedSerial) {
+    const serial = selectedSerial || String(process.env.ANDROID_SERIAL || '').trim();
     return serial ? ['-s', serial] : [];
 }
 
@@ -28,7 +26,7 @@ function runAdb(args, options) {
     const config = options || {};
     const timeoutMs = Number.isFinite(config.timeoutMs) ? config.timeoutMs : ADB_COMMAND_TIMEOUT_MS;
     return new Promise((resolve, reject) => {
-        const child = spawn('adb', adbPrefix().concat(args), {
+        const child = spawn('adb', adbPrefix(config.serial).concat(args), {
             stdio: ['ignore', 'pipe', 'pipe'],
             windowsHide: true
         });
@@ -61,11 +59,11 @@ function runAdb(args, options) {
     });
 }
 
-async function fetchJson(pathname, timeoutMs) {
+async function fetchJson(port, pathname, timeoutMs) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs || 5000);
     try {
-        const response = await fetch(CDP_ORIGIN + pathname, {
+        const response = await fetch(`http://127.0.0.1:${port}` + pathname, {
             signal: controller.signal,
             cache: 'no-store'
         });
@@ -76,19 +74,19 @@ async function fetchJson(pathname, timeoutMs) {
     }
 }
 
-function normalizeWsUrl(raw) {
+function normalizeWsUrl(raw, port) {
     const url = new URL(String(raw || ''));
     if (url.protocol !== 'ws:' && url.protocol !== 'wss:') throw new Error('BAD_WS_URL');
     // The DevTools JSON endpoint sometimes advertises localhost. Pin it to the
     // loopback endpoint created by `adb forward` so no remote host is contacted.
     url.hostname = '127.0.0.1';
-    url.port = String(CDP_PORT);
+    url.port = String(port);
     return url.toString();
 }
 
 class CdpSocket {
-    constructor(url, onEvent) {
-        this.url = normalizeWsUrl(url);
+    constructor(url, port, onEvent) {
+        this.url = normalizeWsUrl(url, port);
         this.onEvent = typeof onEvent === 'function' ? onEvent : () => {};
         this.ws = null;
         this.nextId = 1;
@@ -197,18 +195,18 @@ function validContentLength(headers, limit) {
     return !Number.isFinite(value) || value <= limit;
 }
 
-async function listPageTargets() {
-    const targets = await fetchJson('/json', 5000);
+async function listPageTargets(port) {
+    const targets = await fetchJson(port, '/json', 5000);
     if (!Array.isArray(targets)) return [];
     return targets.filter((target) => target && target.type === 'page' && target.webSocketDebuggerUrl);
 }
 
-async function waitForChromeCdp(timeoutMs) {
+async function waitForChromeCdp(port, timeoutMs) {
     const deadline = Date.now() + timeoutMs;
     let lastError = null;
     while (Date.now() < deadline) {
         try {
-            const version = await fetchJson('/json/version', 2500);
+            const version = await fetchJson(port, '/json/version', 2500);
             if (version && version.webSocketDebuggerUrl) return version;
         } catch (error) {
             lastError = error;
@@ -232,13 +230,13 @@ function safeIntentUrl(raw) {
     return url;
 }
 
-async function openChromeUrl(url) {
+async function openChromeUrl(url, serial) {
     await runAdb([
         'shell', 'am', 'start',
         '-a', 'android.intent.action.VIEW',
         '-d', safeIntentUrl(url),
         '-p', 'com.android.chrome'
-    ]);
+    ], { serial });
 }
 
 function trafficSummary(tally) {
@@ -264,6 +262,8 @@ async function captureAndroidCookie(config) {
     const captureMethods = Array.isArray(config.captureMethods) ? config.captureMethods : ['GET', 'POST'];
     const targetSockets = new Map();
     const tally = { seen: 0, ok: 0, denied: 0, other: 0 };
+    let serial;
+    let forwardPort;
     let settled = false;
     let scanTimer = null;
     let timeoutTimer = null;
@@ -276,6 +276,8 @@ async function captureAndroidCookie(config) {
         resolveResult = resolve;
         rejectResult = reject;
     });
+
+    resultPromise.catch(() => {});
 
     const finish = (error, value) => {
         if (settled) return;
@@ -392,7 +394,7 @@ async function captureAndroidCookie(config) {
         const id = String(target.id || target.targetId || target.webSocketDebuggerUrl);
         if (!id || targetSockets.has(id) || settled) return;
         const state = { requests: new Map() };
-        const socket = new CdpSocket(target.webSocketDebuggerUrl, makeTargetHandler(state));
+        const socket = new CdpSocket(target.webSocketDebuggerUrl, forwardPort, makeTargetHandler(state));
         targetSockets.set(id, { socket, state, url: String(target.url || '') });
         try {
             await socket.connect();
@@ -411,7 +413,7 @@ async function captureAndroidCookie(config) {
         if (scanning || settled) return;
         scanning = true;
         try {
-            const targets = await listPageTargets();
+            const targets = await listPageTargets(forwardPort);
             await Promise.all(targets.map((target) => attachTarget(target)));
         } catch (_) {
             // Temporary target-list failures are expected during navigation.
@@ -422,21 +424,26 @@ async function captureAndroidCookie(config) {
 
     try {
         try {
-            const state = await runAdb(['get-state']);
+            const selected = await runAdb(['get-serialno']);
+            if (!/^[^\s]+$/.test(selected.stdout) || selected.stdout === 'unknown') throw new Error('NOT_DEVICE');
+            serial = selected.stdout;
+            const state = await runAdb(['get-state'], { serial });
             if (!/\bdevice\b/i.test(state.stdout)) throw new Error('NOT_DEVICE');
         } catch (_) {
             throw codedError('ANDROID_ADB_NOT_CONNECTED');
         }
 
         try {
-            await openChromeUrl(config.portalUrl);
+            await openChromeUrl(config.portalUrl, serial);
         } catch (_) {
             throw codedError('ANDROID_CHROME_OPEN_FAILED');
         }
 
         try {
-            await runAdb(['forward', `tcp:${CDP_PORT}`, 'localabstract:chrome_devtools_remote']);
-            await waitForChromeCdp(12000);
+            const { stdout } = await runAdb(['forward', '--no-rebind', 'tcp:0', 'localabstract:chrome_devtools_remote'], { serial });
+            if (!/^[1-9][0-9]{0,4}$/.test(stdout) || Number(stdout) > 65535) throw new Error('BAD_ADB_FORWARD_PORT');
+            forwardPort = Number(stdout);
+            await waitForChromeCdp(forwardPort, 12000);
         } catch (_) {
             throw codedError('ANDROID_CDP_UNAVAILABLE');
         }
@@ -457,7 +464,7 @@ async function captureAndroidCookie(config) {
         }, timeoutMs);
         argusTimer = setTimeout(() => {
             if (settled) return;
-            openChromeUrl(config.argusUrl).then(() => {
+            openChromeUrl(config.argusUrl, serial).then(() => {
                 console.log('   Opened Argus in Chrome. Waiting for a signed-in answer...');
                 return scanTargets();
             }).catch(() => {
@@ -471,8 +478,9 @@ async function captureAndroidCookie(config) {
         throw error;
     } finally {
         if (!settled) finish(codedError('BROWSER_CLOSED'));
-        try { await runAdb(['forward', '--remove', `tcp:${CDP_PORT}`], { timeoutMs: 5000 }); } catch (_) {}
-        if (settled && resultPromise) resultPromise.catch(() => {});
+        if (forwardPort !== undefined) {
+            try { await runAdb(['forward', '--remove', `tcp:${forwardPort}`], { serial, timeoutMs: 5000 }); } catch (_) {}
+        }
     }
 }
 

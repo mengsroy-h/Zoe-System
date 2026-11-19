@@ -4,6 +4,7 @@
 // និង settle ពេលបណ្តាញព្យួរ។
 'use strict';
 
+const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
@@ -150,6 +151,154 @@ if (source) {
     } catch (error) {
         ok('source អាច require បានដោយគ្មាន runtime side effect', false, error && error.code);
     }
+}
+
+function androidForwardFixture(source, { disconnected = false, forwardError = false, malformed = false, probeFailure = false } = {}) {
+    const events = [], urls = [], sockets = [];
+    let nextPort = 33000, tick = 0, nextTimer = 0;
+    const timers = new Map();
+    const captureMs = 12345;
+    const timer = (callback, ms) => {
+        const id = ++nextTimer;
+        timers.set(id, { callback, ms });
+        if (ms === 500) queueMicrotask(() => {
+            if (timers.delete(id)) callback();
+        });
+        return id;
+    };
+    const clear = (id) => timers.delete(id);
+    class Socket {
+        static OPEN = 1;
+        readyState = Socket.OPEN;
+        constructor(url) { sockets.push(url); }
+        addEventListener(event, listener) {
+            if (event === 'open') queueMicrotask(listener);
+            if (event === 'message') this.receive = listener;
+        }
+        send(payload) {
+            queueMicrotask(() => this.receive({ data: JSON.stringify({ id: JSON.parse(payload).id, result: {} }) }));
+        }
+        close() {}
+    }
+    const context = {
+        module: { exports: {} },
+        require(name) {
+            assert.equal(name, 'child_process');
+            return { spawn(file, args) {
+                assert.equal(file, 'adb');
+                events.push(args);
+                const child = new EventEmitter();
+                child.stdout = new EventEmitter();
+                child.stderr = new EventEmitter();
+                queueMicrotask(() => {
+                    let output = '', status = 0;
+                    const call = args.slice(args[0] === '-s' ? 2 : 0);
+                    if (call[0] === 'get-state') { output = 'device'; status = disconnected ? 1 : 0; }
+                    if (call[0] === 'get-serialno') output = 'mock-android';
+                    if (call[0] === 'forward' && call[1] !== '--remove') {
+                        status = forwardError ? 1 : 0;
+                        if (call.includes('tcp:0')) output = malformed ? 'invalid' : String(++nextPort);
+                    }
+                    child.stdout.emit('data', output);
+                    child.emit('close', status);
+                });
+                return child;
+            }};
+        },
+        fetch: async (url) => {
+            urls.push(url);
+            if (probeFailure) throw new Error('mock CDP not ready');
+            const target = { id: 'mock-tab', type: 'page', webSocketDebuggerUrl: 'ws://elsewhere.invalid:9999/devtools' };
+            return { ok: true, json: async () => url.endsWith('/json') ? [target] : target };
+        },
+        process: { env: {} },
+        Date: { now() { tick += 500; return tick; } },
+        setTimeout: timer, clearTimeout: clear, setInterval: timer, clearInterval: clear,
+        AbortController, URL, WebSocket: Socket,
+        console: { log() {} }
+    };
+    vm.runInNewContext(source, context);
+    const capture = () => context.module.exports.captureAndroidCookie({ portalUrl: 'https://example.invalid/', timeoutMs: captureMs });
+    const ready = () => Array.from(timers.values()).filter(({ ms }) => ms === captureMs).length;
+    const expire = () => {
+        for (const [id, { ms, callback }] of timers) {
+            if (ms === captureMs) {
+                timers.delete(id);
+                callback();
+            }
+        }
+    };
+    return { events, urls, sockets, capture, ready, expire };
+}
+
+const androidForwards = (events, remove) => events
+    .map(args => args.slice(args[0] === '-s' ? 2 : 0))
+    .filter(args => args[0] === 'forward' && (args[1] === '--remove') === remove);
+
+async function checkAndroidForwardOwnership(source) {
+    const test = async (label, check) => {
+        try {
+            let finished = false, failure;
+            Promise.resolve().then(check).then(() => { finished = true; }, (error) => {
+                finished = true;
+                failure = error;
+            });
+            for (let i = 0; i < 2048 && !finished; ++i) await Promise.resolve();
+            assert.equal(finished, true, 'fixture មិនបញ្ចប់');
+            if (failure) throw failure;
+            ok(label, true);
+        } catch (error) {
+            ok(label, false, error.message);
+        }
+    };
+    await test('ADB មិនភ្ជាប់៖ មិនលុប forward', async () => {
+        const run = androidForwardFixture(source, { disconnected: true });
+        await assert.rejects(run.capture(), { code: 'ANDROID_ADB_NOT_CONNECTED' });
+        assert.deepEqual(androidForwards(run.events, true), []);
+    });
+
+    await test('ADB បង្កើត forward មិនបាន៖ មិនលុប forward', async () => {
+        const run = androidForwardFixture(source, { forwardError: true });
+        await assert.rejects(run.capture(), { code: 'ANDROID_CDP_UNAVAILABLE' });
+        assert.deepEqual(androidForwards(run.events, true), []);
+        assert.deepEqual(run.urls, []);
+    });
+
+    await test('លេខ port មិនត្រឹមត្រូវ៖ មិនស្មានលេខដើម្បីលុប', async () => {
+        const run = androidForwardFixture(source, { malformed: true });
+        let finished = false;
+        const pending = run.capture();
+        pending.then(() => { finished = true; }, () => { finished = true; });
+        for (let i = 0; i < 128 && !finished && !run.ready(); ++i) await Promise.resolve();
+        if (run.ready()) run.expire();
+        await assert.rejects(pending, { code: 'ANDROID_CDP_UNAVAILABLE' });
+        assert.deepEqual(androidForwards(run.events, true), []);
+        assert.deepEqual(run.urls, []);
+    });
+
+    await test('capture ពីរដំណើរការត្រួតគ្នា៖ ប្រើ និងលុបតែ port ផ្ទាល់ខ្លួន', async () => {
+        const run = androidForwardFixture(source);
+        const running = Promise.allSettled([run.capture(), run.capture()]);
+        for (let i = 0; i < 128 && run.ready() < 2; ++i) await Promise.resolve();
+        // ផ្ទៀងថា capture ទាំងពីរបានភ្ជាប់ CDP មុនពេលបញ្ជាឲ្យផុតកំណត់។
+        assert.equal(run.ready(), 2);
+        assert.equal(run.sockets.length, 2);
+        run.expire();
+        for (const result of await running) assert.equal(result.reason?.code, 'CAPTURE_TIMEOUT');
+        assert.deepEqual(androidForwards(run.events, false).map(args => args.find(arg => arg.startsWith('tcp:'))), ['tcp:0', 'tcp:0']);
+        assert.deepEqual(androidForwards(run.events, true).map(args => args[2]).sort(), ['tcp:33001', 'tcp:33002']);
+        for (const port of [33001, 33002]) for (const endpoint of ['/json/version', '/json']) {
+            assert.ok(run.urls.includes('http://127.0.0.1:' + port + endpoint));
+        }
+        assert.deepEqual(run.sockets.sort(), ['ws://127.0.0.1:33001/devtools', 'ws://127.0.0.1:33002/devtools']);
+        assert.ok(run.events.filter(args => args.includes('forward')).every(args => args[0] === '-s' && args[1] === 'mock-android'));
+    });
+
+    await test('CDP មិនឆ្លើយ៖ នៅតែលុប forward ដែលខ្លួនបានបង្កើត', async () => {
+        const run = androidForwardFixture(source, { probeFailure: true });
+        await assert.rejects(run.capture(), { code: 'ANDROID_CDP_UNAVAILABLE' });
+        assert.deepEqual(androidForwards(run.events, true).map(args => args[2]), ['tcp:33001']);
+    });
 }
 
 async function run() {
@@ -1167,6 +1316,7 @@ async function run() {
     const ADB_ENSURE_PATH = path.join(TOOL_DIR, 'ensure-adb-connected.sh');
     const readOr = (f) => { try { return fs.readFileSync(f, 'utf8'); } catch (_) { return ''; } };
     const capture = readOr(ANDROID_CAPTURE_PATH);
+    await checkAndroidForwardOwnership(capture);
     const termuxRun = readOr(TERMUX_RUN_PATH);
     const termuxSetup = readOr(TERMUX_SETUP_PATH);
     const homeButton = readOr(HOME_BUTTON_PATH);

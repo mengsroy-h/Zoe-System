@@ -262,9 +262,8 @@ function acquireRunLock(backupRoot, staleMs) {
                 if (statError && statError.code === 'ENOENT') continue;
                 throw statError;
             }
-            if (attempt === 0 && stat.isFile() && Date.now() - stat.mtimeMs > staleMs) {
-                fs.unlinkSync(lockPath);
-                continue;
+            if (stat.isFile() && Date.now() - stat.mtimeMs > staleMs) {
+                throw new Error(`Backup lock may be stale (lock: ${lockPath}). Stop and drain all backup processes and schedules, then remove only this lock if no process owns it.`);
             }
             throw new Error(`Another backup run is active (lock: ${lockPath}).`);
         }

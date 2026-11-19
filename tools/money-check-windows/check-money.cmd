@@ -88,8 +88,16 @@ if not exist "!DUMP!" (
   exit /b 1
 )
 
-set "REPORT=%USERPROFILE%\Desktop\zoe-money-report.txt"
-set "SAFE=%USERPROFILE%\Desktop\zoe-dump-SAFE-TO-SHARE.json"
+set "OUTPUT_DIR="
+for /f "delims=" %%O in ('node -e "try { console.log(require('fs').mkdtempSync(require('path').join(process.env.USERPROFILE, 'Desktop', 'zoe-money-'))); } catch (_) { process.exitCode = 3; }"') do set "OUTPUT_DIR=%%O"
+if not defined OUTPUT_DIR (
+  echo ERROR: a new output folder could not be created on your Desktop.
+  echo DO NOT SEND: any copy from this run.
+  pause
+  exit /b 3
+)
+set "REPORT=!OUTPUT_DIR!\zoe-money-report.txt"
+set "SAFE=!OUTPUT_DIR!\zoe-dump-SAFE-TO-SHARE.json"
 
 echo.
 echo Project : !REPO!
@@ -132,7 +140,7 @@ if not "!REDACT_CODE!"=="0" (
   echo.
   echo ERROR: the share-safe copy could not be verified.
   echo DO NOT SEND: the dump or any unverified copy from this run.
-  echo   The money report is still saved on your Desktop.
+  echo   The money report is still saved at: "%REPORT%"
   echo.
   pause
   exit /b 3
@@ -140,10 +148,10 @@ if not "!REDACT_CODE!"=="0" (
 
 echo.
 if exist "%REPORT%" start "" notepad "%REPORT%"
-echo The Khmer report opened in Notepad. It is also saved on your Desktop.
+echo The Khmer report opened in Notepad. Output folder: "!OUTPUT_DIR!"
 echo.
-echo SAFE TO SEND : zoe-money-report.txt          (Desktop)
-echo SAFE TO SEND : zoe-dump-SAFE-TO-SHARE.json   (Desktop)
+echo SAFE TO SEND : "%REPORT%"
+echo SAFE TO SEND : "%SAFE%"
 echo DO NOT SEND  : the original export from Firebase (real phone numbers)
 echo.
 pause

@@ -1,3 +1,4 @@
+import { createLifecycleScope } from '../app/lifecycle/scope';
 import { createWithWindowListenerOwner } from '../platform/sdk-listener-owner';
 import { createClient } from '@supabase/supabase-js';
 import { SbNetworkError, SbRpcError } from './supabase-rtdb';
@@ -81,16 +82,13 @@ export function sbFetchWithTimeout(fetchImpl, url, init, timeoutMs) {
     let controller = null;
     try { controller = new AbortController(); } catch (e) { controller = null; }
     let timer = null;
-    let cancel: (() => void) | undefined;
+    const scope = source ? createLifecycleScope() : null;
     const abort = () => { try { controller?.abort(); } catch (e) {} };
     const guard = new Promise((_, reject) => {
-        if (source) {
-            cancel = () => {
-                reject(new SbNetworkError('aborted'));
-                abort();
-            };
-            source.addEventListener('abort', cancel, { once: true });
-        }
+        scope?.listen(source, 'abort', () => {
+            reject(new SbNetworkError('aborted'));
+            abort();
+        }, { once: true });
         timer = setTimeout(() => {
             reject(new SbNetworkError('timeout'));
             abort();
@@ -116,7 +114,7 @@ export function sbFetchWithTimeout(fetchImpl, url, init, timeoutMs) {
     });
     return Promise.race([run, guard]).finally(() => {
         clearTimeout(timer);
-        if (cancel) source?.removeEventListener('abort', cancel);
+        scope?.dispose();
     });
 }
 

@@ -76,13 +76,24 @@ export function createModeStorage(localStore, sessionStore) {
 }
 
 export function sbFetchWithTimeout(fetchImpl, url, init, timeoutMs) {
+    const source = init?.signal as AbortSignal | undefined;
+    if (source?.aborted) return Promise.reject(new SbNetworkError('aborted', true));
     let controller = null;
     try { controller = new AbortController(); } catch (e) { controller = null; }
     let timer = null;
+    let cancel: (() => void) | undefined;
+    const abort = () => { try { controller?.abort(); } catch (e) {} };
     const guard = new Promise((_, reject) => {
+        if (source) {
+            cancel = () => {
+                reject(new SbNetworkError('aborted'));
+                abort();
+            };
+            source.addEventListener('abort', cancel, { once: true });
+        }
         timer = setTimeout(() => {
-            try { if (controller) controller.abort(); } catch (e) {}
             reject(new SbNetworkError('timeout'));
+            abort();
         }, timeoutMs);
     });
     let started;
@@ -92,6 +103,7 @@ export function sbFetchWithTimeout(fetchImpl, url, init, timeoutMs) {
         started = Promise.reject(e);
     }
     const run = started.then(async (res) => {
+        if (source?.aborted || controller?.signal.aborted) throw new SbNetworkError('aborted');
         let text;
         try {
             text = await res.text();
@@ -102,7 +114,10 @@ export function sbFetchWithTimeout(fetchImpl, url, init, timeoutMs) {
     }, (e) => {
         throw new SbNetworkError(String((e && e.message) || e || 'network'));
     });
-    return Promise.race([run, guard]).finally(() => clearTimeout(timer));
+    return Promise.race([run, guard]).finally(() => {
+        clearTimeout(timer);
+        if (cancel) source?.removeEventListener('abort', cancel);
+    });
 }
 
 export function sbFetchWithCeiling(fetchImpl, input, init, timeoutMs) {
@@ -237,10 +252,10 @@ export function createSupabaseTransport(config, deps?) {
         if (isForeign(s) && (s || !sessionStored())) { noteForeignSession(toSession(s)); return null; }
         return s ? s.access_token : null;
     };
-    const post = async (path, body, token, timeoutMs) => {
+    const post = async (path, body, token, timeoutMs, signal?: AbortSignal) => {
         const headers: any = { apikey: key, 'Content-Type': 'application/json', Accept: 'application/json' };
         if (token) headers.Authorization = 'Bearer ' + token;
-        return sbFetchWithTimeout(fetchImpl, url + path, { method: 'POST', headers, body: JSON.stringify(body || {}), cache: 'no-store', credentials: 'omit' }, timeoutMs);
+        return sbFetchWithTimeout(fetchImpl, url + path, { method: 'POST', headers, body: JSON.stringify(body || {}), cache: 'no-store', credentials: 'omit', signal }, timeoutMs);
     };
     const sessionStored = () => {
         try { return !!storage.getItem(SB_AUTH_STORAGE_KEY); } catch (e) { return false; }
@@ -254,11 +269,11 @@ export function createSupabaseTransport(config, deps?) {
     const storedSession = () => toSession(readStoredSession());
     const unsentWithin = (promise, timeoutMs) => sbWithin(promise, timeoutMs).catch((e) => { throw new SbNetworkError(String((e && e.message) || 'timeout'), true); });
     const sessionEndedElsewhere = () => new SbRpcError('session ended in another tab', 'session-ended', 401, '');
-    const rpc = async (fn, args, timeoutMs, observation?: { observational: true; current: () => boolean; deadline: number }) => {
+    const rpc = async (fn, args, timeoutMs, observation?: { observational: true; current: () => boolean; deadline: number; signal?: AbortSignal }) => {
         const epoch = generation;
         const remaining = () => observation ? Math.max(1, Math.min(timeoutMs, observation.deadline - performance.now())) : timeoutMs;
         const checkCurrent = () => {
-            if (observation && !observation.current()) throw new SbNetworkError('session-ended', true);
+            if (observation && (observation.signal?.aborted || !observation.current())) throw new SbNetworkError('session-ended', true);
             if (observation && performance.now() >= observation.deadline) throw new SbNetworkError('timeout', true);
             if (closed || epoch !== generation) throw new SbNetworkError('session-ended', true);
             if (boundEnded) throw sessionEndedElsewhere();
@@ -280,7 +295,7 @@ export function createSupabaseTransport(config, deps?) {
         }
         checkCurrent();
         let token = current ? current.access_token : null;
-        let res = await post('/rest/v1/rpc/' + fn, args, token, remaining());
+        let res = await post('/rest/v1/rpc/' + fn, args, token, remaining(), observation?.signal);
         if (observation) checkCurrent();
         if (res.status === 401 && token && !observation) {
             checkCurrent();

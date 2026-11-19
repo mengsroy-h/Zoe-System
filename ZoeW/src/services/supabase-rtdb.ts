@@ -1596,20 +1596,20 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         infoListeners.forEach((l: any) => { if (describe(l.path) === key) infoListeners.delete(l); });
     };
 
-    db.getForHealth = async (ref, timeoutMs, ownerCurrent = () => true) => {
+    db.getForHealth = async (ref, timeoutMs, ownerCurrent = () => true, signal?: AbortSignal) => {
         const epoch = sessionEpoch;
         const scope = authScope;
         const topic = tenantTopic;
         const deadline = performance.now() + timeoutMs;
         const current = () => !closed && epoch === sessionEpoch && scope === authScope
-            && topic === tenantTopic && ownerCurrent();
+            && topic === tenantTopic && !signal?.aborted && ownerCurrent();
         if (!current()) throw disconnectError();
         const path = ref._path;
         if (ref._db !== db || path.length !== 2) throw new Error('Health read requires a document reference');
         let res;
         try {
             res = await transport.rpc('zoe_read', { p_root: path[0], p_key: path[1] }, timeoutMs,
-                { observational: true, current, deadline });
+                { observational: true, current, deadline, signal });
         } catch (e) {
             if (!current()) throw disconnectError();
             if (e instanceof SbNetworkError && e.message === 'timeout') throw new Error('Health database read timed out');

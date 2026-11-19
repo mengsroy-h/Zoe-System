@@ -17,7 +17,7 @@ export async function healthDatabaseRead(signal?: AbortSignal): Promise<boolean 
         const reference = sdk.ref(database, DB_LIVENESS_PROBE_PATH);
         if (isSupabaseConfig(config)) {
             if (typeof sdk.getForHealth !== 'function') return null;
-            const snapshot = await withTimeout(Promise.resolve(sdk.getForHealth(reference, DB_LIVENESS_PROBE_TIMEOUT_MS, current)), DB_LIVENESS_PROBE_TIMEOUT_MS, 'Health database read timed out');
+            const snapshot = await withTimeout(Promise.resolve(sdk.getForHealth(reference, DB_LIVENESS_PROBE_TIMEOUT_MS, current, signal)), DB_LIVENESS_PROBE_TIMEOUT_MS, 'Health database read timed out');
             if (!current() || !snapshot || typeof snapshot.val !== 'function') return null;
             const value = snapshot.val();
             return value === null || value === true ? true : null;

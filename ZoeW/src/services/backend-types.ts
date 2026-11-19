@@ -56,7 +56,7 @@ export interface BackendAuth {
 
 export interface BackendTransport {
     rpc<T = unknown>(name: string, args: Record<string, unknown>, timeoutMs?: number,
-        options?: { observational?: boolean; current?: () => boolean; deadline?: number }): Promise<T>;
+        options?: { observational?: boolean; current?: () => boolean; deadline?: number; signal?: AbortSignal }): Promise<T>;
 }
 
 export interface BackendEvidenceAuth {
@@ -197,7 +197,7 @@ export interface BackendSdk {
     onValue<T>(reference: BackendReference<T>, callback: (snapshot: BackendSnapshot<T>) => void, onError?: (error: Error) => void): () => void;
     off(reference: BackendReference): void;
     get<T>(reference: BackendReference<T>): Promise<BackendSnapshot<T>>;
-    getForHealth?<T>(reference: BackendReference<T>, timeoutMs: number, current: () => boolean): Promise<BackendSnapshot<T>>;
+    getForHealth?<T>(reference: BackendReference<T>, timeoutMs: number, current: () => boolean, signal?: AbortSignal): Promise<BackendSnapshot<T>>;
     set<T>(reference: BackendReference<T>, value: NoInfer<T> | null): Promise<void>;
     update(reference: BackendReference, values: Record<string, unknown>): Promise<void>;
     runTransaction<T>(reference: BackendReference<T>, update: (current: NoInfer<T> | null) => NoInfer<T> | null | undefined,

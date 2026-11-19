@@ -150,8 +150,8 @@ export async function healthTenantLiveRow(signal?: AbortSignal) {
     const transport = firebaseState.auth?._transport;
     if (!firebaseState.auth?.currentUser || !transport || typeof transport.rpc !== 'function' || (navigator.onLine as boolean) === false) return healthTenantRow(account);
     try {
-        const rows = await withTimeout(transport.rpc('my_account', {}, 8000, { observational: true, current: () => !signal?.aborted && owner.current(), deadline: performance.now() + 8000 }), 8000, 'Shop health timed out');
-        if (!owner.current()) return healthTenantRow();
+        const rows = await withTimeout(transport.rpc('my_account', {}, 8000, { observational: true, current: () => !signal?.aborted && owner.current(), deadline: performance.now() + 8000, signal }), 8000, 'Shop health timed out');
+        if (signal?.aborted || !owner.current()) return healthTenantRow();
         const row = Array.isArray(rows) ? rows[0] : null;
         if (account?.tenant_id && row?.tenant_id !== account.tenant_id) return healthTenantRow();
         return healthTenantRow(row, true);
@@ -445,6 +445,9 @@ export function ztoSignedMismatchText(body) {
         + ' ➜ មិនរាប់ជាភស្តុតាងបិទ — សូមកែអត្ថបទនោះនៅ Netlify';
 }
 
+const HEALTH_LOOKUP_PREP_TIMEOUT_MS = 4000;
+const HEALTH_LOOKUP_PREP_TIMEOUT_TEXT = 'ការរៀបចំសោ Lookup លើសពេលកំណត់ — សូមពិនិត្យម្តងទៀត';
+
 export async function healthLookupRow(verifyPalm = true, signal?: AbortSignal, current = () => !signal?.aborted) {
     const cfg = getLookupApiConfig(false);
     if (!cfg || !cfg.enabled || !cfg.url) {
@@ -472,7 +475,13 @@ export async function healthLookupRow(verifyPalm = true, signal?: AbortSignal, c
     if (!current() || (palm && !verifyPalm)) return unverified();
     const headers = {};
     if (cfg.headerName) {
-        const value = cfg.headerValueEnc ? await decryptLookupSecret(cfg.headerValueEnc) : '';
+        let value = '';
+        try {
+            value = cfg.headerValueEnc ? (await settleHealthProbes(
+                decryptLookupSecret(cfg.headerValueEnc), signal, HEALTH_LOOKUP_PREP_TIMEOUT_MS)) ?? '' : '';
+        } catch (e) {
+            return current() ? healthRow('warn', 'Lookup អតិថិជន (ZTO)', HEALTH_LOOKUP_PREP_TIMEOUT_TEXT) : unverified();
+        }
         if (!current()) return unverified();
         if (!value) {
             return healthRow('warn', 'Lookup អតិថិជន (ZTO)', 'បើករួច តែស្រាយសោមិនបាន — សូមកំណត់ Header ម្តងទៀត');
@@ -532,10 +541,14 @@ async function healthPalmLookupRow(cfg, headers, signal: AbortSignal | undefined
     const title = 'Lookup អតិថិជន (ZTO)';
     try {
         const identityHeaders = {};
-        await Promise.all([addPalmSessionHeader(cfg, headers), addZtoIdentityHeader(cfg, identityHeaders)]);
+        const prepared = await settleHealthProbes(Promise.all([addPalmSessionHeader(cfg, headers), addZtoIdentityHeader(cfg, identityHeaders)]),
+            signal, HEALTH_LOOKUP_PREP_TIMEOUT_MS);
+        if (!prepared || !current()) return unverified();
         Object.assign(headers, identityHeaders);
     } catch (e) {
-        return healthRow('warn', title, 'មិនទាន់មាន session ZTO — សូម Login ZTO ក្នុង «API ស្វែងរកអតិថិជន»');
+        if (!current()) return unverified();
+        return healthRow('warn', title, e?.message === 'Health round timed out' ? HEALTH_LOOKUP_PREP_TIMEOUT_TEXT
+            : 'មិនទាន់មាន session ZTO — សូម Login ZTO ក្នុង «API ស្វែងរកអតិថិជន»');
     }
     if (!current()) return unverified();
     try {
@@ -660,7 +673,7 @@ export function runHealthCheck(force = false, verifyPalm = true): Promise<void> 
 
 const HEALTH_ROUND_TIMEOUT_MS = 30000;
 
-function settleHealthProbes<T>(probes: Promise<T>, signal: AbortSignal): Promise<T | null> {
+function settleHealthProbes<T>(probes: Promise<T>, signal?: AbortSignal, timeoutMs = HEALTH_ROUND_TIMEOUT_MS): Promise<T | null> {
     return new Promise((resolve, reject) => {
         const scope = createLifecycleScope();
         const clean = () => {
@@ -671,10 +684,10 @@ function settleHealthProbes<T>(probes: Promise<T>, signal: AbortSignal): Promise
         const timer = setTimeout(() => {
             clean();
             reject(new Error('Health round timed out'));
-        }, HEALTH_ROUND_TIMEOUT_MS);
+        }, timeoutMs);
         scope.listen(signal, 'abort', aborted, { once: true });
         probes.then(value => { clean(); resolve(value); }, error => { clean(); reject(error); });
-        if (signal.aborted) aborted();
+        if (signal?.aborted) aborted();
     });
 }
 

@@ -82,6 +82,56 @@ describe('សុខភាព Supabase ប្រើ transport និង database 
         if (change === 'close') transport.close();
         await expect(read()).rejects.toThrow(); expect(fetchSpy).not.toHaveBeenCalled();
     });
+    it('បោះបង់ជុំចាស់ abort ការអាន DB និងគណនី ដោយមិនរំខានជុំថ្មី', async () => {
+        const stale = new AbortController();
+        const fresh = new AbortController();
+        const waiting = deferred();
+        const freshReply = deferred();
+        fetchSpy.mockReturnValueOnce(waiting.promise).mockReturnValueOnce(waiting.promise).mockReturnValueOnce(freshReply.promise);
+        const ref = database.ref('zoew_barcode_registry/__zoew_liveness__');
+        const sdk = createSupabaseSdk(() => transport, {});
+        const oldDb = sdk.getForHealth(ref, 1000, () => !stale.signal.aborted, stale.signal).catch(() => null);
+        const oldShop = transport.rpc('my_account', {}, 1000, { observational: true,
+            current: () => !stale.signal.aborted, deadline: performance.now() + 1000, signal: stale.signal }).catch(() => null);
+        const nextDb = sdk.getForHealth(ref, 1000, () => !fresh.signal.aborted, fresh.signal);
+        await turn();
+        const signals = fetchSpy.mock.calls.map(call => (call as any)[1].signal as AbortSignal);
+        expect(signals).toHaveLength(3);
+        stale.abort();
+        expect(signals.map(signal => signal.aborted)).toEqual([true, true, false]);
+        await expect(Promise.all([oldDb, oldShop])).resolves.toEqual([null, null]);
+        freshReply.resolve(new Response('{"docs":[]}'));
+        expect((await nextDb).val()).toBe(null);
+        const oldBody = vi.fn(async () => '{"docs":[]}');
+        waiting.resolve({ ok: true, status: 200, text: oldBody });
+        await turn();
+        expect(oldBody).not.toHaveBeenCalled();
+        expect(auth.refreshSession).not.toHaveBeenCalled();
+    });
+    it('មិនផ្ញើ request បើបាន abort មុនចាប់ផ្តើម', async () => {
+        const controller = new AbortController(); controller.abort();
+        await expect(transport.rpc('my_account', {}, 1000, { observational: true, current: () => true,
+            deadline: performance.now() + 1000, signal: controller.signal })).rejects.toThrow();
+        await expect(database.getForHealth(database.ref('zoew_barcode_registry/__zoew_liveness__'), 1000,
+            () => true, controller.signal)).rejects.toThrow();
+        expect(fetchSpy).not.toHaveBeenCalled();
+    });
+    it('abort ក្រោយទទួល header បញ្ចប់ការរង់ចាំ body ភ្លាម', async () => {
+        const controller = new AbortController();
+        const waiting = deferred();
+        const text = vi.fn(() => waiting.promise);
+        fetchSpy.mockResolvedValue({ ok: true, status: 200, text });
+        const observation = transport.rpc('my_account', {}, 1000, { observational: true, current: () => true,
+            deadline: performance.now() + 1000, signal: controller.signal });
+        const rejected = expect(observation).rejects.toThrow('aborted');
+        await turn();
+        expect(text).toHaveBeenCalledTimes(1);
+        controller.abort();
+        expect((fetchSpy.mock.calls[0] as any)[1].signal.aborted).toBe(true);
+        await rejected;
+        expect(vi.getTimerCount()).toBe(0);
+        waiting.resolve('[]');
+    });
     it.each(['fetch', 'body'])('ពិដានតែមួយកំណត់ %s ហើយ abort សំណើ', async stage => {
         const pending = deferred();
         if (stage === 'fetch') fetchSpy.mockReturnValue(pending.promise);

@@ -594,37 +594,40 @@ it('Palm history ផុតកំណត់ក្រោយ ៥ នាទី ហើ
 });
 
 
-function stuckHealthDecrypt() {
+function stuckHealthDecrypt(field = "header") {
     const gate = deferred<ArrayBuffer>();
     const previousKey = securityState.lookupSecretKey;
     securityState.lookupSecretKey = {} as CryptoKey;
     configurePalmHealth();
     const config = JSON.parse(localStorage.getItem('zoew_lookup_api_config')!);
-    config.headerName = 'X-Zoe-Proxy-Key';
-    config.headerValueEnc = { iv: Array(12).fill(1), data: [2, 3, 4] };
+    const sealed = { iv: Array(12).fill(1), data: [2, 3, 4] };
+    if (field === 'header') {
+        config.headerName = 'X-Zoe-Proxy-Key';
+        config.headerValueEnc = sealed;
+    } else config.palmTokenEnc = sealed;
     localStorage.setItem('zoew_lookup_api_config', JSON.stringify(config));
     const decrypt = vi.spyOn(crypto.subtle, 'decrypt').mockImplementation(() => gate.promise);
     return { decrypt, release: () => gate.resolve(new TextEncoder().encode('synthetic-header').buffer),
         restore: () => { securityState.lookupSecretKey = previousKey; } };
 }
 
-it('WebCrypto decrypt ព្យួរ៖ ជុំ Health ទាំងមូលបញ្ចប់ក្នុង 30 វិនាទី និងមិនបន្ត request ចាស់ក្រោយមក', async () => {
-    const stuck = stuckHealthDecrypt();
+it.each(['header', 'palm-token'])('WebCrypto %s ព្យួរ មិនបាំងលទ្ធផល Health ផ្សេង', async field => {
+    const stuck = stuckHealthDecrypt(field);
     const run = start(); let settled = false;
     void run.then(() => { settled = true; });
     try {
         await vi.advanceTimersByTimeAsync(1);
         expect(stuck.decrypt).toHaveBeenCalledTimes(1);
         requests.forEach((_, index) => answer(index));
-        await vi.advanceTimersByTimeAsync(29999);
+        await vi.advanceTimersByTimeAsync(3999);
         expect(settled).toBe(true);
         expect(viewState.healthRecheckBusy).toBe(false);
-        expect(uiState.healthRows).toEqual([expect.objectContaining({
-            state: 'warn', detail: expect.stringContaining('ពិនិត្យមិនបានពេញលេញ')
-        })]);
-        const count = requests.length;
+        expect(uiState.healthRows[0].state).toBe('ok');
+        expect(uiState.healthRows.length).toBeGreaterThan(1);
+        expect(palmRow()).toMatchObject({ state: 'warn', detail: expect.stringContaining('ពេលកំណត់') });
+        expect(palmVerificationRequests()).toHaveLength(0);
         stuck.release(); await vi.advanceTimersByTimeAsync(1);
-        expect(requests).toHaveLength(count);
+        expect(palmVerificationRequests()).toHaveLength(0);
     } finally {
         stuck.release(); await vi.advanceTimersByTimeAsync(1);
         requests.forEach((_, index) => answer(index));

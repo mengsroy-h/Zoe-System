@@ -29,9 +29,9 @@ it('busy ➜ មិនផ្ញើជុំស្ទួន ហើយពិនិ
     await vi.advanceTimersByTimeAsync(250);
     expect(mocks.run).not.toHaveBeenCalled();
     viewState.healthRecheckBusy = false; viewState.flush();
-    await vi.advanceTimersByTimeAsync(250);
+    await vi.advanceTimersByTimeAsync(249);
     expect(mocks.run).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(29750);
+    await vi.advanceTimersByTimeAsync(1);
     expect(mocks.run).toHaveBeenCalledTimes(1);
 });
 it('គណនីប្តូរ ➜ ដកលទ្ធផលចាស់ និងពិនិត្យថ្មី', async () => {

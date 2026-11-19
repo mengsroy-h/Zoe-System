@@ -13,8 +13,8 @@ vi.mock('../../../../ZoeW/src/services/scan-engine', () => ({
     scanEngineReady: () => true, buildReaderOptions: () => ({}), CONFIG_QR_FORMAT_NAMES: [], CONFIG_QR_SCAN_WIDTH: 640,
     decodeBarcodeFromCanvasManual: decode, scheduleScanFrame: (_video: unknown, fn: () => void) => frames.push(fn)
 }));
-import { securityState, scanState } from '../../../../ZoeW/src/core/state';
-import { openConfigQrScanner, closeConfigQrScanner } from '../../../../ZoeW/src/features/config-qr';
+import { securityState, scanState, uiState } from '../../../../ZoeW/src/core/state';
+import { openConfigQrScanner, closeConfigQrScanner, decodeConfigQrImage } from '../../../../ZoeW/src/features/config-qr';
 
 function deferred<T>() {
     let resolve!: (value: T) => void, reject!: (error: Error) => void;
@@ -110,4 +110,51 @@ it('កាមេរ៉ាបច្ចុប្បន្នបរាជ័យ ➜
     expect(securityState.configQrScanActive).toBe(false);
     expect(securityState.configQrStream).toBeNull();
     expect(frames).toHaveLength(0);
+});
+
+
+it('ជ្រើសរូប QR ថ្មី៖ FileReader ចាស់មកយឺតមិនភ្ជាប់ម្ដងទៀត', async () => {
+    const readers: any[] = [];
+    vi.stubGlobal('FileReader', class {
+        onload: any;
+        readAsDataURL() { readers.push(this); }
+    });
+    uiState.modalDisplay = { configModal: 'flex' };
+    const { loadScratchImage } = await import('../../../../ZoeW/src/platform/document-io');
+    vi.mocked(loadScratchImage).mockImplementation((_url: any, loaded: any) => {
+        const img = { naturalWidth: 640, naturalHeight: 480 } as HTMLImageElement; loaded(img); return img;
+    });
+    const newerDecode = deferred<string>();
+    decode.mockReturnValueOnce(newerDecode.promise).mockResolvedValueOnce('old setup');
+    decodeConfigQrImage({ target: { files: [new Blob(['old'])] } });
+    decodeConfigQrImage({ target: { files: [new Blob(['new'])] } });
+    readers[1].onload({ target: { result: 'new-image' } }); await turn();
+    expect(connect).not.toHaveBeenCalled();
+    readers[0].onload({ target: { result: 'old-image' } }); await turn();
+    expect(connect).not.toHaveBeenCalled();
+    newerDecode.resolve('new setup'); await turn();
+    expect(connect).toHaveBeenCalledOnce();
+    uiState.modalDisplay = {};
+});
+
+
+it.each(['current', 'closed', 'stale-error'] as const)('រូប QR៖ %s រក្សាម្ចាស់សំណើអានឯកសារ', async mode => {
+    const readers: any[] = [];
+    vi.stubGlobal('FileReader', class { onload: any; onerror: any; readAsDataURL() { readers.push(this); } });
+    uiState.modalDisplay = { configModal: 'flex' };
+    const { loadScratchImage } = await import('../../../../ZoeW/src/platform/document-io');
+    vi.mocked(loadScratchImage).mockImplementation((_url: any, loaded: any) => { const img = { naturalWidth: 640, naturalHeight: 480 } as HTMLImageElement; loaded(img); return img; });
+    decode.mockResolvedValue('valid setup');
+    decodeConfigQrImage({ target: { files: [new Blob(['first'])] } });
+    if (mode === 'closed') uiState.modalDisplay = {};
+    if (mode === 'stale-error') {
+        decodeConfigQrImage({ target: { files: [new Blob(['second'])] } });
+        readers[0].onerror(); await turn();
+        expect(toast).not.toHaveBeenCalled();
+        readers[1].onload({ target: { result: 'second-image' } });
+    } else readers[0].onload({ target: { result: 'first-image' } });
+    await turn();
+    expect(connect).toHaveBeenCalledTimes(mode === 'closed' ? 0 : 1);
+    if (mode === 'closed') expect(decode).not.toHaveBeenCalled();
+    uiState.modalDisplay = {};
 });

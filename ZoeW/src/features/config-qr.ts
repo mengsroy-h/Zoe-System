@@ -136,16 +136,17 @@ export function decodeConfigQrImage(e?) {
         showToast("❌ Camera Scanner មិនទាន់ផ្ទុករួចទេ! សូមរង់ចាំបន្តិចទៀត");
         return;
     }
+    const seq = ++configQrImageSeq;
+    const current = () => seq === configQrImageSeq && modalIsOpen('configModal');
     const reader = new FileReader();
-    reader.onload = (evt) => decodeConfigQrDataUrl(evt.target.result);
-    reader.onerror = () => showToast("❌ មិនអាចអានរូបភាពនេះបានទេ។ សូមសាកល្បងរូបភាពផ្សេង។");
+    reader.onload = (evt) => { if (current()) decodeConfigQrDataUrl(evt.target.result, seq); };
+    reader.onerror = () => { if (current()) showToast("❌ មិនអាចអានរូបភាពនេះបានទេ។ សូមសាកល្បងរូបភាពផ្សេង។"); };
     reader.readAsDataURL(file);
 }
 
 let configQrImageSeq = 0;
 
-export function decodeConfigQrDataUrl(dataUrl) {
-    const seq = ++configQrImageSeq;
+export function decodeConfigQrDataUrl(dataUrl, seq = ++configQrImageSeq) {
     const current = () => seq === configQrImageSeq && modalIsOpen('configModal');
     const notFound = () => { if (current()) showToast("⚠️ រកមិនឃើញ QR Setup Link ក្នុងរូបភាពនេះទេ។ សូមប្រើរូបថតអេក្រង់ QR ដែលច្បាស់ ឬបិទភ្ជាប់ Link ផ្ទាល់។"); };
     loadScratchImage(dataUrl, async (img) => {

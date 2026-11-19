@@ -357,7 +357,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     const docsCache = opt.docsCache || null;
     const writeJournal = opt.writeJournal || null;
     const liveWriteIds = new Set<string>();
-    const writeLocks = new Map<string, () => void>();
+    const writeLocks = new Map<string, () => void | Promise<void>>();
     const webLocks = () => (typeof navigator !== 'undefined' && navigator.locks && typeof navigator.locks.request === 'function' ? navigator.locks : null);
     const holdWrite = (opId) => {
         liveWriteIds.add(opId);
@@ -386,7 +386,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         const release = writeLocks.get(opId);
         if (!release) return;
         writeLocks.delete(opId);
-        release();
+        return release();
     };
     const claimRow = async (opId) => {
         if (liveWriteIds.has(opId)) return false;
@@ -397,16 +397,17 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         }
         let release;
         const held = new Promise<void>((resolve) => { release = resolve; });
+        let released: Promise<void>;
         const granted = await new Promise<boolean>((resolve, reject) => {
             try {
-                locks.request(SB_WRITE_LOCK_PREFIX + opId, { ifAvailable: true }, (lock) => { resolve(!!lock); return lock ? held : undefined; })
-                    .catch(reject);
+                released = locks.request(SB_WRITE_LOCK_PREFIX + opId, { ifAvailable: true }, (lock) => { resolve(!!lock); return lock ? held : undefined; })
+                    .then(() => {}, (error) => { reject(error); });
             } catch (e) { reject(e); }
         });
         if (!granted) return false;
         if (liveWriteIds.has(opId)) { release(); return false; }
         liveWriteIds.add(opId);
-        writeLocks.set(opId, release);
+        writeLocks.set(opId, () => { release(); return released; });
         return true;
     };
     const companionRecoveries = new Map<string, () => boolean>();
@@ -893,7 +894,8 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     const owner = companionRecoveries.get(listed.opId);
                     if (owner && !owner()) {
                         companionRecoveries.delete(listed.opId);
-                        dropWrite(listed.opId);
+                        await dropWrite(listed.opId);
+                        if (!current()) return;
                     }
                     if (!(await claimRow(listed.opId))) continue;
                     const row = current() ? writeJournal.list(scope, topic).find((x) => x.opId === listed.opId) : null;

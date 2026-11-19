@@ -236,14 +236,14 @@ const SEAT_ENROLLMENT_DECL = (source.match(/(?:^|\n)[ \t]*(let seatEnrollmentOpe
             });
             return elements.get(id);
         };
-        const deferred = (entries) => new Promise((resolve, reject) => entries.push({ resolve, reject }));
+        const deferred = (entries, isCurrent) => new Promise((resolve, reject) => entries.push({ resolve, reject, isCurrent }));
         const context = vm.createContext({
             Promise, Error, console: { error() {} }, queueMicrotask,
             authGeneration: 7, auth: { currentUser: { uid: 'u1' } }, db: {},
             LICENSE_APP_CODE: 'ZOE', isDatabaseInitialized: true, isModalOpen: false,
             ZoeLicense: {
                 getStatus: () => deferred(reads),
-                activate: () => deferred(activations)
+                activate: (_key, _appCode, isCurrent) => deferred(activations, isCurrent)
             },
             setTimeout: (fn, ms) => { const id = ++timerId; timers.set(id, { fn, ms }); return id; },
             clearTimeout: (id) => timers.delete(id),
@@ -295,7 +295,9 @@ const SEAT_ENROLLMENT_DECL = (source.match(/(?:^|\n)[ \t]*(let seatEnrollmentOpe
                 const request = surface === 'Activate ដំណាក់ទី១' ? h.activations[0] : h.reads[0];
                 if (request) pendingReached++;
                 if (change) changes[change](c);
-                h.element('activationKeyInput').value = 'KEY-NEW';
+                // Stage one isolates session ownership; editing the submitted key is a separate race below.
+                if (surface !== 'Activate ដំណាក់ទី១') h.element('activationKeyInput').value = 'KEY-NEW';
+                const inputBefore = h.element('activationKeyInput').value;
                 h.effects.length = 0;
                 // ⛔ សារក្នុងប្រអប់ Activation (`viewState.activationMessage` ➜ JSX) ក៏ជា UI ដែរ
                 const messageBefore = vm.runInContext('viewState.activationMessage', c);
@@ -311,7 +313,7 @@ const SEAT_ENROLLMENT_DECL = (source.match(/(?:^|\n)[ \t]*(let seatEnrollmentOpe
                 const label = surface + ' · ' + (active ? 'ទទួលយក' : 'បដិសេធ') + ' · ' + (change || 'វគ្គដដែល');
                 if (change) {
                     ok('លទ្ធផលចាស់មិនកែ UI/arm/listener ៖ ' + label,
-                        h.effects.length === 0 && h.element('activationKeyInput').value === 'KEY-NEW'
+                        h.effects.length === 0 && h.element('activationKeyInput').value === inputBefore
                         && vm.runInContext('viewState.activationMessage', c) === messageBefore
                         && vm.runInContext('JSON.stringify([seatEnrollmentOperation !== null, viewState.seatEnrollmentJson, viewState.seatEnrollmentFingerprint])', c) === enrollmentBefore
                         && (surface !== 'Activate ដំណាក់ទី១' || h.reads.length === 0),
@@ -327,6 +329,24 @@ const SEAT_ENROLLMENT_DECL = (source.match(/(?:^|\n)[ \t]*(let seatEnrollmentOpe
         }
     }
     ok('ជាន់អប្បបរមា៖ គ្រប់លំដាប់ Activation ឈានដល់ promise ព្យួរពិត', pendingReached === 48, pendingReached);
+
+    for (const valid of [true, false]) {
+        const h = activationContext();
+        const pending = h.context.submitActivationKey();
+        await tick();
+        const request = h.activations[0];
+        const currentBeforeEdit = request?.isCurrent?.() === true;
+        h.element('activationKeyInput').value = 'KEY-NEW';
+        const staleAfterEdit = request?.isCurrent?.() === false;
+        if (request) request.resolve({ valid, reason: 'revoked' });
+        await tick();
+        if (h.reads[0]) h.reads[0].resolve({ state: 'active' });
+        await pending;
+        ok('សំណើ Key ចាស់មិនប្ដូរ Key ថ្មីក្នុងវគ្គដដែល ៖ ' + valid,
+            currentBeforeEdit && staleAfterEdit && h.effects.length === 0 && h.reads.length === 0
+                && h.element('activationKeyInput').value === 'KEY-NEW',
+            { currentBeforeEdit, staleAfterEdit, effects: h.effects, reads: h.reads.length });
+    }
 
     for (const stage of ['activate', 'status']) {
         const h = activationContext();

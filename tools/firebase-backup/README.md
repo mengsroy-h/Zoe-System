@@ -119,7 +119,7 @@ cp config.example.json config.json
 - `requestTimeoutMs` — ពិដានពេលក្នុង request នីមួយៗ រហូតអាន JSON body ពេញ (លំនាំដើម 120 វិនាទី)។ HTTP បដិសេធក៏បិទ body ដែលនៅសល់ ដើម្បីឲ្យ process ចេញបាន។
 - `retryCount` និង `retryDelayMs` — retry សម្រាប់ timeout, 408/429/5xx ដោយ exponential backoff;
   កំហុស 401/403 មិន retry ទេ។
-- `lockStaleMs` — ទប់ backup ពីររត់ជាន់គ្នា; lock ដែលសល់ពី process ដួលអាចសង្គ្រោះក្រោយ 12 ម៉ោង។
+- `lockStaleMs` — ទប់ backup ពីររត់ជាន់គ្នា; lock ចាស់ជាង 12 ម៉ោងបង្ហាញសារព្រមាន តែមិនលុបដោយស្វ័យប្រវត្តិ។ មុនលុបតែ `.zoe-backup.lock` ដែលបង្ហាញក្នុងសារ សូមផ្អាកកាលវិភាគទាំងអស់ និងផ្ទៀងផ្ទាត់ថា backup គ្មាន process កំពុងរត់លើថតនោះ។ រួចចាប់ផ្ដើម Backup ម្តងទៀត។ អាយុ lock មិនមែនភស្តុតាងថា process ឈប់ទេ។
 
 Backup សរសេរចូល File បណ្ដោះអាសន្ន `.partial` សិន រួចទើប Rename; ការបញ្ឈប់ process កណ្ដាល write មិនផ្សាយ file មិនទាន់ពេញ ហើយ `.partial` មិនរាប់ចូល `keepCount` ទេ។ វាមិនធានា durability ពេលដាច់ចរន្តនៅគ្រប់ filesystem/hardware ទេ; រក្សា backup មុន និងសាក restore ដាច់ដោយឡែក។
 OAuth access token មានអាយុខ្លីត្រូវបានបង្កើតពី service-account key ក្នុង memory ហើយបញ្ជូនទៅ

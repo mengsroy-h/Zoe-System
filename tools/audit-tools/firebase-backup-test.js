@@ -524,9 +524,15 @@ async function supabaseResponseBudgetScenarios() {
         fs.writeFileSync(lockPath, 'stale-lock', { flag: 'wx' });
         const old = new Date(Date.now() - 120000);
         fs.utimesSync(lockPath, old, old);
-        const releaseStale = backup.acquireRunLock(backupRoot, 60000);
-        releaseStale();
-        ok('Lock ដែល stale ត្រូវបានសង្គ្រោះដោយសុវត្ថិភាព', !fs.existsSync(lockPath));
+        for (let contender = 0; contender < 2; contender += 1) {
+            expectThrow('⛔ Backup មិនដក lock ចាស់ជំនួសម្ចាស់ (' + contender + ')',
+                () => backup.acquireRunLock(backupRoot, 60000), /lock may be stale/);
+            ok('⛔ lock ចាស់នៅដដែល (' + contender + ')',
+                fs.existsSync(lockPath) && fs.readFileSync(lockPath, 'utf8') === 'stale-lock');
+        }
+        fs.unlinkSync(lockPath);
+        backup.acquireRunLock(backupRoot, 60000)();
+        ok('ក្រោយ recovery ដោយម្ចាស់ រត់ឡើងវិញ និងដោះ lock ត្រឹមត្រូវ', !fs.existsSync(lockPath));
 
         expectThrow('Business name ស្ទួនមិនអនុញ្ញាត (case-insensitive)', () => backup.validateBusinesses({
             businesses: [

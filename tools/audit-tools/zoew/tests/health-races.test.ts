@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { watchHealthCheck } from '../../../../ZoeW/src/app/behaviors/health-live';
 import { openHealthCheck, runHealthCheck } from '../../../../ZoeW/src/features/health-check';
 import { registerModalMeta, setModalDisplay, unregisterModalMeta } from '../../../../ZoeW/src/core/modals';
-import { firebaseState, uiState } from '../../../../ZoeW/src/core/state';
+import { firebaseState, securityState, uiState } from '../../../../ZoeW/src/core/state';
 import { viewState } from '../../../../ZoeW/src/core/view-state';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../../../../ZoeW/src/core/text';
 import { acceptFixtureSession } from './helpers/accepted-session';
@@ -522,7 +522,7 @@ it('Palm លទ្ធផល manual ជោគជ័យនៅសល់ក្រោ
 it.each(['auth', 'lookup-config', 'branch'])('Palm ភស្តុតាងចាស់ត្រូវជម្រះក្រោយប្ដូរ %s', async change => {
     await checkedPalmSuccess();
     if (change === 'auth') { firebaseState.authGeneration++; acceptFixtureSession(); }
-    else if (change === 'branch') { firebaseState.auth._account = { branch_code: 'KH002' }; }
+    else if (change === 'branch') { (firebaseState.auth as any)._account = { branch_code: 'KH002' }; }
     else {
         const config = JSON.parse(localStorage.getItem('zoew_lookup_api_config')!);
         config.palmAccount.siteCode = 'KH002';
@@ -551,4 +551,67 @@ it('Palm history ផុតកំណត់ក្រោយ ៥ នាទី ហើ
     expect(palmVerificationRequests()).toHaveLength(1);
     expect(palmRow()?.state).toBe('info');
     expect(palmRow()?.detail).not.toMatch(/ចុងក្រោយ/);
+});
+
+
+function stuckHealthDecrypt() {
+    const gate = deferred<ArrayBuffer>();
+    const previousKey = securityState.lookupSecretKey;
+    securityState.lookupSecretKey = {} as CryptoKey;
+    configurePalmHealth();
+    const config = JSON.parse(localStorage.getItem('zoew_lookup_api_config')!);
+    config.headerName = 'X-Zoe-Proxy-Key';
+    config.headerValueEnc = { iv: Array(12).fill(1), data: [2, 3, 4] };
+    localStorage.setItem('zoew_lookup_api_config', JSON.stringify(config));
+    const decrypt = vi.spyOn(crypto.subtle, 'decrypt').mockImplementation(() => gate.promise);
+    return { decrypt, release: () => gate.resolve(new TextEncoder().encode('synthetic-header').buffer),
+        restore: () => { securityState.lookupSecretKey = previousKey; } };
+}
+
+it('WebCrypto decrypt ព្យួរ៖ ជុំ Health ទាំងមូលបញ្ចប់ក្នុង 30 វិនាទី និងមិនបន្ត request ចាស់ក្រោយមក', async () => {
+    const stuck = stuckHealthDecrypt();
+    const run = start(); let settled = false;
+    void run.then(() => { settled = true; });
+    try {
+        await vi.advanceTimersByTimeAsync(1);
+        expect(stuck.decrypt).toHaveBeenCalledTimes(1);
+        requests.forEach((_, index) => answer(index));
+        await vi.advanceTimersByTimeAsync(29999);
+        expect(settled).toBe(true);
+        expect(viewState.healthRecheckBusy).toBe(false);
+        expect(uiState.healthRows).toEqual([expect.objectContaining({
+            state: 'warn', detail: expect.stringContaining('ពិនិត្យមិនបានពេញលេញ')
+        })]);
+        const count = requests.length;
+        stuck.release(); await vi.advanceTimersByTimeAsync(1);
+        expect(requests).toHaveLength(count);
+    } finally {
+        stuck.release(); await vi.advanceTimersByTimeAsync(1);
+        requests.forEach((_, index) => answer(index));
+        await run; stuck.restore();
+    }
+});
+
+it('បិទ watcher ខណៈ WebCrypto decrypt ព្យួរ៖ ដោះ busy ភ្លាម និងមិនផ្ញើ request ក្រោយ decrypt មកយឺត', async () => {
+    const stuck = stuckHealthDecrypt();
+    const stop = watch(); const run = start(); let settled = false;
+    void run.then(() => { settled = true; });
+    try {
+        await vi.advanceTimersByTimeAsync(1);
+        expect(stuck.decrypt).toHaveBeenCalledTimes(1);
+        requests.forEach((_, index) => answer(index));
+        uiState.modalDisplay = {}; stop();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(settled).toBe(true);
+        expect(viewState.healthRecheckBusy).toBe(false);
+        const count = requests.length;
+        const closedRows = uiState.healthRows;
+        stuck.release(); await vi.advanceTimersByTimeAsync(1);
+        expect(requests).toHaveLength(count);
+        expect(uiState.healthRows).toBe(closedRows);
+    } finally {
+        stuck.release(); await vi.advanceTimersByTimeAsync(1);
+        requests.forEach((_, index) => answer(index));
+        await run; stuck.restore();
+    }
 });

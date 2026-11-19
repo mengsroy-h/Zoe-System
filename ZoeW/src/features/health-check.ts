@@ -652,6 +652,27 @@ export function runHealthCheck(force = false, verifyPalm = true): Promise<void> 
     return task.promise;
 }
 
+const HEALTH_ROUND_TIMEOUT_MS = 30000;
+
+function settleHealthProbes<T>(probes: Promise<T>, signal: AbortSignal): Promise<T | null> {
+    return new Promise((resolve, reject) => {
+        const clean = () => {
+            clearTimeout(timer);
+            signal.removeEventListener('abort', aborted);
+        };
+        const aborted = () => { clean(); resolve(null); };
+        const timer = setTimeout(() => {
+            clean();
+            reject(new Error('Health round timed out'));
+        }, HEALTH_ROUND_TIMEOUT_MS);
+        signal.addEventListener('abort', aborted, { once: true });
+        // Even if a non-cancellable SDK/crypto operation settles later, observe it
+        // without holding the UI busy or accepting a result after invalidation.
+        probes.then(value => { clean(); resolve(value); }, error => { clean(); reject(error); });
+        if (signal.aborted) aborted();
+    });
+}
+
 async function runHealthCheckRound(task: HealthCheckTask) {
     const { run, worker, verifyPalm, controller: { signal }, owner, lookupConfig, lookupSecret, tenant, branch } = task;
     const current = () => healthTaskIsCurrent(task);
@@ -664,11 +685,12 @@ async function runHealthCheckRound(task: HealthCheckTask) {
         if (!current()) return;
         const palm = lookupApiIsPalm(getLookupApiConfig());
         if (palm && verifyPalm) lastPalmHealthEvidence = null;
-        const [databaseRow, licenseRow, lookupRow, offlineRow, networkRow] = await Promise.all([
+        const result = await settleHealthProbes(Promise.all([
             healthDatabaseLiveRow(signal), healthLicenseRow(signal), healthLookupRow(verifyPalm, signal, current),
             healthServiceWorkerLiveRow(signal), healthNetworkLiveRow(signal)
-        ]);
-        if (!current()) return;
+        ]), signal);
+        if (!result || !current()) return;
+        const [databaseRow, licenseRow, lookupRow, offlineRow, networkRow] = result;
         const rows = [healthNetworkRow(networkRow.state === 'ok'), healthClockRow(), healthStorageRow(), healthServiceWorkerRow(), healthCustomerTableRow(), healthSheetScriptRow()];
         rows[3] = worker === navigator.serviceWorker?.controller ? offlineRow : healthServiceWorkerRow();
         const currentDatabase = healthDatabaseRow();
@@ -698,6 +720,7 @@ async function runHealthCheckRound(task: HealthCheckTask) {
             healthCompletedRun = run;
             uiState.healthAdvice = null;
         }
+        task.controller.abort();
     } finally {
         if (healthActiveRun === run) viewState.healthRecheckBusy = false;
     }

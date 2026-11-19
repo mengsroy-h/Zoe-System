@@ -55,7 +55,7 @@ function sliceFn(name) {
 
 const NEEDED = ['healthAgeText', 'healthNetworkRow', 'healthNetworkLiveRow', 'healthServiceWorkerLiveRow', 'healthDatabaseRow', 'healthDatabaseLiveRow', 'healthDatabaseWriteRow', 'captureConnectionOperation', 'healthStorageWritable',
     'healthClockRow', 'healthLicenseRow', 'healthCustomerTableRow', 'healthStorageRow',
-    'healthServiceWorkerRow', 'healthLookupRow', 'ztoRenewalText', 'healthSheetScriptRow', 'clearCustomerDataTableCache', 'ztoDiagnosticsUrl', 'runHealthCheck', 'runHealthCheckRound', 'healthTaskIsCurrent',
+    'healthServiceWorkerRow', 'healthLookupRow', 'ztoRenewalText', 'healthSheetScriptRow', 'clearCustomerDataTableCache', 'ztoDiagnosticsUrl', 'runHealthCheck', 'runHealthCheckRound', 'healthTaskIsCurrent', 'settleHealthProbes',
     'openHealthCheck', 'safeLookupReason', 'lookupApiIsZto', 'lookupApiIsPalm', 'addPalmSessionHeader', 'healthPalmLookupRow', 'lookupApiIsAppsScript',
     'sanitizeInput', 'elapsedSince', 'fetchWithTimeout', 'testLookupApiConfig',
     'attemptAutoLookup', 'lookupApiSendsHeader', 'retryAsync', 'lookupResponseError', 'lookupSecretLocked', 'lookupKeyedUrl', 'lookupUrlWithKey', 'lookupUrlSplitKey',
@@ -89,7 +89,7 @@ function sliceConst(name) {
 }
 const NEEDED_CONSTS = ['LICENSE_NEAR_EXPIRY_DAYS', 'LICENSE_DEFINITIVE_REASONS', 'ZTO_BARCODE_RE', 'ZTO_BARCODE_SHAPE_TEXT',
     'ZTO_ID_TOKEN_TIMEOUT_MS', 'ZTO_ID_TOKEN_LOOKUP_TIMEOUT_MS', 'ZTO_IDENTITY_RETRY_REASONS',
-    'HEALTH_ADVICE_MAX_STEPS', 'HEALTH_ADVICE_LABELS', 'HEALED_BY_DATABASE', 'HEALTH_NO_BACKEND_TEXT'];
+    'HEALTH_ADVICE_MAX_STEPS', 'HEALTH_ADVICE_LABELS', 'HEALED_BY_DATABASE', 'HEALTH_NO_BACKEND_TEXT', 'HEALTH_ROUND_TIMEOUT_MS'];
 const src = {};
 NEEDED.forEach((n) => {
     src[n] = sliceFn(n);

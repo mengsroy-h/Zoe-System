@@ -5754,7 +5754,10 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `tools/audit-tools/zoew/tests/f03-admission-quiescence.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/f03-heap-diagnostic.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/firebase-auth-write-ownership.test.ts` | — | ផ្នែក ៨ · ផ្នែក ៩ |
+| `tools/audit-tools/zoew/tests/firebase-business-audit.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/firebase-loader-gate.test.ts` | — | ផ្នែក ៧ |
+| `tools/audit-tools/zoew/tests/firebase-provision-rules-wrapper.test.ts` | ផ្នែក ២ | — |
+| `tools/audit-tools/zoew/tests/firebase-provision-runtime.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/forbidden-zone-lock.test.ts` | ផ្នែក ១ | ផ្នែក ៨ · ផ្នែក ៩ |
 | `tools/audit-tools/zoew/tests/hardware-scanner.test.tsx` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/health-advice.test.ts` | — | ផ្នែក ៨ |
@@ -5784,6 +5787,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `tools/audit-tools/zoew/tests/keygen-sb-lock-ownership-fixes.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/keygen-secure-inventory.test.ts` | ផ្នែក ១ | — |
 | `tools/audit-tools/zoew/tests/keygen-setup-link-output.test.ts` | ផ្នែក ២ | — |
+| `tools/audit-tools/zoew/tests/keygen-supabase-code-output.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/label-image.test.tsx` | — | ផ្នែក ៨ · ផ្នែក ៩ |
 | `tools/audit-tools/zoew/tests/label-print.test.tsx` | ផ្នែក ២ | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/late-commit-stale-session.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
@@ -5956,6 +5960,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `tools/audit-tools/zoew/tests/shop-device-note.test.ts` | — | ផ្នែក ៨ · ផ្នែក ៩ |
 | `tools/audit-tools/zoew/tests/shop-pending-cleanup.test.tsx` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/static-checker-contracts.test.ts` | ផ្នែក ២ | — |
+| `tools/audit-tools/zoew/tests/supabase-account-transport.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/supabase-account.test.tsx` | ផ្នែក ២ | ផ្នែក ៧ |
 | `tools/audit-tools/zoew/tests/supabase-auth-unavailable.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ |
 | `tools/audit-tools/zoew/tests/supabase-auth-write-ownership.test.ts` | — | ផ្នែក ៨ · ផ្នែក ៩ |
@@ -6081,8 +6086,3 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `tools/audit-tools/zoew/tests/zto-trash-mode-devices.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/zto-trash-mode-shop.test.ts` | ផ្នែក ១ | — |
 | `tools/audit-tools/zoew/tests/zto-upstream-timing.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
-| `tools/audit-tools/zoew/tests/firebase-business-audit.test.ts` | ផ្នែក ២ | — |
-| `tools/audit-tools/zoew/tests/firebase-provision-rules-wrapper.test.ts` | ផ្នែក ២ | — |
-| `tools/audit-tools/zoew/tests/firebase-provision-runtime.test.ts` | ផ្នែក ២ | — |
-| `tools/audit-tools/zoew/tests/keygen-supabase-code-output.test.ts` | ផ្នែក ២ | — |
-| `tools/audit-tools/zoew/tests/supabase-account-transport.test.ts` | ផ្នែក ២ | — |

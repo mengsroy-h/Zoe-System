@@ -143,26 +143,29 @@ function pumpBatchScan() {
         if (!run.scanner && isBarcodeAlreadyUsed(code)) { run.existing++; continue; }
         run.current = code;
         renderBatchScanStatus();
-        const confirmation: { started: boolean; outcome?: ScanConfirmationOutcome } = { started: false };
-        run.currentConfirmation = confirmation;
-        triggerScanAction(code, run.scanner ? undefined : (outcome) => {
-            if (batchRun !== run || !batchSessionIsCurrent(run)) return;
-            if (confirmation.outcome === 'saving') run.confirming--;
-            else if (confirmation.outcome === 'saved') run.saved--;
-            else if (confirmation.outcome === 'skipped') run.skipped--;
-            else if (confirmation.outcome === 'pending') run.pending--;
-            confirmation.outcome = outcome;
-            if (outcome === 'saving') {
-                confirmation.started = true;
-                run.confirming++;
-                return;
-            }
-            if (!confirmation.started) return;
-            if (outcome === 'saved') run.saved++;
-            else if (outcome === 'skipped') run.skipped++;
-            else run.pending++;
-            queueMicrotask(() => { if (batchRun === run) pumpBatchScan(); });
-        });
+        if (run.scanner) triggerScanAction(code);
+        else {
+            const confirmation: { started: boolean; outcome?: ScanConfirmationOutcome } = { started: false };
+            run.currentConfirmation = confirmation;
+            triggerScanAction(code, (outcome) => {
+                if (batchRun !== run || !batchSessionIsCurrent(run)) return;
+                if (confirmation.outcome === 'saving') run.confirming--;
+                else if (confirmation.outcome === 'saved') run.saved--;
+                else if (confirmation.outcome === 'skipped') run.skipped--;
+                else if (confirmation.outcome === 'pending') run.pending--;
+                confirmation.outcome = outcome;
+                if (outcome === 'saving') {
+                    confirmation.started = true;
+                    run.confirming++;
+                    return;
+                }
+                if (!confirmation.started) return;
+                if (outcome === 'saved') run.saved++;
+                else if (outcome === 'skipped') run.skipped++;
+                else run.pending++;
+                queueMicrotask(() => { if (batchRun === run) pumpBatchScan(); });
+            });
+        }
         if (currentIsOpen(run)) { run.waiting = true; return; }
         settleCurrent(run);
         if (scanPathBusy()) return;

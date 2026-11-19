@@ -1,3 +1,5 @@
+import * as workerThreads from 'node:worker_threads';
+import { randomUUID } from 'node:crypto';
 /**
  * ⛔ Supabase ៖ ថ្នាក់ដូច `ledger-replay-companion.test.ts` លើ adapter ៖ កែតម្លៃ (CAS ledger មុន · CAS history ក្រោយ) ក្រៅបណ្តាញ ➜
  *    reload ➜ row journal ២ (`sent` · uncertain) ➜ session បន្ទាប់ replay CAS នីមួយៗ **ដោយឯករាជ្យ** ➜ CAS មួយចុះ មួយទៀត conflict
@@ -58,7 +60,7 @@ const makeJournal = () => {
         remove: (_scope: string, _topic: string, id: string) => rows.delete(id) };
 };
 
-async function open(server: ReturnType<typeof fakeServer>, journal: any) {
+async function open(server: ReturnType<typeof fakeServer>, journal: any, waitForListener = true) {
     const db = createSupabaseDatabase(server.transport, { onListenerError: () => {}, onSynced: () => {}, onForbidden: () => {}, onTxOutcomeUnknown: () => {} },
         { retryStepsMs: [5, 10, 600000], pollFallbackMs: 600000, rpcTimeoutMs: 1000, writeJournal: journal,
             ledgerCompanion: { state: ledgerCompanionState, copy: ledgerCompanionCopyState, witness: ledgerJournalWitness, update: ledgerJournalUpdate } });
@@ -66,8 +68,10 @@ async function open(server: ReturnType<typeof fakeServer>, journal: any) {
     db.setAuthed(true, 'scope');
     let fired = false;
     db.onValue(db.ref(LEDGER), () => { fired = true; });
-    for (let i = 0; i < 200 && !fired; i++) await wait(5);
-    expect(fired).toBe(true);
+    if (waitForListener) {
+        for (let i = 0; i < 200 && !fired; i++) await wait(5);
+        expect(fired).toBe(true);
+    }
     return db;
 }
 
@@ -88,7 +92,7 @@ async function offlinePriceEdit(server: ReturnType<typeof fakeServer>, journal: 
 }
 
 beforeEach(() => { vi.restoreAllMocks(); });
-afterEach(() => { vi.restoreAllMocks(); });
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 it('⛔ ledger ផ្លាស់ប្តូរដោយឧបករណ៍ផ្សេង (CAS ledger conflict) · CAS history ចុះ ➜ delta ledger ត្រូវអនុវត្តតាម intent (មិនបាត់)', async () => {
     const server = fakeServer(); const journal = makeJournal();
@@ -283,6 +287,63 @@ it('session ដដែលចូលវិញមុន follow-up ចាស់បញ
         db.resetForSignOut(); db.setTenantTopic('zoe:t1'); db.setAuthed(true, 'scope');
         for (let i = 0; i < 100 && !db.isReady(); i++) await wait(5);
         expect(db.isReady()).toBe(true);
+        release();
+        for (let i = 0; i < 100 && !nextHeld; i++) await wait(5);
+        expect(nextHeld).toBe(true);
+        expect(db.recoveryState().recovering).toBe(true);
+        expect((await db.discardPendingWrites()).count).toBe(0);
+        expect(journal.rows.has('operation_abcdefghijkl')).toBe(true);
+        releaseNext();
+        db.goOnline();
+        for (let i = 0; i < 200 && journal.rows.size; i++) await wait(5);
+        expect(journal.rows.size).toBe(0);
+        expect(server.get(LEDGER).codDollar).toBe(45);
+        expect(db.recoveryState()).toMatchObject({ blocked: 0, recovering: false });
+    } finally { release(); releaseNext(); db.close('test'); }
+});
+
+it.skipIf(!workerThreads.locks?.request).each(['relogin', 'close'] as const)('native lock %s: session ដដែលចូលវិញមុន follow-up ចាស់បញ្ចប់ ➜ recovery ថ្មីមិនជាប់ owner ចាស់', async (transition) => {
+    // Native Web Locks (Node >=24.5), not a synchronous mock. Namespace each test.
+    const prefix = randomUUID() + ':';
+    const locks = workerThreads.locks;
+    vi.stubGlobal('navigator', { onLine: true, locks: {
+        request(name: string, options: any, callback?: any) {
+            return typeof options === 'function' ? locks.request(prefix + name, options) : locks.request(prefix + name, options, callback);
+        }
+    } });
+    const server = fakeServer(); const journal = makeJournal();
+    const before = ledger(40, 'op_prior_day');
+    const intent = { ...ledgerDeltaIntent('daily', DAY, 5, 0, 0, ledgerDeltaCompanion('item1', 'B1', 15, 0, 10, 0)), token: 'op_mine_token_1' };
+    journal.put({ v: 1, writeProtocol: 2, scope: 'scope', topic: 'zoe:t1', opId: 'operation_abcdefghijkl', stage: 'sent', uncertain: true,
+        sentAfter: Date.now() - 1000, queuedAt: Date.now() - 1000,
+        ops: [{ k: 'cas', p: LEDGER.split('/'), x: before, v: ledgerJournalUpdate(before, intent) }], intent });
+    server.set(ITEM, item(15)); server.set(LEDGER, before);
+    const rpc = server.transport.rpc;
+    let release!: () => void;
+    const delayed = new Promise<void>((resolve) => { release = resolve; });
+    let releaseNext!: () => void;
+    const delayedNext = new Promise<void>((resolve) => { releaseNext = resolve; });
+    let held = false;
+    let nextHeld = false;
+    server.transport.rpc = async (fn, args) => {
+        if (fn === 'zoe_write_v2' && !held) {
+            held = true; await delayed;
+            throw new SbRpcError('session ended', '42501', 403, '');
+        }
+        const reply = await rpc(fn, args);
+        if (fn === 'zoe_write_v2') { expect.soft(args.p_expected_tenant).toBe('t1'); nextHeld = true; await delayedNext; }
+        return reply;
+    };
+    let db = await open(server, journal);
+    try {
+        for (let i = 0; i < 100 && !held; i++) await wait(5);
+        expect(held).toBe(true);
+        if (transition === 'close') { db.close('handoff'); db = await open(server, journal, false); }
+        else { db.resetForSignOut(); db.setTenantTopic('zoe:t1'); db.setAuthed(true, 'scope'); }
+        if (transition === 'relogin') {
+            for (let i = 0; i < 100 && !db.isReady(); i++) await wait(5);
+            expect(db.isReady()).toBe(true);
+        }
         release();
         for (let i = 0; i < 100 && !nextHeld; i++) await wait(5);
         expect(nextHeld).toBe(true);

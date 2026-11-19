@@ -211,17 +211,21 @@ export async function repairSeatEnrollmentIdentity() {
 export async function submitActivationKey() {
     if (viewState.activationBusy || viewState.seatEnrollmentBusy) return;
     const sessionIsCurrent = captureAuthDatabaseGuard();
+    let activationIsCurrent = sessionIsCurrent;
     viewState.activationBusy = true;
     try {
         const keyStr = fieldValue('activationKeyInput').trim();
         if (!keyStr) { showToast('⚠️ សូមបញ្ចូល Activation Key!'); return; }
-        const result = await withTimeout(ZoeLicense.activate(keyStr, LICENSE_APP_CODE), 30000, 'Activation timed out');
-        if (!sessionIsCurrent()) return;
+        const enrollmentEpoch = viewState.seatEnrollmentEpoch;
+        activationIsCurrent = () => sessionIsCurrent() && viewState.seatEnrollmentEpoch === enrollmentEpoch && fieldValue('activationKeyInput').trim() === keyStr;
+        const result = await withTimeout(ZoeLicense.activate(keyStr, LICENSE_APP_CODE, activationIsCurrent), 30000, 'Activation timed out');
+        if (!activationIsCurrent()) return;
         if (!result.valid) {
             setFieldValue('activationKeyInput', '');
             showToast(licenseFailureMessage(result.reason));
             return;
         }
+        activationIsCurrent = sessionIsCurrent;
         setFieldValue('activationKeyInput', '');
         const activated = await withTimeout(ensureAppActivated(), 20000, 'Activation timed out');
         if (!sessionIsCurrent()) return;
@@ -237,7 +241,7 @@ export async function submitActivationKey() {
             showToast("⚠️ Key ត្រូវបានផ្ទៀងផ្ទាត់ក្នុងគ្រឿង ប៉ុន្តែប្រព័ន្ធច្រានចោល — សូមមើលសារនៅក្នុងប្រអប់ខាងលើ");
         }
     } catch (e) {
-        if (!sessionIsCurrent()) return;
+        if (!activationIsCurrent()) return;
         console.error('submitActivationKey failed:', e);
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'submitActivationKey' });
         showToast('❌ កំហុសមិនរំពឹងទុក: ' + (e && e.message ? e.message : String(e)));

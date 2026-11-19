@@ -2818,6 +2818,9 @@
     "tools/audit-tools/zoew/tests/lookup-plain-header-gone.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "tools/audit-tools/zoew/tests/manual-activation-edit-race.audit.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "tools/audit-tools/zoew/tests/manual-adjust-number-browser.test.ts": {
       "policy": "zoew-self-verification"
     },

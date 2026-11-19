@@ -120,6 +120,28 @@ it.each(['auth', 'config'])('ប្ដូរ %s ខណៈ RPC រង់ចាំ
     expect(viewState.healthRecheckBusy).toBe(false);
 });
 
+it('Health ដំបូងត្រូវបានផ្អាកដោយ controller change រួចចាប់ថ្មីដោយមិនចាំចុច', async () => {
+    configurePalmHealth();
+    registerModalMeta('healthCheckModal', {});
+    setModalDisplay('healthCheckModal', 'none');
+    openHealthCheck(); watch();
+    const first = startPassive();
+    workers.dispatchEvent(new Event('controllerchange'));
+    await first;
+    expect(requests[0].signal?.aborted).toBe(true);
+    expect(uiState.healthRows[0].state).not.toBe('ok');
+    await vi.advanceTimersByTimeAsync(249);
+    expect(requests).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(2);
+    expect(requests).toHaveLength(2);
+    expect(palmVerificationRequests()).toHaveLength(0);
+    answer(1); await vi.advanceTimersByTimeAsync(1);
+    expect(uiState.healthRows[0].state).toBe('ok');
+    expect(viewState.healthRecheckBusy).toBe(false);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(requests).toHaveLength(2);
+});
+
 it('ព្យុះ online/offline/controller មិនបង្កើតជុំស្ទួន ហើយរត់ជុំថ្មីក្រោយចាស់ចប់', async () => {
     watch(); const old = start();
     for (let i = 0; i < 10; i++) {
@@ -127,17 +149,35 @@ it('ព្យុះ online/offline/controller មិនបង្កើតជុ�
         online = true; window.dispatchEvent(new Event('online'));
         workers.dispatchEvent(new Event('controllerchange'));
     }
-    await vi.advanceTimersByTimeAsync(250);
+    await old;
+    expect(requests[0].signal?.aborted).toBe(true);
+    await vi.advanceTimersByTimeAsync(249);
     expect(requests).toHaveLength(1);
-    answer(0); await old;
-    await vi.advanceTimersByTimeAsync(251);
-    expect(requests).toHaveLength(1);
-    await vi.advanceTimersByTimeAsync(29749);
+    await vi.advanceTimersByTimeAsync(2);
     expect(requests).toHaveLength(2);
+    answer(0, false);
     answer(1); await vi.advanceTimersByTimeAsync(1);
     expect(uiState.healthRows[0].state).toBe('ok');
     await vi.advanceTimersByTimeAsync(1000);
     expect(requests).toHaveLength(2);
+});
+
+it('ព្យុះបោះបង់ជុំដែលទើបចាប់ថ្មី មិនអាចផ្ញើ request លឿនរាល់ 250ms', async () => {
+    watch(); const first = startPassive();
+    workers.dispatchEvent(new Event('controllerchange'));
+    await first;
+    await vi.advanceTimersByTimeAsync(251);
+    expect(requests).toHaveLength(2);
+    for (let i = 0; i < 20; i++) {
+        workers.dispatchEvent(new Event('controllerchange'));
+        await vi.advanceTimersByTimeAsync(300);
+    }
+    expect(requests[1].signal?.aborted).toBe(true);
+    expect(requests).toHaveLength(2);
+    await vi.advanceTimersByTimeAsync(24000);
+    expect(requests).toHaveLength(3);
+    answer(2); await vi.advanceTimersByTimeAsync(1);
+    expect(uiState.healthRows[0].state).toBe('ok');
 });
 
 it('hidden មិនទទួលចម្លើយចាស់ ហើយ dispose មិនសល់ timer ឬ listener', async () => {
@@ -169,13 +209,13 @@ it('hidden ហើយ visible ពេលជុំចាស់មិនទាន់
     watch(); const old = start();
     hidden = true; document.dispatchEvent(new Event('visibilitychange'));
     hidden = false; document.dispatchEvent(new Event('visibilitychange'));
-    await vi.advanceTimersByTimeAsync(251);
+    await old;
+    expect(requests[0].signal?.aborted).toBe(true);
+    await vi.advanceTimersByTimeAsync(249);
     expect(requests).toHaveLength(1);
-    answer(0); await old;
-    await vi.advanceTimersByTimeAsync(251);
-    expect(requests).toHaveLength(1);
-    await vi.advanceTimersByTimeAsync(29749);
+    await vi.advanceTimersByTimeAsync(2);
     expect(requests).toHaveLength(2);
+    answer(0, false);
     answer(1); await vi.advanceTimersByTimeAsync(1);
     expect(uiState.healthRows[0].state).toBe('ok');
     expect(viewState.healthRecheckBusy).toBe(false);
@@ -187,9 +227,9 @@ it('ព្យុះស្ថានភាពមិនចាប់ផ្តើម 
     const config = localStorage.getItem('zoew_firebase_config');
     watch(); const pending = start();
     window.dispatchEvent(new Event('online')); window.dispatchEvent(new Event('storage'));
-    answer(0); await pending; await vi.advanceTimersByTimeAsync(251);
+    answer(0); await pending; await vi.advanceTimersByTimeAsync(249);
     expect(requests).toHaveLength(1);
-    await vi.advanceTimersByTimeAsync(29749);
+    await vi.advanceTimersByTimeAsync(2);
     expect(requests).toHaveLength(2);
     answer(1); await vi.advanceTimersByTimeAsync(1);
     expect(retry).not.toHaveBeenCalled();
@@ -303,9 +343,9 @@ it('event ថ្មីក្រោយ manual ចាប់ផ្តើម មិ�
     answer(0); await manual;
     expect(uiState.healthRunSeq).toBe(invalidatedGeneration);
     expect(uiState.healthRows[0].state).not.toBe('ok');
-    await vi.advanceTimersByTimeAsync(251);
+    await vi.advanceTimersByTimeAsync(249);
     expect(requests).toHaveLength(1);
-    await vi.advanceTimersByTimeAsync(29749);
+    await vi.advanceTimersByTimeAsync(2);
     expect(requests).toHaveLength(2);
     expect(viewState.healthRecheckBusy).toBe(true);
     answer(1, false); await vi.advanceTimersByTimeAsync(1);

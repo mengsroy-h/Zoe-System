@@ -8,11 +8,16 @@ import { buildHealthAdvice } from '../../features/health-advice';
 import { healthPendingRow } from '../components/health/model';
 import { healthCheckResultIsCurrent, healthClockRow, healthDatabaseRow, healthDatabaseWriteRow, healthNetworkRow, invalidateHealthCheck, runHealthCheck } from '../../features/health-check';
 
+const HEALTH_POLL_INTERVAL_MS = 30000;
+const HEALTH_CHANGE_DEBOUNCE_MS = 250;
+
 export function watchHealthCheck() {
     const scope = createLifecycleScope();
     let stopped = false;
     let dirty = false;
     let nextAutomaticAt = 0;
+    let recovering = false;
+    let nextRecoveryAt = 0;
     let wasBusy = viewState.healthRecheckBusy;
     let previousClock = JSON.stringify(healthClockRow());
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -31,7 +36,8 @@ export function watchHealthCheck() {
     const clear = () => { if (timer !== null) clearTimeout(timer); timer = null; };
     const schedule = (ms: number) => {
         clear();
-        if (available()) timer = setTimeout(tick, Math.max(ms, nextAutomaticAt - performance.now()));
+        const notBefore = dirty && recovering ? Math.min(nextAutomaticAt, nextRecoveryAt) : nextAutomaticAt;
+        if (available()) timer = setTimeout(tick, Math.max(ms, notBefore - performance.now()));
     };
     const invalidate = (clearPalm = false) => {
         invalidateHealthCheck(clearPalm);
@@ -41,20 +47,23 @@ export function watchHealthCheck() {
     const changed = (clearPalm = false) => {
         if (!available()) return;
         dirty = true;
+        recovering ||= viewState.healthRecheckBusy || wasBusy;
         invalidate(clearPalm);
-        schedule(250);
+        schedule(HEALTH_CHANGE_DEBOUNCE_MS);
     };
     const tick = () => {
         timer = null;
         if (!available()) return;
-        if (!dirty && viewState.healthRecheckBusy) { schedule(30000); return; }
-        if (!dirty) { dirty = true; schedule(250); return; }
+        if (!dirty && viewState.healthRecheckBusy) { schedule(HEALTH_POLL_INTERVAL_MS); return; }
+        if (!dirty) { dirty = true; schedule(HEALTH_CHANGE_DEBOUNCE_MS); return; }
         if (viewState.healthRecheckBusy) return;
         dirty = false;
-        nextAutomaticAt = performance.now() + 30000;
+        if (recovering) nextRecoveryAt = performance.now() + HEALTH_POLL_INTERVAL_MS;
+        recovering = false;
+        nextAutomaticAt = performance.now() + HEALTH_POLL_INTERVAL_MS;
         void runHealthCheck(false, false).finally(() => {
-            nextAutomaticAt = performance.now() + 30000;
-            if (available()) schedule(dirty ? 250 : 30000);
+            nextAutomaticAt = performance.now() + HEALTH_POLL_INTERVAL_MS;
+            if (available()) schedule(dirty ? HEALTH_CHANGE_DEBOUNCE_MS : HEALTH_POLL_INTERVAL_MS);
         });
     };
     const stateChanged = () => {
@@ -81,7 +90,12 @@ export function watchHealthCheck() {
         changed(true);
     };
     const visibility = () => {
-        if (document.hidden) { clear(); invalidate(true); dirty = true; }
+        if (document.hidden) {
+            clear();
+            recovering ||= viewState.healthRecheckBusy || wasBusy;
+            invalidate(true);
+            dirty = true;
+        }
         else externalChange();
     };
     const storage = (event: StorageEvent) => {
@@ -92,12 +106,12 @@ export function watchHealthCheck() {
     };
     const offs = [firebaseState, lookupState, securityState].map((store) => store.subscribe(stateChanged));
     offs.push(viewState.subscribe(() => {
-        if (wasBusy && !viewState.healthRecheckBusy) nextAutomaticAt = performance.now() + 30000;
+        if (wasBusy && !viewState.healthRecheckBusy) nextAutomaticAt = performance.now() + HEALTH_POLL_INTERVAL_MS;
         wasBusy = viewState.healthRecheckBusy;
         stateChanged();
         if (dirty && !viewState.healthRecheckBusy) {
-            if (healthCheckResultIsCurrent()) { dirty = false; schedule(30000); }
-            else schedule(250);
+            if (healthCheckResultIsCurrent()) { dirty = false; recovering = false; schedule(HEALTH_POLL_INTERVAL_MS); }
+            else schedule(HEALTH_CHANGE_DEBOUNCE_MS);
         }
     }));
     window.addEventListener('online', externalChange);
@@ -106,7 +120,7 @@ export function watchHealthCheck() {
     document.addEventListener('visibilitychange', visibility);
     const workers = navigator.serviceWorker;
     if (typeof workers?.addEventListener === 'function') scope.listen(workers, 'controllerchange', externalChange);
-    schedule(30000);
+    schedule(HEALTH_POLL_INTERVAL_MS);
     return () => {
         stopped = true;
         clear();

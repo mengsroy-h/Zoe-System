@@ -1166,11 +1166,23 @@ async function run() {
             h.getElementById('setupLinkResultText').textContent === '' && h.getElementById('setupLinkQrContainer').innerHTML === ''
                 && h.ctx.lastGeneratedSetupLink === '');
         const hp = build();
-        hp.getElementById('setupLinkResultText').textContent = 'https://zoew.example/#setup=plain';
-        hp.ctx.lastGeneratedSetupLink = 'https://zoew.example/#setup=plain';
+        // A Config link without a lookup code can still carry a Supabase invitation.
+        // The session boundary clears published output regardless of link format.
+        const plainLink = 'https://zoew.example/#setup=' + Buffer.from(JSON.stringify({
+            supabaseUrl: 'https://example.supabase.co', invite: 'synthetic-invite'
+        })).toString('base64');
+        hp.getElementById('setupLinkResultText').textContent = plainLink;
+        hp.getElementById('setupLinkQrContainer').innerHTML = '<svg></svg>';
+        hp.getElementById('setupLinkResultBox').classList.remove('hidden');
+        hp.getElementById('setupLinkQrSaveBtn').classList.remove('hidden');
+        hp.ctx.lastGeneratedSetupLink = plainLink;
         hp.ctx.invalidateSensitiveSession();
-        ok('re-audit ទិសផ្ទុយ ៖ Link Config ធម្មតា (គ្មានកូដ) នៅលើអេក្រង់', hp.getElementById('setupLinkResultText').textContent !== ''
-            && hp.ctx.lastGeneratedSetupLink !== '');
+        ok('re-audit ៖ បញ្ចប់វគ្គ ➜ លុប Link Config គ្មានកូដ និង QR ផងដែរ',
+            hp.getElementById('setupLinkResultText').textContent === ''
+            && hp.getElementById('setupLinkQrContainer').innerHTML === ''
+            && hp.getElementById('setupLinkResultBox').classList.contains('hidden')
+            && hp.getElementById('setupLinkQrSaveBtn').classList.contains('hidden')
+            && hp.ctx.lastGeneratedSetupLink === '');
     }
 
     // ⛔ deep audit ៩ (F5) ៖ «⏳ បន្ថែម» សរសេរ `now + days` ពីមុន ➜ Key នៅសល់ ៣០០ ថ្ងៃ «បន្ថែម» ៣០ ក្លាយជា ៣០ ថ្ងៃ · admin ២ (+៣៦៥ ហើយ +៧)

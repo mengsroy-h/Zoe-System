@@ -429,7 +429,7 @@ export async function deleteSingleItem(id, opts?) {
     const deleteMode = opts && ['palm', 'cookie', 'local'].includes(opts.trashMode) ? opts.trashMode : getManualZtoTrashMode();
     const deleteIsCurrent = () => trashGenerationOwnerCurrent(generationOwner) && firebaseState.db === deleteDb && firebaseState.authGeneration === deleteGeneration;
     const noteDeleteSessionSwitch = () => {
-        try { patchCleanupJournalEntry(id, { switchReported: true }, preparedTrash, operation?.scope); } catch (journalErr) {}
+        try { patchCleanupJournalEntry(preparedTrash?.id || id, { switchReported: true }, preparedTrash, operation?.scope); } catch (journalErr) {}
         if (window.ZoeErrors) ZoeErrors.capture(new Error('Delete stopped after a database switch'), { zone: 'data', context: 'deleteSingleItem session switch', itemId: id });
     };
     let claimedWhole = null;
@@ -522,6 +522,7 @@ export async function deleteSingleItem(id, opts?) {
             try {
                 await restoreClaimedItemToScanHistory(id, claimedWhole, null);
                 restoreOk = true;
+                clearCleanupJournalEntry(removed.id, removed);
             } catch (restoreErr) {
                 console.error('Failed to restore item to scan history after trash write failure for', id, restoreErr);
                 if (window.ZoeErrors) ZoeErrors.capture(restoreErr, { zone: 'data', context: 'deleteSingleItem restore-after-trash-failure also failed', itemId: id });
@@ -589,8 +590,11 @@ export async function deleteSingleItem(id, opts?) {
                 pendingDelete = true;
                 armLateCommit(deleteTx, async (late) => {
                     try { return await finishDelete(late, true); } finally { releaseDelete(); }
-                }, (lateErr) => {
+                }, (lateErr, lateResult) => {
                     settleClaim(false);
+                    if (deleteIsCurrent() && (lateErr?.txOutcome === 'not-applied' || !lateErr && lateResult?.committed === false) && preparedTrash) {
+                        clearCleanupJournalEntry(preparedTrash.id, preparedTrash);
+                    }
                     releaseDelete();
                     refreshCurrentHistoryView();
                     updateRecentPhonesList();
@@ -606,6 +610,7 @@ export async function deleteSingleItem(id, opts?) {
         }
         if (!result || !result.committed) {
             if (!deleteIsCurrent()) { if (preparedTrash) noteDeleteSessionSwitch(); return 'stale'; }
+            if (result && result.committed === false && preparedTrash) clearCleanupJournalEntry(preparedTrash.id, preparedTrash);
             if (restoreClaimBlocked) {
                 say("⏳ កញ្ចប់នេះកំពុងស្តារ — សូមរង់ចាំឲ្យចប់ រួចសាកលុបម្តងទៀត។");
                 return 'blocked';
@@ -619,6 +624,7 @@ export async function deleteSingleItem(id, opts?) {
         return await finishDelete(result, false);
     } catch (e) {
         console.error("Error deleting single item: ", e);
+        if (e && e.txOutcome === 'not-applied' && preparedTrash && deleteIsCurrent()) clearCleanupJournalEntry(preparedTrash.id, preparedTrash);
         if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'data', context: "Error deleting single item: " });
         refreshCurrentHistoryView();
         updateRecentPhonesList();

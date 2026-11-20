@@ -78,17 +78,21 @@ export function trashZtoStatusEnrichment(item) {
     return Number.isSafeInteger(deletedAt) && deletedAt > 0 && deletedAt <= now && now - deletedAt <= trashRetentionMs(item);
 }
 
+function barcodePersistedReturnWins(barcode, item?) {
+    return !!barcode && Number.isSafeInteger(barcode.ztoReturnedAt) && barcode.ztoReturnedAt > 0
+        && barcode.ztoReturnedAt >= barcodeReturnBasis(barcode, item?.createdAt)
+        && barcode.ztoReturnedAt > Math.max(Number(barcode.ztoSentOutAt) || 0, Number(barcode.ztoMisplacedAt) || 0);
+}
+
 export function trashRestoreBlockOf(item, evidenceOnly?) {
     const stamped = trashZtoFinalBlock(item);
     if (stamped && (stamped !== 'returned' || item.restoreBlocked === true)) return stamped;
-    const barcodes = item && Array.isArray(item.barcodes) ? item.barcodes.filter(Boolean) : [];
+    const barcodes = barcodeEntriesOf(item?.barcodes).map(({ barcode }) => barcode).filter(Boolean);
     if (barcodes.some((b) => barcodeVerdictSigned(b, item))) return 'signed';
     const decision = trashZtoTerminalDecision(item);
     if (decision) return decision;
     if (trashItemLeftBranch(item)) return '';
-    if (['palm', 'cookie'].includes(item?.trashMode) && barcodes.some(b => Number.isSafeInteger(b.ztoReturnedAt)
-        && b.ztoReturnedAt > 0 && b.ztoReturnedAt >= barcodeReturnBasis(b, item.createdAt)
-        && b.ztoReturnedAt > Math.max(Number(b.ztoSentOutAt) || 0, Number(b.ztoMisplacedAt) || 0))) return 'returned';
+    if (['palm', 'cookie'].includes(item?.trashMode) && barcodes.some((b) => barcodePersistedReturnWins(b, item))) return 'returned';
     if (stamped) return stamped;
     if (!barcodes.length) return '';
     if (barcodes.some((b) => {
@@ -108,6 +112,7 @@ export function barcodeZtoLeftKind(barcode, item?) {
     const evidence = barcodeReturnedEvidence(barcode, item);
     if (evidence && evidence.kind !== 'returned') return evidence.kind;
     if (evidence && evidence.at >= Math.max(Number(barcode.ztoSentOutAt) || 0, Number(barcode.ztoMisplacedAt) || 0)) return '';
+    if (barcodePersistedReturnWins(barcode, item)) return '';
     if (barcodeZtoSentOut(barcode)) return 'sent';
     return barcodeZtoMisplaced(barcode) ? 'misplaced' : '';
 }
@@ -121,7 +126,7 @@ export function barcodeSentOutInZto(barcode, item?) {
 }
 
 function trashReturnedEvery(item, test) {
-    const barcodes = item && item.trashReason === 'returned' && Array.isArray(item.barcodes) ? item.barcodes.filter(Boolean) : [];
+    const barcodes = item && item.trashReason === 'returned' ? barcodeEntriesOf(item.barcodes).map(({ barcode }) => barcode).filter(Boolean) : [];
     return barcodes.length > 0 && barcodes.every((barcode) => test(barcode, item));
 }
 
@@ -194,7 +199,9 @@ export function applyZtoFinalMarks(current, wanted, trash) {
             if (want.signedExact === true) b.ztoSignedExact = true;
             changed = true;
         }
-        if (want.returned && returnMarks && (!statusSource || Number.isSafeInteger(want.returned) && want.returned <= getServerNow() && want.returned <= 9007199254740990) && !barcodeZtoReturned(b)
+        const canUpdateReturned = !barcodeZtoReturned(b)
+            || !want.misplaced && want.returned > (Number(b.ztoReturnedAt) || 0) && (barcodeZtoMisplaced(b) || barcodeZtoSentOut(b));
+        if (want.returned && returnMarks && (!statusSource || Number.isSafeInteger(want.returned) && want.returned <= getServerNow() && want.returned <= 9007199254740990) && canUpdateReturned
             && want.returned >= barcodeReturnBasis(b, current.createdAt)) {
             b.ztoReturnedAt = want.returned;
             changed = true;
@@ -253,7 +260,9 @@ export function collectZtoFinalTargets() {
                     if (!barcodeZtoSentOut(b)) want.sentOut = evidence.at;
                 } else if (evidence && evidence.kind !== 'left') {
                     const stampMisplaced = evidence.kind === 'misplaced' && !barcodeZtoMisplaced(b);
-                    if (!barcodeZtoReturned(b) || stampMisplaced) {
+                    const advanceReturn = evidence.kind === 'returned' && evidence.at > (Number(b.ztoReturnedAt) || 0)
+                        && (!barcodeZtoReturned(b) || barcodeZtoMisplaced(b) || barcodeZtoSentOut(b));
+                    if (!barcodeZtoReturned(b) || stampMisplaced || advanceReturn) {
                         want.returned = evidence.at;
                         if (stampMisplaced) want.misplaced = true;
                     }

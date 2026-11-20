@@ -106,7 +106,7 @@ export function barcodeCloseIsRipe(barcode, now, mode = 'local') {
         return !!(barcode?.isClosed && typeof barcode.closedAt === 'number' && isFinite(barcode.closedAt)
             && barcode.closedAt > 0 && now - barcode.closedAt >= TWO_HOURS_MS);
     }
-    return !!(barcode && barcode.isClosed && typeof barcode.closedAt === 'number' && (now - barcode.closedAt) > TWO_HOURS_MS);
+    return !!(barcode && barcode.isClosed && typeof barcode.closedAt === 'number' && isFinite(barcode.closedAt) && barcode.closedAt > 0 && (now - barcode.closedAt) > TWO_HOURS_MS);
 }
 
 export function barcodeAbandonBasis(barcode, parentCreatedAt) {
@@ -149,7 +149,7 @@ export function barcodeZtoSentOut(barcode) {
 
 export function trashZtoFinalBlock(item) {
     if (item?.trashMode === 'palm' && item?.trashReason === 'pickup') return 'palm';
-    const barcodes = item && Array.isArray(item.barcodes) ? item.barcodes.filter(Boolean) : [];
+    const barcodes = barcodeEntriesOf(item?.barcodes).map(({ barcode }) => barcode).filter(Boolean);
     if (barcodes.some(barcodeZtoSigned)) return 'signed';
     if (item?.trashReason === 'returned' && barcodes.some((b) => barcodeZtoReturned(b) && !barcodeZtoMisplaced(b) && !barcodeZtoSentOut(b))) return 'returned';
     return item?.restoreBlocked === true ? 'signed' : '';

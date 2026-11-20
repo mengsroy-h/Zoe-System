@@ -591,6 +591,7 @@ export async function executeRestoreItem() {
     };
     let pickupJournal = null;
     let pickupContext = null;
+    let restoreClaimAcquired = false;
     try {
         stopIfSwitched();
         const safeIdPattern = /^[a-zA-Z0-9_-]+$/;
@@ -610,8 +611,16 @@ export async function executeRestoreItem() {
         if (!existingClaim && previewItem.restoreClaim && !isActiveRestoreClaim(previewItem.restoreClaim)
             && typeof previewItem.restoreClaim.token === 'string' && previewItem.restoreClaim.token
             && typeof previewItem.restoreClaim.targetId === 'string' && safeIdPattern.test(previewItem.restoreClaim.targetId)) {
-            token = previewItem.restoreClaim.token;
-            targetId = previewItem.restoreClaim.targetId;
+            let adoptExpired = !previewItem.restoreAttestationId;
+            if (!adoptExpired) {
+                const oldTargetSnap = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${previewItem.restoreClaim.targetId}`)));
+                stopIfSwitched();
+                adoptExpired = oldTargetSnap.exists() && oldTargetSnap.val()?.restoreClaimId === restoredId;
+            }
+            if (adoptExpired) {
+                token = previewItem.restoreClaim.token;
+                targetId = previewItem.restoreClaim.targetId;
+            }
         }
         stopIfSwitched();
         const consumed = await readTrashConsumption(restoredId, restoreOwner);
@@ -668,6 +677,7 @@ export async function executeRestoreItem() {
         const claimed = authorization.kind === 'allow'
             ? { item: cloneRestoreItem(authorization.source), targetId }
             : await claimDeletedItemForRestore(restoredId, token, targetId, previewItem, restoreIsCurrent);
+        restoreClaimAcquired = true;
         stopIfSwitched();
         targetId = claimed.targetId;
         saveRestoreClaim(restoredId, { token, targetId });
@@ -678,7 +688,7 @@ export async function executeRestoreItem() {
         let itemToRestore = claimed.item;
         await rejectBlockedRestore(itemToRestore, token);
         if (restoreAwaitsLedgerView(itemToRestore)) throw new Error('RESTORE_LEDGER_UNSYNCED');
-        const restoredTrash = { trashReason: itemToRestore.trashReason, deletedAt: itemToRestore.deletedAt, scanDate: itemToRestore.scanDate, isFromDeletion: itemToRestore.isFromDeletion, deducted: barcodeEntriesOf(itemToRestore.barcodes).some(({ barcode }) => barcode?.isDeducted) };
+        const restoredTrash = { trashReason: itemToRestore.trashReason, deletedAt: itemToRestore.deletedAt, scanDate: itemToRestore.scanDate, isFromDeletion: itemToRestore.isFromDeletion, barcodes: cloneRestoreItem(itemToRestore)?.barcodes, deducted: barcodeEntriesOf(itemToRestore.barcodes).some(({ barcode }) => barcode?.isDeducted) };
         delete itemToRestore.trashGeneration;
         delete itemToRestore.deletedAt;
         delete itemToRestore.isFromDeletion;
@@ -773,21 +783,21 @@ export async function executeRestoreItem() {
         await finalizeClaimedRestore(restoredId, token, targetId, appliedRevenueDeltas, restoredLedgerKey, callPatch, lostCodes.size > 0 && !barcodeEntriesOf(prepared.item.barcodes).length,
             consumption, finalization, claimedSource);
         stopIfSwitched();
-        if (pickupJournal && !pickupJournal.confirm(pickupMarks.map((mark) => mark.key))) throw new Error('PICKUP_ADMISSION_FAILED');
-        if (pickupMarks.length) pickupJournal.note(markPickupBarcodes(revenueScanDate, pickupMarks, false, pickupContext));
-        const pickupSaved = await (pickupJournal?.finish() || Promise.resolve(true));
-        stopIfSwitched();
-        activeRestoreClaims.delete(restoredId);
-        saveRestoreClaim(restoredId, null);
-        if (!pickupJournal || pickupSaved) await clearRestoreFinalization(restoredId, token, restoreIsCurrent).catch(() => {});
-        stopIfSwitched();
         const restoredCollectedKeys = (Array.isArray(itemToRestore.barcodes) ? itemToRestore.barcodes : [])
             .filter((restoredBc) => restoredBc && !lostCodes.has(restoredBc.code))
             .map((restoredBc) => pickupBarcodeKey(restoredBc && restoredBc.code))
             .filter(Boolean);
-        if (restoredCollectedKeys.length) {
-            await reconcileCollectedHistory(targetId, restoredCollectedKeys).catch(() => null);
-        }
+        if (pickupJournal && !pickupJournal.confirm(pickupMarks.map((mark) => mark.key))) throw new Error('PICKUP_ADMISSION_FAILED');
+        const pickupApplied = pickupMarks.length ? markPickupBarcodes(revenueScanDate, pickupMarks, false, pickupContext) : null;
+        if (pickupApplied) pickupJournal.note(pickupApplied);
+        const collectedSync = restoredCollectedKeys.length
+            ? Promise.resolve(pickupApplied?.commit).catch(() => null).then(() => reconcileCollectedHistory(targetId, restoredCollectedKeys).catch(() => null))
+            : Promise.resolve(true);
+        const pickupSaved = await (pickupJournal ? pickupJournal.finish(collectedSync) : collectedSync.then(() => true));
+        stopIfSwitched();
+        activeRestoreClaims.delete(restoredId);
+        try { saveRestoreClaim(restoredId, null); } catch (e) {}
+        if (!pickupJournal || pickupSaved) await clearRestoreFinalization(restoredId, token, restoreIsCurrent).catch(() => {});
         stopIfSwitched();
         openRecentlyDeletedModal();
         refreshCurrentHistoryView();
@@ -798,6 +808,7 @@ export async function executeRestoreItem() {
             showToast(restoreLostCodesText(lostList));
         } else showToast(pickupSaved ? "✅ បានស្តារទិន្នន័យមកទីតាំងដើមវិញដោយសុវត្ថិភាព!" : "⏳ ស្តារបញ្ជីរួច — ស្ថិតិយកនៅរង់ចាំផ្ទៀងផ្ទាត់។");
     } catch (error) {
+        if (pickupJournal && !restoreClaimAcquired && restoreIsCurrent()) pickupJournal.abort();
         if (!restoreIsCurrent()) {
             if (window.ZoeErrors) ZoeErrors.capture(new Error('Restore stopped after a database switch'), { zone: 'money', context: 'executeRestoreItem session switch', itemId: restoredId });
             return;
@@ -867,7 +878,7 @@ export async function executeRestoreItem() {
         const alreadyRestored = !!(error && (error.message === 'ALREADY_RESTORED' || error.message === 'RESTORE_CLAIM_LOST'));
         if (alreadyRestored || error && error.message === 'RESTORE_IN_PROGRESS') {
             activeRestoreClaims.delete(restoredId);
-            saveRestoreClaim(restoredId, null);
+            try { saveRestoreClaim(restoredId, null); } catch (e) {}
         }
         if (!alreadyRestored) {
             console.error("Restore failed: ", restoredId, error);
@@ -925,6 +936,12 @@ export async function releaseStaleRestoreClaimForPurge(id, isCurrent = () => tru
     if (typeof claim.targetId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(claim.targetId)) return false;
     const target = (await dbOp(api.get(api.ref(purgeDb, `zoew_scan_history_cod_dod/${claim.targetId}`)))).val();
     if (!current() || !clockOperation.current() || target?.restoreClaimId === id) return false;
+    if (source.restoreAttestationId) {
+        const result = await requestRestoreAuthorization({ ...source, id }, {
+            token: claim.token, targetId: claim.targetId, current: () => current() && clockOperation.current(), action: 'release'
+        }).catch(() => null);
+        return current() && result?.kind === 'released';
+    }
     let released = false;
     await dbOp(api.runTransaction(api.ref<DeletedParcelRow>(purgeDb, `zoew_recently_deleted_cod_dod/${id}`), (currentItem) => {
         released = false;

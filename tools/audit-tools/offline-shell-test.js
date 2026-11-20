@@ -200,11 +200,11 @@ function serve(dir) {
     const engine = await page.evaluate(() => {
         try {
             window.initScanEngine();
-            return { built: typeof window.liveScanCodeReader !== 'undefined' || true, err: null };
+            return { built: typeof window.ZXingWASM === 'object' && typeof window.ZXingWASM.readBarcodes === 'function' && typeof window.initScanEngine === 'function', err: null };
         } catch (e) { return { built: false, err: String(e && e.message || e) }; }
     });
     ok('ពេលបណ្តាញដាច់ ➜ initScanEngine() សាង reader បានដោយគ្មានកំហុស',
-        engine.built && !engine.err, { engine, bootError });
+        engine.built && !engine.err && !bootError, { engine, bootError });
 
     await ctx.close();
     await browser.close();

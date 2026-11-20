@@ -82,7 +82,7 @@ export function collectPickupMarks(item, closed?: boolean, phoneKey?: string | n
     if (!item) return [];
     const owner = phoneKey || getPickupPhoneKey(item);
     const marks: PickupMark[] = [];
-    (Array.isArray(item.barcodes) ? item.barcodes : []).forEach((b) => {
+    barcodeEntriesOf(item.barcodes).forEach(({ barcode: b }) => {
         if (!b) return;
         const key = pickupBarcodeKey(b.code);
         if (key) marks.push({ key: key, phoneKey: owner, closed: closed === undefined ? !!b.isClosed : !!closed });
@@ -256,6 +256,7 @@ export async function commitPickupMarks(scanDateStr, marks, existingOnly = false
             if (!pickupContextIsCurrent(currentOwner)) return null;
             let refusal = 'version-conflict';
             let expected: PickupDayView | undefined;
+            let droppedClosed = false;
             const ref = currentOwner.sdk.ref(currentOwner.db, `zoew_daily_pickup_cod_dod/${scanDateStr}`);
             await dbOp(currentOwner.sdk.get(ref));
             if (!pickupContextIsCurrent(currentOwner)) return null;
@@ -273,6 +274,7 @@ export async function commitPickupMarks(scanDateStr, marks, existingOnly = false
                     return;
                 }
                 const allowed = requested.filter(mark => !mark.closed || !proof || proof.allowedAddKeys?.includes(mark.key));
+                droppedClosed = proof?.outcome !== 'not-applied' && requested.some(mark => mark.closed && !allowed.includes(mark));
                 applyPickupMarksToSet(set, allowed, existingOnly);
                 if (!currentOwner.sdk.__supabase && Object.keys(set).some(key => pickupNativeKeyUnsupported(key) || pickupNativeKeyUnsupported(set[key]))) {
                     refusal = 'recovery-pending';
@@ -297,11 +299,13 @@ export async function commitPickupMarks(scanDateStr, marks, existingOnly = false
             if (visibleMetadata.epoch <= savedMetadata.epoch && visibleMetadata.revision <= savedMetadata.revision) {
                 dataState.dailyPickupData[scanDateStr] = { ...saved, pickedUpPhones: saved?.pickedUpPhones || {}, pickedUpBarcodes: saved?.pickedUpBarcodes || {} };
             }
+            if (droppedClosed) return null;
         }
         return true;
     } catch (e) {
-        if (context?.intent && pickupContextIsCurrent(context)) patchPickupJournalEntry(context.intent, { hold: 'recovery-pending' });
-        if (!quiet) showToast("⚠️ ស្ថិតិយកកំពុងរង់ចាំផ្ទៀងផ្ទាត់ — សូមរង់ចាំ Sync។");
+        const stillCurrent = !context || pickupContextIsCurrent(context);
+        if (context?.intent && stillCurrent) patchPickupJournalEntry(context.intent, { hold: 'recovery-pending' });
+        if (!quiet && stillCurrent) showToast("⚠️ ស្ថិតិយកកំពុងរង់ចាំផ្ទៀងផ្ទាត់ — សូមរង់ចាំ Sync។");
     }
     return null;
 }
@@ -986,7 +990,17 @@ export function pickupIntentTracker(isCurrent, itemId?, kind?) {
         note: (applied) => {
             if (!applied || !applied.commit) return;
             commit = applied.commit;
-            pickupCommit = pickupCommit || applied.pickupCommit || applied.commit;
+            pickupCommit = applied.pickupCommit || applied.commit;
+        },
+        abort: () => {
+            if (!intent || !isCurrent()) return false;
+            const id = intent;
+            const entry = readPickupJournal().find((candidate) => candidate.id === id);
+            if (!entry || entry.restorePlan !== undefined) return false;
+            intent = null;
+            const removed = removePickupJournalEntry(id);
+            releasePickupIntent(id);
+            return removed;
         },
         release: () => {
             if (!intent) return;

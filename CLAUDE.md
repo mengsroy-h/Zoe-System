@@ -79,8 +79,8 @@ are evidence about that session; resolve today's authorization from the active c
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.221` (`zoew-v485`) | `zoew` |
-| **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes · devices per shop) · **separate Firebase project** | `2.24.54` (`zoekeygen-v165`) | `zoekeygen` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.222` (`zoew-v486`) | `zoew` |
+| **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes · devices per shop) · **separate Firebase project** | `2.24.55` (`zoekeygen-v166`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
   and builds to `ZoeW/dist/`. Where this file says `ZoeW/app.js` · `index.html` · `sw.js`, the code is `src/**` · JSX ·
@@ -135,10 +135,10 @@ are evidence about that session; resolve today's authorization from the active c
   (migrations · Edge Functions · rules generator; not Netlify) · `tools/money-check-windows/` (money check on Windows) ·
   `tools/supabase-migrate/` (optional Firebase ➜ Supabase move per customer) · `tools/actions-runners/` (self-hosted runner kit ·
   [`docs/SELF-HOSTED-RUNNERS.md`](docs/SELF-HOSTED-RUNNERS.md)) · `.github/workflows/` (`audit.yml` · `backup.yml` · `android-release.yml` ·
-  `android-shell-check.yml` · `opencode.yml`; repo variable `ZOE_RUNNER_MODE` = `github` ➜ GitHub-hosted runners; anything else ➜ self-hosted labels
+  `android-shell-check.yml` · `f03-native-diagnostic.yml` · `opencode.yml` · `registration-auth.yml`; repo variable `ZOE_RUNNER_MODE` = `github` ➜ GitHub-hosted runners; anything else ➜ self-hosted labels
   `wsl-zoe-audit` · `windows-zoe-android` while the repo is private; a public repo requires `github`, otherwise a `ci-config` preflight fails
-  instead of skipping silently (no false-green CI evidence) · `backup.yml`
-  and `opencode.yml` always run on `ubuntu-latest`).
+  instead of skipping silently (no false-green CI evidence) · `backup.yml`, `opencode.yml`
+  and `registration-auth.yml` always run on `ubuntu-latest`).
 
 ---
 

@@ -1874,6 +1874,8 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     let res;
                     let lost = null;
                     let sentAfter = serverNowSeen;
+                    let sentMono = performance.now();
+                    let sentWall = Date.now();
                     let lostAttempts = 0;
                     const giveUp = () => {
                         lost.txOutcome = 'unknown';
@@ -1898,16 +1900,50 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                         }
                         sendEpoch = sessionEpoch;
                         try {
-                            if (!lost && serverNowIsOld()) {
+                            if (lost) {
+                                const monoElapsed = performance.now() - sentMono;
+                                const wallElapsed = Date.now() - sentWall;
+                                const maybeExpired = !(sentAfter > 0) || monoElapsed >= SB_OP_REPLAY_SAFE_MS / 2 || wallElapsed < 0 || wallElapsed >= SB_OP_REPLAY_SAFE_MS / 2;
+                                if (maybeExpired) {
+                                    try { await rpc('zoe_now', {}); }
+                                    catch (e) { throw e instanceof SbNetworkError ? new SbNetworkError(e.message, true) : e; }
+                                    if (closed || sendEpoch !== sessionEpoch || authScope !== txScope || tenantTopic !== txTopic) continue;
+                                    const age = sentAfter > 0 && Number.isFinite(serverNowSeen) ? serverNowSeen - sentAfter : NaN;
+                                    if (!(age >= 0 && age <= SB_OP_REPLAY_SAFE_MS)) {
+                                        let pulled = false;
+                                        for (let page = 0; page < 1000; page++) {
+                                            const pullArgs: any = { p_since: cursor, p_limit: pullPage };
+                                            if (cursor > 0 && pullFullHead !== null) pullArgs.p_full_head = pullFullHead;
+                                            const pullRes = await rpc('zoe_pull', pullArgs);
+                                            if (closed || sendEpoch !== sessionEpoch || authScope !== txScope || tenantTopic !== txTopic) break;
+                                            applyPull(pullRes);
+                                            cursor = pullRes.seq;
+                                            if (typeof pullRes.tenant === 'string' && pullRes.tenant) serverTenant = pullRes.tenant;
+                                            if (pullRes.reset) pullFullHead = pullRes.more && typeof pullRes.head === 'number' && Number.isFinite(pullRes.head) ? pullRes.head : null;
+                                            if (!pullRes.more) { pullFullHead = null; pulled = true; break; }
+                                        }
+                                        if (closed || sendEpoch !== sessionEpoch || authScope !== txScope || tenantTopic !== txTopic) continue;
+                                        if (!pulled) throw new SbNetworkError('pull-incomplete', true);
+                                        res = { ok: false, conflict: true, now: serverNowSeen, value: serverValueAt(path) };
+                                        break;
+                                    }
+                                }
+                            } else if (serverNowIsOld()) {
                                 try { await rpc('zoe_now', {}); }
                                 catch (e) { throw e instanceof SbNetworkError ? new SbNetworkError(e.message, true) : e; }
                                 if (closed || sendEpoch !== sessionEpoch || authScope !== txScope || tenantTopic !== txTopic) continue;
                                 sentAfter = serverNowSeen;
+                                sentMono = performance.now();
+                                sentWall = Date.now();
                             }
                             res = await rpc('zoe_write', { p_op_id: opId, p_ops: [op] }, updateFn.connectionIntent, advisory, txTopic, admitted);
                             break;
                         } catch (e) {
                             if (!(e instanceof SbNetworkError)) {
+                                if (lost && !advisory && sbReplayRefusalProvesUnsent(e)) {
+                                    dropWrite(opId);
+                                    throw Object.assign(rpcFailureToError(e, path), { txOutcome: 'not-applied', noRetry: true });
+                                }
                                 if (lost && !advisory) throw giveUp();
                                 throw rpcFailureToError(e, path);
                             }

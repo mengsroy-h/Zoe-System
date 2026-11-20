@@ -51,5 +51,5 @@ it('canonical rules គ្រប់ expression មាន grouping equivalence �
         }
     };
     visit(rules);
-    expect(checked).toBe(392);
+    expect(checked).toBe(394);
 });

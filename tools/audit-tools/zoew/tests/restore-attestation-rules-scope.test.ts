@@ -4,11 +4,12 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 const root = path.resolve(__dirname, '../../../..');
 const require = createRequire(import.meta.url);
-const { restoreAttestationRulesProjection, restorePublicationRulesProjection, restoreTerminalDecisionRulesProjection } = require(root + '/tools/audit-tools/restore-attestation-rules-scope.cjs');
+const { restoreAttestationRulesProjection, restorePublicationRulesProjection, restoreTerminalDecisionRulesProjection, restorePurgeAllowRulesProjection } = require(root + '/tools/audit-tools/restore-attestation-rules-scope.cjs');
 const load = (version: string) => JSON.parse(fs.readFileSync(root + '/supabase/migrations/' + version + '_zoe_rules.sql', 'utf8').split('$zoe_rules_json$')[1]);
 const before = load('20261114010845'), after = load('20261114161533');
 const publication = load('20261114181432');
 const terminal = load('20261114192006');
+const purgeAllow = load('20261120075734');
 it('projects only the reviewed ten attestation deltas and preserves both input trees', () => {
     const saved = JSON.stringify(after);
     expect(restoreAttestationRulesProjection(after, before)).toEqual(before);
@@ -55,5 +56,20 @@ for (const [name, mutate] of [
 ] as const) it('rejects a controlled terminal decision mutation: ' + name, () => {
     const changed = structuredClone(terminal); mutate(changed);
     expect(() => restoreTerminalDecisionRulesProjection(changed)).toThrow();
+    expect(() => restoreAttestationRulesProjection(changed, before)).toThrow();
+});
+it('projects only the exact whole-row purge write allowance on restorePublication and ztoTerminalDecision', () => {
+    const saved = JSON.stringify(purgeAllow);
+    expect(restorePurgeAllowRulesProjection(purgeAllow)).toEqual(terminal);
+    expect(restoreAttestationRulesProjection(purgeAllow, before)).toEqual(before);
+    expect(JSON.stringify(purgeAllow)).toBe(saved);
+});
+for (const [name, mutate] of [
+    ['restorePublication made freely writable', (r: any) => { r.c.zoew_recently_deleted_cod_dod.x.r.c.restorePublication.w = { t: 'l', v: true }; }],
+    ['ztoTerminalDecision made freely writable', (r: any) => { r.c.zoew_recently_deleted_cod_dod.x.r.c.ztoTerminalDecision.w = { t: 'l', v: true }; }],
+    ['restoreAttestationId made purge-writable', (r: any) => { r.c.zoew_recently_deleted_cod_dod.x.r.c.restoreAttestationId.w = r.c.zoew_recently_deleted_cod_dod.x.r.c.restorePublication.w; }]
+] as const) it('rejects a controlled purge-allow mutation: ' + name, () => {
+    const changed = structuredClone(purgeAllow); mutate(changed);
+    expect(() => restorePurgeAllowRulesProjection(changed)).toThrow();
     expect(() => restoreAttestationRulesProjection(changed, before)).toThrow();
 });

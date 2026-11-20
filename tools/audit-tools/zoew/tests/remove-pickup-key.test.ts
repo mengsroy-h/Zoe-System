@@ -342,7 +342,7 @@ it.each(['pickup', 'collected'] as const)('Restore ចម្លើយ %s មក�
     else sdk.get = async (ref: any) => {
         const result = await originalGet(ref);
         if (ref.path === HISTORY + '/late_restore' && getAt(TRASH + '/' + trash.id) === null
-            && pickupJournal().length === 0) { waiting = true; await gate; }
+            && !waiting) { waiting = true; await gate; }
         return result;
     };
     const restoring = restore(trash.id);

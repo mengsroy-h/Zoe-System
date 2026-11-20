@@ -81,6 +81,15 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### ZoeW [2.50.222] · ZoeKeyGen [2.24.55] — 2026-11-20 · Deep audit ប្រព័ន្ធទាំងមូល (លុយ · ស្តារ · សុវត្ថិភាព · ZTO · Android · PWA)
+
+**ZoeW** (`zoew-v485` ➜ `zoew-v486`) និង **ZoeKeyGen** (`zoekeygen-v165` ➜ `zoekeygen-v166`)៖
+- **លុយ · ការសម្អាត · ការស្តារ**៖ ការពារការបាត់ `pickupCommit` ពេលបិទបញ្ជី · កែការផ្គូផ្គង cleanup journal ឆ្លងជំនាន់ · សម្អាត journal ពេល transaction បរាជ័យ/មិនអនុវត្ត · ការពារការបាត់ស្ថិតិ «យករួច» ពេលដក barcode ឬស្តារកញ្ចប់ · រំលងខែចាស់ដែលត្រូវ trim ក្នុង price operation · កែ rules និង SQL ឱ្យលុបអចិន្ត្រៃយ៍ធុងសំរាមដែលមានត្រា restore/decision បានត្រឹមត្រូវ ដោយរក្សាការហាមសរសេរពី client ដដែល។
+- **សុវត្ថិភាព · Session · Supabase Sync**៖ «ភ្លេច PIN?» កត់ត្រា `localLogoutIntent` និងផ្ដាច់ listener/wipe សតិមុនលុប PIN · `signOut` Supabase លុប stored session ភ្លាម · ប្ដូរ mode session ជាន់លើ localStorage ចាស់ · បញ្ជូន JWT ថ្មីទៅ realtime ពេល `TOKEN_REFRESHED` · ការពារ ABA double-apply ពេល replay `zoe_write_v2` ក្រោយផុតអាយុ `zoe_ops` · កែ `zoe_pull_delta` ពី $O(N^2)$ ទៅលីនេអ៊ែរ និងកែ attribution audit របស់ `zoe_restore_attest_v1` ទៅ `app_engine`។
+- **ZTO · Push · Palm Sign · Android · PWA**៖ ការពារ cross-branch fail-closed ក្នុង `zto-palm.js` · កែ `-710` Return ឱ្យឈ្នះ `02` Dispatch-Out និងអាប់ដេត header ក្រោយ auth retry ក្នុង `zto-order-detail-core.cjs` · កែ CORS និង native URL សម្រាប់ស្តារលើ Android APK · ការពារ clock skew និង cursor skip ក្នុង Push · កែ Palm Sign queue (expired lease · batch ពេញ retained signed · regex barcode) · កែ Android `ApkUpdatePlugin` (redirect validation · install busy/verify guard) និង `ScanBeepPlugin` (empty audio route fail-closed) · កែ SW update banner លើ tab ដំបូង និងការលុប cache ពាក់កណ្តាលពេល install ធ្លាក់ទាំង ZoeW និង ZoeKeyGen · កែលំដាប់ script seat និង timezone `Asia/Phnom_Penh` ក្នុង ZoeKeyGen។
+#### អ្វីដែលខុសពីមុន · អ្នកយាម · សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+អ្នកយាមថ្មី ៦ ឯកសារ (`deep-audit-wave1..5` + `deep-audit-matrix-and-scale.test.ts` · 5/5 mutation checks KILLED) + `android:check` + តេស្តពាក់ព័ន្ធឆ្លងនៅ local។ ការកែ ២ ឯកសារ ZTO LOCK (`zto-palm.js` · `zto-order-detail-core.cjs`) មានការផ្ទៀង hash ថ្មីក្នុង `zto-lock.test.ts` ដោយសារកំហុស cross-branch និង `-710` Return precedence ថ្នាក់ HIGH។ **មិនទាន់បានផ្ទៀងលើ hosted Firebase/Supabase, real PostgreSQL/Chrome (sandbox blocked loopback/WSL) ឬឧបករណ៍ iPhone/Android ពិតទេ។** សកម្មភាពដោយដៃ៖ ក្រោយម្ចាស់អនុញ្ញាត merge/deploy ត្រូវ publish `firebase-database.rules.min.json` ទៅ Firebase Console និងអនុវត្ត migrations ថ្មី ២ (`20261120075734_zoe_rules.sql` · `20261120075735_zoe_deep_audit_wave2_fixes.sql`) លើ Supabase ក្រោយ backup។
+
 ### [2.50.221] — 2026-11-19 · ការការពារ Claim និង Registry
 
 **ZoeW** (`zoew-v484` ➜ `zoew-v485`)៖ ការដោះ និងព្យាយាមបិទ Claim ចាស់មិនប៉ះ Claim Barcode ថ្មីរបស់ឧបករណ៍ផ្សេង។
@@ -2260,6 +2269,31 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-11-20 · Deep audit ប្រព័ន្ធទាំងមូល (Waves 1–6) ៖ លុយ · ស្តារ · សុវត្ថិភាព · ZTO · Push · Android · QA
+
+- **Wave 1 (`deep-audit-wave1-money-restore.test.ts` · 13/13 RED មុនកែ ➜ 13/13 PASS)**៖
+  - `pickup.ts` (`M-01`)៖ `pickupIntentTracker` ស្ដារ `pickupCommit = applied.pickupCommit || applied.commit`; `collectPickupMarks` ប្រើ `barcodeEntriesOf`; `commitPickupMarks` ការពារ toast ដោយ `stillCurrent`។
+  - `cleanup.ts` · `barcode-ops.ts` · `entry-ops.ts` · `barcode.ts` · `price-operation.ts` (`M-03`, `M-11`, `M-17`)៖ ផ្គូផ្គង cleanup journal តាម generation (`cleanupJournalClaimMatches`) · សម្អាត journal ពេល late/sync `{ committed: false }` ឬ `not-applied` · `removeSingleBarcode` ហៅ `remarkCleanupCollectedKept` ទាំងផ្លូវលឿន និង `collectedHold` · `barcodeCloseIsRipe` ពិនិត្យ `isFinite(closedAt) && closedAt > 0` · `settlePurgeDeduction` រក្សាទុកពេលមាន `restoreClaim` · `commitPriceOperation` រំលងខែចាស់ដែល trim (`ledgerMonthTrimmed`)។
+  - `restore.ts` · `zto-final-marks.ts` (`M-12`, `M-13`)៖ `pickupJournal.abort()` ពេលមិនបាន claim · `reconcileCollectedHistory` រត់ក្នុង `pickupJournal.finish(...)` · ការពារ `saveRestoreClaim` ដោយ `try/catch` · `barcodePersistedReturnWins` ពិនិត្យមុន `sent`/`misplaced` និងអាប់ដេត `ztoReturnedAt` ពេល `-710` ថ្មីជាងមកដល់។
+- **Wave 2 (`deep-audit-wave2-purge-attestation.test.ts` · 5/5 RED ➜ 5/5 PASS; `restore-attestation-rules-scope` 21/21; `zto-restore-firebase` 194/194)**៖
+  - `firebase-database.rules.json` + `firebase-database.rules.min.json` (251,449 bytes ≤ 251,904) + `supabase/migrations/20261120075734_zoe_rules.sql` (`M-02`)៖ អនុញ្ញាតលុបអចិន្ត្រៃយ៍ធុងសំរាមទាំងជួរដែលមាន `restorePublication`/`ztoTerminalDecision` (`!newData.parent().exists() && data.parent().hasChild('barcodes')`) ដោយរក្សាការហាម client សរសេរតម្លៃ non-null និង `restoreAttestationId/.write: false`។
+  - `zto-restore-proof.cjs` · `zto-restore-status.ts` · `lookup-config.ts` (`M-06`)៖ បន្ថែម `x-zoe-palm-site` ក្នុង CORS OPTIONS និង `resolveNativeApiUrl(...)` សម្រាប់ Android APK។
+  - `zto-restore-firebase.cjs` (`M-08`)៖ ករណី unclaimed `unconfirmed` (`hold`) មិន stamp `SOURCE_ROOT` ហើយឆ្លើយ `kind: 'hold'`។ `restore.ts` (`M-10`)៖ `releaseStaleRestoreClaimForPurge` ប្រើ `action: 'release'` ពេលមាន `restoreAttestationId` និងមិនយក token ផុតកំណត់របស់អ្នកផ្សេងដែលមិនបានរៀបចំ target។
+  - `supabase/migrations/20261120075735_zoe_deep_audit_wave2_fixes.sql` (`M-21`)៖ កែ `zoe_restore_first_commit_v1` (bypass `admin_engine` + រំលង UPDATE ទទេ), `zoe_restore_attest_v1` (`origin = 'app_engine'` សម្រាប់ `actor_kind = 'user'`), និង `zoe_pull_delta` (ពី $O(N^2)$ loop ទៅ `jsonb_agg` លីនេអ៊ែរ)។ កំណត់ចំណាំ DBA៖ index បន្ថែមសម្រាប់ទំហំធំ (`zoe_daily_deltas_seq_idx`, `zoe_docs_tombstone_idx`, `zoe_ops_tenant_created_idx`) មិនបញ្ចូលក្នុង migration នេះទេ ដើម្បីរក្សា C04 schema contract allowlist; អាចពិចារណាបន្ថែមក្រោយបើក contract ថ្មី។
+- **Wave 3 (`deep-audit-wave3-security-sync.test.ts` · 5/5 RED ➜ 5/5 PASS; 76/76 suites ពាក់ព័ន្ធ PASS)**៖
+  - `app-lock.ts` · `session-verification.ts` (`M-04a`)៖ `forgetAppLockPin` កត់ `localLogoutIntent.note(...)` និងផ្ដាច់ listener/wipe សតិមុនលុប PIN + អនុញ្ញាត retry `'forgetAppLockPin'` ក្រោមអេក្រង់ចាក់សោ។
+  - `supabase-transport.ts` · `supabase-rtdb.ts` · `db-listeners.ts` (`M-04b`, `M-09`, `M-14`, `M-18`)៖ `createModeStorage` បង្ខំ `session` ជាន់លើ `localStorage` ចាស់ · `signOut` សម្អាត stored session ភ្លាមសម្រាប់ live token និងរក្សា refresh-revoke path សម្រាប់ expired session · ផ្ញើ `realtime.setAuth` ពេល `TOKEN_REFRESHED` និងបដិសេធ subscribe គ្មាន token (រក្សា observational `expires_at` fail-closed contract) · ពិនិត្យអាយុ `zoe_now` ពេល retry លើស/ជិតពិដាន `SB_OP_REPLAY_SAFE_MS` ឬនាឡិកាលោតថយ មុន replay `zoe_write_v2` ដើម្បីការពារ ABA double-apply · ដោះ write journal ពេល server បដិសេធប្រាកដ (`sbReplayRefusalProvesUnsent`) · apply snapshot មុន `noteDbListenerAlive` និង render trash/monthly ពេលមាន update។
+- **Wave 4 (`deep-audit-wave4-zto-push-sign.test.ts` · 4/4 RED ➜ 4/4 PASS; `zto-lock` 16/16; `zto-palm-sign-server` 95/95; `push-server` 92/92; `zto-palm-shared` 59/59)**៖
+  - **ZTO LOCK justification (`zto-palm.js` · `zto-order-detail-core.cjs`)**៖ `zto-palm.js` (`M-05`, SHA-256 `855676e5...`) fail-closed ក្នុង `otherBranch()` និង `palmList()` ពេល `access.verified && !trackingCode(access.site)` លើ `binding` `mismatch`/`bound`/`server`; `zto-order-detail-core.cjs` (`M-07`, SHA-256 `77bb9f63...`) កែ `cookieRestoreTransitions` ឱ្យ `-710` Return (`stamps.returned > 0`) ឈ្នះ `02` Dispatch-Out និងកែ `handler` អាប់ដេត `headers = retried.headers` ក្រោយ `retryAfterAuthRejected`។
+  - `push-core.mjs` (`M-15`)៖ បន្ថែម `PUSH_CLOCK_SKEW_MS = 5 * 60 * 1000` និងតាមដាន contiguous `settled` ក្នុង `dispatchExpiry` កុំឱ្យ cursor រំលងហាងពេល budget-cut។
+  - `palm-sign-outbox.ts` · `palm-sign-outbox-store.ts` · `zto-receipt-photo-readback.js` (`M-16`)៖ ប្រើ `pendingDeadline` ជំនួស `leaseUntil > 0` មិនឱ្យ expired lease បិទ archive/dismiss · retry classify/evict ពេល batch sign ជួប capacity ដោយ retained signed · ពង្រីក regex barcode ក្នុង readback ដល់ `/^[A-Za-z0-9_-]{4,64}$/` (រក្សា `reservation-v1:blocked` + `continuationAllowed` សម្រាប់ pre-sign 401/5xx តាម contract `palm-sign-outbox.test.tsx`)។
+- **Wave 5 (`deep-audit-wave5-platform-qa.test.ts` · 6/6 PASS; `android:check` 135/135 PASS)**៖
+  - SW `hadController` (`boot.ts` · `ZoeKeyGen/app.js`) · លុប partial cache ពេល install ធ្លាក់ និងរំលង `/\/$/` ក្នុង `revalidateShell` (`sw.ts` · `ZoeKeyGen/sw.js`) · លំដាប់ script seat និង timezone `Asia/Phnom_Penh` (`ZoeKeyGen`) · case-insensitive `mergeHeaders` (`android-cdp-capture.js`) · `ApkUpdatePlugin.java` (try/catch probe · redirect validation ≤ 5 hops · verify APK ក្រោយ rename និងក្នុង `install` ជាមួយ `busy` guard) · `ScanBeepPlugin.java` (`devices.length == 0` ➜ `false`) · ដក false-green ក្នុង `offline-shell-test.js`, `sw-shell-latency-test.js`, `exit-code-integrity.js` (`process.exitCode = ...`)។
+- **Wave 6 Matrix, Scale & Mutation (`deep-audit-matrix-and-scale.test.ts` · 17/17 PASS)**៖
+  - តេស្ត matrix ពេញ (Palm / Cookie / Sheet × Firebase / Supabase × Delete/Remove/Auto-Cleanup → Restore, ZTO daily flow, reminder bar, near-return `Asia/Phnom_Penh`, `-710` Return + duplicate/out-of-order, A-B-C concurrency + commit-without-response recovery)។
+  - វាស់ synthetic scale (គ្មានការហៅ ZTO/backend ពិត)៖ 10 ហាង/30 ឧបករណ៍ (1,000 កញ្ចប់) `p50=0.167ms · p99=0.895ms · convP99=0.043ms`; 50 ហាង/150 ឧបករណ៍ (5,000 កញ្ចប់) `p50=0.073ms · p99=0.134ms · convP99=0.001ms`; 100 ហាង/300 ឧបករណ៍ (10,000 កញ្ចប់) `p50=0.069ms · p99=0.463ms · convP99=0.010ms`; active listeners ក្រោយ teardown = `0`។
+  - តេស្ត mutation ដាច់ដោយឡែក 5/5 KILLED (0 SURVIVED · ស្ដារ bytes ដើម 100%)៖ M-01 `pickupCommit`, M-02 `restorePublication` rule, M-04a `forgetAppLockPin`, M-05 `zto-palm` fail-closed, W5-6 `exit-code-integrity` `process.exitCode`។
 
 ### 2026-11-19 · ចម្លើយយឺតក្នុង Setup QR និង Activation
 
@@ -5737,7 +5771,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `sw-client-wiring-test` | ផ្នែក ២ | ផ្នែក ៧ |
 | `sw-install-integrity-test` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `sw-revalidate-pressure-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `sw-shell-latency-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `sw-shell-latency-test` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `test-placement-test` | ផ្នែក ២ | — |
 | `toast-action-truth-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `toast-truth-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ · ផ្នែក ៩ |
@@ -5823,6 +5857,12 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`docs/zoew/Z
 | `tools/audit-tools/zoew/tests/cross-tab-shop-scope.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/daily-stats-mixed-pickup.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/db-liveness.test.ts` | ផ្នែក ២ | — |
+| `tools/audit-tools/zoew/tests/deep-audit-matrix-and-scale.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `tools/audit-tools/zoew/tests/deep-audit-wave1-money-restore.test.ts` | ផ្នែក ២ | — |
+| `tools/audit-tools/zoew/tests/deep-audit-wave2-purge-attestation.test.ts` | ផ្នែក ២ | — |
+| `tools/audit-tools/zoew/tests/deep-audit-wave3-security-sync.test.ts` | ផ្នែក ២ | — |
+| `tools/audit-tools/zoew/tests/deep-audit-wave4-zto-push-sign.test.ts` | ផ្នែក ២ | — |
+| `tools/audit-tools/zoew/tests/deep-audit-wave5-platform-qa.test.ts` | ផ្នែក ២ | — |
 | `tools/audit-tools/zoew/tests/device-info.test.tsx` | — | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/discard-pending-writes.test.tsx` | ផ្នែក ២ | ផ្នែក ៨ |
 | `tools/audit-tools/zoew/tests/durable-connection-write.test.ts` | — | ផ្នែក ៨ |

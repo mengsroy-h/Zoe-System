@@ -348,10 +348,26 @@ async function captureAndroidCookie(config) {
         await sleep(120);
         if (settled) return;
         const current = state.requests.get(requestId) || row;
-        const responseHeaders = Object.assign({}, current.responseHeaders || {}, current.extraResponseHeaders || {});
+        const mergeHeaders = (base, extra) => {
+            const out = {};
+            const put = (source) => {
+                if (!source || typeof source !== 'object') return;
+                for (const [k, v] of Object.entries(source)) {
+                    const low = String(k).toLowerCase();
+                    for (const existing of Object.keys(out)) {
+                        if (existing.toLowerCase() === low) delete out[existing];
+                    }
+                    out[k] = v;
+                }
+            };
+            put(base);
+            put(extra);
+            return out;
+        };
+        const responseHeaders = mergeHeaders(current.responseHeaders, current.extraResponseHeaders);
         if (!isJsonMime(responseHeaders) || !validContentLength(responseHeaders, responseMaxBytes)) return;
 
-        const requestHeaders = Object.assign({}, current.requestHeaders || {}, current.extraRequestHeaders || {});
+        const requestHeaders = mergeHeaders(current.requestHeaders, current.extraRequestHeaders);
         const rawCookie = headerValue(requestHeaders, 'cookie');
         if (!rawCookie) return;
 
@@ -381,7 +397,7 @@ async function captureAndroidCookie(config) {
         // before applying Set-Cookie mutations to the captured request cookie.
         await sleep(120);
         const latest = state.requests.get(requestId) || current;
-        const latestHeaders = Object.assign({}, latest.responseHeaders || {}, latest.extraResponseHeaders || {});
+        const latestHeaders = mergeHeaders(latest.responseHeaders, latest.extraResponseHeaders);
         try {
             cookie = config.cookieAfterResponse(cookie, setCookieLines(latestHeaders), current.url);
         } catch (_) {

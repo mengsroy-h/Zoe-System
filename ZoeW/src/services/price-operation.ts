@@ -4,6 +4,7 @@ import { liveShopScope, shopScopePending } from '../core/shop-scope';
 import { elapsedSince } from '../core/elapsed';
 import { DB_LISTENER_KEY_HISTORY } from '../core/text';
 import { syncCollectedValueForBarcode } from '../domain/collected';
+import { ledgerMonthTrimmed } from '../domain/ledger';
 import { dbListenerViewIsStale } from './db-listeners';
 import { dbOp, dbOpStalled } from './network';
 import { monthlyRootMutation } from './scan-operation';
@@ -69,9 +70,12 @@ export async function commitPriceOperation(handle: PriceOperationHandle, current
     if (!priceOperationOwned(before, handle, 'admitted')) return 'elsewhere';
     const codDiff = codCents / 100;
     const dodDiff = dodCents / 100;
-    const buckets = ['zoew_daily_revenue_cod_dod/' + scanDate, 'zoew_monthly_revenue_cod_dod/' + scanDate.slice(0, 7)];
+    const monthKey = scanDate.slice(0, 7);
+    const buckets = ['zoew_daily_revenue_cod_dod/' + scanDate, 'zoew_monthly_revenue_cod_dod/' + monthKey];
     const records = await Promise.all(buckets.map((path) => readPriceNode(handle, current, path)));
-    if (records.some((record) => codCents && !incrementSafe(record?.codDollar, codDiff) || dodCents && !incrementSafe(record?.dodDollar, dodDiff))) return 'underflow';
+    const monthTrimmed = records[1] === null && ledgerMonthTrimmed(await readPriceNode(handle, current, 'zoew_monthly_revenue_cod_dod'), monthKey);
+    const activeBuckets = monthTrimmed ? [{ bucket: buckets[0], record: records[0] }] : buckets.map((bucket, index) => ({ bucket, record: records[index] }));
+    if (activeBuckets.some(({ record }) => codCents && !incrementSafe(record?.codDollar, codDiff) || dodCents && !incrementSafe(record?.dodDollar, dodDiff))) return 'underflow';
     const priced = pricedRow(handle);
     const patch: Record<string, any> = {
         [itemPath + '/barcodes/' + slot + '/cod']: wantCod,
@@ -81,9 +85,9 @@ export async function commitPriceOperation(handle: PriceOperationHandle, current
         [itemPath + '/price']: priced.price,
         [itemPath + '/pricePending/phase']: 'history'
     };
-    buckets.forEach((bucket, index) => {
-        if (codCents) patch[bucket + '/codDollar'] = handle.sdk.increment(priceIncrement(records[index]?.codDollar, codDiff));
-        if (dodCents) patch[bucket + '/dodDollar'] = handle.sdk.increment(priceIncrement(records[index]?.dodDollar, dodDiff));
+    activeBuckets.forEach(({ bucket, record }) => {
+        if (codCents) patch[bucket + '/codDollar'] = handle.sdk.increment(priceIncrement(record?.codDollar, codDiff));
+        if (dodCents) patch[bucket + '/dodDollar'] = handle.sdk.increment(priceIncrement(record?.dodDollar, dodDiff));
     });
     let failure = null;
     try {

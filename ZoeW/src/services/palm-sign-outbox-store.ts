@@ -120,23 +120,43 @@ async function classifySignJobs(owner: string, key: CryptoKey) {
 }
 
 export async function addSignJob(row: SignEnvelope, current: () => boolean, key?: CryptoKey): Promise<boolean> {
-    const known = key && await countSignJobs(row.owner) >= SIGN_OUTBOX_MAX ? await classifySignJobs(row.owner, key) : { held: new Set<string>(), signed: new Set<string>() };
-    return transact('readwrite', (store, result) => {
-        const stored = store.index('owner').getAllKeys(row.owner);
-        stored.onsuccess = () => {
-            const ids = stored.result.map(String);
-            const signed = ids.filter((id) => known.signed.has(id)).length;
-            if (!current() || ids.filter((id) => !known.held.has(id) && !known.signed.has(id)).length >= SIGN_OUTBOX_MAX
-                || signed >= SIGN_OUTBOX_SIGNED_MAX || ids.length - signed >= SIGN_OUTBOX_MAX + SIGN_OUTBOX_UNREADABLE_MAX) { store.transaction.abort(); return; }
-            const request = store.get(row.id);
-            request.onsuccess = () => {
+    let classified = !!(key && await countSignJobs(row.owner) >= SIGN_OUTBOX_MAX);
+    let known = classified ? await classifySignJobs(row.owner, key!) : { held: new Set<string>(), signed: new Set<string>() };
+    const attempt = (): Promise<boolean | 'retry'> => {
+        let capacityBlocked = false;
+        return transact<boolean>('readwrite', (store, result) => {
+            const stored = store.index('owner').getAllKeys(row.owner);
+            stored.onsuccess = () => {
+                const ids = stored.result.map(String);
+                const signed = ids.filter((id) => known.signed.has(id)).length;
+                const active = ids.filter((id) => !known.held.has(id) && !known.signed.has(id)).length;
                 if (!current()) { store.transaction.abort(); return; }
-                if (request.result) { result(false); return; }
-                store.add(row);
-                result(true);
+                if (active >= SIGN_OUTBOX_MAX || signed >= SIGN_OUTBOX_SIGNED_MAX || ids.length - signed >= SIGN_OUTBOX_MAX + SIGN_OUTBOX_UNREADABLE_MAX) {
+                    capacityBlocked = true;
+                    store.transaction.abort();
+                    return;
+                }
+                const request = store.get(row.id);
+                request.onsuccess = () => {
+                    if (!current()) { store.transaction.abort(); return; }
+                    if (request.result) { result(false); return; }
+                    store.add(row);
+                    result(true);
+                };
             };
-        };
-    });
+        }).catch((err) => {
+            if (capacityBlocked && key && !classified && current()) return 'retry' as const;
+            throw err;
+        });
+    };
+    const first = await attempt();
+    if (first === 'retry') {
+        classified = true;
+        known = await classifySignJobs(row.owner, key!);
+        const second = await attempt();
+        return second === true;
+    }
+    return first;
 }
 
 function sameEncryptedSnapshot(left: SignEnvelope, right: SignEnvelope) {

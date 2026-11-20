@@ -13,6 +13,7 @@ import { refreshZtoListSyncUi } from './zto-list-sync';
 import { clearZtoPickupStatusStore, refreshZtoAutoCloseUi } from './zto-status';
 import { decryptLookupSecret, encryptLookupSecret } from '../services/crypto';
 import { fetchWithTimeout } from '../services/network';
+import { resolveNativeApiUrl } from '../platform/native';
 import { lookupUrlSecretParams, lookupUrlSplitKey, lookupUrlWithKey } from '../services/setup-lookup';
 import { effectiveZtoTrashMode, lastSeenShopZtoTrashMode, markZtoTrashMode, pruneZtoTrashMode, withdrawLeftZtoTrashModes, withdrawZtoTrashMode } from '../services/zto-trash-mode';
 import { closeModal, openModalHelper } from '../ui/modal';
@@ -229,7 +230,7 @@ export async function testLookupApiConfig(btnEl?) {
     if (lookupApiIsAppsScript({ url }) && !lookupUrlSplitKey(url).secret) testUrl = await lookupKeyedUrl(existingCfg, testUrl);
     if (!current()) return;
     if (lookupApiIsPalm({ url })) {
-        const palmTestUrl = new URL(testUrl, window.location.href);
+        const palmTestUrl = new URL(resolveNativeApiUrl(testUrl), window.location.href);
         palmTestUrl.searchParams.set('track', '1');
         testUrl = palmTestUrl.href;
     }

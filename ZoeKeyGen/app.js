@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.54';
+const APP_VERSION = '2.24.55';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -235,9 +235,10 @@ function revealAppAfterBoot() {
                 setInterval(throttledSwUpdate, 30 * 60 * 1000);
             }).catch(() => {});
 
-            const hadControllerAtLoad = !!navigator.serviceWorker.controller;
+            let hadController = !!navigator.serviceWorker.controller;
             navigator.serviceWorker.addEventListener('controllerchange', () => {
-                if (hadControllerAtLoad) showUpdateAvailableBanner();
+                if (hadController) showUpdateAvailableBanner();
+                else hadController = true;
             });
         });
     }
@@ -3947,7 +3948,7 @@ async function manageSecureSeats(id) {
         const originalRevision = state.revision;
         let verifyState = () => true;
         const count = Object.keys(state.seats).length;
-        const choice = prompt('ស្ថានភាព៖ ' + (state.mode === 'active' ? 'សកម្ម' : 'ត្រៀម') + '\nឧបករណ៍៖ ' + count + '\nលំដាប់កែប្រែ៖ ' + state.revision + '\nចំនួនអនុញ្ញាត៖ ' + (state.maxDevices || 'មិនទាន់កំណត់') + '\nថ្ងៃផុតកំណត់៖ ' + (state.licenseExpiresAt ? new Date(state.licenseExpiresAt).toLocaleDateString('km-KH') : 'មិនទាន់កំណត់') + '\nស្ថានភាពបិទ៖ ' + (state.revoked ? 'បិទ' : 'បើក') + '\nជំនាន់ដោះឧបករណ៍៖ ' + state.releaseEpoch + '\n\n1 = ត្រៀម ឬផ្ទៀងផ្ទាត់ការកំណត់\n2 = ចុះឈ្មោះឧបករណ៍\n3 = ដោះឧបករណ៍ទាំងអស់\n4 = ប្ដូរទៅការផ្ទៀងផ្ទាត់សុវត្ថិភាព\nបោះបង់ = បិទ');
+        const choice = prompt('ស្ថានភាព៖ ' + (state.mode === 'active' ? 'សកម្ម' : 'ត្រៀម') + '\nឧបករណ៍៖ ' + count + '\nលំដាប់កែប្រែ៖ ' + state.revision + '\nចំនួនអនុញ្ញាត៖ ' + (state.maxDevices || 'មិនទាន់កំណត់') + '\nថ្ងៃផុតកំណត់៖ ' + (state.licenseExpiresAt ? new Date(state.licenseExpiresAt).toLocaleDateString('km-KH', { timeZone: 'Asia/Phnom_Penh' }) : 'មិនទាន់កំណត់') + '\nស្ថានភាពបិទ៖ ' + (state.revoked ? 'បិទ' : 'បើក') + '\nជំនាន់ដោះឧបករណ៍៖ ' + state.releaseEpoch + '\n\n1 = ត្រៀម ឬផ្ទៀងផ្ទាត់ការកំណត់\n2 = ចុះឈ្មោះឧបករណ៍\n3 = ដោះឧបករណ៍ទាំងអស់\n4 = ប្ដូរទៅការផ្ទៀងផ្ទាត់សុវត្ថិភាព\nបោះបង់ = បិទ');
         if (choice === null || !context.current()) return;
         if (choice === '1') {
             if (row.seatProtocol === 2) throw new Error('seat-already-active');

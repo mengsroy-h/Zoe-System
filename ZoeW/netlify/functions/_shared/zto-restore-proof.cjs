@@ -263,7 +263,7 @@ function createRestoreProofHandler({ lookup, firebaseBackend, env = process.env,
         if (request.method === 'OPTIONS') {
             const method = request.headers.get('access-control-request-method');
             const names = String(request.headers.get('access-control-request-headers') || '').split(',').map(name => name.trim().toLowerCase()).filter(Boolean);
-            if (method !== 'POST' || names.some(name => !['content-type', 'x-zoe-id-token', 'x-zoe-proxy-key', 'x-zoe-palm-token'].includes(name))) {
+            if (method !== 'POST' || names.some(name => !['content-type', 'x-zoe-id-token', 'x-zoe-proxy-key', 'x-zoe-palm-token', 'x-zoe-palm-site'].includes(name))) {
                 return json(403, { v: 1, success: false, code: 'ZTO_RESTORE_ORIGIN_DENIED' }, headers);
             }
             return new Response(null, { status: 204, headers: { ...headers, 'Cache-Control': 'no-store',

@@ -220,6 +220,11 @@ function createFirebaseBackend({ verifyActor, resolveOrigin = configuredOrigin }
                     || proof.status === 'deny' && !Object.hasOwn(proof.snapshot, 'restoreAttestationId') && !Object.hasOwn(proof.snapshot, 'restoreClaim')
                     && sameTerminalBusiness(proof.snapshot, source, input.sourceId));
             if (released) return { pending: false };
+            const unclaimedHold = current === previous && !Object.hasOwn(source, 'restoreAttestationId') && !Object.hasOwn(source, 'restoreClaim')
+                && proof.status === 'hold' && !proof.recovery
+                && !Object.hasOwn(proof.snapshot, 'restoreAttestationId') && !Object.hasOwn(proof.snapshot, 'restoreClaim')
+                && sameTerminalBusiness(proof.snapshot, source, input.sourceId);
+            if (unclaimedHold) return { pending: false };
             if (current !== previous || proof.policyEpoch !== context.policy.epoch || proof.mode !== effectiveMode(context)) {
                 throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
             }
@@ -442,17 +447,27 @@ function createFirebaseBackend({ verifyActor, resolveOrigin = configuredOrigin }
                     if (target?.restoreClaimId === input.sourceId) throw new RestoreFailure('ZTO_RESTORE_IN_PROGRESS', 409);
                 }
                 if (allowing && expiresAt <= now()) throw new RestoreFailure('ZTO_RESTORE_UNCONFIRMED');
-                let next = { ...context.source, id: input.sourceId, restoreAttestationId: attestationId,
-                    restorePublication: publicationId,
-                    restoreClaim: { token: input.token, targetId: input.targetId, claimedAt: issuedAt } };
-                if (grant.status === 'deny' && verdict === 'signed') next.restoreBlocked = true;
-                if (input.action === 'release') {
-                    delete next.restoreClaim;
-                    delete next.restoreAttestationId;
+                const shouldPublish = allowing || input.action === 'release' || grant.status === 'deny' || !!context.source.restoreAttestationId;
+                let sourceValue = context.source;
+                if (shouldPublish) {
+                    const priorClaim = context.source.restoreClaim;
+                    const claimedAt = priorClaim && priorClaim.token === input.token && priorClaim.targetId === input.targetId && integer(priorClaim.claimedAt)
+                        ? priorClaim.claimedAt : issuedAt;
+                    let next = { ...context.source, id: input.sourceId, restorePublication: publicationId };
+                    if (allowing || context.source.restoreAttestationId) {
+                        next.restoreAttestationId = attestationId;
+                        next.restoreClaim = { token: input.token, targetId: input.targetId, claimedAt };
+                    }
+                    if (grant.status === 'deny' && verdict === 'signed') next.restoreBlocked = true;
+                    if (input.action === 'release') {
+                        delete next.restoreClaim;
+                        delete next.restoreAttestationId;
+                    }
+                    const committed = await put(SOURCE_ROOT + '/' + input.sourceId, next, context.sourceEtag);
+                    sourceValue = committed.value;
                 }
-                const committed = await put(SOURCE_ROOT + '/' + input.sourceId, next, context.sourceEtag);
-                return { v: 1, success: true, kind: input.action === 'release' ? 'released' : grant.status === 'allow' ? 'allow' : 'deny',
-                    attestationId, expiresAt, source: committed.value };
+                return { v: 1, success: true, kind: input.action === 'release' ? 'released' : grant.status === 'allow' ? 'allow' : grant.status === 'hold' ? 'hold' : 'deny',
+                    attestationId, expiresAt, source: sourceValue };
             }
         };
         return backend;

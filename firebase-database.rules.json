@@ -538,11 +538,11 @@
           ".validate": false
         },
         "restorePublication": {
-          ".write": false,
+          ".write": "auth!=null&&!newData.parent().exists()&&data.parent().hasChild('barcodes')",
           ".validate": "newData.isNumber()&&newData.val()>=1&&newData.val()<=9007199254740990&&newData.val()%1===0"
         },
         "ztoTerminalDecision": {
-          ".write": false,
+          ".write": "auth!=null&&!newData.parent().exists()&&data.parent().hasChild('barcodes')",
           ".validate": "newData.val()==='signed'||newData.val()==='returned'"
         }
       }

@@ -89,6 +89,7 @@ ZoeW ប្រើ React + TypeScript ក្នុង `src/**` សម្រាប
 | ឯកសារ | ហេតុអ្វី |
 |---|---|
 | `public/firebase-loader.js` | ផ្លូវស្តារ «SDK ផ្ទុកមិនបាន» ពឹងលើការពិតដែលថា SDK ជាធនធានខាងក្រៅដែលអាចធ្លាក់ |
+| `public/license-seat-config.js` · `public/license-seat-client.js` | ការកំណត់ និង client កៅអី License ដែលផ្ទុកមុន `license-verify.js` |
 | `public/license-verify.js` | ⛔ ត្រូវ **byte-identical** ជាមួយ App ដទៃ — bundle ➜ វាលែងដូច |
 | `public/error-reporting.js` | ដូចគ្នា; ហើយវាត្រូវផ្ទុក **មុន** កូដ App ដើម្បីចាប់កំហុស boot |
 | `public/vendor/zxing-wasm.js` · `.wasm` | ត្រូវនៅ origin ដដែល ➜ ស្កេនដើរក្រៅបណ្តាញ |
@@ -130,7 +131,7 @@ TypeScript ផ្ទៀង import ពេល build។ ឈ្មោះសកម្
 ## ៧. ដំណើរការចាប់ផ្តើម
 
 1. `index.html` ➜ `boot-flags.js` (ទង់ iOS · ទង់ Android native · font) ➜
-   `zxing-wasm` · `firebase-loader` · `license-verify` · `error-reporting`
+   `zxing-wasm` · `firebase-loader` · `license-seat-config` · `license-seat-client` · `license-verify` · `error-reporting`
 2. `src/main.tsx` ➜ `createRoot(#root).render(<App/>)`
 3. `<App>` ➜ `useLayoutEffect` ➜ microtask ➜ `bootApplication(scope)`
    (`src/app/lifecycle/boot.ts`) ➜ unmount ➜ `scope.dispose()`

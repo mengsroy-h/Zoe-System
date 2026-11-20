@@ -1,15 +1,20 @@
 import { blurActiveElement, focusField, isFieldFocused, setFieldValue, fieldValue } from '../app/refs';
 import { setupAppLockAwayGuard } from '../app/behaviors/app-lock-guard';
-import { firebaseState, securityState } from '../core/state';
+import { dataState, firebaseState, securityState, uiState } from '../core/state';
 import { viewState } from '../core/view-state';
 import { elapsedSince } from '../core/elapsed';
 import { appLocalStore, appSessionStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
 import { APP_LOCK_PREF_KEY, APP_LOCK_SESSION_KEY } from '../core/storage-keys';
 import { safeFocusScanner } from '../core/timezone';
 import { biometricUnlockPin, clearBiometricRecord, isBiometricEnabled, refreshBiometricUi } from './biometric';
+import { resetClearHistoryOperationState } from './clear-history';
+import { clearCustomerDataTableCache } from './customer-table';
+import { loginBackendScope } from './login-memory';
 import { requestPinBeforeConfig, unlockLookupSecretForPin } from './pin';
 import { clearRememberedSession, showLoginModalWithPrefill } from './session';
 import { forgetStoredLookupSecretKey, verifyStoredPin } from '../services/crypto';
+import { detachDatabaseListeners, resetDbListenerHealthState } from '../services/db-listeners';
+import { localLogoutIntent } from '../services/local-logout-intent';
 import { drawerAction } from '../ui/page-nav';
 import { reannounceOrShowToast, releaseHeldToasts, showToast } from '../ui/toast';
 
@@ -255,10 +260,28 @@ export function forgetAppLockPin() {
     if (appLockLogoutOwner && !appLockLogoutOwner.late && appLockLogoutOwner.auth === firebaseState.auth && appLockLogoutOwner.sdk === firebaseState.fb
         && appLockLogoutOwner.uid === firebaseState.auth?.currentUser?.uid && appLockLogoutOwner.authGeneration === firebaseState.authGeneration) return;
     if (!confirm('លុប Security PIN នៃឧបករណ៍នេះ រួចចាកចេញពីប្រព័ន្ធ?\n\n· ទិន្នន័យអាជីវកម្មមិនរងផលទេ\n· អ្នកនឹងត្រូវចូលប្រព័ន្ធដោយអ៊ីមែល និងពាក្យសម្ងាត់ម្តងទៀត\n· ការតភ្ជាប់ដែលអ៊ិនគ្រីបដោយ PIN ចាស់ ត្រូវកំណត់ថ្មី')) return;
+    const signedInUid = firebaseState.auth?.currentUser?.uid;
+    if (signedInUid && !localLogoutIntent.note(loginBackendScope(), signedInUid)) {
+        showToast('❌ លុប Security PIN មិនបានទេ — PIN និងស្ថានភាពចូលប្រព័ន្ធនៅដដែល។');
+        return;
+    }
     if (!safeStoreRemove(appLocalStore, 'zoew_security_pin_hash')) {
         showToast('❌ លុប Security PIN មិនបានទេ — PIN និងស្ថានភាពចូលប្រព័ន្ធនៅដដែល។');
         return;
     }
+    firebaseState.sessionExpiryCheck = 'signed-out';
+    resetClearHistoryOperationState();
+    resetDbListenerHealthState();
+    detachDatabaseListeners();
+    firebaseState.isDatabaseInitialized = false;
+    dataState.scanHistory = [];
+    dataState.deletedItems = [];
+    dataState.dailyRevenueData = {};
+    dataState.monthlyRevenueData = {};
+    dataState.dailyPickupData = {};
+    dataState.dailyCollectedData = {};
+    uiState.lockerBarcodeIndex = {};
+    clearCustomerDataTableCache();
     safeStoreRemove(appLocalStore, 'zoew_pin_fail_count');
     safeStoreRemove(appLocalStore, 'zoew_pin_lockout_until');
     safeStoreRemove(appLocalStore, APP_LOCK_PREF_KEY);

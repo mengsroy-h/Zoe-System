@@ -1,4 +1,5 @@
 import { dataState, firebaseState } from '../core/state';
+import { modalIsOpen } from '../core/modals';
 import { getServerNow } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
 import { appLocalStore } from '../core/storage';
@@ -8,6 +9,7 @@ import { parseParcelNumber } from '../domain/parcel-number';
 import { runAutomaticDeletedCleanup } from '../domain/cleanup';
 import { flushPendingRegistryReleases } from '../domain/registry';
 import { invalidateStaleNotifyViews, refreshNotifyRemovedView } from '../features/notifications';
+import { renderRecentlyDeleted } from '../features/trash';
 import { RECENT_PHONES_MAX, collectPhoneSuggestions } from '../features/phone-suggest';
 import { DB_LISTENER_PROGRESS_GRACE_MS, DB_LISTENER_RETRY_MIN_GAP_MS, LISTENER_RECOVERY_STEPS_MS, clearInfoListenerRecovery, clearReconnectWatchdog, renderConnectionStatus } from './connection';
 import { debouncedRenderAfterHistorySync } from './network';
@@ -174,18 +176,21 @@ export function initDatabaseListeners() {
     if (firebaseState.dbRefExchangeRate) {
         firebaseState.fb.onValue(firebaseState.dbRefExchangeRate, (snapshot) => {
             if (listenerGeneration !== firebaseState.dbListenerGeneration) return;
-            noteDbListenerAlive('exchangeRate');
             const val = snapshot.val();
             if (val && !isNaN(val)) {
                 dataState.exchangeRateObservedVersion++;
                 dataState.exchangeRateRiel = parseParcelNumber(val);
                 try { appLocalStore.setItem('zoew_exchange_rate', dataState.exchangeRateRiel); } catch (e) {}
+                noteDbListenerAlive('exchangeRate');
                 debouncedRenderAfterHistorySync();
             } else if (val === null || val === undefined) {
                 dataState.exchangeRateObservedVersion++;
                 dataState.exchangeRateRiel = 4100;
                 try { appLocalStore.removeItem('zoew_exchange_rate'); } catch (e) {}
+                noteDbListenerAlive('exchangeRate');
                 debouncedRenderAfterHistorySync();
+            } else {
+                noteDbListenerAlive('exchangeRate');
             }
         }, (err) => {
             if (listenerGeneration !== firebaseState.dbListenerGeneration) return;
@@ -200,8 +205,8 @@ export function initDatabaseListeners() {
     if (firebaseState.dbRefDailyRevenue) {
         firebaseState.fb.onValue(firebaseState.dbRefDailyRevenue, (snapshot) => {
             if (listenerGeneration !== firebaseState.dbListenerGeneration) return;
-            noteDbListenerAlive(DB_LISTENER_KEY_DAILY_REVENUE);
             dataState.dailyRevenueData = snapshot.val() || {};
+            noteDbListenerAlive(DB_LISTENER_KEY_DAILY_REVENUE);
             debouncedRenderAfterHistorySync();
         }, (err) => {
             if (listenerGeneration !== firebaseState.dbListenerGeneration) return;
@@ -212,8 +217,9 @@ export function initDatabaseListeners() {
     if (firebaseState.dbRefMonthlyRevenue) {
         firebaseState.fb.onValue(firebaseState.dbRefMonthlyRevenue, (snapshot) => {
             if (listenerGeneration !== firebaseState.dbListenerGeneration) return;
-            noteDbListenerAlive(DB_LISTENER_KEY_MONTHLY_REVENUE);
             dataState.monthlyRevenueData = snapshot.val() || {};
+            noteDbListenerAlive(DB_LISTENER_KEY_MONTHLY_REVENUE);
+            debouncedRenderAfterHistorySync();
         }, (err) => {
             if (listenerGeneration !== firebaseState.dbListenerGeneration) return;
             handleDbListenerError(err, DB_LISTENER_KEY_MONTHLY_REVENUE);
@@ -223,8 +229,8 @@ export function initDatabaseListeners() {
     if (firebaseState.dbRefDailyPickup) {
         firebaseState.fb.onValue(firebaseState.dbRefDailyPickup, (snapshot) => {
             if (listenerGeneration !== firebaseState.dbListenerGeneration) return;
-            noteDbListenerAlive('dailyPickup');
             dataState.dailyPickupData = snapshot.val() || {};
+            noteDbListenerAlive('dailyPickup');
             debouncedRenderAfterHistorySync();
         }, (err) => {
             if (listenerGeneration !== firebaseState.dbListenerGeneration) return;
@@ -235,8 +241,8 @@ export function initDatabaseListeners() {
     if (firebaseState.dbRefDailyCollected) {
         firebaseState.fb.onValue(firebaseState.dbRefDailyCollected, (snapshot) => {
             if (listenerGeneration !== firebaseState.dbListenerGeneration) return;
-            noteDbListenerAlive(DB_LISTENER_KEY_DAILY_COLLECTED);
             dataState.dailyCollectedData = snapshot.val() || {};
+            noteDbListenerAlive(DB_LISTENER_KEY_DAILY_COLLECTED);
             debouncedRenderAfterHistorySync();
         }, (err) => {
             if (listenerGeneration !== firebaseState.dbListenerGeneration) return;
@@ -310,6 +316,8 @@ export function initDatabaseListeners() {
         noteDbListenerAlive('deleted');
         runAutomaticDeletedCleanup();
         refreshNotifyRemovedView();
+        if (modalIsOpen('recentlyDeletedModal')) renderRecentlyDeleted();
+        debouncedRenderAfterHistorySync();
     }, (err) => {
         if (listenerGeneration !== firebaseState.dbListenerGeneration) return;
         handleDbListenerError(err, DB_LISTENER_KEY_DELETED);

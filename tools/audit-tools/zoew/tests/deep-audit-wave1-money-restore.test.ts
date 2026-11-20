@@ -561,8 +561,25 @@ it('M-17e៖ removeSingleBarcode ប្ដូរ session កណ្ដាល awai
     expect(uiState.toasts.some((t: any) => String(t.msg || t).includes('បានដកកញ្ចប់អីវ៉ាន់'))).toBe(false);
 });
 
-it('M-17f៖ pickupIntentTracker.note ត្រូវរក្សា pickupCommit ដំបូងមិនឱ្យ heal note បន្ទាប់ជាន់លុប (A461)', async () => {
+it('M-17f៖ pickupIntentTracker.note ត្រូវជំនួស speculative pre-confirm commit ដោយ post-confirm pickupCommit និងរក្សា confirmed pickupCommit ពី heal note បន្ទាប់ (A461)', async () => {
     setAt(PICKUP + '/' + DAY, { packagesPickedUp: 0, pickupRevision: 1, pickupResetEpoch: 0 });
+    const specTracker = pickup.pickupIntentTracker(() => true, 'm17f_spec');
+    expect(await specTracker.prepare(DAY, [key('M17F000')])).toBeTruthy();
+    expect(specTracker.start()).toBe(true);
+    specTracker.note({ marks: [{ key: key('M17F000'), phoneKey: PHONE, closed: true }], commit: Promise.resolve(null) });
+    expect(specTracker.confirm([key('M17F000')])).toBe(true);
+    specTracker.note({ marks: [{ key: key('M17F000'), phoneKey: PHONE, closed: true }], pickupCommit: Promise.resolve(true), commit: Promise.resolve(true) });
+    expect(await specTracker.finish(Promise.resolve(true))).toBe(true);
+
+    const extraTracker = pickup.pickupIntentTracker(() => true, 'm17f_extra');
+    expect(await extraTracker.prepare(DAY, [key('M17F002'), key('M17F003')])).toBeTruthy();
+    expect(extraTracker.start()).toBe(true);
+    expect(extraTracker.confirm([key('M17F002'), key('M17F003')])).toBe(true);
+    extraTracker.note({ marks: [{ key: key('M17F002'), phoneKey: PHONE, closed: true }], commit: Promise.resolve(true) });
+    extraTracker.note({ marks: [{ key: key('M17F002'), phoneKey: PHONE, closed: true }, { key: key('M17F003'), phoneKey: PHONE, closed: true }], commit: Promise.resolve(null) });
+    expect(await extraTracker.finish(Promise.resolve(true))).toBe(false);
+    expect(pickup.readPickupJournal().some((entry: any) => entry.item === 'm17f_extra' && entry.pickupDone === true)).toBe(false);
+
     const tracker = pickup.pickupIntentTracker(() => true, 'm17f');
     const ctx = await tracker.prepare(DAY, [key('M17F001')]);
     expect(ctx).toBeTruthy();

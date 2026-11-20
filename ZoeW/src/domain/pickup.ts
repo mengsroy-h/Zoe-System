@@ -876,6 +876,19 @@ export function pickupIntentTracker(isCurrent, itemId?, kind?) {
     let intent = null;
     let commit = null;
     let pickupCommit = null;
+    let pickupCommitKeys = new Set<string>();
+    const closedKeysOf = (applied) => new Set<string>((applied?.marks || []).filter((m) => m && m.key && m.closed).map((m) => m.key));
+    const eitherPickupTrue = (first, second) => new Promise((resolve) => {
+        let pending = 2;
+        let settled = false;
+        const onValue = (value) => {
+            if (settled) return;
+            if (value === true) { settled = true; resolve(true); return; }
+            if (--pending === 0) { settled = true; resolve(value); }
+        };
+        Promise.resolve(first).then(onValue, () => onValue(null));
+        Promise.resolve(second).then(onValue, () => onValue(null));
+    });
     let context = null;
     let admissionFailed = false;
     let transitionKnown = false;
@@ -994,7 +1007,17 @@ export function pickupIntentTracker(isCurrent, itemId?, kind?) {
         note: (applied) => {
             if (!applied || !applied.commit) return;
             commit = applied.commit;
-            pickupCommit = pickupCommit || applied.pickupCommit || applied.commit;
+            const nextCommit = applied.pickupCommit || applied.commit;
+            const nextKeys = closedKeysOf(applied);
+            if (!pickupCommit) {
+                pickupCommit = nextCommit;
+                pickupCommitKeys = nextKeys;
+            } else if ([...nextKeys].every((k) => pickupCommitKeys.has(k))) {
+                pickupCommit = eitherPickupTrue(pickupCommit, nextCommit);
+            } else {
+                pickupCommit = nextCommit;
+                pickupCommitKeys = nextKeys;
+            }
         },
         abort: () => {
             if (!intent || !isCurrent()) return false;

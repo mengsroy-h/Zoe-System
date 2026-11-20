@@ -754,7 +754,7 @@ async function palmGet(query, session, keys, deps) {
         return json(200, { success: false, found: false, barcode, code: 'ZTO_OTHER_BRANCH', reason: 'branch:palm-other-branch' });
     }
     if (query.status === '1' || verifyRestore) {
-        if (access?.verified && trackingCode(access.site) !== trackingCode(session.site)) {
+        if (access?.verified && (otherBranch(access, session.site) || trackingCode(access.site) !== trackingCode(session.site))) {
             return json(200, { success: false, found: false, barcode, code: 'ZTO_OTHER_BRANCH', reason: 'branch:other' });
         }
         const tracking = await palmTracking(barcode, session, keys, deps);
@@ -1350,9 +1350,7 @@ async function palmList(query, session, keys, deps) {
     }
     const access = await deps.lookupAccess();
     if (access && access.response) return access.response;
-    if (access && access.verified && (!trackingCode(access.site)
-        ? (access.binding === 'mismatch' || access.binding === 'bound' || access.binding === 'server')
-        : (!!trackingCode(session.site) && trackingCode(access.site) !== trackingCode(session.site)))) {
+    if (otherBranch(access, session.site)) {
         return json(200, { success: false, list: true, enabled: false, code: 'ZTO_LIST_NOT_CONFIGURED', reason: 'site:palm-other-branch' });
     }
     if (query.signed !== '1') {

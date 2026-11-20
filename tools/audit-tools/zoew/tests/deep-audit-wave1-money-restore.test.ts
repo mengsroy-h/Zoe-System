@@ -560,3 +560,17 @@ it('M-17e៖ removeSingleBarcode ប្ដូរ session កណ្ដាល awai
     expect(res).toBe('stale');
     expect(uiState.toasts.some((t: any) => String(t.msg || t).includes('បានដកកញ្ចប់អីវ៉ាន់'))).toBe(false);
 });
+
+it('M-17f៖ pickupIntentTracker.note ត្រូវរក្សា pickupCommit ដំបូងមិនឱ្យ heal note បន្ទាប់ជាន់លុប (A461)', async () => {
+    setAt(PICKUP + '/' + DAY, { packagesPickedUp: 0, pickupRevision: 1, pickupResetEpoch: 0 });
+    const tracker = pickup.pickupIntentTracker(() => true, 'm17f');
+    const ctx = await tracker.prepare(DAY, [key('M17F001')]);
+    expect(ctx).toBeTruthy();
+    expect(tracker.start()).toBe(true);
+    expect(tracker.confirm([key('M17F001')])).toBe(true);
+    tracker.note({ commit: Promise.resolve(true) });
+    tracker.note({ commit: Promise.resolve(null) });
+    const finished = await tracker.finish(Promise.resolve(true));
+    expect(finished).toBe(false);
+    expect(pickup.readPickupJournal().some((entry: any) => entry.item === 'm17f' && entry.pickupDone === true)).toBe(true);
+});

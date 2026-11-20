@@ -3,7 +3,7 @@ import { dataState, firebaseState, securityState, uiState } from '../../../../Zo
 import { appLocalStore, appSessionStore } from '../../../../ZoeW/src/core/storage';
 import { registerModalMeta, setModalDisplay, unregisterModalMeta } from '../../../../ZoeW/src/core/modals';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../../../../ZoeW/src/core/text';
-import { forgetAppLockPin, showAppLockScreen } from '../../../../ZoeW/src/features/app-lock';
+import { forgetAppLockPin, noteAppLockAway, showAppLockScreen } from '../../../../ZoeW/src/features/app-lock';
 import { loginBackendScope } from '../../../../ZoeW/src/features/login-memory';
 import { localLogoutIntent } from '../../../../ZoeW/src/services/local-logout-intent';
 import { detachDatabaseListeners, initDatabaseListeners } from '../../../../ZoeW/src/services/db-listeners';
@@ -47,38 +47,50 @@ afterEach(() => {
     unregisterModalMeta('loginModal');
 });
 
-it('M-04a៖ forgetAppLockPin ត្រូវកត់ localLogoutIntent និងសម្អាត signed-in data មុនលុប PIN (ហើយបដិសេធលុប PIN បើ localLogoutIntent.note បរាជ័យ)', async () => {
+it('M-04a៖ forgetAppLockPin ត្រូវកត់ localLogoutIntent និងសម្អាត signed-in data (មិនបន្សល់ session ពុលពេល setItem ធ្លាក់ · មិនកុហកថាបានលុប PIN ពេល removeItem ធ្លាក់)', async () => {
     registerModalMeta('loginModal', {});
     setModalDisplay('loginModal', 'none');
     appLocalStore.setItem('zoew_security_pin_hash', 'pin:123456');
     firebaseState.authGeneration++;
-    firebaseState.auth = { currentUser: { uid: 'u-lock' } } as any;
+    firebaseState.auth = { currentUser: { uid: 'u-lock-quota' } } as any;
     firebaseState.db = { name: 'lock-db' } as any;
-    const pendingSignOut = deferred<void>();
-    firebaseState.fb = { signOut: vi.fn(() => pendingSignOut.promise), off: vi.fn() } as any;
+    const quotaFailSignOut = deferred<void>();
+    firebaseState.fb = { signOut: vi.fn(() => quotaFailSignOut.promise), off: vi.fn() } as any;
     firebaseState.isDatabaseInitialized = true;
     firebaseState.sessionExpiryCheck = 'live';
     acceptFixtureSession();
     dataState.scanHistory = [{ id: 'secret1', phone: '012345678', barcodes: [{ code: 'SEC1' }] }];
     dataState.deletedItems = [{ id: 'trash1', phone: '012345678', barcodes: [{ code: 'TR1' }] }];
 
-    const noteSpy = vi.spyOn(localLogoutIntent, 'note').mockReturnValueOnce(false);
+    const origSet = appLocalStore.setItem.bind(appLocalStore);
+    const setSpy = vi.spyOn(appLocalStore, 'setItem').mockImplementation((k: string, v: string) => {
+        if (k.includes('zoew_local_logout_v1:')) throw new Error('quota-exceeded');
+        return origSet(k, v);
+    });
     showAppLockScreen();
     forgetAppLockPin();
-    expect(appLocalStore.getItem('zoew_security_pin_hash')).toBe('pin:123456');
-    expect(firebaseState.fb.signOut).not.toHaveBeenCalled();
-    noteSpy.mockRestore();
-
-    forgetAppLockPin();
     await turns();
-    expect(localLogoutIntent.blocked(loginBackendScope(), 'u-lock')).toBe(true);
+    expect(localLogoutIntent.blocked(loginBackendScope(), 'u-lock-quota')).toBe(true);
     expect(firebaseState.sessionExpiryCheck).toBe('signed-out');
     expect(dataState.scanHistory).toEqual([]);
     expect(dataState.deletedItems).toEqual([]);
-    expect(appLocalStore.getItem('zoew_security_pin_hash')).toBeNull();
-    firebaseState.auth.currentUser = null;
-    pendingSignOut.resolve();
+    expect(appLocalStore.getItem('zoew_security_pin_hash')).toBe('pin:123456');
+    expect(firebaseState.fb.signOut).toHaveBeenCalledTimes(1);
+    quotaFailSignOut.reject(new Error('offline-signout-failed'));
     await turns();
+    expect(appLocalStore.getItem('zoew_security_pin_hash')).toBe('pin:123456');
+    expect(securityState.appIsLocked).toBe(true);
+
+    const quotaOkSignOut = deferred<void>();
+    firebaseState.fb = { signOut: vi.fn(() => quotaOkSignOut.promise), off: vi.fn() } as any;
+    forgetAppLockPin();
+    await turns();
+    firebaseState.auth.currentUser = null;
+    quotaOkSignOut.resolve();
+    await turns();
+    setSpy.mockRestore();
+    expect(appLocalStore.getItem('zoew_security_pin_hash')).toBeNull();
+    expect(securityState.appIsLocked).toBe(false);
 
     firebaseState.authGeneration++;
     firebaseState.auth = { currentUser: { uid: 'u-lock-remove-fail' } } as any;
@@ -88,6 +100,7 @@ it('M-04a៖ forgetAppLockPin ត្រូវកត់ localLogoutIntent និ�
     acceptFixtureSession();
     appLocalStore.setItem('zoew_security_pin_hash', 'pin:654321');
     dataState.scanHistory = [{ id: 'secret2', phone: '012345678', barcodes: [{ code: 'SEC2' }] }];
+    uiState.toasts = [];
     const origRemove = appLocalStore.removeItem.bind(appLocalStore);
     const removeSpy = vi.spyOn(appLocalStore, 'removeItem').mockImplementation((k: string) => {
         if (k === 'zoew_security_pin_hash') throw new Error('storage-remove-denied');
@@ -96,13 +109,17 @@ it('M-04a៖ forgetAppLockPin ត្រូវកត់ localLogoutIntent និ�
     showAppLockScreen();
     forgetAppLockPin();
     await turns();
-    removeSpy.mockRestore();
+    noteAppLockAway();
     expect(localLogoutIntent.blocked(loginBackendScope(), 'u-lock-remove-fail')).toBe(true);
     expect(dataState.scanHistory).toEqual([]);
     expect(firebaseState.fb.signOut).toHaveBeenCalledTimes(1);
     firebaseState.auth.currentUser = null;
     secondSignOut.resolve();
     await turns();
+    removeSpy.mockRestore();
+    expect(securityState.appIsLocked).toBe(false);
+    expect(uiState.toasts.some((t: any) => String(t.msg || t).includes('បានលុប PIN'))).toBe(false);
+    expect(uiState.toasts.some((t: any) => String(t.msg || t).includes('មិនអាចលុប PIN'))).toBe(true);
 });
 
 it('M-04b៖ Supabase transport.signOut ត្រូវលុប session ក្នុង storage ភ្លាមៗមុនរង់ចាំ network /auth/v1/logout', async () => {

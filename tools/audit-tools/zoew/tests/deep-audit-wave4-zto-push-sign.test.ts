@@ -65,8 +65,8 @@ it('M-05៖ zto-palm.js ត្រូវ fail-closed ពេល access.binding=mis
         Buffer, URL, URLSearchParams, AbortController, Date, setTimeout, clearTimeout, process: { env: {} },
         fetch: globalThis.fetch, crypto
     });
-    vm.runInContext(fs.readFileSync(palmPath, 'utf8') + '\nmodule.exports._test = { otherBranch, palmList };', ctx);
-    const { otherBranch, palmList } = ctx.module.exports._test;
+    vm.runInContext(fs.readFileSync(palmPath, 'utf8') + '\nmodule.exports._test = { otherBranch, palmList, palmGet };', ctx);
+    const { otherBranch, palmList, palmGet } = ctx.module.exports._test;
 
     expect(otherBranch({ verified: true, site: '', binding: 'mismatch' }, '001')).toBe(true);
     expect(otherBranch({ verified: true, site: '', binding: 'bound' }, '001')).toBe(true);
@@ -74,6 +74,7 @@ it('M-05៖ zto-palm.js ត្រូវ fail-closed ពេល access.binding=mis
     expect(otherBranch({ verified: true, site: '', binding: 'unbound' }, '001')).toBe(false);
     expect(otherBranch({ verified: true, site: '001', binding: 'bound' }, '001')).toBe(false);
     expect(otherBranch({ verified: true, site: '002', binding: 'bound' }, '001')).toBe(true);
+    expect(otherBranch({ verified: true, site: '001', binding: 'bound' }, '')).toBe(true);
 
     let upstreamCalled = false;
     const res = await palmList(
@@ -92,6 +93,34 @@ it('M-05៖ zto-palm.js ត្រូវ fail-closed ពេល access.binding=mis
     expect(upstreamCalled).toBe(false);
     expect(body.success).toBe(false);
     expect(body.reason).toBe('site:palm-other-branch');
+
+    const emptySiteList = await palmList(
+        { from: '2026-11-18', to: '2026-11-18', page: '1', signed: '1' },
+        { token: 'tok', site: '', siteName: '', operator: 'op' },
+        {},
+        {
+            listRange: (from: string, to: string) => ({ from, to }),
+            listSignedRange: (r: any) => r,
+            listMaxPages: 5,
+            lookupAccess: async () => ({ verified: true, site: '001', binding: 'bound' }),
+            fetchFn: async () => { upstreamCalled = true; return new Response('{}', { status: 200 }); }
+        }
+    );
+    expect(upstreamCalled).toBe(false);
+    expect(JSON.parse(emptySiteList.body)).toMatchObject({ success: false, reason: 'site:palm-other-branch' });
+
+    for (const flag of ['status', 'restore'] as const) {
+        const mismatchGet = await palmGet(
+            { barcode: 'M05TEST001', [flag]: '1' },
+            { token: 'tok', site: '', siteName: '', operator: 'op' },
+            {},
+            {
+                lookupAccess: async () => ({ verified: true, site: '', binding: 'mismatch' }),
+                upstreamMs: () => 2000
+            }
+        );
+        expect(JSON.parse(mismatchGet.body)).toMatchObject({ success: false, found: false, code: 'ZTO_OTHER_BRANCH' });
+    }
 });
 
 it('M-07៖ zto-order-detail-core.cjs៖ 1) -710 Return ឈ្នះ 02 Dispatch-Out ក្នុង cookieRestoreTransitions 2) retryAfterAuthRejected អាប់ដេត headers', async () => {

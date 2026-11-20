@@ -11,7 +11,7 @@ import { resetClearHistoryOperationState } from './clear-history';
 import { clearCustomerDataTableCache } from './customer-table';
 import { loginBackendScope } from './login-memory';
 import { requestPinBeforeConfig, unlockLookupSecretForPin } from './pin';
-import { clearRememberedSession, showLoginModalWithPrefill } from './session';
+import { LOCAL_LOGOUT_UNPERSISTED_TOAST, clearRememberedSession, showLoginModalWithPrefill } from './session';
 import { forgetStoredLookupSecretKey, verifyStoredPin } from '../services/crypto';
 import { detachDatabaseListeners, resetDbListenerHealthState } from '../services/db-listeners';
 import { localLogoutIntent } from '../services/local-logout-intent';
@@ -261,17 +261,19 @@ export function forgetAppLockPin() {
         && appLockLogoutOwner.uid === firebaseState.auth?.currentUser?.uid && appLockLogoutOwner.authGeneration === firebaseState.authGeneration) return;
     if (!confirm('លុប Security PIN នៃឧបករណ៍នេះ រួចចាកចេញពីប្រព័ន្ធ?\n\n· ទិន្នន័យអាជីវកម្មមិនរងផលទេ\n· អ្នកនឹងត្រូវចូលប្រព័ន្ធដោយអ៊ីមែល និងពាក្យសម្ងាត់ម្តងទៀត\n· ការតភ្ជាប់ដែលអ៊ិនគ្រីបដោយ PIN ចាស់ ត្រូវកំណត់ថ្មី')) return;
     const signedInUid = firebaseState.auth?.currentUser?.uid;
-    if (signedInUid && !localLogoutIntent.note(loginBackendScope(), signedInUid)) {
-        showToast('❌ លុប Security PIN មិនបានទេ — PIN និងស្ថានភាពចូលប្រព័ន្ធនៅដដែល។');
-        return;
-    }
-    if (!safeStoreRemove(appLocalStore, 'zoew_security_pin_hash')) {
-        if (!signedInUid) {
-            showToast('❌ លុប Security PIN មិនបានទេ — PIN និងស្ថានភាពចូលប្រព័ន្ធនៅដដែល។');
-            return;
+    const intentDurable = !signedInUid || localLogoutIntent.note(loginBackendScope(), signedInUid);
+    let pinRemoved = false;
+    if (intentDurable) {
+        if (!safeStoreRemove(appLocalStore, 'zoew_security_pin_hash')) {
+            if (!signedInUid) {
+                showToast('❌ លុប Security PIN មិនបានទេ — PIN និងស្ថានភាពចូលប្រព័ន្ធនៅដដែល។');
+                return;
+            }
+        } else {
+            pinRemoved = true;
         }
-        showToast('⚠️ លុប PIN ក្នុងឧបករណ៍មិនបានទេ — ប្រព័ន្ធកំពុងចាកចេញដើម្បីសុវត្ថិភាព។');
     }
+    const priorPinHash = pinRemoved ? null : safeStoreGet(appLocalStore, 'zoew_security_pin_hash');
     firebaseState.sessionExpiryCheck = 'signed-out';
     resetClearHistoryOperationState();
     resetDbListenerHealthState();
@@ -305,7 +307,7 @@ export function forgetAppLockPin() {
         appLockLogoutOwner = null;
         if (owner.late && (!signedOut || !securityState.appIsLocked || generation !== appLockUnlockGeneration)) return;
         if (firebaseState.auth !== logoutAuth || firebaseState.fb !== logoutSdk
-            || generation !== appLockUnlockGeneration && appLockPinIsSet()) return;
+            || generation !== appLockUnlockGeneration && (pinRemoved ? appLockPinIsSet() : (safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== priorPinHash || owner.authGeneration !== firebaseState.authGeneration))) return;
         const unconfirmed = () => {
             setAppLockBusy(false);
             setAppLockMsg('⚠️ មិនទាន់អាចបញ្ជាក់ថាបានចាកចេញទេ។ សូមចុច «ភ្លេច PIN?» ម្តងទៀត ឬ Refresh។');
@@ -323,11 +325,19 @@ export function forgetAppLockPin() {
             }
             return;
         }
+        if (!pinRemoved && signedOut && safeStoreRemove(appLocalStore, 'zoew_security_pin_hash')) {
+            pinRemoved = true;
+            refreshAppLockUi();
+        }
         showLoginModalWithPrefill();
         hideAppLockScreen();
-        reannounceOrShowToast(signedOut
-            ? '⚠️ បានលុប PIN និងចាកចេញពីប្រព័ន្ធ — សូមចូលប្រព័ន្ធម្ដងទៀត'
-            : '⚠️ បានលុប PIN ក្នុងឧបករណ៍ ប៉ុន្តែមិនអាចបញ្ជាក់ថាបានចាកចេញពីឧបករណ៍នេះទេ — សូម Refresh ហើយសាកចាកចេញម្តងទៀត');
+        reannounceOrShowToast(pinRemoved
+            ? (signedOut
+                ? '⚠️ បានលុប PIN និងចាកចេញពីប្រព័ន្ធ — សូមចូលប្រព័ន្ធម្ដងទៀត'
+                : '⚠️ បានលុប PIN ក្នុងឧបករណ៍ ប៉ុន្តែមិនអាចបញ្ជាក់ថាបានចាកចេញពីឧបករណ៍នេះទេ — សូម Refresh ហើយសាកចាកចេញម្តងទៀត')
+            : (signedOut
+                ? '⚠️ បានចាកចេញពីប្រព័ន្ធ ប៉ុន្តែមិនអាចលុប PIN ក្នុងឧបករណ៍បានទេ — សូមលុបទិន្នន័យ Browser រួចចូលប្រព័ន្ធម្ដងទៀត'
+                : (!intentDurable ? LOCAL_LOGOUT_UNPERSISTED_TOAST : '⚠️ មិនអាចលុប PIN ឬបញ្ជាក់ថាបានចាកចេញពីឧបករណ៍នេះទេ — សូម Refresh ហើយសាកចាកចេញម្តងទៀត')));
     };
     if (logoutAuth && logoutSdk) {
         const ceiling = setTimeout(() => finish(false, true), APP_LOCK_SIGN_OUT_MS);

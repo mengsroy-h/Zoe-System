@@ -994,7 +994,7 @@ export function pickupIntentTracker(isCurrent, itemId?, kind?) {
         note: (applied) => {
             if (!applied || !applied.commit) return;
             commit = applied.commit;
-            pickupCommit = applied.pickupCommit || applied.commit;
+            pickupCommit = pickupCommit || applied.pickupCommit || applied.commit;
         },
         abort: () => {
             if (!intent || !isCurrent()) return false;

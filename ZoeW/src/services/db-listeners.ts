@@ -316,7 +316,7 @@ export function initDatabaseListeners() {
         noteDbListenerAlive('deleted');
         runAutomaticDeletedCleanup();
         refreshNotifyRemovedView();
-        if (modalIsOpen('recentlyDeletedModal')) renderRecentlyDeleted();
+        if (typeof modalIsOpen === 'function' && modalIsOpen('recentlyDeletedModal')) renderRecentlyDeleted();
         debouncedRenderAfterHistorySync();
     }, (err) => {
         if (listenerGeneration !== firebaseState.dbListenerGeneration) return;

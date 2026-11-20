@@ -238,8 +238,11 @@ function pickupOwnMapSame(left: unknown, right: unknown) {
 
 export async function commitPickupMarks(scanDateStr, marks, existingOnly = false, quiet = false, keep?: (key: string) => boolean, context?, compareRevision = false) {
     notePickupKeyAdds(marks);
+    const startDb = firebaseState.db;
+    const startGeneration = firebaseState.authGeneration;
+    let owner = null;
     try {
-        const owner = context ? await context : await capturePickupContext(scanDateStr);
+        owner = context ? await context : await capturePickupContext(scanDateStr);
         if (!pickupContextIsCurrent(owner) || owner.date !== scanDateStr) return null;
         const entry = owner.intent ? readPickupJournal().find(entry => entry.id === owner.intent) : null;
         if (owner.intent && !pickupJournalStarted(entry)) return null;
@@ -303,8 +306,9 @@ export async function commitPickupMarks(scanDateStr, marks, existingOnly = false
         }
         return true;
     } catch (e) {
-        const stillCurrent = !context || pickupContextIsCurrent(context);
-        if (context?.intent && stillCurrent) patchPickupJournalEntry(context.intent, { hold: 'recovery-pending' });
+        const stillCurrent = owner ? pickupContextIsCurrent(owner)
+            : (startDb === firebaseState.db && startGeneration === firebaseState.authGeneration && e?.message !== 'PICKUP_CONTEXT_CHANGED');
+        if (owner?.intent && stillCurrent) patchPickupJournalEntry(owner.intent, { hold: 'recovery-pending' });
         if (!quiet && stillCurrent) showToast("⚠️ ស្ថិតិយកកំពុងរង់ចាំផ្ទៀងផ្ទាត់ — សូមរង់ចាំ Sync។");
     }
     return null;

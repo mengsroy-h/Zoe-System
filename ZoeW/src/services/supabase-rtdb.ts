@@ -1874,8 +1874,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     let res;
                     let lost = null;
                     let sentAfter = serverNowSeen;
-                    let sentMono = performance.now();
-                    let sentWall = Date.now();
+                    let sentAt = Date.now();
                     let lostAttempts = 0;
                     const giveUp = () => {
                         lost.txOutcome = 'unknown';
@@ -1901,9 +1900,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                         sendEpoch = sessionEpoch;
                         try {
                             if (lost) {
-                                const monoElapsed = performance.now() - sentMono;
-                                const wallElapsed = Date.now() - sentWall;
-                                const maybeExpired = !(sentAfter > 0) || monoElapsed >= SB_OP_REPLAY_SAFE_MS / 2 || wallElapsed < 0 || wallElapsed >= SB_OP_REPLAY_SAFE_MS / 2;
+                                const maybeExpired = !(sentAfter > 0) || elapsedSince(sentAt) >= SB_OP_REPLAY_SAFE_MS / 2;
                                 if (maybeExpired) {
                                     try { await rpc('zoe_now', {}); }
                                     catch (e) { throw e instanceof SbNetworkError ? new SbNetworkError(e.message, true) : e; }
@@ -1933,8 +1930,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                                 catch (e) { throw e instanceof SbNetworkError ? new SbNetworkError(e.message, true) : e; }
                                 if (closed || sendEpoch !== sessionEpoch || authScope !== txScope || tenantTopic !== txTopic) continue;
                                 sentAfter = serverNowSeen;
-                                sentMono = performance.now();
-                                sentWall = Date.now();
+                                sentAt = Date.now();
                             }
                             res = await rpc('zoe_write', { p_op_id: opId, p_ops: [op] }, updateFn.connectionIntent, advisory, txTopic, admitted);
                             break;

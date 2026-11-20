@@ -536,3 +536,27 @@ it('M-17d៖ settlePurgeDeduction ត្រូវឈប់បើ trash លើ se
     expect(settled).toBeNull();
     expect(getAt(DAILY + '/' + DAY + '/ded/m17d')).toBeNull();
 });
+
+it('M-17e៖ removeSingleBarcode ប្ដូរ session កណ្ដាល await remarkCleanupCollectedKept ត្រូវត្រឡប់ stale ដោយមិនលោត toast ជោគជ័យលើហាងថ្មី', async () => {
+    seedItem('m17e', ['M17E001', 'M17E002'], ['M17E001']);
+    setAt(DAILY + '/' + DAY, { codDollar: 100, dodDollar: 4, totalCount: 2 });
+    setAt(MONTHLY + '/' + MONTH, { codDollar: 100, dodDollar: 4, totalCount: 2 });
+    setAt(PICKUP + '/' + DAY, { packagesPickedUp: 1, pickedUpPhones: { [PHONE]: 1 }, pickedUpBarcodes: { [key('M17E001')]: PHONE }, pickupRevision: 2, pickupResetEpoch: 0 });
+    setAt(MIRROR + '/' + DAY, { [key('M17E001')]: { c: 50, d: 2 } });
+    loadViewsFromServer();
+    let switched = false;
+    lab.getHook = (path) => {
+        const trash = getAt(TRASH);
+        const trashItem = trash && Object.values(trash)[0] as any;
+        if (!switched && path === PICKUP + '/' + DAY && trashItem?.barcodes?.every((b: any) => b?.isDeducted === true)) {
+            switched = true;
+            firebaseState.authGeneration++;
+            return Promise.resolve(snap(makeRef(DB, path), getAt(path)));
+        }
+        return null;
+    };
+    uiState.toasts = [];
+    const res = await removeSingleBarcode('m17e', 'M17E001');
+    expect(res).toBe('stale');
+    expect(uiState.toasts.some((t: any) => String(t.msg || t).includes('បានដកកញ្ចប់អីវ៉ាន់'))).toBe(false);
+});

@@ -266,8 +266,11 @@ export function forgetAppLockPin() {
         return;
     }
     if (!safeStoreRemove(appLocalStore, 'zoew_security_pin_hash')) {
-        showToast('❌ លុប Security PIN មិនបានទេ — PIN និងស្ថានភាពចូលប្រព័ន្ធនៅដដែល។');
-        return;
+        if (!signedInUid) {
+            showToast('❌ លុប Security PIN មិនបានទេ — PIN និងស្ថានភាពចូលប្រព័ន្ធនៅដដែល។');
+            return;
+        }
+        showToast('⚠️ លុប PIN ក្នុងឧបករណ៍មិនបានទេ — ប្រព័ន្ធកំពុងចាកចេញដើម្បីសុវត្ថិភាព។');
     }
     firebaseState.sessionExpiryCheck = 'signed-out';
     resetClearHistoryOperationState();

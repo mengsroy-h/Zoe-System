@@ -296,11 +296,10 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
             }
             const needsCollectedCheck = !!claimedBarcode.isClosed;
             if (collectedSaved === true && pickupSaved === true) {
-                if (!needsCollectedCheck || await remarkCleanupCollectedKept(preparedEntry, removeIsCurrent, removeDb) === true && removeIsCurrent()) {
-                    clearCleanupJournalEntry(itemToTrash.id, itemToTrash);
-                } else {
-                    markCleanupJournalStage(itemToTrash.id, CLEANUP_STAGE_COLLECTED, itemToTrash);
-                }
+                const keptOk = !needsCollectedCheck || await remarkCleanupCollectedKept(preparedEntry, removeIsCurrent, removeDb) === true;
+                if (!removeIsCurrent()) return 'stale';
+                if (keptOk) clearCleanupJournalEntry(itemToTrash.id, itemToTrash);
+                else markCleanupJournalStage(itemToTrash.id, CLEANUP_STAGE_COLLECTED, itemToTrash);
             } else {
                 markCleanupJournalStage(itemToTrash.id, CLEANUP_STAGE_COLLECTED, itemToTrash);
                 const awaiting = (saved) => saved === true || saved === undefined;

@@ -79,6 +79,30 @@ it('M-04a៖ forgetAppLockPin ត្រូវកត់ localLogoutIntent និ�
     firebaseState.auth.currentUser = null;
     pendingSignOut.resolve();
     await turns();
+
+    firebaseState.authGeneration++;
+    firebaseState.auth = { currentUser: { uid: 'u-lock-remove-fail' } } as any;
+    const secondSignOut = deferred<void>();
+    firebaseState.fb = { signOut: vi.fn(() => secondSignOut.promise), off: vi.fn() } as any;
+    firebaseState.sessionExpiryCheck = 'live';
+    acceptFixtureSession();
+    appLocalStore.setItem('zoew_security_pin_hash', 'pin:654321');
+    dataState.scanHistory = [{ id: 'secret2', phone: '012345678', barcodes: [{ code: 'SEC2' }] }];
+    const origRemove = appLocalStore.removeItem.bind(appLocalStore);
+    const removeSpy = vi.spyOn(appLocalStore, 'removeItem').mockImplementation((k: string) => {
+        if (k === 'zoew_security_pin_hash') throw new Error('storage-remove-denied');
+        return origRemove(k);
+    });
+    showAppLockScreen();
+    forgetAppLockPin();
+    await turns();
+    removeSpy.mockRestore();
+    expect(localLogoutIntent.blocked(loginBackendScope(), 'u-lock-remove-fail')).toBe(true);
+    expect(dataState.scanHistory).toEqual([]);
+    expect(firebaseState.fb.signOut).toHaveBeenCalledTimes(1);
+    firebaseState.auth.currentUser = null;
+    secondSignOut.resolve();
+    await turns();
 });
 
 it('M-04b៖ Supabase transport.signOut ត្រូវលុប session ក្នុង storage ភ្លាមៗមុនរង់ចាំ network /auth/v1/logout', async () => {

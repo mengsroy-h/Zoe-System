@@ -1025,7 +1025,7 @@ export function pickupIntentTracker(isCurrent, itemId?, kind?) {
             if (!intent || !isCurrent()) return false;
             const id = intent;
             const entry = readPickupJournal().find((candidate) => candidate.id === id);
-            if (!entry || entry.restorePlan !== undefined) return false;
+            if (!entry || entry.restorePlan !== undefined || entry.kind === 'restore') return false;
             intent = null;
             const removed = removePickupJournalEntry(id);
             releasePickupIntent(id);

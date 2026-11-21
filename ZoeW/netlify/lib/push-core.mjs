@@ -29,6 +29,7 @@ export const PUSH_RUN_BUDGET_MS = 20000;
 export const PUSH_LICENSE_CACHE_MS = 10 * 60 * 1000;
 export const PUSH_IDENTITY_CACHE_MAX = 500;
 export const PUSH_TTL_SECONDS = 24 * 60 * 60;
+export const PUSH_CLOCK_SKEW_MS = 5 * 60 * 1000;
 export const PUSH_TITLE_MAX = 120;
 export const PUSH_BODY_MAX = 240;
 export const APP_ZONE_OFFSET_MS = 7 * 60 * 60 * 1000;
@@ -56,6 +57,12 @@ export function elapsedSince(mark, now) {
     if (!mark) return Infinity;
     const delta = now - mark;
     return delta < 0 ? Infinity : delta;
+}
+
+export function ageWithin(mark, current, maxMs) {
+    if (!Number.isFinite(mark) || mark <= 0 || !Number.isFinite(current)) return false;
+    const delta = current - mark;
+    return delta >= -PUSH_CLOCK_SKEW_MS && delta <= maxMs;
 }
 
 export function settleWithin(run, timeoutMs) {
@@ -659,7 +666,7 @@ export function createPushService(deps) {
         }
         const lastId = ledger.data && typeof ledger.data.lastId === 'string' ? ledger.data.lastId : '';
         const byId = new Map(notices.map((n) => [n.id, n]));
-        const live = (n) => elapsedSince(noticeAt(n), startedAt) <= PUSH_NOTICE_MAX_AGE_MS;
+        const live = (n) => ageWithin(noticeAt(n), startedAt, PUSH_NOTICE_MAX_AGE_MS);
         const carried = (ledger.data && Array.isArray(ledger.data.carry) ? ledger.data.carry : [])
             .filter((c) => c && typeof c.id === 'string' && c.id <= lastId && byId.has(c.id) && live(byId.get(c.id)))
             .map((c) => ({ id: c.id, after: typeof c.after === 'string' ? c.after : '' }));
@@ -737,13 +744,13 @@ export function createPushService(deps) {
             if (ledger && ledger.data && ledger.data.day === zone.day) return;
             const sched = await readJson(schedKey);
             if (!sched || !sched.data || !Array.isArray(sched.data.times)) return;
-            if (elapsedSince(sched.data.at, startedAt) > PUSH_SCHEDULE_MAX_AGE_MS) return;
+            if (!ageWithin(sched.data.at, startedAt, PUSH_SCHEDULE_MAX_AGE_MS)) return;
             const count = sched.data.times.filter((t) => typeof t === 'number' && t > startedAt && t <= startedAt + PUSH_EXPIRY_WINDOW_MS).length;
             if (!count) return;
             const index = await readJson('bykey/' + keyId);
             const keys = index && index.data && Array.isArray(index.data.subs) ? index.data.subs.filter((k) => typeof k === 'string').slice(-PUSH_SUBS_PER_KEY_MAX) : [];
             if (!keys.length) return;
-            if (!claimOpen()) { total.cut++; return; }
+            if (!claimOpen()) { total.cut++; return 'cut'; }
             const claim = await store.setJSON(ledgerKey, { day: zone.day, at: startedAt }, ledger ? { onlyIfMatch: ledger.etag } : { onlyIfNew: true });
             if (!claim || !claim.modified) return;
             total.keys++;
@@ -751,19 +758,26 @@ export function createPushService(deps) {
             Object.keys(tally).forEach((k) => { total[k] = (total[k] || 0) + tally[k]; });
         }
         let next = 0;
-        let lastStarted = '';
+        const settled = new Array(scheds.length).fill(false);
         async function worker() {
             while (next < scheds.length) {
                 if (!claimOpen()) { total.cut += scheds.length - next; next = scheds.length; return; }
-                const schedKey = scheds[next++];
-                lastStarted = schedKey;
-                try { await remind(schedKey); } catch (_) { total.fail++; }
+                const idx = next++;
+                const schedKey = scheds[idx];
+                try {
+                    if (await remind(schedKey) !== 'cut') settled[idx] = true;
+                } catch (_) { total.fail++; settled[idx] = true; }
             }
         }
         const workers = [];
         for (let w = 0; w < Math.min(PUSH_EXPIRY_CONCURRENCY, scheds.length); w++) workers.push(worker());
         await Promise.all(workers);
-        if (lastStarted) await store.setJSON(cursorKey, { day: zone.day, after: lastStarted }, savedCursor ? { onlyIfMatch: savedCursor.etag } : { onlyIfNew: true });
+        let lastDone = '';
+        for (let i = 0; i < scheds.length; i++) {
+            if (!settled[i]) break;
+            lastDone = scheds[i];
+        }
+        if (lastDone) await store.setJSON(cursorKey, { day: zone.day, after: lastDone }, savedCursor ? { onlyIfMatch: savedCursor.etag } : { onlyIfNew: true });
         return total;
     }
 

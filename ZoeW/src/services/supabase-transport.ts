@@ -38,6 +38,7 @@ function storeOf(name) {
 
 export function createModeStorage(localStore, sessionStore) {
     let mode = 'local';
+    let modeExplicit = false;
     let closed = false;
     const read = (store, key) => {
         try { return store ? store.getItem(key) : null; } catch (e) { return null; }
@@ -49,7 +50,7 @@ export function createModeStorage(localStore, sessionStore) {
         try { if (store) store.removeItem(key); } catch (e) {}
     };
     return {
-        setMode(next) { mode = next === 'session' ? 'session' : 'local'; },
+        setMode(next) { mode = next === 'session' ? 'session' : 'local'; modeExplicit = true; },
         getMode() { return mode; },
         getItem(key) {
             if (closed) return null;
@@ -60,7 +61,7 @@ export function createModeStorage(localStore, sessionStore) {
             if (closed) return;
             const inSession = read(sessionStore, key) !== null;
             const inLocal = read(localStore, key) !== null;
-            const target = inSession && !inLocal ? 'session' : (inLocal ? 'local' : mode);
+            const target = modeExplicit ? mode : (inSession && !inLocal ? 'session' : (inLocal ? 'local' : mode));
             if (target === 'session') {
                 if (write(sessionStore, key, value)) drop(localStore, key);
             } else if (write(localStore, key, value)) {
@@ -369,8 +370,20 @@ export function createSupabaseTransport(config, deps?) {
         },
         async signOut() {
             if (closed) return;
+            const stored = readStoredSession();
+            const liveToken = stored && typeof stored.access_token === 'string' && stored.access_token
+                && Number.isFinite(stored.expires_at) && stored.expires_at * 1000 > Date.now() + 60000
+                ? stored.access_token : null;
             bindTo(null);
             const epoch = generation;
+            if (liveToken) {
+                clearStoredSession();
+                if (sessionStored()) throw new SbNetworkError('sign-out-storage');
+                if (!closed && epoch === generation) {
+                    await sbWithin(post('/auth/v1/logout?scope=local', {}, liveToken, SB_SIGN_OUT_CEILING_MS), SB_SIGN_OUT_CEILING_MS).catch(() => {});
+                }
+                return;
+            }
             const revoke = async () => {
                 const token = await accessToken().catch(() => null);
                 if (token && !closed && epoch === generation) await post('/auth/v1/logout?scope=local', {}, token, SB_SIGN_OUT_CEILING_MS);
@@ -381,7 +394,12 @@ export function createSupabaseTransport(config, deps?) {
             if (sessionStored()) throw new SbNetworkError('sign-out-storage');
         },
         onSession(cb) {
-            const { data } = client.auth.onAuthStateChange((event, session) => cb(event, toSession(session)));
+            const { data } = client.auth.onAuthStateChange((event, session) => {
+                if (event === 'TOKEN_REFRESHED' && session && typeof session.access_token === 'string' && session.access_token && !closed && !boundEnded && !!boundUid && !isForeign(session)) {
+                    try { Promise.resolve(client.realtime.setAuth(session.access_token)).catch(() => {}); } catch (e) {}
+                }
+                cb(event, toSession(session));
+            });
             return () => { try { data.subscription.unsubscribe(); } catch (e) {} };
         },
         onForeignSession(cb) {
@@ -423,6 +441,7 @@ export function createSupabaseTransport(config, deps?) {
                     if (!isCurrent()) return;
                     const token = await accessToken();
                     if (!isCurrent()) return;
+                    if (!token) { onStatus('CHANNEL_ERROR'); return; }
                     await client.realtime.setAuth(token);
                     if (!isCurrent()) return;
                     channel = client.channel(topic, { config: { private: true, broadcast: { self: false } } });

@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoekeygen-v165';
+const CACHE_VERSION = 'zoekeygen-v166';
 
 const CORE_SHELL = [
     './',
@@ -88,6 +88,7 @@ self.addEventListener('install', (event) => {
                 .then(() => Promise.all(OPTIONAL_SHELL.map((url) => addOptionalShell(cache, url)))))
             .then(() => deployUnchangedDuringInstall())
             .then(() => self.skipWaiting())
+            .catch((err) => (typeof caches.delete === 'function' ? caches.delete(CACHE_VERSION).catch(() => {}) : Promise.resolve()).then(() => Promise.reject(err)))
     );
 });
 
@@ -169,7 +170,7 @@ function revalidateShell(cache, request, cacheKey) {
     if (linkIsFrugal())
         return Promise.resolve();
     const key = typeof cacheKey === 'string' ? cacheKey : request.url;
-    if (/\.(?:html|js|css|wasm)$/i.test(key))
+    if (/\.(?:html|js|css|wasm)$/i.test(key) || /\/$/.test(key))
         return Promise.resolve();
     if (revalidateInFlight.has(key))
         return Promise.resolve();

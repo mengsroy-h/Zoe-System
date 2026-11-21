@@ -468,7 +468,9 @@ it('a late allow cannot overwrite a newer HOLD or DENY revision', async () => {
     await expect(backend.apply(input, late, 'allow', 'server-proof-2')).rejects.toBeTruthy();
     expect(w.nodes.get(proofPath).status).toBe('hold');
     expect(w.nodes.get(proofPath).revision).toBe(1);
-    expect(w.writes).toHaveLength(2);
+    expect(w.writes).toHaveLength(1);
+    expect(w.nodes.get(sourcePath)).not.toHaveProperty('restoreClaim');
+    expect(w.nodes.get(sourcePath)).not.toHaveProperty('restoreAttestationId');
 });
 it('terminal return denies without fabricating a provider timestamp or Signed flag', async () => {
     const w = world();

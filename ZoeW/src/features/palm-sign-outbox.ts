@@ -871,7 +871,7 @@ async function archiveQueuedSign(id: string) {
     try {
         const value = (await readJobs(op)).jobs.find(entry => entry.row.id === id);
         if (!value || value.job.recovery || !op.current() || activeJobs.has(id)) return;
-        if (value.row.leaseUntil > 0) { showToast('⏳ សំណើមុននៅរង់ចាំផ្ទៀងថាចប់។ មិនផ្លាស់ការងារកំពុងដំណើរការ; រូបដើមនៅរក្សាទុក។'); return; }
+        if (pendingDeadline(value.row.leaseUntil, Date.now(), SIGN_OUTBOX_LEASE_MS)) { showToast('⏳ សំណើមុននៅរង់ចាំផ្ទៀងថាចប់។ មិនផ្លាស់ការងារកំពុងដំណើរការ; រូបដើមនៅរក្សាទុក។'); return; }
         const check: SignRecoveryCheck = { at: Date.now(), signed: signedEvidence(value.job) ? true : value.job.recoveryCheck?.signed,
             photoVerified: value.job.photoVerified === true, reason: value.job.manualReviewReason };
         await updateJob(op, value, { recovery: { archivedAt: Date.now(), previousPhase: value.job.phase, previousMessage: value.job.message },
@@ -1072,7 +1072,7 @@ async function setRetainedVisibility(id: string, dismissed: boolean) {
     busyActions.add(id);
     try {
         const value = (await readJobs(op)).jobs.find(entry => entry.row.id === id);
-        if (!value?.job.recovery || !op.current() || activeJobs.has(id) || value.row.leaseUntil > 0) return;
+        if (!value?.job.recovery || !op.current() || activeJobs.has(id) || pendingDeadline(value.row.leaseUntil, Date.now(), SIGN_OUTBOX_LEASE_MS)) return;
         await updateJob(op, value, { recovery: { ...value.job.recovery, dismissed } });
     } catch {
         if (op.current()) showToast('⚠️ ប្ដូរបញ្ជីមិនបាន។ រូប និងការងារដើមនៅដដែល។');

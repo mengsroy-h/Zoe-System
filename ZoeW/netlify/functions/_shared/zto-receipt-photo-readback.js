@@ -53,7 +53,7 @@ function jpegStructure(bytes) {
 }
 
 async function verifyReceiptPhoto(input, fetchImpl = globalThis.fetch) {
-    if (!input || input.authenticated !== true || typeof input.barcode !== 'string' || !/^[A-Z0-9]{4,40}$/.test(input.barcode) || typeof input.expectedSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(input.expectedSha256) || !Array.isArray(input.receiptRefs) || !input.receiptRefs.length || input.receiptRefs.length > MAX_REFS) return unknown('invalid_input');
+    if (!input || input.authenticated !== true || typeof input.barcode !== 'string' || !/^[A-Za-z0-9_-]{4,64}$/.test(input.barcode) || typeof input.expectedSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(input.expectedSha256) || !Array.isArray(input.receiptRefs) || !input.receiptRefs.length || input.receiptRefs.length > MAX_REFS) return unknown('invalid_input');
     const refs = Array.from(input.receiptRefs, (ref, index) => ({ url: safeUrl(ref, input.barcode), index }));
     if (refs.some(ref => !ref.url)) return unknown('invalid_reference');
     if (active >= 2) return unknown('busy');

@@ -82,7 +82,7 @@ export function collectPickupMarks(item, closed?: boolean, phoneKey?: string | n
     if (!item) return [];
     const owner = phoneKey || getPickupPhoneKey(item);
     const marks: PickupMark[] = [];
-    (Array.isArray(item.barcodes) ? item.barcodes : []).forEach((b) => {
+    barcodeEntriesOf(item.barcodes).forEach(({ barcode: b }) => {
         if (!b) return;
         const key = pickupBarcodeKey(b.code);
         if (key) marks.push({ key: key, phoneKey: owner, closed: closed === undefined ? !!b.isClosed : !!closed });
@@ -238,8 +238,11 @@ function pickupOwnMapSame(left: unknown, right: unknown) {
 
 export async function commitPickupMarks(scanDateStr, marks, existingOnly = false, quiet = false, keep?: (key: string) => boolean, context?, compareRevision = false) {
     notePickupKeyAdds(marks);
+    const startDb = firebaseState.db;
+    const startGeneration = firebaseState.authGeneration;
+    let owner = null;
     try {
-        const owner = context ? await context : await capturePickupContext(scanDateStr);
+        owner = context ? await context : await capturePickupContext(scanDateStr);
         if (!pickupContextIsCurrent(owner) || owner.date !== scanDateStr) return null;
         const entry = owner.intent ? readPickupJournal().find(entry => entry.id === owner.intent) : null;
         if (owner.intent && !pickupJournalStarted(entry)) return null;
@@ -256,6 +259,7 @@ export async function commitPickupMarks(scanDateStr, marks, existingOnly = false
             if (!pickupContextIsCurrent(currentOwner)) return null;
             let refusal = 'version-conflict';
             let expected: PickupDayView | undefined;
+            let droppedClosed = false;
             const ref = currentOwner.sdk.ref(currentOwner.db, `zoew_daily_pickup_cod_dod/${scanDateStr}`);
             await dbOp(currentOwner.sdk.get(ref));
             if (!pickupContextIsCurrent(currentOwner)) return null;
@@ -273,6 +277,7 @@ export async function commitPickupMarks(scanDateStr, marks, existingOnly = false
                     return;
                 }
                 const allowed = requested.filter(mark => !mark.closed || !proof || proof.allowedAddKeys?.includes(mark.key));
+                droppedClosed = proof?.outcome !== 'not-applied' && requested.some(mark => mark.closed && !allowed.includes(mark));
                 applyPickupMarksToSet(set, allowed, existingOnly);
                 if (!currentOwner.sdk.__supabase && Object.keys(set).some(key => pickupNativeKeyUnsupported(key) || pickupNativeKeyUnsupported(set[key]))) {
                     refusal = 'recovery-pending';
@@ -297,11 +302,14 @@ export async function commitPickupMarks(scanDateStr, marks, existingOnly = false
             if (visibleMetadata.epoch <= savedMetadata.epoch && visibleMetadata.revision <= savedMetadata.revision) {
                 dataState.dailyPickupData[scanDateStr] = { ...saved, pickedUpPhones: saved?.pickedUpPhones || {}, pickedUpBarcodes: saved?.pickedUpBarcodes || {} };
             }
+            if (droppedClosed) return null;
         }
         return true;
     } catch (e) {
-        if (context?.intent && pickupContextIsCurrent(context)) patchPickupJournalEntry(context.intent, { hold: 'recovery-pending' });
-        if (!quiet) showToast("⚠️ ស្ថិតិយកកំពុងរង់ចាំផ្ទៀងផ្ទាត់ — សូមរង់ចាំ Sync។");
+        const stillCurrent = owner ? pickupContextIsCurrent(owner)
+            : (startDb === firebaseState.db && startGeneration === firebaseState.authGeneration && e?.message !== 'PICKUP_CONTEXT_CHANGED');
+        if (owner?.intent && stillCurrent) patchPickupJournalEntry(owner.intent, { hold: 'recovery-pending' });
+        if (!quiet && stillCurrent) showToast("⚠️ ស្ថិតិយកកំពុងរង់ចាំផ្ទៀងផ្ទាត់ — សូមរង់ចាំ Sync។");
     }
     return null;
 }
@@ -868,6 +876,20 @@ export function pickupIntentTracker(isCurrent, itemId?, kind?) {
     let intent = null;
     let commit = null;
     let pickupCommit = null;
+    let pickupCommitKeys = new Set<string>();
+    const markSignaturesOf = (applied) => new Set<string>((applied?.marks || []).filter((m) => m && m.key)
+        .map((m) => (applied?.existingOnly === true ? 'E' : 'A') + '\0' + m.key + '\0' + (m.closed ? '1:' + (m.phoneKey || '') : '0')));
+    const eitherPickupTrue = (first, second) => new Promise((resolve) => {
+        let pending = 2;
+        let settled = false;
+        const onValue = (value) => {
+            if (settled) return;
+            if (value === true) { settled = true; resolve(true); return; }
+            if (--pending === 0) { settled = true; resolve(value); }
+        };
+        Promise.resolve(first).then(onValue, () => onValue(null));
+        Promise.resolve(second).then(onValue, () => onValue(null));
+    });
     let context = null;
     let admissionFailed = false;
     let transitionKnown = false;
@@ -963,8 +985,10 @@ export function pickupIntentTracker(isCurrent, itemId?, kind?) {
             const targets = barcodeEntriesOf(item.barcodes).filter(({ barcode }) => keys.includes(pickupBarcodeKey(barcode?.code)))
                 .map(({ barcode }) => ({ ...pickupCloseBasis(item, barcode), scanIntent: barcode.scanIntent ?? null }));
             const restorePlan = { v: 1, consumption, finalization, phone: item.phone, phoneKey: getPickupPhoneKey(item), targets };
-            return new Set(keys).size === keys.length && targets.length === keys.length && pickupRestorePlanValid({ ...entry, restorePlan })
+            const saved = new Set(keys).size === keys.length && targets.length === keys.length && pickupRestorePlanValid({ ...entry, restorePlan })
                 && patchPickupJournalEntry(intent, { restorePlan });
+            if (!saved) admissionFailed = true;
+            return saved;
         },
         confirm: (keys) => {
             const entry = readPickupJournal().find((e) => e.id === intent);
@@ -977,7 +1001,11 @@ export function pickupIntentTracker(isCurrent, itemId?, kind?) {
             transitionKnown = patchPickupJournalEntry(intent, { transitionKnown: true, outcome: 'not-applied' });
             return transitionKnown;
         },
-        setItem: (id) => intent ? patchPickupJournalEntry(intent, { item: id }) : false,
+        setItem: (id) => {
+            const saved = intent ? patchPickupJournalEntry(intent, { item: id }) : false;
+            if (!saved) admissionFailed = true;
+            return saved;
+        },
         add: (scanDateStr, keys) => {
             const saved = intent && addPickupIntentKeys(intent, keys);
             if (!saved || context?.date !== scanDateStr) admissionFailed = true;
@@ -986,7 +1014,35 @@ export function pickupIntentTracker(isCurrent, itemId?, kind?) {
         note: (applied) => {
             if (!applied || !applied.commit) return;
             commit = applied.commit;
-            pickupCommit = pickupCommit || applied.pickupCommit || applied.commit;
+            const nextCommit = applied.pickupCommit || applied.commit;
+            const nextKeys = markSignaturesOf(applied);
+            if (!pickupCommit) {
+                pickupCommit = nextCommit;
+                pickupCommitKeys = nextKeys;
+            } else if (applied.reverted !== true && applied.excludedReverted !== true
+                && nextKeys.size === pickupCommitKeys.size && [...nextKeys].every((k) => pickupCommitKeys.has(k))) {
+                pickupCommit = eitherPickupTrue(pickupCommit, nextCommit);
+            } else {
+                pickupCommit = nextCommit;
+                pickupCommitKeys = nextKeys;
+            }
+        },
+        abort: () => {
+            if (!intent || !isCurrent()) return false;
+            const id = intent;
+            const entry = readPickupJournal().find((candidate) => candidate.id === id);
+            if (!entry || entry.restorePlan !== undefined) return false;
+            if (entry.kind === 'restore' && !admissionFailed) {
+                intent = null;
+                const removed = removePickupJournalEntry(id);
+                releasePickupIntent(id);
+                return removed;
+            }
+            if (entry.kind === 'restore') return false;
+            intent = null;
+            const removed = removePickupJournalEntry(id);
+            releasePickupIntent(id);
+            return removed;
         },
         release: () => {
             if (!intent) return;

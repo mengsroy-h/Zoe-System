@@ -179,7 +179,7 @@ function serve(dir) {
         appJs: typeof window.initScanEngine === 'function',
         reader: typeof window.ZXingWASM === 'object'
     }));
-    ok('បណ្តាញដាច់ទាំងស្រុង ➜ សំបក App នៅផ្ទុកបាន', offline.hasShell && offline.appJs, { offline, bootError });
+    ok('បណ្តាញដាច់ទាំងស្រុង ➜ សំបក App នៅផ្ទុកបាន', offline.hasShell && offline.appJs && !bootError, { offline, bootError });
     ok('បណ្តាញដាច់ទាំងស្រុង ➜ engine ស្កេននៅមកដដែល', offline.reader, offline);
 
     await ctx.close();

@@ -154,36 +154,40 @@ public class ApkUpdatePlugin extends Plugin {
             call.reject("bad version", "bad-version");
             return;
         }
-        probes.execute(() -> {
-            HttpURLConnection conn = null;
-            try {
-                conn = (HttpURLConnection) new URL(releaseUrl(version)).openConnection();
-                conn.setInstanceFollowRedirects(false);
-                conn.setRequestMethod("HEAD");
-                conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
-                conn.setReadTimeout(READ_TIMEOUT_MS);
-                conn.setUseCaches(false);
-                int status = conn.getResponseCode();
-                JSObject out = new JSObject();
-                out.put("status", status);
-                if (status == HttpURLConnection.HTTP_NOT_FOUND) {
-                    out.put("available", false);
-                    call.resolve(out);
-                    return;
+        try {
+            probes.execute(() -> {
+                HttpURLConnection conn = null;
+                try {
+                    conn = (HttpURLConnection) new URL(releaseUrl(version)).openConnection();
+                    conn.setInstanceFollowRedirects(false);
+                    conn.setRequestMethod("HEAD");
+                    conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
+                    conn.setReadTimeout(READ_TIMEOUT_MS);
+                    conn.setUseCaches(false);
+                    int status = conn.getResponseCode();
+                    JSObject out = new JSObject();
+                    out.put("status", status);
+                    if (status == HttpURLConnection.HTTP_NOT_FOUND) {
+                        out.put("available", false);
+                        call.resolve(out);
+                        return;
+                    }
+                    boolean redirect = status == 301 || status == 302 || status == 303 || status == 307 || status == 308;
+                    if (redirect && assetLocation(conn.getHeaderField("Location"))) {
+                        out.put("available", true);
+                        call.resolve(out);
+                        return;
+                    }
+                    call.reject("HTTP " + status, "http");
+                } catch (IOException | RuntimeException e) {
+                    call.reject("network", "network", e);
+                } finally {
+                    if (conn != null) conn.disconnect();
                 }
-                boolean redirect = status == 301 || status == 302 || status == 303 || status == 307 || status == 308;
-                if (redirect && assetLocation(conn.getHeaderField("Location"))) {
-                    out.put("available", true);
-                    call.resolve(out);
-                    return;
-                }
-                call.reject("HTTP " + status, "http");
-            } catch (IOException | RuntimeException e) {
-                call.reject("network", "network", e);
-            } finally {
-                if (conn != null) conn.disconnect();
-            }
-        });
+            });
+        } catch (RuntimeException e) {
+            call.reject("failed", "failed", e);
+        }
     }
 
     @PluginMethod
@@ -228,12 +232,24 @@ public class ApkUpdatePlugin extends Plugin {
         HttpURLConnection conn = null;
         boolean done = false;
         try {
-            conn = (HttpURLConnection) new URL(releaseUrl(version)).openConnection();
-            conn.setInstanceFollowRedirects(true);
-            conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
-            conn.setReadTimeout(READ_TIMEOUT_MS);
-            conn.setUseCaches(false);
-            int status = conn.getResponseCode();
+            String nextUrl = releaseUrl(version);
+            int status = 0;
+            for (int hop = 0; hop < 5; hop++) {
+                conn = (HttpURLConnection) new URL(nextUrl).openConnection();
+                conn.setInstanceFollowRedirects(false);
+                conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
+                conn.setReadTimeout(READ_TIMEOUT_MS);
+                conn.setUseCaches(false);
+                status = conn.getResponseCode();
+                boolean redirect = status == 301 || status == 302 || status == 303 || status == 307 || status == 308;
+                if (!redirect) break;
+                String location = conn.getHeaderField("Location");
+                conn.disconnect();
+                conn = null;
+                if (!assetLocation(location)) throw new ApkFailure("http", "bad redirect");
+                nextUrl = location;
+            }
+            if (conn == null) throw new ApkFailure("http", "too many redirects");
             if (status == HttpURLConnection.HTTP_NOT_FOUND) throw new ApkFailure("not-found", "HTTP 404");
             if (status != HttpURLConnection.HTTP_OK) throw new ApkFailure("http", "HTTP " + status);
             long total = conn.getContentLengthLong();
@@ -297,21 +313,34 @@ public class ApkUpdatePlugin extends Plugin {
             call.reject("bad version", "bad-version");
             return;
         }
-        File apk = apkFile(version);
-        if (!apk.isFile()) {
-            call.reject("missing", "missing");
+        if (!busy.compareAndSet(false, true)) {
+            call.reject("busy", "busy");
             return;
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !getContext().getPackageManager().canRequestPackageInstalls()) {
-            try {
-                Intent settings = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getContext().getPackageName()));
-                startActivityForResult(call, settings, "installPermissionResult");
-            } catch (ActivityNotFoundException e) {
-                call.reject("no settings", "no-installer", e);
+        try {
+            File apk = apkFile(version);
+            if (!apk.isFile()) {
+                call.reject("missing", "missing");
+                return;
             }
-            return;
+            if (!apkMatches(apk, version)) {
+                apk.delete();
+                call.reject("bad-apk", "bad-apk");
+                return;
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !getContext().getPackageManager().canRequestPackageInstalls()) {
+                try {
+                    Intent settings = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getContext().getPackageName()));
+                    startActivityForResult(call, settings, "installPermissionResult");
+                } catch (ActivityNotFoundException e) {
+                    call.reject("no settings", "no-installer", e);
+                }
+                return;
+            }
+            openInstaller(call, apk);
+        } finally {
+            busy.set(false);
         }
-        openInstaller(call, apk);
     }
 
     @ActivityCallback

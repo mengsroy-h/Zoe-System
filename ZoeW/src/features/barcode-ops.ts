@@ -294,14 +294,18 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
                 markCleanupJournalStage(itemToTrash.id, CLEANUP_STAGE_FLIP, itemToTrash);
                 if (!(await settleCleanupDeduction(itemId, itemToTrash, revenue, false))) return 'pending';
             }
+            const needsCollectedCheck = !!claimedBarcode.isClosed;
             if (collectedSaved === true && pickupSaved === true) {
-                clearCleanupJournalEntry(itemToTrash.id, itemToTrash);
+                const keptOk = !needsCollectedCheck || await remarkCleanupCollectedKept(preparedEntry, removeIsCurrent, removeDb) === true;
+                if (!removeIsCurrent()) return 'stale';
+                if (keptOk) clearCleanupJournalEntry(itemToTrash.id, itemToTrash);
+                else markCleanupJournalStage(itemToTrash.id, CLEANUP_STAGE_COLLECTED, itemToTrash);
             } else {
                 markCleanupJournalStage(itemToTrash.id, CLEANUP_STAGE_COLLECTED, itemToTrash);
                 const awaiting = (saved) => saved === true || saved === undefined;
                 if (awaiting(collectedSaved) && awaiting(pickupSaved)) collectedHold = Promise.all([collectedServer || true, pickupServer || true]).then(async ([saved, picked]) => {
                     if (saved !== true || picked !== true) return;
-                    if (await remarkCleanupCollectedKept(preparedEntry, removeIsCurrent, removeDb) === true && removeIsCurrent()) clearCleanupJournalEntry(itemToTrash.id, itemToTrash);
+                    if ((!needsCollectedCheck || await remarkCleanupCollectedKept(preparedEntry, removeIsCurrent, removeDb) === true) && removeIsCurrent()) clearCleanupJournalEntry(itemToTrash.id, itemToTrash);
                 }, () => {});
             }
             showToast(late ? `✅ បណ្តាញត្រឡប់មកវិញ — បានដកកញ្ចប់ (${barcodeCode}) រួចរាល់!`
@@ -356,11 +360,11 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
                         releaseRemoval();
                         if (confirmedScanToken) clearScannedRemovalInFlight(itemId, barcodeCode, confirmedScanToken);
                     }
-                }, (lateErr) => {
+                }, (lateErr, lateResult) => {
                     settleClaim(false);
                     try {
                         if (!removeIsCurrent()) return;
-                        if (lateErr && lateErr.txOutcome === 'not-applied' && preparedEntry) clearCleanupJournalEntry(preparedEntry.trashItem.id, preparedEntry.trashItem);
+                        if ((lateErr && lateErr.txOutcome === 'not-applied' || !lateErr && lateResult?.committed === false) && preparedEntry) clearCleanupJournalEntry(preparedEntry.trashItem.id, preparedEntry.trashItem);
                         refreshCurrentHistoryView();
                         showToast(restoreClaimBlocked
                             ? "⏳ កញ្ចប់នេះកំពុងស្តារ — សូមរង់ចាំឲ្យចប់ រួចសាកដកម្តងទៀត។"
@@ -378,6 +382,7 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
         }
         if (!result || !result.committed) {
             if (!removeIsCurrent()) { if (preparedEntry) noteRemoveSessionSwitch(preparedEntry.trashItem.id); return 'stale'; }
+            if (result && result.committed === false && preparedEntry) clearCleanupJournalEntry(preparedEntry.trashItem.id, preparedEntry.trashItem);
             if (restoreClaimBlocked) {
                 showToast("⏳ កញ្ចប់នេះកំពុងស្តារ — សូមរង់ចាំឲ្យចប់ រួចសាកដកម្តងទៀត។");
                 return 'failed';

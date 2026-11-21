@@ -1344,7 +1344,7 @@ async function cookieRestoreTransitions(config, headers, barcode, session, start
     const floor = Math.max(basis, stamps.arrival);
     const out = { restoreTransitionsVerified: true, ztoClosed: stamps.signed >= floor && stamps.signed > 0 };
     if (out.ztoClosed) return Object.assign(out, { ztoSignedAt: stamps.signed });
-    if (stamps.returned >= floor && stamps.returned > stamps.sent) return Object.assign(out, { ztoReturnedAt: stamps.returned });
+    if (stamps.returned >= floor && stamps.returned > 0) return Object.assign(out, { ztoReturnedAt: stamps.returned });
     if (stamps.sent >= floor && stamps.sent > 0) return Object.assign(out, { ztoReturnedAt: stamps.sent,
         ...(stamps.problem >= floor && stamps.problem <= stamps.sent ? { ztoMisplacedAt: stamps.sent } : { ztoSentOutAt: stamps.sent }) });
     return out;
@@ -3078,6 +3078,7 @@ async function handleRequest(event) {
             return json(401, { error: 'ZTO authentication rejected', code: 'ZTO_AUTH_EXPIRED' });
         }
         session = retried.session;
+        headers = retried.headers;
         outcome = retried.outcome;
         companionRun = retried.companionRun;
         if (branchPlans.length && outcome.kind === 'ok') {

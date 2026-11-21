@@ -1348,8 +1348,9 @@ async function dailyDeltaGuard() {
     console.log('\n── A352 ៖ delta ប្រចាំថ្ងៃ · upgrade ហាងចាស់ · ៣០០/៦០០ barcode ──');
     const { c } = await H.freshDb('default-grants');
     try {
-        const deltaFile = migrationFiles.find((f) => f.endsWith('_zoe_daily_delta_pull.sql'));
-        await c.query(migrationFiles.filter((f) => f !== deltaFile).map((f) => fs.readFileSync(path.join(MIGRATIONS_DIR, f), 'utf8')).join('\n;\n'));
+        const deltaFiles = migrationFiles.filter((f) => f.endsWith('_zoe_daily_delta_pull.sql')
+            || /function\s+public\.zoe_pull_delta\b/i.test(fs.readFileSync(path.join(MIGRATIONS_DIR, f), 'utf8')));
+        await c.query(migrationFiles.filter((f) => !deltaFiles.includes(f)).map((f) => fs.readFileSync(path.join(MIGRATIONS_DIR, f), 'utf8')).join('\n;\n'));
         const { SERVICE, tenants } = await setupTenants(c);
         const A = tenants.A, B = tenants.B;
         const root = 'zoew_daily_pickup_cod_dod';
@@ -1366,7 +1367,7 @@ async function dailyDeltaGuard() {
         const oldValue = { packagesPickedUp: 1, pickedUpBarcodes: { LEGACY: '0970000001' } };
         await adminSet(root, oldValue);
         const beforeUpgrade = await pull(A.who, 0, false);
-        await c.query(fs.readFileSync(path.join(MIGRATIONS_DIR, deltaFile), 'utf8'));
+        await c.query(deltaFiles.map((f) => fs.readFileSync(path.join(MIGRATIONS_DIR, f), 'utf8')).join('\n;\n'));
         const afterUpgrade = await pull(A.who, 0);
         ok('upgrade ៖ ទិន្នន័យហាងចាស់ និង full pull ដដែល', JSON.stringify(beforeUpgrade.rows) === JSON.stringify(afterUpgrade.rows));
         await adminSet(root, { ...oldValue, packagesPickedUp: 2, pickedUpBarcodes: { ...oldValue.pickedUpBarcodes, NEW: '0970000002' } });

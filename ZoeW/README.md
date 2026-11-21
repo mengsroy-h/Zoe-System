@@ -13,7 +13,7 @@ TypeScript + Vite** — ការអភិវឌ្ឍ · build · ការវ�
 
 ## កំណែ
 
-កំណែបច្ចុប្បន្ន **`2.50.221`** — ជាកំណែ **របស់ ZoeW ផ្ទាល់** (ដាច់ពី ZoeKeyGen
+កំណែបច្ចុប្បន្ន **`2.50.222`** — ជាកំណែ **របស់ ZoeW ផ្ទាល់** (ដាច់ពី ZoeKeyGen
 តាំងពី 2.19.4) ហើយត្រូវស៊ីនឹង `version` ក្នុង `manifest.json` **របស់ ZoeW**។
 
 - បង្ហាញ **២ កន្លែង** ៖ ប្រអប់ចូលប្រព័ន្ធ និងខាងក្រោមរបា Slide។ ចុចលើលេខ
@@ -180,7 +180,7 @@ directory **`netlify/functions`**។ `netlify.toml` ក្នុងថតនេ�
 រួចរាល់ហើយ — ជំហាន build និងការផ្ទៀងផ្ទាត់មុន deploy ស្ថិតក្នុង
 [DEVELOPMENT.md](../docs/zoew/DEVELOPMENT.md)។
 
-Firebase rules (`../firebase-database.rules.json`) ត្រូវ paste ចូល Firebase
+Firebase rules (`../firebase-database.rules.min.json` ដែលបង្កើតចេញពី `../firebase-database.rules.json`) ត្រូវ paste ចូល Firebase
 Console ➜ **Publish** ដោយដៃ។ ⛔ វាមិន deploy ស្វ័យប្រវត្តិទេ។
 
 ### ២. ដំឡើងឧបករណ៍ថ្មី

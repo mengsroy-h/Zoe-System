@@ -121,7 +121,19 @@ function restorePublicationRulesProjection(current) {
     assert.equal(rawDigest(projected), '036e82896add6cecf82436d716071bbf169a73a7a22a65850cc2d8b803d1a84d', 'publication projection changed an existing rule or optimization hint');
     return projected;
 }
+function restorePurgeAllowRulesProjection(current) {
+    assert.equal(rawDigest(current), 'f5ddf02b8a6d54a94869ec8dcee0439d7c3d65ebf868aa45263135f1299ec4a3', 'reviewed trash purge-allow Rules AST or optimization hint changed');
+    const projected = clone(current), row = projected.c.zoew_recently_deleted_cod_dod.x.r;
+    const purgeWrite = parseExpression("auth!=null&&!newData.parent().exists()&&data.parent().hasChild('barcodes')", []);
+    assert.equal(digest(row.c.restorePublication.w), digest(purgeWrite), 'reviewed restorePublication purge write rule changed');
+    assert.equal(digest(row.c.ztoTerminalDecision.w), digest(purgeWrite), 'reviewed ztoTerminalDecision purge write rule changed');
+    row.c.restorePublication.w = { t: 'l', v: false };
+    row.c.ztoTerminalDecision.w = { t: 'l', v: false };
+    assert.equal(rawDigest(projected), 'cc8e93bad4ba527e7ae740cdc4f1cdfeba7ae2f2dd4d73216d29dec30435f994', 'trash purge-allow projection changed an existing rule or optimization hint');
+    return projected;
+}
 function restoreAttestationRulesProjection(current, legacy) {
+    if (rawDigest(current) === 'f5ddf02b8a6d54a94869ec8dcee0439d7c3d65ebf868aa45263135f1299ec4a3') current = restorePurgeAllowRulesProjection(current);
     if (rawDigest(current) === 'cc8e93bad4ba527e7ae740cdc4f1cdfeba7ae2f2dd4d73216d29dec30435f994') current = restoreTerminalDecisionRulesProjection(current);
     if (rawDigest(current) === 'def6cbc9bfb965bfe0d1f13e16fb5adf2cee12d1eff673f9f0dbc04af2e1c076') current = restorePublicationRulesProjection(current);
     assert.deepEqual([rawDigest(legacy), rawDigest(current)], ["043609a50954502fd3f83446738653ba72663b41c2446f748b194149e2a16af6","036e82896add6cecf82436d716071bbf169a73a7a22a65850cc2d8b803d1a84d"], 'reviewed full Rules AST or optimization hint changed');
@@ -140,4 +152,4 @@ function restoreAttestationRulesProjection(current, legacy) {
     assert.equal(seen.size, Object.keys(REVIEWED).length, 'reviewed restore attestation delta missing');
     return clone(legacy);
 }
-module.exports = { restoreAttestationRulesProjection, restorePublicationRulesProjection, restoreTerminalDecisionRulesProjection };
+module.exports = { restoreAttestationRulesProjection, restorePublicationRulesProjection, restoreTerminalDecisionRulesProjection, restorePurgeAllowRulesProjection };

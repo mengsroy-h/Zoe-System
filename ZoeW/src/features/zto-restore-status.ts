@@ -5,6 +5,7 @@ import { trashGenerationOf } from '../domain/trash-generation';
 import { barcodeEntriesOf, barcodeReturnBasis } from '../domain/barcode';
 import { pickupBarcodeKey } from '../domain/pickup';
 import { dbOp, fetchWithTimeout } from '../services/network';
+import { resolveNativeApiUrl } from '../platform/native';
 import { txReadServerValue, txRestUrl } from '../services/tx-outcome';
 import { addZtoIdentityHeader, buildLookupRequestHeaders } from './lookup-api';
 import { getLookupApiConfig, getZtoTrashMode } from './lookup-config';
@@ -64,7 +65,7 @@ export async function requestRestoreAuthorization(item, operation: RestoreProofO
         && scope === liveShopScope() && JSON.stringify(getLookupApiConfig()) === signature;
     let url;
     try {
-        url = new URL(cfg.url, window.location.href);
+        url = new URL(resolveNativeApiUrl(cfg.url), window.location.href);
         if (!/\/\.netlify\/functions\/zto-order-detail$/.test(url.pathname)) throw new Error();
         url.pathname = url.pathname.replace(/zto-order-detail$/, 'zto-restore-proof');
         url.search = '';

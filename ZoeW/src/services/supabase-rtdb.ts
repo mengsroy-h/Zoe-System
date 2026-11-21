@@ -447,6 +447,18 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     const answeredSeqs = new Map();
     let syncing = false;
     let wantSync = false;
+    const syncWaiters: Array<{ resolve: () => void; reject: (error: any) => void }> = [];
+    let activeSyncBatch: Array<{ resolve: () => void; reject: (error: any) => void }> = [];
+    const settleSyncBatch = (batch, error?) => {
+        for (const waiter of batch) {
+            if (error) waiter.reject(error);
+            else waiter.resolve();
+        }
+    };
+    const rejectAllSyncWaiters = (error) => {
+        settleSyncBatch(activeSyncBatch.splice(0), error);
+        settleSyncBatch(syncWaiters.splice(0), error);
+    };
     let online = true;
     let connected = false;
     let serverOffset = 0;
@@ -1146,13 +1158,15 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         try {
             while (wantSync && !closed) {
                 wantSync = false;
+                activeSyncBatch = syncWaiters.splice(0);
                 const epoch = sessionEpoch;
                 const syncScope = authScope;
                 const syncTopic = tenantTopic;
                 const syncAuthed = authed;
                 const syncIsCurrent = () => epoch === sessionEpoch && syncScope === authScope && syncTopic === tenantTopic && syncAuthed === authed;
-                if (!online || (navigator.onLine as boolean) === false) { setConnected(false); break; }
+                if (!online || (navigator.onLine as boolean) === false) { settleSyncBatch(activeSyncBatch.splice(0), new SbNetworkError('offline', true)); setConnected(false); break; }
                 if (!authed) {
+                    settleSyncBatch(activeSyncBatch.splice(0), new SbNetworkError('unauthenticated', true));
                     try {
                         await transport.ping(rpcTimeoutMs);
                         if (closed) return;
@@ -1174,7 +1188,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                         const scope = cacheScope;
                         const rec = await loadCacheWithin(scope);
                         if (closed) return;
-                        if (!syncIsCurrent()) { cacheTried = false; wantSync = true; continue; }
+                        if (!syncIsCurrent()) { cacheTried = false; settleSyncBatch(activeSyncBatch.splice(0), new SbNetworkError('stale-sync', true)); wantSync = true; continue; }
                         if (scope === cacheScope && authed && cursor === 0 && server.size === 0 && docsCacheRecordIsValid(rec, scope)) seedFromCache(rec);
                     }
                 }
@@ -1231,8 +1245,9 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                             break;
                         }
                     }
-                    if (staleSession) { wantSync = true; continue; }
+                    if (staleSession) { settleSyncBatch(activeSyncBatch.splice(0), new SbNetworkError('stale-sync', true)); wantSync = true; continue; }
                     if (!pullComplete) throw new SbRpcError('pull incomplete', 'pull_incomplete', 0, '');
+                    settleSyncBatch(activeSyncBatch.splice(0));
                     await recoverWrites();
                     if (!syncIsCurrent()) { wantSync = true; continue; }
                     forbidden = null;
@@ -1247,17 +1262,19 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     scheduleCacheSave();
                 } catch (e) {
                     if (closed) return;
-                    if (!syncIsCurrent()) { wantSync = true; continue; }
+                    if (!syncIsCurrent()) { settleSyncBatch(activeSyncBatch.splice(0), new SbNetworkError('stale-sync', true)); wantSync = true; continue; }
                     if (e instanceof SbRpcError && e.code === 'bad_delta') {
                         cursor = 0; pullFullHead = null; pullStage = null;
                     }
                     if (e instanceof SbRpcError && (e.code === '42501' || e.status === 401 || e.status === 403)) {
+                        settleSyncBatch(activeSyncBatch.splice(0), e);
                         forbidden = e;
                         setConnected(true);
                         cancelListenersWith(e);
                         hooks.onForbidden(e);
                         break;
                     }
+                    settleSyncBatch(activeSyncBatch.splice(0), new SbNetworkError(e?.message || 'sync-failed', true));
                     setConnected(false);
                     scheduleRetry();
                     break;
@@ -1265,6 +1282,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             }
         } finally {
             syncing = false;
+            rejectAllSyncWaiters(new SbNetworkError('sync-stopped', true));
         }
     };
 
@@ -1273,6 +1291,12 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         wantSync = true;
         if (!syncing) runSync();
     }
+
+    const syncFresh = () => new Promise<void>((resolve, reject) => {
+        if (closed) { reject(new SbNetworkError('closed', true)); return; }
+        syncWaiters.push({ resolve, reject });
+        requestSync();
+    });
 
     const scheduleRealtimeRetry = () => {
         if (realtimeRetryTimer || closed) return;
@@ -1874,6 +1898,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     let res;
                     let lost = null;
                     let sentAfter = serverNowSeen;
+                    let sentAt = Date.now();
                     let lostAttempts = 0;
                     const giveUp = () => {
                         lost.txOutcome = 'unknown';
@@ -1882,6 +1907,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                         return lost;
                     };
                     let sendEpoch = sessionEpoch;
+                    let replayExpired = false;
                     for (;;) {
                         if (!admitted()) throw lost ? giveUp() : endedWrite();
                         if (closed) throw lost ? giveUp() : firebaseLikeError('disconnect', path);
@@ -1897,17 +1923,45 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                             continue;
                         }
                         sendEpoch = sessionEpoch;
+                        let wrote = false;
                         try {
-                            if (!lost && serverNowIsOld()) {
-                                try { await rpc('zoe_now', {}); }
+                            if (lost) {
+                                const maybeExpired = !(sentAfter > 0) || elapsedSince(sentAt) >= SB_OP_REPLAY_SAFE_MS / 2;
+                                if (maybeExpired) {
+                                    let now;
+                                    try { now = await rpc('zoe_now', {}); }
+                                    catch (e) { throw e instanceof SbNetworkError ? new SbNetworkError(e.message, true) : e; }
+                                    if (closed || sendEpoch !== sessionEpoch || authScope !== txScope || tenantTopic !== txTopic) continue;
+                                    const age = sentAfter > 0 && typeof now === 'number' && Number.isFinite(now) ? now - sentAfter : NaN;
+                                    if (!(age >= 0 && age <= SB_OP_REPLAY_SAFE_MS)) {
+                                        await syncFresh();
+                                        if (closed || sendEpoch !== sessionEpoch || authScope !== txScope || tenantTopic !== txTopic) continue;
+                                        replayExpired = true;
+                                        res = { ok: false, conflict: true, now: typeof now === 'number' && Number.isFinite(now) ? now : serverNowSeen, value: serverValueAt(path) };
+                                        break;
+                                    }
+                                }
+                            } else if (serverNowIsOld()) {
+                                let now;
+                                try { now = await rpc('zoe_now', {}); }
                                 catch (e) { throw e instanceof SbNetworkError ? new SbNetworkError(e.message, true) : e; }
                                 if (closed || sendEpoch !== sessionEpoch || authScope !== txScope || tenantTopic !== txTopic) continue;
-                                sentAfter = serverNowSeen;
+                                if (typeof now !== 'number' || !Number.isFinite(now) || !(now > 0)) throw new SbNetworkError('server time unavailable', true);
+                                sentAfter = now;
+                                sentAt = Date.now();
                             }
+                            wrote = true;
                             res = await rpc('zoe_write', { p_op_id: opId, p_ops: [op] }, updateFn.connectionIntent, advisory, txTopic, admitted);
                             break;
                         } catch (e) {
                             if (!(e instanceof SbNetworkError)) {
+                                if (wrote && lost && !advisory && sbReplayRefusalProvesUnsent(e)) {
+                                    if (writeJournal) {
+                                        try { writeJournal.remove(txScope, txTopic, opId); } catch (error) { hooks.onListenerError(error); }
+                                    }
+                                    dropWrite(opId);
+                                    throw Object.assign(rpcFailureToError(e, path), { txOutcome: 'not-applied', noRetry: true });
+                                }
                                 if (lost && !advisory) throw giveUp();
                                 throw rpcFailureToError(e, path);
                             }
@@ -1940,7 +1994,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                         if (sendEpoch !== sessionEpoch || authScope !== txScope || tenantTopic !== txTopic) throw lost ? giveUp() : firebaseLikeError('permission_denied', path);
                         if (lost) {
                             const age = sentAfter > 0 && typeof res.now === 'number' && Number.isFinite(res.now) ? res.now - sentAfter : NaN;
-                            if (age >= 0 && age <= SB_OP_REPLAY_SAFE_MS) {
+                            if (!replayExpired && age >= 0 && age <= SB_OP_REPLAY_SAFE_MS) {
                                 lost.txOutcome = 'not-applied';
                                 throw lost;
                             }
@@ -2060,6 +2114,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         listeners.forEach((l: any) => { l.fired = false; l.last = null; });
         markAllDirty();
         setConnected(false);
+        rejectAllSyncWaiters(new SbNetworkError('stale-sync', true));
     };
 
     db.resetForSignOut = () => {
@@ -2105,6 +2160,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         retryTimer = null;
         pollTimer = null;
         cacheSaveTimer = null;
+        rejectAllSyncWaiters(new SbNetworkError('closed', true));
         wakeWaiters();
         listeners.clear();
         infoListeners.clear();

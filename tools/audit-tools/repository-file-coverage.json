@@ -5662,6 +5662,30 @@
     },
     "tools/audit-tools/zoew/tests/firebase-provision-rules-wrapper.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "supabase/migrations/20261120075734_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261120075735_zoe_deep_audit_wave2_fixes.sql": {
+      "policy": "supabase-db"
+    },
+    "tools/audit-tools/zoew/tests/deep-audit-wave1-money-restore.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/deep-audit-wave2-purge-attestation.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/deep-audit-wave3-security-sync.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/deep-audit-wave4-zto-push-sign.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/deep-audit-wave5-platform-qa.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "tools/audit-tools/zoew/tests/deep-audit-matrix-and-scale.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

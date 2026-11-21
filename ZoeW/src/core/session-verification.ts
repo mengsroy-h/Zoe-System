@@ -15,7 +15,7 @@ export function sessionVerificationRequired() {
 
 export function sessionUserActionAllowed(name) {
     if (!firebaseState.auth?.currentUser) return true;
-    if (locallySignedOut()) return ['submitLoginForm', 'toggleRememberPassword', 'openRegisterForm', 'openResetPasswordForm', 'submitRegisterForm', 'submitResetPasswordForm', 'backToLoginForm', 'logoutApp', 'promptLogout', 'confirmLogout', 'cancelLogout'].includes(name);
+    if (locallySignedOut()) return ['submitLoginForm', 'toggleRememberPassword', 'openRegisterForm', 'openResetPasswordForm', 'submitRegisterForm', 'submitResetPasswordForm', 'backToLoginForm', 'logoutApp', 'promptLogout', 'confirmLogout', 'cancelLogout', 'forgetAppLockPin'].includes(name);
     serverClockIsTrustworthy();
     return !sessionVerificationRequired() || name === 'retrySessionVerification' || name === 'logoutApp' || name === 'promptLogout' || name === 'confirmLogout' || name === 'cancelLogout';
 }

@@ -143,9 +143,10 @@ function registerServiceWorker(scope: LifecycleScope): void {
 
     scope.listen(navigator.serviceWorker, 'message', (event: MessageEvent) => handleServiceWorkerMessage(event.data));
 
-    const hadControllerAtLoad = !!navigator.serviceWorker.controller;
+    let hadController = !!navigator.serviceWorker.controller;
     scope.listen(navigator.serviceWorker, 'controllerchange', () => {
-        if (hadControllerAtLoad) showUpdateAvailableBanner();
+        if (hadController) showUpdateAvailableBanner();
+        else hadController = true;
     });
 }
 

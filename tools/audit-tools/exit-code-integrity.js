@@ -318,7 +318,7 @@ function poisonSource(src) {
     //      នោះយើងពុលមិនបាន ➜ ត្រឡប់ `null` ហើយវារាយក្នុង `unpoisonable`
     //      (មើលឃើញ) ជំនួសការពុលអថេរខុសដោយស្ងាត់។
     const FAILISH = /^(fail|fails|failed|failures|problem|problems|gap|gaps|offend|offenders|bad|errors?|miss|missing|dirty|totalGaps)$/i;
-    const exits = [...src.matchAll(/process\.exit\(([^)]*)\)/g)];
+    const exits = [...src.matchAll(/process\.exit\(([^)]*)\)/g), ...src.matchAll(/process\.exitCode\s*=\s*([^;\n]+)/g)];
     const ids = [];
     for (let i = exits.length - 1; i >= 0; i--) {
         const expr = exits[i][1];

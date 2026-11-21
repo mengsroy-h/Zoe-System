@@ -67,11 +67,14 @@ function sameTerminalBarcodes(before, current) {
         const unchanged = field => Object.hasOwn(a, field) === Object.hasOwn(b, field) && canonical(a[field]) === canonical(b[field]);
         const unmeasuredExact = !Object.hasOwn(a, 'ztoSignedExact') || a.ztoSignedExact === null || a.ztoSignedExact === false;
         const firstExact = unmeasuredExact && b.ztoSignedExact === true;
+        const priorNonReturn = Math.max(positive(a.ztoMisplacedAt) ? a.ztoMisplacedAt : 0, positive(a.ztoSentOutAt) ? a.ztoSentOutAt : 0);
+        const firstFinalReturn = priorNonReturn > 0 && positive(a.ztoReturnedAt) && a.ztoReturnedAt <= priorNonReturn && measured(b.ztoReturnedAt) && b.ztoReturnedAt > priorNonReturn;
         for (const field of timeFields) {
             if (unchanged(field)) continue;
             if (!Object.hasOwn(b, field) || !measured(b[field])) return false;
             if (Object.hasOwn(a, field) && a[field] !== null && a[field] !== 0
-                && !(field === 'ztoSignedAt' && positive(a[field]) && firstExact)) return false;
+                && !(field === 'ztoSignedAt' && positive(a[field]) && firstExact)
+                && !(field === 'ztoReturnedAt' && firstFinalReturn)) return false;
         }
         if (!unchanged('ztoSignedExact') && !(firstExact && measured(b.ztoSignedAt))) return false;
         if (b.ztoSignedExact === true && !positive(b.ztoSignedAt)) return false;
@@ -220,6 +223,11 @@ function createFirebaseBackend({ verifyActor, resolveOrigin = configuredOrigin }
                     || proof.status === 'deny' && !Object.hasOwn(proof.snapshot, 'restoreAttestationId') && !Object.hasOwn(proof.snapshot, 'restoreClaim')
                     && sameTerminalBusiness(proof.snapshot, source, input.sourceId));
             if (released) return { pending: false };
+            const unclaimedHold = current === previous && !Object.hasOwn(source, 'restoreAttestationId') && !Object.hasOwn(source, 'restoreClaim')
+                && proof.status === 'hold' && !proof.recovery
+                && !Object.hasOwn(proof.snapshot, 'restoreAttestationId') && !Object.hasOwn(proof.snapshot, 'restoreClaim')
+                && sameTerminalBusiness(proof.snapshot, source, input.sourceId);
+            if (unclaimedHold) return { pending: false };
             if (current !== previous || proof.policyEpoch !== context.policy.epoch || proof.mode !== effectiveMode(context)) {
                 throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
             }
@@ -277,7 +285,10 @@ function createFirebaseBackend({ verifyActor, resolveOrigin = configuredOrigin }
                         || !['allow', 'hold', 'deny'].includes(prior.status) || prior.status === 'deny' && !['signed', 'returned'].includes(prior.verdict)
                         || !plain(prior.snapshot) || prior.sourceHash !== hash(prior.snapshot)
                         || !sameTerminalBusiness(prior.snapshot, source, input.sourceId)) throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
-                    if (publication(source) === publication(prior.snapshot) && canonical(source) === canonical(prior.snapshot)) {
+                    if (!Object.hasOwn(source, 'restoreAttestationId') && !Object.hasOwn(source, 'restoreClaim')
+                        && (prior.status === 'deny' || !reservation(input, { ...context, source, attestation: prior }).pending)) {
+                        released = true;
+                    } else if (publication(source) === publication(prior.snapshot) && canonical(source) === canonical(prior.snapshot)) {
                         if (!integer(prior.issuedAt) || prior.issuedAt <= 0) throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
                         claim = { token: prior.token, targetId: prior.targetId, claimedAt: prior.issuedAt };
                     } else if (Object.hasOwn(source, 'restoreAttestationId')) {
@@ -285,9 +296,7 @@ function createFirebaseBackend({ verifyActor, resolveOrigin = configuredOrigin }
                             || source.restoreClaim.token !== prior.token || source.restoreClaim.targetId !== prior.targetId
                             || !integer(source.restoreClaim.claimedAt) || source.restoreClaim.claimedAt <= 0) throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
                         claim = { ...source.restoreClaim };
-                    } else if (!Object.hasOwn(source, 'restoreClaim') && (prior.status === 'deny'
-                        || !reservation(input, { ...context, source, attestation: prior }).pending)) released = true;
-                    else {
+                    } else {
                         if (canonical(source.restoreClaim) !== canonical(prior.snapshot.restoreClaim)
                             || !integer(prior.issuedAt) || prior.issuedAt <= 0) throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
                         claim = { token: prior.token, targetId: prior.targetId, claimedAt: prior.issuedAt };
@@ -374,7 +383,9 @@ function createFirebaseBackend({ verifyActor, resolveOrigin = configuredOrigin }
                 if (source.value.restoreAttestationId && (!proof || proof.id !== source.value.restoreAttestationId)) throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
                 if (claim) {
                     if (!plain(claim) || typeof claim.token !== 'string' || !ID.test(claim.targetId) || !integer(claim.claimedAt)) throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
-                    if (!pending.pending && claim.token === input.token && proof && proof.actorUid !== actor.uid) throw new RestoreFailure('ZTO_RESTORE_AUTH_REQUIRED', 401);
+                    const expiredForRelease = input.action === 'release' && proof && proof.expiresAt <= now()
+                        && (claim.claimedAt + PROOF_TTL_MS <= now() || !!(proof.recovery && proof.status === 'hold'));
+                    if (!pending.pending && claim.token === input.token && proof && proof.actorUid !== actor.uid && !expiredForRelease) throw new RestoreFailure('ZTO_RESTORE_AUTH_REQUIRED', 401);
                     if (claim.token !== input.token || claim.targetId !== input.targetId) {
                         const oldTarget = claim.targetId === input.targetId ? target.value : (await read(HISTORY_ROOT + '/' + claim.targetId)).value;
                         const recoveredExpiry = proof?.recovery && proof.status === 'hold' && proof.expiresAt <= now();
@@ -442,17 +453,27 @@ function createFirebaseBackend({ verifyActor, resolveOrigin = configuredOrigin }
                     if (target?.restoreClaimId === input.sourceId) throw new RestoreFailure('ZTO_RESTORE_IN_PROGRESS', 409);
                 }
                 if (allowing && expiresAt <= now()) throw new RestoreFailure('ZTO_RESTORE_UNCONFIRMED');
-                let next = { ...context.source, id: input.sourceId, restoreAttestationId: attestationId,
-                    restorePublication: publicationId,
-                    restoreClaim: { token: input.token, targetId: input.targetId, claimedAt: issuedAt } };
-                if (grant.status === 'deny' && verdict === 'signed') next.restoreBlocked = true;
-                if (input.action === 'release') {
-                    delete next.restoreClaim;
-                    delete next.restoreAttestationId;
+                const shouldPublish = allowing || input.action === 'release' || grant.status === 'deny' || !!context.source.restoreAttestationId;
+                let sourceValue = context.source;
+                if (shouldPublish) {
+                    const priorClaim = context.source.restoreClaim;
+                    const claimedAt = priorClaim && priorClaim.token === input.token && priorClaim.targetId === input.targetId && integer(priorClaim.claimedAt)
+                        ? priorClaim.claimedAt : issuedAt;
+                    let next = { ...context.source, id: input.sourceId, restorePublication: publicationId };
+                    if (allowing || context.source.restoreAttestationId) {
+                        next.restoreAttestationId = attestationId;
+                        next.restoreClaim = { token: input.token, targetId: input.targetId, claimedAt };
+                    }
+                    if (grant.status === 'deny' && verdict === 'signed') next.restoreBlocked = true;
+                    if (input.action === 'release') {
+                        delete next.restoreClaim;
+                        delete next.restoreAttestationId;
+                    }
+                    const committed = await put(SOURCE_ROOT + '/' + input.sourceId, next, context.sourceEtag);
+                    sourceValue = committed.value;
                 }
-                const committed = await put(SOURCE_ROOT + '/' + input.sourceId, next, context.sourceEtag);
-                return { v: 1, success: true, kind: input.action === 'release' ? 'released' : grant.status === 'allow' ? 'allow' : 'deny',
-                    attestationId, expiresAt, source: committed.value };
+                return { v: 1, success: true, kind: input.action === 'release' ? 'released' : grant.status === 'allow' ? 'allow' : grant.status === 'hold' ? 'hold' : 'deny',
+                    attestationId, expiresAt, source: sourceValue };
             }
         };
         return backend;

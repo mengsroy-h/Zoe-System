@@ -92,7 +92,9 @@ public class ScanBeepPlugin extends Plugin {
                 }
                 return true;
             }
-            for (AudioDeviceInfo device : audio.getDevices(AudioManager.GET_DEVICES_OUTPUTS)) {
+            AudioDeviceInfo[] devices = audio.getDevices(AudioManager.GET_DEVICES_OUTPUTS);
+            if (devices == null || devices.length == 0) return false;
+            for (AudioDeviceInfo device : devices) {
                 if (device == null) return false;
                 int type = device.getType();
                 if (type != AudioDeviceInfo.TYPE_BUILTIN_SPEAKER && type != AudioDeviceInfo.TYPE_BUILTIN_EARPIECE

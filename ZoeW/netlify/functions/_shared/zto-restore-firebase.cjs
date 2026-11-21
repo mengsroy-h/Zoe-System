@@ -67,11 +67,14 @@ function sameTerminalBarcodes(before, current) {
         const unchanged = field => Object.hasOwn(a, field) === Object.hasOwn(b, field) && canonical(a[field]) === canonical(b[field]);
         const unmeasuredExact = !Object.hasOwn(a, 'ztoSignedExact') || a.ztoSignedExact === null || a.ztoSignedExact === false;
         const firstExact = unmeasuredExact && b.ztoSignedExact === true;
+        const priorNonReturn = Math.max(positive(a.ztoMisplacedAt) ? a.ztoMisplacedAt : 0, positive(a.ztoSentOutAt) ? a.ztoSentOutAt : 0);
+        const firstFinalReturn = priorNonReturn > 0 && positive(a.ztoReturnedAt) && a.ztoReturnedAt <= priorNonReturn && measured(b.ztoReturnedAt) && b.ztoReturnedAt > priorNonReturn;
         for (const field of timeFields) {
             if (unchanged(field)) continue;
             if (!Object.hasOwn(b, field) || !measured(b[field])) return false;
             if (Object.hasOwn(a, field) && a[field] !== null && a[field] !== 0
-                && !(field === 'ztoSignedAt' && positive(a[field]) && firstExact)) return false;
+                && !(field === 'ztoSignedAt' && positive(a[field]) && firstExact)
+                && !(field === 'ztoReturnedAt' && firstFinalReturn)) return false;
         }
         if (!unchanged('ztoSignedExact') && !(firstExact && measured(b.ztoSignedAt))) return false;
         if (b.ztoSignedExact === true && !positive(b.ztoSignedAt)) return false;

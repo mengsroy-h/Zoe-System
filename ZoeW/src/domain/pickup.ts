@@ -877,7 +877,8 @@ export function pickupIntentTracker(isCurrent, itemId?, kind?) {
     let commit = null;
     let pickupCommit = null;
     let pickupCommitKeys = new Set<string>();
-    const closedKeysOf = (applied) => new Set<string>((applied?.marks || []).filter((m) => m && m.key && m.closed).map((m) => m.key));
+    const markSignaturesOf = (applied) => new Set<string>((applied?.marks || []).filter((m) => m && m.key)
+        .map((m) => (applied?.existingOnly === true ? 'E' : 'A') + '\0' + m.key + '\0' + (m.closed ? '1:' + (m.phoneKey || '') : '0')));
     const eitherPickupTrue = (first, second) => new Promise((resolve) => {
         let pending = 2;
         let settled = false;
@@ -1008,7 +1009,7 @@ export function pickupIntentTracker(isCurrent, itemId?, kind?) {
             if (!applied || !applied.commit) return;
             commit = applied.commit;
             const nextCommit = applied.pickupCommit || applied.commit;
-            const nextKeys = closedKeysOf(applied);
+            const nextKeys = markSignaturesOf(applied);
             if (!pickupCommit) {
                 pickupCommit = nextCommit;
                 pickupCommitKeys = nextKeys;

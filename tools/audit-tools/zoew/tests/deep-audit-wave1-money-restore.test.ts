@@ -411,9 +411,10 @@ it('M-13a៖ កញ្ចប់ត្រឡប់ដែលមាន ztoSentOutAt
     expect(trashDisplayReasonOf(item)).toBe('returned');
 });
 
-it('M-13b៖ កញ្ចប់ misplaced (ztoReturnedAt=T1, ztoMisplacedAt=T1) ដែល ZTO ស្កេនត្រឡប់ពិតនៅ T2>T1 ត្រូវអាប់ដេត ztoReturnedAt=T2 លើ server', () => {
+it('M-13b៖ កញ្ចប់ misplaced (ztoReturnedAt=T1, ztoMisplacedAt=T1) ដែល ZTO ស្កេនត្រឡប់ពិតនៅ T2>T1 ត្រូវអាប់ដេត ztoReturnedAt=T2 លើ server តែម្ដង (មិនប្តូរទៅ T3 ទៀត)', () => {
     const t1 = NOW - 3 * H;
     const t2 = NOW - H;
+    const t3 = NOW - 10 * 60 * 1000;
     const item = {
         id: 'm13b', phone: PHONE, scanDate: DAY, createdAt: NOW - 4 * H, deletedAt: t1,
         trashReason: 'returned', trashMode: 'cookie', isFromDeletion: false,
@@ -426,6 +427,11 @@ it('M-13b៖ កញ្ចប់ misplaced (ztoReturnedAt=T1, ztoMisplacedAt=T1) 
     const updated = applyZtoFinalMarks(clone(item), targets[0].wanted, true);
     expect(updated).toBeTruthy();
     expect(updated.barcodes[0].ztoReturnedAt).toBe(t2);
+
+    dataState.deletedItems = [clone(updated)];
+    noteZtoReturnedEvidence('M13B001', t3, 'returned');
+    expect(collectZtoFinalTargets()).toHaveLength(0);
+    expect(applyZtoFinalMarks(clone(updated), { [key('M13B001')]: { returned: t3 } }, true)).toBeUndefined();
 });
 
 it('M-17a៖ removeSingleBarcode collectedDrop យឺតដែលមកដល់ក្រោយ Restore ត្រូវជួសជុល daily_collected វិញ (មិនលុបប្រាក់ដែលបានស្តារ)', async () => {
@@ -579,6 +585,33 @@ it('M-17f៖ pickupIntentTracker.note ត្រូវជំនួស speculative
     extraTracker.note({ marks: [{ key: key('M17F002'), phoneKey: PHONE, closed: true }, { key: key('M17F003'), phoneKey: PHONE, closed: true }], commit: Promise.resolve(null) });
     expect(await extraTracker.finish(Promise.resolve(true))).toBe(false);
     expect(pickup.readPickupJournal().some((entry: any) => entry.item === 'm17f_extra' && entry.pickupDone === true)).toBe(false);
+
+    const phoneTracker = pickup.pickupIntentTracker(() => true, 'm17f_phone');
+    expect(await phoneTracker.prepare(DAY, [key('M17F004')])).toBeTruthy();
+    expect(phoneTracker.start()).toBe(true);
+    expect(phoneTracker.confirm([key('M17F004')])).toBe(true);
+    phoneTracker.note({ marks: [{ key: key('M17F004'), phoneKey: '011111111', closed: true }], commit: Promise.resolve(true) });
+    phoneTracker.note({ marks: [{ key: key('M17F004'), phoneKey: '022222222', closed: true }], commit: Promise.resolve(null) });
+    expect(await phoneTracker.finish(Promise.resolve(true))).toBe(false);
+    expect(pickup.readPickupJournal().some((entry: any) => entry.item === 'm17f_phone' && entry.pickupDone === true)).toBe(false);
+
+    const reopenTracker = pickup.pickupIntentTracker(() => true, 'm17f_reopen');
+    expect(await reopenTracker.prepare(DAY, [key('M17F005'), key('M17F006')])).toBeTruthy();
+    expect(reopenTracker.start()).toBe(true);
+    expect(reopenTracker.confirm([key('M17F005'), key('M17F006')])).toBe(true);
+    reopenTracker.note({ marks: [{ key: key('M17F005'), phoneKey: PHONE, closed: false }], commit: Promise.resolve(true) });
+    reopenTracker.note({ marks: [{ key: key('M17F005'), phoneKey: PHONE, closed: false }, { key: key('M17F006'), phoneKey: PHONE, closed: false }], commit: Promise.resolve(null) });
+    expect(await reopenTracker.finish(Promise.resolve(true))).toBe(false);
+    expect(pickup.readPickupJournal().some((entry: any) => entry.item === 'm17f_reopen' && entry.pickupDone === true)).toBe(false);
+
+    const existingTracker = pickup.pickupIntentTracker(() => true, 'm17f_existing');
+    expect(await existingTracker.prepare(DAY, [key('M17F007')])).toBeTruthy();
+    expect(existingTracker.start()).toBe(true);
+    expect(existingTracker.confirm([key('M17F007')])).toBe(true);
+    existingTracker.note({ existingOnly: true, marks: [{ key: key('M17F007'), phoneKey: PHONE, closed: true }], commit: Promise.resolve(true) });
+    existingTracker.note({ marks: [{ key: key('M17F007'), phoneKey: PHONE, closed: true }], commit: Promise.resolve(null) });
+    expect(await existingTracker.finish(Promise.resolve(true))).toBe(false);
+    expect(pickup.readPickupJournal().some((entry: any) => entry.item === 'm17f_existing' && entry.pickupDone === true)).toBe(false);
 
     const tracker = pickup.pickupIntentTracker(() => true, 'm17f');
     const ctx = await tracker.prepare(DAY, [key('M17F001')]);

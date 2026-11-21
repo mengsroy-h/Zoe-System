@@ -221,4 +221,76 @@ $$;
 revoke all on function public.zoe_pull_delta(bigint, integer, bigint) from public, anon, authenticated, service_role;
 grant execute on function public.zoe_pull_delta(bigint, integer, bigint) to authenticated;
 
+create or replace function private.zoe_restore_terminal_business_v1(p_before jsonb,p_current jsonb,p_source_id text) returns boolean
+language plpgsql immutable security invoker set search_path=''
+as $$
+declare old_rank integer;new_rank integer;old_publication numeric:=0;new_publication numeric:=0;field text;slot text;old_row jsonb;new_row jsonb;old_value jsonb;new_value jsonb;prior_non_return numeric:=0;
+begin
+    if jsonb_typeof(p_before) is distinct from 'object' or jsonb_typeof(p_current) is distinct from 'object' then return false;end if;
+    if p_before ? 'id' then
+        if p_before->>'id' is distinct from p_source_id or p_current->'id' is distinct from p_before->'id' then return false;end if;
+    elsif p_current ? 'id' and p_current->>'id' is distinct from p_source_id then return false;end if;
+    if p_before->'restoreBlocked' is distinct from p_current->'restoreBlocked' and p_current->'restoreBlocked' is distinct from 'true'::jsonb then return false;end if;
+    foreach field in array array['restorePublication'] loop
+        if p_before ? field then
+            if jsonb_typeof(p_before->field) is distinct from 'number' then return false;end if;
+            old_publication:=(p_before->>field)::numeric;
+            if old_publication not between 1 and 9007199254740990 or old_publication<>trunc(old_publication) then return false;end if;
+        end if;
+        if p_current ? field then
+            if jsonb_typeof(p_current->field) is distinct from 'number' then return false;end if;
+            new_publication:=(p_current->>field)::numeric;
+            if new_publication not between 1 and 9007199254740990 or new_publication<>trunc(new_publication) then return false;end if;
+        end if;
+    end loop;
+    if new_publication<old_publication then return false;end if;
+    old_rank:=case when not(p_before ? 'ztoTerminalDecision') then 0 when p_before->'ztoTerminalDecision'='"returned"'::jsonb then 1 when p_before->'ztoTerminalDecision'='"signed"'::jsonb then 2 else -1 end;
+    new_rank:=case when not(p_current ? 'ztoTerminalDecision') then 0 when p_current->'ztoTerminalDecision'='"returned"'::jsonb then 1 when p_current->'ztoTerminalDecision'='"signed"'::jsonb then 2 else -1 end;
+    if old_rank<0 or new_rank<old_rank then return false;end if;
+    if (p_before-array['id','restoreBlocked','restoreClaim','restoreAttestationId','restorePublication','ztoTerminalDecision','barcodes']) is distinct from
+        (p_current-array['id','restoreBlocked','restoreClaim','restoreAttestationId','restorePublication','ztoTerminalDecision','barcodes']) then return false;end if;
+    if jsonb_typeof(p_before->'barcodes') is distinct from jsonb_typeof(p_current->'barcodes') then return false;end if;
+    if jsonb_typeof(p_before->'barcodes') is null or jsonb_typeof(p_before->'barcodes') not in ('object','array') then return (p_before->'barcodes') is not distinct from (p_current->'barcodes');end if;
+    if jsonb_typeof(p_before->'barcodes')='array' then
+        if jsonb_array_length(p_before->'barcodes')<>jsonb_array_length(p_current->'barcodes') then return false;end if;
+    elsif (select coalesce(jsonb_agg(key order by key),'[]'::jsonb) from jsonb_object_keys(p_before->'barcodes')key) is distinct from
+        (select coalesce(jsonb_agg(key order by key),'[]'::jsonb) from jsonb_object_keys(p_current->'barcodes')key) then return false;end if;
+    for slot,old_row in select e.key,e.value from jsonb_each(case when jsonb_typeof(p_before->'barcodes')='object' then p_before->'barcodes' else '{}'::jsonb end)e
+        union all select (e.ordinality-1)::text,e.value from jsonb_array_elements(case when jsonb_typeof(p_before->'barcodes')='array' then p_before->'barcodes' else '[]'::jsonb end) with ordinality e loop
+        new_row:=case when jsonb_typeof(p_current->'barcodes')='array' then (p_current->'barcodes')->slot::integer else (p_current->'barcodes')->slot end;
+        if jsonb_typeof(new_row)='object' and new_row->'ztoSignedExact'='true'::jsonb then
+            if jsonb_typeof(new_row->'ztoSignedAt') is distinct from 'number' then return false;end if;
+            if (new_row->>'ztoSignedAt')::double precision<=0 then return false;end if;
+        end if;
+        if old_row is not distinct from new_row then continue;end if;
+        if jsonb_typeof(old_row) is distinct from 'object' or jsonb_typeof(new_row) is distinct from 'object' then return false;end if;
+        if (old_row-array['ztoSignedAt','ztoReturnedAt','ztoMisplacedAt','ztoSentOutAt','ztoSignedExact']) is distinct from
+            (new_row-array['ztoSignedAt','ztoReturnedAt','ztoMisplacedAt','ztoSentOutAt','ztoSignedExact']) then return false;end if;
+        prior_non_return:=greatest(
+            case when jsonb_typeof(old_row->'ztoMisplacedAt')='number' and (old_row->>'ztoMisplacedAt')::numeric>0 then (old_row->>'ztoMisplacedAt')::numeric else 0 end,
+            case when jsonb_typeof(old_row->'ztoSentOutAt')='number' and (old_row->>'ztoSentOutAt')::numeric>0 then (old_row->>'ztoSentOutAt')::numeric else 0 end
+        );
+        foreach field in array array['ztoSignedAt','ztoReturnedAt','ztoMisplacedAt','ztoSentOutAt'] loop
+            old_value:=old_row->field;new_value:=new_row->field;
+            if old_value is not distinct from new_value then continue;end if;
+            if jsonb_typeof(new_value) is distinct from 'number' then return false;end if;
+            if (new_value#>>'{}')::numeric not between 1 and 9007199254740990
+                or (new_value#>>'{}')::numeric<>trunc((new_value#>>'{}')::numeric) then return false;end if;
+            if old_value is null or old_value='null'::jsonb or old_value='0'::jsonb then continue;end if;
+            if field='ztoReturnedAt' and prior_non_return>0 and jsonb_typeof(old_value)='number'
+                and (old_value#>>'{}')::numeric>0 and (old_value#>>'{}')::numeric<=prior_non_return
+                and (new_value#>>'{}')::numeric>prior_non_return then continue;end if;
+            if field<>'ztoSignedAt' or jsonb_typeof(old_value) is distinct from 'number' or (old_value#>>'{}')::numeric<=0
+                or (new_row->'ztoSignedExact'='true'::jsonb and (old_row->'ztoSignedExact' is null or old_row->'ztoSignedExact' in ('null'::jsonb,'false'::jsonb))) is not true then return false;end if;
+        end loop;
+        if old_row->'ztoSignedExact' is distinct from new_row->'ztoSignedExact' and (new_row->'ztoSignedExact'='true'::jsonb
+            and (old_row->'ztoSignedExact' is null or old_row->'ztoSignedExact' in ('null'::jsonb,'false'::jsonb))
+            and jsonb_typeof(new_row->'ztoSignedAt')='number' and (new_row->>'ztoSignedAt')::numeric between 1 and 9007199254740990
+            and (new_row->>'ztoSignedAt')::numeric=trunc((new_row->>'ztoSignedAt')::numeric)) is not true then return false;end if;
+    end loop;
+    return true;
+exception when numeric_value_out_of_range then return false;
+end $$;
+revoke all on function private.zoe_restore_terminal_business_v1(jsonb,jsonb,text) from public,anon,authenticated,service_role;
+
 notify pgrst, 'reload schema';

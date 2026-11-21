@@ -1883,6 +1883,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                         return lost;
                     };
                     let sendEpoch = sessionEpoch;
+                    let replayExpired = false;
                     for (;;) {
                         if (!admitted()) throw lost ? giveUp() : endedWrite();
                         if (closed) throw lost ? giveUp() : firebaseLikeError('disconnect', path);
@@ -1898,6 +1899,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                             continue;
                         }
                         sendEpoch = sessionEpoch;
+                        let wrote = false;
                         try {
                             if (lost) {
                                 const maybeExpired = !(sentAfter > 0) || elapsedSince(sentAt) >= SB_OP_REPLAY_SAFE_MS / 2;
@@ -1907,21 +1909,29 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                                     if (closed || sendEpoch !== sessionEpoch || authScope !== txScope || tenantTopic !== txTopic) continue;
                                     const age = sentAfter > 0 && Number.isFinite(serverNowSeen) ? serverNowSeen - sentAfter : NaN;
                                     if (!(age >= 0 && age <= SB_OP_REPLAY_SAFE_MS)) {
-                                        let pulled = false;
-                                        for (let page = 0; page < 1000; page++) {
-                                            const pullArgs: any = { p_since: cursor, p_limit: pullPage };
-                                            if (cursor > 0 && pullFullHead !== null) pullArgs.p_full_head = pullFullHead;
-                                            const pullRes = await rpc('zoe_pull', pullArgs);
-                                            if (closed || sendEpoch !== sessionEpoch || authScope !== txScope || tenantTopic !== txTopic) break;
-                                            applyPull(pullRes);
-                                            cursor = pullRes.seq;
-                                            if (typeof pullRes.tenant === 'string' && pullRes.tenant) serverTenant = pullRes.tenant;
-                                            if (pullRes.reset) pullFullHead = pullRes.more && typeof pullRes.head === 'number' && Number.isFinite(pullRes.head) ? pullRes.head : null;
-                                            if (!pullRes.more) { pullFullHead = null; pulled = true; break; }
+                                        let readRes;
+                                        try {
+                                            readRes = await rpc('zoe_read', { p_root: path[0], p_key: path.length > 1 ? path[1] : null });
+                                            if (!readRes || !Array.isArray(readRes.docs)) throw new SbRpcError('bad read response', 'bad_response', 0, '');
+                                        } catch (e) {
+                                            throw e instanceof SbNetworkError ? new SbNetworkError(e.message, true) : e;
                                         }
                                         if (closed || sendEpoch !== sessionEpoch || authScope !== txScope || tenantTopic !== txTopic) continue;
-                                        if (!pulled) throw new SbNetworkError('pull-incomplete', true);
-                                        res = { ok: false, conflict: true, now: serverNowSeen, value: serverValueAt(path) };
+                                        for (const d of readRes.docs) {
+                                            if (typeof d.s === 'number' && d.s > 0) putAnsweredDoc(d);
+                                        }
+                                        let node = null;
+                                        if (path.length === 1) {
+                                            const out = Object.create(null);
+                                            for (const d of readRes.docs) if (d.v !== null && d.v !== undefined) out[d.k] = d.v;
+                                            node = Object.keys(out).length ? out : null;
+                                        } else {
+                                            const doc = readRes.docs.find((d) => d.k === path[1]);
+                                            node = getAt(doc ? doc.v : null, path.slice(2));
+                                        }
+                                        if (node === null && serverValueAt(path) !== null) requestSync();
+                                        replayExpired = true;
+                                        res = { ok: false, conflict: true, now: typeof readRes.now === 'number' && Number.isFinite(readRes.now) ? readRes.now : serverNowSeen, value: node };
                                         break;
                                     }
                                 }
@@ -1932,11 +1942,12 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                                 sentAfter = serverNowSeen;
                                 sentAt = Date.now();
                             }
+                            wrote = true;
                             res = await rpc('zoe_write', { p_op_id: opId, p_ops: [op] }, updateFn.connectionIntent, advisory, txTopic, admitted);
                             break;
                         } catch (e) {
                             if (!(e instanceof SbNetworkError)) {
-                                if (lost && !advisory && sbReplayRefusalProvesUnsent(e)) {
+                                if (wrote && lost && !advisory && sbReplayRefusalProvesUnsent(e)) {
                                     dropWrite(opId);
                                     throw Object.assign(rpcFailureToError(e, path), { txOutcome: 'not-applied', noRetry: true });
                                 }
@@ -1972,7 +1983,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                         if (sendEpoch !== sessionEpoch || authScope !== txScope || tenantTopic !== txTopic) throw lost ? giveUp() : firebaseLikeError('permission_denied', path);
                         if (lost) {
                             const age = sentAfter > 0 && typeof res.now === 'number' && Number.isFinite(res.now) ? res.now - sentAfter : NaN;
-                            if (age >= 0 && age <= SB_OP_REPLAY_SAFE_MS) {
+                            if (!replayExpired && age >= 0 && age <= SB_OP_REPLAY_SAFE_MS) {
                                 lost.txOutcome = 'not-applied';
                                 throw lost;
                             }

@@ -316,7 +316,7 @@ it('M-10a/b៖ releaseStaleRestoreClaimForPurge ប្រើ action=release ន�
     expect(authCall.token).not.toBe('foreign_user_token');
 });
 
-it('M-21៖ Supabase migrations ចុងក្រោយត្រូវជួសជុល zoe_restore_first_commit_v1, zoe_restore_attest_v1 attribution និង zoe_pull_delta O(N)', () => {
+it('M-21៖ Supabase migrations ចុងក្រោយត្រូវជួសជុល zoe_restore_first_commit_v1, zoe_restore_attest_v1 attribution, zoe_pull_delta O(N) និង ztoReturnedAt upgrade តែម្ដង', () => {
     const dir = path.join(ROOT, 'supabase/migrations');
     const allSql = fs.readdirSync(dir).filter(f => f.endsWith('.sql')).sort().map(f => ({ file: f, text: fs.readFileSync(path.join(dir, f), 'utf8') }));
     const latestFirstCommit = [...allSql].reverse().find(m => /create\s+(?:or\s+replace\s+)?function\s+private\.zoe_restore_first_commit_v1\b/i.test(m.text))!;
@@ -328,4 +328,20 @@ it('M-21៖ Supabase migrations ចុងក្រោយត្រូវជួស
     const latestPullDelta = [...allSql].reverse().find(m => /create\s+(?:or\s+replace\s+)?function\s+public\.zoe_pull_delta\b/i.test(m.text))!;
     const pullSlice = latestPullDelta.text.slice(latestPullDelta.text.search(/function\s+public\.zoe_pull_delta/i));
     expect(pullSlice).not.toContain('rows_out := rows_out ||');
+
+    const latestTerminal = [...allSql].reverse().find(m => /create\s+(?:or\s+replace\s+)?function\s+private\.zoe_restore_terminal_business_v1\b/i.test(m.text))!;
+    expect(latestTerminal.text).toContain('prior_non_return');
+    expect(latestTerminal.text).toContain("field='ztoReturnedAt'");
+
+    const fbPath = path.join(ROOT, 'ZoeW/netlify/functions/_shared/zto-restore-firebase.cjs');
+    const fbSrc = fs.readFileSync(fbPath, 'utf8');
+    const fnStart = fbSrc.indexOf('function sameTerminalBarcodes(');
+    const fnEnd = fbSrc.indexOf('function sameTerminalBusiness(');
+    const helperFactory = new Function('integer', 'plain', 'canonical', fbSrc.slice(fnStart, fnEnd) + '\nreturn sameTerminalBarcodes;');
+    const helper = helperFactory((v: any) => Number.isSafeInteger(v) && v >= 0 && v <= 9007199254740990, (v: any) => !!v && typeof v === 'object' && !Array.isArray(v), (v: any) => JSON.stringify(v));
+    expect(helper([{ code: 'R1', ztoMisplacedAt: 1000, ztoReturnedAt: 1000 }], [{ code: 'R1', ztoMisplacedAt: 1000, ztoReturnedAt: 2000 }])).toBe(true);
+    expect(helper([{ code: 'R1', ztoSentOutAt: 1000, ztoReturnedAt: 1000 }], [{ code: 'R1', ztoSentOutAt: 1000, ztoReturnedAt: 2000 }])).toBe(true);
+    expect(helper([{ code: 'R1', ztoMisplacedAt: 1000, ztoReturnedAt: 2000 }], [{ code: 'R1', ztoMisplacedAt: 1000, ztoReturnedAt: 3000 }])).toBe(false);
+    expect(helper([{ code: 'R1', ztoReturnedAt: 1000 }], [{ code: 'R1', ztoReturnedAt: 2000 }])).toBe(false);
+    expect(helper([{ code: 'R1', ztoMisplacedAt: 1000, ztoReturnedAt: 1000 }], [{ code: 'R1', ztoMisplacedAt: 1000, ztoReturnedAt: 999 }])).toBe(false);
 });

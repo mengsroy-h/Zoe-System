@@ -197,8 +197,9 @@ export function applyZtoFinalMarks(current, wanted, trash) {
             if (want.signedExact === true) b.ztoSignedExact = true;
             changed = true;
         }
+        const priorNonReturn = Math.max(barcodeZtoMisplaced(b) ? Number(b.ztoMisplacedAt) : 0, barcodeZtoSentOut(b) ? Number(b.ztoSentOutAt) : 0);
         const canUpdateReturned = !barcodeZtoReturned(b)
-            || !want.misplaced && want.returned > (Number(b.ztoReturnedAt) || 0) && (barcodeZtoMisplaced(b) || barcodeZtoSentOut(b));
+            || !want.misplaced && priorNonReturn > 0 && Number(b.ztoReturnedAt) <= priorNonReturn && want.returned > priorNonReturn;
         if (want.returned && returnMarks && (!statusSource || Number.isSafeInteger(want.returned) && want.returned <= getServerNow() && want.returned <= 9007199254740990) && canUpdateReturned
             && want.returned >= barcodeReturnBasis(b, current.createdAt)) {
             b.ztoReturnedAt = want.returned;
@@ -258,8 +259,9 @@ export function collectZtoFinalTargets() {
                     if (!barcodeZtoSentOut(b)) want.sentOut = evidence.at;
                 } else if (evidence && evidence.kind !== 'left') {
                     const stampMisplaced = evidence.kind === 'misplaced' && !barcodeZtoMisplaced(b);
-                    const advanceReturn = evidence.kind === 'returned' && evidence.at > (Number(b.ztoReturnedAt) || 0)
-                        && (!barcodeZtoReturned(b) || barcodeZtoMisplaced(b) || barcodeZtoSentOut(b));
+                    const priorNonReturn = Math.max(barcodeZtoMisplaced(b) ? Number(b.ztoMisplacedAt) : 0, barcodeZtoSentOut(b) ? Number(b.ztoSentOutAt) : 0);
+                    const advanceReturn = evidence.kind === 'returned' && (!barcodeZtoReturned(b)
+                        || priorNonReturn > 0 && Number(b.ztoReturnedAt) <= priorNonReturn && evidence.at > priorNonReturn);
                     if (!barcodeZtoReturned(b) || stampMisplaced || advanceReturn) {
                         want.returned = evidence.at;
                         if (stampMisplaced) want.misplaced = true;

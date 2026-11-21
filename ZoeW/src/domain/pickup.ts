@@ -985,8 +985,10 @@ export function pickupIntentTracker(isCurrent, itemId?, kind?) {
             const targets = barcodeEntriesOf(item.barcodes).filter(({ barcode }) => keys.includes(pickupBarcodeKey(barcode?.code)))
                 .map(({ barcode }) => ({ ...pickupCloseBasis(item, barcode), scanIntent: barcode.scanIntent ?? null }));
             const restorePlan = { v: 1, consumption, finalization, phone: item.phone, phoneKey: getPickupPhoneKey(item), targets };
-            return new Set(keys).size === keys.length && targets.length === keys.length && pickupRestorePlanValid({ ...entry, restorePlan })
+            const saved = new Set(keys).size === keys.length && targets.length === keys.length && pickupRestorePlanValid({ ...entry, restorePlan })
                 && patchPickupJournalEntry(intent, { restorePlan });
+            if (!saved) admissionFailed = true;
+            return saved;
         },
         confirm: (keys) => {
             const entry = readPickupJournal().find((e) => e.id === intent);
@@ -999,7 +1001,11 @@ export function pickupIntentTracker(isCurrent, itemId?, kind?) {
             transitionKnown = patchPickupJournalEntry(intent, { transitionKnown: true, outcome: 'not-applied' });
             return transitionKnown;
         },
-        setItem: (id) => intent ? patchPickupJournalEntry(intent, { item: id }) : false,
+        setItem: (id) => {
+            const saved = intent ? patchPickupJournalEntry(intent, { item: id }) : false;
+            if (!saved) admissionFailed = true;
+            return saved;
+        },
         add: (scanDateStr, keys) => {
             const saved = intent && addPickupIntentKeys(intent, keys);
             if (!saved || context?.date !== scanDateStr) admissionFailed = true;
@@ -1025,7 +1031,14 @@ export function pickupIntentTracker(isCurrent, itemId?, kind?) {
             if (!intent || !isCurrent()) return false;
             const id = intent;
             const entry = readPickupJournal().find((candidate) => candidate.id === id);
-            if (!entry || entry.restorePlan !== undefined || entry.kind === 'restore') return false;
+            if (!entry || entry.restorePlan !== undefined) return false;
+            if (entry.kind === 'restore' && !admissionFailed) {
+                intent = null;
+                const removed = removePickupJournalEntry(id);
+                releasePickupIntent(id);
+                return removed;
+            }
+            if (entry.kind === 'restore') return false;
             intent = null;
             const removed = removePickupJournalEntry(id);
             releasePickupIntent(id);

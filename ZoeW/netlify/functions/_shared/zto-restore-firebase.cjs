@@ -285,7 +285,10 @@ function createFirebaseBackend({ verifyActor, resolveOrigin = configuredOrigin }
                         || !['allow', 'hold', 'deny'].includes(prior.status) || prior.status === 'deny' && !['signed', 'returned'].includes(prior.verdict)
                         || !plain(prior.snapshot) || prior.sourceHash !== hash(prior.snapshot)
                         || !sameTerminalBusiness(prior.snapshot, source, input.sourceId)) throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
-                    if (publication(source) === publication(prior.snapshot) && canonical(source) === canonical(prior.snapshot)) {
+                    if (!Object.hasOwn(source, 'restoreAttestationId') && !Object.hasOwn(source, 'restoreClaim')
+                        && (prior.status === 'deny' || !reservation(input, { ...context, source, attestation: prior }).pending)) {
+                        released = true;
+                    } else if (publication(source) === publication(prior.snapshot) && canonical(source) === canonical(prior.snapshot)) {
                         if (!integer(prior.issuedAt) || prior.issuedAt <= 0) throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
                         claim = { token: prior.token, targetId: prior.targetId, claimedAt: prior.issuedAt };
                     } else if (Object.hasOwn(source, 'restoreAttestationId')) {
@@ -293,9 +296,7 @@ function createFirebaseBackend({ verifyActor, resolveOrigin = configuredOrigin }
                             || source.restoreClaim.token !== prior.token || source.restoreClaim.targetId !== prior.targetId
                             || !integer(source.restoreClaim.claimedAt) || source.restoreClaim.claimedAt <= 0) throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
                         claim = { ...source.restoreClaim };
-                    } else if (!Object.hasOwn(source, 'restoreClaim') && (prior.status === 'deny'
-                        || !reservation(input, { ...context, source, attestation: prior }).pending)) released = true;
-                    else {
+                    } else {
                         if (canonical(source.restoreClaim) !== canonical(prior.snapshot.restoreClaim)
                             || !integer(prior.issuedAt) || prior.issuedAt <= 0) throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
                         claim = { token: prior.token, targetId: prior.targetId, claimedAt: prior.issuedAt };
@@ -382,7 +383,9 @@ function createFirebaseBackend({ verifyActor, resolveOrigin = configuredOrigin }
                 if (source.value.restoreAttestationId && (!proof || proof.id !== source.value.restoreAttestationId)) throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
                 if (claim) {
                     if (!plain(claim) || typeof claim.token !== 'string' || !ID.test(claim.targetId) || !integer(claim.claimedAt)) throw new RestoreFailure('ZTO_RESTORE_SOURCE_CHANGED', 409);
-                    if (!pending.pending && claim.token === input.token && proof && proof.actorUid !== actor.uid) throw new RestoreFailure('ZTO_RESTORE_AUTH_REQUIRED', 401);
+                    const expiredForRelease = input.action === 'release' && proof && proof.expiresAt <= now()
+                        && (claim.claimedAt + PROOF_TTL_MS <= now() || !!(proof.recovery && proof.status === 'hold'));
+                    if (!pending.pending && claim.token === input.token && proof && proof.actorUid !== actor.uid && !expiredForRelease) throw new RestoreFailure('ZTO_RESTORE_AUTH_REQUIRED', 401);
                     if (claim.token !== input.token || claim.targetId !== input.targetId) {
                         const oldTarget = claim.targetId === input.targetId ? target.value : (await read(HISTORY_ROOT + '/' + claim.targetId)).value;
                         const recoveredExpiry = proof?.recovery && proof.status === 'hold' && proof.expiresAt <= now();

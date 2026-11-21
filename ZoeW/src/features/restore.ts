@@ -591,7 +591,7 @@ export async function executeRestoreItem() {
     };
     let pickupJournal = null;
     let pickupContext = null;
-    let restoreClaimAcquired = false;
+    let restoreBound = false;
     try {
         stopIfSwitched();
         const safeIdPattern = /^[a-zA-Z0-9_-]+$/;
@@ -677,7 +677,6 @@ export async function executeRestoreItem() {
         const claimed = authorization.kind === 'allow'
             ? { item: cloneRestoreItem(authorization.source), targetId }
             : await claimDeletedItemForRestore(restoredId, token, targetId, previewItem, restoreIsCurrent);
-        restoreClaimAcquired = true;
         stopIfSwitched();
         targetId = claimed.targetId;
         saveRestoreClaim(restoredId, { token, targetId });
@@ -780,6 +779,7 @@ export async function executeRestoreItem() {
         const consumption = trashConsumptionOf(claimedSource, 'restore', restoreOwner, token, targetId);
         const finalization = { token, targetId, finalizedAt: getServerNow() };
         if (pickupJournal && !pickupJournal.bindRestore(consumption, finalization, prepared.item, pickupMarks.map(mark => mark.key))) throw new Error('PICKUP_ADMISSION_FAILED');
+        restoreBound = true;
         await finalizeClaimedRestore(restoredId, token, targetId, appliedRevenueDeltas, restoredLedgerKey, callPatch, lostCodes.size > 0 && !barcodeEntriesOf(prepared.item.barcodes).length,
             consumption, finalization, claimedSource);
         stopIfSwitched();
@@ -808,7 +808,7 @@ export async function executeRestoreItem() {
             showToast(restoreLostCodesText(lostList));
         } else showToast(pickupSaved ? "✅ បានស្តារទិន្នន័យមកទីតាំងដើមវិញដោយសុវត្ថិភាព!" : "⏳ ស្តារបញ្ជីរួច — ស្ថិតិយកនៅរង់ចាំផ្ទៀងផ្ទាត់។");
     } catch (error) {
-        if (pickupJournal && !restoreClaimAcquired && restoreIsCurrent()) pickupJournal.abort();
+        if (pickupJournal && !restoreBound && restoreIsCurrent()) pickupJournal.abort();
         if (!restoreIsCurrent()) {
             if (window.ZoeErrors) ZoeErrors.capture(new Error('Restore stopped after a database switch'), { zone: 'money', context: 'executeRestoreItem session switch', itemId: restoredId });
             return;

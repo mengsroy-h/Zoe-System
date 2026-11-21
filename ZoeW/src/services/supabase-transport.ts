@@ -395,7 +395,7 @@ export function createSupabaseTransport(config, deps?) {
         },
         onSession(cb) {
             const { data } = client.auth.onAuthStateChange((event, session) => {
-                if (event === 'TOKEN_REFRESHED' && session && typeof session.access_token === 'string' && session.access_token && !closed) {
+                if (event === 'TOKEN_REFRESHED' && session && typeof session.access_token === 'string' && session.access_token && !closed && !boundEnded && !!boundUid && !isForeign(session)) {
                     try { Promise.resolve(client.realtime.setAuth(session.access_token)).catch(() => {}); } catch (e) {}
                 }
                 cb(event, toSession(session));

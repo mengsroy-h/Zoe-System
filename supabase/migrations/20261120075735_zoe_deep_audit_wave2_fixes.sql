@@ -4,7 +4,8 @@ as $$
 <<restore_commit>>
 declare source_id text;body jsonb;source jsonb;policy jsonb;current_value jsonb;required boolean;now_ms bigint;
 begin
-    if current_setting('zoe.internal_write',true)='admin_engine' then return null;end if;
+    if current_setting('zoe.restore_admin_tenant',true)=new.tenant_id::text
+        and current_setting('role',true) in ('service_role','postgres','none') then return null;end if;
     if new.root not in ('zoew_recently_deleted_cod_dod','zoew_scan_history_cod_dod','zoew_trash_consumptions') or new.value is null then return null;end if;
     if tg_op='UPDATE' and new.value is not distinct from old.value then return null;end if;
     select d.value into current_value from public.zoe_docs d where d.tenant_id=new.tenant_id and d.root=new.root and d.key=new.key;
@@ -291,5 +292,20 @@ begin
     return true;
 exception when numeric_value_out_of_range then return false;
 end $$;
+
+create or replace function public.zoe_admin_write(p_tenant uuid, p_op_id text, p_ops jsonb, p_replace boolean default false) returns jsonb
+language plpgsql volatile security definer set search_path = ''
+as $$
+begin
+    if p_replace is true then
+        raise exception 'replace-unsupported' using errcode = '22023';
+    end if;
+    if p_tenant is null or not exists (select 1 from public.tenants t where t.id = p_tenant) then
+        raise exception 'tenant-not-found' using errcode = 'P0002';
+    end if;
+    perform set_config('zoe.restore_admin_tenant', p_tenant::text, true);
+    return private.zoe_apply(p_tenant, p_op_id, p_ops, false, false);
+end
+$$;
 
 notify pgrst, 'reload schema';

@@ -259,6 +259,40 @@ it('M-08៖ Firebase restore backend ពេល verdict=unconfirmed លើធុ�
     const retryRes = await backend.apply(retryInput, retryCtx, 'allow', 'att_m08_2');
     expect(retryRes.kind).toBe('allow');
     expect(nodes.get(srcPath).restoreAttestationId).toBe('att_m08_2');
+
+    const termPath = 'zoew_recently_deleted_cod_dod/m08_term';
+    nodes.set(termPath, { id: 'm08_term', phone: PHONE, scanDate: DAY, createdAt: NOW - 3 * H, deletedAt: NOW - H, trashMode: 'palm', barcodes: [{ code: 'M08T001', cod: 10, dod: 1 }] });
+    const holdInput = { v: 1, action: 'authorize', sourceId: 'm08_term', token: 'tok_term_1', targetId: 'm08_term', expectedGeneration: 0 };
+    const holdRes = await backend.apply(holdInput, await backend.context(holdInput), 'unconfirmed', 'att_term_1');
+    expect(holdRes.kind).toBe('hold');
+    const denyInput = { ...holdInput, token: 'tok_term_2' };
+    const denyRes = await backend.apply(denyInput, await backend.context(denyInput), 'signed', 'att_term_2');
+    expect(denyRes.kind).toBe('deny');
+    expect(nodes.get(termPath).ztoTerminalDecision).toBe('signed');
+    expect(nodes.get(termPath).restoreBlocked).toBe(true);
+    expect(nodes.get(termPath)).not.toHaveProperty('restoreAttestationId');
+    expect(nodes.get(termPath)).not.toHaveProperty('restoreClaim');
+
+    const claimsU2 = { aud: 'wave2-proj', iss: 'https://securetoken.google.com/wave2-proj', sub: 'u2', email: 'u2@zoew001.com',
+        exp: Math.floor(NOW / 1000) + 3600, iat: Math.floor(NOW / 1000), auth_time: authTime };
+    const payloadU2 = encode({ alg: 'RS256', kid: 'k1' }) + '.' + encode(claimsU2);
+    const idTokenU2 = payloadU2 + '.' + sign('RSA-SHA256', Buffer.from(payloadU2), pair.privateKey).toString('base64url');
+    const fetchImplU2 = async (raw: string, init: any) => {
+        const u = new URL(raw);
+        if (u.hostname === 'identitytoolkit.googleapis.com') return Response.json({ users: [{ localId: 'u2', email: claimsU2.email, disabled: false, validSince: '0' }] });
+        return fetchImpl(raw, init);
+    };
+    const activeRelInput = { v: 1, action: 'release', sourceId: 'm08_src', token: 'tok_m08_retry', targetId: 'm08_src', expectedGeneration: 0 };
+    const backendU2Active = await createFirebaseBackend({ verifyActor: core.verifyRestoreFirebaseActor })({ env, token: idTokenU2, claims: claimsU2, budget: deadlineBudget(), fetchImpl: fetchImplU2, now: () => NOW });
+    await expect(backendU2Active.context(activeRelInput)).rejects.toMatchObject({ code: 'ZTO_RESTORE_AUTH_REQUIRED', status: 401 });
+
+    const laterNow = NOW + 5 * 60 * 1000;
+    const backendU2Expired = await createFirebaseBackend({ verifyActor: core.verifyRestoreFirebaseActor })({ env, token: idTokenU2, claims: claimsU2, budget: deadlineBudget(), fetchImpl: fetchImplU2, now: () => laterNow });
+    const expiredRelCtx = await backendU2Expired.context(activeRelInput);
+    const expiredRelRes = await backendU2Expired.apply(activeRelInput, expiredRelCtx, 'unconfirmed', 'att_m08_rel');
+    expect(expiredRelRes.kind).toBe('released');
+    expect(nodes.get(srcPath)).not.toHaveProperty('restoreAttestationId');
+    expect(nodes.get(srcPath)).not.toHaveProperty('restoreClaim');
 });
 
 it('M-10a/b៖ releaseStaleRestoreClaimForPurge ប្រើ action=release និង cross-user expired takeover បង្កើត token ថ្មី', async () => {
@@ -320,7 +354,10 @@ it('M-21៖ Supabase migrations ចុងក្រោយត្រូវជួស
     const dir = path.join(ROOT, 'supabase/migrations');
     const allSql = fs.readdirSync(dir).filter(f => f.endsWith('.sql')).sort().map(f => ({ file: f, text: fs.readFileSync(path.join(dir, f), 'utf8') }));
     const latestFirstCommit = [...allSql].reverse().find(m => /create\s+(?:or\s+replace\s+)?function\s+private\.zoe_restore_first_commit_v1\b/i.test(m.text))!;
-    expect(latestFirstCommit.text).toMatch(/zoe\.internal_write.*admin_engine/i);
+    expect(latestFirstCommit.text).toContain("current_setting('zoe.restore_admin_tenant',true)=new.tenant_id::text");
+    expect(latestFirstCommit.text).toContain("current_setting('role',true) in ('service_role','postgres','none')");
+    const latestAdminWrite = [...allSql].reverse().find(m => /create\s+(?:or\s+replace\s+)?function\s+public\.zoe_admin_write\b/i.test(m.text))!;
+    expect(latestAdminWrite.text).toContain("perform set_config('zoe.restore_admin_tenant', p_tenant::text, true);");
     const latestAttest = [...allSql].reverse().find(m => /create\s+(?:or\s+replace\s+)?function\s+private\.zoe_restore_attest_v1\b/i.test(m.text))!;
     const attestSlice = latestAttest.text.slice(latestAttest.text.search(/function\s+private\.zoe_restore_attest_v1/i));
     expect(attestSlice).toContain("'origin','app_engine'");

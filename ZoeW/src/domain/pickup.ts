@@ -1013,7 +1013,8 @@ export function pickupIntentTracker(isCurrent, itemId?, kind?) {
             if (!pickupCommit) {
                 pickupCommit = nextCommit;
                 pickupCommitKeys = nextKeys;
-            } else if ([...nextKeys].every((k) => pickupCommitKeys.has(k))) {
+            } else if (applied.reverted !== true && applied.excludedReverted !== true
+                && nextKeys.size === pickupCommitKeys.size && [...nextKeys].every((k) => pickupCommitKeys.has(k))) {
                 pickupCommit = eitherPickupTrue(pickupCommit, nextCommit);
             } else {
                 pickupCommit = nextCommit;

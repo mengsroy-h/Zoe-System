@@ -274,6 +274,8 @@ export function forgetAppLockPin() {
         }
     }
     const priorPinHash = pinRemoved ? null : safeStoreGet(appLocalStore, 'zoew_security_pin_hash');
+    firebaseState.authGeneration++;
+    firebaseState.authLoginOperation = null;
     firebaseState.sessionExpiryCheck = 'signed-out';
     resetClearHistoryOperationState();
     resetDbListenerHealthState();
@@ -307,7 +309,7 @@ export function forgetAppLockPin() {
         appLockLogoutOwner = null;
         if (owner.late && (!signedOut || !securityState.appIsLocked || generation !== appLockUnlockGeneration)) return;
         if (firebaseState.auth !== logoutAuth || firebaseState.fb !== logoutSdk
-            || generation !== appLockUnlockGeneration && (pinRemoved ? appLockPinIsSet() : (safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== priorPinHash || owner.authGeneration !== firebaseState.authGeneration))) return;
+            || generation !== appLockUnlockGeneration && (pinRemoved ? appLockPinIsSet() : (safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== priorPinHash || !!logoutAuth?.currentUser && owner.authGeneration !== firebaseState.authGeneration))) return;
         const unconfirmed = () => {
             setAppLockBusy(false);
             setAppLockMsg('⚠️ មិនទាន់អាចបញ្ជាក់ថាបានចាកចេញទេ។ សូមចុច «ភ្លេច PIN?» ម្តងទៀត ឬ Refresh។');

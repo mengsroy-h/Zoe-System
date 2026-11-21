@@ -313,30 +313,34 @@ public class ApkUpdatePlugin extends Plugin {
             call.reject("bad version", "bad-version");
             return;
         }
-        if (busy.get()) {
+        if (!busy.compareAndSet(false, true)) {
             call.reject("busy", "busy");
             return;
         }
-        File apk = apkFile(version);
-        if (!apk.isFile()) {
-            call.reject("missing", "missing");
-            return;
-        }
-        if (!apkMatches(apk, version)) {
-            apk.delete();
-            call.reject("bad-apk", "bad-apk");
-            return;
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !getContext().getPackageManager().canRequestPackageInstalls()) {
-            try {
-                Intent settings = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getContext().getPackageName()));
-                startActivityForResult(call, settings, "installPermissionResult");
-            } catch (ActivityNotFoundException e) {
-                call.reject("no settings", "no-installer", e);
+        try {
+            File apk = apkFile(version);
+            if (!apk.isFile()) {
+                call.reject("missing", "missing");
+                return;
             }
-            return;
+            if (!apkMatches(apk, version)) {
+                apk.delete();
+                call.reject("bad-apk", "bad-apk");
+                return;
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !getContext().getPackageManager().canRequestPackageInstalls()) {
+                try {
+                    Intent settings = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getContext().getPackageName()));
+                    startActivityForResult(call, settings, "installPermissionResult");
+                } catch (ActivityNotFoundException e) {
+                    call.reject("no settings", "no-installer", e);
+                }
+                return;
+            }
+            openInstaller(call, apk);
+        } finally {
+            busy.set(false);
         }
-        openInstaller(call, apk);
     }
 
     @ActivityCallback

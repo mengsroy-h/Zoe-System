@@ -352,6 +352,16 @@ it('M-12a៖ executeRestoreItem ដែលបរាជ័យមុន applyClaime
     await executeRestoreItem();
     await sleep(30);
     expect(pickup.readPickupJournal()).toEqual([]);
+
+    setAt(TRASH + '/' + trashId + '/restoreClaim', null);
+    setAt(DAILY + '/' + DAY, null);
+    dataState.dailyRevenueData = {};
+    loadViewsFromServer();
+    dataState.dailyRevenueData = {};
+    uiState.pendingRestoreId = trashId;
+    await executeRestoreItem();
+    await sleep(30);
+    expect(pickup.readPickupJournal()).toEqual([]);
 });
 
 it('M-12b៖ restore កញ្ចប់ remove ដែលបិទរួច មិនត្រូវលុប pickup journal មុន reconcileCollectedHistory ជោគជ័យ — resume ត្រូវសង្គ្រោះ daily_collected', async () => {
@@ -401,14 +411,17 @@ it('M-12c៖ saveRestoreClaim(id, null) បរាជ័យក្រោយ finali
     expect(window.alert).not.toHaveBeenCalled();
 });
 
-it('M-13a៖ កញ្ចប់ត្រឡប់ដែលមាន ztoSentOutAt ចាស់ និង ztoReturnedAt ថ្មីជាង ត្រូវបិទស្តារ និងបង្ហាញ «ត្រឡប់» ទោះក្រោយ reload', () => {
-    const item = {
-        id: 'm13a', phone: PHONE, scanDate: DAY, createdAt: NOW - 4 * H, deletedAt: NOW - H,
-        trashReason: 'returned', trashMode: 'cookie', isFromDeletion: false,
-        barcodes: [{ code: 'M13A001', createdAt: NOW - 4 * H, ztoSentOutAt: NOW - 3 * H, ztoReturnedAt: NOW - 2 * H, isClosed: false, isDeducted: true }]
-    };
-    expect(trashRestoreBlockOf(item)).toBe('returned');
-    expect(trashDisplayReasonOf(item)).toBe('returned');
+it('M-13a៖ កញ្ចប់ត្រឡប់ដែលមាន ztoSentOutAt/ztoMisplacedAt ចាស់ និង ztoReturnedAt ថ្មីជាង ត្រូវបិទស្តារ និងបង្ហាញ «ត្រឡប់» ទោះក្រោយ reload គ្រប់ mode (cookie/local/legacy)', () => {
+    for (const trashMode of ['cookie', 'local', undefined] as const) {
+        const item: any = {
+            id: 'm13a_' + String(trashMode || 'legacy'), phone: PHONE, scanDate: DAY, createdAt: NOW - 4 * H, deletedAt: NOW - H,
+            trashReason: 'returned', isFromDeletion: false,
+            ...(trashMode ? { trashMode } : {}),
+            barcodes: [{ code: 'M13A001', createdAt: NOW - 4 * H, ztoSentOutAt: NOW - 3 * H, ztoReturnedAt: NOW - 2 * H, isClosed: false, isDeducted: true }]
+        };
+        expect(trashRestoreBlockOf(item)).toBe('returned');
+        expect(trashDisplayReasonOf(item)).toBe('returned');
+    }
 });
 
 it('M-13b៖ កញ្ចប់ misplaced (ztoReturnedAt=T1, ztoMisplacedAt=T1) ដែល ZTO ស្កេនត្រឡប់ពិតនៅ T2>T1 ត្រូវអាប់ដេត ztoReturnedAt=T2 លើ server តែម្ដង (មិនប្តូរទៅ T3 ទៀត)', () => {
@@ -612,6 +625,24 @@ it('M-17f៖ pickupIntentTracker.note ត្រូវជំនួស speculative
     existingTracker.note({ marks: [{ key: key('M17F007'), phoneKey: PHONE, closed: true }], commit: Promise.resolve(null) });
     expect(await existingTracker.finish(Promise.resolve(true))).toBe(false);
     expect(pickup.readPickupJournal().some((entry: any) => entry.item === 'm17f_existing' && entry.pickupDone === true)).toBe(false);
+
+    const subsetTracker = pickup.pickupIntentTracker(() => true, 'm17f_subset');
+    expect(await subsetTracker.prepare(DAY, [key('M17F008'), key('M17F009')])).toBeTruthy();
+    expect(subsetTracker.start()).toBe(true);
+    expect(subsetTracker.confirm([key('M17F008'), key('M17F009')])).toBe(true);
+    subsetTracker.note({ marks: [{ key: key('M17F008'), phoneKey: PHONE, closed: false }, { key: key('M17F009'), phoneKey: PHONE, closed: false }], commit: Promise.resolve(true) });
+    subsetTracker.note({ marks: [{ key: key('M17F008'), phoneKey: PHONE, closed: false }], excludedReverted: true, commit: Promise.resolve(null) });
+    expect(await subsetTracker.finish(Promise.resolve(true))).toBe(false);
+    expect(pickup.readPickupJournal().some((entry: any) => entry.item === 'm17f_subset' && entry.pickupDone === true)).toBe(false);
+
+    const revertTracker = pickup.pickupIntentTracker(() => true, 'm17f_revert');
+    expect(await revertTracker.prepare(DAY, [key('M17F010')])).toBeTruthy();
+    expect(revertTracker.start()).toBe(true);
+    expect(revertTracker.confirm([key('M17F010')])).toBe(true);
+    revertTracker.note({ marks: [{ key: key('M17F010'), phoneKey: PHONE, closed: false }], commit: Promise.resolve(true) });
+    revertTracker.note({ marks: undefined, reverted: true, commit: Promise.resolve(null) });
+    expect(await revertTracker.finish(Promise.resolve(true))).toBe(false);
+    expect(pickup.readPickupJournal().some((entry: any) => entry.item === 'm17f_revert' && entry.pickupDone === true)).toBe(false);
 
     const tracker = pickup.pickupIntentTracker(() => true, 'm17f');
     const ctx = await tracker.prepare(DAY, [key('M17F001')]);

@@ -141,7 +141,7 @@ describe('Deep Audit Wave 5: SW, ZoeKeyGen, CDP, Android & QA Checkers', () => {
         expect(apkSrc).toMatch(/try\s*\{\s*probes\.execute\(/);
         expect(apkSrc).toMatch(/for\s*\(int hop = 0; hop < 5; hop\+\+\)[\s\S]*?setInstanceFollowRedirects\(false\)[\s\S]*?if \(!assetLocation\(location\)\)/);
         expect(apkSrc).toMatch(/if \(!apkMatches\(target, version\)\)\s*\{\s*target\.delete\(\);/);
-        expect(apkSrc).toMatch(/public void install\(PluginCall call\)[\s\S]*?if \(busy\.get\(\)\)[\s\S]*?if \(!apkMatches\(apk, version\)\)/);
+        expect(apkSrc).toMatch(/public void install\(PluginCall call\)[\s\S]*?if \(!busy\.compareAndSet\(false, true\)\)[\s\S]*?if \(!apkMatches\(apk, version\)\)[\s\S]*?finally\s*\{\s*busy\.set\(false\);\s*\}/);
         expect(beepSrc).toMatch(/if \(devices == null \|\| devices\.length == 0\) return false;/);
 
         for (const [name, src] of [['ApkUpdatePlugin.java', apkSrc], ['ScanBeepPlugin.java', beepSrc]]) {

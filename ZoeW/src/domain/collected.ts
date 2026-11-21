@@ -329,7 +329,7 @@ export function reapplyPickupMarks(applied, marks, scanDateStr, existingOnly = f
             context: applied?.context, marks: ((applied && applied.marks) || []).filter((m) => m && requested.has(m.key)) }, null, true);
         const written = next.length ? markPickupBarcodes(day, next, onlyExisting, applied?.context) : null;
         const commit = Promise.all([resolved.commit, written ? written.commit : true]).then(([truth, saved]) => (truth === true && saved === true ? true : null));
-        return { scanDate: day, marks: next, context: applied?.context, previous: written ? written.previous : [], changed: !!(written && written.changed), commit, ...(onlyExisting ? { existingOnly: true } : {}) };
+        return { scanDate: day, marks: next, context: applied?.context, previous: written ? written.previous : [], changed: !!(written && written.changed), commit, excludedReverted: true, ...(onlyExisting ? { existingOnly: true } : {}) };
     }
     const undo = excluded.map((p) => ({ key: p.key, phoneKey: p.phoneKey, closed: !!p.closed }));
     const all = undo.concat(next);
@@ -390,7 +390,7 @@ export function revertPickupMarks(applied, truthMarks?, refreshFromServer = fals
             const reverted = revertPickupMarks({ ...applied, context: fence, compareRevision: true }, marks);
             return reverted ? reverted.commit : null;
         }).catch(() => null);
-        return Object.assign({}, applied, { commit });
+        return Object.assign({}, applied, { commit, pickupCommit: undefined, marks: undefined, reverted: true });
     }
     const truth = new Map<string, any>();
     (Array.isArray(truthMarks) ? truthMarks : []).forEach((mark) => { if (mark && mark.key) truth.set(mark.key, mark); });
@@ -404,7 +404,7 @@ export function revertPickupMarks(applied, truthMarks?, refreshFromServer = fals
     });
     applyPickupMarksInMemory(applied.scanDate, marks, applied.existingOnly === true);
     const commit = commitPickupMarks(applied.scanDate, marks, applied.existingOnly === true, false, undefined, applied.context, applied.compareRevision === true);
-    return Object.assign({}, applied, { commit: commit });
+    return Object.assign({}, applied, { commit: commit, pickupCommit: undefined, marks: undefined, reverted: true });
 }
 
 export function requestPinBeforeResetPickup() {

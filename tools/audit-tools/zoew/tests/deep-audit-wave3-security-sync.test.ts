@@ -107,13 +107,16 @@ it('M-04a៖ forgetAppLockPin ត្រូវកត់ localLogoutIntent និ�
         return origRemove(k);
     });
     showAppLockScreen();
+    const genBeforeForget = firebaseState.authGeneration;
     forgetAppLockPin();
+    expect(firebaseState.authGeneration).toBeGreaterThan(genBeforeForget);
     await turns();
     noteAppLockAway();
     expect(localLogoutIntent.blocked(loginBackendScope(), 'u-lock-remove-fail')).toBe(true);
     expect(dataState.scanHistory).toEqual([]);
     expect(firebaseState.fb.signOut).toHaveBeenCalledTimes(1);
     firebaseState.auth.currentUser = null;
+    firebaseState.authGeneration++;
     secondSignOut.resolve();
     await turns();
     removeSpy.mockRestore();
@@ -229,10 +232,16 @@ it('M-09a/b៖ Supabase runTransaction មិនត្រូវ resend zoe_write
         subscribe: () => () => {}
     };
     const unknownPaths: string[] = [];
+    const journalRows = new Map<string, any>();
+    const writeJournal = {
+        list: (scope: string, topic: string) => [...journalRows.values()].filter((r) => r.scope === scope && r.topic === topic),
+        put: (row: any) => { journalRows.set(row.opId, JSON.parse(JSON.stringify(row))); return true; },
+        remove: (_scope: string, _topic: string, opId: string) => { journalRows.delete(opId); return true; }
+    };
     const db = createSupabaseDatabase(transport, {
         onListenerError: () => {}, onSynced: () => {}, onForbidden: () => {},
         onTxOutcomeUnknown: (p: string[]) => { unknownPaths.push(p.join('/')); }
-    }, { retryStepsMs: [50, 100, 600000], pollFallbackMs: 600000, rpcTimeoutMs: 1000 });
+    }, { retryStepsMs: [50, 100, 600000], pollFallbackMs: 600000, rpcTimeoutMs: 1000, writeJournal });
     db.setTenantTopic('zoe:t1');
     db.setAuthed(true, 'scope');
     let ready = false;
@@ -252,12 +261,15 @@ it('M-09a/b៖ Supabase runTransaction មិនត្រូវ resend zoe_write
     docVal = { codDollar: 100 };
     seq++;
     await wait(72 * HOUR);
+    let perfStep = 0;
+    const perfSpy = vi.spyOn(performance, 'now').mockImplementation(() => (++perfStep) * 50000);
     const pullsBefore = pullCalls;
     holdResetPullPage2 = true;
     mode = 'ok';
     await wait(1200000);
     if (releasePullPage2) releasePullPage2();
     await wait(100);
+    perfSpy.mockRestore();
     expect(appliedOps).toHaveLength(1);
     expect(docVal).toEqual({ codDollar: 100 });
     expect(maxConcurrentPulls).toBe(1);
@@ -280,14 +292,18 @@ it('M-09a/b៖ Supabase runTransaction មិនត្រូវ resend zoe_write
     db.goOnline();
     await wait(50);
 
+    journalRows.clear();
     mode = 'drop';
     let refusedResult: any = 'pending';
-    db.runTransaction(db.ref('ledger/d1'), (cur: any) => ({ codDollar: (cur?.codDollar || 0) - 5 }))
+    const taggedUpdater: any = (cur: any) => ({ codDollar: (cur?.codDollar || 0) - 5, op: 'op_refused01' });
+    db.runTransaction(db.ref('ledger/d1'), taggedUpdater)
         .then((r: any) => { refusedResult = r; }, (e: any) => { refusedResult = e; });
     await wait(30);
+    expect(journalRows.size).toBe(1);
     mode = 'tenant-mismatch';
     await wait(1200000);
     expect(refusedResult?.txOutcome).toBe('not-applied');
+    expect(journalRows.size).toBe(0);
     db.close('test');
 });
 

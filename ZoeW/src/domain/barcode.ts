@@ -151,7 +151,8 @@ export function trashZtoFinalBlock(item) {
     if (item?.trashMode === 'palm' && item?.trashReason === 'pickup') return 'palm';
     const barcodes = barcodeEntriesOf(item?.barcodes).map(({ barcode }) => barcode).filter(Boolean);
     if (barcodes.some(barcodeZtoSigned)) return 'signed';
-    if (item?.trashReason === 'returned' && barcodes.some((b) => barcodeZtoReturned(b) && !barcodeZtoMisplaced(b) && !barcodeZtoSentOut(b))) return 'returned';
+    if (item?.trashReason === 'returned' && barcodes.some((b) => barcodeZtoReturned(b)
+        && b.ztoReturnedAt > Math.max(barcodeZtoMisplaced(b) ? Number(b.ztoMisplacedAt) : 0, barcodeZtoSentOut(b) ? Number(b.ztoSentOutAt) : 0))) return 'returned';
     return item?.restoreBlocked === true ? 'signed' : '';
 }
 

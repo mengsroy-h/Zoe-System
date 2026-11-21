@@ -173,38 +173,40 @@ it('M-14៖ createModeStorage ត្រូវគោរព setMode(session) ទ�
     expect(passiveLocal.has('k2')).toBe(false);
 });
 
-it('M-09a/b៖ Supabase runTransaction មិនត្រូវ resend zoe_write ក្រោយ SB_OP_REPLAY_SAFE_MS (ប្រើ zoe_read មិន race runSync) និងត្រូវត្រឡប់ not-applied តែលើ zoe_write refusal', async () => {
+it('M-09a/b៖ Supabase runTransaction មិនត្រូវ resend zoe_write ក្រោយ SB_OP_REPLAY_SAFE_MS (sync តាម runSync មិន race pullStage) និងត្រូវត្រឡប់ not-applied តែលើ zoe_write refusal', async () => {
     vi.useFakeTimers();
     const wait = (ms: number) => vi.advanceTimersByTimeAsync(ms);
     const HOUR = 60 * 60 * 1000;
-    let mode: 'ok' | 'drop' | 'down' | 'tenant-mismatch' | 'read-refuse' = 'ok';
+    let mode: 'ok' | 'drop' | 'down' | 'tenant-mismatch' | 'pull-refuse' = 'ok';
     let seq = 1;
     let docVal: any = { codDollar: 100 };
     const appliedOps: string[] = [];
-    let readCalls = 0;
     let pullCalls = 0;
+    let concurrentPulls = 0;
+    let maxConcurrentPulls = 0;
     let holdResetPullPage2 = false;
     let releasePullPage2: (() => void) | null = null;
     const transport = {
         rpc: async (fn: string, args: any) => {
             if (fn === 'zoe_pull' || fn === 'zoe_pull_delta') {
                 pullCalls++;
-                if (mode === 'down') throw new SbNetworkError('down');
-                if (holdResetPullPage2 && args.p_since === 0) {
-                    return { seq: 1, more: true, reset: true, head: seq, tenant: 't1', now: Date.now(), rows: [{ r: 'other', k: 'k1', v: { ok: 1 }, s: 1 }] };
+                concurrentPulls++;
+                maxConcurrentPulls = Math.max(maxConcurrentPulls, concurrentPulls);
+                try {
+                    if (mode === 'down') throw new SbNetworkError('down');
+                    if (mode === 'pull-refuse') throw new SbRpcError('permission_denied', '42501', 403, '');
+                    if (holdResetPullPage2 && args.p_since === 0) {
+                        return { seq: 1, more: true, reset: true, head: seq, tenant: 't1', now: Date.now(), rows: [{ r: 'other', k: 'k1', v: { ok: 1 }, s: 1 }] };
+                    }
+                    if (holdResetPullPage2 && args.p_since > 0) {
+                        await new Promise<void>((r) => { releasePullPage2 = r; });
+                        holdResetPullPage2 = false;
+                        return { seq, more: false, reset: false, head: seq, tenant: 't1', now: Date.now(), rows: [{ r: 'ledger', k: 'd1', v: docVal, s: seq }] };
+                    }
+                    return { seq, more: false, reset: true, head: seq, tenant: 't1', now: Date.now(), rows: [{ r: 'other', k: 'k1', v: { ok: 1 }, s: 1 }, { r: 'ledger', k: 'd1', v: docVal, s: seq }] };
+                } finally {
+                    concurrentPulls--;
                 }
-                if (holdResetPullPage2 && args.p_since > 0) {
-                    await new Promise<void>((r) => { releasePullPage2 = r; });
-                    holdResetPullPage2 = false;
-                    return { seq, more: false, reset: false, head: seq, tenant: 't1', now: Date.now(), rows: [{ r: 'ledger', k: 'd1', v: docVal, s: seq }] };
-                }
-                return { seq, more: false, reset: true, head: seq, tenant: 't1', now: Date.now(), rows: [{ r: 'other', k: 'k1', v: { ok: 1 }, s: 1 }, { r: 'ledger', k: 'd1', v: docVal, s: seq }] };
-            }
-            if (fn === 'zoe_read') {
-                readCalls++;
-                if (mode === 'down') throw new SbNetworkError('down');
-                if (mode === 'read-refuse') throw new SbRpcError('permission_denied', '42501', 403, '');
-                return { now: Date.now(), docs: [{ r: args.p_root, k: args.p_key, v: docVal, s: seq }] };
             }
             if (fn === 'zoe_now') {
                 if (mode === 'down') throw new SbNetworkError('down');
@@ -258,22 +260,25 @@ it('M-09a/b៖ Supabase runTransaction មិនត្រូវ resend zoe_write
     await wait(100);
     expect(appliedOps).toHaveLength(1);
     expect(docVal).toEqual({ codDollar: 100 });
-    expect(readCalls).toBeGreaterThanOrEqual(1);
+    expect(maxConcurrentPulls).toBe(1);
     expect(abaResult?.txOutcome).toBe('unknown');
     expect(unknownPaths).toContain('ledger/d1');
     expect(db.snapshotState().docs['other/k1']?.v).toEqual({ ok: 1 });
-    expect(pullCalls).toBeGreaterThanOrEqual(pullsBefore);
+    expect(pullCalls).toBeGreaterThan(pullsBefore);
 
     mode = 'drop';
-    let readRefusedResult: any = 'pending';
+    let pullRefusedResult: any = 'pending';
     db.runTransaction(db.ref('ledger/d1'), (cur: any) => ({ codDollar: (cur?.codDollar || 0) - 5 }))
-        .then((r: any) => { readRefusedResult = r; }, (e: any) => { readRefusedResult = e; });
+        .then((r: any) => { pullRefusedResult = r; }, (e: any) => { pullRefusedResult = e; });
     await wait(30);
     mode = 'down';
     await wait(72 * HOUR);
-    mode = 'read-refuse';
+    mode = 'pull-refuse';
     await wait(1200000);
-    expect(readRefusedResult?.txOutcome).toBe('unknown');
+    expect(pullRefusedResult?.txOutcome).toBe('unknown');
+    mode = 'ok';
+    db.goOnline();
+    await wait(50);
 
     mode = 'drop';
     let refusedResult: any = 'pending';

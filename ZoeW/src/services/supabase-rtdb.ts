@@ -447,6 +447,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     const answeredSeqs = new Map();
     let syncing = false;
     let wantSync = false;
+    const syncWaiters: Array<{ resolve: () => void; reject: (error: any) => void }> = [];
     let online = true;
     let connected = false;
     let serverOffset = 0;
@@ -1143,16 +1144,25 @@ export function createSupabaseDatabase(transport, hooks, options?) {
 
     const runSync = async () => {
         syncing = true;
+        let activeBatch: Array<{ resolve: () => void; reject: (error: any) => void }> = [];
+        const settleBatch = (batch, error?) => {
+            for (const waiter of batch) {
+                if (error) waiter.reject(error);
+                else waiter.resolve();
+            }
+        };
         try {
             while (wantSync && !closed) {
                 wantSync = false;
+                activeBatch = syncWaiters.splice(0);
                 const epoch = sessionEpoch;
                 const syncScope = authScope;
                 const syncTopic = tenantTopic;
                 const syncAuthed = authed;
                 const syncIsCurrent = () => epoch === sessionEpoch && syncScope === authScope && syncTopic === tenantTopic && syncAuthed === authed;
-                if (!online || (navigator.onLine as boolean) === false) { setConnected(false); break; }
+                if (!online || (navigator.onLine as boolean) === false) { settleBatch(activeBatch.splice(0), new SbNetworkError('offline', true)); setConnected(false); break; }
                 if (!authed) {
+                    settleBatch(activeBatch.splice(0), new SbNetworkError('unauthenticated', true));
                     try {
                         await transport.ping(rpcTimeoutMs);
                         if (closed) return;
@@ -1174,7 +1184,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                         const scope = cacheScope;
                         const rec = await loadCacheWithin(scope);
                         if (closed) return;
-                        if (!syncIsCurrent()) { cacheTried = false; wantSync = true; continue; }
+                        if (!syncIsCurrent()) { cacheTried = false; settleBatch(activeBatch.splice(0), new SbNetworkError('stale-sync', true)); wantSync = true; continue; }
                         if (scope === cacheScope && authed && cursor === 0 && server.size === 0 && docsCacheRecordIsValid(rec, scope)) seedFromCache(rec);
                     }
                 }
@@ -1231,8 +1241,9 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                             break;
                         }
                     }
-                    if (staleSession) { wantSync = true; continue; }
+                    if (staleSession) { settleBatch(activeBatch.splice(0), new SbNetworkError('stale-sync', true)); wantSync = true; continue; }
                     if (!pullComplete) throw new SbRpcError('pull incomplete', 'pull_incomplete', 0, '');
+                    settleBatch(activeBatch.splice(0));
                     await recoverWrites();
                     if (!syncIsCurrent()) { wantSync = true; continue; }
                     forbidden = null;
@@ -1247,17 +1258,19 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     scheduleCacheSave();
                 } catch (e) {
                     if (closed) return;
-                    if (!syncIsCurrent()) { wantSync = true; continue; }
+                    if (!syncIsCurrent()) { settleBatch(activeBatch.splice(0), new SbNetworkError('stale-sync', true)); wantSync = true; continue; }
                     if (e instanceof SbRpcError && e.code === 'bad_delta') {
                         cursor = 0; pullFullHead = null; pullStage = null;
                     }
                     if (e instanceof SbRpcError && (e.code === '42501' || e.status === 401 || e.status === 403)) {
+                        settleBatch(activeBatch.splice(0), e);
                         forbidden = e;
                         setConnected(true);
                         cancelListenersWith(e);
                         hooks.onForbidden(e);
                         break;
                     }
+                    settleBatch(activeBatch.splice(0), new SbNetworkError(e?.message || 'sync-failed', true));
                     setConnected(false);
                     scheduleRetry();
                     break;
@@ -1265,6 +1278,8 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             }
         } finally {
             syncing = false;
+            settleBatch(activeBatch.splice(0), new SbNetworkError('sync-stopped', true));
+            settleBatch(syncWaiters.splice(0), new SbNetworkError('sync-stopped', true));
         }
     };
 
@@ -1273,6 +1288,12 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         wantSync = true;
         if (!syncing) runSync();
     }
+
+    const syncFresh = () => new Promise<void>((resolve, reject) => {
+        if (closed) { reject(new SbNetworkError('closed', true)); return; }
+        syncWaiters.push({ resolve, reject });
+        requestSync();
+    });
 
     const scheduleRealtimeRetry = () => {
         if (realtimeRetryTimer || closed) return;
@@ -1909,29 +1930,10 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                                     if (closed || sendEpoch !== sessionEpoch || authScope !== txScope || tenantTopic !== txTopic) continue;
                                     const age = sentAfter > 0 && Number.isFinite(serverNowSeen) ? serverNowSeen - sentAfter : NaN;
                                     if (!(age >= 0 && age <= SB_OP_REPLAY_SAFE_MS)) {
-                                        let readRes;
-                                        try {
-                                            readRes = await rpc('zoe_read', { p_root: path[0], p_key: path.length > 1 ? path[1] : null });
-                                            if (!readRes || !Array.isArray(readRes.docs)) throw new SbRpcError('bad read response', 'bad_response', 0, '');
-                                        } catch (e) {
-                                            throw e instanceof SbNetworkError ? new SbNetworkError(e.message, true) : e;
-                                        }
+                                        await syncFresh();
                                         if (closed || sendEpoch !== sessionEpoch || authScope !== txScope || tenantTopic !== txTopic) continue;
-                                        for (const d of readRes.docs) {
-                                            if (typeof d.s === 'number' && d.s > 0) putAnsweredDoc(d);
-                                        }
-                                        let node = null;
-                                        if (path.length === 1) {
-                                            const out = Object.create(null);
-                                            for (const d of readRes.docs) if (d.v !== null && d.v !== undefined) out[d.k] = d.v;
-                                            node = Object.keys(out).length ? out : null;
-                                        } else {
-                                            const doc = readRes.docs.find((d) => d.k === path[1]);
-                                            node = getAt(doc ? doc.v : null, path.slice(2));
-                                        }
-                                        if (node === null && serverValueAt(path) !== null) requestSync();
                                         replayExpired = true;
-                                        res = { ok: false, conflict: true, now: typeof readRes.now === 'number' && Number.isFinite(readRes.now) ? readRes.now : serverNowSeen, value: node };
+                                        res = { ok: false, conflict: true, now: serverNowSeen, value: serverValueAt(path) };
                                         break;
                                     }
                                 }

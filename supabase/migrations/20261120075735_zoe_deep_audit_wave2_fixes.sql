@@ -291,6 +291,5 @@ begin
     return true;
 exception when numeric_value_out_of_range then return false;
 end $$;
-revoke all on function private.zoe_restore_terminal_business_v1(jsonb,jsonb,text) from public,anon,authenticated,service_role;
 
 notify pgrst, 'reload schema';
